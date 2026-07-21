@@ -484,29 +484,21 @@ scrollbar, computed with a separate `COUNT(*)` and cached per filter.
 
 **Stack: React 18 + Vite + TypeScript + Tailwind + shadcn/ui + Motion.**
 
-Reversing the earlier Jinja+HTMX recommendation, deliberately. HTMX is the right
-call when you want minimum machinery and don't care much how it looks. You said
-you care how it looks and have no frontend experience, which inverts the
-tradeoff: what you need is an ecosystem where polished components already exist
-and you assemble rather than design.
+Chosen over Jinja+HTMX (the earlier recommendation): HTMX minimizes machinery,
+but the priority here is a polished result built by someone without frontend
+experience, which favors an ecosystem of ready-made components to assemble over
+hand-designed markup.
 
-- **shadcn/ui** — you copy component source into your repo rather than
-  installing a dependency. Accessible, well-built, and restrained-looking by
-  default. This is the single biggest lever on "looks nice without design
-  skill".
-- **Tailwind** — utility classes, no separate stylesheet to maintain, no naming
-  decisions.
-- **Motion** (ex-Framer Motion) — the microinteraction layer. Layout animations
-  when the grid re-sorts, spring transitions on the score picker, list
-  enter/exit. `<AnimatePresence>` and `layout` props get you most of it for
-  almost no code.
-- **TanStack Query** — server state, caching, optimistic updates. Optimistic
+- **shadcn/ui** — component source copied into the repo rather than installed as
+  a dependency; accessible and restrained by default.
+- **Tailwind** — utility classes; no separate stylesheet, no class-naming decisions.
+- **Motion** (ex-Framer Motion) — the microinteraction layer: grid re-sort,
+  score-picker springs, list enter/exit via `<AnimatePresence>` and `layout`.
+- **TanStack Query** — server state, caching, and optimistic updates; optimistic
   mutation is what makes inline score editing feel instant.
 
-Honest cost: a Node build step, a `package.json`, and more code than the HTMX
-version. Mitigated by a multi-stage Docker build (§8) so deployment stays one
-container. Secondary benefit: this is the same stack you'd want for Tu
-Reclamo's frontend, so the learning transfers.
+Cost: a Node build step and more code than the HTMX version, kept to one deployed
+container by the multi-stage Docker build (§8).
 
 ### Design direction
 

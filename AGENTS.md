@@ -13,6 +13,7 @@ From the repository root:
    - the active sprint file named by `active_sprint_file`;
    - every document listed in that sprint's `Required context` section;
    - `docs/agent/WORKFLOW.md`;
+   - the last entry of `docs/agent/worklog.md`: where the previous session stopped, what it verified, and any warning it left;
    - `docs/decisions.md` entries referenced by the sprint.
 3. Inspect existing code and tests named by the sprint. Never infer their content from an earlier agent's summary.
 4. Confirm that the active sprint status is `ready` or `in_progress`, all `depends_on` sprints are completed, and the worktree is clean except for changes explicitly described in `docs/agent/HANDOFF.md`.
@@ -30,6 +31,7 @@ If state is inconsistent, repair documentation-only inconsistencies when the int
 3. Make small conventional commits at coherent checkpoints. Do not rewrite or squash commits made before this session.
 4. Stay inside sprint scope. A prerequisite defect may be fixed if necessary; record it. Future-sprint work is forbidden unless the active sprint explicitly pulls it forward.
 5. Never weaken, delete, skip, or mark flaky a test merely to get green. Never fabricate command output.
+6. Whenever a session ends without closing the sprint — out of budget, interrupted, or blocked — append a `docs/agent/worklog.md` entry before stopping, so the next session resumes from recorded evidence rather than re-deriving it.
 
 ## 3. Verify
 
@@ -55,10 +57,10 @@ Only after all acceptance criteria and verification pass:
 
 1. Mark the active sprint `completed` in its file.
 2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if Sprint 012 just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
-3. Rewrite `docs/agent/HANDOFF.md` for the next agent: concise current reality, not a transcript.
+3. Append a `docs/agent/worklog.md` entry for this session (done, verified-and-how, deviations, next), then rewrite `docs/agent/HANDOFF.md` for the next agent as concise current reality, not a transcript.
 4. Run `python scripts/validate_project.py`, `make check`, and `make test` once more.
 5. Create the final documentation/state commit: `docs(sprint-NNN): close sprint and hand off`.
-6. Confirm `git status --short` is empty and report delivered behavior, verification output, commits, deviations, and the next sprint.
+6. Confirm `git status --short` is empty, then write the completion report for the owner (Mauro, not a frontend developer): in plain language, the sprint that was completed, one line per acceptance criterion and how it was verified, any deviations, anything that needs the owner (accounts, keys, money, irreversible choices), and one sentence on what the next sprint delivers. Keep audit detail — commit hashes, full command output — in the sprint `Outcome` and worklog, not the report.
 
 The active sprint pointer must never advance before the implementation is tested and committed.
 
@@ -85,4 +87,5 @@ When documents conflict, do not guess. If the product intent is clear, reconcile
 - Network providers are never consulted while rendering cached library pages.
 - Calibre is opened read-only.
 - v1 has no auth and must remain LAN-only.
+- Internal names are permanent: the code package stays `book_tracker` and the core entities stay `items`/`entries` regardless of product branding. No session renames them to match a brand; user-facing copy is the only thing that follows the brand.
 - Secrets, databases, uploaded imports, and covers are never committed.

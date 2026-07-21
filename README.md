@@ -17,7 +17,8 @@ Start with [`AGENTS.md`](AGENTS.md). If your instruction is only `work`, follow 
 3. [`docs/sprints/ROADMAP.md`](docs/sprints/ROADMAP.md) — ordered delivery plan
 4. [`docs/agent/WORKFLOW.md`](docs/agent/WORKFLOW.md) — execution and handoff protocol
 5. [`docs/agent/state.json`](docs/agent/state.json) — machine-readable active sprint pointer
-6. [`docs/decisions.md`](docs/decisions.md) — decisions and implementation deviations
+6. [`docs/agent/worklog.md`](docs/agent/worklog.md) — append-only per-session work log
+7. [`docs/decisions.md`](docs/decisions.md) — decisions and implementation deviations
 
 The precedence and conflict rules are defined in `AGENTS.md`.
 

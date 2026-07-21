@@ -42,7 +42,7 @@ A dirty worktree with no handoff explanation is ambiguous. Ask the user before d
 
 Read narrowly but completely:
 
-- always read `AGENTS.md`, state, active sprint, workflow, handoff, and relevant decisions;
+- always read `AGENTS.md`, state, active sprint, workflow, handoff, the last worklog entry, and relevant decisions;
 - read only product/technical sections named by the active sprint, then follow links needed to understand invariants;
 - inspect actual implementation and focused tests before changing them;
 - scan the roadmap after implementation, not every future detail before each small edit.
@@ -71,6 +71,15 @@ Prefer behavior tests over mocks. Mock network, time, randomness, and host paths
 - Do not amend/rebase prior-agent commits or push unless explicitly asked.
 - A sprint can contain several implementation commits and one final state/handoff commit.
 - Commit hashes belong in the sprint Outcome because they are audit history, not persistent assistant memory.
+
+## Session worklog
+
+`docs/agent/worklog.md` is the append-only, one-entry-per-session memory layer between `docs/decisions.md` (durable architecture decisions) and the sprint `Outcome` (per-sprint delivered behavior). It exists so a session that resumes an in-progress sprint does not re-derive or silently redo what an earlier session already tried.
+
+- Append an entry whenever a session ends — sprint complete, still in progress, interrupted, or blocked — using the format at the top of the file.
+- Record what was actually verified and how, and every dead-end or workaround the next agent would otherwise rediscover. Terse and factual.
+- Never edit or delete a prior entry; correct the record by appending a new one.
+- This does not replace code inspection or the canonical specs; a worklog entry is evidence of what a session did, not authority over intended behavior.
 
 ## Clarification policy
 
@@ -111,7 +120,7 @@ When blocked:
 
 1. preserve all useful green work in commits;
 2. set state and sprint to `blocked`;
-3. write `HANDOFF.md` with exact blocker, reproduction command/output summary, attempted approaches, safe next action, and dirty files if any;
+3. append a `docs/agent/worklog.md` entry and write `HANDOFF.md` with exact blocker, reproduction command/output summary, attempted approaches, safe next action, and dirty files if any;
 4. run all checks that remain meaningful;
 5. commit documentation/state if the worktree can be left coherent;
 6. ask the focused clarification.
@@ -141,6 +150,7 @@ If tests and docs disagree, actual test output proves current behavior, while hi
 - [ ] All future sprints were impact-reviewed.
 - [ ] Active Sprint Outcome contains concise evidence and commits.
 - [ ] Next detailed sprint file is expanded from template and references actual paths.
+- [ ] Worklog entry appended for this session.
 - [ ] State and handoff point to that sprint.
 - [ ] Project validator passes.
 - [ ] Final closure commit exists.

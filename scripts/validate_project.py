@@ -20,6 +20,7 @@ REQUIRED_PATHS = (
     "docs/sprints/TEMPLATE.md",
     "docs/agent/WORKFLOW.md",
     "docs/agent/HANDOFF.md",
+    "docs/agent/worklog.md",
     "docs/agent/state.json",
     "docs/decisions.md",
 )
