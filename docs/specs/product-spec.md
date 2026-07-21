@@ -1,0 +1,712 @@
+# Book Tracker — Product Spec v1
+
+**Status:** approved baseline for v1 implementation
+**Owner:** Mauro
+**Deploy target:** self-hosted, ZimaBoard 2, Docker, single user
+**Canonical companion:** [`technical-spec.md`](technical-spec.md)
+
+Implementation details that refine this product intent are canonical in the technical spec. Product behavior wins if the documents ever conflict; agents must record and resolve the conflict before coding.
+
+---
+
+## 1. Purpose
+
+A personal reading tracker modelled on how MyAnimeList is actually used: find a
+thing, give it a score, forget about it, come back later and sort by score or
+recency to remember what was good.
+
+Explicitly *not* a social network, not a library manager, not an ebook server.
+Kavita already handles files; this handles opinions.
+
+### Success criteria
+
+Adding a finished book — search, pick the right edition, set status, set score,
+save — takes under 20 seconds and never requires leaving the keyboard.
+
+### Non-goals for v1
+
+- Multiuser, auth, registration
+- Public sharing / profile links
+- Reviews, comments, discussion, follows, activity feeds
+- Reading progress (page counts, % complete), reading sessions, streaks
+- Ebook file management or runtime linkage to Kavita/Calibre. Read-only Calibre
+  metadata import is explicitly in scope.
+- Recommendations, statistics dashboards, year-in-review
+- Mobile app (responsive web is enough)
+
+---
+
+## 2. Core decisions (settled)
+
+| Decision | Choice | Rationale |
+|---|---|---|
+| Rating | Integer 1–10, no half points, nullable | The whole reason for not using Goodreads |
+| Shelves | Many-per-book (tags) | Confirmed |
+| Statuses | unsorted (inbox), read, reading, to_read, wishlist, dropped | Confirmed |
+| Schema split | `items` (shared metadata) / `entries` (personal opinion) | Enables multiuser + sharing later without migration |
+| Backend | Python 3.12 + FastAPI + SQLite | Confirmed |
+| Frontend | React + Vite + TypeScript + Tailwind + shadcn/ui + Motion | Highest polish-per-unit-effort for someone without frontend experience |
+| Imports | Goodreads CSV + Calibre `metadata.db`, both in v1 | Existing libraries in both; hand-entry is not viable |
+| Metadata sources | Open Library + Google Books, manual fallback | Free, keyless (OL) / good Spanish coverage (GB) |
+| Domain generality | `items.type` present, provider interface defined, **no plugin runtime** | Extract the registry when a second domain actually exists |
+| Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
+| List rendering | TanStack Virtual + keyset pagination on `/` and `/triage` | Calibre libraries reach thousands of rows |
+| Auth | None. LAN-only, bound behind NPM | Deferred with sharing; see §9 |
+| Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
+
+---
+
+## 3. Data model
+
+SQLite. JSON columns are TEXT with the JSON1 functions; no jsonb, but
+`json_extract` is indexable via generated columns if it ever matters.
+
+### 3.1 `items` — metadata cache, domain-agnostic shell
+
+One row per **edition** (not per work). Deduped, user-agnostic, safe to correct
+globally.
+
+```sql
+CREATE TABLE items (
+    id           INTEGER PRIMARY KEY,
+    type         TEXT NOT NULL DEFAULT 'book',   -- 'book' | future: 'wine'
+    title        TEXT NOT NULL,
+    subtitle     TEXT,
+    year         INTEGER,                        -- publication year of this edition
+    cover_path   TEXT,                           -- relative path on disk, nullable
+    identifiers  TEXT NOT NULL DEFAULT '{}',     -- JSON: {isbn13, isbn10, olid, gbooks_id}
+    metadata     TEXT NOT NULL DEFAULT '{}',     -- JSON: domain fields, see below
+    source       TEXT,                           -- 'openlibrary' | 'googlebooks' | 'manual'
+    source_id    TEXT,
+    created_at   TEXT NOT NULL,
+    updated_at   TEXT NOT NULL
+);
+
+CREATE UNIQUE INDEX idx_items_source ON items(source, source_id)
+    WHERE source IS NOT NULL AND source_id IS NOT NULL;
+CREATE INDEX idx_items_title ON items(title COLLATE NOCASE);
+```
+
+`metadata` for `type='book'`, all optional:
+
+```json
+{
+  "authors": ["Julio Cortázar"],
+  "publisher": "Alfaguara",
+  "language": "es",
+  "page_count": 736,
+  "description": "…",
+  "subjects": ["Argentine fiction"],
+  "series": null,
+  "original_year": 1963
+}
+```
+
+`authors` is an array of plain strings. **No author table in v1.** Author
+identity is its own resolution problem and buys nothing until you want an author
+page. Sorting by author uses `authors[0]`, exposed as a generated column:
+
+```sql
+ALTER TABLE items ADD COLUMN sort_author TEXT
+    GENERATED ALWAYS AS (json_extract(metadata, '$.authors[0]')) VIRTUAL;
+```
+
+### 3.2 `entries` — the personal layer
+
+```sql
+CREATE TABLE entries (
+    id          INTEGER PRIMARY KEY,
+    user_id     INTEGER NOT NULL DEFAULT 1,      -- present, unused, do not remove
+    item_id     INTEGER NOT NULL REFERENCES items(id),
+    status      TEXT NOT NULL,                   -- see enum below
+    score       INTEGER CHECK (score BETWEEN 1 AND 10),  -- nullable
+    notes       TEXT,
+    date_added  TEXT NOT NULL,
+    date_started TEXT,
+    date_finished TEXT,
+    reread_count INTEGER NOT NULL DEFAULT 0,
+    score_provisional INTEGER NOT NULL DEFAULT 0,  -- 1 = derived from a 1-5 import
+    suggested_status TEXT,                         -- importer's guess, triage pre-selects
+    import_conflicts TEXT,                         -- JSON, nullable, losing values
+    import_batch TEXT,                             -- nullable, enables undo
+    UNIQUE (user_id, item_id)
+);
+
+CREATE INDEX idx_entries_status ON entries(user_id, status);
+CREATE INDEX idx_entries_score  ON entries(user_id, score DESC);
+```
+
+**Status enum:** `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`
+
+Semantics worth writing down now so the UI doesn't drift:
+
+- `unsorted` = **the inbox.** Exists in the library, has metadata, has no opinion
+  attached yet. Everything imported lands here. Hidden from the main list by
+  default; surfaced as a badge count. Nothing else in the app ever sets it.
+- `to_read` = I own it or can get it, intent to read
+- `wishlist` = I don't have it, want to acquire it
+- `dropped` = started, abandoned; may still carry a score
+- Score is independent of status. A `dropped` book can be a 3. A `to_read` book
+  has no score. Never block scoring on status.
+
+Dates are ISO-8601 strings (`YYYY-MM-DD` for dates, full timestamp for
+`date_added`). SQLite has no date type; be consistent and it sorts correctly as
+text.
+
+### 3.3 Shelves
+
+```sql
+CREATE TABLE shelves (
+    id       INTEGER PRIMARY KEY,
+    user_id  INTEGER NOT NULL DEFAULT 1,
+    name     TEXT NOT NULL,
+    slug     TEXT NOT NULL,
+    UNIQUE (user_id, slug)
+);
+
+CREATE TABLE entry_shelves (
+    entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    shelf_id INTEGER NOT NULL REFERENCES shelves(id) ON DELETE CASCADE,
+    PRIMARY KEY (entry_id, shelf_id)
+);
+```
+
+Shelves attach to **entries**, not items — a shelf is an opinion ("sci-fi I'd
+recommend"), not a fact about the book. Created on the fly by typing a new name
+in the shelf input. No hierarchy, no colours, no ordering in v1.
+
+---
+
+## 4. Metadata acquisition
+
+### 4.1 Provider interface
+
+Two methods. Hardcoded to the book providers in v1; no registry, no entry
+points, no dynamic loading.
+
+```python
+class Provider(Protocol):
+    name: str          # 'openlibrary'
+    item_type: str     # 'book'
+
+    async def search(self, query: str, limit: int = 20) -> list[Candidate]: ...
+    async def fetch(self, source_id: str) -> ItemPayload: ...
+```
+
+```python
+@dataclass
+class Candidate:
+    source: str
+    source_id: str
+    title: str
+    subtitle: str | None
+    authors: list[str]
+    year: int | None
+    cover_url: str | None
+    identifiers: dict[str, str]     # at minimum isbn13 when known
+    language: str | None
+```
+
+`ItemPayload` is `Candidate` plus the full `metadata` dict.
+
+Both the picker UI and the cache-on-add step operate only on these shapes and
+never learn which domain they're in.
+
+### 4.2 Providers, v1
+
+**OpenLibraryProvider**
+- Search: `GET https://openlibrary.org/search.json?q={q}&limit=20&fields=key,title,subtitle,author_name,first_publish_year,isbn,cover_i,language,edition_key`
+- Fetch: `GET https://openlibrary.org/isbn/{isbn}.json` or `/books/{olid}.json`
+- Covers: `https://covers.openlibrary.org/b/id/{cover_i}-L.jpg`
+- No API key. Set a descriptive `User-Agent` with a contact address — they ask
+  for it and will throttle anonymous hammering.
+
+**GoogleBooksProvider**
+- Search: `GET https://www.googleapis.com/books/v1/volumes?q={q}&maxResults=20&key={KEY}`
+- Query operators worth exposing: `intitle:`, `inauthor:`, `isbn:`
+- Covers: `imageLinks.thumbnail`, then strip `&edge=curl` and bump `zoom=1`→`zoom=3`
+  for a usable size. Rewrite `http:`→`https:`.
+- Free tier ~1000 req/day, ample. Key in env, and degrade gracefully if absent.
+
+**ManualProvider** — not really a provider; a form. Title, authors, year,
+publisher, language, ISBN, optional cover upload. Writes `source='manual'`.
+Required for Argentine and small-press editions that neither source indexes.
+
+### 4.3 Search flow
+
+1. User submits a free-text query, or pastes a URL (see 4.4).
+2. Fan out to both providers concurrently (`asyncio.gather`), 5s timeout each. A
+   provider that errors or times out is skipped silently; results from the other
+   still render. Log the failure.
+3. Merge: dedupe on normalised ISBN13. If both sources have the same ISBN13,
+   keep one card but retain both `source_id`s; prefer Open Library's record and
+   Google Books' cover if OL has none.
+4. Rank: exact-ish title matches first, then results whose language is `es` or
+   `en`, then by presence of a cover. Deliberately dumb — the human picks.
+5. Render a picker grid: cover, title, subtitle, authors, year, publisher,
+   language, source badge. Always include a **"None of these — enter manually"**
+   card at the end.
+6. On selection, run `fetch()` for full metadata, then cache-on-add.
+
+**Duplicate handling.** Two distinct cases, handled differently:
+
+- **Exact duplicate** (same `source`+`source_id`, or same ISBN13, resolving to an
+  existing `item_id` you already have an entry for): no error, no new row.
+  Navigate straight to `/books/{existing_entry_id}` with a toast reading
+  *"Already in your library"*. The unique constraint is never allowed to surface
+  as a 500. If the existing entry is `unsorted`, this is actually the fast path
+  for triaging a single book — you searched for it, you're now editing it.
+- **Near-duplicate** (different edition: same normalised title + first author,
+  different ISBN): this is a *legitimate* second row under the edition model, so
+  don't block it. Show an inline warning on the picker card — *"You already have
+  the 1999 Alfaguara edition"* — with a button to open that entry instead.
+  Warn, never prevent.
+
+Near-match detection is normalised title + first author, both lowercased with
+accents and punctuation stripped. Cheap, and good enough at your scale.
+
+### 4.4 Add by URL
+
+Regex the ID out and skip straight to `fetch()`:
+
+| Pattern | Provider |
+|---|---|
+| `openlibrary.org/books/OL\d+M` | Open Library, by OLID |
+| `openlibrary.org/works/OL\d+W` | Open Library, resolve to first edition |
+| `books.google.*` with `id=` param | Google Books |
+| bare ISBN-10/13, with or without hyphens | Open Library, then Google Books |
+
+Goodreads URLs are out of scope — no API, scraping not worth it.
+
+### 4.5 Cache-on-add — the rule that matters
+
+On add, **copy every field into `items` and download the cover to local disk.**
+Never store only a foreign ID and re-fetch at render time.
+
+- Covers → `data/covers/{item_id}.jpg`, max 600px on the long edge, re-encoded
+  as JPEG q85. Store the relative path in `cover_path`.
+- Cover download failure is non-fatal: save the item with `cover_path = NULL`
+  and show a placeholder.
+- After add, the app makes **zero** network calls to render any page. This is
+  what makes it immune to Open Library going down, Google deprecating the API,
+  or the ZimaBoard being offline.
+- Every field is editable by hand afterwards, at `/items/{id}/edit`. Assume the
+  metadata is wrong for Spanish-language books and make correcting it painless.
+  **Hand edits are permanent** — no automatic process ever overwrites a
+  populated field (§5.2). Only the explicit re-pull button does.
+
+---
+
+## 5. Imports
+
+Both sources are open formats. Neither requires scraping or an API key.
+
+### 5.1 Goodreads CSV
+
+Export lives at `goodreads.com/review/import` → **Export Library**, desktop web
+only, produces `goodreads_library_export.csv`. It is a snapshot, not a sync —
+Amazon killed the public Goodreads API in 2020 and there is no legitimate live
+path. One-shot import, then Goodreads stops being authoritative.
+
+**Columns used:** `Title`, `Author`, `Additional Authors`, `ISBN`, `ISBN13`,
+`My Rating`, `Publisher`, `Number of Pages`, `Year Published`,
+`Original Publication Year`, `Date Read`, `Date Added`, `Bookshelves`,
+`Exclusive Shelf`, `My Review`, `Read Count`.
+
+**Gotchas, all of them real:**
+
+- ISBN fields are Excel-armoured as `="9780441013593"`. Strip `="` and `"`
+  before use. Empty values arrive as `=""`.
+- `Exclusive Shelf` is the status field, but it does **not** set status directly.
+  Everything lands as `unsorted`; the Goodreads value is preserved as a
+  *suggestion* (`entries.suggested_status`) that triage pre-selects and you
+  accept or override in bulk. Suggested mapping:
+  `read`→`read`, `currently-reading`→`reading`, `to-read`→`to_read`.
+  Goodreads has no wishlist/dropped concept, so those never get suggested.
+- `Bookshelves` is a comma-separated list of *non*-exclusive shelves → becomes
+  your shelf tags. It redundantly repeats the exclusive shelf; filter it out.
+- `My Rating` is 1–5, and `0` means unrated (**not** a score of zero).
+- Dates are `YYYY/MM/DD`, not ISO. Frequently blank.
+
+**Rating conversion.** Doubling (3★ → 6) is the default, but it only ever
+produces even scores and quietly fabricates precision you never expressed. So:
+double it, and set `score_provisional = 1` on imported entries. The UI shows
+those scores in a muted style with a dot, and there's a filter for
+"provisional scores" so you can re-rate at leisure. Any manual edit clears the
+flag.
+
+### 5.2 Calibre
+
+Calibre's `metadata.db` is a plain SQLite database — no API needed, and this is
+the better of the two integrations.
+
+**Access:** mount the Calibre library directory read-only into the container and
+open with `sqlite3.connect("file:metadata.db?mode=ro", uri=True)`. Never write
+to it. Do not read it while Calibre is mid-write; a stale read is possible but
+harmless for a one-shot import.
+
+**Tables:** `books` (title, sort, pubdate, path, uuid), `authors` +
+`books_authors_link`, `identifiers` (rows with `type` in `isbn`, `google`,
+`amazon`), `tags` + `books_tags_link`, `comments` (description), `series` +
+`books_series_link`, `ratings` + `books_ratings_link`.
+
+**The nice surprise:** Calibre stores ratings as an integer 0–10 where 10 = five
+stars. It's a half-star scale internally, so the values map to your 1–10 scale
+**directly, no conversion, no provisional flag.** Calibre ratings are the one
+imported score you can trust as-is.
+
+**Covers:** `cover.jpg` inside each book's folder, at `<library>/<books.path>/`.
+Copy into your own `data/covers/` rather than referencing across the mount.
+
+**Mapping:** Calibre tags → shelves. Status is absent from Calibre entirely, so
+everything lands `unsorted` with no suggestion. This removes the "is my Calibre
+library owned or finished?" question — you answer it per-book in triage, in
+bulk, in about a minute.
+
+**Re-sync:** store `books.uuid` in `items.identifiers.calibre_uuid`. Re-running
+the import adds new books and never touches `entries` — your scores and statuses
+are yours, Calibre doesn't get a vote.
+
+**Re-sync never overwrites.** On a matched item, sync fills only fields that are
+currently empty. A publisher, title, or cover you corrected by hand survives
+every subsequent sync, permanently, with no dirty-tracking machinery. The escape
+hatch is an explicit per-item **"re-pull metadata"** button
+(`POST /api/items/{id}/refresh`) that clears the item's fields and refetches from
+its source — the only path by which a sync can overwrite your edits, and you have
+to ask for it. Same rule applies to Open Library / Google Books refreshes.
+
+### 5.3 Shared import pipeline
+
+Both importers emit the same `Candidate` shape from §4.1 and go through one path:
+
+1. Parse → normalised rows, in-memory
+2. Match each row against existing `items`: ISBN13 → ISBN10 → calibre_uuid →
+   normalised title+author
+3. **Dry-run preview**, always: counts of create/update/skip. Deliberately
+   lightweight now — it no longer has to surface every ambiguity, because
+   ambiguity is triage's job, not the importer's
+4. Write as `unsorted`, in one transaction
+5. Background enrichment: for rows with an ISBN but no cover, queue Open
+   Library/Google Books lookups at ~2 req/s. Runs for minutes on a large
+   library; never inside the request. Triage is usable while it runs
+
+**Collision handling gets much simpler.** With nothing needing to be final, the
+importer does not silently overwrite an existing library value. For multiple
+source rows that collapse into one *new* entry in the same commit, it starts with
+the higher-confidence value (Calibre > Goodreads for metadata and scores, since
+Calibre's are native 1–10) and records alternatives in
+`entries.import_conflicts` as JSON. On a pre-existing item or entry, imports fill
+empty fields only; a disagreeing non-empty value is preserved and the incoming
+alternative is recorded as a conflict. Triage shows a small marker on those rows
+with both values one click apart. Personal edits always win.
+
+Import is idempotent: re-running the same file changes nothing. Provenance and
+safe undo are tracked by `import_batches` and an import ledger linking each batch
+to the entries/items it created or filled. The canonical columns and undo
+semantics are defined in the technical spec; do not add the previously proposed
+but undefined `items.import_source` shortcut.
+
+---
+
+## 6. HTTP API
+
+FastAPI, JSON, no auth in v1 (bind to LAN / behind Nginx Proxy Manager).
+
+```
+GET    /api/search?q=…                 → merged candidates
+GET    /api/search/resolve?url=…       → single candidate from a URL or ISBN
+POST   /api/entries                    → {source, source_id} | {manual: {...}}
+                                          + {status, score?, shelves?[]}
+                                          creates/reuses item, creates entry
+GET    /api/entries?status=&shelf=&sort=&order=&q=
+PATCH  /api/entries/{id}               → status, score, notes, dates, shelves
+PATCH  /api/entries/bulk               → {entry_ids[], set:{status?, score?,
+                                          add_shelves?[], remove_shelves?[],
+                                          clear_provisional?}}
+POST   /api/entries/accept-suggested   → {filter} applies suggested_status in bulk
+DELETE /api/entries/{id}
+GET    /api/items/{id}
+PATCH  /api/items/{id}                 → manual metadata correction
+POST   /api/items/{id}/refresh         → re-pull from source, OVERWRITES edits
+POST   /api/items/{id}/cover           → upload replacement cover
+GET    /api/shelves
+PATCH  /api/shelves/{id}               → rename
+DELETE /api/shelves/{id}               → detaches, does not delete entries
+
+POST   /api/import/goodreads/preview   → CSV upload, returns dry-run report
+POST   /api/import/goodreads/commit    → {batch_id, options}
+POST   /api/import/calibre/preview     → {library_path}, returns dry-run report
+POST   /api/import/calibre/commit      → {batch_id, options}
+GET    /api/import/jobs/{id}           → progress for background enrichment
+DELETE /api/import/batches/{id}        → undo an import batch
+```
+
+`POST /api/entries` is deliberately one call: given a provider hit, it fetches,
+dedupes the item, downloads the cover, and creates the entry atomically. The
+20-second add flow depends on this not being three round trips.
+
+**Sort keys:** `date_added` (default, desc), `score`, `title`, `sort_author`,
+`year`, `date_finished`. NULL scores sort last regardless of direction.
+
+**Pagination.** `GET /api/entries` is keyset-paginated, not offset-paginated:
+`?after={last_sort_value},{last_id}&limit=100`. Always include `id` as the
+tiebreaker so the cursor is stable when sort values collide (many books share a
+score of 8). Offset pagination degrades badly and breaks under concurrent
+edits; keyset is barely more code and pairs correctly with virtual scrolling.
+Response returns `{items: [...], next_cursor, total}` — `total` powers the
+scrollbar, computed with a separate `COUNT(*)` and cached per filter.
+
+---
+
+## 7. UI
+
+**Stack: React 18 + Vite + TypeScript + Tailwind + shadcn/ui + Motion.**
+
+Reversing the earlier Jinja+HTMX recommendation, deliberately. HTMX is the right
+call when you want minimum machinery and don't care much how it looks. You said
+you care how it looks and have no frontend experience, which inverts the
+tradeoff: what you need is an ecosystem where polished components already exist
+and you assemble rather than design.
+
+- **shadcn/ui** — you copy component source into your repo rather than
+  installing a dependency. Accessible, well-built, and restrained-looking by
+  default. This is the single biggest lever on "looks nice without design
+  skill".
+- **Tailwind** — utility classes, no separate stylesheet to maintain, no naming
+  decisions.
+- **Motion** (ex-Framer Motion) — the microinteraction layer. Layout animations
+  when the grid re-sorts, spring transitions on the score picker, list
+  enter/exit. `<AnimatePresence>` and `layout` props get you most of it for
+  almost no code.
+- **TanStack Query** — server state, caching, optimistic updates. Optimistic
+  mutation is what makes inline score editing feel instant.
+
+Honest cost: a Node build step, a `package.json`, and more code than the HTMX
+version. Mitigated by a multi-stage Docker build (§8) so deployment stays one
+container. Secondary benefit: this is the same stack you'd want for Tu
+Reclamo's frontend, so the learning transfers.
+
+### Design direction
+
+Pick a real one rather than defaulting. Suggested: dark-first, near-black
+(`zinc-950`) rather than pure black, one saturated accent for scores and active
+states, covers as the primary visual element with generous spacing. Type: one
+sans (Inter or Geist) at two or three weights. Avoid the default Tailwind blue
+and the standard card-with-border-and-shadow look — those are what "AI-generated
+dashboard" looks like.
+
+### Rendering at scale
+
+A Calibre import can produce several thousand rows, and `/triage` is a dense
+table of exactly those. Plain React rendering will visibly stutter past ~500.
+
+- **TanStack Virtual** on both `/` and `/triage`. Only visible rows mount.
+- **TanStack Query with `infiniteQuery`** against the keyset cursor (§6), page
+  size 100, prefetch the next page when the user scrolls within 200px of the
+  bottom.
+- Rows must be **fixed-height** in table view for cheap virtualization
+  (`estimateSize` returns a constant). Grid view uses fixed-aspect cover cards,
+  same benefit.
+- **This constrains Motion.** Layout animations on a virtualized list fight the
+  virtualizer — items unmount as they scroll out and re-animate on return. Rule:
+  animate on *sort/filter changes only*, by keying the list container on the
+  active sort and doing a single crossfade, rather than `layout` props on every
+  row. Keep spring animations for things that don't scroll: the score picker,
+  the action bar, dialogs.
+- Text filtering runs server-side (SQL `LIKE` over cached title/author) rather
+  than client-side, since the client only holds the loaded pages. At this scale
+  `LIKE` is fine; FTS5 is a later optimisation if it ever isn't.
+
+This is the one place where "make it look nice" and "make it fast" genuinely
+conflict, and the resolution is to spend the animation budget on interactions
+rather than on scrolling.
+
+### Microinteractions worth building
+
+These are the ones that carry the feel; everything else can be static.
+
+- **Score picker** — 1–10 as a row of segments, fill animates on hover, spring
+  on commit, colour shifts across the range. This is the thing you touch most.
+- **Sort/filter transitions** — crossfade the list container on sort change,
+  keyed by the active sort (see "Rendering at scale" — per-row `layout` props
+  are off the table with virtualization).
+- **Add flow** — search results stagger in; the selected card animates into
+  place rather than a page navigation.
+- **Optimistic writes** — score updates render instantly, reconcile in
+  background, roll back with a shake on failure. Never a spinner for a local DB
+  write.
+- **Cover load** — blur-up or skeleton, never layout shift.
+
+Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
+
+### Screens
+
+**`/` — My Books.** The primary screen and the one to get right.
+- Grid (covers) / compact table toggle, persisted in localStorage
+- Filter chips: status, shelf. Free-text filter over cached title/author, local
+  SQL only, no network
+- Sort dropdown per §6
+- Inline score editing directly from the list — click the number, type, done.
+  No modal, no navigation.
+- Counts per status somewhere unobtrusive
+
+**`/add` — Search & add.**
+- Single input accepting free text, URL, or ISBN; detects which
+- Picker grid per §4.3
+- On select: a small form — status (default `read`), score, shelves — then save
+  returns to `/` with the new entry highlighted
+
+**`/books/{entry_id}` — Detail.**
+- Cover, full metadata, description
+- Editable: status, score, notes, dates, shelves, reread count
+- Link to edit underlying item metadata
+- Delete entry
+
+**`/triage` — The inbox.** The screen that makes bulk import viable, and the
+second-most-important in the app after `/`. Everything `unsorted` lives here.
+
+Design goal: clear several hundred books in one sitting without it feeling like
+data entry. That means bulk-first, keyboard-first, and never one-book-at-a-time
+unless you choose it.
+
+- **Dense table by default** — small cover thumb, title, author, year, suggested
+  status, score, shelves. Compact rows, ~25 visible at once. Grid view optional
+  but the table is the working surface.
+- **Selection model** — checkbox column, click-drag to range-select,
+  shift-click, `Ctrl/Cmd+A`. A persistent action bar appears when anything is
+  selected: *Set status · Add shelves · Set score · Clear provisional · Delete*.
+  All apply to the whole selection in one request.
+- **Grouping and filters** — by import batch, by suggested status, by author, by
+  shelf, by "has conflict", by "provisional score", by "no cover". The point is
+  that you sort into a homogeneous group and then act on all of it at once:
+  every Goodreads `to-read` row → `to_read`, one click, done.
+- **Accept suggestions in bulk** — a single "Accept all suggested statuses"
+  action, scoped to the current filter. For a Goodreads import that alone
+  clears most of the backlog.
+- **Keyboard flow for the rest** — `j`/`k` move, digits set score, `r`/`t`/`w`/
+  `d` set status, `s` opens shelf autocomplete, `Enter` commits and advances.
+  This is the MAL-style rhythm, and it's what makes the leftover hundred books
+  tolerable.
+- **Conflicts** — rows with `import_conflicts` show a marker; clicking expands
+  both values inline with one click to switch. Never a modal.
+- **Deferring is fine and explicit.** No "you must finish" pressure. The badge
+  count on `/` is the only nag. Books can sit `unsorted` indefinitely and still
+  be searchable.
+
+**`/shelves` — Shelf management.** List, rename, delete, counts.
+
+**`/import` — Import.** Two tabs, Goodreads CSV (file drop) and Calibre
+(library path + "re-sync" button). Both show the dry-run preview before any
+write, with the unmatched/ambiguous rows called out. Progress bar for background
+enrichment. "Undo last import" for 24 hours.
+
+### Interaction notes
+
+- Keyboard: `/` focuses search, `a` opens add, digits `1`–`9` + `0` set score on
+  a focused row
+- No confirmation dialogs except delete
+- Dark mode, since this runs next to Jellyfin at night
+
+---
+
+## 8. Deployment
+
+- **Multi-stage Docker build:** stage 1 `node:22-alpine` runs `vite build`,
+  stage 2 `python:3.12-slim` copies `dist/` in and FastAPI serves it as static
+  files with an SPA catch-all route. Node does not ship in the final image.
+  Still one container, one process on the ZimaBoard.
+- Volume: `/data` → `books.db` + `covers/`
+- Volume: `/calibre` → your Calibre library, **read-only** (`:ro` in compose)
+- Env: `GOOGLE_BOOKS_API_KEY` (optional), `TZ`, `USER_AGENT_CONTACT`
+- Behind Nginx Proxy Manager, e.g. `books.home.lan`, matching the AdGuard/NPM
+  pattern already in use
+- Backup: nightly `sqlite3 books.db ".backup /data/backups/books-$(date).db"`
+  plus a covers tarball. The DB is the only irreplaceable thing — metadata is
+  re-fetchable, your scores are not.
+- Migrations: Alembic from commit one. Even single-user, hand-editing schema on
+  a live DB with real ratings in it goes badly.
+
+---
+
+## 9. Out of scope, deliberately deferred
+
+Listed so they're not re-litigated during build.
+
+**v2 — Export.** `GET /api/export` dumping entries + items as JSON, plus a
+Goodreads-shaped CSV. Agreed in principle, not a priority. Note the interim
+risk: until this exists, your only exit path is the SQLite file itself. That's
+genuinely fine — it's a documented open format you can query with any tool —
+but it means **the nightly DB backup (§8) is not optional.** Do that from day
+one and the export can wait indefinitely.
+
+**v2 — Auth.** None in v1; LAN-only, bound behind NPM. When it lands: single
+env-var password with a signed session cookie, which is also the prerequisite
+for public share links. Until then, the operational rule is that this host must
+not be exposed externally — worth a comment in the compose file so future-you
+doesn't forget while adding a proxy host at 1am.
+
+**v2 — sharing.** Public read-only list URLs. Cheap *if* the list view is
+already `render(entries WHERE user=X, filter, sort)` and authorization is a
+separate check. Build the view that way now; add the route later.
+
+**v2 — multiuser.** `user_id` already exists on `entries` and `shelves`. Adding
+auth touches routing and nothing else. No schema migration required.
+
+**v2 — Calibre write-back.** Pushing your scores into Calibre's `ratings` table
+so the two stay in sync. Technically easy given the identical 0–10 scale, but it
+means writing to a DB another program owns. Not worth the risk in v1.
+
+**v2 — OPDS / Content Server as an alternative Calibre path.** If the library
+ever lives on a different machine than the tracker, Calibre's Content Server
+exposes `/ajax/search` and `/ajax/books` over HTTP. Direct `metadata.db` reads
+are simpler while both are on the ZimaBoard.
+
+**v3 — second domain (wine).** The `items`/`entries` split and the two-method
+provider shape are the entire preparation. When it arrives: add a wine provider,
+a per-type display config declaring sort fields and facets, and extract the
+provider registry from the two concrete cases. Expect wine to be
+manual-entry-first — there's no free equivalent of ISBN, and identity is
+producer + cuvée + vintage + format, all fuzzy. Do **not** build the plugin
+runtime before this exists.
+
+---
+
+
+## 10. Settled decisions log
+
+Resolved during spec review; recorded so they aren't reopened.
+
+| # | Question | Resolution |
+|---|---|---|
+| 1 | Provisional scores in sorting | Double Goodreads 1–5, flag provisional, mix into sort with visual marking + exclude filter |
+| 2 | Re-sync vs manual edits | Sync fills empty fields only, never overwrites; explicit per-item re-pull button (§5.2) |
+| 3 | Adding a book you already have | Exact dupe → navigate to existing entry with a toast. Different edition → warn on the picker card, don't block (§4.3) |
+| 4 | Rereads | Stay lossy: latest dates, one score, `reread_count`. No `readings` table |
+| 5 | Scale | TanStack Virtual + keyset pagination; animation budget spent on interactions, not scrolling (§6, §7) |
+| 6 | Export | Deferred to v2. Nightly DB backup becomes mandatory in the meantime (§9) |
+| 7 | Auth | Deferred to v2. LAN-only, must not be exposed via NPM (§9) |
+
+---
+
+## 11. Defaults pending owner override
+
+These four defaults are adopted for implementation and are not blockers. They
+remain easy for the owner to override before the affected sprint begins; any
+override must update the technical spec, decision log, and downstream sprint
+acceptance criteria.
+
+1. **Does `unsorted` count as "in the library"?** Spec assumes yes — unsorted
+   books are searchable and appear in shelf views, just hidden from the default
+   list on `/`. The alternative is full quarantine until triaged. Low stakes,
+   easy to flip later.
+2. **Deleting an entry — what happens to the item?** Spec leaves orphaned
+   `items` rows and their covers in place, treating them as cache so re-adding
+   is instant, with a manual "prune orphans" maintenance action. Only matters
+   for disk usage, and covers are ~50KB each.
+3. **Work vs edition.** One row = one edition; a reread of a different edition
+   is the same entry with `reread_count++`. Changing this means a different
+   uniqueness constraint on `entries`. Recommendation stands: don't.
+4. **Series.** Free-text in `metadata`, not modelled. Only becomes a problem if
+   you want "show me the Malazan books in reading order", which needs a real
+   series + position pair. Add later if you miss it — it's an additive migration,
+   not a destructive one.

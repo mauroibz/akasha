@@ -1,0 +1,67 @@
+# Decisions and deviations
+
+Append-only record of material architecture choices, product-default resolutions, and differences between plans and implementation. Later decisions supersede earlier ones by reference; do not rewrite history.
+
+## DEC-001 — Canonical document hierarchy
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** The source product draft mixed product intent with implementation sketches and had no deterministic agent handoff.
+- **Decision:** Product behavior is canonical in `docs/specs/product-spec.md`; implementation contracts are canonical in `docs/specs/technical-spec.md`; the active sprint controls sequence. `AGENTS.md` defines conflict precedence.
+- **Consequence:** Agents may refine implementation details without re-litigating product scope, but must record material deviations and cannot edit product intent to excuse incomplete work.
+
+## DEC-002 — Import provenance uses a ledger
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** The source draft referenced an undefined `items.import_source` and proposed undo by `entries.import_batch`, which could delete pre-existing records or lose fill-empty history.
+- **Decision:** Use `import_batches` plus `import_batch_entries` with created flags and before-values. Undo only effects proven to belong to that batch.
+- **Consequence:** Import and undo are auditable and idempotent at the cost of two explicit tables.
+
+## DEC-003 — Preserve merged provider identities
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** Search merging must retain Open Library and Google Books IDs, but one `items.source/source_id` pair cannot represent both or enforce secondary-source dedupe.
+- **Decision:** Add `item_sources`; retain `items.source/source_id` as the preferred refresh source.
+- **Consequence:** Exact dedupe works for any known provider identity without introducing a plugin registry.
+
+## DEC-004 — Durable in-process job queue
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** Import enrichment must run for minutes outside requests and survive restart, while deployment remains one container/process.
+- **Decision:** Persist jobs and leases in SQLite and run one cooperative poller in FastAPI lifespan. Handlers are idempotent; expired jobs are reclaimed.
+- **Consequence:** No Redis/Celery dependency. Multiple Uvicorn workers are unsupported in v1 and must be prevented/documented.
+
+## DEC-005 — Opaque, versioned keyset cursors and exact counts
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** The comma cursor in the draft is ambiguous for text/null values, and a count cache has difficult invalidation before profiling establishes a need.
+- **Decision:** Use base64url versioned JSON cursors bound to sort/filter identity, explicit null buckets, and exact counts initially.
+- **Consequence:** Cursor behavior is testable and evolvable. Count caching is deferred until measured.
+
+## DEC-006 — Authorized defaults for four open product questions
+
+- **Date:** 2026-07-21
+- **Status:** accepted pending owner override
+- **Context:** Four nonblocking questions remained in the source product draft.
+- **Decision:** Unsorted is searchable but hidden by default; entry deletion retains items/covers; one row remains one edition with lossy rereads; series remains free text.
+- **Consequence:** Agents do not stop for these questions. Any owner change updates product/technical specs and downstream sprints.
+
+## DEC-007 — Network/file work outside SQLite write locks
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** The one-call add requirement described remote fetch, cover handling, and relational creation as atomic, but holding a SQLite write transaction across network calls would block local writes.
+- **Decision:** Fetch and prepare cover to a temporary file first; perform dedupe, item/entry writes, and atomic file placement in a short transaction with compensating file cleanup.
+- **Consequence:** The client still makes one request and relational state remains atomic; file side effects have explicit cleanup semantics.
+
+## DEC-008 — Existing personal values outrank imports
+
+- **Date:** 2026-07-21
+- **Status:** accepted
+- **Context:** The source draft both said Calibre re-sync never touches entries and suggested that higher-confidence Calibre values win import collisions.
+- **Decision:** Source confidence chooses among rows only while creating a new entry in one commit. Once an item or entry exists, imports fill empty fields and record conflicting alternatives; they never replace non-empty personal values.
+- **Consequence:** Calibre's native score can seed a new entry but cannot erase a provisional or manually edited score. Triage exposes the alternative for explicit choice.
