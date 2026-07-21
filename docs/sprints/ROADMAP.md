@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 1
+**Plan revision:** 2
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [Sprint 001](001-foundation.md)
 
@@ -48,16 +48,16 @@ These are binding outcome boundaries. Before a future sprint becomes active, the
 
 Scope:
 
-- Domain enums/models, ISBN and text normalization, item/source identity, fill-empty merge semantics.
-- Initial complete v1 schema for items, item sources, entries, shelves, import ledgers, and jobs.
+- Item identifiers/sources, ISBN and text normalization, edition-safe ambiguity decisions, and fill-empty merge semantics.
+- Initial complete v1 schema for items, item identifiers, item sources, entries, shelves, import records/effects, and jobs.
 - SQLAlchemy repositories and transaction fixture.
 
 Acceptance:
 
 - Alembic upgrade from empty DB and downgrade/upgrade round trip pass.
 - Foreign keys are demonstrably enabled on every connection.
-- Constraints reject invalid scores/statuses and duplicate identities.
-- Repository tests prove item/entry exact dedupe and shelf behavior.
+- Constraints reject invalid scores/statuses and duplicate authoritative identifiers/sources, including ISBN-10/13 conversion-equivalent races.
+- Repository tests prove exact item/entry dedupe, split exact identities produce a typed conflict without mutation, ambiguous title/author never auto-merges, and shelf behavior.
 - No API surface beyond health/config is required.
 
 ### Sprint 003 — Entries, shelves, filtering, keyset API
@@ -66,12 +66,12 @@ Scope:
 
 - Entry/item/shelf read and mutation services and routes.
 - Server-side filters, counts, whitelisted sorting, opaque keyset cursors.
-- Bulk entry mutation and accept-suggested service contracts.
+- Bulk entry mutation accepts explicit IDs or server filter plus exclusions; accept-suggested uses the same validated filter contract.
 
 Acceptance:
 
 - OpenAPI and API tests cover happy/error paths.
-- NULL-last pagination works in both directions with duplicate values and deleted boundaries.
+- NULL-last pagination works in both directions with duplicate values, matching text collation, deleted boundaries, query-plan assertions, and reload after sort-key edits.
 - Default library excludes unsorted; explicit filters can find it.
 - Manual score changes clear provisional state.
 - Static `/entries/bulk` routing cannot be shadowed by `/{entry_id}`.
@@ -95,16 +95,16 @@ Acceptance:
 
 Scope:
 
-- Open Library and optional Google Books adapters, merge/rank, URL/ISBN resolution.
-- Manual payloads, exact and near duplicate detection.
+- Open Library and optional Google Books adapters, merge/rank, edition-safe URL/ISBN resolution.
+- Manual payloads, exact duplicate constraints, advisory near matches, and work-URL edition picking.
 - Cover download/validation/resize/cache and one-call create orchestration.
 
 Acceptance:
 
 - All external HTTP is mocked in normal tests.
 - Independent timeout/failure behavior returns partial success.
-- Search merging retains both source identities.
-- Add holds no DB write lock during network calls and cleans file failures.
+- Search merging retains both source identities; Open Library work years never become edition years, and work URLs require edition choice.
+- Add holds no DB write lock during network/image work; cover failure cannot roll back a valid entry and double-submit is idempotent.
 - Existing entry returns a typed already-exists response; near edition only warns.
 
 ### Sprint 006 — Add, detail, and metadata-edit UI
@@ -119,28 +119,28 @@ Acceptance:
 - Manual and provider-backed Playwright add flows pass.
 - Existing duplicate navigates to detail with toast; near duplicate remains addable.
 - Metadata edit survives a fill-empty sync test.
-- Explicit refresh communicates overwrite and preserves data on provider failure.
+- Explicit refresh communicates overwrite, updates only fields present in a validated payload, preserves omitted fields, and leaves all old data on failure.
 
 ### Sprint 007 — Goodreads import
 
 Scope:
 
-- Size-limited staging, CSV parser, validation, fingerprinted preview, transactional commit ledger.
+- Size-limited staging, CSV parser (including Goodreads Book Id provenance), durable normalized preview records, explicit ambiguity decisions, and transactional effect ledger.
 - Goodreads status suggestions, shelf filtering, date conversion, provisional score conversion.
 - Import UI tab with preview and actionable row errors.
 
 Acceptance:
 
 - Excel-armored/empty ISBNs, malformed dates, UTF-8 text, missing columns, repeated files, and zero ratings have fixtures.
-- Preview has no library side effects.
-- Commit is idempotent; every row lands unsorted; manual edits remain untouched.
+- Preview changes no library entities, persists the exact commit plan, and exposes parse errors/ambiguities.
+- Commit is idempotent; new rows land unsorted while existing entries and manual edits remain untouched.
 - UI never uploads on commit a second time or exposes staged host paths.
 
 ### Sprint 008 — Calibre import and re-sync
 
 Scope:
 
-- Path confinement, read-only Calibre connection, supported schema queries, cover preparation.
+- Path confinement, read-only Calibre connection, supported schema queries, and preview-time staging of normalized rows/cover preparation so commit never rereads a changed source.
 - Shared matching/commit pipeline and Calibre UI tab.
 
 Acceptance:
@@ -155,14 +155,14 @@ Acceptance:
 Scope:
 
 - DB-backed job polling, leasing, retries, progress API, rate-limited enrichment.
-- Batch ledger undo for created and fill-empty values; UI progress and undo window.
+- Import-effect reverse undo for created and fill-empty values, queued-job cancellation/late-result guards, UI progress, and undo window.
 
 Acceptance:
 
 - Queued/running jobs survive simulated restart and handlers tolerate replay.
 - Provider rate and retry caps are clock-injected and deterministic.
-- Undo cannot remove later user edits, shared items, or pre-existing entries.
-- Partial retention is reported; repeated undo is harmless.
+- Undo cannot remove later user edits, shared items, or pre-existing entries; it reverts a field only if current value still matches the recorded imported value.
+- Partial retention is reported, repeated undo is harmless, and late jobs from an undone batch cannot mutate data.
 
 ### Sprint 010 — Bulk-first triage
 
@@ -173,7 +173,7 @@ Scope:
 
 Acceptance:
 
-- Server-side select-all/filter semantics do not accidentally mutate hidden rows.
+- Server-side select-all means all rows matching the current filter and uses exclusions; unloaded or hidden rows are mutated only when that contract explicitly includes them.
 - `j/k`, status, score, shelf, commit/advance shortcuts work with input guards.
 - A Playwright scenario imports and triages hundreds of rows without one request per row.
 - Conflicting values remain visible until explicitly resolved.
@@ -198,7 +198,7 @@ Acceptance:
 Scope:
 
 - Multi-stage non-root image, production static SPA routing, Compose mounts/config, healthcheck.
-- Alembic startup/deploy procedure, online backup script, retention/checksums, restore documentation.
+- Alembic startup/deploy procedure, online backup script, host-scheduler example, retention/checksums/integrity check, restore documentation.
 - Fresh-install and upgrade smoke tests; operator runbook and release notes.
 
 Acceptance:

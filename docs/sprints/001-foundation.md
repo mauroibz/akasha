@@ -2,7 +2,7 @@
 
 **Status:** ready
 **Depends on:** none
-**Roadmap revision:** 1
+**Roadmap revision:** 2
 
 ## Objective
 
@@ -59,7 +59,7 @@ Create `frontend/package.json` with an npm lockfile and strict TypeScript Vite a
 - Final stage runs as non-root, contains no Node executable, and exposes a healthcheck.
 - Compose visibly warns that v1 is LAN-only and mounts `/data`; Calibre mount may be documented/disabled until Sprint 008.
 
-## Required tests (TDD)
+## Acceptance criteria (ordered, TDD)
 
 1. App factory construction has no filesystem side effects before startup.
 2. Live health succeeds without consulting DB/providers.

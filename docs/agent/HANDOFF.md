@@ -7,6 +7,7 @@
 ## Current reality
 
 - The repository contains canonical product and technical specifications, an ordered 12-sprint roadmap, and the autonomous execution protocol.
+- Roadmap revision 2 incorporates the independent architecture review: relational authoritative identifiers, edition-safe ambiguity handling, persisted import plans/effects, non-fatal post-commit covers, server-scoped bulk selection, and corrected refresh/deployment contracts.
 - There is intentionally no backend/frontend application code yet.
 - `python scripts/validate_project.py` is the only current executable validation command.
 - Sprint 001 must create the package/toolchain/container foundation and turn the aspirational `make` commands into working commands.

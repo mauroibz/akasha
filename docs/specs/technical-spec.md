@@ -79,8 +79,8 @@ Application startup must:
 2. enable SQLite `PRAGMA foreign_keys=ON` for every connection, WAL mode, and a bounded busy timeout;
 3. refuse to auto-create or mutate schema outside Alembic;
 4. report schema mismatch with a useful startup error;
-5. start one cooperative durable-job polling loop in the FastAPI lifespan;
-6. stop accepting job work and cancel cleanly on shutdown.
+5. once Sprint 009 introduces the jobs schema, start one cooperative durable-job polling loop in the FastAPI lifespan;
+6. when that runner exists, stop accepting job work and cancel it cleanly on shutdown.
 
 Do not run multiple Uvicorn workers: the target is one process and the v1 job lease design assumes it. Tests must still enforce idempotency in case a job is retried after a crash.
 
@@ -111,20 +111,32 @@ All timestamps are UTC RFC 3339 strings at API boundaries and timezone-aware Pyt
 - `id` integer primary key
 - `type` text, default `book`
 - `title` required text
-- `subtitle`, `year`, `cover_path`, `source`, `source_id` nullable
-- `identifiers`, `metadata` required JSON-as-text with application validation
+- `subtitle`, `year`, and `cover_path` nullable
+- `identifiers` optional JSON API/cache projection derived from relational identifiers; never the uniqueness authority
+- `metadata` required JSON-as-text with application validation
 - `sort_author` generated from first metadata author
 - `created_at`, `updated_at` required
-- unique partial index on primary `(source, source_id)`
 - case-insensitive title index
+
+`item_identifiers`
+
+- `item_id` foreign key to items, cascade delete
+- `kind`, `normalized_value`, and original `value` required
+- primary key `(item_id, kind, normalized_value)`
+- unique `(kind, normalized_value)` for authoritative identities; ISBN-10 and ISBN-13 share canonical kind `isbn`, while Calibre UUID uses a stable namespaced kind
+
+A valid ISBN-10 is converted to canonical ISBN-13 before storage, so conversion-equivalent values collide on the same `(kind, normalized_value)`. Provider identities live in `item_sources`, avoiding duplicate authority. Relational constraints—not check-then-insert or JSON queries—close duplicate races.
 
 `item_sources`
 
 - `item_id` foreign key to items, cascade delete
-- `source`, `source_id` required
+- `source`, `source_id`, and boolean `is_primary` required
 - primary key `(source, source_id)`; unique `(item_id, source)`
+- at most one primary source per item, enforced by a partial unique index
 
-This table resolves an omission in the product draft: a merged search candidate can retain both Open Library and Google Books identities. `items.source/source_id` remains the preferred refresh source for simple reads.
+A merged search candidate can retain both Open Library and Google Books identities. The primary source selects explicit refresh; manual-only items have none.
+
+Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps.
 
 `entries`
 
@@ -148,19 +160,27 @@ This table resolves an omission in the product draft: a merged search candidate 
 - `created_at`, `committed_at`, `undo_expires_at`
 - unique `(kind, fingerprint)` for committed input identity where practical
 
-`import_batch_entries`
+`import_records`
 
-- `batch_id`, `entry_id`, `item_id`
-- booleans `created_entry`, `created_item`
-- before-values JSON for fields filled or changed by the batch
-- primary key `(batch_id, entry_id)`
+- `id` integer primary key; `batch_id` foreign key and source `row_number`
+- normalized payload JSON, matched item/entry IDs, match kind, planned action
+- conflicts JSON, validation errors JSON, and explicit ambiguity resolution
+- unique `(batch_id, row_number)`
 
-This ledger makes undo safe: undo reverts only values created/filled by that batch and deletes only entries/items proven to have been created by it. It never deletes a pre-existing entry merely because `entries.import_batch` points at the latest import.
+Preview persists these normalized records, so commit applies exactly the reviewed plan rather than reparsing an upload or rereading a Calibre database that may have changed.
+
+`import_effects`
+
+- `effect_id` integer primary key and `batch_id`, `record_id`, effect/entity types, entity ID
+- before-values and after-values JSON
+- monotonic `effect_id` provides deterministic reverse-order undo
+
+This ledger makes undo safe: reverse only effects recorded for the batch; delete entities only when the batch created them and they remain unmodified/unreferenced; revert a filled field only if its current value still equals the recorded imported value. Late jobs from an undone batch are ignored.
 
 `jobs`
 
-- `id` UUID, `kind`, `state` (`queued`, `running`, `succeeded`, `failed`)
-- payload/progress/error JSON, attempts, `available_at`, lease timestamps
+- `id` UUID, nullable `batch_id`, `kind`, `state` (`queued`, `running`, `succeeded`, `failed`, `cancelled`)
+- payload/progress/error JSON, attempts, `available_at`, heartbeat/lease timestamps
 - `created_at`, `updated_at`, `finished_at`
 
 Jobs survive restart. Handlers are idempotent. The lifespan runner claims one queued job in a short transaction, processes network/file work outside that transaction, and persists progress. On startup, expired `running` jobs return to `queued` with incremented attempts. Cap retries and expose terminal failure.
@@ -182,18 +202,18 @@ Deleting an entry deletes its shelf joins but retains the item, source links, an
 
 Normalize ISBN by stripping armor/separators and validating ISBN-10/13 checksums; convert ISBN-10 to canonical ISBN-13 when possible. Normalize near-match text with Unicode NFKD, combining-mark removal, casefold, punctuation-to-space, and collapsed whitespace.
 
-Matching precedence for imports:
+Matching precedence for imports and add dedupe:
 
-1. canonical ISBN-13;
-2. valid ISBN-10;
+1. authoritative provider source ID;
+2. canonical ISBN-13 (including validated ISBN-10 conversion-equivalence);
 3. Calibre UUID;
-4. normalized title plus normalized first author.
+4. normalized title plus normalized first author as an **ambiguous suggestion only**.
 
-A match result records the rule and confidence. Near title/author matches from interactive search are warnings, not identity proof. Exact provider identity and canonical ISBN are exact duplicates.
+A fuzzy title/author result never merges automatically because the model is edition-level: translations and reprints commonly share that key. It requires an explicit preview decision or creates a separate item. A match result records rule, confidence, and decision provenance. If two or more exact identities from one record resolve to different existing items, return a typed `identity_conflict`, quarantine that record for explicit resolution, and attach no new identifier or entry automatically.
 
 ### 6.2 Provider boundary
 
-The domain defines immutable `Candidate` and `ItemPayload` models plus an async `Provider` protocol. Candidate must support multiple source references after merge. Provider adapters never leak raw provider responses above infrastructure.
+The domain defines separate immutable models: `SearchCandidate`, `ItemPayload`, `ImportRecord`, `MatchDecision`, and `ImportPlan`, plus an async `Provider` protocol. Search candidates support multiple source references after merge. Import records carry personal fields, source-row provenance, validation errors, and conflict alternatives; they never masquerade as provider candidates. Provider and import adapters never leak raw source responses above infrastructure.
 
 - Search providers concurrently with an independent five-second timeout.
 - Return successful results when one provider fails and log a structured warning.
@@ -202,33 +222,33 @@ The domain defines immutable `Candidate` and `ItemPayload` models plus an async 
 - Bound result count and response size.
 - Mock all provider traffic in tests; no default test contacts public APIs.
 
-Open Library work URLs resolve deterministically to an edition. Prefer an edition with a usable ISBN and requested/default `es`, then `en`, then the first stable edition result; return the selected edition identity to the user. Do not label an arbitrary work record as an edition.
+Open Library search must not map work-level `first_publish_year` into edition publication year. It may expose that value separately as `original_year`; `items.year` is populated only from edition data. A work URL resolves to an edition-picker list, preferring editions with valid ISBNs and useful language metadata for ranking, but never silently chooses one. A chosen result always carries an edition identity.
 
 ### 6.3 Cache-on-add transaction
 
-1. Fetch and normalize provider metadata outside a DB transaction.
-2. Download, validate, resize, and encode a cover to a unique temporary file outside the transaction; enforce content-type, byte, pixel, and timeout limits.
-3. Begin a short write transaction, resolve exact duplicates again, insert/reuse item and source links, atomically move the prepared cover to `covers/{item_id}.jpg`, and insert/reuse the entry.
-4. Commit; on rollback, remove any newly moved file. A cover failure produces a valid entry with no cover.
-5. Return `201` for a new entry and `200` with `already_exists=true` for an existing entry.
+1. Fetch and normalize the primary provider payload outside a DB transaction. Secondary `source_refs` supplied by the client become authoritative only after provider validation or agreement on canonical ISBN; ignore unverifiable refs.
+2. Download, validate, resize, and encode a cover to a unique temporary file outside the transaction; enforce content-type, byte, pixel, URL, and timeout limits. Cover preparation failure is non-fatal.
+3. Begin a short `BEGIN IMMEDIATE` write transaction, re-resolve exact identity through unique relational constraints, and insert/reuse item, identifiers, sources, and entry. Commit without a cover path.
+4. After the relational commit, atomically install a prepared cover and update `cover_path` in a second short transaction, or enqueue an idempotent cover job. Failure leaves the valid entry intact and cleans/retries temporary files.
+5. Return `201` for a new entry and `200` with `already_exists=true` for an existing entry. Protect double-submit through constraints and an idempotency key or equivalent request token.
 
-Do not hold a SQLite write lock during remote network work. `POST /api/entries` remains one client round trip; atomicity refers to persistent relational state, with explicit cleanup for file side effects.
+Do not hold a SQLite write lock during remote, parsing, or image work. `POST /api/entries` remains one client round trip; relational creation is atomic, while cover installation is explicitly eventual and non-fatal.
 
 ### 6.4 Fill-empty versus explicit refresh
 
-Import and resync may fill only fields considered empty (`NULL`, empty string, empty list/object as defined per field). They never overwrite non-empty user-visible fields. Identifier unions may add a previously absent key. For multiple source rows creating one new entry within the same commit, source confidence may choose the initial value; once an entry exists, a conflicting incoming score/status/note/date is recorded in `import_conflicts` rather than applied. A manual entry edit always wins and must not be reverted by later imports.
+Import and resync may fill only fields considered empty (`NULL`, empty string, empty list/object as defined per field). They never overwrite non-empty user-visible fields. Identifier unions may add a previously absent key only when all exact identities resolve to the same item. For multiple source rows creating one new entry within the same commit, source confidence may choose the initial value; once an entry exists, a conflicting incoming score/status/note/date is recorded only in the batch's `import_records`, never on the entry itself. A manual entry edit always wins and must not be reverted by later imports.
 
-Explicit item refresh is destructive and must require `confirm_overwrite: true`. It fetches first, then atomically replaces provider-owned metadata and identifiers while preserving item identity and entry opinion fields. If fetch fails, existing data remains unchanged. A manual item with no refreshable source returns a typed conflict.
+Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the replacement first; on timeout, malformed data, or invalid payload, leave the item unchanged. In one short transaction, overwrite only provider-managed fields actually present in the successful response and add authoritative identifiers/source links. Omitted provider fields do not erase old values, and entry opinion fields are never touched. A manual-only item with no primary source returns a typed conflict.
 
 ### 6.5 Imports
 
-Preview is mandatory and has no library side effects. Uploaded Goodreads files are copied to a private staged path with size limits and a SHA-256 fingerprint. Calibre requests identify only a path relative to configured `BOOK_TRACKER_CALIBRE_DIR`; resolve and verify it cannot escape the mount. Open `metadata.db` with `mode=ro` and `PRAGMA query_only=ON`.
+Preview is mandatory and has no library side effects beyond durable staging/audit records. Uploaded Goodreads files are copied to `/data/imports/{batch_id}/` with size limits and a SHA-256 fingerprint. Parse and persist normalized `ImportRecord` rows, match decisions, explicit ambiguities, row errors, and preview counts. Calibre requests identify only a path relative to configured `BOOK_TRACKER_CALIBRE_DIR`; resolve and verify it cannot escape the mount, open `metadata.db` with `mode=ro` and `PRAGMA query_only=ON`, and stage its normalized rows during preview so commit never rereads a changing source DB.
 
-Commit accepts a preview batch ID, rejects stale/missing/mismatched previews, and applies the normalized rows in one short transaction. Large input parsing and cover copying happen before the write transaction where possible. Each row receives a deterministic source identity so retries are idempotent.
+Commit accepts a preview batch ID, rejects stale/missing/mismatched previews or unresolved ambiguities, and applies the persisted plan in one bounded `BEGIN IMMEDIATE` transaction. Revalidate authoritative identifiers because the library may have changed since preview. If exact keys now resolve to different items, mark the record `identity_conflict` and abort that record rather than choosing a winner. Otherwise create/reuse items and entries, fill empty item fields, attach shelves only to newly created entries, record audit conflicts/effects, and persist enrichment jobs before commit. Existing entries are never reset to `unsorted` or modified. All parsing, Calibre reads, cover copies, image work, and provider calls stay outside the write transaction. A uniqueness race may reload and reuse a winner only when every exact identity agrees on that item.
 
-Enrichment is enqueued after commit and limited to about two provider requests per second. Triage is immediately usable. Job progress is polled from the API.
+Enrichment is enqueued after commit and limited to about two provider requests per second. Every metadata or cover fill performed for an import appends its `import_effect` in the same short transaction as the mutation, so undo includes asynchronous effects. Triage is immediately usable. Job progress is polled from the API.
 
-Undo is available until `undo_expires_at` (24 hours). It uses the batch ledger, is idempotent, and refuses destructive cleanup if later user edits or references make reversal unsafe; the response reports retained records.
+Undo is available in the UI until `undo_expires_at` (24 hours), while the durable audit ledger remains recoverable. Reverse effects in order, cancel queued jobs, and make late job results no-ops. Delete only batch-created entities that remain unmodified and unreferenced; revert a filled field only when its current value equals recorded `after_values`. The response reports reverted, retained, and skipped effects, and repeated undo is harmless.
 
 ## 7. HTTP API contract
 
@@ -245,6 +265,7 @@ Never expose tracebacks, host filesystem paths, provider keys, or raw SQL.
 The product-spec route list is authoritative, with these refinements:
 
 - Define static routes such as `/entries/bulk` before `/entries/{entry_id}`.
+- Bulk mutation accepts either explicit `entry_ids` or a validated server-side filter plus `excluded_entry_ids`; never both. This supports select-all across unloaded virtual rows without sending thousands of IDs. Return affected count and apply in one transaction.
 - `GET /entries` accepts repeated `status`, `shelf`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. The response is `{items, next_cursor, total, facets}`, where `facets.status_counts` supplies the unobtrusive status counts required by the library UI for the current non-status filters.
 - `POST /entries/accept-suggested` returns affected count and operates in one transaction over the server-side filter, not client-loaded IDs.
 - `POST /items/{id}/refresh` requires explicit overwrite confirmation.
@@ -258,7 +279,7 @@ OpenAPI is the API contract. Generate or validate frontend request/response type
 
 Use an opaque base64url-encoded, versioned JSON cursor containing sort key, direction, last normalized value, last ID, and null bucket. Clients must treat it as opaque. Reject a cursor when sort/filter identity does not match the request.
 
-Every ordering is a whitelisted SQL expression plus `id` tie-breaker. NULL values always sort last using an explicit null bucket in both ordering and seek predicate. Tests cover asc/desc, nulls, duplicate values, deleted boundary rows, filter changes, and malformed cursors. `total` is exact initially; do not add an invalidation-prone count cache until measurement proves it necessary.
+Every ordering is a whitelisted SQL expression plus `id` tie-breaker. NULL values always sort last using an explicit null bucket in both ordering and seek predicate. Text ordering and cursor comparison use the same stored normalization/collation. Tests cover asc/desc, nulls, duplicate values, deleted boundary rows, filter changes, malformed cursors, and `EXPLAIN QUERY PLAN` for common composite indexes. `total` is exact but advisory under concurrent edits; do not add an invalidation-prone count cache until measurement proves it necessary. Any mutation of the active sort key invalidates infinite pages and reloads from page one while restoring focus by entry ID.
 
 ## 8. Frontend architecture and behavior
 
@@ -282,6 +303,7 @@ Cross-cutting behavior:
 - Keyboard shortcuts are disabled while an input, textarea, select, dialog, or content-editable element owns focus unless explicitly relevant.
 - `0` means score 10 only in score-shortcut context; Escape cancels an edit.
 - Virtual rows have stable keys and fixed measured sizes. Sort/filter changes crossfade the container; rows do not use layout animations.
+- Selection is independent of mounted rows: either explicit selected IDs or `all_matching=true` with excluded IDs. `Ctrl/Cmd+A` means all server rows matching the current filter, not merely loaded rows.
 
 The product spec defines each screen. Sprint acceptance tests must include the critical keyboard flows and reduced-motion behavior.
 
@@ -302,10 +324,10 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
 
 Test pyramid:
 
-- domain unit tests: normalization, ISBN validation, merge/rank, matching, status/score invariants, cursor logic;
-- repository/application integration tests against temporary SQLite databases migrated by Alembic;
-- provider contract tests with captured minimal fixtures and mocked HTTP;
-- import parser fixtures for malformed/realistic Goodreads and synthetic Calibre schemas;
+- domain unit tests: ISBN armor/checksums/conversion-equivalence, accent normalization, merge/rank, edition-safe ambiguous matching, precedence/conflicts, status/score invariants, and cursor encode/filter/null/tie logic;
+- repository/application integration tests against migrated temporary **file-backed** SQLite databases, covering WAL/foreign keys, concurrent identity races, import rollback/idempotency, existing-entry preservation, undo before/after user edits, stale-job recovery, pagination plans, and sort-key mutation reloads;
+- provider/filesystem contract tests with mocked HTTP for concurrent partial failure, 429/timeout/malformed payloads, Open Library work/edition years, refresh complete/partial/failure, oversized/non-image covers, atomic rename, and path/read-only failures;
+- import parser fixtures for BOM/quoted/malformed/realistic Goodreads exports and synthetic Calibre schema variants; verify source Calibre DB hashes never change;
 - API tests through the ASGI app;
 - frontend component tests for forms, optimistic rollback, keyboard guards, and accessibility;
 - Playwright tests for add-manual, edit-score, import-preview/commit/triage, and critical navigation;
@@ -324,7 +346,7 @@ The final image runs as a non-root user, has a healthcheck, and receives signals
 - `${DATA_DIR:-./data}:/data`
 - `${CALIBRE_DIR}:/calibre:ro`
 
-Backup from day one using SQLite online backup semantics plus covers. A backup script must create a consistent DB copy, archive covers, checksum outputs, enforce retention, and be restore-tested. Do not copy a live WAL database naively. Deployment docs must include migration, rollback, backup, restore, and LAN-only proxy guidance.
+Backup from the first production deployment using SQLite online backup semantics plus covers. A backup script must create a consistent DB copy, archive covers and import audit metadata, checksum outputs, enforce retention, run `PRAGMA integrity_check`, and be restore-tested. Do not copy a live WAL database naively. Schedule nightly execution from the host/NAS scheduler rather than pretending the single application process is a cron daemon. Deployment docs must include migration, rollback, backup, restore, and LAN-only proxy guidance.
 
 ## 12. Deferred decisions and explicit defaults
 

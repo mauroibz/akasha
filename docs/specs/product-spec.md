@@ -51,7 +51,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Domain generality | `items.type` present, provider interface defined, **no plugin runtime** | Extract the registry when a second domain actually exists |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
 | List rendering | TanStack Virtual + keyset pagination on `/` and `/triage` | Calibre libraries reach thousands of rows |
-| Auth | None. LAN-only, bound behind NPM | Deferred with sharing; see §9 |
+| Auth | None. LAN-only; internal proxying allowed, no internet-reachable route | Deferred with sharing; see §9 |
 | Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
 
 ---
@@ -86,6 +86,12 @@ CREATE UNIQUE INDEX idx_items_source ON items(source, source_id)
     WHERE source IS NOT NULL AND source_id IS NOT NULL;
 CREATE INDEX idx_items_title ON items(title COLLATE NOCASE);
 ```
+
+The SQL above is the product-level shape, not the final physical identity model.
+The canonical technical schema normalizes authoritative ISBN/Calibre identifiers
+and provider source IDs into relational tables with uniqueness constraints; the
+JSON `identifiers` object is an API/cache projection only. This is required to
+make concurrent dedupe safe.
 
 `metadata` for `type='book'`, all optional:
 
@@ -127,8 +133,6 @@ CREATE TABLE entries (
     reread_count INTEGER NOT NULL DEFAULT 0,
     score_provisional INTEGER NOT NULL DEFAULT 0,  -- 1 = derived from a 1-5 import
     suggested_status TEXT,                         -- importer's guess, triage pre-selects
-    import_conflicts TEXT,                         -- JSON, nullable, losing values
-    import_batch TEXT,                             -- nullable, enables undo
     UNIQUE (user_id, item_id)
 );
 
@@ -189,15 +193,16 @@ class Provider(Protocol):
     name: str          # 'openlibrary'
     item_type: str     # 'book'
 
-    async def search(self, query: str, limit: int = 20) -> list[Candidate]: ...
+    async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]: ...
     async def fetch(self, source_id: str) -> ItemPayload: ...
 ```
 
 ```python
 @dataclass
-class Candidate:
-    source: str
+class SearchCandidate:
+    source: str                       # primary display/fetch source
     source_id: str
+    source_refs: list[SourceRef]      # all merged provider identities
     title: str
     subtitle: str | None
     authors: list[str]
@@ -207,15 +212,17 @@ class Candidate:
     language: str | None
 ```
 
-`ItemPayload` is `Candidate` plus the full `metadata` dict.
+`ItemPayload` is `SearchCandidate` plus the full `metadata` dict.
 
-Both the picker UI and the cache-on-add step operate only on these shapes and
-never learn which domain they're in.
+Both the picker UI and cache-on-add operate on these shapes. `SourceRef` is the
+provider name plus source ID; merge retains all refs while choosing one primary
+source for display and later refresh. Import records are separate (§5.3).
 
 ### 4.2 Providers, v1
 
 **OpenLibraryProvider**
 - Search: `GET https://openlibrary.org/search.json?q={q}&limit=20&fields=key,title,subtitle,author_name,first_publish_year,isbn,cover_i,language,edition_key`
+- `first_publish_year` is work-level context (`original_year`), never this edition's `items.year`; fetch edition data before assigning edition year.
 - Fetch: `GET https://openlibrary.org/isbn/{isbn}.json` or `/books/{olid}.json`
 - Covers: `https://covers.openlibrary.org/b/id/{cover_i}-L.jpg`
 - No API key. Set a descriptive `User-Agent` with a contact address — they ask
@@ -272,7 +279,7 @@ Regex the ID out and skip straight to `fetch()`:
 | Pattern | Provider |
 |---|---|
 | `openlibrary.org/books/OL\d+M` | Open Library, by OLID |
-| `openlibrary.org/works/OL\d+W` | Open Library, resolve to first edition |
+| `openlibrary.org/works/OL\d+W` | Open Library, resolve to an edition-picker list; never silently choose an arbitrary edition |
 | `books.google.*` with `id=` param | Google Books |
 | bare ISBN-10/13, with or without hyphens | Open Library, then Google Books |
 
@@ -308,7 +315,7 @@ only, produces `goodreads_library_export.csv`. It is a snapshot, not a sync —
 Amazon killed the public Goodreads API in 2020 and there is no legitimate live
 path. One-shot import, then Goodreads stops being authoritative.
 
-**Columns used:** `Title`, `Author`, `Additional Authors`, `ISBN`, `ISBN13`,
+**Columns used:** `Book Id` (provenance only), `Title`, `Author`, `Additional Authors`, `ISBN`, `ISBN13`,
 `My Rating`, `Publisher`, `Number of Pages`, `Year Published`,
 `Original Publication Year`, `Date Read`, `Date Added`, `Bookshelves`,
 `Exclusive Shelf`, `My Review`, `Read Count`.
@@ -371,34 +378,45 @@ are yours, Calibre doesn't get a vote.
 currently empty. A publisher, title, or cover you corrected by hand survives
 every subsequent sync, permanently, with no dirty-tracking machinery. The escape
 hatch is an explicit per-item **"re-pull metadata"** button
-(`POST /api/items/{id}/refresh`) that clears the item's fields and refetches from
-its source — the only path by which a sync can overwrite your edits, and you have
-to ask for it. Same rule applies to Open Library / Google Books refreshes.
+(`POST /api/items/{id}/refresh`). It fetches and validates first, then overwrites
+only fields actually present in the successful provider response; omitted fields
+and all entry opinion data remain unchanged. This is the only path by which
+provider values may overwrite populated item metadata, and you have to ask for
+it. A failed or partial-invalid fetch leaves the old item untouched. Manual-only
+items cannot refresh until linked to an authoritative provider source.
 
 ### 5.3 Shared import pipeline
 
-Both importers emit the same `Candidate` shape from §4.1 and go through one path:
+Both importers emit an import-specific normalized record (score, dates, status
+suggestion, shelves, review, source row, and metadata) and go through one path.
+They do **not** reuse the interactive provider `SearchCandidate` shape:
 
-1. Parse → normalised rows, in-memory
-2. Match each row against existing `items`: ISBN13 → ISBN10 → calibre_uuid →
-   normalised title+author
-3. **Dry-run preview**, always: counts of create/update/skip. Deliberately
-   lightweight now — it no longer has to surface every ambiguity, because
-   ambiguity is triage's job, not the importer's
-4. Write as `unsorted`, in one transaction
+1. Parse → normalised records, persisted for the preview
+2. Match each row against existing `items`: provider identity → canonical ISBN13 →
+   valid ISBN10/conversion-equivalent → calibre_uuid. A normalised title+author
+   similarity is **ambiguous evidence only**: preview it for explicit resolution
+   or create a separate edition; never auto-merge on that fuzzy key. If exact
+   identities from one record resolve to different existing items, mark a typed
+   identity conflict for explicit resolution and perform no mutation for that row.
+3. **Dry-run preview**, always: counts of new items, new entries, empty item
+   fields to fill, existing entries left unchanged, ambiguous records,
+   conflicts, and idempotent skips. Parse errors and ambiguous rows are shown
+   with enough detail to resolve before commit; value conflicts can remain for
+   triage.
+4. In one bounded transaction, create absent entries as `unsorted`, fill only
+   empty item fields, preserve all existing entries, record effects/conflicts,
+   and enqueue enrichment jobs
 5. Background enrichment: for rows with an ISBN but no cover, queue Open
    Library/Google Books lookups at ~2 req/s. Runs for minutes on a large
    library; never inside the request. Triage is usable while it runs
 
 **Collision handling gets much simpler.** With nothing needing to be final, the
-importer does not silently overwrite an existing library value. For multiple
-source rows that collapse into one *new* entry in the same commit, it starts with
-the higher-confidence value (Calibre > Goodreads for metadata and scores, since
-Calibre's are native 1–10) and records alternatives in
-`entries.import_conflicts` as JSON. On a pre-existing item or entry, imports fill
-empty fields only; a disagreeing non-empty value is preserved and the incoming
-alternative is recorded as a conflict. Triage shows a small marker on those rows
-with both values one click apart. Personal edits always win.
+The importer does not mutate a pre-existing entry to store conflict evidence.
+For a new entry assembled from multiple source rows, deterministic confidence
+(Calibre > Goodreads for metadata and scores) chooses its initial values. All
+losing or incoming alternatives are stored in the batch's durable import audit
+records. Triage joins unresolved audit conflicts to rows and offers an explicit
+choice; personal edits always win.
 
 Import is idempotent: re-running the same file changes nothing. Provenance and
 safe undo are tracked by `import_batches` and an import ledger linking each batch
@@ -414,15 +432,18 @@ FastAPI, JSON, no auth in v1 (bind to LAN / behind Nginx Proxy Manager).
 
 ```
 GET    /api/search?q=…                 → merged candidates
-GET    /api/search/resolve?url=…       → single candidate from a URL or ISBN
-POST   /api/entries                    → {source, source_id} | {manual: {...}}
+GET    /api/search/resolve?url=…       → single candidate, or edition candidates for a work URL
+POST   /api/entries                    → {source, source_id, source_refs?[]} | {manual: {...}}
                                           + {status, score?, shelves?[]}
-                                          creates/reuses item, creates entry
+                                          refetches the primary source, validates secondary
+                                          refs against canonical identity, creates/reuses item
+                                          and entry
 GET    /api/entries?status=&shelf=&sort=&order=&q=
 PATCH  /api/entries/{id}               → status, score, notes, dates, shelves
-PATCH  /api/entries/bulk               → {entry_ids[], set:{status?, score?,
-                                          add_shelves?[], remove_shelves?[],
-                                          clear_provisional?}}
+PATCH  /api/entries/bulk               → {entry_ids[]} or
+                                          {filter, excluded_entry_ids[]}, plus
+                                          {set:{status?, score?, add_shelves?[],
+                                          remove_shelves?[], clear_provisional?}}
 POST   /api/entries/accept-suggested   → {filter} applies suggested_status in bulk
 DELETE /api/entries/{id}
 GET    /api/items/{id}
@@ -441,9 +462,10 @@ GET    /api/import/jobs/{id}           → progress for background enrichment
 DELETE /api/import/batches/{id}        → undo an import batch
 ```
 
-`POST /api/entries` is deliberately one call: given a provider hit, it fetches,
-dedupes the item, downloads the cover, and creates the entry atomically. The
-20-second add flow depends on this not being three round trips.
+`POST /api/entries` is deliberately one client call: given a provider hit, it
+fetches and dedupes, commits the item/entry relationally, then installs a prepared
+cover or queues retryable cover work. Cover failure never rolls back the valid
+entry. The 20-second add flow depends on this not being three client round trips.
 
 **Sort keys:** `date_added` (default, desc), `score`, `title`, `sort_author`,
 `year`, `date_finished`. NULL scores sort last regardless of direction.
@@ -587,8 +609,9 @@ unless you choose it.
   `d` set status, `s` opens shelf autocomplete, `Enter` commits and advances.
   This is the MAL-style rhythm, and it's what makes the leftover hundred books
   tolerable.
-- **Conflicts** — rows with `import_conflicts` show a marker; clicking expands
-  both values inline with one click to switch. Never a modal.
+- **Conflicts** — rows with unresolved conflicts in their joined import audit
+  records show a marker; clicking expands both values inline with one click to
+  choose. Never a modal.
 - **Deferring is fine and explicit.** No "you must finish" pressure. The badge
   count on `/` is the only nag. Books can sit `unsorted` indefinitely and still
   be searchable.
@@ -636,21 +659,25 @@ Listed so they're not re-litigated during build.
 Goodreads-shaped CSV. Agreed in principle, not a priority. Note the interim
 risk: until this exists, your only exit path is the SQLite file itself. That's
 genuinely fine — it's a documented open format you can query with any tool —
-but it means **the nightly DB backup (§8) is not optional.** Do that from day
-one and the export can wait indefinitely.
+but it means **the nightly DB backup (§8) is not optional in production.** Enable
+it with the first production deployment and the export can wait indefinitely.
 
-**v2 — Auth.** None in v1; LAN-only, bound behind NPM. When it lands: single
-env-var password with a signed session cookie, which is also the prerequisite
-for public share links. Until then, the operational rule is that this host must
-not be exposed externally — worth a comment in the compose file so future-you
-doesn't forget while adding a proxy host at 1am.
+**v2 — Auth.** None in v1; LAN-only. Internal Nginx Proxy Manager routing is
+allowed, but there must be no public DNS, internet port-forwarding, tunnel, or
+internet-reachable proxy host until authentication exists. When auth lands:
+single env-var password with a signed session cookie, which is also the
+prerequisite for public share links. Docker may bind the container normally;
+restrict exposure at published ports, firewall, DNS, and proxy layers. Keep this
+warning in Compose so future-you doesn't expose it while adding a host at 1am.
 
 **v2 — sharing.** Public read-only list URLs. Cheap *if* the list view is
 already `render(entries WHERE user=X, filter, sort)` and authorization is a
 separate check. Build the view that way now; add the route later.
 
-**v2 — multiuser.** `user_id` already exists on `entries` and `shelves`. Adding
-auth touches routing and nothing else. No schema migration required.
+**v2 — multiuser.** `user_id` on `entries` and `shelves` reduces data-model
+churn, but multiuser still requires a real users table, ownership backfill,
+authentication identities, authorization checks, and uniqueness validation.
+Do not claim it is migration-free.
 
 **v2 — Calibre write-back.** Pushing your scores into Calibre's `ratings` table
 so the two stay in sync. Technically easy given the identical 0–10 scale, but it
@@ -684,7 +711,7 @@ Resolved during spec review; recorded so they aren't reopened.
 | 4 | Rereads | Stay lossy: latest dates, one score, `reread_count`. No `readings` table |
 | 5 | Scale | TanStack Virtual + keyset pagination; animation budget spent on interactions, not scrolling (§6, §7) |
 | 6 | Export | Deferred to v2. Nightly DB backup becomes mandatory in the meantime (§9) |
-| 7 | Auth | Deferred to v2. LAN-only, must not be exposed via NPM (§9) |
+| 7 | Auth | Deferred to v2. LAN-only; internal NPM is allowed, but no internet-reachable proxy/DNS/forwarding until auth (§9) |
 
 ---
 

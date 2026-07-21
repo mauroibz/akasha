@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_revision": 1,
+  "plan_revision": 2,
   "project_status": "ready",
   "active_sprint": "001",
   "active_sprint_file": "docs/sprints/001-foundation.md",
@@ -8,5 +8,5 @@
   "last_completed_sprint": null,
   "completed_sprints": [],
   "started_at": null,
-  "updated_at": "2026-07-21T17:03:17-03:00"
+  "updated_at": "2026-07-21T17:39:38-03:00"
 }
