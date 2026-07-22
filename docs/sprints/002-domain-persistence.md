@@ -1,6 +1,6 @@
 # Sprint 002 — Domain model and durable persistence
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 001
 **Roadmap revision:** 2
 
