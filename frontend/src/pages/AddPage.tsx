@@ -26,6 +26,8 @@ export function AddPage() {
   );
   const [shelfIds, setShelfIds] = useState<number[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
+  const statusRef = useRef<HTMLSelectElement>(null);
+  const nearRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   useEffect(() => {
     if (query.trim().length < 2) return setResults([]);
@@ -53,6 +55,12 @@ export function AddPage() {
   useEffect(() => {
     if (manual) titleRef.current?.focus();
   }, [manual]);
+  useEffect(() => {
+    if (selected) statusRef.current?.focus();
+  }, [selected]);
+  useEffect(() => {
+    if (near.length) nearRef.current?.focus();
+  }, [near]);
 
   async function submit(form: HTMLFormElement, confirmed = false) {
     if (near.length && !confirmed) return;
@@ -208,6 +216,7 @@ export function AddPage() {
             <label>
               Status
               <select
+                ref={statusRef}
                 className="field"
                 value={status}
                 onChange={(e) => setStatus(e.target.value as EntryStatus)}
@@ -262,6 +271,7 @@ export function AddPage() {
                 anyway?
               </p>
               <button
+                ref={nearRef}
                 type="button"
                 onClick={(e) => void submit(e.currentTarget.form!, true)}
               >

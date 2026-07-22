@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   getEntry,
@@ -19,6 +19,7 @@ export function DetailPage() {
     "opinion" | "metadata" | "refresh" | null
   >(null);
   const [error, setError] = useState("");
+  const headingRef = useRef<HTMLHeadingElement>(null);
   const detail = useQuery({
     queryKey: ["entry", entryId],
     queryFn: () => getEntry(entryId),
@@ -38,6 +39,9 @@ export function DetailPage() {
     },
     onError: (value: Error) => setError(value.message),
   });
+  useEffect(() => {
+    if (detail.data) headingRef.current?.focus();
+  }, [detail.data]);
   if (detail.isPending) return <p role="status">Loading book detail…</p>;
   if (!detail.data) return <p role="alert">Book detail could not be loaded</p>;
   const entry = detail.data;
@@ -74,7 +78,13 @@ export function DetailPage() {
           </label>
         </aside>
         <section>
-          <h1 className="text-4xl font-semibold">{item.title}</h1>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-4xl font-semibold focus:outline-none"
+          >
+            {item.title}
+          </h1>
           <p className="text-zinc-400">{item.subtitle}</p>
           <p>
             {item.sort_author} · {item.year}
@@ -134,7 +144,12 @@ export function DetailPage() {
           <h2>Edit your opinion</h2>
           <label>
             Status
-            <select name="status" defaultValue={entry.status} className="field">
+            <select
+              autoFocus
+              name="status"
+              defaultValue={entry.status}
+              className="field"
+            >
               <option value="read">Read</option>
               <option value="reading">Reading</option>
               <option value="to_read">To read</option>
@@ -314,6 +329,7 @@ export function DetailPage() {
             Provider-managed fields will be replaced. Opinion data is preserved.
           </p>
           <button
+            autoFocus
             onClick={() => {
               update.mutate(() => refreshItem(item.id));
               setDialog(null);
