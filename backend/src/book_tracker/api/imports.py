@@ -77,6 +77,29 @@ class CommitResponse(BaseModel):
     unchanged_entries: int
 
 
+class JobProgressResponse(BaseModel):
+    id: str
+    batch_id: str | None = None
+    kind: str
+    state: str
+    progress: dict[str, Any] = Field(default_factory=dict)
+    error: str | None = None
+    attempts: int = 0
+    created_at: str
+    finished_at: str | None = None
+
+
+class UndoEffectSummary(BaseModel):
+    batch_id: str
+    state: str
+    reverted: int
+    retained: int
+    skipped: int
+    reverted_entries: int = 0
+    reverted_items: int = 0
+    retained_items: int = 0
+
+
 def service(request: Request) -> GoodreadsImportService:
     return GoodreadsImportService(request.app.state.engine, request.app.state.data_dir)
 
@@ -150,3 +173,38 @@ async def calibre_commit(body: CommitBody, request: Request) -> CommitResponse:
         code = "unresolved_ambiguities" if str(error).startswith("[") else str(error)
         raise LibraryError(code, "Import preview cannot be committed", status_code=409) from error
     return CommitResponse.model_validate(result)
+
+
+@router.get("/jobs/{job_id}", response_model=JobProgressResponse)
+async def get_job_progress(job_id: str, request: Request) -> JobProgressResponse:
+    from book_tracker.infrastructure.jobs import JobRepository
+
+    repo = JobRepository(request.app.state.engine)
+    job = repo.get_job(job_id)
+    if job is None:
+        raise LibraryError("job_not_found", "Job was not found", status_code=404)
+    return JobProgressResponse.model_validate(job)
+
+
+@router.delete("/batches/{batch_id}", response_model=UndoEffectSummary)
+async def undo_batch(batch_id: str, request: Request) -> UndoEffectSummary:
+    from book_tracker.application.undo import UndoExpiredError, UndoService
+
+    undo = UndoService(request.app.state.engine)
+    try:
+        result = undo.undo(batch_id)
+    except LookupError as error:
+        raise LibraryError(
+            "import_batch_not_found", "Import batch was not found", status_code=404
+        ) from error
+    except UndoExpiredError as error:
+        raise LibraryError(
+            "undo_expired",
+            "Undo window has expired (24 hours since commit)",
+            status_code=409,
+        ) from error
+    except ValueError as error:
+        raise LibraryError(
+            "undo_not_committable", str(error), status_code=409
+        ) from error
+    return UndoEffectSummary.model_validate(result)

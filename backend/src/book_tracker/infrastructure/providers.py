@@ -261,6 +261,10 @@ class OpenLibraryProvider:
             cover_fallback_urls=tuple(cover_urls[1:]),
         )
 
+    async def fetch_by_isbn(self, isbn: str) -> ItemPayload:
+        """Fetch edition data by ISBN. Used by background enrichment."""
+        return await self.fetch(isbn)
+
     async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._json(
             f"https://openlibrary.org/works/{work_id}/editions.json", limit=min(limit, 20)
@@ -390,6 +394,19 @@ class GoogleBooksProvider:
     async def fetch(self, source_id: str) -> ItemPayload:
         row = await self._get(f"https://www.googleapis.com/books/v1/volumes/{source_id}")
         candidate = self._candidate(row)
+        if candidate is None:
+            raise ProviderPayloadError("Google Books volume is incomplete")
+        return ItemPayload(**candidate.__dict__)
+
+    async def fetch_by_isbn(self, isbn: str) -> ItemPayload:
+        """Fetch edition data by ISBN. Used by background enrichment."""
+        body = await self._get(
+            "https://www.googleapis.com/books/v1/volumes", q=f"isbn:{isbn}", maxResults=1
+        )
+        items = body.get("items", [])
+        if not isinstance(items, list) or not items:
+            raise ProviderPayloadError("Google Books found no volume for ISBN")
+        candidate = self._candidate(items[0])
         if candidate is None:
             raise ProviderPayloadError("Google Books volume is incomplete")
         return ItemPayload(**candidate.__dict__)

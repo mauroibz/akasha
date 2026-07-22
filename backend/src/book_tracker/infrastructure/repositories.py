@@ -2,7 +2,7 @@ import json
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Engine, delete, select
@@ -736,5 +736,8 @@ class ImportRepository:
             batch.state = "committed"
             batch.counters = json.dumps(counters)
             batch.committed_at = now
+            batch.undo_expires_at = (
+                datetime.now(UTC) + timedelta(hours=24)
+            ).isoformat().replace("+00:00", "Z")
             batch.updated_at = now
             return {"batch_id": batch.id, "state": "committed", **counters}

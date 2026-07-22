@@ -1,6 +1,6 @@
 # Sprint 011 — Durable enrichment and safe undo
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 010
 **Roadmap revision:** 4
 
