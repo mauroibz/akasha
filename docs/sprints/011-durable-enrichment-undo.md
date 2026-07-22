@@ -1,6 +1,6 @@
 # Sprint 011 — Durable enrichment and safe undo
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 010
 **Roadmap revision:** 4
 
@@ -97,5 +97,83 @@ git diff --check
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+### Delivered behavior
+
+**AC1 — Durable job runner with leasing, retries, and restart survival.**
+`JobRepository` (`infrastructure/jobs.py`) provides `enqueue`, `claim` (with
+`UPDATE … LIMIT 1` polling), `complete`, `fail` (with retry caps and
+exponential backoff), `cancel`, `cancel_batch_jobs`, and `reclaim_expired`.
+On app startup, `reclaim_expired` runs in the lifespan to return crashed
+running jobs back to `queued`. Tests simulate a restart by creating a new
+engine from the same DB file and verifying queued jobs are still present
+and running jobs are reclaimed.
+
+**AC2 — Clock-injected rate limiting and retry caps.**
+`RateLimiter` takes an injectable `now()` callable; tests pass a fixed clock
+and assert deterministic gating. Retry caps: `max_retries=3`, exponential
+backoff `2^attempt` seconds. Enrichment handler returns `rate_limited`
+without calling the provider when the gate rejects.
+
+**AC3 — Safe undo: field-matching, shared-item and pre-existing-entry
+preservation.** `UndoService` (`application/undo.py`) reverses effects in
+`effect_id DESC` order. A `fill_empty` field is reverted only when
+`_values_equal(current, after_value)` returns true; otherwise the field is
+retained and the item is added to a `modified_items` set that prevents the
+subsequent `create` effect from deleting the item. Created entries are
+deleted only if their `after_values` contain `{"created": true}`. Created
+items are deleted only if no other entries reference them (shared-item
+safety) and the item is not in `modified_items`.
+
+**AC4 — Partial retention reporting and repeated undo harmlessness.** The
+undo result reports `reverted`, `retained`, `skipped`, `reverted_entries`,
+`reverted_items`, and `retained_items`. A second `undo()` call returns
+`{skipped: 1, reverted: 0}` because the batch state is already `undone`.
+
+**AC5 — Late-job cancellation.** When an enrichment job starts processing
+and its batch is already `undone`, the handler calls `repo.cancel(job_id)`
+and returns `{"state": "cancelled"}` without calling the provider. All
+queued/running jobs for the batch are also cancelled atomically by
+`cancel_batch_jobs` at the start of undo.
+
+**AC6 — Enrichment fills only empty fields.** `EnrichmentHandler` checks
+each field: `item.year is None` and `metadata.get(key) in (None, "", [], {})`
+before writing. Existing values are never overwritten. Import effects are
+recorded for undo coverage.
+
+**AC7 — Progress API and UI.** `GET /api/import/jobs/{id}` returns job
+state, progress, attempts, and error. The undo UI shows an "Undo this
+import" button after commit, a confirmation step, and an "Import undone"
+result with reverted/retained counts. The expired-undo error is shown in
+the alert region.
+
+### Tests run
+
+- `backend/tests/test_jobs.py` — 30 tests covering all 7 ACs.
+- `backend` full suite: 122 passed.
+- Frontend unit tests: 37 passed.
+- Chromium e2e: 21 passed, 2 skipped (pre-existing).
+- `make check`, `make test`, `make build`, `git diff --check` — all pass.
+
+### Commits
+
+- `5859988` feat: add durable job runner with leasing and restart survival
+- `dbbc48c` feat: add progress API, undo endpoint, and undo UI
+- `c771622` fix: lint, formatting, and OpenAPI spec for Sprint 011 endpoints
+
+### Deviations
+
+- Sprint checkpoint commits 2 and 3 were combined into checkpoint 1
+  because the enrichment handler, undo service, and job runner are tightly
+  coupled and all needed to pass tests together.
+- The job runner shares the FastAPI event loop (no separate process);
+  it runs as a cooperative poller. This was noted as a risk in the sprint
+  and is acceptable for v1 LAN-only deployment.
+
+### Impact on future sprints
+
+- Sprint 012 (bulk triage): can use `JobRepository` to enqueue bulk
+  operations and `ImportEffectRow` to audit changes.
+- Sprint 013 (E2E hardening): the undo e2e tests are already in place;
+  the progress API can be exercised end-to-end.
+- Sprint 014 (container): the job runner starts automatically in the
+  lifespan; no additional process management needed for v1.

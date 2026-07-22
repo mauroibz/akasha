@@ -1,35 +1,40 @@
-# Agent handoff
+# Handoff — current reality
 
-**State:** Sprint 010 completed; Sprint 011 is ready and unclaimed.
-**Active sprint:** [`011-durable-enrichment-undo.md`](../sprints/011-durable-enrichment-undo.md)
-**Worktree expectation:** clean after the Sprint 010 closure commit.
+**Last completed:** Sprint 011 (durable-enrichment-undo), 2026-07-22.
+**Next:** Sprint 012 (bulk-first triage) — status `ready`, but the sprint file
+`docs/sprints/012-bulk-first-triage.md` does not yet exist. It must be expanded
+from the roadmap entry before implementation can begin.
 
-## Current reality
+## What was built in Sprint 011
 
-- The application has a responsive editorial shell (AppShell) with desktop/mobile navigation for
-  Library, Add, Import, and Shelves. Unknown routes show a 404 with recovery links.
-- Virtual library rows open detail by clicking the title/cover or pressing Enter; inline score/status
-  controls remain independently operable. Library filters (status, shelf, query, sort) are URL-backed
-  and reload-stable. New entries return to `/` with a highlight ring; exact duplicates open detail with
-  a toast.
-- Detail page shows all cached metadata, identifiers, sources, dates, notes, shelves, and cover state
-  in personal-reading and edition-facts regions. Edit/refresh/delete dialogs trap focus, close on
-  Escape, and preserve input on failure. Confirmed deletion calls DELETE, invalidates caches, and
-  returns to the library with a toast.
-- `/shelves` provides create, rename, confirmed delete with entry counts. Backend `ShelfResponse`
-  includes `entry_count` via a count subquery. Duplicate slugs surface actionable errors.
-- Segmented ScorePicker (1–10) is used in add, detail, and inline library editing. CoverImage provides
-  skeleton placeholders and broken-cover fallbacks without layout shift.
-- Import flows (Goodreads and Calibre) retain all tested behavior inside the new shell.
-- The verified baseline is 92 backend tests, 37 frontend component tests, and 19 Chromium e2e flows.
-- OpenAPI and typed frontend clients include the `entry_count` shelf response field.
+- **Job runner** (`backend/src/book_tracker/infrastructure/jobs.py`):
+  `JobRepository` with enqueue/claim/complete/fail/cancel/reclaim_expired,
+  `RateLimiter` with clock-injected gating, `JobRunner` cooperative poller.
+- **Enrichment** (`backend/src/book_tracker/application/enrichment.py`):
+  fills empty item fields from providers, records `import_effects` for undo
+  coverage, skips undone batches (late-job guard).
+- **Undo** (`backend/src/book_tracker/application/undo.py`): reverses effects
+  in descending order, reverts fill_empty only when current value matches
+  after-value, preserves edited/shared/pre-existing entities, 24-hour window.
+- **API**: `GET /api/import/jobs/{id}`, `DELETE /api/import/batches/{id}`.
+- **UI**: undo button with confirmation, result display with reverted/retained
+  counts, back-to-library link.
+- **Tests**: `backend/tests/test_jobs.py` (30 tests), e2e undo flow tests.
 
-## First action
+## State
 
-Expand Sprint 011 from `TEMPLATE.md` into `docs/sprints/011-durable-enrichment-undo.md`, incorporating
-actual deviations from Sprint 010. The sprint delivers DB-backed job polling, enrichment, and safe
-24-hour undo using the import-effect ledger already recorded by Sprints 007–009.
+- All commits are on `main`, pushed to `origin/main`.
+- Worktree is clean.
+- `docs/agent/state.json` has `active_sprint: "012"`, `active_sprint_status: "ready"`.
+- `docs/sprints/012-bulk-first-triage.md` does not exist — create it first.
+- New decisions: DEC-018 (job runner shares event loop), DEC-019 (undo
+  field-matching semantics).
 
-## Known blockers
+## Key files to read for Sprint 012
 
-None. Isolated `uv build` may need approved network access for Hatchling when its cache is cold.
+- `docs/sprints/ROADMAP.md` — Sprint 012 scope and acceptance criteria.
+- `backend/src/book_tracker/infrastructure/jobs.py` — job queue infrastructure.
+- `backend/src/book_tracker/infrastructure/repositories.py` — existing query patterns.
+- `backend/src/book_tracker/api/library.py` — existing API endpoints to extend.
+- `frontend/src/pages/HomePage.tsx` — current library view to replace with table.
+- `frontend/src/api/imports.ts` — undo/progress API functions added in Sprint 011.

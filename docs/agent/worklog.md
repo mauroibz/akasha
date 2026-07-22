@@ -176,3 +176,36 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 011 (durable jobs, enrichment, safe undo) and expand its sprint file from
   TEMPLATE.md.
+
+## Session 2026-07-22 — Sprint 011 (durable-enrichment-undo)
+
+**Done:**
+- Implemented durable job runner (`infrastructure/jobs.py`): enqueue, claim with polling,
+  complete, fail with retry caps and exponential backoff, cancel, cancel_batch_jobs,
+  reclaim_expired.
+- Implemented clock-injected rate limiting (`RateLimiter`) for provider calls.
+- Implemented enrichment handler (`application/enrichment.py`) that fills only empty
+  item fields from providers, records import effects for undo coverage, and skips
+  undone batches (late-job guard).
+- Implemented safe undo (`application/undo.py`) with 24-hour window, field-matching
+  semantics, shared-item/pre-existing-entry preservation, partial retention reporting,
+  and repeated undo harmlessness.
+- Added API endpoints: `GET /api/import/jobs/{id}` for progress, `DELETE /api/import/batches/{id}` for undo.
+- Added undo UI with confirmation step and result display.
+- Added e2e tests for undo flow and expired-undo error.
+- Set `undo_expires_at` to 24h after commit in `repositories.py`.
+- Added `fetch_by_isbn` to OpenLibraryProvider and GoogleBooksProvider.
+
+**Verified:**
+- `backend/tests/test_jobs.py`: 30 tests, all pass.
+- `make test` (backend + frontend): 122 + 37 = 159 passed.
+- `npx playwright test`: 21 passed, 2 skipped (pre-existing).
+- `make check`, `make build`, `git diff --check`: all pass.
+
+**Deviations:**
+- Sprint checkpoint commits 2 and 3 were combined into checkpoint 1 due to tight coupling.
+- Job runner shares FastAPI event loop (no separate process); recorded as DEC-018.
+- Undo field-matching semantics recorded as DEC-019.
+
+**Next:** Sprint 012 (bulk-first triage) — sprint file does not yet exist; needs to be
+expanded from the roadmap before implementation can begin.

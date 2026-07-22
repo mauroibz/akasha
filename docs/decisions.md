@@ -156,3 +156,35 @@ Append-only record of material architecture choices, product-default resolutions
   time. OpenAPI and typed frontend clients were regenerated.
 - **Consequence:** Shelf management can display counts and update them after mutations without a
   separate API call. The count is always fresh from the database.
+
+## DEC-018 — Job runner shares the FastAPI event loop
+
+- **Date:** 2026-07-22
+- **Status:** accepted
+- **Context:** Sprint 011 needs a durable background job runner for enrichment tasks. The
+  sprint risk notes asked whether a separate process is needed or the runner can share the
+  FastAPI event loop.
+- **Decision:** The `JobRunner` runs as a cooperative poller within the FastAPI lifespan.
+  It uses `UPDATE … LIMIT 1` to atomically claim jobs without a separate worker process.
+  Rate limiting and retry caps are clock-injected for deterministic testing. On startup,
+  `reclaim_expired` returns crashed running jobs to `queued`.
+- **Consequence:** No additional process management is needed for v1 LAN-only deployment.
+  The runner is testable without subprocess orchestration. If throughput demands a separate
+  worker later, the `JobRepository` API already supports external claiming.
+
+## DEC-019 — Undo field-matching semantics
+
+- **Date:** 2026-07-22
+- **Status:** accepted
+- **Context:** Sprint 011's safe undo must not remove later user edits. The spec requires
+  reverting a field only if the current value still matches the recorded imported value.
+- **Decision:** `UndoService` records `before_values` and `after_values` in
+  `import_effects`. On undo, a `fill_empty` field is reverted to `before_values[field]`
+  only when `_values_equal(current, after_values[field])` returns true. If the current
+  value differs (user edited after import), the field is retained and counted as
+  `retained`. Items with any retained field are added to a `modified_items` set that
+  prevents their `create` effect from deleting the item. Created entries are deleted only
+  if `after_values` contains `{"created": true}`. Created items are deleted only if no
+  other entries reference them (shared-item safety).
+- **Consequence:** Undo is safe to run at any time within the 24-hour window. Partial
+  retention is reported in the API response and UI. Repeated undo is a no-op.

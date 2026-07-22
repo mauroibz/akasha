@@ -177,7 +177,7 @@ Scope and acceptance are detailed in the linked sprint contract. It delivers DB-
 rate-limited enrichment, and safe 24-hour undo using the import-effect ledger established in Sprints
 007–009.
 
-### Sprint 012 — Bulk-first triage
+### [Sprint 012 — Bulk-first triage](012-bulk-first-triage.md)
 
 Scope:
 
