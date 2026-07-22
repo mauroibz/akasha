@@ -1,6 +1,6 @@
 # Sprint 006 — Add, detail, and metadata-edit UI
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 004, 005
 **Roadmap revision:** 2
 

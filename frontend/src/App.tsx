@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 
 import { HomePage } from "@/pages/HomePage";
-import { ComingSoonPage } from "@/pages/ComingSoonPage";
+import { AddPage } from "@/pages/AddPage";
 
 const queryClient = new QueryClient();
 
@@ -12,7 +12,7 @@ export function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<HomePage />} />
-          <Route path="/add" element={<ComingSoonPage />} />
+          <Route path="/add" element={<AddPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

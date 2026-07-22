@@ -1,0 +1,68 @@
+import type { EntryStatus, LibraryEntry, Shelf } from "./library";
+
+export interface SourceRef {
+  source: string;
+  source_id: string;
+}
+export interface SearchCandidate {
+  source: string;
+  source_id: string;
+  source_refs: SourceRef[];
+  title: string;
+  subtitle: string | null;
+  authors: string[];
+  year: number | null;
+  cover_url: string | null;
+  identifiers: Record<string, string>;
+  language: string | null;
+  metadata: Record<string, unknown>;
+}
+export interface ManualItem {
+  title: string;
+  subtitle?: string;
+  authors: string[];
+  year?: number;
+  publisher?: string;
+  language?: string;
+  isbn?: string;
+}
+export interface CreateEntryResponse {
+  entry: LibraryEntry;
+  already_exists: boolean;
+  near_matches: number[];
+}
+
+async function json<T>(response: Response, message: string): Promise<T> {
+  if (!response.ok) throw new Error(message);
+  return response.json() as Promise<T>;
+}
+export function searchBooks(value: string) {
+  const resolved = /^(https?:\/\/|[\dXx -]{10,17}$)/.test(value.trim());
+  const route = resolved
+    ? `/api/search/resolve?url=${encodeURIComponent(value.trim())}`
+    : `/api/search?q=${encodeURIComponent(value.trim())}`;
+  return fetch(route, { headers: { Accept: "application/json" } }).then((r) =>
+    json<SearchCandidate[]>(r, "Metadata providers are unavailable"),
+  );
+}
+export function getShelves() {
+  return fetch("/api/shelves").then((r) =>
+    json<Shelf[]>(r, "Shelves could not be loaded"),
+  );
+}
+export function createEntry(body: {
+  manual?: ManualItem;
+  source?: string;
+  source_id?: string;
+  source_refs?: SourceRef[];
+  status: EntryStatus;
+  score?: number;
+  shelf_ids: number[];
+  idempotency_key?: string;
+}) {
+  return fetch("/api/entries", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  }).then((r) => json<CreateEntryResponse>(r, "Book could not be added"));
+}
