@@ -68,6 +68,63 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
   await expect(page.locator("main")).toBeVisible();
 });
 
+test("Calibre preview and re-sync are keyboard-complete at mobile width", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 375, height: 740 });
+  let previewBody: unknown;
+  let commitBody: unknown;
+  await page.route("**/api/import/calibre/preview", async (route) => {
+    previewBody = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "calibre-1",
+        fingerprint: "db",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [
+          {
+            ...record,
+            goodreads_book_id: null,
+            calibre_book_id: "1",
+            calibre_uuid: "uuid-1",
+            title: "Ficciones",
+            authors: ["Jorge Luis Borges"],
+            score: 9,
+            score_provisional: false,
+            cover_staged: true,
+          },
+        ],
+      },
+    });
+  });
+  await page.route("**/api/import/calibre/commit", async (route) => {
+    commitBody = route.request().postDataJSON();
+    await route.fulfill({
+      json: {
+        batch_id: "calibre-1",
+        state: "committed",
+        created_items: 1,
+        created_entries: 1,
+        unchanged_entries: 0,
+      },
+    });
+  });
+  await page.goto("/import");
+  await page.getByRole("tab", { name: "Calibre" }).press("Enter");
+  await expect(page.getByLabel(/calibre library path/i)).toBeFocused();
+  await page.getByLabel(/calibre library path/i).fill("Library");
+  await page.getByRole("button", { name: /preview calibre/i }).press("Enter");
+  await expect(page.getByText(/local cover staged/i)).toBeVisible();
+  await page
+    .getByRole("button", { name: /import 1 ready row/i })
+    .press("Enter");
+  await expect(page.getByRole("status")).toContainText("1 book added");
+  expect(previewBody).toEqual({ library_path: "Library" });
+  expect(commitBody).toEqual({ batch_id: "calibre-1", choices: [] });
+});
+
 test("row errors and ambiguity require an explicit choice", async ({
   page,
 }) => {

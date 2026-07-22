@@ -8,6 +8,75 @@ import { ImportPage } from "./ImportPage";
 afterEach(() => vi.restoreAllMocks());
 
 describe("ImportPage", () => {
+  it("previews and commits a confined Calibre library without asking for a file", async () => {
+    const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      requests.push([input, init]);
+      if (String(input).endsWith("calibre/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "calibre-1",
+            fingerprint: "db",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [
+              {
+                record_id: 8,
+                row_number: 2,
+                calibre_book_id: "1",
+                calibre_uuid: "uuid-1",
+                title: "Ficciones",
+                authors: ["Jorge Luis Borges"],
+                isbn: "9780141187761",
+                suggested_status: null,
+                score: 9,
+                score_provisional: false,
+                shelves: ["cuentos"],
+                errors: [],
+                planned_action: "create_item",
+                match_kind: "new",
+                candidates: [],
+                cover_staged: true,
+              },
+            ],
+          }),
+          { status: 201 },
+        );
+      return new Response(
+        JSON.stringify({
+          batch_id: "calibre-1",
+          state: "committed",
+          created_items: 1,
+          created_entries: 1,
+          unchanged_entries: 0,
+        }),
+      );
+    });
+    render(
+      <MemoryRouter>
+        <ImportPage />
+      </MemoryRouter>,
+    );
+    await userEvent.click(screen.getByRole("tab", { name: /calibre/i }));
+    expect(screen.getByText(/read-only/i)).toBeVisible();
+    await userEvent.type(screen.getByLabelText(/library path/i), "My Books");
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre/i }),
+    );
+    expect(await screen.findByText(/local cover staged/i)).toBeVisible();
+    expect(screen.getByText(/rating 9/i)).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: /import 1 ready row/i }),
+    );
+    expect(requests[0]).toEqual([
+      "/api/import/calibre/preview",
+      expect.objectContaining({
+        body: JSON.stringify({ library_path: "My Books" }),
+      }),
+    ]);
+    expect(String(requests[1][0])).toContain("/api/import/calibre/commit");
+  });
+
   it("previews once, exposes errors and commits only the recorded batch", async () => {
     const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {

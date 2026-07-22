@@ -1,7 +1,9 @@
 export interface ImportRecord {
   record_id: number;
   row_number: number;
-  goodreads_book_id: string;
+  goodreads_book_id?: string | null;
+  calibre_book_id?: string | null;
+  calibre_uuid?: string | null;
   title: string;
   authors: string[];
   isbn: string | null;
@@ -13,6 +15,7 @@ export interface ImportRecord {
   planned_action: string;
   match_kind: string;
   candidates: number[];
+  cover_staged?: boolean;
 }
 export interface ImportPreview {
   batch_id: string;
@@ -53,6 +56,25 @@ export function commitGoodreads(
   choices: Array<{ record_id: number; item_id: number | null }>,
 ) {
   return fetch("/api/import/goodreads/commit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ batch_id: batchId, choices }),
+  }).then((response) => responseJson<ImportResult>(response));
+}
+
+export function previewCalibre(libraryPath: string) {
+  return fetch("/api/import/calibre/preview", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ library_path: libraryPath }),
+  }).then((response) => responseJson<ImportPreview>(response));
+}
+
+export function commitCalibre(
+  batchId: string,
+  choices: Array<{ record_id: number; item_id: number | null }>,
+) {
+  return fetch("/api/import/calibre/commit", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ batch_id: batchId, choices }),

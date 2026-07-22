@@ -3,13 +3,17 @@ import { Link } from "react-router-dom";
 
 import {
   commitGoodreads,
+  commitCalibre,
+  previewCalibre,
   previewGoodreads,
   type ImportPreview,
   type ImportResult,
 } from "@/api/imports";
 
 export function ImportPage() {
+  const [source, setSource] = useState<"goodreads" | "calibre">("goodreads");
   const [file, setFile] = useState<File | null>(null);
+  const [libraryPath, setLibraryPath] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [choices, setChoices] = useState<Record<number, number | "new">>({});
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -40,38 +44,93 @@ export function ImportPage() {
       </Link>
       <h1 className="mt-6 text-4xl font-semibold">Import books</h1>
       <p className="mt-2 text-zinc-400">
-        Goodreads CSV is previewed locally before anything enters your library.
-        Metadata enrichment and undo are not part of this step.
+        Preview a source before anything enters your library. Existing values
+        are preserved when a re-sync only supplies missing metadata.
       </p>
+      {!preview && (
+        <div
+          className="mt-7 flex gap-2"
+          role="tablist"
+          aria-label="Import source"
+        >
+          {(["goodreads", "calibre"] as const).map((value) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={source === value}
+              className={`focus-ring rounded-full px-5 py-2 capitalize ${source === value ? "bg-fuchsia-600" : "bg-zinc-800"}`}
+              onClick={() => {
+                setSource(value);
+                setError("");
+              }}
+            >
+              {value}
+            </button>
+          ))}
+        </div>
+      )}
       {!preview && (
         <form
           className="mt-8 space-y-5 rounded-2xl bg-zinc-900 p-5"
           onSubmit={(event) => {
             event.preventDefault();
-            if (!file) return;
+            if (source === "goodreads" && !file) return;
+            if (source === "calibre" && !libraryPath.trim()) return;
             setPending(true);
             setError("");
-            void previewGoodreads(file)
+            const request =
+              source === "goodreads"
+                ? previewGoodreads(file as File)
+                : previewCalibre(libraryPath.trim());
+            void request
               .then(setPreview)
               .catch((reason: Error) => setError(reason.message))
               .finally(() => setPending(false));
           }}
         >
-          <label className="block">
-            Goodreads CSV
-            <input
-              autoFocus
-              className="field"
-              type="file"
-              accept=".csv,text/csv"
-              onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-            />
-          </label>
+          {source === "goodreads" ? (
+            <label className="block">
+              Goodreads CSV
+              <input
+                autoFocus
+                className="field"
+                type="file"
+                accept=".csv,text/csv"
+                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+              />
+            </label>
+          ) : (
+            <>
+              <p className="rounded-xl bg-zinc-800 p-4 text-sm text-zinc-300">
+                Akasha opens this library read-only inside the configured
+                Calibre mount. Enter a relative folder only; absolute paths and
+                parent traversal are rejected. Covers are copied during preview
+                so the source is never needed during commit.
+              </p>
+              <label className="block">
+                Calibre library path
+                <input
+                  autoFocus
+                  className="field"
+                  value={libraryPath}
+                  placeholder="Library"
+                  onChange={(event) => setLibraryPath(event.target.value)}
+                />
+              </label>
+            </>
+          )}
           <button
             className="focus-ring rounded-full bg-fuchsia-600 px-5 py-3"
-            disabled={pending || !file}
+            disabled={
+              pending || (source === "goodreads" ? !file : !libraryPath.trim())
+            }
           >
-            {pending ? "Reading file…" : "Preview import"}
+            {pending
+              ? "Reading source…"
+              : source === "calibre"
+                ? "Preview Calibre library"
+                : "Preview import"}
           </button>
         </form>
       )}
@@ -100,11 +159,18 @@ export function ImportPage() {
                 </h3>
                 <p className="text-sm text-zinc-400">
                   {record.authors.join(", ") || "Author missing"}
-                  {record.score ? ` · provisional score ${record.score}` : ""}
+                  {record.score
+                    ? record.score_provisional
+                      ? ` · provisional score ${record.score}`
+                      : ` · rating ${record.score}`
+                    : ""}
                   {record.suggested_status
                     ? ` · suggested ${record.suggested_status}`
                     : ""}
                 </p>
+                {record.cover_staged && (
+                  <p className="text-sm text-emerald-300">Local cover staged</p>
+                )}
                 {record.errors.map((row, index) => (
                   <p
                     key={`${row.field}-${index}`}
@@ -149,7 +215,9 @@ export function ImportPage() {
             onClick={() => {
               setPending(true);
               setError("");
-              void commitGoodreads(
+              const commit =
+                source === "calibre" ? commitCalibre : commitGoodreads;
+              void commit(
                 preview.batch_id,
                 Object.entries(choices).map(([recordId, value]) => ({
                   record_id: Number(recordId),
