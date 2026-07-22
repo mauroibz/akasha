@@ -1,5 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { HomePage } from "./HomePage";
@@ -10,12 +12,17 @@ function renderPage() {
   });
   return render(
     <QueryClientProvider client={client}>
-      <HomePage />
+      <MemoryRouter>
+        <HomePage />
+      </MemoryRouter>
     </QueryClientProvider>,
   );
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
 
 const populated = {
   items: [
@@ -64,11 +71,9 @@ test("announces loading and then renders the populated library and inbox facet",
   );
   renderPage();
   expect(screen.getByRole("status")).toHaveTextContent("Loading your library");
-  resolveResponse?.(
-    new Response(JSON.stringify(populated), { status: 200 }),
-  );
+  resolveResponse?.(new Response(JSON.stringify(populated), { status: 200 }));
   expect(await screen.findByText("Rayuela")).toBeVisible();
-  expect(screen.getByText(/Inbox 12/)).toBeVisible();
+  expect(screen.getAllByText(/Inbox 12/)[0]).toBeVisible();
   expect(fetch).toHaveBeenCalledWith(
     expect.stringContaining("/api/entries"),
     expect.anything(),
@@ -78,21 +83,22 @@ test("announces loading and then renders the populated library and inbox facet",
 test("renders a useful empty state", async () => {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () =>
-      new Response(
-        JSON.stringify({
-          items: [],
-          next_cursor: null,
-          total: 0,
-          facets: { status_counts: { unsorted: 3 } },
-        }),
-        { status: 200 },
-      ),
+    vi.fn(
+      async () =>
+        new Response(
+          JSON.stringify({
+            items: [],
+            next_cursor: null,
+            total: 0,
+            facets: { status_counts: { unsorted: 3 } },
+          }),
+          { status: 200 },
+        ),
     ),
   );
   renderPage();
   expect(await screen.findByText("Your library is waiting")).toBeVisible();
-  expect(screen.getByText(/Inbox 3/)).toBeVisible();
+  expect(screen.getAllByText(/Inbox 3/)[0]).toBeVisible();
 });
 
 test("announces a library error and offers retry", async () => {
@@ -105,4 +111,97 @@ test("announces a library error and offers retry", async () => {
     "Your library could not be loaded",
   );
   expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
+});
+
+test("persists the compact table preference", async () => {
+  localStorage.clear();
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async () => new Response(JSON.stringify(populated), { status: 200 })),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  await screen.findByText("Rayuela");
+  await user.click(screen.getByRole("button", { name: "Table view" }));
+  expect(localStorage.getItem("akasha.library.view")).toBe("table");
+  expect(screen.getByRole("table", { name: "Library" })).toBeVisible();
+});
+
+test("optimistically clears provisional score styling and rolls back with an announcement", async () => {
+  const provisional = {
+    ...populated,
+    items: [{ ...populated.items[0], score_provisional: true }],
+  };
+  let rejectPatch: ((reason?: unknown) => void) | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Promise<Response>((_resolve, reject) => {
+          rejectPatch = reject;
+        });
+      }
+      return Promise.resolve(
+        new Response(JSON.stringify(provisional), { status: 200 }),
+      );
+    }),
+  );
+  renderPage();
+  const user = userEvent.setup();
+  const score = await screen.findByRole("spinbutton", {
+    name: "Score for Rayuela",
+  });
+  const row = score.closest("article");
+  expect(row).toHaveAttribute("data-provisional", "true");
+  await user.clear(score);
+  await user.type(score, "7");
+  await waitFor(() => expect(score).toHaveValue(7));
+  expect(row).toHaveAttribute("data-provisional", "false");
+  rejectPatch?.(new Error("offline"));
+  expect(
+    await screen.findByText(/previous value was restored/),
+  ).toBeInTheDocument();
+  expect(score).toHaveValue(9);
+});
+
+test("score shortcuts apply to a focused row but editable controls keep their keystrokes", async () => {
+  const fetchMock = vi.fn(
+    async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Response(
+          JSON.stringify({ ...populated.items[0], score: 5 }),
+          { status: 200 },
+        );
+      }
+      return new Response(JSON.stringify(populated), { status: 200 });
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  const user = userEvent.setup();
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  row.focus();
+  await user.keyboard("5");
+  expect(fetchMock).toHaveBeenCalledWith(
+    "/api/entries/7",
+    expect.objectContaining({
+      method: "PATCH",
+      body: JSON.stringify({ score: 5 }),
+    }),
+  );
+  await waitFor(() =>
+    expect(
+      screen.getByRole("spinbutton", { name: "Score for Rayuela" }),
+    ).toHaveValue(5),
+  );
+  const search = screen.getByRole("searchbox", { name: "Search library" });
+  await user.click(search);
+  await user.keyboard("a");
+  expect(search).toHaveValue("a");
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("q=a"),
+      expect.anything(),
+    ),
+  );
 });

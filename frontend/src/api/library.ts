@@ -9,12 +9,7 @@ export const entryStatuses = [
 
 export type EntryStatus = (typeof entryStatuses)[number];
 export type SortKey =
-  | "date_added"
-  | "score"
-  | "title"
-  | "sort_author"
-  | "year"
-  | "date_finished";
+  "date_added" | "score" | "title" | "sort_author" | "year" | "date_finished";
 export type SortOrder = "asc" | "desc";
 
 export interface Shelf {

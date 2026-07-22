@@ -40,6 +40,7 @@ openapi:
 
 openapi-check:
 	cd backend && $(UV_ENV) uv run python ../scripts/export_openapi.py --check
+	cd frontend && npm run api:check
 
 check: lint typecheck openapi-check
 	python scripts/validate_project.py
