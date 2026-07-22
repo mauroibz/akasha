@@ -1595,6 +1595,11 @@
       },
       "ShelfResponse": {
         "properties": {
+          "entry_count": {
+            "default": 0,
+            "title": "Entry Count",
+            "type": "integer"
+          },
           "id": {
             "title": "Id",
             "type": "integer"

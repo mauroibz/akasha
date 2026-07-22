@@ -1,7 +1,8 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { ScorePicker } from "@/components/ScorePicker";
 import type { LibraryEntry } from "@/api/library";
 import type { LibraryView } from "./library";
 
@@ -25,8 +26,6 @@ function EntryControls({
 }: Pick<VirtualLibraryProps, "onScore" | "onStatus"> & {
   entry: LibraryEntry;
 }) {
-  const [scoreDraft, setScoreDraft] = useState(entry.score?.toString() ?? "");
-  useEffect(() => setScoreDraft(entry.score?.toString() ?? ""), [entry.score]);
   return (
     <div
       className="flex items-center gap-2"
@@ -53,20 +52,14 @@ function EntryControls({
       <label className="sr-only" htmlFor={`score-${entry.id}`}>
         Score for {entry.item.title}
       </label>
-      <input
-        id={`score-${entry.id}`}
-        className={`h-11 w-14 rounded-lg bg-zinc-800 px-2 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-fuchsia-400 ${entry.score_provisional ? "ring-1 ring-amber-400/70 text-amber-200" : ""}`}
-        inputMode="numeric"
-        min={1}
-        max={10}
-        type="number"
-        value={scoreDraft}
-        onChange={(event) => {
-          setScoreDraft(event.target.value);
-          const score = Number(event.target.value);
-          if (event.target.value && score >= 1 && score <= 10)
-            onScore(entry, score);
+      <ScorePicker
+        value={entry.score}
+        provisional={entry.score_provisional}
+        onChange={(score) => {
+          if (score !== null) onScore(entry, score);
         }}
+        label={`Score for ${entry.item.title}`}
+        compact
       />
     </div>
   );

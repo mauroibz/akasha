@@ -174,3 +174,10 @@ export async function replaceCover(
     );
   return response.json() as Promise<LibraryEntry["item"]>;
 }
+
+export async function deleteEntry(entryId: number): Promise<void> {
+  const response = await fetch(`/api/entries/${entryId}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) throw new Error("Entry could not be deleted");
+}

@@ -19,6 +19,7 @@ const expected = {
   BookMetadataResponse: ["authors", "subjects"],
   BookMetadataPatch: ["authors", "publisher", "original_year"],
   FacetsResponse: ["status_counts"],
+  ShelfResponse: ["id", "name", "slug", "entry_count"],
 };
 
 for (const [name, properties] of Object.entries(expected)) {

@@ -44,6 +44,7 @@ class ShelfResponse(BaseModel):
     id: int
     name: str
     slug: str
+    entry_count: int = 0
 
 
 class SourceResponse(BaseModel):

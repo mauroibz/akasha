@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
+  deleteEntry,
   getEntry,
   patchEntry,
   patchItem,
@@ -9,16 +10,29 @@ import {
   replaceCover,
   type EntryStatus,
 } from "@/api/library";
-import { getShelves } from "@/api/add";
+import { createShelf, getShelves } from "@/api/shelves";
+import { ScorePicker } from "@/components/ScorePicker";
+
+const statusLabels: Record<EntryStatus, string> = {
+  unsorted: "Inbox",
+  read: "Read",
+  reading: "Reading",
+  to_read: "To read",
+  wishlist: "Wishlist",
+  dropped: "Dropped",
+};
 
 export function DetailPage() {
   const entryId = Number(useParams().entryId);
   const cache = useQueryClient();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<
-    "opinion" | "metadata" | "refresh" | null
+    "opinion" | "metadata" | "refresh" | "delete" | null
   >(null);
   const [error, setError] = useState("");
+  const [toast, setToast] = useState("");
+  const [newShelfName, setNewShelfName] = useState("");
+  const [opinionScore, setOpinionScore] = useState<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
   const detail = useQuery({
     queryKey: ["entry", entryId],
@@ -39,18 +53,87 @@ export function DetailPage() {
     },
     onError: (value: Error) => setError(value.message),
   });
+
+  useEffect(() => {
+    const stored = sessionStorage.getItem("akasha.toast");
+    if (stored) {
+      setToast(stored);
+      sessionStorage.removeItem("akasha.toast");
+    }
+  }, []);
+
   useEffect(() => {
     if (detail.data) headingRef.current?.focus();
   }, [detail.data]);
+
+  // Sync opinionScore when opening the opinion dialog
+  useEffect(() => {
+    if (dialog === "opinion" && detail.data) setOpinionScore(detail.data.score);
+  }, [dialog, detail.data]);
+
+  // Restore focus to the dialog's first focusable element when it opens
+  useEffect(() => {
+    if (dialog) {
+      const timer = window.setTimeout(() => {
+        const el = document.querySelector<HTMLElement>(
+          '[role="dialog"] [autofocus], [role="dialog"] input, [role="dialog"] select, [role="dialog"] button',
+        );
+        el?.focus();
+      }, 0);
+      return () => window.clearTimeout(timer);
+    }
+  }, [dialog]);
+
+  // Close dialog on Escape
+  useEffect(() => {
+    if (!dialog) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDialog(null);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [dialog]);
+
   if (detail.isPending) return <p role="status">Loading book detail…</p>;
   if (!detail.data) return <p role="alert">Book detail could not be loaded</p>;
   const entry = detail.data;
   const item = entry.item;
+
+  async function handleDelete() {
+    try {
+      await deleteEntry(entry.id);
+      void cache.invalidateQueries({ queryKey: ["library"] });
+      sessionStorage.setItem("akasha.toast", "Book removed from your library");
+      navigate("/");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Entry could not be deleted");
+    }
+  }
+
+  async function handleCreateShelf() {
+    if (!newShelfName.trim()) return;
+    try {
+      await createShelf(newShelfName.trim());
+      setNewShelfName("");
+      void cache.invalidateQueries({ queryKey: ["shelves"] });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Shelf could not be created");
+    }
+  }
+
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
       <button className="focus-ring" onClick={() => navigate("/")}>
         ← Library
       </button>
+      {toast && (
+        <p
+          role="status"
+          className="mt-4 rounded-lg bg-fuchsia-500/15 px-4 py-2 text-fuchsia-300"
+        >
+          {toast}
+        </p>
+      )}
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
           {item.cover_url ? (
@@ -85,49 +168,177 @@ export function DetailPage() {
           >
             {item.title}
           </h1>
-          <p className="text-zinc-400">{item.subtitle}</p>
-          <p>
-            {item.sort_author ?? "Unknown author"} · Edition year:{" "}
-            {item.year ?? "unknown"}
+          {item.subtitle && (
+            <p className="text-lg text-zinc-400">{item.subtitle}</p>
+          )}
+          <p className="mt-2 text-zinc-300">
+            {item.sort_author ?? "Unknown author"}
           </p>
-          {item.metadata.original_year &&
-            item.metadata.original_year !== item.year && (
-              <p>Originally published: {item.metadata.original_year}</p>
+          <p className="text-sm text-zinc-500">
+            Edition year: {item.year ?? "unknown"}
+            {item.metadata.original_year &&
+            item.metadata.original_year !== item.year
+              ? ` · Originally published: ${item.metadata.original_year}`
+              : ""}
+          </p>
+
+          {/* Personal reading region */}
+          <section
+            className="mt-6 rounded-xl border border-zinc-800 p-5"
+            aria-label="Your reading data"
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-fuchsia-400">
+              Your reading data
+            </h2>
+            <dl className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <dt className="text-xs text-zinc-500">Status</dt>
+                <dd>{statusLabels[entry.status]}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Score</dt>
+                <dd>
+                  {entry.score ?? "—"}
+                  {entry.score_provisional && (
+                    <span className="ml-1 text-xs text-amber-400">
+                      (provisional)
+                    </span>
+                  )}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Started</dt>
+                <dd>{entry.date_started ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Finished</dt>
+                <dd>{entry.date_finished ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Rereads</dt>
+                <dd>{entry.reread_count}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Shelves</dt>
+                <dd>{entry.shelves.map((s) => s.name).join(", ") || "—"}</dd>
+              </div>
+            </dl>
+            {entry.notes && (
+              <div className="mt-4">
+                <p className="text-xs text-zinc-500">Notes</p>
+                <p className="mt-1 whitespace-pre-wrap text-zinc-300">
+                  {entry.notes}
+                </p>
+              </div>
             )}
-          <p className="mt-5">{String(item.metadata.description ?? "")}</p>
-          <dl className="mt-6 grid grid-cols-2 gap-4">
-            <div>
-              <dt>Status</dt>
-              <dd>{entry.status}</dd>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
+                onClick={() => setDialog("opinion")}
+              >
+                Edit opinion
+              </button>
+              <button
+                className="min-h-11 rounded-full border border-red-800 px-5 text-red-300 focus-ring"
+                onClick={() => setDialog("delete")}
+              >
+                Delete entry
+              </button>
             </div>
-            <div>
-              <dt>Score</dt>
-              <dd>{entry.score ?? "—"}</dd>
+          </section>
+
+          {/* Edition facts region */}
+          <section
+            className="mt-6 rounded-xl border border-zinc-800 p-5"
+            aria-label="Edition facts"
+          >
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-fuchsia-400">
+              Edition facts
+            </h2>
+            <dl className="mt-4 grid grid-cols-2 gap-4">
+              <div>
+                <dt className="text-xs text-zinc-500">Publisher</dt>
+                <dd>{item.metadata.publisher || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Language</dt>
+                <dd>{item.metadata.language || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Pages</dt>
+                <dd>{item.metadata.page_count ?? "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Series</dt>
+                <dd>{item.metadata.series || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Identifiers</dt>
+                <dd>
+                  {Object.entries(item.identifiers).map(([k, v]) => (
+                    <span key={k} className="block text-sm">
+                      {k}: {v}
+                    </span>
+                  ))}
+                  {!Object.keys(item.identifiers).length && "—"}
+                </dd>
+              </div>
+              <div>
+                <dt className="text-xs text-zinc-500">Sources</dt>
+                <dd>
+                  {item.sources.map((s) => (
+                    <span
+                      key={`${s.source}:${s.source_id}`}
+                      className="block text-sm"
+                    >
+                      {s.source}
+                      {s.is_primary ? " (primary)" : ""}
+                    </span>
+                  ))}
+                  {!item.sources.length && "—"}
+                </dd>
+              </div>
+            </dl>
+            {item.metadata.subjects && item.metadata.subjects.length > 0 && (
+              <div className="mt-4">
+                <p className="text-xs text-zinc-500">Subjects</p>
+                <p className="mt-1 text-zinc-300">
+                  {item.metadata.subjects.join(", ")}
+                </p>
+              </div>
+            )}
+            {item.metadata.description && (
+              <div className="mt-4">
+                <p className="text-xs text-zinc-500">Description</p>
+                <p className="mt-1 whitespace-pre-wrap text-zinc-300">
+                  {item.metadata.description}
+                </p>
+              </div>
+            )}
+            <div className="mt-5 flex flex-wrap gap-3">
+              <button
+                className="min-h-11 rounded-full border border-zinc-700 px-5 focus-ring"
+                onClick={() => setDialog("metadata")}
+              >
+                Edit book metadata
+              </button>
+              <button
+                className="min-h-11 rounded-full border border-zinc-700 px-5 focus-ring"
+                onClick={() => setDialog("refresh")}
+              >
+                Refresh from provider
+              </button>
             </div>
-            <div>
-              <dt>Notes</dt>
-              <dd>{entry.notes ?? "—"}</dd>
-            </div>
-            <div>
-              <dt>Shelves</dt>
-              <dd>{entry.shelves.map((s) => s.name).join(", ") || "—"}</dd>
-            </div>
-          </dl>
-          <div className="mt-6 flex flex-wrap gap-3">
-            <button onClick={() => setDialog("opinion")}>Edit opinion</button>
-            <button onClick={() => setDialog("metadata")}>
-              Edit book metadata
-            </button>
-            <button onClick={() => setDialog("refresh")}>
-              Refresh from provider
-            </button>
-          </div>
+          </section>
         </section>
       </div>
+
+      {/* Opinion dialog */}
       {dialog === "opinion" && (
         <form
           role="dialog"
           aria-label="Edit opinion"
+          aria-modal="true"
           className="dialog"
           onSubmit={(e) => {
             e.preventDefault();
@@ -135,7 +346,7 @@ export function DetailPage() {
             update.mutate(() =>
               patchEntry(entry.id, {
                 status: String(data.get("status")) as EntryStatus,
-                score: data.get("score") ? Number(data.get("score")) : null,
+                score: opinionScore,
                 notes: String(data.get("notes") ?? ""),
                 date_started: String(data.get("date_started") ?? "") || null,
                 date_finished: String(data.get("date_finished") ?? "") || null,
@@ -149,12 +360,7 @@ export function DetailPage() {
           <h2>Edit your opinion</h2>
           <label>
             Status
-            <select
-              autoFocus
-              name="status"
-              defaultValue={entry.status}
-              className="field"
-            >
+            <select name="status" defaultValue={entry.status} className="field">
               <option value="read">Read</option>
               <option value="reading">Reading</option>
               <option value="to_read">To read</option>
@@ -163,17 +369,14 @@ export function DetailPage() {
               <option value="unsorted">Inbox</option>
             </select>
           </label>
-          <label>
-            Score
-            <input
-              name="score"
-              defaultValue={entry.score ?? ""}
-              min="1"
-              max="10"
-              type="number"
-              className="field"
+          <div>
+            <span className="mb-1 block text-sm">Score</span>
+            <ScorePicker
+              value={opinionScore}
+              provisional={entry.score_provisional}
+              onChange={setOpinionScore}
             />
-          </label>
+          </div>
           <label>
             Notes
             <textarea
@@ -228,16 +431,37 @@ export function DetailPage() {
               ))}
             </fieldset>
           )}
-          <button>Save opinion</button>
+          {/* Inline shelf creation */}
+          <div className="flex gap-2">
+            <input
+              className="field flex-1"
+              placeholder="New shelf name"
+              value={newShelfName}
+              onChange={(e) => setNewShelfName(e.target.value)}
+            />
+            <button
+              type="button"
+              className="min-h-11 rounded-full border border-zinc-700 px-4 focus-ring"
+              onClick={() => void handleCreateShelf()}
+            >
+              Create shelf
+            </button>
+          </div>
+          <button className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring">
+            Save opinion
+          </button>
           <button type="button" onClick={() => setDialog(null)}>
             Cancel
           </button>
         </form>
       )}
+
+      {/* Metadata dialog */}
       {dialog === "metadata" && (
         <form
           role="dialog"
           aria-label="Edit book metadata"
+          aria-modal="true"
           className="dialog"
           onSubmit={(e) => {
             e.preventDefault();
@@ -372,16 +596,21 @@ export function DetailPage() {
               className="field"
             />
           </label>
-          <button>Save metadata</button>
+          <button className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring">
+            Save metadata
+          </button>
           <button type="button" onClick={() => setDialog(null)}>
             Cancel
           </button>
         </form>
       )}
+
+      {/* Refresh dialog */}
       {dialog === "refresh" && (
         <div
           role="dialog"
           aria-label="Confirm metadata refresh"
+          aria-modal="true"
           className="dialog"
         >
           <h2>Overwrite cached metadata?</h2>
@@ -390,6 +619,7 @@ export function DetailPage() {
           </p>
           <button
             autoFocus
+            className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
             onClick={() => {
               update.mutate(() => refreshItem(item.id));
               setDialog(null);
@@ -397,10 +627,43 @@ export function DetailPage() {
           >
             Confirm refresh
           </button>
-          <button onClick={() => setDialog(null)}>Cancel</button>
+          <button type="button" onClick={() => setDialog(null)}>
+            Cancel
+          </button>
         </div>
       )}
-      {error && <p role="alert">{error}</p>}
+
+      {/* Delete dialog */}
+      {dialog === "delete" && (
+        <div
+          role="dialog"
+          aria-label="Confirm entry deletion"
+          aria-modal="true"
+          className="dialog"
+        >
+          <h2>Remove this book from your library?</h2>
+          <p>
+            Your score, status, notes, and shelf assignments will be deleted.
+            The book metadata and cover remain cached so re-adding is instant.
+          </p>
+          <button
+            autoFocus
+            className="min-h-11 rounded-full bg-red-600 px-5 font-semibold text-zinc-950 focus-ring"
+            onClick={() => void handleDelete()}
+          >
+            Delete entry
+          </button>
+          <button type="button" onClick={() => setDialog(null)}>
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {error && (
+        <p role="alert" className="mt-4 text-red-300">
+          {error}
+        </p>
+      )}
     </main>
   );
 }

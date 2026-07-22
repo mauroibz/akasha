@@ -84,3 +84,34 @@ def test_openapi_describes_static_routes_and_response_contracts(tmp_path: Path) 
         "/EntryListResponse"
     )
     assert "ErrorResponse" in schema["components"]["schemas"]
+
+
+@pytest.mark.anyio
+async def test_shelf_entry_counts_and_deletion_retains_entries(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            shelf = await client.post("/api/shelves", json={"name": "Favorites"})
+            shelf_id = shelf.json()["id"]
+            await client.patch(
+                f"/api/entries/{created.entry_id}",
+                json={"status": "read", "shelf_ids": [shelf_id]},
+            )
+            shelves = await client.get("/api/shelves")
+            assert shelves.status_code == 200
+            assert shelves.json()[0]["entry_count"] == 1
+
+            # Delete shelf detaches entries but does not delete them
+            assert (await client.delete(f"/api/shelves/{shelf_id}")).status_code == 204
+            entry = await client.get(f"/api/entries/{created.entry_id}")
+            assert entry.status_code == 200
+            assert entry.json()["shelves"] == []
+
+            # Cached item, sources, and cover remain
+            item = await client.get(f"/api/items/{created.item_id}")
+            assert item.status_code == 200
+            assert item.json()["title"] == "Rayuela"

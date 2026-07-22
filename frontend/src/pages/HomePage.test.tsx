@@ -152,20 +152,26 @@ test("optimistically clears provisional score styling and rolls back with an ann
   );
   renderPage();
   const user = userEvent.setup();
-  const score = await screen.findByRole("spinbutton", {
-    name: "Score for Rayuela",
+  const scoreButton = await screen.findByRole("button", {
+    name: /score for rayuela: 9/i,
   });
-  const row = score.closest("article");
+  const row = scoreButton.closest("article");
   expect(row).toHaveAttribute("data-provisional", "true");
-  await user.clear(score);
-  await user.type(score, "7");
-  await waitFor(() => expect(score).toHaveValue(7));
+  await user.click(scoreButton);
+  await user.click(screen.getByRole("button", { name: "Score 7" }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: /score for rayuela: 7/i }),
+    ).toBeVisible(),
+  );
   expect(row).toHaveAttribute("data-provisional", "false");
   rejectPatch?.(new Error("offline"));
   expect(
     await screen.findByText(/previous value was restored/),
   ).toBeInTheDocument();
-  expect(score).toHaveValue(9);
+  expect(
+    screen.getByRole("button", { name: /score for rayuela: 9/i }),
+  ).toBeVisible();
 });
 
 test("score shortcuts apply to a focused row but editable controls keep their keystrokes", async () => {
@@ -195,8 +201,8 @@ test("score shortcuts apply to a focused row but editable controls keep their ke
   );
   await waitFor(() =>
     expect(
-      screen.getByRole("spinbutton", { name: "Score for Rayuela" }),
-    ).toHaveValue(5),
+      screen.getByRole("button", { name: /score for rayuela: 5/i }),
+    ).toBeVisible(),
   );
   const search = screen.getByRole("searchbox", { name: "Search library" });
   await user.click(search);

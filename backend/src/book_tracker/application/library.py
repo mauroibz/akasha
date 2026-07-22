@@ -259,12 +259,18 @@ class LibraryService:
 
     def list_shelves(self) -> list[dict[str, Any]]:
         with Session(self.engine) as session:
-            rows = session.scalars(
-                select(ShelfRow)
+            count_subq = (
+                select(EntryShelfRow.shelf_id, func.count().label("cnt"))
+                .group_by(EntryShelfRow.shelf_id)
+                .subquery()
+            )
+            rows = session.execute(
+                select(ShelfRow, func.coalesce(count_subq.c.cnt, 0).label("entry_count"))
+                .outerjoin(count_subq, count_subq.c.shelf_id == ShelfRow.id)
                 .where(ShelfRow.user_id == self.user_id)
                 .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
-            )
-            return [self._shelf_dict(row) for row in rows]
+            ).all()
+            return [{**self._shelf_dict(row[0]), "entry_count": row[1]} for row in rows]
 
     def create_shelf(self, name: str) -> dict[str, Any]:
         try:

@@ -8,6 +8,7 @@ import {
   type ManualItem,
   type SearchCandidate,
 } from "@/api/add";
+import { ScorePicker } from "@/components/ScorePicker";
 import type { EntryStatus } from "@/api/library";
 
 export function AddPage() {
@@ -251,17 +252,13 @@ export function AddPage() {
                 <option value="unsorted">Inbox</option>
               </select>
             </label>
-            <label>
-              Score
-              <input
-                className="field"
-                type="number"
-                min="1"
-                max="10"
-                value={score}
-                onChange={(e) => setScore(e.target.value)}
+            <div>
+              <span className="mb-1 block text-sm">Score</span>
+              <ScorePicker
+                value={score ? Number(score) : null}
+                onChange={(v) => setScore(v ? String(v) : "")}
               />
-            </label>
+            </div>
           </div>
           {shelves.length > 0 && (
             <fieldset>

@@ -1,4 +1,4 @@
-import type { EntryStatus, LibraryEntry, Shelf } from "./library";
+import type { EntryStatus, LibraryEntry } from "./library";
 
 export interface SourceRef {
   source: string;
@@ -57,11 +57,7 @@ export function searchBooks(value: string) {
     }),
   );
 }
-export function getShelves() {
-  return fetch("/api/shelves").then((r) =>
-    json<Shelf[]>(r, "Shelves could not be loaded"),
-  );
-}
+export { getShelves, createShelf } from "./shelves";
 export function createEntry(body: {
   manual?: ManualItem;
   source?: string;
