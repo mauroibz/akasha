@@ -16,6 +16,7 @@ function renderPage(initialEntry = "/") {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
+          <Route path="/triage" element={<h1>Triage</h1>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -233,12 +234,7 @@ test("Inbox count applies the unsorted filter", async () => {
   await screen.findByText("Rayuela");
   const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
   await user.click(inboxButtons[0]);
-  await waitFor(() =>
-    expect(fetchMock).toHaveBeenCalledWith(
-      expect.stringContaining("status=unsorted"),
-      expect.anything(),
-    ),
-  );
+  await screen.findByText("Triage");
 });
 
 test("a library row opens detail by pointer", async () => {

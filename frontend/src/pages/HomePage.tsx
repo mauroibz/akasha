@@ -271,13 +271,7 @@ export function HomePage() {
           <button
             className="min-h-11 rounded-full border border-zinc-800 px-4 text-sm focus-ring aria-pressed:border-fuchsia-400 aria-pressed:text-fuchsia-300"
             aria-pressed={filters.statuses.includes("unsorted")}
-            onClick={() =>
-              updateFilters({
-                statuses: filters.statuses.includes("unsorted")
-                  ? filters.statuses.filter((s) => s !== "unsorted")
-                  : [...filters.statuses, "unsorted"],
-              })
-            }
+            onClick={() => void navigate("/triage")}
           >
             Inbox {inboxCount}
           </button>

@@ -8,6 +8,7 @@ import { AddPage } from "@/pages/AddPage";
 import { DetailPage } from "@/pages/DetailPage";
 import { ImportPage } from "@/pages/ImportPage";
 import { ShelvesPage } from "@/pages/ShelvesPage";
+import { TriagePage } from "@/pages/TriagePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ export function App() {
               <Route path="/books/:entryId" element={<DetailPage />} />
               <Route path="/import" element={<ImportPage />} />
               <Route path="/shelves" element={<ShelvesPage />} />
+              <Route path="/triage" element={<TriagePage />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
           </ErrorBoundary>

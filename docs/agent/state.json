@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 4,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "012",
   "active_sprint_file": "docs/sprints/012-bulk-first-triage.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "011",
   "completed_sprints": ["001", "002", "003", "004", "005", "006", "007", "008", "009", "010", "011"],
-  "started_at": "",
-  "updated_at": "2026-07-22T20:15:00-03:00"
+  "started_at": "2026-07-22T20:30:00-03:00",
+  "updated_at": "2026-07-22T20:30:00-03:00"
 }

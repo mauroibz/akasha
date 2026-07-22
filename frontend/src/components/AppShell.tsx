@@ -12,6 +12,7 @@ interface NavItem {
 const navItems: readonly NavItem[] = [
   { to: "/", label: "Library", icon: <LibraryIcon /> },
   { to: "/add", label: "Add", icon: <PlusIcon /> },
+  { to: "/triage", label: "Triage", icon: <TriageIcon /> },
   { to: "/import", label: "Import", icon: <ImportIcon /> },
   { to: "/shelves", label: "Shelves", icon: <ShelfIcon /> },
 ];
@@ -85,6 +86,25 @@ function ShelfIcon() {
     >
       <path
         d="M3.75 6.75h16.5M3.75 12h16.5M3.75 17.25h16.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TriageIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="h-5 w-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={1.5}
+      viewBox="0 0 24 24"
+    >
+      <path
+        d="M5 5h14M5 12h14M5 19h14"
         strokeLinecap="round"
         strokeLinejoin="round"
       />

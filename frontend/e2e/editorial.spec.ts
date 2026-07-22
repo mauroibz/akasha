@@ -90,9 +90,7 @@ test("URL-backed filters are reload-stable", async ({ page }) => {
   await expect(page).toHaveURL(/order=asc/);
 });
 
-test("Inbox filter applies unsorted status from the header button", async ({
-  page,
-}) => {
+test("Inbox button navigates to the triage page", async ({ page }) => {
   await stubEntry(page);
   await page.goto("/");
   await expect(page.getByText(/Inbox 5/).first()).toBeVisible();
@@ -100,7 +98,7 @@ test("Inbox filter applies unsorted status from the header button", async ({
     .getByText(/Inbox 5/)
     .first()
     .click();
-  await expect(page).toHaveURL(/status=unsorted/);
+  await expect(page).toHaveURL(/\/triage/);
 });
 
 test("detail renders all metadata regions", async ({ page }) => {
@@ -253,7 +251,7 @@ test("navigation shell exposes all four destinations at desktop width", async ({
   await stubEntry(page);
   await page.goto("/");
   // Desktop nav is visible at default width
-  for (const label of ["Library", "Add", "Import", "Shelves"]) {
+  for (const label of ["Library", "Add", "Triage", "Import", "Shelves"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();

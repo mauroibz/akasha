@@ -181,3 +181,48 @@ export async function deleteEntry(entryId: number): Promise<void> {
   });
   if (!response.ok) throw new Error("Entry could not be deleted");
 }
+
+export interface BulkSet {
+  status?: EntryStatus;
+  score?: number;
+  add_shelves?: number[];
+  remove_shelves?: number[];
+  clear_provisional?: boolean;
+}
+
+export interface BulkBody {
+  entry_ids?: number[];
+  filter?: {
+    status?: EntryStatus[];
+    shelf?: string[];
+    q?: string;
+  };
+  excluded_entry_ids?: number[];
+  set: BulkSet;
+}
+
+export async function bulkUpdateEntries(body: BulkBody): Promise<number> {
+  const response = await fetch("/api/entries/bulk", {
+    method: "PATCH",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error("Bulk update failed");
+  const data = (await response.json()) as { affected: number };
+  return data.affected;
+}
+
+export async function acceptSuggestedStatuses(filter: {
+  status?: EntryStatus[];
+  shelf?: string[];
+  q?: string;
+}): Promise<number> {
+  const response = await fetch("/api/entries/accept-suggested", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ filter }),
+  });
+  if (!response.ok) throw new Error("Could not accept suggested statuses");
+  const data = (await response.json()) as { affected: number };
+  return data.affected;
+}

@@ -1,6 +1,6 @@
 # Sprint 012 — Bulk-first triage
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 011
 **Roadmap revision:** 4
 
