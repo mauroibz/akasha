@@ -214,6 +214,12 @@ export function HomePage() {
             Inbox {firstPage?.facets.status_counts.unsorted ?? 0}
           </span>
           <button
+            className="min-h-11 rounded-full px-4 focus-ring"
+            onClick={() => void navigate("/import")}
+          >
+            Import
+          </button>
+          <button
             className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
             onClick={() => void navigate("/add")}
           >

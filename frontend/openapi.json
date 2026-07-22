@@ -26,6 +26,44 @@
         "title": "AffectedResponse",
         "type": "object"
       },
+      "AmbiguityChoice": {
+        "properties": {
+          "item_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Item Id"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "record_id"
+        ],
+        "title": "AmbiguityChoice",
+        "type": "object"
+      },
+      "Body_preview_api_import_goodreads_preview_post": {
+        "properties": {
+          "file": {
+            "format": "binary",
+            "title": "File",
+            "type": "string"
+          }
+        },
+        "required": [
+          "file"
+        ],
+        "title": "Body_preview_api_import_goodreads_preview_post",
+        "type": "object"
+      },
       "Body_replace_cover_api_items__item_id__cover_post": {
         "properties": {
           "cover": {
@@ -129,6 +167,59 @@
           }
         },
         "title": "BulkSet",
+        "type": "object"
+      },
+      "CommitBody": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "choices": {
+            "items": {
+              "$ref": "#/components/schemas/AmbiguityChoice"
+            },
+            "title": "Choices",
+            "type": "array"
+          }
+        },
+        "required": [
+          "batch_id"
+        ],
+        "title": "CommitBody",
+        "type": "object"
+      },
+      "CommitResponse": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "created_entries": {
+            "title": "Created Entries",
+            "type": "integer"
+          },
+          "created_items": {
+            "title": "Created Items",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "unchanged_entries": {
+            "title": "Unchanged Entries",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "batch_id",
+          "state",
+          "created_items",
+          "created_entries",
+          "unchanged_entries"
+        ],
+        "title": "CommitResponse",
         "type": "object"
       },
       "EntryCreateBody": {
@@ -597,6 +688,200 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImportRecordResponse": {
+        "properties": {
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "candidates": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "date_added": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Added"
+          },
+          "date_finished": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Finished"
+          },
+          "errors": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Errors",
+            "type": "array"
+          },
+          "goodreads_book_id": {
+            "title": "Goodreads Book Id",
+            "type": "string"
+          },
+          "isbn": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Isbn"
+          },
+          "match_kind": {
+            "title": "Match Kind",
+            "type": "string"
+          },
+          "original_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Year"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "planned_action": {
+            "title": "Planned Action",
+            "type": "string"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "record_id": {
+            "title": "Record Id",
+            "type": "integer"
+          },
+          "reread_count": {
+            "default": 0,
+            "title": "Reread Count",
+            "type": "integer"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review"
+          },
+          "row_number": {
+            "title": "Row Number",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "score_provisional": {
+            "title": "Score Provisional",
+            "type": "boolean"
+          },
+          "shelves": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Shelves",
+            "type": "array"
+          },
+          "suggested_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Suggested Status"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "record_id",
+          "row_number",
+          "goodreads_book_id",
+          "title",
+          "authors",
+          "isbn",
+          "suggested_status",
+          "score",
+          "score_provisional",
+          "shelves",
+          "errors",
+          "planned_action",
+          "match_kind",
+          "candidates"
+        ],
+        "title": "ImportRecordResponse",
+        "type": "object"
+      },
       "ItemPatch": {
         "properties": {
           "metadata": {
@@ -824,6 +1109,69 @@
           "title"
         ],
         "title": "ManualItemBody",
+        "type": "object"
+      },
+      "PreviewResponse": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "records": {
+            "items": {
+              "$ref": "#/components/schemas/ImportRecordResponse"
+            },
+            "title": "Records",
+            "type": "array"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PreviewSummary"
+          }
+        },
+        "required": [
+          "batch_id",
+          "fingerprint",
+          "state",
+          "summary",
+          "records"
+        ],
+        "title": "PreviewResponse",
+        "type": "object"
+      },
+      "PreviewSummary": {
+        "properties": {
+          "ambiguous": {
+            "title": "Ambiguous",
+            "type": "integer"
+          },
+          "errors": {
+            "title": "Errors",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "ready",
+          "errors",
+          "ambiguous"
+        ],
+        "title": "PreviewSummary",
         "type": "object"
       },
       "RefreshBody": {
@@ -1590,6 +1938,88 @@
           }
         },
         "summary": "Ready"
+      }
+    },
+    "/api/import/goodreads/commit": {
+      "post": {
+        "operationId": "commit_api_import_goodreads_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Commit",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/goodreads/preview": {
+      "post": {
+        "operationId": "preview_api_import_goodreads_preview_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_preview_api_import_goodreads_preview_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview",
+        "tags": [
+          "imports"
+        ]
       }
     },
     "/api/items/{item_id}": {
