@@ -191,7 +191,7 @@ Acceptance:
 - A Playwright scenario imports and triages hundreds of rows without one request per row.
 - Conflicting values remain visible until explicitly resolved.
 
-### Sprint 013 — Scale, accessibility, and resilience
+### [Sprint 013 — Scale, accessibility, and resilience](013-scale-accessibility-resilience.md)
 
 Scope:
 

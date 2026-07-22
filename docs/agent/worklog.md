@@ -209,3 +209,38 @@ Entry format:
 
 **Next:** Sprint 012 (bulk-first triage) — sprint file does not yet exist; needs to be
 expanded from the roadmap before implementation can begin.
+
+## Session 2026-07-22 — Sprint 012 (bulk-first-triage)
+
+**Done:**
+- Built triage page (`frontend/src/pages/TriagePage.tsx`): virtualized dense
+  table with @tanstack/react-virtual, 56px rows, checkbox selection, shift-range
+  selection, Ctrl/Cmd+A select-all-matching with exclusions, bulk action bar
+  (status, score, clear provisional), accept-suggested button.
+- Keyboard shortcuts: j/k + ArrowUp/Down navigation, status hotkeys
+  (r/t/w/d/g/u), score 1-9/0, Enter (open detail or advance), Escape (clear
+  selection). All guarded by isEditableTarget except Ctrl/Cmd+A which is
+  allowed from any target.
+- Frontend API: `bulkUpdateEntries` and `acceptSuggestedStatuses` in
+  `frontend/src/api/library.ts`.
+- Added /triage route and Triage nav item with icon in AppShell.
+- HomePage Inbox button now navigates to /triage instead of toggling filter.
+- 6 e2e tests in `frontend/e2e/triage.spec.ts` covering all 4 ACs.
+- Updated editorial e2e tests for new inbox navigation and 5-item nav.
+- Fixed focus management bug: useEffect was bailing because document.activeElement
+  was still the old row when focusedId changed via keyboard. Fixed by checking
+  if active element IS the target row or inside it before bailing.
+
+**Verified:**
+- `make check` → passed (tsc, eslint, prettier, ruff, mypy, OpenAPI types, validate_project)
+- `make test` → 37/37 frontend unit tests, 122/122 backend tests
+- `npx playwright test` → 27 passed, 2 skipped (pre-existing), 0 failed
+- `make build` → 342 KB JS (104 KB gzip), 17 KB CSS
+
+**Deviations:**
+- Backend bulk API already existed from Sprint 010 — no backend changes needed.
+- Planned commit checkpoints consolidated into one commit (7b431aa).
+- HomePage Inbox button behavior changed (DEC-021).
+
+**Next:** Sprint 013 (scale-accessibility-resilience) — status `ready`, sprint
+file created at `docs/sprints/013-scale-accessibility-resilience.md`.

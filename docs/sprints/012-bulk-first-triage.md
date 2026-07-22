@@ -1,6 +1,6 @@
 # Sprint 012 — Bulk-first triage
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 011
 **Roadmap revision:** 4
 
@@ -84,5 +84,61 @@ git diff --check
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+### Delivered behavior
+
+**AC1 — Server-side select-all with exclusions.**
+The triage page supports Ctrl/Cmd+A to select all rows matching the current
+filter. Deselecting individual rows adds them to an `excluded_entry_ids` set
+that is sent to the backend instead of an explicit `entry_ids` list. The bulk
+API (`PATCH /api/entries/bulk`) already supported this contract from Sprint
+010; the frontend now exercises it. Verified by e2e test
+`triage Ctrl+A selects all matching with server-side exclusions` which asserts
+the bulk body contains `filter` + `excluded_entry_ids` rather than `entry_ids`.
+
+**AC2 — Keyboard shortcuts with input guards.**
+`j`/`k` (and ArrowUp/ArrowDown) navigate between rows. Status hotkeys
+(`r`=read, `t`=to_read, `w`=wishlist, `d`=dropped, `g`=reading, `u`=unsorted)
+apply to the focused row or the current selection. Score keys `1`-`9` and `0`
+(=10) work the same way. `Enter` opens detail for a single row or advances
+focus after a bulk action. `Escape` clears selection. All shortcuts are
+guarded by `isEditableTarget` — they do not fire when focus is in an input,
+select, textarea, or contenteditable element. The one exception is Ctrl/Cmd+A,
+which is allowed from any target since it's a page-level select-all action.
+Verified by e2e tests `triage keyboard shortcuts set status on focused row`
+and `triage j/k navigation moves focus between rows`.
+
+**AC3 — Hundreds of rows triaged without per-row requests.**
+E2e test `triage hundreds of rows without per-row requests` renders 200 rows,
+selects all via Ctrl+A, presses `r` to set all to read, and asserts
+`bulkCallCount === 1` — a single bulk PATCH request, not 200 individual ones.
+
+**AC4 — Conflicting values remain visible until explicitly resolved.**
+Entries with `suggested_status !== null` display an amber badge showing the
+suggested status. The "Accept all suggested" button sends a bulk
+`POST /api/entries/accept-suggested` that applies the suggested status to all
+matching entries in one request. The suggested-status badge remains visible
+until the user explicitly accepts or manually changes the status.
+
+### Commands and actual results
+
+```
+make check     → passed (tsc, eslint, prettier, ruff, mypy, OpenAPI types, validate_project)
+make test      → 37/37 frontend unit tests, 122/122 backend tests
+npx playwright test → 27 passed, 2 skipped (pre-existing), 0 failed
+make build     → 342 KB JS (104 KB gzip), 17 KB CSS, built in 918ms
+```
+
+### Commits
+
+- `7b431aa` — feat: add bulk-first triage page with selection, keyboard shortcuts, and e2e tests
+
+### Deviations
+
+- The backend bulk API (`PATCH /api/entries/bulk` and
+  `POST /api/entries/accept-suggested`) was already implemented in Sprint 010.
+  This sprint built the frontend triage page that exercises it. No backend
+  changes were needed.
+- The planned commit checkpoints were consolidated into a single commit because
+  the triage page, API functions, and e2e tests are tightly coupled.
+- The HomePage Inbox button now navigates to `/triage` instead of toggling the
+  unsorted status filter. This aligns with the product spec's triage workflow.

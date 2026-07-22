@@ -188,3 +188,31 @@ Append-only record of material architecture choices, product-default resolutions
   other entries reference them (shared-item safety).
 - **Consequence:** Undo is safe to run at any time within the 24-hour window. Partial
   retention is reported in the API response and UI. Repeated undo is a no-op.
+
+## DEC-020 — Triage page uses existing bulk API
+
+- **Date:** 2026-07-22
+- **Status:** accepted
+- **Context:** Sprint 012 needed a bulk-first triage page. The backend bulk
+  update API (`PATCH /api/entries/bulk`) and accept-suggested endpoint
+  (`POST /api/entries/accept-suggested`) were already implemented in Sprint 010
+  with server-side select-all and exclusions support.
+- **Decision:** Build only the frontend triage page that exercises the existing
+  API. No backend changes needed.
+- **Consequences:** The triage page sends `filter` + `excluded_entry_ids` for
+  select-all-with-exclusions, and `entry_ids` for explicit selection. The API
+  contract is unchanged.
+
+## DEC-021 — Inbox button navigates to /triage
+
+- **Date:** 2026-07-22
+- **Status:** accepted
+- **Context:** The HomePage Inbox button previously toggled the `status=unsorted`
+  filter on the library page. Sprint 012 introduces a dedicated triage page that
+  is better suited for bulk processing of unsorted entries.
+- **Decision:** The Inbox button now navigates to `/triage` instead of toggling
+  the filter. The library page still supports status filtering via the status
+  filter chips.
+- **Consequences:** Users who previously used the Inbox button to filter the
+  library now land on the triage page. The library page status chips remain
+  available for filtering.

@@ -1,40 +1,43 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 011 (durable-enrichment-undo), 2026-07-22.
-**Next:** Sprint 012 (bulk-first triage) — status `ready`, but the sprint file
-`docs/sprints/012-bulk-first-triage.md` does not yet exist. It must be expanded
-from the roadmap entry before implementation can begin.
+**Last completed:** Sprint 012 (bulk-first-triage), 2026-07-22.
+**Next:** Sprint 013 (scale-accessibility-resilience) — status `ready`, sprint
+file at `docs/sprints/013-scale-accessibility-resilience.md`.
 
-## What was built in Sprint 011
+## What was delivered in Sprint 012
 
-- **Job runner** (`backend/src/book_tracker/infrastructure/jobs.py`):
-  `JobRepository` with enqueue/claim/complete/fail/cancel/reclaim_expired,
-  `RateLimiter` with clock-injected gating, `JobRunner` cooperative poller.
-- **Enrichment** (`backend/src/book_tracker/application/enrichment.py`):
-  fills empty item fields from providers, records `import_effects` for undo
-  coverage, skips undone batches (late-job guard).
-- **Undo** (`backend/src/book_tracker/application/undo.py`): reverses effects
-  in descending order, reverts fill_empty only when current value matches
-  after-value, preserves edited/shared/pre-existing entities, 24-hour window.
-- **API**: `GET /api/import/jobs/{id}`, `DELETE /api/import/batches/{id}`.
-- **UI**: undo button with confirmation, result display with reverted/retained
-  counts, back-to-library link.
-- **Tests**: `backend/tests/test_jobs.py` (30 tests), e2e undo flow tests.
+- Triage page at `/triage` with virtualized dense table (56px rows), checkbox
+  selection with shift-range, Ctrl/Cmd+A select-all-matching with exclusions,
+  bulk action bar (status/score/clear-provisional), and accept-suggested button.
+- Keyboard shortcuts: j/k + arrows for navigation, r/t/w/d/g/u for status,
+  1-9/0 for score, Enter to open/advance, Escape to clear. All guarded by
+  isEditableTarget except Ctrl/Cmd+A.
+- Frontend API functions: `bulkUpdateEntries`, `acceptSuggestedStatuses` in
+  `frontend/src/api/library.ts`.
+- HomePage Inbox button navigates to /triage (DEC-021).
+- 6 new e2e tests in `frontend/e2e/triage.spec.ts`.
+
+## Key files to know
+
+- `frontend/src/pages/TriagePage.tsx` — the triage page (597 lines)
+- `frontend/src/api/library.ts` — bulk API functions at bottom
+- `frontend/src/components/AppShell.tsx` — nav items (now 5)
+- `frontend/e2e/triage.spec.ts` — triage e2e tests
+- Backend bulk API: `backend/src/book_tracker/api/library.py` (PATCH /bulk,
+  POST /accept-suggested — already existed from Sprint 010)
+- Backend bulk service: `backend/src/book_tracker/application/library.py`
+  (`bulk_update`, `accept_suggested` methods)
 
 ## State
 
-- All commits are on `main`, pushed to `origin/main`.
-- Worktree is clean.
-- `docs/agent/state.json` has `active_sprint: "012"`, `active_sprint_status: "ready"`.
-- `docs/sprints/012-bulk-first-triage.md` does not exist — create it first.
-- New decisions: DEC-018 (job runner shares event loop), DEC-019 (undo
-  field-matching semantics).
+- All work committed to `main`, pushed to origin.
+- Worktree clean.
+- `make check`, `make test`, `make build`, all e2e tests pass.
+- Sprint 013 file exists and is `ready`; no code work started yet.
 
-## Key files to read for Sprint 012
+## For the next agent
 
-- `docs/sprints/ROADMAP.md` — Sprint 012 scope and acceptance criteria.
-- `backend/src/book_tracker/infrastructure/jobs.py` — job queue infrastructure.
-- `backend/src/book_tracker/infrastructure/repositories.py` — existing query patterns.
-- `backend/src/book_tracker/api/library.py` — existing API endpoints to extend.
-- `frontend/src/pages/HomePage.tsx` — current library view to replace with table.
-- `frontend/src/api/imports.ts` — undo/progress API functions added in Sprint 011.
+Sprint 013 is about performance, accessibility, and resilience — no new
+features. Read the sprint file, then the technical spec sections 12 and 13 for
+performance budgets and accessibility requirements. The 10k-entry benchmark
+should use the existing SQLite database — check if a seed script exists.
