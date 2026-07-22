@@ -155,18 +155,37 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               }}
               tabIndex={0}
             >
-              <div
-                className={
-                  props.view === "table"
-                    ? "h-14 w-10 shrink-0 rounded bg-zinc-800"
-                    : "aspect-[2/3] rounded-xl bg-zinc-800"
-                }
-                aria-hidden="true"
-              />
+              {entry.item.cover_url ? (
+                <img
+                  className={
+                    props.view === "table"
+                      ? "h-14 w-10 shrink-0 rounded object-cover"
+                      : "aspect-[2/3] rounded-xl object-cover"
+                  }
+                  src={entry.item.cover_url}
+                  alt=""
+                />
+              ) : (
+                <div
+                  className={
+                    props.view === "table"
+                      ? "h-14 w-10 shrink-0 rounded bg-zinc-800"
+                      : "aspect-[2/3] rounded-xl bg-zinc-800"
+                  }
+                  aria-label="No cover"
+                />
+              )}
               <div className="min-w-0 flex-1">
                 <h2 className="truncate font-semibold">{entry.item.title}</h2>
                 <p className="truncate text-sm text-zinc-400">
                   {entry.item.sort_author ?? "Unknown author"}
+                </p>
+                <p className="text-xs text-zinc-500">
+                  Edition year: {entry.item.year ?? "unknown"}
+                  {entry.item.metadata.original_year &&
+                  entry.item.metadata.original_year !== entry.item.year
+                    ? ` · Original: ${entry.item.metadata.original_year}`
+                    : ""}
                 </p>
               </div>
               <EntryControls

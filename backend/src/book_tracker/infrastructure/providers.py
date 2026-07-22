@@ -64,8 +64,31 @@ def _language(value: object) -> str | None:
     values = value if isinstance(value, list) else [value]
     if not values or values[0] is None:
         return None
-    code = str(values[0]).casefold()
+    first = values[0]
+    if isinstance(first, dict):
+        first = first.get("key") or first.get("code")
+    if not first:
+        return None
+    code = str(first).casefold()
+    if code.startswith("/languages/"):
+        code = code.removeprefix("/languages/")
     return {"spa": "es", "eng": "en"}.get(code, code[:2])
+
+
+def _description(value: object) -> str | None:
+    if isinstance(value, dict):
+        value = value.get("value")
+    return str(value).strip() if value else None
+
+
+def _keys(values: object, prefix: str) -> list[str]:
+    if not isinstance(values, list):
+        return []
+    return [
+        str(value.get("key", "")).removeprefix(prefix)
+        for value in values
+        if isinstance(value, dict) and value.get("key")
+    ]
 
 
 class OpenLibraryProvider:
@@ -81,11 +104,16 @@ class OpenLibraryProvider:
         return await _bounded_json(self.client, url, params=params, headers=self.headers)
 
     def _candidate(self, row: Mapping[str, Any]) -> SearchCandidate | None:
+        nested = row.get("editions")
+        nested_docs = nested.get("docs", []) if isinstance(nested, dict) else []
+        edition = nested_docs[0] if isinstance(nested_docs, list) and nested_docs else {}
         editions = row.get("edition_key")
-        source_id = str(editions[0]) if isinstance(editions, list) and editions else ""
+        source_id = str(edition.get("key", "")).removeprefix("/books/")
+        if not source_id:
+            source_id = str(editions[0]) if isinstance(editions, list) and editions else ""
         if not source_id or not row.get("title"):
             return None
-        cover_id = row.get("cover_i")
+        cover_id = edition.get("cover_i") or row.get("cover_i")
         metadata: dict[str, Any] = {}
         if row.get("first_publish_year") is not None:
             metadata["original_year"] = row["first_publish_year"]
@@ -95,14 +123,17 @@ class OpenLibraryProvider:
             source_refs=(SourceRef(self.name, source_id),),
             title=str(row["title"]),
             subtitle=str(row["subtitle"]) if row.get("subtitle") else None,
-            authors=tuple(str(value) for value in row.get("author_name", [])),
-            year=None,
+            authors=tuple(
+                str(value) for value in edition.get("author_name", row.get("author_name", []))
+            ),
+            year=_year(edition.get("publish_date")),
             cover_url=(
                 f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg" if cover_id else None
             ),
-            identifiers=_isbn(list(row.get("isbn", []))),
-            language=_language(row.get("language")),
+            identifiers=_isbn(list(edition.get("isbn", row.get("isbn", [])))),
+            language=_language(edition.get("language", row.get("language"))),
             metadata=metadata,
+            original_year=_year(row.get("first_publish_year")),
         )
 
     async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
@@ -112,7 +143,9 @@ class OpenLibraryProvider:
             limit=min(limit, 20),
             fields=(
                 "key,title,subtitle,author_name,first_publish_year,isbn,cover_i,"
-                "language,edition_key"
+                "language,edition_key,editions,editions.key,editions.title,editions.subtitle,"
+                "editions.author_name,editions.publish_date,editions.isbn,editions.language,"
+                "editions.cover_i"
             ),
         )
         docs = body.get("docs", [])
@@ -130,19 +163,57 @@ class OpenLibraryProvider:
         title = row.get("title")
         if not title:
             raise ProviderPayloadError("Open Library edition has no title")
+        author_ids = _keys(row.get("authors"), "/authors/")
+        author_records = []
+        for author_id in author_ids:
+            try:
+                author_records.append(
+                    await self._json(f"https://openlibrary.org/authors/{author_id}.json")
+                )
+            except (httpx.HTTPError, ProviderPayloadError):
+                author_records.append({})
         authors = tuple(
-            str(value.get("name") or value.get("key", "")).removeprefix("/authors/")
-            for value in row.get("authors", [])
-            if isinstance(value, dict)
+            str(record.get("name") or author_id)
+            for author_id, record in zip(author_ids, author_records, strict=True)
+        )
+        work_ids = _keys(row.get("works"), "/works/")
+        work = (
+            await self._json(f"https://openlibrary.org/works/{work_ids[0]}.json")
+            if work_ids
+            else {}
         )
         identifiers = _isbn(list(row.get("isbn_13", [])) + list(row.get("isbn_10", [])))
         cover_ids = row.get("covers", [])
         cover = cover_ids[0] if isinstance(cover_ids, list) and cover_ids else None
+        publisher = next(
+            (str(value).strip() for value in row.get("publishers", []) if str(value).strip()), None
+        )
+        subjects = row.get("subjects") or work.get("subjects") or []
         metadata = {
             "authors": list(authors),
-            "publishers": row.get("publishers", []),
+            "publisher": publisher,
+            "language": _language(row.get("languages")),
             "page_count": row.get("number_of_pages"),
+            "description": _description(row.get("description"))
+            or _description(work.get("description")),
+            "subjects": [str(value) for value in subjects if value],
+            "series": next(iter(row.get("series", [])), None),
+            "original_year": _year(
+                work.get("first_publish_date") or work.get("created", {}).get("value")
+            ),
         }
+        metadata = {
+            key: value for key, value in metadata.items() if value not in (None, "", [], {})
+        }
+        cover_url = None
+        if cover:
+            cover_url = f"https://covers.openlibrary.org/b/id/{cover}-L.jpg?default=false"
+        elif source_id:
+            cover_url = f"https://covers.openlibrary.org/b/olid/{source_id}-L.jpg?default=false"
+        elif identifiers.get("isbn13"):
+            cover_url = (
+                f"https://covers.openlibrary.org/b/isbn/{identifiers['isbn13']}-L.jpg?default=false"
+            )
         return ItemPayload(
             source=self.name,
             source_id=source_id,
@@ -151,10 +222,11 @@ class OpenLibraryProvider:
             subtitle=str(row["subtitle"]) if row.get("subtitle") else None,
             authors=authors,
             year=_year(row.get("publish_date")),
-            cover_url=(f"https://covers.openlibrary.org/b/id/{cover}-L.jpg" if cover else None),
+            cover_url=cover_url,
             identifiers=identifiers,
             language=_language(row.get("languages")),
             metadata=metadata,
+            original_year=metadata.get("original_year"),
         )
 
     async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
@@ -235,6 +307,10 @@ class GoogleBooksProvider:
             "publisher": info.get("publisher"),
             "page_count": info.get("pageCount"),
             "description": info.get("description"),
+            "subjects": info.get("categories"),
+        }
+        metadata = {
+            key: value for key, value in metadata.items() if value not in (None, "", [], {})
         }
         images = info.get("imageLinks", {})
         return SearchCandidate(
@@ -249,6 +325,7 @@ class GoogleBooksProvider:
             identifiers=identifiers,
             language=_language(info.get("language")),
             metadata=metadata,
+            original_year=None,
         )
 
     async def _get(self, url: str, **params: str | int) -> Mapping[str, Any]:

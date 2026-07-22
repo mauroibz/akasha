@@ -126,6 +126,14 @@ class LibraryService:
                 ItemSourceRow.item_id == item.id
             )
         ).all()
+        metadata = json.loads(item.metadata_json)
+        legacy_publishers = metadata.pop("publishers", None)
+        if not metadata.get("publisher") and isinstance(legacy_publishers, list):
+            metadata["publisher"] = next(
+                (str(value).strip() for value in legacy_publishers if str(value).strip()), None
+            )
+        metadata = {key: value for key, value in metadata.items() if value is not None}
+        cover_version = item.updated_at.replace(":", "").replace("-", "")
         return {
             "id": item.id,
             "type": item.type,
@@ -133,8 +141,10 @@ class LibraryService:
             "subtitle": item.subtitle,
             "year": item.year,
             "sort_author": item.sort_author,
-            "cover_path": item.cover_path,
-            "metadata": json.loads(item.metadata_json),
+            "cover_url": f"/api/items/{item.id}/cover?v={cover_version}"
+            if item.cover_path
+            else None,
+            "metadata": metadata,
             "identifiers": {row.kind: row.normalized_value for row in identifiers},
             "sources": [
                 {
@@ -201,7 +211,21 @@ class LibraryService:
                 if field in changes:
                     setattr(item, field, changes[field])
             if "metadata" in changes:
-                item.metadata_json = json.dumps(changes["metadata"], ensure_ascii=False)
+                metadata = json.loads(item.metadata_json)
+                legacy_publishers = metadata.pop("publishers", None)
+                if not metadata.get("publisher") and isinstance(legacy_publishers, list):
+                    publisher = next(
+                        (str(value).strip() for value in legacy_publishers if str(value).strip()),
+                        None,
+                    )
+                    if publisher:
+                        metadata["publisher"] = publisher
+                for key, value in changes["metadata"].items():
+                    if value is None:
+                        metadata.pop(key, None)
+                    else:
+                        metadata[key] = value
+                item.metadata_json = json.dumps(metadata, ensure_ascii=False)
             item.updated_at = _now()
             session.flush()
             return self._item_dict(session, item)
@@ -224,7 +248,7 @@ class LibraryService:
         with self._write() as session:
             item = self._item(session, item_id)
             for field in ("title", "subtitle", "year"):
-                if field in values:
+                if field in values and values[field] is not None:
                     setattr(item, field, values[field])
             metadata = json.loads(item.metadata_json)
             metadata.update(values.get("metadata", {}))

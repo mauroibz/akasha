@@ -57,6 +57,9 @@ class AddService:
                 "provider_failure", "Metadata could not be fetched", status_code=502
             ) from error
         refs = list(payload.source_refs)
+        metadata = dict(payload.metadata)
+        identifiers = dict(payload.identifiers)
+        cover_url = payload.cover_url
         primary_isbn = next(iter(self._identifiers(payload.identifiers)), None)
         for ref in supplied_refs:
             secondary = self.providers.get(ref.source)
@@ -73,7 +76,21 @@ class AddService:
                 and primary_isbn.normalized_value == secondary_isbn.normalized_value
             ):
                 refs.append(ref)
-        return ItemPayload(**{**payload.__dict__, "source_refs": tuple(refs)})
+                for key, value in candidate.metadata.items():
+                    if metadata.get(key) in (None, "", [], {}) and value not in (None, "", [], {}):
+                        metadata[key] = value
+                for key, value in candidate.identifiers.items():
+                    identifiers.setdefault(key, value)
+                cover_url = cover_url or candidate.cover_url
+        return ItemPayload(
+            **{
+                **payload.__dict__,
+                "source_refs": tuple(refs),
+                "metadata": metadata,
+                "identifiers": identifiers,
+                "cover_url": cover_url,
+            }
+        )
 
     async def add(
         self,

@@ -12,6 +12,7 @@ export interface SearchCandidate {
   subtitle: string | null;
   authors: string[];
   year: number | null;
+  original_year?: number | null;
   cover_url: string | null;
   identifiers: Record<string, string>;
   language: string | null;

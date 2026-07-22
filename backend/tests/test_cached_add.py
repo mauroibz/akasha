@@ -254,7 +254,7 @@ async def test_cover_failure_is_nonfatal_and_success_sets_only_valid_local_path(
                     "source_id": source_id,
                     "source_refs": (SourceRef(self.name, source_id),),
                     "identifiers": {},
-                    "cover_url": f"https://covers.example/{source_id}",
+                    "cover_url": f"https://covers.openlibrary.org/{source_id}",
                 }
             )
 
@@ -288,11 +288,14 @@ async def test_cover_failure_is_nonfatal_and_success_sets_only_valid_local_path(
                 },
             )
     assert failed.status_code == 201
-    assert failed.json()["entry"]["item"]["cover_path"] is None
+    assert failed.json()["entry"]["item"]["cover_url"] is None
+    assert "cover_path" not in failed.json()["entry"]["item"]
     assert succeeded.status_code == 201
-    cover_path = succeeded.json()["entry"]["item"]["cover_path"]
-    assert cover_path == f"covers/{succeeded.json()['entry']['item']['id']}.jpg"
-    assert (tmp_path / cover_path).is_file()
+    item_id = succeeded.json()["entry"]["item"]["id"]
+    assert succeeded.json()["entry"]["item"]["cover_url"].startswith(
+        f"/api/items/{item_id}/cover?v="
+    )
+    assert (tmp_path / "covers" / f"{item_id}.jpg").is_file()
     assert list((tmp_path / "covers").glob("*.tmp")) == []
 
 

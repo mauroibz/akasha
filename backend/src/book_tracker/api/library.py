@@ -2,13 +2,18 @@ from datetime import date
 from typing import Annotated, Any, Literal
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from book_tracker.application.add import AddService
 from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
-from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_uploaded_cover
+from book_tracker.infrastructure.covers import (
+    CoverError,
+    install_cover,
+    prepare_cover,
+    prepare_uploaded_cover,
+)
 from book_tracker.infrastructure.repositories import DomainRepository
 
 router = APIRouter(prefix="/api")
@@ -47,6 +52,30 @@ class SourceResponse(BaseModel):
     is_primary: bool
 
 
+class BookMetadataResponse(BaseModel):
+    authors: list[str] = Field(default_factory=list)
+    publisher: str | None = None
+    language: str | None = None
+    page_count: int | None = None
+    description: str | None = None
+    subjects: list[str] = Field(default_factory=list)
+    series: str | None = None
+    original_year: int | None = None
+
+
+class BookMetadataPatch(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    authors: list[str] | None = None
+    publisher: str | None = None
+    language: str | None = None
+    page_count: int | None = Field(default=None, ge=1)
+    description: str | None = None
+    subjects: list[str] | None = None
+    series: str | None = None
+    original_year: int | None = Field(default=None, ge=0, le=9999)
+
+
 class ItemResponse(BaseModel):
     id: int
     type: str
@@ -54,8 +83,8 @@ class ItemResponse(BaseModel):
     subtitle: str | None
     year: int | None
     sort_author: str | None
-    cover_path: str | None
-    metadata: dict[str, Any]
+    cover_url: str | None
+    metadata: BookMetadataResponse
     identifiers: dict[str, str]
     sources: list[SourceResponse]
 
@@ -161,7 +190,7 @@ class ItemPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1)
     subtitle: str | None = None
     year: int | None = None
-    metadata: dict[str, Any] | None = None
+    metadata: BookMetadataPatch | None = None
 
     @model_validator(mode="after")
     def required_title_when_present(self) -> "ItemPatch":
@@ -312,19 +341,50 @@ async def delete_entry(entry_id: int, library: Library) -> Response:
     return Response(status_code=204)
 
 
-@router.get("/items/{item_id}", response_model=ItemResponse, responses=ERRORS)
+@router.get(
+    "/items/{item_id}",
+    response_model=ItemResponse,
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
 async def get_item(item_id: int, library: Library) -> ItemResponse:
     return ItemResponse.model_validate(library.get_item(item_id))
 
 
-@router.patch("/items/{item_id}", response_model=ItemResponse, responses=ERRORS)
+@router.patch(
+    "/items/{item_id}",
+    response_model=ItemResponse,
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
 async def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
-    return ItemResponse.model_validate(
-        library.update_item(item_id, body.model_dump(exclude_unset=True))
+    changes = body.model_dump(exclude_unset=True)
+    if body.metadata is not None:
+        changes["metadata"] = body.metadata.model_dump(exclude_unset=True)
+    return ItemResponse.model_validate(library.update_item(item_id, changes))
+
+
+@router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
+async def get_cover(item_id: int, request: Request) -> Response:
+    item = LibraryService(request.app.state.engine).get_item(item_id)
+    if not item["cover_url"]:
+        raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
+    target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
+    if not target.is_file():
+        raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
+    return Response(
+        content=target.read_bytes(),
+        media_type="image/jpeg",
+        headers={"Cache-Control": "private, max-age=31536000, immutable"},
     )
 
 
-@router.post("/items/{item_id}/cover", response_model=ItemResponse, responses=ERRORS)
+@router.post(
+    "/items/{item_id}/cover",
+    response_model=ItemResponse,
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
 async def replace_cover(
     item_id: int, request: Request, cover: Annotated[UploadFile, File()]
 ) -> ItemResponse:
@@ -352,7 +412,12 @@ async def replace_cover(
     return ItemResponse.model_validate(library.get_item(item_id))
 
 
-@router.post("/items/{item_id}/refresh", response_model=ItemResponse, responses=ERRORS)
+@router.post(
+    "/items/{item_id}/refresh",
+    response_model=ItemResponse,
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
 async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> ItemResponse:
     library = LibraryService(request.app.state.engine)
     source, source_id = library.primary_source(item_id)
@@ -369,17 +434,33 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
     metadata["authors"] = list(payload.authors)
     if payload.language is not None:
         metadata["language"] = payload.language
-    return ItemResponse.model_validate(
-        library.overwrite_provider_fields(
-            item_id,
-            {
-                "title": payload.title,
-                "subtitle": payload.subtitle,
-                "year": payload.year,
-                "metadata": metadata,
-            },
-        )
+    prepared = None
+    if payload.cover_url:
+        try:
+            prepared = await prepare_cover(
+                request.app.state.provider_client, payload.cover_url, request.app.state.data_dir
+            )
+        except CoverError:
+            prepared = None
+    refreshed = library.overwrite_provider_fields(
+        item_id,
+        {
+            "title": payload.title,
+            "subtitle": payload.subtitle,
+            "year": payload.year,
+            "metadata": metadata,
+        },
     )
+    if prepared is not None:
+        try:
+            install_cover(prepared, request.app.state.data_dir, item_id)
+            DomainRepository(request.app.state.engine).set_cover_path(
+                item_id, f"covers/{item_id}.jpg"
+            )
+            refreshed = library.get_item(item_id)
+        except CoverError:
+            pass
+    return ItemResponse.model_validate(refreshed)
 
 
 @router.get("/shelves", response_model=list[ShelfResponse])

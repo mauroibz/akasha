@@ -25,7 +25,7 @@ async def test_cover_is_bounded_resized_and_atomically_installed(tmp_path: Path)
         return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg())
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
-        prepared = await prepare_cover(client, "https://covers.example/one", tmp_path)
+        prepared = await prepare_cover(client, "https://covers.openlibrary.org/one", tmp_path)
     target = install_cover(prepared, tmp_path, 42)
     assert target == tmp_path / "covers" / "42.jpg"
     with Image.open(target) as image:
@@ -47,7 +47,7 @@ async def test_cover_rejects_non_images_and_oversized_payloads(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(CoverError):
-            await prepare_cover(client, "https://covers.example/bad", tmp_path)
+            await prepare_cover(client, "https://covers.openlibrary.org/bad", tmp_path)
     assert list((tmp_path / "covers").glob("*.tmp")) == []
 
 
@@ -76,9 +76,23 @@ async def test_cover_rejects_excessive_pixels_before_loading(
 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(CoverError, match="pixel limit"):
-            await prepare_cover(client, "https://covers.example/huge", tmp_path)
+            await prepare_cover(client, "https://covers.openlibrary.org/huge", tmp_path)
     assert huge.loaded is False
     assert list((tmp_path / "covers").glob("*.tmp")) == []
+
+
+@pytest.mark.anyio
+async def test_cover_follows_only_bounded_allowlisted_https_redirects(tmp_path: Path) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path == "/start":
+            return httpx.Response(302, headers={"location": "https://evil.example/cover.jpg"})
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg())
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(CoverError, match="allowlisted"):
+            await prepare_cover(client, "https://covers.openlibrary.org/start", tmp_path)
+        with pytest.raises(CoverError, match="allowlisted"):
+            await prepare_cover(client, "http://covers.openlibrary.org/cover.jpg", tmp_path)
 
 
 def test_cover_install_failure_removes_prepared_file(

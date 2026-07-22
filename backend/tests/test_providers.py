@@ -143,6 +143,76 @@ async def test_openlibrary_search_keeps_work_year_out_of_edition_year() -> None:
 
 
 @pytest.mark.anyio
+async def test_openlibrary_selects_nested_edition_and_resolves_full_metadata() -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        path = request.url.path
+        if path == "/search.json":
+            return httpx.Response(
+                200,
+                json={
+                    "docs": [
+                        {
+                            "title": "Rayuela",
+                            "first_publish_year": 1963,
+                            "edition_key": ["WRONG"],
+                            "editions": {
+                                "docs": [
+                                    {
+                                        "key": "/books/OL1M",
+                                        "author_name": ["Julio Cortázar"],
+                                        "publish_date": "2019",
+                                        "isbn": ["9788437604572"],
+                                        "language": ["spa"],
+                                    }
+                                ]
+                            },
+                        }
+                    ]
+                },
+            )
+        if path == "/books/OL1M.json":
+            return httpx.Response(
+                200,
+                json={
+                    "title": "Rayuela",
+                    "authors": [{"key": "/authors/OL1A"}],
+                    "works": [{"key": "/works/OL1W"}],
+                    "publish_date": "2019",
+                    "publishers": ["Cátedra"],
+                    "number_of_pages": 736,
+                    "languages": [{"key": "/languages/spa"}],
+                    "isbn_13": ["9788437604572"],
+                    "covers": [42],
+                    "subjects": ["Fiction"],
+                },
+            )
+        if path == "/authors/OL1A.json":
+            return httpx.Response(200, json={"name": "Julio Cortázar"})
+        if path == "/works/OL1W.json":
+            return httpx.Response(
+                200, json={"description": {"value": "A novel"}, "first_publish_date": "1963"}
+            )
+        raise AssertionError(path)
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenLibraryProvider(client, "test@example.invalid")
+        search = await provider.search("Rayuela")
+        payload = await provider.fetch(search[0].source_id)
+    assert (search[0].source_id, search[0].year, search[0].original_year) == ("OL1M", 2019, 1963)
+    assert payload.authors == ("Julio Cortázar",)
+    assert payload.metadata == {
+        "authors": ["Julio Cortázar"],
+        "publisher": "Cátedra",
+        "language": "es",
+        "page_count": 736,
+        "description": "A novel",
+        "subjects": ["Fiction"],
+        "original_year": 1963,
+    }
+    assert payload.cover_url == "https://covers.openlibrary.org/b/id/42-L.jpg?default=false"
+
+
+@pytest.mark.anyio
 async def test_googlebooks_normalizes_cover_and_can_be_disabled_without_a_key() -> None:
     async def handler(_request: httpx.Request) -> httpx.Response:
         return httpx.Response(

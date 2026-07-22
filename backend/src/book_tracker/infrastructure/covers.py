@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 from PIL import Image, UnidentifiedImageError
@@ -9,6 +9,12 @@ from PIL import Image, UnidentifiedImageError
 MAX_COVER_BYTES = 10 * 1024 * 1024
 MAX_COVER_PIXELS = 40_000_000
 MAX_COVER_EDGE = 600
+MAX_COVER_REDIRECTS = 3
+ALLOWED_COVER_HOSTS = {
+    "covers.openlibrary.org",
+    "books.google.com",
+    "books.googleusercontent.com",
+}
 
 
 class CoverError(ValueError):
@@ -50,14 +56,33 @@ def prepare_uploaded_cover(content: bytes, content_type: str, data_dir: Path) ->
 
 
 async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> Path:
-    parsed = urlsplit(url)
-    if parsed.scheme != "https" or not parsed.hostname:
-        raise CoverError("cover URL must use HTTPS")
+    def validate_url(value: str) -> None:
+        parsed = urlsplit(value)
+        if parsed.scheme != "https" or parsed.hostname not in ALLOWED_COVER_HOSTS:
+            raise CoverError("cover URL must use an allowlisted HTTPS host")
+
+    validate_url(url)
     covers_dir = data_dir / "covers"
     covers_dir.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
     try:
-        async with client.stream("GET", url, follow_redirects=False) as response:
+        current = url
+        response: httpx.Response | None = None
+        for redirect_count in range(MAX_COVER_REDIRECTS + 1):
+            response = await client.send(client.build_request("GET", current), stream=True)
+            if response.status_code not in {301, 302, 303, 307, 308}:
+                break
+            if redirect_count == MAX_COVER_REDIRECTS:
+                raise CoverError("cover exceeded redirect limit")
+            location = response.headers.get("location")
+            if not location:
+                await response.aclose()
+                raise CoverError("cover redirect has no location")
+            await response.aclose()
+            current = urljoin(current, location)
+            validate_url(current)
+        assert response is not None
+        try:
             response.raise_for_status()
             content_type = response.headers.get("content-type", "").split(";", 1)[0]
             if content_type not in {"image/jpeg", "image/png", "image/webp"}:
@@ -75,10 +100,12 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
                     if size > MAX_COVER_BYTES:
                         raise CoverError("cover exceeds byte limit")
                     output.write(chunk)
+        finally:
+            await response.aclose()
         assert temporary is not None
         with Image.open(temporary) as image:
             width, height = image.size
-            if width <= 0 or height <= 0 or width * height > MAX_COVER_PIXELS:
+            if width < 10 or height < 10 or width * height > MAX_COVER_PIXELS:
                 raise CoverError("cover exceeds pixel limit")
             image.load()
             converted = image.convert("RGB")

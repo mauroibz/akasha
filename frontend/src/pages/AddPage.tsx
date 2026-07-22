@@ -151,12 +151,36 @@ export function AddPage() {
                 className="min-h-28 rounded-2xl bg-zinc-900 p-4 text-left focus-ring"
                 onClick={() => setSelected(row)}
               >
-                <strong>{row.title}</strong>
-                <span className="mt-1 block text-zinc-400">
-                  {row.authors.join(", ")} · {row.year ?? "Year unknown"}
-                </span>
-                <span className="text-xs uppercase text-fuchsia-400">
-                  {row.source}
+                <span className="grid grid-cols-[64px_1fr] gap-3">
+                  {row.cover_url ? (
+                    <img
+                      className="aspect-[2/3] w-16 rounded object-cover"
+                      src={row.cover_url}
+                      alt=""
+                    />
+                  ) : (
+                    <span
+                      className="aspect-[2/3] w-16 rounded bg-zinc-800"
+                      aria-hidden="true"
+                    />
+                  )}
+                  <span>
+                    <strong>{row.title}</strong>
+                    <span className="mt-1 block text-zinc-400">
+                      {row.authors.join(", ") || "Unknown author"}
+                    </span>
+                    <span className="block text-sm">
+                      Edition year: {row.year ?? "unknown"}
+                    </span>
+                    {row.original_year && row.original_year !== row.year && (
+                      <span className="block text-sm">
+                        Originally published: {row.original_year}
+                      </span>
+                    )}
+                    <span className="text-xs uppercase text-fuchsia-400">
+                      {row.source}
+                    </span>
+                  </span>
                 </span>
               </button>
             ))}

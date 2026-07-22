@@ -28,6 +28,7 @@ class SearchCandidateResponse(BaseModel):
     subtitle: str | None
     authors: list[str]
     year: int | None
+    original_year: int | None
     cover_url: str | None
     identifiers: dict[str, str]
     language: str | None
@@ -46,6 +47,7 @@ class SearchCandidateResponse(BaseModel):
             subtitle=candidate.subtitle,
             authors=list(candidate.authors),
             year=candidate.year,
+            original_year=candidate.original_year,
             cover_url=candidate.cover_url,
             identifiers=dict(candidate.identifiers),
             language=candidate.language,

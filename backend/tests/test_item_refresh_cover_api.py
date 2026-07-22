@@ -4,6 +4,7 @@ from pathlib import Path
 import httpx
 import pytest
 from PIL import Image
+from sqlalchemy import text
 
 from book_tracker.config import Settings
 from book_tracker.domain.providers import ItemPayload, SourceRef
@@ -47,6 +48,41 @@ class RefreshProvider:
 
 
 @pytest.mark.anyio
+async def test_typed_partial_metadata_patch_migrates_legacy_publisher_and_clears(
+    tmp_path: Path,
+) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        created = await client.post(
+            "/api/entries", json={"manual": {"title": "Legacy"}, "idempotency_key": "legacy"}
+        )
+        item_id = created.json()["entry"]["item_id"]
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET metadata = :metadata WHERE id = :id"),
+                {"metadata": '{"authors": ["A"], "publishers": ["Legacy House"]}', "id": item_id},
+            )
+        migrated = await client.patch(
+            f"/api/items/{item_id}", json={"metadata": {"language": "es"}}
+        )
+        cleared = await client.patch(
+            f"/api/items/{item_id}", json={"metadata": {"publisher": None}}
+        )
+        invalid = await client.patch(
+            f"/api/items/{item_id}", json={"metadata": {"unknown": "fabricated"}}
+        )
+        openapi = (await client.get("/openapi.json")).json()
+    assert migrated.json()["metadata"]["publisher"] == "Legacy House"
+    assert migrated.json()["metadata"]["language"] == "es"
+    assert "publisher" not in cleared.json()["metadata"]
+    assert invalid.status_code == 422
+    assert "BookMetadataPatch" in openapi["components"]["schemas"]
+
+
+@pytest.mark.anyio
 async def test_cover_replacement_is_bounded_and_preserves_previous_on_failure(
     tmp_path: Path,
 ) -> None:
@@ -64,17 +100,21 @@ async def test_cover_replacement_is_bounded_and_preserves_previous_on_failure(
             f"/api/items/{item_id}/cover",
             files={"cover": ("cover.png", image_bytes(), "image/png")},
         )
-        previous = (tmp_path / good.json()["cover_path"]).read_bytes()
+        previous = (tmp_path / "covers" / f"{item_id}.jpg").read_bytes()
+        served = await client.get(good.json()["cover_url"])
         bad = await client.post(
             f"/api/items/{item_id}/cover",
             files={"cover": ("bad.txt", b"not an image", "text/plain")},
         )
     assert good.status_code == 200
-    with Image.open(tmp_path / good.json()["cover_path"]) as normalized:
+    assert served.status_code == 200
+    assert served.headers["content-type"] == "image/jpeg"
+    assert "immutable" in served.headers["cache-control"]
+    with Image.open(tmp_path / "covers" / f"{item_id}.jpg") as normalized:
         assert normalized.format == "JPEG"
         assert max(normalized.size) == 600
     assert bad.status_code == 422
-    assert (tmp_path / good.json()["cover_path"]).read_bytes() == previous
+    assert (tmp_path / "covers" / f"{item_id}.jpg").read_bytes() == previous
 
 
 @pytest.mark.anyio
@@ -111,6 +151,7 @@ async def test_confirmed_refresh_merges_present_metadata_and_failure_is_atomic(
         "series": "Keep",
         "authors": ["Provider Author"],
         "language": "es",
+        "subjects": [],
     }
     assert failed.status_code == 502
     assert after.json() == refreshed.json()

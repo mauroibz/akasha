@@ -53,10 +53,10 @@ export function DetailPage() {
       </button>
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
-          {item.cover_path ? (
+          {item.cover_url ? (
             <img
               className="aspect-[2/3] w-full rounded-xl object-cover"
-              src={`/${item.cover_path}`}
+              src={item.cover_url}
               alt={`Cover of ${item.title}`}
             />
           ) : (
@@ -87,8 +87,13 @@ export function DetailPage() {
           </h1>
           <p className="text-zinc-400">{item.subtitle}</p>
           <p>
-            {item.sort_author} · {item.year}
+            {item.sort_author ?? "Unknown author"} · Edition year:{" "}
+            {item.year ?? "unknown"}
           </p>
+          {item.metadata.original_year &&
+            item.metadata.original_year !== item.year && (
+              <p>Originally published: {item.metadata.original_year}</p>
+            )}
           <p className="mt-5">{String(item.metadata.description ?? "")}</p>
           <dl className="mt-6 grid grid-cols-2 gap-4">
             <div>
@@ -250,6 +255,18 @@ export function DetailPage() {
                     .filter(Boolean),
                   publisher: String(data.get("publisher") ?? ""),
                   language: String(data.get("language") ?? ""),
+                  page_count: data.get("page_count")
+                    ? Number(data.get("page_count"))
+                    : null,
+                  description: String(data.get("description") ?? "") || null,
+                  subjects: String(data.get("subjects") ?? "")
+                    .split(",")
+                    .map((v) => v.trim())
+                    .filter(Boolean),
+                  series: String(data.get("series") ?? "") || null,
+                  original_year: data.get("original_year")
+                    ? Number(data.get("original_year"))
+                    : null,
                 },
               }),
             );
@@ -309,6 +326,49 @@ export function DetailPage() {
             <input
               name="language"
               defaultValue={String(item.metadata.language ?? "")}
+              className="field"
+            />
+          </label>
+          <label>
+            Page count
+            <input
+              name="page_count"
+              type="number"
+              min="1"
+              defaultValue={item.metadata.page_count ?? ""}
+              className="field"
+            />
+          </label>
+          <label>
+            Description
+            <textarea
+              name="description"
+              defaultValue={item.metadata.description ?? ""}
+              className="field"
+            />
+          </label>
+          <label>
+            Subjects, comma separated
+            <input
+              name="subjects"
+              defaultValue={(item.metadata.subjects ?? []).join(", ")}
+              className="field"
+            />
+          </label>
+          <label>
+            Series
+            <input
+              name="series"
+              defaultValue={item.metadata.series ?? ""}
+              className="field"
+            />
+          </label>
+          <label>
+            Original publication year
+            <input
+              name="original_year"
+              type="number"
+              defaultValue={item.metadata.original_year ?? ""}
               className="field"
             />
           </label>

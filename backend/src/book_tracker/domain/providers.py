@@ -25,6 +25,7 @@ class SearchCandidate:
     identifiers: Mapping[str, str]
     language: str | None
     metadata: Mapping[str, Any]
+    original_year: int | None = None
 
 
 @dataclass(frozen=True)
@@ -57,17 +58,33 @@ def _merge_group(group: Sequence[SearchCandidate]) -> SearchCandidate:
     refs = tuple(sorted({ref for row in group for ref in row.source_refs}))
     identifiers = dict(primary.identifiers)
     metadata = dict(primary.metadata)
+
+    def missing(value: object) -> bool:
+        return value is None or value == "" or value == [] or value == {}
+
     for row in group:
         identifiers.update(
-            {key: value for key, value in row.identifiers.items() if key not in identifiers}
+            {
+                key: value
+                for key, value in row.identifiers.items()
+                if key not in identifiers or missing(identifiers[key])
+            }
         )
-        metadata.update({key: value for key, value in row.metadata.items() if key not in metadata})
+        metadata.update(
+            {
+                key: value
+                for key, value in row.metadata.items()
+                if not missing(value) and (key not in metadata or missing(metadata[key]))
+            }
+        )
     return replace(
         primary,
         source_refs=refs,
         cover_url=cover,
         identifiers=identifiers,
         metadata=metadata,
+        original_year=primary.original_year
+        or next((row.original_year for row in group if row.original_year), None),
     )
 
 

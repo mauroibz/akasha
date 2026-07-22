@@ -37,8 +37,18 @@ export interface LibraryEntry {
     subtitle: string | null;
     year: number | null;
     sort_author: string | null;
-    cover_path: string | null;
-    metadata: Record<string, unknown>;
+    cover_url?: string | null;
+    cover_path?: string | null;
+    metadata: {
+      authors?: string[];
+      publisher?: string | null;
+      language?: string | null;
+      page_count?: number | null;
+      description?: string | null;
+      subjects?: string[];
+      series?: string | null;
+      original_year?: number | null;
+    };
     identifiers: Record<string, string>;
     sources: Array<{ source: string; source_id: string; is_primary: boolean }>;
   };
@@ -122,7 +132,7 @@ export async function patchItem(
     title?: string;
     subtitle?: string | null;
     year?: number | null;
-    metadata?: Record<string, unknown>;
+    metadata?: Partial<LibraryEntry["item"]["metadata"]>;
   },
 ): Promise<LibraryEntry["item"]> {
   const response = await fetch(`/api/items/${itemId}`, {
