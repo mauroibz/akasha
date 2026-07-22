@@ -87,7 +87,7 @@ class AffectedResponse(BaseModel):
     affected: int
 
 
-ERRORS = {
+ERRORS: dict[int | str, dict[str, Any]] = {
     404: {"model": ErrorResponse, "description": "Requested resource was not found"},
     409: {"model": ErrorResponse, "description": "Domain conflict"},
 }
