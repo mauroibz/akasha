@@ -1,51 +1,44 @@
 # Akasha Book Tracker
 
-A self-hosted, keyboard-first personal book rating and triage application. It is an opinion tracker, not an ebook server or social network.
+Akasha is a self-hosted, keyboard-first personal book rating and triage app. It tracks opinions, not ebook files, and v1 has no authentication: deploy it only on a trusted LAN.
 
-## Repository status
+## Local setup
 
-The repository is prepared for sprint-by-sprint autonomous implementation. Application code has not started yet. Sprint 001 is the active unit of work.
-
-## For coding agents
-
-Start with [`AGENTS.md`](AGENTS.md). If your instruction is only `work`, follow that file exactly. Do not choose a different sprint or implement future scope.
-
-## Canonical documents
-
-1. [`docs/specs/product-spec.md`](docs/specs/product-spec.md) — user-visible behavior and scope
-2. [`docs/specs/technical-spec.md`](docs/specs/technical-spec.md) — architecture, contracts, data model, quality constraints
-3. [`docs/sprints/ROADMAP.md`](docs/sprints/ROADMAP.md) — ordered delivery plan
-4. [`docs/agent/WORKFLOW.md`](docs/agent/WORKFLOW.md) — execution and handoff protocol
-5. [`docs/agent/state.json`](docs/agent/state.json) — machine-readable active sprint pointer
-6. [`docs/agent/worklog.md`](docs/agent/worklog.md) — append-only per-session work log
-7. [`docs/decisions.md`](docs/decisions.md) — decisions and implementation deviations
-
-The precedence and conflict rules are defined in `AGENTS.md`.
-
-## Intended development commands
-
-These commands become operational in Sprint 001:
+Requirements: Docker, Node 22, npm, and `uv`. `uv` installs the required Python 3.12 runtime automatically.
 
 ```bash
 make bootstrap
-make check
-make test
-make dev
+cp .env.example .env
+make dev-backend   # terminal 1, API at http://localhost:8000
+make dev-frontend  # terminal 2, UI at http://localhost:5173
 ```
 
-Until Sprint 001 creates the application scaffold, validate the planning repository with:
+The first backend startup creates the local `data/` directories and applies the foundation Alembic migration. Sprint 001 intentionally seeds no book-domain rows.
+
+## Quality and build commands
 
 ```bash
-python scripts/validate_project.py
+make format       # apply backend/frontend formatting
+make check        # format check, lint, types, project state, OpenAPI drift
+make test         # backend and frontend behavior tests
+make build        # Python wheel and production SPA
+make openapi      # regenerate frontend/openapi.json
+make migrate      # explicitly upgrade the configured database
 ```
 
-## Target stack
+## Container
 
-- Python 3.12, FastAPI, SQLAlchemy 2, Alembic, SQLite
-- React 18, Vite, TypeScript, Tailwind, shadcn/ui, Motion
-- pytest for backend tests; Vitest + Testing Library for frontend tests; Playwright for critical flows
-- One multi-stage Docker image; `/data` is writable and `/calibre` is read-only
+Set a real contact address for future provider requests, then build and start the single production container:
 
-## Product safety boundary
+```bash
+cp .env.example .env
+docker compose up --build
+```
 
-v1 has no authentication. It is LAN-only and must not be exposed to the public internet. Reverse-proxy configuration must preserve that boundary.
+Compose persists `${DATA_DIR:-./data}` at `/data`. The image serves the SPA and API on port 8000, runs as a non-root user, contains no Node runtime, and uses `/api/health/ready` for health checks. The Calibre read-only mount is enabled in Sprint 008.
+
+Run the repeatable image proof with `make smoke-container`; it builds the image, checks readiness and SPA routing, recreates the container over persistent data, confirms the process is non-root, and verifies Node is absent.
+
+## Repository guidance
+
+Coding agents start with [AGENTS.md](AGENTS.md). Product behavior is canonical in [the product spec](docs/specs/product-spec.md), while implementation contracts live in [the technical spec](docs/specs/technical-spec.md).
