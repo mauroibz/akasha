@@ -87,7 +87,17 @@ export async function getLibraryPage(
 
 export async function patchEntry(
   entryId: number,
-  changes: Partial<Pick<LibraryEntry, "score" | "status">>,
+  changes: Partial<
+    Pick<
+      LibraryEntry,
+      | "score"
+      | "status"
+      | "notes"
+      | "date_started"
+      | "date_finished"
+      | "reread_count"
+    >
+  > & { shelf_ids?: number[] },
 ): Promise<LibraryEntry> {
   const response = await fetch(`/api/entries/${entryId}`, {
     method: "PATCH",
@@ -96,4 +106,61 @@ export async function patchEntry(
   });
   if (!response.ok) throw new Error("Your change could not be saved");
   return (await response.json()) as LibraryEntry;
+}
+
+export async function getEntry(entryId: number): Promise<LibraryEntry> {
+  const response = await fetch(`/api/entries/${entryId}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("Book detail could not be loaded");
+  return response.json() as Promise<LibraryEntry>;
+}
+
+export async function patchItem(
+  itemId: number,
+  changes: {
+    title?: string;
+    subtitle?: string | null;
+    year?: number | null;
+    metadata?: Record<string, unknown>;
+  },
+): Promise<LibraryEntry["item"]> {
+  const response = await fetch(`/api/items/${itemId}`, {
+    method: "PATCH",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(changes),
+  });
+  if (!response.ok) throw new Error("Book metadata could not be saved");
+  return response.json() as Promise<LibraryEntry["item"]>;
+}
+
+export async function refreshItem(
+  itemId: number,
+): Promise<LibraryEntry["item"]> {
+  const response = await fetch(`/api/items/${itemId}/refresh`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ overwrite: true }),
+  });
+  if (!response.ok)
+    throw new Error("Provider refresh failed; your metadata was not changed");
+  return response.json() as Promise<LibraryEntry["item"]>;
+}
+
+export async function replaceCover(
+  itemId: number,
+  cover: File,
+): Promise<LibraryEntry["item"]> {
+  const body = new FormData();
+  body.set("cover", cover);
+  const response = await fetch(`/api/items/${itemId}/cover`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body,
+  });
+  if (!response.ok)
+    throw new Error(
+      "Cover could not be replaced; the previous cover is unchanged",
+    );
+  return response.json() as Promise<LibraryEntry["item"]>;
 }

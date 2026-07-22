@@ -2,12 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer components {
-  .field {
-    @apply mt-1 min-h-11 w-full rounded-lg bg-zinc-900 px-3 focus-ring;
-  }
-}
-
 :root {
   color-scheme: dark;
   font-family: Inter, ui-sans-serif, system-ui, sans-serif;
@@ -34,6 +28,14 @@ button {
 @layer utilities {
   .focus-ring {
     @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400;
+  }
+}
+@layer components {
+  .field {
+    @apply mt-1 min-h-11 w-full rounded-lg bg-zinc-900 px-3 focus-ring;
+  }
+  .dialog {
+    @apply fixed inset-x-4 top-1/2 z-20 mx-auto grid max-h-[90vh] max-w-lg -translate-y-1/2 gap-4 overflow-auto rounded-2xl border border-zinc-700 bg-zinc-950 p-6 shadow-2xl;
   }
 }
 @media (prefers-reduced-motion: reduce) {
