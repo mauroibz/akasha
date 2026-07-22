@@ -2,15 +2,19 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from book_tracker.api.library import router as library_router
+from book_tracker.api.providers import router as providers_router
 from book_tracker.application.library import LibraryError
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
+from book_tracker.domain.providers import Provider
+from book_tracker.infrastructure.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import schema_is_current, upgrade
 
@@ -27,8 +31,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             assert configured.database_url is not None
             upgrade(configured.database_url)
         app.state.engine = create_engine(configured)
-        yield
-        app.state.engine.dispose()
+        provider_client = httpx.AsyncClient(
+            timeout=httpx.Timeout(5), limits=httpx.Limits(max_connections=10)
+        )
+        providers: list[Provider] = [
+            OpenLibraryProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        ]
+        google = GoogleBooksProvider(provider_client, configured.google_books_api_key)
+        if google.enabled:
+            providers.append(google)
+        app.state.providers = {provider.name: provider for provider in providers}
+        try:
+            yield
+        finally:
+            await provider_client.aclose()
+            app.state.engine.dispose()
 
     app = FastAPI(title="Akasha Book Tracker", version="0.1.0", lifespan=lifespan)
 
@@ -73,6 +92,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse({"status": "ready"})
 
     app.include_router(library_router)
+    app.include_router(providers_router)
 
     @app.api_route(
         "/api/{path:path}",
