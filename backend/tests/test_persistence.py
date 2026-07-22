@@ -51,6 +51,25 @@ def test_list_index_migration_round_trips_from_domain_head(tmp_path: Path) -> No
     config = alembic_config(configured.database_url)
     command.upgrade(config, "0002_domain_schema")
     command.upgrade(config, "head")
+
+
+def test_import_planning_indexes_migrate_from_previous_head(tmp_path: Path) -> None:
+    from alembic import command
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    config = alembic_config(configured.database_url)
+    command.upgrade(config, "0003_list_indexes")
+    command.upgrade(config, "head")
+    engine = create_engine(configured)
+    assert "ix_import_records_batch_action" in {
+        index["name"] for index in inspect(engine).get_indexes("import_records")
+    }
+    command.downgrade(config, "0003_list_indexes")
+    assert "ix_import_records_batch_action" not in {
+        index["name"] for index in inspect(engine).get_indexes("import_records")
+    }
+    command.upgrade(config, "head")
     engine = create_engine(configured)
     assert "ix_entries_user_status_date_id" in {
         index["name"] for index in inspect(engine).get_indexes("entries")

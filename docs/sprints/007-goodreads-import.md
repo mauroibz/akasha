@@ -1,6 +1,6 @@
 # Sprint 007 — Goodreads import
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 003, 006
 **Roadmap revision:** 2
 

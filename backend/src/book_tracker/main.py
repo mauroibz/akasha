@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.application.library import LibraryError
@@ -97,6 +98,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     app.include_router(library_router)
     app.include_router(providers_router)
+    app.include_router(imports_router)
 
     @app.api_route(
         "/api/{path:path}",
