@@ -195,6 +195,121 @@ class DomainRepository:
             session.flush()
             return EntryResult(item_id, entry.id, False)
 
+    def near_entry_ids(self, title: str, first_author: str, user_id: int = 1) -> list[int]:
+        decision = self.match(title=title, first_author=first_author)
+        if decision.kind is not MatchKind.AMBIGUOUS:
+            return []
+        with Session(self.engine) as session:
+            return list(
+                session.scalars(
+                    select(EntryRow.id)
+                    .where(
+                        EntryRow.user_id == user_id,
+                        EntryRow.item_id.in_(decision.candidates),
+                    )
+                    .order_by(EntryRow.id)
+                )
+            )
+
+    def create_cached_entry(
+        self,
+        *,
+        title: str,
+        subtitle: str | None,
+        year: int | None,
+        metadata: Mapping[str, Any],
+        identifiers: Sequence[Identifier],
+        sources: Sequence[SourceIdentity],
+        status: str,
+        score: int | None,
+        shelf_ids: Sequence[int] = (),
+        user_id: int = 1,
+    ) -> EntryResult:
+        with self._write() as session:
+            exact = self._exact_ids(session, identifiers, sources)
+            decision = decide_match(exact, set())
+            if decision.kind is MatchKind.IDENTITY_CONFLICT:
+                raise IdentityConflict(decision)
+            now = _now()
+            if decision.item_id is None:
+                item = ItemRow(
+                    type="book",
+                    title=title,
+                    subtitle=subtitle,
+                    year=year,
+                    cover_path=None,
+                    identifiers=json.dumps(
+                        {value.kind: value.normalized_value for value in identifiers}
+                    ),
+                    metadata_json=json.dumps(dict(metadata), ensure_ascii=False),
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(item)
+                session.flush()
+                item_id = item.id
+                session.add_all(
+                    ItemIdentifierRow(
+                        item_id=item_id,
+                        kind=value.kind,
+                        normalized_value=value.normalized_value,
+                        value=value.value,
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    for value in identifiers
+                )
+                session.add_all(
+                    ItemSourceRow(
+                        item_id=item_id,
+                        source=value.source,
+                        source_id=value.source_id,
+                        is_primary=int(value.is_primary),
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    for value in sources
+                )
+            else:
+                item_id = decision.item_id
+            existing = session.scalar(
+                select(EntryRow).where(EntryRow.user_id == user_id, EntryRow.item_id == item_id)
+            )
+            if existing is not None:
+                return EntryResult(item_id, existing.id, True)
+            shelves = set(shelf_ids)
+            if shelves:
+                found = set(
+                    session.scalars(
+                        select(ShelfRow.id).where(
+                            ShelfRow.user_id == user_id, ShelfRow.id.in_(shelves)
+                        )
+                    )
+                )
+                if found != shelves:
+                    raise LookupError("shelf_not_found")
+            entry = EntryRow(
+                user_id=user_id,
+                item_id=item_id,
+                status=status,
+                score=score,
+                notes=None,
+                date_added=now,
+                date_started=None,
+                date_finished=None,
+                reread_count=0,
+                score_provisional=0,
+                suggested_status=None,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(entry)
+            session.flush()
+            session.add_all(
+                EntryShelfRow(entry_id=entry.id, shelf_id=shelf_id) for shelf_id in shelves
+            )
+            return EntryResult(item_id, entry.id, False)
+
     def fill_empty_item(
         self, item_id: int, values: Mapping[str, Any], identifiers: Sequence[Identifier] = ()
     ) -> None:
@@ -227,6 +342,14 @@ class DomainRepository:
                             updated_at=now,
                         )
                     )
+
+    def set_cover_path(self, item_id: int, cover_path: str) -> None:
+        with self._write() as session:
+            item = session.get(ItemRow, item_id)
+            if item is None:
+                raise LookupError(item_id)
+            item.cover_path = cover_path
+            item.updated_at = _now()
 
     def create_shelf(self, name: str, user_id: int = 1) -> int:
         now = _now()

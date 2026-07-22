@@ -4,7 +4,9 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, Depends, Query, Request, Response
 from pydantic import BaseModel, Field, model_validator
 
+from book_tracker.application.add import AddService
 from book_tracker.application.library import LibraryService
+from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
 
 router = APIRouter(prefix="/api")
@@ -85,6 +87,49 @@ class EntryListResponse(BaseModel):
 
 class AffectedResponse(BaseModel):
     affected: int
+
+
+class SourceRefBody(BaseModel):
+    source: str = Field(min_length=1, max_length=50)
+    source_id: str = Field(min_length=1, max_length=200)
+
+
+class ManualItemBody(BaseModel):
+    title: str = Field(min_length=1, max_length=500)
+    subtitle: str | None = Field(default=None, max_length=500)
+    authors: list[str] = Field(default_factory=list, max_length=50)
+    year: int | None = Field(default=None, ge=0, le=9999)
+    publisher: str | None = Field(default=None, max_length=300)
+    language: str | None = Field(default=None, max_length=20)
+    isbn: str | None = Field(default=None, max_length=40)
+
+
+class EntryCreateBody(BaseModel):
+    source: str | None = Field(default=None, max_length=50)
+    source_id: str | None = Field(default=None, max_length=200)
+    source_refs: list[SourceRefBody] = Field(default_factory=list, max_length=10)
+    manual: ManualItemBody | None = None
+    status: EntryStatus = EntryStatus.READ
+    score: int | None = Field(default=None, ge=1, le=10)
+    shelf_ids: list[int] = Field(default_factory=list, max_length=100)
+    idempotency_key: str | None = Field(default=None, min_length=1, max_length=100)
+
+    @model_validator(mode="after")
+    def exactly_one_source(self) -> "EntryCreateBody":
+        provider_selected = self.source is not None or self.source_id is not None
+        if (self.source is None) != (self.source_id is None):
+            raise ValueError("source and source_id must be provided together")
+        if (self.manual is None) == (not provider_selected):
+            raise ValueError("provide exactly one of manual or provider source")
+        if self.manual is not None and not (self.idempotency_key or self.manual.isbn):
+            raise ValueError("manual add requires idempotency_key or ISBN")
+        return self
+
+
+class EntryCreateResponse(BaseModel):
+    entry: EntryResponse
+    already_exists: bool
+    near_matches: list[int]
 
 
 ERRORS: dict[int | str, dict[str, Any]] = {
@@ -185,6 +230,36 @@ async def list_entries(
             limit=limit,
         )
     )
+
+
+@router.post(
+    "/entries",
+    response_model=EntryCreateResponse,
+    status_code=201,
+    responses={200: {"model": EntryCreateResponse}, **ERRORS},
+)
+async def create_entry(
+    body: EntryCreateBody, request: Request, response: Response
+) -> EntryCreateResponse:
+    add = AddService(
+        request.app.state.engine,
+        request.app.state.providers,
+        cover_client=request.app.state.provider_client,
+        data_dir=request.app.state.data_dir,
+    )
+    result = await add.add(
+        manual=body.manual.model_dump() if body.manual else None,
+        source=body.source,
+        source_id=body.source_id,
+        supplied_refs=[SourceRef(value.source, value.source_id) for value in body.source_refs],
+        status=body.status.value,
+        score=body.score,
+        shelf_ids=body.shelf_ids,
+        idempotency_key=body.idempotency_key,
+    )
+    if result["already_exists"]:
+        response.status_code = 200
+    return EntryCreateResponse.model_validate(result)
 
 
 @router.patch("/entries/bulk", response_model=AffectedResponse, responses=ERRORS)

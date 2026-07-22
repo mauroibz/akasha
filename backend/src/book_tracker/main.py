@@ -34,6 +34,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         provider_client = httpx.AsyncClient(
             timeout=httpx.Timeout(5), limits=httpx.Limits(max_connections=10)
         )
+        app.state.provider_client = provider_client
+        app.state.data_dir = configured.data_dir
         providers: list[Provider] = [
             OpenLibraryProvider(
                 provider_client, configured.user_agent_contact or "local@example.invalid"

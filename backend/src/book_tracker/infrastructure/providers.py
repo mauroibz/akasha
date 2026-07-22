@@ -1,3 +1,4 @@
+import json
 from collections.abc import Mapping
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -10,6 +11,35 @@ from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRe
 
 class ProviderPayloadError(ValueError):
     pass
+
+
+MAX_PROVIDER_BYTES = 2 * 1024 * 1024
+
+
+async def _bounded_json(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: Mapping[str, str | int],
+    headers: Mapping[str, str] | None = None,
+) -> Mapping[str, Any]:
+    async with client.stream("GET", url, params=params, headers=headers) as response:
+        response.raise_for_status()
+        declared = int(response.headers.get("content-length", "0"))
+        if declared > MAX_PROVIDER_BYTES:
+            raise ProviderPayloadError("Provider response exceeds byte limit")
+        body = bytearray()
+        async for chunk in response.aiter_bytes():
+            body.extend(chunk)
+            if len(body) > MAX_PROVIDER_BYTES:
+                raise ProviderPayloadError("Provider response exceeds byte limit")
+    try:
+        decoded = json.loads(body)
+    except (UnicodeDecodeError, json.JSONDecodeError) as error:
+        raise ProviderPayloadError("Provider returned malformed JSON") from error
+    if not isinstance(decoded, dict):
+        raise ProviderPayloadError("Provider returned a non-object payload")
+    return decoded
 
 
 def _year(value: object) -> int | None:
@@ -48,12 +78,7 @@ class OpenLibraryProvider:
         self.headers = {"User-Agent": f"Akasha/0.1 ({contact})"}
 
     async def _json(self, url: str, **params: str | int) -> Mapping[str, Any]:
-        response = await self.client.get(url, params=params, headers=self.headers)
-        response.raise_for_status()
-        body = response.json()
-        if not isinstance(body, dict):
-            raise ProviderPayloadError("Open Library returned a non-object payload")
-        return body
+        return await _bounded_json(self.client, url, params=params, headers=self.headers)
 
     def _candidate(self, row: Mapping[str, Any]) -> SearchCandidate | None:
         editions = row.get("edition_key")
@@ -229,12 +254,7 @@ class GoogleBooksProvider:
     async def _get(self, url: str, **params: str | int) -> Mapping[str, Any]:
         if not self.enabled:
             raise RuntimeError("Google Books is disabled")
-        response = await self.client.get(url, params={**params, "key": self.api_key})
-        response.raise_for_status()
-        body = response.json()
-        if not isinstance(body, dict):
-            raise ProviderPayloadError("Google Books returned a non-object payload")
-        return body
+        return await _bounded_json(self.client, url, params={**params, "key": self.api_key})
 
     async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._get(

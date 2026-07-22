@@ -10,7 +10,12 @@ from book_tracker.application.providers import (
     search_providers,
 )
 from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
-from book_tracker.infrastructure.providers import GoogleBooksProvider, OpenLibraryProvider
+from book_tracker.infrastructure.providers import (
+    MAX_PROVIDER_BYTES,
+    GoogleBooksProvider,
+    OpenLibraryProvider,
+    ProviderPayloadError,
+)
 
 
 @pytest.fixture
@@ -171,6 +176,34 @@ async def test_googlebooks_normalizes_cover_and_can_be_disabled_without_a_key() 
 
 
 @pytest.mark.anyio
+@pytest.mark.parametrize(
+    ("response", "error_type"),
+    [
+        (httpx.Response(429), httpx.HTTPStatusError),
+        (httpx.Response(200, content=b"not-json"), ProviderPayloadError),
+        (
+            httpx.Response(
+                200,
+                headers={"content-length": str(MAX_PROVIDER_BYTES + 1)},
+                content=b"{}",
+            ),
+            ProviderPayloadError,
+        ),
+    ],
+)
+async def test_provider_rejects_429_malformed_and_oversized_responses(
+    response: httpx.Response, error_type: type[Exception]
+) -> None:
+    async def handler(request: httpx.Request) -> httpx.Response:
+        response.request = request
+        return response
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(error_type):
+            await OpenLibraryProvider(client, "test@example.invalid").search("Rayuela")
+
+
+@pytest.mark.anyio
 async def test_resolve_work_url_requires_edition_choices_and_rejects_unsupported_urls() -> None:
     editions = [candidate("openlibrary", "OL1M"), candidate("openlibrary", "OL2M")]
 
@@ -184,3 +217,22 @@ async def test_resolve_work_url_requires_edition_choices_and_rejects_unsupported
     assert [row.source_id for row in result] == ["OL1M", "OL2M"]
     with pytest.raises(InvalidResolution):
         await resolve_input("https://goodreads.com/book/show/1", {"openlibrary": provider})
+
+
+@pytest.mark.anyio
+async def test_resolve_accepts_isbn_and_supported_edition_urls() -> None:
+    fetched: list[str] = []
+
+    class Resolver(StubProvider):
+        async def fetch(self, source_id: str) -> SearchCandidate:
+            fetched.append(source_id)
+            return candidate(self.name, source_id)
+
+    openlibrary = Resolver("openlibrary", [candidate("openlibrary", "OL1M")])
+    google = Resolver("googlebooks")
+    isbn = await resolve_input("978-84-376-0457-2", {"openlibrary": openlibrary})
+    ol = await resolve_input("https://openlibrary.org/books/OL7M", {"openlibrary": openlibrary})
+    gb = await resolve_input("https://books.google.com/books?id=g7", {"googlebooks": google})
+    assert isbn[0].source_id == "OL1M"
+    assert [row.source_id for row in (*ol, *gb)] == ["OL7M", "g7"]
+    assert fetched == ["OL7M", "g7"]
