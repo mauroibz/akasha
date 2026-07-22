@@ -274,6 +274,10 @@ The product-spec route list is authoritative, with these refinements:
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - Import commit bodies contain preview batch IDs, not client-controlled source payloads.
+- `POST /import/calibre/preview` accepts only `library_path` relative to the configured mount;
+  `POST /import/calibre/commit` accepts the durable batch ID and ambiguity choices. Preview responses
+  expose normalized Calibre UUID/book identity and whether a local cover was staged, never a source
+  filesystem path.
 - Cover files are served from a controlled route or static mount with immutable cache headers; database paths are relative and never accepted from clients.
 - Add `GET /api/health/live` and `GET /api/health/ready`; readiness verifies DB access and migration head, not public provider availability.
 

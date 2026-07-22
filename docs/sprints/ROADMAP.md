@@ -2,7 +2,7 @@
 
 **Plan revision:** 4
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 009](009-calibre-import.md)
+**Active sprint:** [Sprint 010](010-editorial-ui-redesign.md)
 
 ## Dependency graph
 
@@ -37,8 +37,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | completed |
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
 | 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | completed |
-| 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | ready |
-| 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | planned |
+| 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | completed |
+| 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | ready |
 | 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | planned |
 | 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | planned |
 | 013 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 012 | planned |

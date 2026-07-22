@@ -1,6 +1,6 @@
 # Sprint 009 — Calibre import and re-sync
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 008
 **Roadmap revision:** 4
 
@@ -108,5 +108,22 @@ source DB hashes before and after, and run the specified Chromium flows.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-07-22.
+
+- `0b7896b` added the mount-confined adapter, `mode=ro`/`query_only` enforcement, supported full and
+  minimal schema normalization, durable exact-plan preview/commit, staged local covers, safe typed
+  errors, UUID/ISBN matching, fill-empty re-sync, and Goodreads regression coverage.
+- `73ee89d` added typed Calibre client calls and a keyboard/mobile import tab explaining relative
+  paths, read-only access, cover staging, ratings, row errors, ambiguity, and re-sync semantics.
+- `4c88c91` synchronized OpenAPI and quality contracts; `b3c89a4` ensured an ISBN-matched existing
+  item also retains its non-conflicting Calibre UUID provenance.
+- Synthetic file-backed tests prove absolute/traversal/missing/symlink/non-database rejection,
+  unchanged source SHA-256, source-independent commit/retry, optional-schema tolerance, native
+  nonprovisional score, shelves, cover installation, idempotency, and manual-value preservation.
+- Verification passed: project validation; format/check; 91 backend and 16 component tests; Python
+  wheel and production SPA build; nine normal Chromium flows (two live-provider flows gated/skipped),
+  including the Calibre mobile keyboard flow; and `git diff --check`. The isolated build initially
+  lacked DNS for Hatchling; the approved network rerun passed.
+- No product or scope deviation. The implementation consolidated the first two planned backend
+  checkpoints into one coherent commit. Sprint 010 now redesigns the real two-source import UI and
+  implements the already-specified navigation/detail/delete/shelf completion work.

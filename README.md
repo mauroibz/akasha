@@ -2,9 +2,10 @@
 
 Akasha is a self-hosted, keyboard-first personal book rating and triage app. It tracks opinions, not ebook files, and v1 has no authentication: deploy it only on a trusted LAN.
 
-The current application supports cached manual/provider adds and preview-first Goodreads CSV imports.
-Goodreads imports are size-bounded, land in the inbox with status suggestions and provisional scores,
-and never overwrite existing library opinions.
+The current application supports cached manual/provider adds plus preview-first Goodreads CSV and
+read-only Calibre imports. Goodreads imports land in the inbox with status suggestions and
+provisional scores. Calibre imports use native 1–10 ratings, tags as shelves, locally copied covers,
+and fill-empty re-sync. Neither source overwrites existing library opinions or populated metadata.
 
 ## Local setup
 
@@ -40,7 +41,9 @@ cp .env.example .env
 docker compose up --build
 ```
 
-Compose persists `${DATA_DIR:-./data}` at `/data`. The image serves the SPA and API on port 8000, runs as a non-root user, contains no Node runtime, and uses `/api/health/ready` for health checks. The Calibre read-only mount is enabled in Sprint 008.
+Compose persists `${DATA_DIR:-./data}` at `/data`. The image serves the SPA and API on port 8000,
+runs as a non-root user, contains no Node runtime, and uses `/api/health/ready` for health checks.
+Calibre libraries are addressed by a relative folder beneath the read-only `/calibre` mount.
 
 Run the repeatable image proof with `make smoke-container`; it builds the image, checks readiness and SPA routing, recreates the container over persistent data, confirms the process is non-root, and verifies Node is absent.
 

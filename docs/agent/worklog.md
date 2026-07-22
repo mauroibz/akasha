@@ -141,3 +141,17 @@ Entry format:
   sprint insertion; Sprint 008 Outcome records live-discovered behavior.
 - Blocked/open: none.
 - Next: claim Sprint 009 and begin with synthetic Calibre read-only/query-only/path-confinement tests.
+
+## 2026-07-22 — Sprint 009 (complete)
+- Done: specified the editorial UI completion Sprint 010 before implementation (`79f1fdc`), then
+  delivered confined read-only Calibre preview/commit (`0b7896b`), its typed keyboard/mobile UI
+  (`73ee89d`), synchronized contracts (`4c88c91`), and UUID provenance on ISBN matches (`b3c89a4`).
+- Verified: 91 backend and 16 component tests pass; nine normal Chromium flows pass and two opt-in
+  live-provider flows skip without credentials. Source hash/read-only/query-only, staged-cover
+  stability, safe paths, optional schemas, fill-empty re-sync, and Goodreads regressions are covered.
+  Project validation, format/check/test, build, and diff checks pass; build needed the approved network
+  rerun to resolve cached-missing Hatchling.
+- Deviations: no product/scope deviation; the first two backend checkpoints were one coherent commit.
+- Blocked/open: none.
+- Next: claim Sprint 010 and start with its visual inventory plus shell/navigation tests, then deliver
+  clickable detail, deletion, shelf management, and the specified editorial redesign.
