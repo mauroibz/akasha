@@ -624,6 +624,38 @@ class ImportRepository:
                                 after_values=json.dumps(after, ensure_ascii=False),
                             )
                         )
+                    for identity_kind, identity_value in identity_values.items():
+                        present = session.scalar(
+                            select(ItemIdentifierRow.item_id).where(
+                                ItemIdentifierRow.item_id == item_id,
+                                ItemIdentifierRow.kind == identity_kind,
+                                ItemIdentifierRow.normalized_value == identity_value,
+                            )
+                        )
+                        if present is None:
+                            identifier = ItemIdentifierRow(
+                                item_id=item_id,
+                                kind=identity_kind,
+                                normalized_value=identity_value,
+                                value=identity_value,
+                                created_at=now,
+                                updated_at=now,
+                            )
+                            session.add(identifier)
+                            session.flush()
+                            session.add(
+                                ImportEffectRow(
+                                    batch_id=batch_id,
+                                    record_id=row.id,
+                                    effect_type="create",
+                                    entity_type="item_identifier",
+                                    entity_id=f"{item_id}:{identity_kind}:{identity_value}",
+                                    before_values="{}",
+                                    after_values=json.dumps(
+                                        {"kind": identity_kind, "value": identity_value}
+                                    ),
+                                )
+                            )
                 row.matched_item_id = item_id
                 existing = session.scalar(
                     select(EntryRow).where(EntryRow.user_id == user_id, EntryRow.item_id == item_id)

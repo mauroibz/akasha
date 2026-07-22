@@ -179,7 +179,7 @@ async def test_calibre_minimal_schema_and_resync_fill_only(tmp_path: Path) -> No
                 text(
                     "INSERT INTO item_identifiers("
                     "item_id,kind,normalized_value,value,created_at,updated_at) "
-                    "VALUES(:id,'calibre_uuid','uuid-1','uuid-1','n','n')"
+                    "VALUES(:id,'isbn','9780141187761','9780141187761','n','n')"
                 ),
                 {"id": item_id},
             )
@@ -200,3 +200,13 @@ async def test_calibre_minimal_schema_and_resync_fill_only(tmp_path: Path) -> No
             assert item.title == "Manual title" and item.year == 1944
             assert '"publisher": "Manual"' in item.metadata
             assert "Jorge Luis Borges" in item.metadata
+            assert (
+                connection.scalar(
+                    text(
+                        "SELECT count(*) FROM item_identifiers "
+                        "WHERE item_id=:id AND kind='calibre_uuid' AND normalized_value='uuid-1'"
+                    ),
+                    {"id": item_id},
+                )
+                == 1
+            )
