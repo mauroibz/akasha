@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 3
+**Plan revision:** 4
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [Sprint 009](009-calibre-import.md)
 
@@ -16,10 +16,11 @@
              └─ 007 Goodreads import
                  └─ 008 Working metadata + covers
                      └─ 009 Calibre import
-                         └─ 010 Durable enrichment + undo
-                             └─ 011 Triage workflow
-                                 └─ 012 Scale, accessibility, resilience
-                                     └─ 013 Container, backup, release
+                         └─ 010 Editorial UI redesign + completion
+                             └─ 011 Durable enrichment + undo
+                                 └─ 012 Triage workflow
+                                     └─ 013 Scale, accessibility, resilience
+                                         └─ 014 Container, backup, release
 ```
 
 Sprints 003 and 005 are architecturally parallel but are intentionally sequenced for one-agent worktrees and simpler handoffs. Frontend vertical slices begin only after stable API contracts exist.
@@ -37,10 +38,11 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
 | 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | completed |
 | 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | ready |
-| 010 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 009 | planned |
-| 011 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 010 | planned |
-| 012 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 011 | planned |
-| 013 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 012 | planned |
+| 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | planned |
+| 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | planned |
+| 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | planned |
+| 013 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 012 | planned |
+| 014 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 013 | planned |
 
 ## Detailed future sprint contracts
 
@@ -164,7 +166,12 @@ Acceptance:
 - `mode=ro` plus `query_only` is tested; source DB hash is unchanged after import.
 - Re-sync adds/fills only and native 1–10 scores are not provisional.
 
-### Sprint 010 — Durable enrichment and safe undo
+### [Sprint 010 — Editorial UI redesign and product-spec completion](010-editorial-ui-redesign.md)
+
+Scope and acceptance are detailed in the linked sprint contract. It closes implemented-screen gaps,
+adds only shelf-count-level UI-enabling API data, and leaves jobs, full triage, and hardening separate.
+
+### Sprint 011 — Durable enrichment and safe undo
 
 Scope:
 
@@ -178,7 +185,7 @@ Acceptance:
 - Undo cannot remove later user edits, shared items, or pre-existing entries; it reverts a field only if current value still matches the recorded imported value.
 - Partial retention is reported, repeated undo is harmless, and late jobs from an undone batch cannot mutate data.
 
-### Sprint 011 — Bulk-first triage
+### Sprint 012 — Bulk-first triage
 
 Scope:
 
@@ -192,7 +199,7 @@ Acceptance:
 - A Playwright scenario imports and triages hundreds of rows without one request per row.
 - Conflicting values remain visible until explicitly resolved.
 
-### Sprint 012 — Scale, accessibility, and resilience
+### Sprint 013 — Scale, accessibility, and resilience
 
 Scope:
 
@@ -207,7 +214,7 @@ Acceptance:
 - Upload/image/path/provider limits and log redaction tests pass.
 - No uncaught frontend errors in E2E console.
 
-### Sprint 013 — Container, backup, and v1 release
+### Sprint 014 — Container, backup, and v1 release
 
 Scope:
 

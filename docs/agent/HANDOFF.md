@@ -10,7 +10,7 @@
   ambiguity choices, and atomic idempotent commit using only the recorded batch plan.
 - New Goodreads entries are `unsorted`; status is suggested, nonzero ratings are doubled and marked
   provisional, and shelves remain filterable. Existing personal and populated metadata are preserved.
-- Ordered effects are recorded for Sprint 010, but enrichment and undo execution are not implemented.
+- Ordered effects are recorded for Sprint 011, but enrichment and undo execution are not implemented.
 - Open Library now resolves nested editions plus work/author metadata, Google Books fills missing
   same-ISBN fields when configured, and all standard metadata is typed/editable/preserved.
 - Covers are securely cached and served through versioned API URLs. The required three-title live

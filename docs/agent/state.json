@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_revision": 2,
+  "plan_revision": 4,
   "project_status": "ready",
   "active_sprint": "009",
   "active_sprint_file": "docs/sprints/009-calibre-import.md",
@@ -8,5 +8,5 @@
   "last_completed_sprint": "008",
   "completed_sprints": ["001", "002", "003", "004", "005", "006", "007", "008"],
   "started_at": null,
-  "updated_at": "2026-07-22T12:02:00-03:00"
+  "updated_at": "2026-07-22T12:30:00-03:00"
 }

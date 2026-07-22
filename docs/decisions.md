@@ -129,3 +129,18 @@ Append-only record of material architecture choices, product-default resolutions
 - **Context:** Interactive add, Calibre, Goodreads enrichment, refresh, and manual correction need one stable interpretation of edition metadata and cached covers. Building Calibre first would duplicate or prematurely settle that boundary.
 - **Decision:** Insert Sprint 008 for working book metadata/covers and shift Calibre through release to Sprints 009–013. Open Library remains the primary refresh identity; optional Google Books may fill only absent fields for the same canonical ISBN. Persist cover paths internally and expose controlled versioned API URLs.
 - **Consequence:** All later ingestion paths reuse typed metadata, edition/original-year separation, secure cached covers, and preservation semantics. Final-project validation now closes after Sprint 013.
+
+## DEC-017 — Editorial UI completion follows Calibre
+
+- **Date:** 2026-07-22
+- **Status:** accepted; supersedes DEC-016 only for downstream sprint numbering
+- **Context:** The implemented APIs and screens cover core workflows but omit planned navigation,
+  entry deletion, shelf management, complete modal behavior, and a coherent responsive visual system.
+  Calibre remains the next source boundary and its actual UI must exist before import screens are
+  redesigned together.
+- **Decision:** Keep Calibre as Sprint 009, insert a dedicated editorial UI redesign/completion Sprint
+  010, and shift jobs, triage, hardening, and release to Sprints 011–014. Permit only small typed API
+  additions directly required by a specified screen; retain full triage as its own sprint.
+- **Consequence:** Sprint 010 can redesign the real Goodreads/Calibre experience and close current
+  product-spec UI gaps without simulating jobs or triage. Final-project validation closes after
+  Sprint 014.

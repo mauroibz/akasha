@@ -79,7 +79,7 @@ Application startup must:
 2. enable SQLite `PRAGMA foreign_keys=ON` for every connection, WAL mode, and a bounded busy timeout;
 3. refuse to auto-create or mutate schema outside Alembic;
 4. report schema mismatch with a useful startup error;
-5. once Sprint 010 introduces the jobs schema, start one cooperative durable-job polling loop in the FastAPI lifespan;
+5. once Sprint 011 introduces the jobs schema, start one cooperative durable-job polling loop in the FastAPI lifespan;
 6. when that runner exists, stop accepting job work and cancel it cleanly on shutdown.
 
 Do not run multiple Uvicorn workers: the target is one process and the v1 job lease design assumes it. Tests must still enforce idempotency in case a job is retried after a crash.
