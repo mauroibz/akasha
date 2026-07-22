@@ -1,6 +1,6 @@
 # Sprint 003 — Entries, shelves, filtering, and keyset API
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 002
 **Roadmap revision:** 2
 

@@ -1,0 +1,469 @@
+import hashlib
+import json
+from collections.abc import Iterator, Mapping, Sequence
+from contextlib import contextmanager
+from datetime import UTC, datetime
+from typing import Any, Literal
+
+from sqlalchemy import Engine, and_, case, delete, func, or_, select
+from sqlalchemy.exc import IntegrityError
+from sqlalchemy.orm import Session
+
+from book_tracker.domain.normalization import normalize_text, shelf_slug
+from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
+from book_tracker.infrastructure.models import (
+    EntryRow,
+    EntryShelfRow,
+    ItemIdentifierRow,
+    ItemRow,
+    ItemSourceRow,
+    ShelfRow,
+)
+
+
+def _now() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+class LibraryError(Exception):
+    def __init__(self, code: str, message: str, *, status_code: int = 409) -> None:
+        self.code = code
+        self.message = message
+        self.status_code = status_code
+        super().__init__(message)
+
+
+class LibraryService:
+    def __init__(self, engine: Engine, user_id: int = 1) -> None:
+        self.engine = engine
+        self.user_id = user_id
+
+    @contextmanager
+    def _write(self) -> Iterator[Session]:
+        with self.engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
+            session = Session(bind=connection)
+            try:
+                yield session
+                session.flush()
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+            finally:
+                session.close()
+
+    def _entry(self, session: Session, entry_id: int) -> EntryRow:
+        entry = session.scalar(
+            select(EntryRow).where(EntryRow.id == entry_id, EntryRow.user_id == self.user_id)
+        )
+        if entry is None:
+            raise LibraryError("entry_not_found", "Entry was not found", status_code=404)
+        return entry
+
+    def _item(self, session: Session, item_id: int) -> ItemRow:
+        item = session.get(ItemRow, item_id)
+        if item is None:
+            raise LibraryError("item_not_found", "Item was not found", status_code=404)
+        return item
+
+    def _shelf(self, session: Session, shelf_id: int) -> ShelfRow:
+        shelf = session.scalar(
+            select(ShelfRow).where(ShelfRow.id == shelf_id, ShelfRow.user_id == self.user_id)
+        )
+        if shelf is None:
+            raise LibraryError("shelf_not_found", "Shelf was not found", status_code=404)
+        return shelf
+
+    def _shelves_for_entry(self, session: Session, entry_id: int) -> list[dict[str, Any]]:
+        rows = session.execute(
+            select(ShelfRow)
+            .join(EntryShelfRow, EntryShelfRow.shelf_id == ShelfRow.id)
+            .where(EntryShelfRow.entry_id == entry_id)
+            .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
+        ).scalars()
+        return [self._shelf_dict(row) for row in rows]
+
+    @staticmethod
+    def _shelf_dict(shelf: ShelfRow) -> dict[str, Any]:
+        return {"id": shelf.id, "name": shelf.name, "slug": shelf.slug}
+
+    def _entry_dict(self, session: Session, entry: EntryRow) -> dict[str, Any]:
+        item = self._item(session, entry.item_id)
+        return {
+            "id": entry.id,
+            "item_id": entry.item_id,
+            "status": entry.status,
+            "score": entry.score,
+            "notes": entry.notes,
+            "date_added": entry.date_added,
+            "date_started": entry.date_started,
+            "date_finished": entry.date_finished,
+            "reread_count": entry.reread_count,
+            "score_provisional": bool(entry.score_provisional),
+            "suggested_status": entry.suggested_status,
+            "item": self._item_dict(session, item),
+            "shelves": self._shelves_for_entry(session, entry.id),
+        }
+
+    @staticmethod
+    def _item_dict(session: Session, item: ItemRow) -> dict[str, Any]:
+        identifiers = session.execute(
+            select(ItemIdentifierRow.kind, ItemIdentifierRow.normalized_value).where(
+                ItemIdentifierRow.item_id == item.id
+            )
+        ).all()
+        sources = session.execute(
+            select(ItemSourceRow.source, ItemSourceRow.source_id, ItemSourceRow.is_primary).where(
+                ItemSourceRow.item_id == item.id
+            )
+        ).all()
+        return {
+            "id": item.id,
+            "type": item.type,
+            "title": item.title,
+            "subtitle": item.subtitle,
+            "year": item.year,
+            "sort_author": item.sort_author,
+            "cover_path": item.cover_path,
+            "metadata": json.loads(item.metadata_json),
+            "identifiers": {row.kind: row.normalized_value for row in identifiers},
+            "sources": [
+                {
+                    "source": row.source,
+                    "source_id": row.source_id,
+                    "is_primary": bool(row.is_primary),
+                }
+                for row in sources
+            ],
+        }
+
+    def get_entry(self, entry_id: int) -> dict[str, Any]:
+        with Session(self.engine) as session:
+            return self._entry_dict(session, self._entry(session, entry_id))
+
+    def update_entry(self, entry_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
+        with self._write() as session:
+            entry = self._entry(session, entry_id)
+            for field in (
+                "status",
+                "score",
+                "notes",
+                "date_started",
+                "date_finished",
+                "reread_count",
+            ):
+                if field in changes:
+                    setattr(entry, field, changes[field])
+            if "score" in changes:
+                entry.score_provisional = 0
+            if "shelf_ids" in changes:
+                shelf_ids = set(changes["shelf_ids"])
+                found = set(
+                    session.scalars(
+                        select(ShelfRow.id).where(
+                            ShelfRow.user_id == self.user_id, ShelfRow.id.in_(shelf_ids)
+                        )
+                    )
+                )
+                if found != shelf_ids:
+                    raise LibraryError(
+                        "shelf_not_found", "One or more shelves were not found", status_code=404
+                    )
+                session.execute(delete(EntryShelfRow).where(EntryShelfRow.entry_id == entry.id))
+                session.add_all(
+                    EntryShelfRow(entry_id=entry.id, shelf_id=value) for value in shelf_ids
+                )
+            entry.updated_at = _now()
+            session.flush()
+            return self._entry_dict(session, entry)
+
+    def delete_entry(self, entry_id: int) -> None:
+        with self._write() as session:
+            session.delete(self._entry(session, entry_id))
+
+    def get_item(self, item_id: int) -> dict[str, Any]:
+        with Session(self.engine) as session:
+            return self._item_dict(session, self._item(session, item_id))
+
+    def update_item(self, item_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
+        with self._write() as session:
+            item = self._item(session, item_id)
+            for field in ("title", "subtitle", "year"):
+                if field in changes:
+                    setattr(item, field, changes[field])
+            if "metadata" in changes:
+                item.metadata_json = json.dumps(changes["metadata"], ensure_ascii=False)
+            item.updated_at = _now()
+            session.flush()
+            return self._item_dict(session, item)
+
+    def list_shelves(self) -> list[dict[str, Any]]:
+        with Session(self.engine) as session:
+            rows = session.scalars(
+                select(ShelfRow)
+                .where(ShelfRow.user_id == self.user_id)
+                .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
+            )
+            return [self._shelf_dict(row) for row in rows]
+
+    def create_shelf(self, name: str) -> dict[str, Any]:
+        try:
+            with self._write() as session:
+                now = _now()
+                shelf = ShelfRow(
+                    user_id=self.user_id,
+                    name=name.strip(),
+                    slug=shelf_slug(name),
+                    created_at=now,
+                    updated_at=now,
+                )
+                session.add(shelf)
+                session.flush()
+                return self._shelf_dict(shelf)
+        except (IntegrityError, ValueError) as error:
+            raise LibraryError("shelf_slug_conflict", "Shelf name is already in use") from error
+
+    def rename_shelf(self, shelf_id: int, name: str) -> dict[str, Any]:
+        try:
+            with self._write() as session:
+                shelf = self._shelf(session, shelf_id)
+                shelf.name = name.strip()
+                shelf.slug = shelf_slug(name)
+                shelf.updated_at = _now()
+                session.flush()
+                return self._shelf_dict(shelf)
+        except IntegrityError as error:
+            raise LibraryError("shelf_slug_conflict", "Shelf name is already in use") from error
+
+    def delete_shelf(self, shelf_id: int) -> None:
+        with self._write() as session:
+            session.delete(self._shelf(session, shelf_id))
+
+    @staticmethod
+    def _filter_key(statuses: Sequence[str] | None, shelves: Sequence[str], q: str | None) -> str:
+        value = json.dumps(
+            {"q": q or "", "shelves": sorted(shelves), "statuses": sorted(statuses or [])},
+            separators=(",", ":"),
+            sort_keys=True,
+        )
+        return hashlib.sha256(value.encode()).hexdigest()[:16]
+
+    def _filtered_entries(
+        self, statuses: Sequence[str] | None, shelves: Sequence[str], q: str | None
+    ) -> Any:
+        query = (
+            select(EntryRow)
+            .join(ItemRow, ItemRow.id == EntryRow.item_id)
+            .where(EntryRow.user_id == self.user_id)
+        )
+        if statuses is None:
+            query = query.where(EntryRow.status != "unsorted")
+        elif statuses:
+            query = query.where(EntryRow.status.in_(statuses))
+        if shelves:
+            query = query.where(
+                EntryRow.id.in_(
+                    select(EntryShelfRow.entry_id)
+                    .join(ShelfRow, ShelfRow.id == EntryShelfRow.shelf_id)
+                    .where(ShelfRow.user_id == self.user_id, ShelfRow.slug.in_(shelves))
+                    .group_by(EntryShelfRow.entry_id)
+                    .having(func.count(func.distinct(ShelfRow.slug)) == len(set(shelves)))
+                )
+            )
+        if q:
+            pattern = f"%{normalize_text(q)}%"
+            query = query.where(
+                or_(
+                    func.normalize_text(ItemRow.title).like(pattern),
+                    func.normalize_text(ItemRow.sort_author).like(pattern),
+                )
+            )
+        return query
+
+    def list_entries(
+        self,
+        *,
+        statuses: Sequence[str] | None = None,
+        shelves: Sequence[str] = (),
+        q: str | None = None,
+        sort: str = "date_added",
+        order: Literal["asc", "desc"] = "desc",
+        after: str | None = None,
+        limit: int = 100,
+    ) -> dict[str, Any]:
+        sort_expressions = {
+            "date_added": EntryRow.date_added,
+            "score": EntryRow.score,
+            "title": func.normalize_text(ItemRow.title),
+            "sort_author": func.normalize_text(ItemRow.sort_author),
+            "year": ItemRow.year,
+            "date_finished": EntryRow.date_finished,
+        }
+        expression = sort_expressions[sort]
+        bucket = case((expression.is_(None), 1), else_=0)
+        filter_key = self._filter_key(statuses, shelves, q)
+        state = None
+        if after:
+            try:
+                state = decode_cursor(after, sort=sort, order=order, filter_key=filter_key)
+            except CursorError as error:
+                raise LibraryError("invalid_cursor", str(error), status_code=400) from error
+
+        query = self._filtered_entries(statuses, shelves, q)
+        if state is not None:
+            id_comparison = (
+                EntryRow.id > state.entry_id if order == "asc" else EntryRow.id < state.entry_id
+            )
+            if state.null_bucket:
+                query = query.where(and_(bucket == 1, id_comparison))
+            else:
+                value_comparison = (
+                    expression > state.value if order == "asc" else expression < state.value
+                )
+                query = query.where(
+                    or_(
+                        bucket > 0,
+                        and_(
+                            bucket == 0,
+                            or_(value_comparison, and_(expression == state.value, id_comparison)),
+                        ),
+                    )
+                )
+        direction = expression.asc if order == "asc" else expression.desc
+        id_direction = EntryRow.id.asc if order == "asc" else EntryRow.id.desc
+        query = query.order_by(bucket.asc(), direction(), id_direction()).limit(limit + 1)
+
+        with Session(self.engine) as session:
+            entries = list(session.scalars(query))
+            has_more = len(entries) > limit
+            entries = entries[:limit]
+            total_query = select(func.count()).select_from(
+                self._filtered_entries(statuses, shelves, q).order_by(None).subquery()
+            )
+            total = session.scalar(total_query) or 0
+            facet_base = self._filtered_entries([], shelves, q).subquery()
+            facet_rows = session.execute(
+                select(facet_base.c.status, func.count()).group_by(facet_base.c.status)
+            ).all()
+            next_cursor = None
+            if has_more and entries:
+                last = entries[-1]
+                item = self._item(session, last.item_id)
+                values: dict[str, Any] = {
+                    "date_added": last.date_added,
+                    "score": last.score,
+                    "title": normalize_text(item.title),
+                    "sort_author": normalize_text(item.sort_author) if item.sort_author else None,
+                    "year": item.year,
+                    "date_finished": last.date_finished,
+                }
+                last_value = values[sort]
+                next_cursor = encode_cursor(
+                    CursorState(
+                        sort=sort,
+                        order=order,
+                        filter_key=filter_key,
+                        value=last_value,
+                        entry_id=last.id,
+                        null_bucket=int(last_value is None),
+                    )
+                )
+            return {
+                "items": [self._entry_dict(session, entry) for entry in entries],
+                "next_cursor": next_cursor,
+                "total": total,
+                "facets": {"status_counts": {row[0]: row[1] for row in facet_rows}},
+            }
+
+    def _selection(
+        self,
+        session: Session,
+        entry_ids: Sequence[int] | None,
+        filters: Mapping[str, Any] | None,
+        excluded_entry_ids: Sequence[int],
+    ) -> list[EntryRow]:
+        if entry_ids is not None:
+            unique_ids = set(entry_ids)
+            entries = list(
+                session.scalars(
+                    select(EntryRow).where(
+                        EntryRow.user_id == self.user_id, EntryRow.id.in_(unique_ids)
+                    )
+                )
+            )
+            if len(entries) != len(unique_ids):
+                raise LibraryError(
+                    "entry_not_found", "One or more entries were not found", status_code=404
+                )
+            return entries
+        assert filters is not None
+        statuses = filters.get("status")
+        query = self._filtered_entries(statuses, filters.get("shelf", []), filters.get("q"))
+        if excluded_entry_ids:
+            query = query.where(EntryRow.id.not_in(excluded_entry_ids))
+        return list(session.scalars(query))
+
+    def bulk_update(
+        self,
+        *,
+        entry_ids: Sequence[int] | None,
+        filters: Mapping[str, Any] | None,
+        excluded_entry_ids: Sequence[int],
+        changes: Mapping[str, Any],
+    ) -> int:
+        with self._write() as session:
+            entries = self._selection(session, entry_ids, filters, excluded_entry_ids)
+            add_shelves = set(changes.get("add_shelves", []))
+            remove_shelves = set(changes.get("remove_shelves", []))
+            requested_shelves = add_shelves | remove_shelves
+            if requested_shelves:
+                found = set(
+                    session.scalars(
+                        select(ShelfRow.id).where(
+                            ShelfRow.user_id == self.user_id,
+                            ShelfRow.id.in_(requested_shelves),
+                        )
+                    )
+                )
+                if found != requested_shelves:
+                    raise LibraryError(
+                        "shelf_not_found", "One or more shelves were not found", status_code=404
+                    )
+            now = _now()
+            for entry in entries:
+                if changes.get("status") is not None:
+                    entry.status = changes["status"]
+                if "score" in changes:
+                    entry.score = changes["score"]
+                    entry.score_provisional = 0
+                if changes.get("clear_provisional"):
+                    entry.score_provisional = 0
+                for shelf_id in add_shelves:
+                    if session.get(EntryShelfRow, (entry.id, shelf_id)) is None:
+                        session.add(EntryShelfRow(entry_id=entry.id, shelf_id=shelf_id))
+                if remove_shelves:
+                    session.execute(
+                        delete(EntryShelfRow).where(
+                            EntryShelfRow.entry_id == entry.id,
+                            EntryShelfRow.shelf_id.in_(remove_shelves),
+                        )
+                    )
+                entry.updated_at = now
+            return len(entries)
+
+    def accept_suggested(self, filters: Mapping[str, Any]) -> int:
+        with self._write() as session:
+            selection_filters = dict(filters)
+            if selection_filters.get("status") is None:
+                selection_filters["status"] = ["unsorted"]
+            entries = self._selection(session, None, selection_filters, ())
+            affected = 0
+            now = _now()
+            for entry in entries:
+                if entry.suggested_status is not None:
+                    entry.status = entry.suggested_status
+                    entry.suggested_status = None
+                    entry.updated_at = now
+                    affected += 1
+            return affected

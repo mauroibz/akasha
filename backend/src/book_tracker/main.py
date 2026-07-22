@@ -7,6 +7,8 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from book_tracker.api.library import router as library_router
+from book_tracker.application.library import LibraryError
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.logging import configure_logging
@@ -29,6 +31,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.engine.dispose()
 
     app = FastAPI(title="Akasha Book Tracker", version="0.1.0", lifespan=lifespan)
+
+    @app.exception_handler(LibraryError)
+    async def library_error(_request: object, error: LibraryError) -> JSONResponse:
+        return JSONResponse(
+            status_code=error.status_code,
+            content={"error": {"code": error.code, "message": error.message, "details": {}}},
+        )
 
     @app.get("/api/health/live")
     async def live() -> dict[str, str]:
@@ -62,6 +71,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 },
             )
         return JSONResponse({"status": "ready"})
+
+    app.include_router(library_router)
 
     @app.api_route(
         "/api/{path:path}",

@@ -43,6 +43,25 @@ def test_complete_schema_migrates_and_round_trips(tmp_path: Path) -> None:
     assert expected <= set(inspect(engine).get_table_names())
 
 
+def test_list_index_migration_round_trips_from_domain_head(tmp_path: Path) -> None:
+    from alembic import command
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    config = alembic_config(configured.database_url)
+    command.upgrade(config, "0002_domain_schema")
+    command.upgrade(config, "head")
+    engine = create_engine(configured)
+    assert "ix_entries_user_status_date_id" in {
+        index["name"] for index in inspect(engine).get_indexes("entries")
+    }
+    command.downgrade(config, "0002_domain_schema")
+    assert "ix_entries_user_status_date_id" not in {
+        index["name"] for index in inspect(engine).get_indexes("entries")
+    }
+    command.upgrade(config, "head")
+
+
 @pytest.mark.parametrize(
     "statement",
     [
