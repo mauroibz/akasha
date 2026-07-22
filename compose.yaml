@@ -1,0 +1,19 @@
+services:
+  akasha:
+    build: .
+    image: akasha:local
+    ports:
+      - "${AKASHA_PORT:-8000}:8000"
+    environment:
+      USER_AGENT_CONTACT: "${USER_AGENT_CONTACT:?Set USER_AGENT_CONTACT in .env}"
+      TZ: "${TZ:-UTC}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
+    volumes:
+      - "${DATA_DIR:-./data}:/data"
+      # Sprint 008 enables the required read-only Calibre mount:
+      # - "${CALIBRE_DIR}:/calibre:ro"
+    restart: unless-stopped
+    init: true
+    labels:
+      org.akasha.security-boundary: "LAN-only; v1 has no authentication and must never be internet-exposed"
