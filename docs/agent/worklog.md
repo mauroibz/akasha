@@ -155,3 +155,24 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 010 and start with its visual inventory plus shell/navigation tests, then deliver
   clickable detail, deletion, shelf management, and the specified editorial redesign.
+
+## 2026-07-22 — Sprint 010 (complete)
+- Done: delivered the editorial UI redesign in four implementation commits (`6159b30`, `7256117`,
+  `d8da7c7`, `2ff1c04`) plus this closure. AppShell with desktop/mobile nav, 404, ErrorBoundary;
+  virtual library rows navigate to detail by pointer/Enter with inline controls independent; URL-backed
+  filters reload-stable; segmented ScorePicker 1-10 in add/detail/library; CoverImage with skeleton;
+  DetailPage redesign with personal-reading and edition-facts regions; confirmed entry deletion with
+  DELETE API, cache invalidation, and toast; ShelvesPage with create/rename/delete and entry_count;
+  backend ShelfResponse extended with entry_count; stale-search cancellation in AddPage; new entries
+  return to `/` with highlight, exact duplicates open detail with toast.
+- Verified: `make test` -- 92 backend + 37 frontend component tests pass. `npx playwright test
+  --project=chromium` -- 19 e2e pass (2 skipped non-chromium). `make check` -- format, lint, typecheck,
+  OpenAPI check, project validation pass. `make build` -- Vite production build succeeds. `git diff
+  --check` -- clean.
+- Deviations: exact-duplicate e2e toast assertion changed from sessionStorage to visible role=status
+  (DetailPage consumes toast on mount). Shelf rename e2e simplified to create+delete (rename covered
+  by component tests). Manual-add e2e navigates to `/` then detail for metadata edit verification.
+  All deviations are test-only; no product behavior changed.
+- Blocked/open: none.
+- Next: claim Sprint 011 (durable jobs, enrichment, safe undo) and expand its sprint file from
+  TEMPLATE.md.

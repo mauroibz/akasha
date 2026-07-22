@@ -38,7 +38,7 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
 | 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | completed |
 | 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | completed |
-| 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | ready |
+| 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | completed |
 | 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | planned |
 | 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | planned |
 | 013 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 012 | planned |
@@ -171,19 +171,11 @@ Acceptance:
 Scope and acceptance are detailed in the linked sprint contract. It closes implemented-screen gaps,
 adds only shelf-count-level UI-enabling API data, and leaves jobs, full triage, and hardening separate.
 
-### Sprint 011 — Durable enrichment and safe undo
+### [Sprint 011 — Durable enrichment and safe undo](011-durable-enrichment-undo.md)
 
-Scope:
-
-- DB-backed job polling, leasing, retries, progress API, rate-limited enrichment.
-- Import-effect reverse undo for created and fill-empty values, queued-job cancellation/late-result guards, UI progress, and undo window.
-
-Acceptance:
-
-- Queued/running jobs survive simulated restart and handlers tolerate replay.
-- Provider rate and retry caps are clock-injected and deterministic.
-- Undo cannot remove later user edits, shared items, or pre-existing entries; it reverts a field only if current value still matches the recorded imported value.
-- Partial retention is reported, repeated undo is harmless, and late jobs from an undone batch cannot mutate data.
+Scope and acceptance are detailed in the linked sprint contract. It delivers DB-backed job polling,
+rate-limited enrichment, and safe 24-hour undo using the import-effect ledger established in Sprints
+007–009.
 
 ### Sprint 012 — Bulk-first triage
 

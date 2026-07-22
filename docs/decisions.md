@@ -144,3 +144,15 @@ Append-only record of material architecture choices, product-default resolutions
 - **Consequence:** Sprint 010 can redesign the real Goodreads/Calibre experience and close current
   product-spec UI gaps without simulating jobs or triage. Final-project validation closes after
   Sprint 014.
+
+## DEC-018 -- Shelf response gains entry_count
+
+- **Date:** 2026-07-22
+- **Status:** accepted
+- **Context:** Sprint 010 requires shelf entry counts in the `/shelves` management UI, but the
+  existing `ShelfResponse` only carried id, name, and slug.
+- **Decision:** Extend `ShelfResponse` with `entry_count: int = 0` via a `func.count` subquery join
+  on `entry_shelves` in `list_shelves`. No schema change is needed; the count is derived at query
+  time. OpenAPI and typed frontend clients were regenerated.
+- **Consequence:** Shelf management can display counts and update them after mutations without a
+  separate API call. The count is always fresh from the database.

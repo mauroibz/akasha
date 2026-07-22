@@ -1,31 +1,34 @@
 # Agent handoff
 
-**State:** Sprint 009 completed; Sprint 010 is ready and unclaimed.
-**Active sprint:** [`010-editorial-ui-redesign.md`](../sprints/010-editorial-ui-redesign.md)
-**Worktree expectation:** clean after the Sprint 009 closure commit.
+**State:** Sprint 010 completed; Sprint 011 is ready and unclaimed.
+**Active sprint:** [`011-durable-enrichment-undo.md`](../sprints/011-durable-enrichment-undo.md)
+**Worktree expectation:** clean after the Sprint 010 closure commit.
 
 ## Current reality
 
-- `/import` now provides Goodreads and Calibre tabs with durable normalized previews, row errors,
-  explicit ambiguity choices, and atomic/idempotent commit using only the recorded batch plan.
-- New Goodreads entries are `unsorted`; status is suggested, nonzero ratings are doubled and marked
-  provisional, and shelves remain filterable. Existing personal and populated metadata are preserved.
-- Calibre paths are confined beneath the configured mount; SQLite is opened read-only/query-only,
-  covers are staged during preview, UUID provenance is retained, and commit never rereads the source.
-- Ordered effects are recorded for Sprint 011, but enrichment and undo execution are not implemented.
-- Open Library now resolves nested editions plus work/author metadata, Google Books fills missing
-  same-ISBN fields when configured, and all standard metadata is typed/editable/preserved.
-- Covers are securely cached and served through versioned API URLs. The required three-title live
-  smoke passed with 2012/2015/2005 editions and offline rendering after restart.
-- OpenAPI and typed frontend clients include metadata, cover, Goodreads, and Calibre contracts.
-  The verified baseline is 91 backend tests, 16 component tests, and nine normal Chromium flows;
-  two live-provider flows remain opt-in.
+- The application has a responsive editorial shell (AppShell) with desktop/mobile navigation for
+  Library, Add, Import, and Shelves. Unknown routes show a 404 with recovery links.
+- Virtual library rows open detail by clicking the title/cover or pressing Enter; inline score/status
+  controls remain independently operable. Library filters (status, shelf, query, sort) are URL-backed
+  and reload-stable. New entries return to `/` with a highlight ring; exact duplicates open detail with
+  a toast.
+- Detail page shows all cached metadata, identifiers, sources, dates, notes, shelves, and cover state
+  in personal-reading and edition-facts regions. Edit/refresh/delete dialogs trap focus, close on
+  Escape, and preserve input on failure. Confirmed deletion calls DELETE, invalidates caches, and
+  returns to the library with a toast.
+- `/shelves` provides create, rename, confirmed delete with entry counts. Backend `ShelfResponse`
+  includes `entry_count` via a count subquery. Duplicate slugs surface actionable errors.
+- Segmented ScorePicker (1–10) is used in add, detail, and inline library editing. CoverImage provides
+  skeleton placeholders and broken-cover fallbacks without layout shift.
+- Import flows (Goodreads and Calibre) retain all tested behavior inside the new shell.
+- The verified baseline is 92 backend tests, 37 frontend component tests, and 19 Chromium e2e flows.
+- OpenAPI and typed frontend clients include the `entry_count` shelf response field.
 
 ## First action
 
-Claim Sprint 010 and begin with its UI inventory/visual contract and failing shell/navigation tests.
-The owner explicitly asked for clickable library entries, local metadata inspection, deletion, and
-a cohesive editorial redesign; all are specified in the active sprint before implementation.
+Expand Sprint 011 from `TEMPLATE.md` into `docs/sprints/011-durable-enrichment-undo.md`, incorporating
+actual deviations from Sprint 010. The sprint delivers DB-backed job polling, enrichment, and safe
+24-hour undo using the import-effect ledger already recorded by Sprints 007–009.
 
 ## Known blockers
 
