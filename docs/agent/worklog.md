@@ -36,3 +36,10 @@ Entry format:
 - Blocked/open: four product questions carry authorized defaults (DEC-006); the
   owner may override before the affected sprint activates.
 - Next: claim Sprint 001 per `AGENTS.md` and build the reproducible foundation.
+
+## 2026-07-21 — Sprint 001 (complete)
+- Done: delivered backend migration/health/SQLite foundation (`29e2ad1`), frontend health view and unified contract/tooling (`e355640`), and CI/production container proof (`4ceebba`). Repaired the validator's generated-directory traversal and recorded the lock strategy in DEC-014.
+- Verified: 7 backend tests and 2 frontend component tests pass; required bootstrap/format/check/test/build commands pass; Compose config renders; scripted Docker recreation proves ready health, SPA routing, persisted probe, non-root UID, and no Node; `git diff --check` passes.
+- Deviations: no product or sprint scope deviation. The container uses a non-editable uv environment created at `/opt/venv` because copied editable/relocated environments failed the smoke proof.
+- Blocked/open: none.
+- Next: claim Sprint 002 and implement the complete domain migration and repositories in acceptance order.

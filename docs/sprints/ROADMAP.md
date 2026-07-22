@@ -2,7 +2,7 @@
 
 **Plan revision:** 2
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 001](001-foundation.md)
+**Active sprint:** [Sprint 002](002-domain-persistence.md)
 
 ## Dependency graph
 
@@ -27,8 +27,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 
 | Sprint | Outcome | Key acceptance signal | Depends on | Status |
 |---|---|---|---|---|
-| 001 | Reproducible monorepo foundation | Backend/frontend hello slices, migration, all quality gates and dev commands work | — | ready |
-| 002 | Domain model and durable persistence | Migrations and repositories enforce identity, score/status, source, and shelf invariants | 001 | planned |
+| 001 | Reproducible monorepo foundation | Backend/frontend hello slices, migration, all quality gates and dev commands work | — | completed |
+| 002 | Domain model and durable persistence | Migrations and repositories enforce identity, score/status, source, and shelf invariants | 001 | ready |
 | 003 | Entries, shelves, filtering, keyset API | CRUD and list API pass contract tests including null-safe asc/desc cursors | 002 | planned |
 | 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | planned |
 | 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | planned |

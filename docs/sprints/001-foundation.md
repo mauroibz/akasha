@@ -1,6 +1,6 @@
 # Sprint 001 — Reproducible foundation
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** none
 **Roadmap revision:** 2
 
@@ -113,4 +113,10 @@ Suggested coherent commits (adapt to actual work, do not commit red tests):
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands and results, commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered the reproducible FastAPI/React foundation in commits `29e2ad1`, `e355640`, and `4ceebba`. The application factory remains filesystem-safe until lifespan startup; Alembic owns the foundation schema; readiness distinguishes unavailable and stale databases; SQLite connections enforce foreign keys, WAL, and a bounded busy timeout. The React hello slice announces loading, ready, and unavailable states, while the API-safe SPA fallback remains compatible with frontend routes.
+
+Dependency locks use `uv.lock` for Python and `package-lock.json`/`npm ci` for Node (DEC-014). Root Make targets, deterministic OpenAPI drift detection, executable setup docs, CI, Compose, and a multi-stage non-root runtime image are included. The pre-existing project validator was repaired to exclude generated dependency/build directories once the new toolchains made that defect observable.
+
+Verification: `python scripts/validate_project.py` passed; `make bootstrap`, `make format`, `make check`, `make test`, and `make build` passed; backend pytest reported 7 passing tests with 95% branch-aware coverage; frontend Vitest reported 2 passing component tests; `docker compose config` passed with the LAN-only label and `/data` mount; `make smoke-container` proved readiness, SPA fallback, database persistence across recreation, non-root execution, and no Node binary; `git diff --check` passed. No acceptance criteria were deferred. Container-build troubleshooting corrected editable/relocatable virtualenv packaging before the successful proof.
+
+Downstream review: Sprint 002 can build directly on `backend/alembic`, the migrated file-backed SQLite test pattern, and the configured engine. Later API/frontend sprints inherit deterministic OpenAPI drift checks. Sprint 012 still owns backup/restore and release hardening; no future product behavior was pulled forward.
