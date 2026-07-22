@@ -104,9 +104,10 @@ test("work resolution exposes edition choice and exact duplicate navigates", asy
   await page.getByRole("button", { name: /Rayuela.*1999/i }).click();
   await page.getByRole("button", { name: /add to library/i }).click();
   await expect(page).toHaveURL(/\/books\/7/);
-  expect(
-    await page.evaluate(() => sessionStorage.getItem("akasha.toast")),
-  ).toBe("Already in your library");
+  // The toast is displayed on the detail page
+  await expect(page.getByRole("status")).toContainText(
+    "Already in your library",
+  );
 });
 
 test("mobile detail confirms refresh and reports cover failure without motion", async ({
