@@ -94,4 +94,46 @@ describe("AddPage", () => {
       "Already in your library",
     );
   });
+
+  it("requires explicit confirmation before adding a near-match edition", async () => {
+    let posts = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      posts += 1;
+      if (posts === 1)
+        return new Response(
+          JSON.stringify({
+            error: {
+              code: "near_match_confirmation_required",
+              details: { entry_ids: [4] },
+            },
+          }),
+          { status: 409 },
+        );
+      return new Response(
+        JSON.stringify({
+          entry: { id: 8 },
+          already_exists: false,
+          near_matches: [4],
+        }),
+        { status: 201 },
+      );
+    });
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: /enter manually/i }),
+    );
+    await userEvent.type(screen.getByLabelText(/^title$/i), "Rayuela");
+    await userEvent.click(
+      screen.getByRole("button", { name: /add to library/i }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /similar edition/i,
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /add separate edition/i }),
+    );
+    await screen.findByRole("heading", { name: /book detail/i });
+    expect(posts).toBe(2);
+  });
 });

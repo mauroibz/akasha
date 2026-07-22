@@ -46,8 +46,14 @@ export function searchBooks(value: string) {
   const route = resolved
     ? `/api/search/resolve?url=${encodeURIComponent(value.trim())}`
     : `/api/search?q=${encodeURIComponent(value.trim())}`;
-  return fetch(route, { headers: { Accept: "application/json" } }).then((r) =>
-    json<SearchCandidate[]>(r, "Metadata providers are unavailable"),
+  return fetch(route, { headers: { Accept: "application/json" } }).then(
+    async (response) => ({
+      items: await json<SearchCandidate[]>(
+        response,
+        "Metadata providers are unavailable",
+      ),
+      warning: response.headers.get("X-Provider-Warning"),
+    }),
   );
 }
 export function getShelves() {

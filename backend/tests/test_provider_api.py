@@ -71,3 +71,22 @@ async def test_search_api_maps_all_provider_failure_and_invalid_resolution(tmp_p
     assert failed.json()["error"]["code"] == "providers_unavailable"
     assert invalid.status_code == 422
     assert invalid.json()["error"]["code"] == "invalid_resolution"
+
+
+@pytest.mark.anyio
+async def test_search_api_announces_partial_provider_results(tmp_path: Path) -> None:
+    class Failed(Provider):
+        name = "googlebooks"
+
+        async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+            raise httpx.TimeoutException("timeout")
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": Provider(), "googlebooks": Failed()}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            response = await client.get("/api/search", params={"q": "Rayuela"})
+    assert response.status_code == 200
+    assert response.headers["X-Provider-Warning"] == "Some metadata providers are unavailable"

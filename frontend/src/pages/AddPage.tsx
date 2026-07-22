@@ -33,7 +33,10 @@ export function AddPage() {
       setPending(true);
       setError("");
       void searchBooks(query)
-        .then(setResults)
+        .then((value) => {
+          setResults(value.items);
+          setWarning(value.warning ?? "");
+        })
         .catch((e: Error) => {
           setError(e.message);
           setWarning("You can still enter this book manually.");

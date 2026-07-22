@@ -1,6 +1,6 @@
 from typing import Annotated, Any, cast
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Query, Request, Response
 from pydantic import BaseModel
 
 from book_tracker.application.library import LibraryError
@@ -74,10 +74,13 @@ async def resolve(
 
 @router.get("/search", response_model=list[SearchCandidateResponse])
 async def search(
-    q: Annotated[str, Query(min_length=1, max_length=300)], request: Request
+    q: Annotated[str, Query(min_length=1, max_length=300)], request: Request, response: Response
 ) -> list[SearchCandidateResponse]:
     try:
         rows = await search_providers(q, list(_providers(request).values()))
     except ProvidersUnavailable as error:
         raise LibraryError("providers_unavailable", str(error), status_code=503) from error
+    represented = {ref.source for row in rows for ref in row.source_refs}
+    if rows and len(represented) < len(_providers(request)):
+        response.headers["X-Provider-Warning"] = "Some metadata providers are unavailable"
     return [SearchCandidateResponse.from_domain(row) for row in rows]
