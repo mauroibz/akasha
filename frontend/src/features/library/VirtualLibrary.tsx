@@ -50,7 +50,7 @@ function EntryControls({
       </label>
       <input
         id={`score-${entry.id}`}
-        className="h-11 w-14 rounded-lg bg-zinc-800 px-2 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-fuchsia-400"
+        className={`h-11 w-14 rounded-lg bg-zinc-800 px-2 text-center focus-visible:outline focus-visible:outline-2 focus-visible:outline-fuchsia-400 ${entry.score_provisional ? "ring-1 ring-amber-400/70 text-amber-200" : ""}`}
         inputMode="numeric"
         min={1}
         max={10}

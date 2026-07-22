@@ -86,7 +86,11 @@ test("keyboard guards and reduced motion remain effective", async ({
     .first()
     .evaluate((element) => getComputedStyle(element).transitionDuration);
   expect(["0s", "0.00001s", "1e-05s"]).toContain(duration);
-  await page.getByRole("feed", { name: "Library" }).focus();
+  const firstRow = page.locator("[data-entry-id='1']");
+  await firstRow.focus();
+  await page.keyboard.press("j");
+  await expect(page.locator("[data-entry-id='2']")).toBeFocused();
+  await page.getByRole("heading", { name: "Akasha" }).click();
   await page.keyboard.press("a");
   await expect(page).toHaveURL("/add");
 });
