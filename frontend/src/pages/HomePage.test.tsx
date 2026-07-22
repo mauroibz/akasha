@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
@@ -180,7 +180,7 @@ test("score shortcuts apply to a focused row but editable controls keep their ke
   renderPage();
   const user = userEvent.setup();
   const row = await screen.findByRole("article", { name: "Rayuela" });
-  row.focus();
+  act(() => row.focus());
   await user.keyboard("5");
   expect(fetchMock).toHaveBeenCalledWith(
     "/api/entries/7",
