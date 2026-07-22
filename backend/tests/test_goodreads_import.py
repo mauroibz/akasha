@@ -176,3 +176,44 @@ async def test_commit_requires_ambiguity_choice_and_preserves_existing_entry(
             ).one()
             assert tuple(entry) == ("read", 9)
             assert connection.scalar(text("SELECT count(*) FROM items")) == 1
+
+
+@pytest.mark.anyio
+async def test_commit_fills_only_empty_shared_metadata(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        with app.state.engine.begin() as connection:
+            item_id = connection.execute(
+                text(
+                    "INSERT INTO items(title,year,metadata,created_at,updated_at) "
+                    "VALUES('Ficciones',NULL,:metadata,'n','n') RETURNING id"
+                ),
+                {"metadata": '{"authors":["Jorge Luis Borges"],"publisher":"Manual"}'},
+            ).scalar_one()
+            connection.execute(
+                text(
+                    "INSERT INTO item_identifiers"
+                    "(item_id,kind,normalized_value,value,created_at,updated_at) "
+                    "VALUES(:id,'isbn','9780141187761','9780141187761','n','n')"
+                ),
+                {"id": item_id},
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            preview = await client.post(
+                "/api/import/goodreads/preview",
+                files={"file": ("x.csv", csv_row(), "text/csv")},
+            )
+            committed = await client.post(
+                "/api/import/goodreads/commit",
+                json={"batch_id": preview.json()["batch_id"]},
+            )
+            assert committed.status_code == 200
+        with app.state.engine.connect() as connection:
+            item = connection.execute(
+                text("SELECT year,metadata FROM items WHERE id=:id"), {"id": item_id}
+            ).one()
+            assert item.year == 1944
+            assert '"publisher": "Manual"' in item.metadata
+            assert '"page_count": 200' in item.metadata
