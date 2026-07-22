@@ -1,6 +1,6 @@
 # Sprint 004 — Frontend shell and virtualized library
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 003
 **Roadmap revision:** 2
 
