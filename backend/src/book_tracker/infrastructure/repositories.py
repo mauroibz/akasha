@@ -415,16 +415,19 @@ class ImportRepository:
         filename: str,
         summary: Mapping[str, Any],
         records: Sequence[Mapping[str, Any]],
+        *,
+        kind: str = "goodreads",
+        source_descriptor: Mapping[str, Any] | None = None,
     ) -> None:
         now = _now()
         with DomainRepository(self.engine)._write() as session:
             session.add(
                 ImportBatchRow(
                     id=batch_id,
-                    kind="goodreads",
+                    kind=kind,
                     fingerprint=fingerprint,
                     state="previewed",
-                    source_descriptor=json.dumps({"filename": filename}),
+                    source_descriptor=json.dumps(source_descriptor or {"filename": filename}),
                     preview_summary=json.dumps(summary),
                     counters="{}",
                     error=None,
@@ -459,11 +462,16 @@ class ImportRepository:
                 )
 
     def commit(
-        self, batch_id: str, choices: Mapping[int, Mapping[str, Any]], user_id: int = 1
+        self,
+        batch_id: str,
+        choices: Mapping[int, Mapping[str, Any]],
+        user_id: int = 1,
+        *,
+        kind: str = "goodreads",
     ) -> dict[str, Any]:
         with DomainRepository(self.engine)._write() as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None or batch.kind != "goodreads":
+            if batch is None or batch.kind != kind:
                 raise LookupError("import_batch_not_found")
             if batch.state == "committed":
                 return {"batch_id": batch.id, "state": batch.state, **json.loads(batch.counters)}
@@ -502,12 +510,15 @@ class ImportRepository:
                         if item_id is not None
                         else {"action": "create_new"}
                     )
-                isbn = payload.get("isbn")
-                if isbn:
+                identity_values = {
+                    key: payload.get(key) for key in ("isbn", "calibre_uuid") if payload.get(key)
+                }
+                isbn = identity_values.get("isbn")
+                for identity_kind, identity_value in identity_values.items():
                     exact = session.scalar(
                         select(ItemIdentifierRow.item_id).where(
-                            ItemIdentifierRow.kind == "isbn",
-                            ItemIdentifierRow.normalized_value == isbn,
+                            ItemIdentifierRow.kind == identity_kind,
+                            ItemIdentifierRow.normalized_value == identity_value,
                         )
                     )
                     if exact is not None and item_id is not None and exact != item_id:
@@ -527,6 +538,12 @@ class ImportRepository:
                             if payload.get("original_year")
                             else {}
                         ),
+                        **(
+                            {"description": payload["description"]}
+                            if payload.get("description")
+                            else {}
+                        ),
+                        **({"series": payload["series"]} if payload.get("series") else {}),
                     }
                     item = ItemRow(
                         type="book",
@@ -554,13 +571,13 @@ class ImportRepository:
                             after_values=json.dumps({"created": True}),
                         )
                     )
-                    if isbn:
+                    for identity_kind, identity_value in identity_values.items():
                         session.add(
                             ItemIdentifierRow(
                                 item_id=item_id,
-                                kind="isbn",
-                                normalized_value=isbn,
-                                value=isbn,
+                                kind=identity_kind,
+                                normalized_value=identity_value,
+                                value=identity_value,
                                 created_at=now,
                                 updated_at=now,
                             )
@@ -580,6 +597,8 @@ class ImportRepository:
                         "publisher": payload.get("publisher"),
                         "page_count": payload.get("page_count"),
                         "original_year": payload.get("original_year"),
+                        "description": payload.get("description"),
+                        "series": payload.get("series"),
                     }
                     for key, value in incoming.items():
                         if value not in (None, "", [], {}) and metadata.get(key) in (

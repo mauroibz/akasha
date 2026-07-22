@@ -3,18 +3,21 @@ from typing import Annotated, Any
 from fastapi import APIRouter, File, Request, UploadFile
 from pydantic import BaseModel, Field
 
-from book_tracker.application.imports import GoodreadsImportService
+from book_tracker.application.imports import CalibreImportService, GoodreadsImportService
 from book_tracker.application.library import LibraryError
+from book_tracker.domain.calibre import CalibreError
 from book_tracker.domain.goodreads import GoodreadsCSVError
 
-router = APIRouter(prefix="/api/import/goodreads", tags=["imports"])
+router = APIRouter(prefix="/api/import", tags=["imports"])
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 
 
 class ImportRecordResponse(BaseModel):
     record_id: int
     row_number: int
-    goodreads_book_id: str
+    goodreads_book_id: str | None = None
+    calibre_book_id: str | None = None
+    calibre_uuid: str | None = None
     title: str
     authors: list[str]
     isbn: str | None
@@ -34,6 +37,11 @@ class ImportRecordResponse(BaseModel):
     date_added: str | None = None
     review: str | None = None
     reread_count: int = 0
+    description: str | None = None
+    series: str | None = None
+    cover_staged: bool = False
+    connection_mode: str | None = None
+    query_only: bool | None = None
 
 
 class PreviewSummary(BaseModel):
@@ -73,7 +81,7 @@ def service(request: Request) -> GoodreadsImportService:
     return GoodreadsImportService(request.app.state.engine, request.app.state.data_dir)
 
 
-@router.post("/preview", status_code=201, response_model=PreviewResponse)
+@router.post("/goodreads/preview", status_code=201, response_model=PreviewResponse)
 async def preview(request: Request, file: Annotated[UploadFile, File()]) -> PreviewResponse:
     chunks: list[bytes] = []
     size = 0
@@ -91,10 +99,46 @@ async def preview(request: Request, file: Annotated[UploadFile, File()]) -> Prev
     return PreviewResponse.model_validate(result)
 
 
-@router.post("/commit", response_model=CommitResponse)
+@router.post("/goodreads/commit", response_model=CommitResponse)
 async def commit(body: CommitBody, request: Request) -> CommitResponse:
     try:
         result = service(request).commit(
+            body.batch_id,
+            {choice.record_id: choice.model_dump(exclude={"record_id"}) for choice in body.choices},
+        )
+    except LookupError as error:
+        raise LibraryError(
+            "import_batch_not_found", "Import preview was not found", status_code=404
+        ) from error
+    except ValueError as error:
+        code = "unresolved_ambiguities" if str(error).startswith("[") else str(error)
+        raise LibraryError(code, "Import preview cannot be committed", status_code=409) from error
+    return CommitResponse.model_validate(result)
+
+
+class CalibrePreviewBody(BaseModel):
+    library_path: str = Field(min_length=1, max_length=500)
+
+
+def calibre_service(request: Request) -> CalibreImportService:
+    return CalibreImportService(
+        request.app.state.engine, request.app.state.data_dir, request.app.state.calibre_dir
+    )
+
+
+@router.post("/calibre/preview", status_code=201, response_model=PreviewResponse)
+async def calibre_preview(body: CalibrePreviewBody, request: Request) -> PreviewResponse:
+    try:
+        result = calibre_service(request).preview(body.library_path)
+    except CalibreError as error:
+        raise LibraryError(error.code, str(error), status_code=422) from error
+    return PreviewResponse.model_validate(result)
+
+
+@router.post("/calibre/commit", response_model=CommitResponse)
+async def calibre_commit(body: CommitBody, request: Request) -> CommitResponse:
+    try:
+        result = calibre_service(request).commit(
             body.batch_id,
             {choice.record_id: choice.model_dump(exclude={"record_id"}) for choice in body.choices},
         )

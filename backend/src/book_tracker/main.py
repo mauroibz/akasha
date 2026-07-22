@@ -37,6 +37,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
+        app.state.calibre_dir = configured.calibre_dir
         providers: list[Provider] = [
             OpenLibraryProvider(
                 provider_client, configured.user_agent_contact or "local@example.invalid"

@@ -10,10 +10,12 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.application.library import LibraryError
+from book_tracker.domain.calibre import CalibreAdapter
 from book_tracker.domain.goodreads import parse_goodreads
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.matching import MatchKind
 from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
+from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_uploaded_cover
 from book_tracker.infrastructure.repositories import DomainRepository, ImportRepository
 
 
@@ -112,3 +114,107 @@ class GoodreadsImportService:
 
     def commit(self, batch_id: str, choices: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
         return self.imports.commit(batch_id, choices)
+
+
+class CalibreImportService(GoodreadsImportService):
+    def __init__(self, engine: Engine, data_dir: Path, calibre_dir: Path) -> None:
+        super().__init__(engine, data_dir)
+        self.adapter = CalibreAdapter(calibre_dir)
+
+    def preview(self, library_path: str) -> dict[str, Any]:
+        snapshot = self.adapter.read(library_path)
+        existing = self.imports.get_batch_by_fingerprint("calibre", snapshot.fingerprint)
+        if existing is not None:
+            return self.get_preview(existing)
+        batch_id = str(uuid.uuid4())
+        directory = self.data_dir / "imports" / batch_id / "covers"
+        directory.mkdir(parents=True, exist_ok=True)
+        planned: list[dict[str, Any]] = []
+        for payload in snapshot.records:
+            source = payload.pop("cover_source")
+            cover_staged = False
+            cover_stage = None
+            if source:
+                try:
+                    prepared = prepare_uploaded_cover(
+                        Path(source).read_bytes(), "image/jpeg", self.data_dir
+                    )
+                    staged = directory / f"{payload['row_number']}.jpg"
+                    prepared.replace(staged)
+                    cover_stage = str(staged.relative_to(self.data_dir))
+                    cover_staged = True
+                except (CoverError, OSError):
+                    pass
+            identifiers = []
+            if payload.get("isbn"):
+                identifiers.append(normalize_identifier("isbn", payload["isbn"]))
+            if payload.get("calibre_uuid"):
+                identifiers.append(normalize_identifier("calibre_uuid", payload["calibre_uuid"]))
+            match = self.domain.match(
+                identifiers=identifiers,
+                title=payload["title"],
+                first_author=payload["authors"][0] if payload["authors"] else "",
+            )
+            if payload["errors"]:
+                action = "error"
+            elif match.kind is MatchKind.AMBIGUOUS:
+                action = "ambiguous"
+            elif match.kind is MatchKind.IDENTITY_CONFLICT:
+                action = "identity_conflict"
+            elif match.item_id is None:
+                action = "create_item"
+            else:
+                action = "reuse_item"
+            planned.append(
+                {
+                    **payload,
+                    "cover_staged": cover_staged,
+                    "cover_stage": cover_stage,
+                    "match_kind": match.kind.value,
+                    "matched_item_id": match.item_id,
+                    "candidates": list(match.candidates),
+                    "planned_action": action,
+                }
+            )
+        summary = {
+            "total": len(planned),
+            "ready": sum(row["planned_action"] in {"create_item", "reuse_item"} for row in planned),
+            "errors": sum(
+                row["planned_action"] in {"error", "identity_conflict"} for row in planned
+            ),
+            "ambiguous": sum(row["planned_action"] == "ambiguous" for row in planned),
+        }
+        self.imports.create_preview(
+            batch_id,
+            snapshot.fingerprint,
+            "metadata.db",
+            summary,
+            planned,
+            kind="calibre",
+            source_descriptor={"library_path": library_path},
+        )
+        return self.get_preview(batch_id)
+
+    def commit(self, batch_id: str, choices: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
+        result = self.imports.commit(batch_id, choices, kind="calibre")
+        with Session(self.engine) as session:
+            rows = list(
+                session.scalars(select(ImportRecordRow).where(ImportRecordRow.batch_id == batch_id))
+            )
+            installs = [
+                (row.matched_item_id, json.loads(row.normalized_payload).get("cover_stage"))
+                for row in rows
+                if row.matched_item_id
+            ]
+        for item_id, relative in installs:
+            if not relative:
+                continue
+            staged = self.data_dir / relative
+            if not staged.is_file():
+                continue
+            try:
+                install_cover(staged, self.data_dir, item_id)
+                self.domain.set_cover_path(item_id, f"covers/{item_id}.jpg")
+            except CoverError:
+                pass
+        return result
