@@ -98,15 +98,13 @@ export function AddPage() {
         setPending(false);
         return;
       }
-      if (result.already_exists)
+      if (result.already_exists) {
         sessionStorage.setItem("akasha.toast", "Already in your library");
-      navigate(`/books/${result.entry.id}`, {
-        state: {
-          toast: result.already_exists
-            ? "Already in your library"
-            : "Book added",
-        },
-      });
+      } else {
+        sessionStorage.setItem("akasha.new-entry", String(result.entry.id));
+        sessionStorage.setItem("akasha.toast", "Book added");
+      }
+      navigate(`/books/${result.entry.id}`);
     } catch (e) {
       if (e instanceof NearMatchError) {
         setNear(e.entryIds);

@@ -1,6 +1,6 @@
 # Sprint 010 — Editorial UI redesign and product-spec completion
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 009
 **Roadmap revision:** 4
 

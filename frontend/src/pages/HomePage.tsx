@@ -4,7 +4,7 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import {
   entryStatuses,
@@ -18,7 +18,6 @@ import {
 } from "@/api/library";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
 import {
-  defaultLibraryFilters,
   isEditableTarget,
   mergeUniqueEntries,
   readViewPreference,
@@ -43,23 +42,78 @@ const sortLabels: Record<SortKey, string> = {
   date_finished: "Finished",
 };
 
+function filtersFromParams(params: URLSearchParams): LibraryFilters {
+  const statuses = params.getAll("status") as EntryStatus[];
+  return {
+    statuses,
+    shelves: params.getAll("shelf"),
+    query: params.get("q") ?? "",
+    sort: (params.get("sort") as SortKey) ?? "date_added",
+    order: (params.get("order") as "asc" | "desc") ?? "desc",
+  };
+}
+
+function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  filters.statuses.forEach((s) => params.append("status", s));
+  filters.shelves.forEach((s) => params.append("shelf", s));
+  if (filters.query.trim()) params.set("q", filters.query.trim());
+  params.set("sort", filters.sort);
+  params.set("order", filters.order);
+  return params;
+}
+
 export function HomePage() {
-  const [filters, setFilters] = useState<LibraryFilters>(defaultLibraryFilters);
-  const [search, setSearch] = useState("");
+  const [searchParams, setSearchParams] = useSearchParams();
+  const filters = useMemo(
+    () => filtersFromParams(searchParams),
+    [searchParams],
+  );
+  const [search, setSearch] = useState(filters.query);
   const [view, setView] = useState<LibraryView>(readViewPreference);
   const [focusedId, setFocusedId] = useState<number | null>(null);
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
+  // Restore toast from session storage (set by add page on exact duplicate)
   useEffect(() => {
-    const timer = window.setTimeout(
-      () => setFilters((old) => ({ ...old, query: search })),
-      250,
-    );
+    const toast = sessionStorage.getItem("akasha.toast");
+    if (toast) {
+      setAnnouncement(toast);
+      sessionStorage.removeItem("akasha.toast");
+    }
+  }, []);
+
+  // Highlight newly added entry (set by add page via location state)
+  useEffect(() => {
+    const stored = sessionStorage.getItem("akasha.new-entry");
+    if (stored) {
+      const id = Number(stored);
+      if (id) {
+        setHighlightId(id);
+        setFocusedId(id);
+      }
+      sessionStorage.removeItem("akasha.new-entry");
+    }
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (search.trim()) next.set("q", search.trim());
+          else next.delete("q");
+          return next;
+        },
+        { replace: true },
+      );
+    }, 250);
     return () => window.clearTimeout(timer);
-  }, [search]);
+  }, [search, setSearchParams]);
 
   const library = useInfiniteQuery({
     queryKey: ["library", filters],
@@ -193,12 +247,16 @@ export function HomePage() {
     return () => window.removeEventListener("keydown", onKey);
   }, [entries, focusedId, mutation, navigate]);
 
-  const updateFilters = (changes: Partial<LibraryFilters>) =>
-    setFilters((old) => ({ ...old, ...changes }));
+  const updateFilters = (changes: Partial<LibraryFilters>) => {
+    const next = { ...filters, ...changes };
+    setSearchParams(paramsFromFilters(next), { replace: true });
+  };
   const setLibraryView = (next: LibraryView) => {
     setView(next);
     localStorage.setItem(viewPreferenceKey, next);
   };
+
+  const inboxCount = firstPage?.facets.status_counts.unsorted ?? 0;
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
@@ -210,14 +268,18 @@ export function HomePage() {
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">Akasha</h1>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-sm text-zinc-400">
-            Inbox {firstPage?.facets.status_counts.unsorted ?? 0}
-          </span>
           <button
-            className="min-h-11 rounded-full px-4 focus-ring"
-            onClick={() => void navigate("/import")}
+            className="min-h-11 rounded-full border border-zinc-800 px-4 text-sm focus-ring aria-pressed:border-fuchsia-400 aria-pressed:text-fuchsia-300"
+            aria-pressed={filters.statuses.includes("unsorted")}
+            onClick={() =>
+              updateFilters({
+                statuses: filters.statuses.includes("unsorted")
+                  ? filters.statuses.filter((s) => s !== "unsorted")
+                  : [...filters.statuses, "unsorted"],
+              })
+            }
           >
-            Import
+            Inbox {inboxCount}
           </button>
           <button
             className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
@@ -365,6 +427,7 @@ export function HomePage() {
           entries={entries}
           view={view}
           focusedId={focusedId}
+          highlightId={highlightId}
           hasNextPage={library.hasNextPage}
           isFetchingNextPage={library.isFetchingNextPage}
           loadNextPage={() => void library.fetchNextPage()}

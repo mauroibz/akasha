@@ -1,19 +1,22 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { HomePage } from "./HomePage";
 
-function renderPage() {
+function renderPage(initialEntry = "/") {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
-      <MemoryRouter>
-        <HomePage />
+      <MemoryRouter initialEntries={[initialEntry]}>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
+        </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -46,6 +49,7 @@ const populated = {
         year: 1963,
         sort_author: "Cortázar, Julio",
         cover_path: null,
+        cover_url: null,
         metadata: {},
         identifiers: {},
         sources: [],
@@ -204,4 +208,74 @@ test("score shortcuts apply to a focused row but editable controls keep their ke
       expect.anything(),
     ),
   );
+});
+
+test("Inbox count applies the unsorted filter", async () => {
+  const fetchMock = vi.fn(
+    async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Response(JSON.stringify(populated.items[0]), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify(populated), { status: 200 });
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  const user = userEvent.setup();
+  await screen.findByText("Rayuela");
+  const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
+  await user.click(inboxButtons[0]);
+  await waitFor(() =>
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("status=unsorted"),
+      expect.anything(),
+    ),
+  );
+});
+
+test("a library row opens detail by pointer", async () => {
+  const fetchMock = vi.fn(
+    async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Response(JSON.stringify(populated.items[0]), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify(populated), { status: 200 });
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  const user = userEvent.setup();
+  await screen.findByText("Rayuela");
+  // Click on the title heading to navigate (not the inline controls)
+  const title = screen.getByText("Rayuela");
+  await user.click(title);
+  await waitFor(() => {
+    expect(screen.getByRole("heading", { name: "Book detail" })).toBeVisible();
+  });
+});
+
+test("Enter opens a focused row to detail", async () => {
+  const fetchMock = vi.fn(
+    async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Response(JSON.stringify(populated.items[0]), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify(populated), { status: 200 });
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  const user = userEvent.setup();
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  act(() => row.focus());
+  await user.keyboard("{Enter}");
+  await waitFor(() => {
+    expect(screen.getByRole("heading", { name: "Book detail" })).toBeVisible();
+  });
 });

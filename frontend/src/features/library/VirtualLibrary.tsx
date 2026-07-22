@@ -1,5 +1,6 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import type { LibraryEntry } from "@/api/library";
 import type { LibraryView } from "./library";
@@ -9,6 +10,7 @@ interface VirtualLibraryProps {
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   focusedId: number | null;
+  highlightId?: number | null;
   loadNextPage: () => void;
   onFocusEntry: (id: number) => void;
   onScore: (entry: LibraryEntry, score: number) => void;
@@ -26,7 +28,10 @@ function EntryControls({
   const [scoreDraft, setScoreDraft] = useState(entry.score?.toString() ?? "");
   useEffect(() => setScoreDraft(entry.score?.toString() ?? ""), [entry.score]);
   return (
-    <div className="flex items-center gap-2">
+    <div
+      className="flex items-center gap-2"
+      onClick={(e) => e.stopPropagation()}
+    >
       <label className="sr-only" htmlFor={`status-${entry.id}`}>
         Status for {entry.item.title}
       </label>
@@ -69,6 +74,7 @@ function EntryControls({
 
 export function VirtualLibrary(props: VirtualLibraryProps) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
   const rowHeight = props.view === "table" ? 84 : 310;
   const virtualizer = useVirtualizer({
     count: props.entries.length,
@@ -136,18 +142,26 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
       >
         {mountedItems.map((row) => {
           const entry = props.entries[row.index];
+          const isHighlighted = props.highlightId === entry.id;
           return (
             <article
               aria-label={entry.item.title}
               className={
                 props.view === "table"
-                  ? "absolute left-0 top-0 flex w-full items-center gap-4 border-b border-zinc-800 px-4"
-                  : "absolute left-0 top-0 grid w-full grid-cols-[128px_1fr] gap-5 px-4 py-3"
+                  ? `absolute left-0 top-0 flex w-full items-center gap-4 border-b border-zinc-800 px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400 ${isHighlighted ? "ring-2 ring-fuchsia-400" : ""}`
+                  : `absolute left-0 top-0 grid w-full grid-cols-[128px_1fr] gap-5 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400 ${isHighlighted ? "ring-2 ring-fuchsia-400" : ""}`
               }
               data-entry-id={entry.id}
               data-provisional={entry.score_provisional ? "true" : "false"}
+              data-highlighted={isHighlighted ? "true" : "false"}
               key={entry.id}
               onFocus={() => props.onFocusEntry(entry.id)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  void navigate(`/books/${entry.id}`);
+                }
+              }}
               role={props.view === "table" ? "row" : undefined}
               style={{
                 height: row.size,
@@ -155,39 +169,46 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               }}
               tabIndex={0}
             >
-              {entry.item.cover_url ? (
-                <img
-                  className={
-                    props.view === "table"
-                      ? "h-14 w-10 shrink-0 rounded object-cover"
-                      : "aspect-[2/3] rounded-xl object-cover"
-                  }
-                  src={entry.item.cover_url}
-                  alt=""
-                />
-              ) : (
-                <div
-                  className={
-                    props.view === "table"
-                      ? "h-14 w-10 shrink-0 rounded bg-zinc-800"
-                      : "aspect-[2/3] rounded-xl bg-zinc-800"
-                  }
-                  aria-label="No cover"
-                />
-              )}
-              <div className="min-w-0 flex-1">
-                <h2 className="truncate font-semibold">{entry.item.title}</h2>
-                <p className="truncate text-sm text-zinc-400">
-                  {entry.item.sort_author ?? "Unknown author"}
-                </p>
-                <p className="text-xs text-zinc-500">
-                  Edition year: {entry.item.year ?? "unknown"}
-                  {entry.item.metadata.original_year &&
-                  entry.item.metadata.original_year !== entry.item.year
-                    ? ` · Original: ${entry.item.metadata.original_year}`
-                    : ""}
-                </p>
-              </div>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-4 text-left focus-visible:outline-none"
+                aria-label={`Open ${entry.item.title}`}
+                onClick={() => void navigate(`/books/${entry.id}`)}
+              >
+                {entry.item.cover_url ? (
+                  <img
+                    className={
+                      props.view === "table"
+                        ? "h-14 w-10 shrink-0 rounded object-cover"
+                        : "aspect-[2/3] rounded-xl object-cover"
+                    }
+                    src={entry.item.cover_url}
+                    alt=""
+                  />
+                ) : (
+                  <div
+                    className={
+                      props.view === "table"
+                        ? "h-14 w-10 shrink-0 rounded bg-zinc-800"
+                        : "aspect-[2/3] rounded-xl bg-zinc-800"
+                    }
+                    aria-label="No cover"
+                  />
+                )}
+                <div className="min-w-0 flex-1">
+                  <h2 className="truncate font-semibold">{entry.item.title}</h2>
+                  <p className="truncate text-sm text-zinc-400">
+                    {entry.item.sort_author ?? "Unknown author"}
+                  </p>
+                  <p className="text-xs text-zinc-500">
+                    Edition year: {entry.item.year ?? "unknown"}
+                    {entry.item.metadata.original_year &&
+                    entry.item.metadata.original_year !== entry.item.year
+                      ? ` · Original: ${entry.item.metadata.original_year}`
+                      : ""}
+                  </p>
+                </div>
+              </button>
               <EntryControls
                 entry={entry}
                 onScore={props.onScore}

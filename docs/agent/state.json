@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 4,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "010",
   "active_sprint_file": "docs/sprints/010-editorial-ui-redesign.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "009",
   "completed_sprints": ["001", "002", "003", "004", "005", "006", "007", "008", "009"],
-  "started_at": null,
+  "started_at": "2026-07-22T15:10:00-03:00",
   "updated_at": "2026-07-22T13:40:00-03:00"
 }
