@@ -24,6 +24,7 @@ make test         # backend and frontend behavior tests
 make build        # Python wheel and production SPA
 make openapi      # regenerate frontend/openapi.json
 make migrate      # explicitly upgrade the configured database
+cd frontend && npm run test:e2e  # Chromium library/keyboard browser checks
 ```
 
 ## Container

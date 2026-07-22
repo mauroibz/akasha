@@ -91,7 +91,7 @@ Acceptance:
 - Optimistic failure rolls back and is announced accessibly.
 - `/`, `a`, and score shortcuts obey input-focus rules and reduced motion.
 
-### Sprint 005 — Providers and cached add API
+### [Sprint 005 — Providers and cached add API](005-providers-add-api.md)
 
 Scope:
 

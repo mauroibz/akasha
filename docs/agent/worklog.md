@@ -69,3 +69,18 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 004 and begin with failing typed library loading/empty/error/populated component
   tests before adding the application shell and virtualization.
+
+## 2026-07-22 — Sprint 004 (complete)
+- Done: delivered typed library states (`2c38bec`), cursor-aware server controls and fixed-size
+  virtual grid/table views (`01d0cdf`), optimistic edits/keyboard behavior (`fc44dff`), and isolated
+  browser artifacts (`01e031e`), and guarded focus restoration (`22eb2ec`); expanded Sprint 005
+  against current paths.
+- Verified: 49 backend and 9 frontend tests pass; two Chromium checks prove keyboard guards,
+  reduced motion, and fewer than 20 mounted entries in a deterministic 5,000-entry library.
+  Required format/check/test/build/project-validation and `git diff --check` commands pass.
+- Deviations: no product/scope deviation. Grid cards use fixed-height virtual rows rather than
+  masonry; the `/add` route is a non-functional scope-boundary notice until Sprint 006.
+- Blocked/open: none. The sandboxed isolated Python build could not resolve hatchling; the required
+  approved `make build` rerun with network access passed.
+- Next: claim Sprint 005 and begin with failing provider model/merge plus independent partial-failure
+  search tests before implementing HTTP adapters.

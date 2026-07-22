@@ -1,6 +1,6 @@
 # Sprint 004 — Frontend shell and virtualized library
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 003
 **Roadmap revision:** 2
 
@@ -91,5 +91,23 @@ optimistic rollback, reduced motion, virtualization DOM bounds, and the seeded 5
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands
-and results, commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered the Akasha application shell and checked OpenAPI library boundary (`2c38bec`), server-side
+filter/sort/search controls, persisted grid/table preference, opaque-cursor infinite queries,
+deduplication, fixed-size virtualization, optimistic score/status edits, shared editable-target
+shortcut guards, focus restoration/navigation, reduced motion, and deterministic browser fixtures
+(`01d0cdf`, `fc44dff`, `01e031e`, `22eb2ec`, `3cb636b`). Score edits immediately clear provisional
+presentation; failures restore the snapshot and announce the rollback, without stealing focus from
+the user's next control.
+
+Verification: 49 backend tests and 9 frontend component tests pass. Two Chromium Playwright checks
+pass for the seeded 5,000-entry flow (fewer than 20 mounted entries after deep scrolling), keyboard
+guards/navigation, routing, and reduced motion. `python scripts/validate_project.py`, `make format`,
+`make check`, `make test`, `make build`, OpenAPI type-surface checking, and `git diff --check` pass.
+The isolated Python build initially could not resolve hatchling inside the network-restricted
+sandbox; the required `make build` rerun outside that restriction passed.
+
+Deviations: no product or sprint-scope deviation. Grid mode uses fixed-height virtual cover rows
+rather than a masonry layout so both modes retain the specified stable fixed-size behavior. The
+future add route intentionally renders only a scope boundary notice until Sprint 006. Review found
+no required changes to Sprints 005–012; Sprint 005 was expanded from the roadmap against current
+paths.
