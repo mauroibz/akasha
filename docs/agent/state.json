@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 2,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "001",
   "active_sprint_file": "docs/sprints/001-foundation.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": null,
   "completed_sprints": [],
-  "started_at": null,
-  "updated_at": "2026-07-21T17:39:38-03:00"
+  "started_at": "2026-07-21T18:00:00-03:00",
+  "updated_at": "2026-07-21T18:00:00-03:00"
 }

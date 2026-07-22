@@ -27,6 +27,7 @@ REQUIRED_PATHS = (
 PROJECT_STATUSES = {"ready", "in_progress", "blocked", "complete"}
 SPRINT_STATUSES = {"planned", "ready", "in_progress", "blocked", "completed"}
 ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
+GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
 SPRINT_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*([a-z_]+)", re.MULTILINE)
 SPRINT_ID_RE = re.compile(r"^(\d{3})-")
@@ -210,7 +211,7 @@ def validate_state(errors: list[str]) -> None:
 
 def validate_markdown_links(errors: list[str]) -> None:
     for path in sorted(ROOT.rglob("*.md")):
-        if any(part in {".git", "node_modules", ".venv"} for part in path.parts):
+        if any(part in GENERATED_DIRECTORIES for part in path.parts):
             continue
         text = path.read_text(encoding="utf-8")
         for raw_target in LINK_RE.findall(text):
@@ -232,7 +233,7 @@ def validate_markdown_links(errors: list[str]) -> None:
 
 def validate_text_hygiene(errors: list[str]) -> None:
     for path in sorted(ROOT.rglob("*")):
-        if not path.is_file() or ".git" in path.parts:
+        if not path.is_file() or any(part in GENERATED_DIRECTORIES for part in path.parts):
             continue
         if path.suffix not in {".md", ".json", ".py", ".yml", ".yaml", ".toml"} and path.name not in {
             ".gitignore",

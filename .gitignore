@@ -12,6 +12,7 @@ htmlcov/
 node_modules/
 frontend/dist/
 frontend/coverage/
+*.tsbuildinfo
 playwright-report/
 test-results/
 
