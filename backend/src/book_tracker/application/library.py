@@ -26,10 +26,18 @@ def _now() -> str:
 
 
 class LibraryError(Exception):
-    def __init__(self, code: str, message: str, *, status_code: int = 409) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        *,
+        status_code: int = 409,
+        details: Mapping[str, Any] | None = None,
+    ) -> None:
         self.code = code
         self.message = message
         self.status_code = status_code
+        self.details = dict(details or {})
         super().__init__(message)
 
 
@@ -194,6 +202,33 @@ class LibraryService:
                     setattr(item, field, changes[field])
             if "metadata" in changes:
                 item.metadata_json = json.dumps(changes["metadata"], ensure_ascii=False)
+            item.updated_at = _now()
+            session.flush()
+            return self._item_dict(session, item)
+
+    def primary_source(self, item_id: int) -> tuple[str, str]:
+        with Session(self.engine) as session:
+            self._item(session, item_id)
+            source = session.execute(
+                select(ItemSourceRow.source, ItemSourceRow.source_id).where(
+                    ItemSourceRow.item_id == item_id, ItemSourceRow.is_primary == 1
+                )
+            ).first()
+            if source is None:
+                raise LibraryError(
+                    "refresh_unavailable", "This item has no provider source", status_code=422
+                )
+            return source.source, source.source_id
+
+    def overwrite_provider_fields(self, item_id: int, values: Mapping[str, Any]) -> dict[str, Any]:
+        with self._write() as session:
+            item = self._item(session, item_id)
+            for field in ("title", "subtitle", "year"):
+                if field in values:
+                    setattr(item, field, values[field])
+            metadata = json.loads(item.metadata_json)
+            metadata.update(values.get("metadata", {}))
+            item.metadata_json = json.dumps(metadata, ensure_ascii=False)
             item.updated_at = _now()
             session.flush()
             return self._item_dict(session, item)

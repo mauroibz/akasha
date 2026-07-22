@@ -31,6 +31,11 @@ export interface CreateEntryResponse {
   already_exists: boolean;
   near_matches: number[];
 }
+export class NearMatchError extends Error {
+  constructor(public entryIds: number[]) {
+    super("A similar edition is already in your library");
+  }
+}
 
 async function json<T>(response: Response, message: string): Promise<T> {
   if (!response.ok) throw new Error(message);
@@ -59,10 +64,20 @@ export function createEntry(body: {
   score?: number;
   shelf_ids: number[];
   idempotency_key?: string;
+  confirm_near_match?: boolean;
 }) {
   return fetch("/api/entries", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }).then((r) => json<CreateEntryResponse>(r, "Book could not be added"));
+  }).then(async (response) => {
+    if (response.status === 409) {
+      const value = (await response.json()) as {
+        error?: { code?: string; details?: { entry_ids?: number[] } };
+      };
+      if (value.error?.code === "near_match_confirmation_required")
+        throw new NearMatchError(value.error.details?.entry_ids ?? []);
+    }
+    return json<CreateEntryResponse>(response, "Book could not be added");
+  });
 }

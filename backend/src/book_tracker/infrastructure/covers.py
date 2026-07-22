@@ -15,6 +15,40 @@ class CoverError(ValueError):
     pass
 
 
+def prepare_uploaded_cover(content: bytes, content_type: str, data_dir: Path) -> Path:
+    if content_type not in {"image/jpeg", "image/png", "image/webp"}:
+        raise CoverError("cover upload is not a supported image")
+    if len(content) > MAX_COVER_BYTES:
+        raise CoverError("cover exceeds byte limit")
+    covers_dir = data_dir / "covers"
+    covers_dir.mkdir(parents=True, exist_ok=True)
+    temporary: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            dir=covers_dir, prefix="upload-", suffix=".tmp", delete=False
+        ) as output:
+            temporary = Path(output.name)
+            output.write(content)
+        with Image.open(temporary) as image:
+            width, height = image.size
+            if width <= 0 or height <= 0 or width * height > MAX_COVER_PIXELS:
+                raise CoverError("cover exceeds pixel limit")
+            image.load()
+            converted = image.convert("RGB")
+            converted.thumbnail((MAX_COVER_EDGE, MAX_COVER_EDGE), Image.Resampling.LANCZOS)
+            normalized = temporary.with_suffix(".jpg.tmp")
+            converted.save(normalized, "JPEG", quality=85, optimize=True)
+        temporary.unlink(missing_ok=True)
+        return normalized
+    except (CoverError, OSError, UnidentifiedImageError, Image.DecompressionBombError) as error:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+            temporary.with_suffix(".jpg.tmp").unlink(missing_ok=True)
+        if isinstance(error, CoverError):
+            raise
+        raise CoverError("cover could not be prepared") from error
+
+
 async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> Path:
     parsed = urlsplit(url)
     if parsed.scheme != "https" or not parsed.hostname:

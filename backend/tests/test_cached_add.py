@@ -79,14 +79,31 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
                 "idempotency_key": "manual-rayuela-2",
             },
         )
+        confirmed = await client.post(
+            "/api/entries",
+            json={
+                "manual": {
+                    "title": "Rayuela",
+                    "authors": ["Julio Cortázar"],
+                    "year": 2005,
+                    "isbn": "9780307474728",
+                },
+                "status": "to_read",
+                "idempotency_key": "manual-rayuela-2",
+                "confirm_near_match": True,
+            },
+        )
     assert created.status_code == 201
     assert created.json()["entry"]["item"]["year"] == 1999
     assert created.json()["entry"]["status"] == "read"
     assert created.json()["entry"]["score"] == 9
     assert duplicate.status_code == 200
     assert duplicate.json()["already_exists"] is True
-    assert near.status_code == 201
-    assert near.json()["near_matches"] == [created.json()["entry"]["id"]]
+    assert near.status_code == 409
+    assert near.json()["error"]["code"] == "near_match_confirmation_required"
+    assert near.json()["error"]["details"]["entry_ids"] == [created.json()["entry"]["id"]]
+    assert confirmed.status_code == 201
+    assert confirmed.json()["near_matches"] == [created.json()["entry"]["id"]]
 
 
 @pytest.mark.anyio
@@ -263,7 +280,12 @@ async def test_cover_failure_is_nonfatal_and_success_sets_only_valid_local_path(
                 "/api/entries", json={"source": "openlibrary", "source_id": "bad"}
             )
             succeeded = await client.post(
-                "/api/entries", json={"source": "openlibrary", "source_id": "good"}
+                "/api/entries",
+                json={
+                    "source": "openlibrary",
+                    "source_id": "good",
+                    "confirm_near_match": True,
+                },
             )
     assert failed.status_code == 201
     assert failed.json()["entry"]["item"]["cover_path"] is None

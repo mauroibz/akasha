@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   createEntry,
+  getShelves,
+  NearMatchError,
   searchBooks,
   type ManualItem,
   type SearchCandidate,
@@ -19,6 +21,10 @@ export function AddPage() {
   const [warning, setWarning] = useState("");
   const [near, setNear] = useState<number[]>([]);
   const [pending, setPending] = useState(false);
+  const [shelves, setShelves] = useState<Array<{ id: number; name: string }>>(
+    [],
+  );
+  const [shelfIds, setShelfIds] = useState<number[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -36,6 +42,11 @@ export function AddPage() {
     }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
+  useEffect(() => {
+    void getShelves()
+      .then(setShelves)
+      .catch(() => undefined);
+  }, []);
   useEffect(() => {
     if (manual) titleRef.current?.focus();
   }, [manual]);
@@ -68,7 +79,8 @@ export function AddPage() {
             }),
         status,
         score: score ? Number(score) : undefined,
-        shelf_ids: [],
+        shelf_ids: shelfIds,
+        confirm_near_match: confirmed,
       });
       if (result.near_matches.length && !confirmed) {
         setNear(result.near_matches);
@@ -85,6 +97,11 @@ export function AddPage() {
         },
       });
     } catch (e) {
+      if (e instanceof NearMatchError) {
+        setNear(e.entryIds);
+        setPending(false);
+        return;
+      }
       setError(e instanceof Error ? e.message : "Book could not be added");
       setPending(false);
     }
@@ -212,6 +229,29 @@ export function AddPage() {
               />
             </label>
           </div>
+          {shelves.length > 0 && (
+            <fieldset>
+              <legend>Shelves</legend>
+              <div className="flex flex-wrap gap-3">
+                {shelves.map((shelf) => (
+                  <label key={shelf.id}>
+                    <input
+                      type="checkbox"
+                      checked={shelfIds.includes(shelf.id)}
+                      onChange={(e) =>
+                        setShelfIds((old) =>
+                          e.target.checked
+                            ? [...old, shelf.id]
+                            : old.filter((id) => id !== shelf.id),
+                        )
+                      }
+                    />{" "}
+                    {shelf.name}
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
           {near.length > 0 && (
             <div role="alert">
               <p>

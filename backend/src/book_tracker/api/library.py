@@ -1,13 +1,15 @@
 from datetime import date
 from typing import Annotated, Any, Literal
 
-from fastapi import APIRouter, Depends, Query, Request, Response
+from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, Field, model_validator
 
 from book_tracker.application.add import AddService
-from book_tracker.application.library import LibraryService
+from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
+from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_uploaded_cover
+from book_tracker.infrastructure.repositories import DomainRepository
 
 router = APIRouter(prefix="/api")
 
@@ -113,6 +115,7 @@ class EntryCreateBody(BaseModel):
     score: int | None = Field(default=None, ge=1, le=10)
     shelf_ids: list[int] = Field(default_factory=list, max_length=100)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=100)
+    confirm_near_match: bool = False
 
     @model_validator(mode="after")
     def exactly_one_source(self) -> "EntryCreateBody":
@@ -164,6 +167,16 @@ class ItemPatch(BaseModel):
     def required_title_when_present(self) -> "ItemPatch":
         if "title" in self.model_fields_set and self.title is None:
             raise ValueError("title cannot be null")
+        return self
+
+
+class RefreshBody(BaseModel):
+    overwrite: bool
+
+    @model_validator(mode="after")
+    def confirmed(self) -> "RefreshBody":
+        if not self.overwrite:
+            raise ValueError("overwrite confirmation is required")
         return self
 
 
@@ -256,6 +269,7 @@ async def create_entry(
         score=body.score,
         shelf_ids=body.shelf_ids,
         idempotency_key=body.idempotency_key,
+        confirm_near_match=body.confirm_near_match,
     )
     if result["already_exists"]:
         response.status_code = 200
@@ -307,6 +321,64 @@ async def get_item(item_id: int, library: Library) -> ItemResponse:
 async def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
     return ItemResponse.model_validate(
         library.update_item(item_id, body.model_dump(exclude_unset=True))
+    )
+
+
+@router.post("/items/{item_id}/cover", response_model=ItemResponse, responses=ERRORS)
+async def replace_cover(
+    item_id: int, request: Request, cover: Annotated[UploadFile, File()]
+) -> ItemResponse:
+    library = LibraryService(request.app.state.engine)
+    library.get_item(item_id)
+    content = await cover.read(10 * 1024 * 1024 + 1)
+    target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
+    previous = target.read_bytes() if target.is_file() else None
+    try:
+        prepared = prepare_uploaded_cover(
+            content, cover.content_type or "", request.app.state.data_dir
+        )
+        install_cover(prepared, request.app.state.data_dir, item_id)
+        DomainRepository(request.app.state.engine).set_cover_path(item_id, f"covers/{item_id}.jpg")
+    except CoverError as error:
+        raise LibraryError("invalid_cover", str(error), status_code=422) from error
+    except Exception:
+        if previous is None:
+            target.unlink(missing_ok=True)
+        else:
+            recovery = target.with_suffix(".recovery.tmp")
+            recovery.write_bytes(previous)
+            recovery.replace(target)
+        raise
+    return ItemResponse.model_validate(library.get_item(item_id))
+
+
+@router.post("/items/{item_id}/refresh", response_model=ItemResponse, responses=ERRORS)
+async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> ItemResponse:
+    library = LibraryService(request.app.state.engine)
+    source, source_id = library.primary_source(item_id)
+    provider = request.app.state.providers.get(source)
+    if provider is None:
+        raise LibraryError("provider_disabled", "Metadata provider is not enabled", status_code=422)
+    try:
+        payload = await provider.fetch(source_id)
+    except Exception as error:
+        raise LibraryError(
+            "provider_failure", "Metadata could not be fetched", status_code=502
+        ) from error
+    metadata = dict(payload.metadata)
+    metadata["authors"] = list(payload.authors)
+    if payload.language is not None:
+        metadata["language"] = payload.language
+    return ItemResponse.model_validate(
+        library.overwrite_provider_fields(
+            item_id,
+            {
+                "title": payload.title,
+                "subtitle": payload.subtitle,
+                "year": payload.year,
+                "metadata": metadata,
+            },
+        )
     )
 
 

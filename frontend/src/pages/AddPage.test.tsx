@@ -26,25 +26,27 @@ afterEach(() => vi.restoreAllMocks());
 
 describe("AddPage", () => {
   it("debounces provider search and offers keyboard-accessible manual fallback", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      new Response(
-        JSON.stringify([
-          {
-            source: "openlibrary",
-            source_id: "OL1M",
-            source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
-            title: "Rayuela",
-            subtitle: null,
-            authors: ["Julio Cortázar"],
-            year: 1963,
-            cover_url: null,
-            identifiers: {},
-            language: "es",
-            metadata: {},
-          },
-        ]),
-        { status: 200 },
-      ),
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/shelves"
+        ? new Response("[]")
+        : new Response(
+            JSON.stringify([
+              {
+                source: "openlibrary",
+                source_id: "OL1M",
+                source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+                title: "Rayuela",
+                subtitle: null,
+                authors: ["Julio Cortázar"],
+                year: 1963,
+                cover_url: null,
+                identifiers: {},
+                language: "es",
+                metadata: {},
+              },
+            ]),
+            { status: 200 },
+          ),
     );
     renderPage();
     await userEvent.type(
@@ -64,15 +66,17 @@ describe("AddPage", () => {
   it("submits a manual entry once and announces exact duplicates", async () => {
     const request = vi
       .spyOn(globalThis, "fetch")
-      .mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            entry: { id: 7 },
-            already_exists: true,
-            near_matches: [],
-          }),
-          { status: 200 },
-        ),
+      .mockImplementation(async (input) =>
+        String(input) === "/api/shelves"
+          ? new Response("[]")
+          : new Response(
+              JSON.stringify({
+                entry: { id: 7 },
+                already_exists: true,
+                near_matches: [],
+              }),
+              { status: 200 },
+            ),
       );
     renderPage();
     await userEvent.click(
@@ -83,7 +87,9 @@ describe("AddPage", () => {
       screen.getByRole("button", { name: /add to library/i }),
     );
     await screen.findByRole("heading", { name: /book detail/i });
-    expect(request).toHaveBeenCalledTimes(1);
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST"),
+    ).toHaveLength(1);
     expect(sessionStorage.getItem("akasha.toast")).toBe(
       "Already in your library",
     );

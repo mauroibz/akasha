@@ -7,6 +7,7 @@ from sqlalchemy import Engine
 
 from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
+from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.repositories import (
@@ -85,6 +86,7 @@ class AddService:
         score: int | None,
         shelf_ids: Sequence[int],
         idempotency_key: str | None,
+        confirm_near_match: bool = False,
     ) -> dict[str, Any]:
         if manual is not None:
             cover_url = None
@@ -125,6 +127,13 @@ class AddService:
             except CoverError:
                 prepared_cover = None
         near_matches = self.repository.near_entry_ids(title, authors[0] if authors else "")
+        exact = self.repository.match(identifiers=identifiers, sources=sources)
+        if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
+            raise LibraryError(
+                "near_match_confirmation_required",
+                "A similar edition is already in your library",
+                details={"entry_ids": near_matches},
+            )
         try:
             result = self.repository.create_cached_entry(
                 title=title,
