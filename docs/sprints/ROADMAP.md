@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 2
+**Plan revision:** 3
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 008](008-calibre-import.md)
+**Active sprint:** [Sprint 008](008-book-metadata-covers.md)
 
 ## Dependency graph
 
@@ -13,12 +13,13 @@
      │   └─ 004 Frontend shell + library
      └─ 005 Providers + cached add API
          └─ 006 Add/detail/edit UI
-             ├─ 007 Goodreads import
-             └─ 008 Calibre import
-                 └─ 009 Durable enrichment + undo
-                     └─ 010 Triage workflow
-                         └─ 011 Scale, accessibility, resilience
-                             └─ 012 Container, backup, release
+             └─ 007 Goodreads import
+                 └─ 008 Working metadata + covers
+                     └─ 009 Calibre import
+                         └─ 010 Durable enrichment + undo
+                             └─ 011 Triage workflow
+                                 └─ 012 Scale, accessibility, resilience
+                                     └─ 013 Container, backup, release
 ```
 
 Sprints 003 and 005 are architecturally parallel but are intentionally sequenced for one-agent worktrees and simpler handoffs. Frontend vertical slices begin only after stable API contracts exist.
@@ -34,11 +35,12 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | completed |
 | 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | completed |
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
-| 008 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 007 | ready |
-| 009 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 008 | planned |
-| 010 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 009 | planned |
-| 011 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 010 | planned |
-| 012 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 011 | planned |
+| 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | in_progress |
+| 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | planned |
+| 010 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 009 | planned |
+| 011 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 010 | planned |
+| 012 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 011 | planned |
+| 013 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 012 | planned |
 
 ## Detailed future sprint contracts
 
@@ -136,7 +138,19 @@ Acceptance:
 - Commit is idempotent; new rows land unsorted while existing entries and manual edits remain untouched.
 - UI never uploads on commit a second time or exposes staged host paths.
 
-### [Sprint 008 — Calibre import and re-sync](008-calibre-import.md)
+### [Sprint 008 — Working book metadata and covers](008-book-metadata-covers.md)
+
+Scope:
+
+- Normalize Open Library edition/work/author data and optional same-ISBN Google Books fill-empty data.
+- Type metadata patches, migrate legacy publishers, cache and serve versioned covers, and expose the edition/original-year distinction throughout the UI.
+
+Acceptance:
+
+- Provider and file-backed tests cover normalized metadata, identity-safe merging, patch clearing, refresh preservation, secure cover download/serving, and zero provider calls during rendering.
+- Component/Chromium tests cover search, virtual rows, detail/edit/refresh, mobile, keyboard, and missing-cover states; the specified three-title live smoke proves cached offline rendering.
+
+### [Sprint 009 — Calibre import and re-sync](009-calibre-import.md)
 
 Scope:
 
@@ -150,7 +164,7 @@ Acceptance:
 - `mode=ro` plus `query_only` is tested; source DB hash is unchanged after import.
 - Re-sync adds/fills only and native 1–10 scores are not provisional.
 
-### Sprint 009 — Durable enrichment and safe undo
+### Sprint 010 — Durable enrichment and safe undo
 
 Scope:
 
@@ -164,7 +178,7 @@ Acceptance:
 - Undo cannot remove later user edits, shared items, or pre-existing entries; it reverts a field only if current value still matches the recorded imported value.
 - Partial retention is reported, repeated undo is harmless, and late jobs from an undone batch cannot mutate data.
 
-### Sprint 010 — Bulk-first triage
+### Sprint 011 — Bulk-first triage
 
 Scope:
 
@@ -178,7 +192,7 @@ Acceptance:
 - A Playwright scenario imports and triages hundreds of rows without one request per row.
 - Conflicting values remain visible until explicitly resolved.
 
-### Sprint 011 — Scale, accessibility, and resilience
+### Sprint 012 — Scale, accessibility, and resilience
 
 Scope:
 
@@ -193,7 +207,7 @@ Acceptance:
 - Upload/image/path/provider limits and log redaction tests pass.
 - No uncaught frontend errors in E2E console.
 
-### Sprint 012 — Container, backup, and v1 release
+### Sprint 013 — Container, backup, and v1 release
 
 Scope:
 

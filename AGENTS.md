@@ -56,7 +56,7 @@ Document observed reality. Do not change the product spec merely to excuse an in
 Only after all acceptance criteria and verification pass:
 
 1. Mark the active sprint `completed` in its file.
-2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if Sprint 012 just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
+2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if Sprint 013 just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
 3. Append a `docs/agent/worklog.md` entry for this session (done, verified-and-how, deviations, next), then rewrite `docs/agent/HANDOFF.md` for the next agent as concise current reality, not a transcript.
 4. Run `python scripts/validate_project.py`, `make check`, and `make test` once more.
 5. Create the final documentation/state commit: `docs(sprint-NNN): close sprint and hand off`.

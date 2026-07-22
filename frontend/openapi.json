@@ -78,6 +78,196 @@
         "title": "Body_replace_cover_api_items__item_id__cover_post",
         "type": "object"
       },
+      "BookMetadataPatch": {
+        "additionalProperties": false,
+        "properties": {
+          "authors": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Authors"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "original_year": {
+            "anyOf": [
+              {
+                "maximum": 9999.0,
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Year"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "minimum": 1.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
+          "subjects": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subjects"
+          }
+        },
+        "title": "BookMetadataPatch",
+        "type": "object"
+      },
+      "BookMetadataResponse": {
+        "properties": {
+          "authors": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Authors",
+            "type": "array"
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
+          "language": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Language"
+          },
+          "original_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Year"
+          },
+          "page_count": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Page Count"
+          },
+          "publisher": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Publisher"
+          },
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
+          "subjects": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Subjects",
+            "type": "array"
+          }
+        },
+        "title": "BookMetadataResponse",
+        "type": "object"
+      },
       "BulkBody": {
         "properties": {
           "entry_ids": {
@@ -887,14 +1077,12 @@
           "metadata": {
             "anyOf": [
               {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/BookMetadataPatch"
               },
               {
                 "type": "null"
               }
-            ],
-            "title": "Metadata"
+            ]
           },
           "subtitle": {
             "anyOf": [
@@ -936,7 +1124,7 @@
       },
       "ItemResponse": {
         "properties": {
-          "cover_path": {
+          "cover_url": {
             "anyOf": [
               {
                 "type": "string"
@@ -945,7 +1133,7 @@
                 "type": "null"
               }
             ],
-            "title": "Cover Path"
+            "title": "Cover Url"
           },
           "id": {
             "title": "Id",
@@ -959,9 +1147,7 @@
             "type": "object"
           },
           "metadata": {
-            "additionalProperties": true,
-            "title": "Metadata",
-            "type": "object"
+            "$ref": "#/components/schemas/BookMetadataResponse"
           },
           "sort_author": {
             "anyOf": [
@@ -1019,7 +1205,7 @@
           "subtitle",
           "year",
           "sort_author",
-          "cover_path",
+          "cover_url",
           "metadata",
           "identifiers",
           "sources"
@@ -1230,6 +1416,17 @@
             "title": "Metadata",
             "type": "object"
           },
+          "original_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Original Year"
+          },
           "source": {
             "title": "Source",
             "type": "string"
@@ -1280,6 +1477,7 @@
           "subtitle",
           "authors",
           "year",
+          "original_year",
           "cover_url",
           "identifiers",
           "language",
@@ -2149,6 +2347,61 @@
       }
     },
     "/api/items/{item_id}/cover": {
+      "get": {
+        "operationId": "get_cover_api_items__item_id__cover_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Cover"
+      },
       "post": {
         "operationId": "replace_cover_api_items__item_id__cover_post",
         "parameters": [

@@ -1,6 +1,6 @@
 # Sprint 009 — Calibre import and re-sync
 
-**Status:** ready
+**Status:** planned
 **Depends on:** 008
 **Roadmap revision:** 3
 
@@ -17,7 +17,7 @@ Read in order:
 2. `docs/specs/product-spec.md` sections 2, 3, 5.2, 5.3, 6, and 7
 3. `docs/specs/technical-spec.md` sections 5, 6.1, 6.4, 6.5, 7, 8, 9, and 10
 4. `docs/decisions.md` DEC-002, DEC-007, DEC-008, DEC-009, DEC-010, and DEC-013
-5. `docs/sprints/007-goodreads-import.md` Outcome and `docs/sprints/ROADMAP.md` Sprints 008–011
+5. `docs/sprints/008-book-metadata-covers.md` Outcome and `docs/sprints/ROADMAP.md` Sprints 009–013
 6. `docs/agent/WORKFLOW.md`, the last worklog entry, and `docs/agent/HANDOFF.md`
 7. `backend/src/book_tracker/domain/goodreads.py`, `application/imports.py`, import API/repository,
    migrations/models, `frontend/src/api/imports.ts`, `frontend/src/pages/ImportPage.tsx`, and tests
@@ -27,7 +27,7 @@ Read in order:
 Goodreads import now provides bounded staging, exact-plan persistence, explicit ambiguity choices,
 atomic idempotent commit, ordered effects, OpenAPI contracts, and a keyboard/mobile import page.
 Calibre configuration exists, but there is no path-confined adapter, read-only database reader,
-Calibre normalization, cover staging, Calibre routes, or second UI tab. Sprint 009 still owns jobs,
+Calibre normalization, cover staging, Calibre routes, or second UI tab. Sprint 010 still owns jobs,
 enrichment, progress, and undo execution.
 
 ## Deliverables
