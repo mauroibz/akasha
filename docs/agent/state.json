@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 2,
-  "project_status": "in_progress",
-  "active_sprint": "007",
-  "active_sprint_file": "docs/sprints/007-goodreads-import.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "006",
-  "completed_sprints": ["001", "002", "003", "004", "005", "006"],
-  "started_at": "2026-07-22T12:00:00-03:00",
-  "updated_at": "2026-07-22T03:18:00-03:00"
+  "project_status": "ready",
+  "active_sprint": "008",
+  "active_sprint_file": "docs/sprints/008-calibre-import.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "007",
+  "completed_sprints": ["001", "002", "003", "004", "005", "006", "007"],
+  "started_at": null,
+  "updated_at": "2026-07-22T10:37:18-03:00"
 }

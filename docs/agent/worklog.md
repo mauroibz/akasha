@@ -110,3 +110,18 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 007 and begin with failing migration/parser fixtures for durable Goodreads
   preview records and armored/empty ISBN, malformed-date, UTF-8, and missing-column behavior.
+
+## 2026-07-22 — Sprint 007 (complete)
+- Done: delivered bounded Goodreads parsing and durable exact-plan preview/commit (`9216f27`), typed
+  keyboard/mobile import UI (`4110481`), and safe retry/fill-empty/manual-preservation coverage
+  (`0682b79`); expanded Sprint 008 against the shared import boundary.
+- Verified: 82 backend and 15 component tests pass. File-backed migrated SQLite tests cover parser
+  edge cases, preview isolation, atomic/idempotent commit, ambiguity, ordered effects, fill-empty,
+  and manual preservation. Eight Chromium flows pass, including valid import, malformed/oversized
+  recovery, ambiguity, keyboard focus, and mobile layout. Required format/check/test/build/project
+  validation and `git diff --check` pass.
+- Deviations: no product/scope deviation. Sprint 002 already created the audit tables, so Sprint 007
+  added planning/effect indexes and the operational repositories rather than duplicate schema.
+- Blocked/open: none.
+- Next: claim Sprint 008 and begin with synthetic Calibre schema fixtures plus confined read-only and
+  `query_only` adapter tests with source hash proof.

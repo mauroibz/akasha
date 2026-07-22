@@ -2,7 +2,7 @@
 
 **Plan revision:** 2
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 006](006-add-detail-edit-ui.md)
+**Active sprint:** [Sprint 008](008-calibre-import.md)
 
 ## Dependency graph
 
@@ -32,9 +32,9 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 003 | Entries, shelves, filtering, keyset API | CRUD and list API pass contract tests including null-safe asc/desc cursors | 002 | completed |
 | 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | completed |
 | 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | completed |
-| 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | ready |
-| 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | planned |
-| 008 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 007 | planned |
+| 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | completed |
+| 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
+| 008 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 007 | ready |
 | 009 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 008 | planned |
 | 010 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 009 | planned |
 | 011 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 010 | planned |
@@ -136,7 +136,7 @@ Acceptance:
 - Commit is idempotent; new rows land unsorted while existing entries and manual edits remain untouched.
 - UI never uploads on commit a second time or exposes staged host paths.
 
-### Sprint 008 — Calibre import and re-sync
+### [Sprint 008 — Calibre import and re-sync](008-calibre-import.md)
 
 Scope:
 

@@ -1,6 +1,6 @@
 # Sprint 007 — Goodreads import
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 003, 006
 **Roadmap revision:** 2
 
@@ -100,5 +100,25 @@ idempotency, existing-manual-value preservation, keyboard focus, and mobile layo
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands,
-commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered a 5 MiB-bounded streaming Goodreads adapter with UTF-8/BOM-safe CSV parsing, canonical
+column and ISBN validation, Goodreads provenance, normalized dates/status suggestions/shelves, and
+provisional 1–10 scores. Preview fingerprints and stages the normalized plan without library writes;
+commit consumes only the batch ID and explicit ambiguity choices, revalidates identity inside one
+`BEGIN IMMEDIATE` transaction, preserves existing personal/shared values, fills empty shared
+metadata, deduplicates repeated rows, and records ordered effects. The responsive `/import` UI
+announces preview/error/commit states, enforces explicit choices, and never claims enrichment or undo.
+
+Commits: `9216f27` (migration/parser/preview/commit), `4110481` (typed UI and Chromium flows), and
+`0682b79` (data-safety regression coverage).
+
+Verification: 82 backend tests and 15 frontend component tests pass; focused tests use migrated
+temporary file-backed SQLite databases and cover migration round trips, malformed/oversized input,
+normalization, preview isolation, ambiguity, retry idempotency, ordered effects, fill-empty behavior,
+and manual-value preservation. Eight Chromium flows pass, including valid import, malformed and
+oversized recovery, ambiguity choice, keyboard focus, and mobile layout. `make format`, `make check`,
+`make test`, `make build`, project validation, and `git diff --check` pass.
+
+Deviations: no product or scope deviation. The complete import audit tables were already introduced
+by Sprint 002's full-domain migration; this sprint added query/replay indexes rather than duplicating
+those tables. Sprint 008 can reuse the persisted plan/commit boundary, while Sprint 009 retains job
+enrichment and undo execution.

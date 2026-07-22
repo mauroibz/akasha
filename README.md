@@ -2,6 +2,10 @@
 
 Akasha is a self-hosted, keyboard-first personal book rating and triage app. It tracks opinions, not ebook files, and v1 has no authentication: deploy it only on a trusted LAN.
 
+The current application supports cached manual/provider adds and preview-first Goodreads CSV imports.
+Goodreads imports are size-bounded, land in the inbox with status suggestions and provisional scores,
+and never overwrite existing library opinions.
+
 ## Local setup
 
 Requirements: Docker, Node 22, npm, and `uv`. `uv` installs the required Python 3.12 runtime automatically.
@@ -24,7 +28,7 @@ make test         # backend and frontend behavior tests
 make build        # Python wheel and production SPA
 make openapi      # regenerate frontend/openapi.json
 make migrate      # explicitly upgrade the configured database
-cd frontend && npm run test:e2e  # Chromium library, add, detail, keyboard, and mobile checks
+cd frontend && npm run test:e2e  # Chromium library, add, detail, import, keyboard, and mobile checks
 ```
 
 ## Container

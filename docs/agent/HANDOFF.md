@@ -1,24 +1,23 @@
 # Agent handoff
 
-**State:** Sprint 006 completed; Sprint 007 is ready and unclaimed.
-**Active sprint:** [`007-goodreads-import.md`](../sprints/007-goodreads-import.md)
-**Worktree expectation:** clean after the Sprint 006 closure commit.
+**State:** Sprint 007 completed; Sprint 008 is ready and unclaimed.
+**Active sprint:** [`008-calibre-import.md`](../sprints/008-calibre-import.md)
+**Worktree expectation:** clean after the Sprint 007 closure commit.
 
 ## Current reality
 
-- `/add` supports debounced provider search, ISBN/URL resolution, Open Library work-edition choice,
-  manual fallback, shelves/opinion fields, exact duplicate navigation, and confirmed near matches.
-- `/books/{entry_id}` is cached-only and edits opinion/shared metadata; provider failure cannot affect
-  ordinary rendering. Confirmed refresh merges present provider metadata and preserves opinion data.
-- Cover upload is bounded to JPEG/PNG/WebP byte/pixel limits, normalized to a local 600px JPEG, and
-  retains the previous valid cover on invalid input or installation failure.
-- OpenAPI and typed frontend clients include these contracts. Full unit and Chromium suites pass.
-- No import schema, parser, preview/commit service, or import UI exists yet.
+- `/import` provides a bounded Goodreads upload, durable normalized preview, row errors, explicit
+  ambiguity choices, and atomic idempotent commit using only the recorded batch plan.
+- New Goodreads entries are `unsorted`; status is suggested, nonzero ratings are doubled and marked
+  provisional, and shelves remain filterable. Existing personal and populated metadata are preserved.
+- Ordered effects are recorded for Sprint 009, but enrichment and undo execution are not implemented.
+- OpenAPI and typed frontend clients include import contracts; 82 backend, 15 component, and eight
+  Chromium tests pass. No Calibre reader, routes, cover staging, or UI tab exists yet.
 
 ## First action
 
-Follow `AGENTS.md`, claim Sprint 007, inspect its named persistence/API/frontend paths, and begin with
-failing migration/parser fixtures for the complete Goodreads edge-case matrix.
+Follow `AGENTS.md`, claim Sprint 008, build synthetic Calibre databases, and begin with failing
+path-confinement/read-only/query-only adapter tests plus before/after source hash evidence.
 
 ## Known blockers
 
