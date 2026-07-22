@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 2,
-  "project_status": "in_progress",
-  "active_sprint": "005",
-  "active_sprint_file": "docs/sprints/005-providers-add-api.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "004",
-  "completed_sprints": ["001", "002", "003", "004"],
-  "started_at": "2026-07-22T02:26:58-03:00",
-  "updated_at": "2026-07-22T02:26:58-03:00"
+  "project_status": "ready",
+  "active_sprint": "006",
+  "active_sprint_file": "docs/sprints/006-add-detail-edit-ui.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "005",
+  "completed_sprints": ["001", "002", "003", "004", "005"],
+  "started_at": null,
+  "updated_at": "2026-07-22T02:49:55-03:00"
 }

@@ -1,27 +1,26 @@
 # Agent handoff
 
-**State:** Sprint 004 completed; Sprint 005 is ready and unclaimed.
-**Active sprint:** [`005-providers-add-api.md`](../sprints/005-providers-add-api.md)
-**Worktree expectation:** clean after the Sprint 004 closure commit.
+**State:** Sprint 005 completed; Sprint 006 is ready and unclaimed.
+**Active sprint:** [`006-add-detail-edit-ui.md`](../sprints/006-add-detail-edit-ui.md)
+**Worktree expectation:** clean after the Sprint 005 closure commit.
 
 ## Current reality
 
-- `/` is a typed, dark-first, keyboard-accessible library with server filters/facets/sorts,
-  debounced search, opaque-cursor infinite queries, and persisted virtual grid/table views.
-- Optimistic score/status edits snapshot and roll back query data with an assertive announcement;
-  active score sorts reload from page one and entry-ID focus is restored.
-- A shared editable-target guard protects `/`, `a`, navigation, and score shortcuts. Reduced-motion
-  CSS and deterministic 5,000-entry Chromium checks are in place.
-- Frontend library types are checked against `frontend/openapi.json` during `make check`.
-- Sprint 005 owns provider models/adapters, edition-safe resolution, one-call cached creation, and
-  the non-fatal bounded cover pipeline. The `/add` UI itself remains Sprint 006 scope.
+- Provider search fans out with independent limits, retains merged identities, and supports bare
+  ISBN plus Open Library book/work and Google Books URL resolution through typed APIs.
+- `POST /api/entries` refetches selected metadata, validates secondary identities, prepares covers
+  outside its short write transaction, and returns new/existing entries plus advisory near matches.
+- Cached entries render without provider access. Covers are bounded, normalized, atomically
+  installed after commit, and non-fatal with temporary-file cleanup.
+- The frontend library remains complete from Sprint 004, but `/add` is still a placeholder. Sprint
+  006 owns the add/detail/edit UI and the missing cover-upload/explicit-refresh backend contracts.
+- Frontend library types remain checked against the regenerated `frontend/openapi.json`.
 
 ## First action
 
-Follow `AGENTS.md`, claim Sprint 005, inspect its named domain/repository/API code and tests, and
-start with failing provider candidate merge/rank and independent provider-timeout tests.
+Follow `AGENTS.md`, claim Sprint 006, inspect its named frontend/backend paths and tests, and begin
+with failing typed add-page tests for provider/manual/loading/error/duplicate/near-match states.
 
 ## Known blockers
 
-None. Isolated `uv build` may require network access to resolve hatchling when its build cache is
-cold; the approved `make build` path passed during Sprint 004.
+None. Isolated `uv build` may need approved network access for Hatchling when its cache is cold.

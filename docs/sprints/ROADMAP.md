@@ -2,7 +2,7 @@
 
 **Plan revision:** 2
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 004](004-frontend-library.md)
+**Active sprint:** [Sprint 006](006-add-detail-edit-ui.md)
 
 ## Dependency graph
 
@@ -30,9 +30,9 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 001 | Reproducible monorepo foundation | Backend/frontend hello slices, migration, all quality gates and dev commands work | — | completed |
 | 002 | Domain model and durable persistence | Migrations and repositories enforce identity, score/status, source, and shelf invariants | 001 | completed |
 | 003 | Entries, shelves, filtering, keyset API | CRUD and list API pass contract tests including null-safe asc/desc cursors | 002 | completed |
-| 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | ready |
-| 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | planned |
-| 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | planned |
+| 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | completed |
+| 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | completed |
+| 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | ready |
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | planned |
 | 008 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 007 | planned |
 | 009 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 008 | planned |
@@ -107,7 +107,7 @@ Acceptance:
 - Add holds no DB write lock during network/image work; cover failure cannot roll back a valid entry and double-submit is idempotent.
 - Existing entry returns a typed already-exists response; near edition only warns.
 
-### Sprint 006 — Add, detail, and metadata-edit UI
+### [Sprint 006 — Add, detail, and metadata-edit UI](006-add-detail-edit-ui.md)
 
 Scope:
 

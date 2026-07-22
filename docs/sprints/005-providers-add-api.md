@@ -1,6 +1,6 @@
 # Sprint 005 — Providers and cached add API
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 004
 **Roadmap revision:** 2
 
@@ -105,5 +105,26 @@ write-lock timing proof, and cover size/type/pixel/install-failure filesystem te
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands
-and results, commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered immutable provider contracts, deterministic ISBN merge/rank, independent partial-failure
+search, bounded Open Library and optional Google Books adapters, edition-safe URL/ISBN resolution,
+and typed search APIs (`61c8371`). Delivered manual/provider one-call cached creation, canonical
+identity validation, exact idempotency/conflicts, advisory near matches, short SQLite transactions,
+bounded provider payloads, and the pre-commit/post-commit non-fatal cover pipeline (`24106d9`). The
+checked OpenAPI document includes the new entry/search contracts; cached library reads perform no
+provider calls.
+
+Verification: 73 backend tests and 9 frontend tests pass. Focused mocked tests cover independent
+timeouts and partial failure, all-provider failure, HTTP 429, malformed and oversized payloads,
+Open Library work/edition-year separation and edition ranking, disabled Google Books, ISBN and
+supported URL resolution, concurrent double submit, contradictory identities, validated secondary
+sources, a local write completing while provider fetch is blocked, cover byte/type/pixel limits,
+JPEG resize, atomic install failure cleanup, and successful/non-fatal failed cover creation.
+`python scripts/validate_project.py`, `make format`, `make check`, `make test`, `make build`, and
+`git diff --check` pass. The isolated build initially lacked sandbox DNS for Hatchling; the approved
+network-enabled rerun passed.
+
+Deviations: no product or scope deviation. Provider JSON responses are capped at 2 MiB to implement
+the technical specification's bounded-response requirement. Commit checkpoints two through four
+were consolidated into two coherent green implementation commits because resolution shipped with
+the provider boundary and cached creation integrates cover preparation/installation. Review found
+no contract changes required for Sprints 007–012; Sprint 006 was expanded against the delivered API.

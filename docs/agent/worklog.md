@@ -84,3 +84,16 @@ Entry format:
   approved `make build` rerun with network access passed.
 - Next: claim Sprint 005 and begin with failing provider model/merge plus independent partial-failure
   search tests before implementing HTTP adapters.
+
+## 2026-07-22 — Sprint 005 (complete)
+- Done: delivered provider/search/resolve contracts (`61c8371`) and bounded cached add/cover
+  orchestration (`24106d9`); regenerated OpenAPI and expanded Sprint 006 against the real boundary.
+- Verified: 73 backend and 9 frontend tests pass. Focused mocked tests cover timeout/partial/429/
+  malformed/oversized provider behavior, work-edition and URL/ISBN resolution, double submit,
+  identity validation/conflict, write-lock timing, and cover byte/type/pixel/install/failure paths.
+  Required format/check/test/build/project-validation and `git diff --check` commands pass.
+- Deviations: no product deviation; consolidated implementation checkpoints into two green commits.
+  The isolated build's sandbox DNS failed to fetch Hatchling; the approved network rerun passed.
+- Blocked/open: none.
+- Next: claim Sprint 006 and begin with failing typed add-page tests for provider, resolution,
+  manual, exact-duplicate, and advisory near-match states.
