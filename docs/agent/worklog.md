@@ -43,3 +43,15 @@ Entry format:
 - Deviations: no product or sprint scope deviation. The container uses a non-editable uv environment created at `/opt/venv` because copied editable/relocated environments failed the smoke proof.
 - Blocked/open: none.
 - Next: claim Sprint 002 and implement the complete domain migration and repositories in acceptance order.
+
+## 2026-07-22 — Sprint 002 (complete)
+- Done: delivered the complete domain migration (`d45f365`), normalization and matching contracts
+  (`19ea28d`), and transactional mapped repositories (`ca21ca6`). Expanded Sprint 003 from the
+  roadmap using the implemented paths.
+- Verified: 25 backend and 2 frontend tests pass; real file-backed migration empty/previous-head
+  round trips and a focused two-thread ISBN-equivalence race pass. `make format`, `make check`,
+  `make test`, `make build`, project validation, and `git diff --check` pass.
+- Deviations: none.
+- Blocked/open: none.
+- Next: claim Sprint 003 and add application/API contracts in acceptance order, beginning with
+  failing entry and shelf mutation tests.

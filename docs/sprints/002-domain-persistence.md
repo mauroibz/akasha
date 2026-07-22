@@ -1,6 +1,6 @@
 # Sprint 002 — Domain model and durable persistence
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 001
 **Roadmap revision:** 2
 
@@ -78,4 +78,20 @@ Also migrate real temporary SQLite files empty-to-head and `0001_foundation`-to-
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands and results, commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered the complete v1 relational schema and its SQLAlchemy mappings, framework-independent
+normalization/matching/fill-empty contracts, and short `BEGIN IMMEDIATE` repository transactions.
+The repositories deduplicate authoritative item and per-user entry identities, reject split exact
+identity without mutation, keep title/author matches advisory, and implement shelf lifecycle rules.
+
+- `d45f365` adds the domain migration, canonical constraints/indexes, and real file-backed migration
+  round-trip/negative tests.
+- `19ea28d` adds ISBN-10/13 canonicalization, Unicode text and shelf normalization, typed match
+  decisions/status/source contracts, and fill-empty behavior.
+- `ca21ca6` adds mappings and repositories with concurrency, conflict, ambiguity, fill-empty,
+  identifier-union, and shelf tests.
+- Verification: `python scripts/validate_project.py`, `make format`, `make check`, `make test`
+  (25 backend and 2 frontend tests), `make build`, and `git diff --check` passed. The focused
+  two-thread equivalent-ISBN test passed against a migrated file-backed SQLite database; migration
+  tests exercised empty-to-head, `0001_foundation`-to-head, downgrade, and re-upgrade.
+- Deviations: none. All downstream sprints were reviewed; Sprint 003 was expanded using the actual
+  repository and migration paths, and no later acceptance contract required adjustment.

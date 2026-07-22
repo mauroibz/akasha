@@ -1,20 +1,25 @@
 # Agent handoff
 
-**State:** Sprint 001 completed; Sprint 002 is ready and unclaimed.
-**Active sprint:** [`002-domain-persistence.md`](../sprints/002-domain-persistence.md)
-**Worktree expectation:** clean after the Sprint 001 closure commit.
+**State:** Sprint 002 completed; Sprint 003 is ready and unclaimed.
+**Active sprint:** [`003-entries-shelves-api.md`](../sprints/003-entries-shelves-api.md)
+**Worktree expectation:** clean after the Sprint 002 closure commit.
 
 ## Current reality
 
-- FastAPI construction has no filesystem side effects; lifespan startup creates data directories, applies Alembic, and configures the SQLite engine.
-- Health, readiness failure modes, SQLite pragmas, and API-safe SPA fallback have backend acceptance tests.
-- The React/Vite page has accessible loading, ready, and unavailable component tests.
-- `make bootstrap`, `make check`, `make test`, `make build`, deterministic OpenAPI export, CI, Compose, and the persistent non-root/no-Node container smoke are operational.
-- The only schema table is the Sprint 001 `schema_probe`; no book-domain rows or contracts were invented.
+- Alembic head `0002_domain_schema` contains the complete v1 tables, constraints, and indexes;
+  downgrade to the foundation and re-upgrade are tested on real files.
+- Framework-independent ISBN/text/shelf normalization, matching decisions, enums, and fill-empty
+  behavior live under `backend/src/book_tracker/domain/`.
+- All schema tables are mapped under `infrastructure/models.py`; `DomainRepository` uses short
+  `BEGIN IMMEDIATE` writes for identity/entry creation, fill-empty union, and shelf lifecycle.
+- Exact ISBN/provider identities and per-user entries deduplicate; split exact identities raise a
+  typed conflict without mutation, and title/author similarities remain advisory.
+- Only health HTTP routes exist; Sprint 003 owns application services, list/cursor queries, and API.
 
 ## First action
 
-Follow `AGENTS.md`, claim Sprint 002, inspect the actual foundation migration/tests, and add the domain migration tests before implementing the complete schema.
+Follow `AGENTS.md`, claim Sprint 003, inspect the actual domain repositories/tests, and begin with
+failing entry and shelf application-service tests.
 
 ## Known blockers
 
