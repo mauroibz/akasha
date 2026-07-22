@@ -104,7 +104,11 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   useEffect(() => {
     if (props.focusedId === null) return;
     const active = document.activeElement;
-    if (active instanceof HTMLElement && active !== document.body && active.isConnected)
+    if (
+      active instanceof HTMLElement &&
+      active !== document.body &&
+      active.isConnected
+    )
       return;
     const index = props.entries.findIndex(
       (entry) => entry.id === props.focusedId,
