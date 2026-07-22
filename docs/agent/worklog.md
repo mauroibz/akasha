@@ -97,3 +97,16 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 006 and begin with failing typed add-page tests for provider, resolution,
   manual, exact-duplicate, and advisory near-match states.
+
+## 2026-07-22 — Sprint 006 (complete)
+- Done: delivered provider/manual/work-edition add (`513fd61`), cached detail and metadata editing
+  (`465ea20`), cover replacement/confirmed refresh (`fc36831`), browser and near-match coverage
+  (`b3a25b1`), and predictable focus transitions (`2aa8da2`); expanded Sprint 007.
+- Verified: 76 backend and 13 frontend tests pass; five Chromium flows cover manual/work-edition add,
+  exact duplicate, cached detail/edit, refresh/cover failures, mobile/reduced-motion/keyboard behavior,
+  and the 5,000-entry regression. Required validation/format/check/test/build/diff checks pass.
+- Deviations: no product or scope deviation; one corrective focus commit supplemented the planned
+  checkpoints. Added `python-multipart` for the bounded multipart cover contract.
+- Blocked/open: none.
+- Next: claim Sprint 007 and begin with failing migration/parser fixtures for durable Goodreads
+  preview records and armored/empty ISBN, malformed-date, UTF-8, and missing-column behavior.

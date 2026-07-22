@@ -1,25 +1,24 @@
 # Agent handoff
 
-**State:** Sprint 005 completed; Sprint 006 is ready and unclaimed.
-**Active sprint:** [`006-add-detail-edit-ui.md`](../sprints/006-add-detail-edit-ui.md)
-**Worktree expectation:** clean after the Sprint 005 closure commit.
+**State:** Sprint 006 completed; Sprint 007 is ready and unclaimed.
+**Active sprint:** [`007-goodreads-import.md`](../sprints/007-goodreads-import.md)
+**Worktree expectation:** clean after the Sprint 006 closure commit.
 
 ## Current reality
 
-- Provider search fans out with independent limits, retains merged identities, and supports bare
-  ISBN plus Open Library book/work and Google Books URL resolution through typed APIs.
-- `POST /api/entries` refetches selected metadata, validates secondary identities, prepares covers
-  outside its short write transaction, and returns new/existing entries plus advisory near matches.
-- Cached entries render without provider access. Covers are bounded, normalized, atomically
-  installed after commit, and non-fatal with temporary-file cleanup.
-- The frontend library remains complete from Sprint 004, but `/add` is still a placeholder. Sprint
-  006 owns the add/detail/edit UI and the missing cover-upload/explicit-refresh backend contracts.
-- Frontend library types remain checked against the regenerated `frontend/openapi.json`.
+- `/add` supports debounced provider search, ISBN/URL resolution, Open Library work-edition choice,
+  manual fallback, shelves/opinion fields, exact duplicate navigation, and confirmed near matches.
+- `/books/{entry_id}` is cached-only and edits opinion/shared metadata; provider failure cannot affect
+  ordinary rendering. Confirmed refresh merges present provider metadata and preserves opinion data.
+- Cover upload is bounded to JPEG/PNG/WebP byte/pixel limits, normalized to a local 600px JPEG, and
+  retains the previous valid cover on invalid input or installation failure.
+- OpenAPI and typed frontend clients include these contracts. Full unit and Chromium suites pass.
+- No import schema, parser, preview/commit service, or import UI exists yet.
 
 ## First action
 
-Follow `AGENTS.md`, claim Sprint 006, inspect its named frontend/backend paths and tests, and begin
-with failing typed add-page tests for provider/manual/loading/error/duplicate/near-match states.
+Follow `AGENTS.md`, claim Sprint 007, inspect its named persistence/API/frontend paths, and begin with
+failing migration/parser fixtures for the complete Goodreads edge-case matrix.
 
 ## Known blockers
 

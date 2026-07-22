@@ -1,6 +1,6 @@
 # Sprint 006 — Add, detail, and metadata-edit UI
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 004, 005
 **Roadmap revision:** 2
 
@@ -105,5 +105,21 @@ mobile layout.
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands
-and results, commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered typed keyboard-first provider/ISBN/URL/work-edition and manual add flows, one-call entry
+creation, exact-duplicate navigation, server-enforced near-match confirmation, cached entry detail,
+opinion and shared-metadata editors, shelf selection, bounded atomic cover replacement, and confirmed
+provider refresh with presence-aware metadata merging. Degraded providers are announced and ordinary
+detail rendering uses only local entry/item APIs.
+
+Implementation commits: `513fd61`, `465ea20`, `fc36831`, `b3a25b1`, and `2aa8da2`.
+
+Verification passed: project validation; `make format`; `make check`; 76 backend tests and 13
+frontend tests via `make test`; `make build`; `git diff --check`; focused cached-add,
+cover-upload/refresh, provider-contract, add-page, and detail-page tests; and five Chromium Playwright
+flows covering manual/provider work-edition add, exact duplicate, cached detail/edit persistence,
+refresh and cover failures, focus/keyboard behavior, reduced motion, mobile layout, and the existing
+5,000-entry virtualization regression.
+
+Deviations: the planned four implementation checkpoints became five because focus restoration was
+kept as a separate corrective commit. No product or future-sprint scope changed. Sprints 007, 009,
+010, and 011 were reviewed; their criteria and dependencies remain valid against the delivered APIs.

@@ -619,7 +619,7 @@ enrichment. "Undo last import" for 24 hours.
 
 - Keyboard: `/` focuses search, `a` opens add, digits `1`–`9` + `0` set score on
   a focused row
-- No confirmation dialogs except delete
+- Confirmation dialogs are limited to delete and explicit provider refresh overwrite.
 - Dark mode, since this runs next to Jellyfin at night
 
 ---

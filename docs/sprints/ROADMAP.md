@@ -121,7 +121,7 @@ Acceptance:
 - Metadata edit survives a fill-empty sync test.
 - Explicit refresh communicates overwrite, updates only fields present in a validated payload, preserves omitted fields, and leaves all old data on failure.
 
-### Sprint 007 — Goodreads import
+### [Sprint 007 — Goodreads import](007-goodreads-import.md)
 
 Scope:
 

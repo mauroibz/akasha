@@ -269,6 +269,10 @@ The product-spec route list is authoritative, with these refinements:
 - `GET /entries` accepts repeated `status`, `shelf`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. The response is `{items, next_cursor, total, facets}`, where `facets.status_counts` supplies the unobtrusive status counts required by the library UI for the current non-status filters.
 - `POST /entries/accept-suggested` returns affected count and operates in one transaction over the server-side filter, not client-loaded IDs.
 - `POST /items/{id}/refresh` requires explicit overwrite confirmation.
+- `POST /entries` requires `confirm_near_match=true` before creating a title/first-author
+  near-match; the initial 409 includes advisory existing entry IDs and performs no write.
+- `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
+  byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - Import commit bodies contain preview batch IDs, not client-controlled source payloads.
 - Cover files are served from a controlled route or static mount with immutable cache headers; database paths are relative and never accepted from clients.
 - Add `GET /api/health/live` and `GET /api/health/ready`; readiness verifies DB access and migration head, not public provider availability.
