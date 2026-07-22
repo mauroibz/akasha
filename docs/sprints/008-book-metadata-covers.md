@@ -1,6 +1,6 @@
 # Sprint 008 — Working book metadata and covers
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 007
 **Roadmap revision:** 3
 
@@ -47,4 +47,25 @@ cached library/detail rendering.
 
 ## Outcome
 
-_In progress._
+Delivered normalized Open Library nested-edition/work/author fetching, edition/original-year
+separation, optional same-ISBN Google Books fill-empty merging, and retained source identities.
+Migration `0005_book_metadata` converts legacy `publishers` arrays without replacing a canonical
+publisher. Typed metadata responses and partial patches support explicit clearing.
+
+Covers now use bounded HTTPS redirects restricted to provider/archive hosts, byte/pixel/type limits,
+atomic JPEG installation, ordered cover-ID/OLID/ISBN fallback, old-cover preservation, and controlled
+versioned `/api/items/{id}/cover` serving. Search, virtual rows/cards, and detail/edit/refresh expose
+cached covers, authors, edition/original years, and all standard metadata without render-time provider
+calls.
+
+Commits: `62861fa` (metadata/cover boundary and UI), `85bcc86` (roadmap insertion and contracts), and
+`2e9ff12` (live-discovered cover/year fallbacks). Verification: 85 backend and 15 component tests;
+eight normal Chromium flows plus two opt-in live/offline flows; validation, format, lint, mypy,
+TypeScript, OpenAPI check, build, and `git diff --check` pass. The live smoke selected Cien años de
+soledad (2012), Harry Potter (2015), and La sombra del viento (2005), cached all covers, then rendered
+all three after restart with provider proxies disabled.
+
+Deviation: the official Open Library cover service redirects through `archive.org` and dynamic
+`*.us.archive.org` hosts, so those narrowly scoped HTTPS hosts are included in the allowlist. Some
+work search rows omit nested edition data; one bounded editions lookup resolves the leading result
+instead of accepting an arbitrary `edition_key`. Both behaviors were discovered and verified live.

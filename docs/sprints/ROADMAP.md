@@ -2,7 +2,7 @@
 
 **Plan revision:** 3
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 008](008-book-metadata-covers.md)
+**Active sprint:** [Sprint 009](009-calibre-import.md)
 
 ## Dependency graph
 
@@ -35,8 +35,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | completed |
 | 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | completed |
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
-| 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | in_progress |
-| 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | planned |
+| 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | completed |
+| 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | ready |
 | 010 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 009 | planned |
 | 011 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 010 | planned |
 | 012 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 011 | planned |

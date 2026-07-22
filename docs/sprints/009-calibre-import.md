@@ -1,6 +1,6 @@
 # Sprint 009 — Calibre import and re-sync
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 008
 **Roadmap revision:** 3
 

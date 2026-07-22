@@ -125,3 +125,19 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 008 and begin with synthetic Calibre schema fixtures plus confined read-only and
   `query_only` adapter tests with source hash proof.
+
+## 2026-07-22 — Sprint 008 (complete)
+- Done: inserted the metadata sprint before Calibre; delivered normalized edition/work/author and
+  optional same-ISBN provider merging, typed editable metadata, publisher migration, secure cached
+  cover fallbacks/serving, metadata-rich search/library/detail UI, and live smoke automation in
+  `62861fa`, `85bcc86`, and `2e9ff12`.
+- Verified: 85 backend and 15 component tests pass; eight normal Chromium flows pass (two live tests
+  skip by default). Explicit live add/offline runs selected Cien años de soledad (2012), Harry Potter
+  (2015), and La sombra del viento (2005), cached every cover, restarted with provider proxies
+  disabled, and rendered every detail. Validation, format/check/test/build and diff checks pass; the
+  sandboxed build DNS failure passed on the approved network rerun.
+- Deviations: official cover redirects required narrow `archive.org`/`*.us.archive.org` allowlisting;
+  missing nested search data requires one bounded leading-work editions lookup. DEC-016 records the
+  sprint insertion; Sprint 008 Outcome records live-discovered behavior.
+- Blocked/open: none.
+- Next: claim Sprint 009 and begin with synthetic Calibre read-only/query-only/path-confinement tests.
