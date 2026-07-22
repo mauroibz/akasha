@@ -305,9 +305,13 @@ export function ImportPage() {
           <p className="mt-1 text-sm text-zinc-300">
             {undoResult.reverted}{" "}
             {undoResult.reverted === 1 ? "change" : "changes"} reverted
-            {undoResult.retained > 0 && ` · ${undoResult.retained} retained (edited after import)`}
+            {undoResult.retained > 0 &&
+              ` · ${undoResult.retained} retained (edited after import)`}
           </p>
-          <Link className="focus-ring mt-3 inline-block text-fuchsia-400" to="/">
+          <Link
+            className="focus-ring mt-3 inline-block text-fuchsia-400"
+            to="/"
+          >
             ← Back to library
           </Link>
         </div>

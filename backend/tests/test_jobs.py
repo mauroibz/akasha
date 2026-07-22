@@ -18,13 +18,13 @@ from book_tracker.database import create_engine as create_sqlalchemy_engine
 from book_tracker.domain.providers import ItemPayload, SourceRef
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import ImportEffectRow, JobRow
-from book_tracker.migrations import upgrade
 from book_tracker.main import create_app
-
+from book_tracker.migrations import upgrade
 
 # ---------------------------------------------------------------------------
 # Sync engine fixture for DB-only tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def engine(tmp_path: Path) -> Engine:
@@ -48,9 +48,7 @@ def _create_committed_batch(
     undo_hours: int = 24,
 ) -> str:
     now = _now_iso()
-    expires = (datetime.now(UTC) + timedelta(hours=undo_hours)).isoformat().replace(
-        "+00:00", "Z"
-    )
+    expires = (datetime.now(UTC) + timedelta(hours=undo_hours)).isoformat().replace("+00:00", "Z")
     with eng.begin() as conn:
         conn.execute(
             text(
@@ -135,7 +133,9 @@ def _add_fill_empty_effect(
         ).scalar_one()
 
 
-def _create_item(eng: Engine, title: str, year: int | None = None, metadata: dict | None = None) -> int:
+def _create_item(
+    eng: Engine, title: str, year: int | None = None, metadata: dict | None = None
+) -> int:
     with eng.begin() as conn:
         return conn.execute(
             text(
@@ -178,6 +178,7 @@ def settings(tmp_path: Path) -> Settings:
 # ---------------------------------------------------------------------------
 # AC1: Job lifecycle — queue, lease, complete, retry, cancel, restart survival
 # ---------------------------------------------------------------------------
+
 
 class TestJobLifecycle:
     def test_enqueue_creates_queued_job(self, engine: Engine) -> None:
@@ -300,9 +301,7 @@ class TestJobLifecycle:
             assert job.attempts == 1
             assert job.lease_expires_at is None
 
-    def test_restart_survival_expired_running_reclaimed_on_startup(
-        self, tmp_path: Path
-    ) -> None:
+    def test_restart_survival_expired_running_reclaimed_on_startup(self, tmp_path: Path) -> None:
         """AC1: Queued and running jobs survive a simulated restart."""
         configured = settings(tmp_path)
         assert configured.database_url is not None
@@ -356,8 +355,9 @@ class TestJobLifecycle:
                     "VALUES('b1','goodreads','fp','previewed','{}','{}','{}','n','n')"
                 ),
             )
-            conn.execute(text("UPDATE jobs SET batch_id='b1' WHERE id IN (:j1,:j2)"),
-                         {"j1": j1, "j2": j2})
+            conn.execute(
+                text("UPDATE jobs SET batch_id='b1' WHERE id IN (:j1,:j2)"), {"j1": j1, "j2": j2}
+            )
         jobs = repo.list_batch_jobs("b1")
         assert len(jobs) == 2
         assert all(j["batch_id"] == "b1" for j in jobs)
@@ -366,6 +366,7 @@ class TestJobLifecycle:
 # ---------------------------------------------------------------------------
 # AC2: Clock-injected rate limiting and retry caps
 # ---------------------------------------------------------------------------
+
 
 class TestRateLimiting:
     def test_rate_limiter_enforces_minimum_interval(self) -> None:
@@ -390,6 +391,7 @@ class TestRateLimiting:
 # AC6: Enrichment fills only empty fields, never overwrites
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.anyio
 async def test_enrichment_fills_empty_fields_only(tmp_path: Path) -> None:
     """AC6: Enrichment fills only empty fields and never overwrites."""
@@ -397,9 +399,7 @@ async def test_enrichment_fills_empty_fields_only(tmp_path: Path) -> None:
     async with app.router.lifespan_context(app):
         item_id = _create_item(app.state.engine, "Test Book")
         repo = JobRepository(app.state.engine)
-        job_id = repo.enqueue(
-            None, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"}
-        )
+        job_id = repo.enqueue(None, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"})
         now = datetime.now(UTC)
         mock_provider = MagicMock()
         mock_provider.fetch_by_isbn = AsyncMock(
@@ -441,13 +441,13 @@ async def test_enrichment_never_overwrites_existing_values(tmp_path: Path) -> No
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         item_id = _create_item(
-            app.state.engine, "My Book", year=1950,
+            app.state.engine,
+            "My Book",
+            year=1950,
             metadata={"authors": ["Author"], "publisher": "Manual Press"},
         )
         repo = JobRepository(app.state.engine)
-        job_id = repo.enqueue(
-            None, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"}
-        )
+        job_id = repo.enqueue(None, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"})
         now = datetime.now(UTC)
         mock_provider = MagicMock()
         mock_provider.fetch_by_isbn = AsyncMock(
@@ -472,7 +472,7 @@ async def test_enrichment_never_overwrites_existing_values(tmp_path: Path) -> No
         handler = EnrichmentHandler(
             app.state.engine, {"openlibrary": mock_provider}, rate_limiter=None
         )
-        result = await handler.process(job_id, now)
+        await handler.process(job_id, now)
         with app.state.engine.connect() as conn:
             row = conn.execute(
                 text("SELECT title, year, metadata FROM items WHERE id=:id"),
@@ -544,6 +544,7 @@ async def test_enrichment_records_import_effect(tmp_path: Path) -> None:
 # AC3: Safe undo — revert matching, preserve edited, shared, pre-existing
 # ---------------------------------------------------------------------------
 
+
 class TestUndo:
     def test_undo_reverts_matching_values(self, engine: Engine) -> None:
         """AC3: Undo reverts a field only if current value matches recorded after-value."""
@@ -585,7 +586,7 @@ class TestUndo:
         batch_id = _create_committed_batch(engine)
         # Pre-existing item with a pre-existing entry (not created by this batch)
         item_id = _create_item(engine, "Pre-existing", year=2000)
-        existing_entry_id = _create_entry(engine, item_id, "read", 7)
+        _create_entry(engine, item_id, "read", 7)
         # Batch filled year on this existing item (no create effect)
         _add_fill_empty_effect(engine, batch_id, 1, "item", str(item_id), "year", None, 2000)
         undo = UndoService(engine)
@@ -602,7 +603,7 @@ class TestUndo:
         """AC3: Undo cannot remove pre-existing entries not created by the batch."""
         batch_id = _create_committed_batch(engine)
         item_id = _create_item(engine, "Pre-existing", year=2000)
-        entry_id = _create_entry(engine, item_id, "read", 9)
+        _create_entry(engine, item_id, "read", 9)
         # Batch only filled year on this pre-existing item
         _add_fill_empty_effect(engine, batch_id, 1, "item", str(item_id), "year", None, 2000)
         undo = UndoService(engine)
@@ -616,6 +617,7 @@ class TestUndo:
 # ---------------------------------------------------------------------------
 # AC4: Partial retention reporting + repeated undo
 # ---------------------------------------------------------------------------
+
 
 class TestUndoReporting:
     def test_undo_reports_reverted_retained_and_skipped(self, engine: Engine) -> None:
@@ -647,7 +649,7 @@ class TestUndoReporting:
         _add_create_effect(engine, batch_id, 1, "item", item_id)
         _add_create_effect(engine, batch_id, 1, "entry", entry_id)
         undo = UndoService(engine)
-        first = undo.undo(batch_id)
+        undo.undo(batch_id)
         second = undo.undo(batch_id)
         assert second["reverted"] == 0
         assert second["retained"] == 0
@@ -681,13 +683,16 @@ class TestUndoReporting:
 # AC5: Late-job cancellation
 # ---------------------------------------------------------------------------
 
+
 class TestLateJobCancellation:
     def test_late_job_from_undone_batch_is_cancelled(self, engine: Engine) -> None:
         """AC5: Late jobs from an undone batch cannot mutate data and are marked cancelled."""
         batch_id = _create_committed_batch(engine)
         item_id = _create_item(engine, "Test")
         repo = JobRepository(engine)
-        job_id = repo.enqueue(batch_id, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"})
+        job_id = repo.enqueue(
+            batch_id, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"}
+        )
         undo = UndoService(engine)
         undo.undo(batch_id)
         with Session(engine) as session:
@@ -728,6 +733,7 @@ class TestLateJobCancellation:
 # AC7: Progress API
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.anyio
 async def test_get_job_progress(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
@@ -762,6 +768,7 @@ async def test_get_job_not_found(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # Undo API
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.anyio
 async def test_undo_batch(tmp_path: Path) -> None:

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Engine, select, update
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.models import JobRow
@@ -128,9 +128,7 @@ class JobRepository:
                 row.lease_expires_at = lease_iso
                 row.updated_at = now_iso
 
-    def complete(
-        self, job_id: str, progress: Mapping[str, Any], now: datetime
-    ) -> None:
+    def complete(self, job_id: str, progress: Mapping[str, Any], now: datetime) -> None:
         now_iso = now.isoformat().replace("+00:00", "Z")
         with self._write() as session:
             row = session.get(JobRow, job_id)
@@ -242,9 +240,7 @@ class JobRepository:
         with Session(self.engine) as session:
             rows = list(
                 session.scalars(
-                    select(JobRow)
-                    .where(JobRow.batch_id == batch_id)
-                    .order_by(JobRow.created_at)
+                    select(JobRow).where(JobRow.batch_id == batch_id).order_by(JobRow.created_at)
                 )
             )
             return [

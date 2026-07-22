@@ -737,7 +737,7 @@ class ImportRepository:
             batch.counters = json.dumps(counters)
             batch.committed_at = now
             batch.undo_expires_at = (
-                datetime.now(UTC) + timedelta(hours=24)
-            ).isoformat().replace("+00:00", "Z")
+                (datetime.now(UTC) + timedelta(hours=24)).isoformat().replace("+00:00", "Z")
+            )
             batch.updated_at = now
             return {"batch_id": batch.id, "state": "committed", **counters}

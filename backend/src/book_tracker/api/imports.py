@@ -204,7 +204,5 @@ async def undo_batch(batch_id: str, request: Request) -> UndoEffectSummary:
             status_code=409,
         ) from error
     except ValueError as error:
-        raise LibraryError(
-            "undo_not_committable", str(error), status_code=409
-        ) from error
+        raise LibraryError("undo_not_committable", str(error), status_code=409) from error
     return UndoEffectSummary.model_validate(result)

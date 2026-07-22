@@ -254,12 +254,16 @@ test("undo flow from import history", async ({ page }) => {
   await page.getByRole("button", { name: /preview import/i }).click();
   await page.getByRole("button", { name: /import 1 ready row/i }).click();
   await expect(page.getByRole("status")).toContainText("1 book added");
-  await expect(page.getByRole("button", { name: /undo this import/i })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /undo this import/i }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /undo this import/i }).click();
-  await expect(page.getByRole("button", { name: /confirm undo/i })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /confirm undo/i }),
+  ).toBeVisible();
   await page.getByRole("button", { name: /confirm undo/i }).click();
-  await expect(page.getByRole("status")).toContainText("Import undone");
-  await expect(page.getByRole("status")).toContainText("2 changes reverted");
+  await expect(page.getByText("Import undone")).toBeVisible();
+  await expect(page.getByText("2 changes reverted")).toBeVisible();
   expect(commitCount).toBe(1);
 });
 

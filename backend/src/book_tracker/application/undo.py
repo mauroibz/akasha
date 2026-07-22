@@ -14,7 +14,6 @@ from book_tracker.infrastructure.models import (
     EntryRow,
     ImportBatchRow,
     ImportEffectRow,
-    ImportRecordRow,
     ItemRow,
 )
 
@@ -117,12 +116,6 @@ class UndoService:
                             if entry is None:
                                 skipped += 1
                                 continue
-                            # Check if the entry was modified after import.
-                            # For a created entry, "modified" means any personal
-                            # opinion field was changed from the imported values.
-                            # We check the after_values — if {created: True}, the
-                            # entry was created from scratch. If the entry still
-                            # exists and has no other references, we can delete it.
                             after = json.loads(effect.after_values)
                             if after.get("created"):
                                 # Entry was created by this batch — delete it
@@ -146,12 +139,11 @@ class UndoService:
                                 continue
                             # Check if item is referenced by other entries
                             other_entries = session.scalar(
-                                select(func.count()).select_from(EntryRow).where(
-                                    EntryRow.item_id == item_id
-                                )
+                                select(func.count())
+                                .select_from(EntryRow)
+                                .where(EntryRow.item_id == item_id)
                             )
-                            # If no entries reference this item, delete it
-                            if other_entries == 0:
+                            if other_entries is not None and other_entries == 0:
                                 session.delete(item)
                                 reverted += 1
                                 reverted_items += 1
@@ -162,13 +154,10 @@ class UndoService:
                             # Shelves: delete if no other entries reference them
                             shelf_id = int(effect.entity_id)
                             shelf_result = session.execute(
-                                text(
-                                    "SELECT count(*) FROM entry_shelves "
-                                    "WHERE shelf_id=:sid"
-                                ),
+                                text("SELECT count(*) FROM entry_shelves WHERE shelf_id=:sid"),
                                 {"sid": shelf_id},
                             ).scalar()
-                            if shelf_result == 0:
+                            if shelf_result is not None and shelf_result == 0:
                                 session.execute(
                                     text("DELETE FROM shelves WHERE id=:sid"),
                                     {"sid": shelf_id},
@@ -193,9 +182,7 @@ class UndoService:
                                 current_value = _get_item_field(item, field)
                                 if _values_equal(current_value, imported_value):
                                     # Current value still matches — revert to before
-                                    _set_item_field(
-                                        item, field, before.get(field)
-                                    )
+                                    _set_item_field(item, field, before.get(field))
                                     reverted += 1
                                 else:
                                     # User edited after import — retain
@@ -218,8 +205,7 @@ class UndoService:
                                     ),
                                     {"iid": item_id, "kind": kind, "val": value},
                                 ).scalar()
-                                if exists > 0:
-                                    # Remove the identifier added by this import
+                                if exists is not None and exists > 0:
                                     session.execute(
                                         text(
                                             "DELETE FROM item_identifiers "
@@ -245,7 +231,7 @@ class UndoService:
                                     ),
                                     {"eid": entry_id, "sid": shelf_id},
                                 ).scalar()
-                                if exists > 0:
+                                if exists is not None and exists > 0:
                                     session.execute(
                                         text(
                                             "DELETE FROM entry_shelves "

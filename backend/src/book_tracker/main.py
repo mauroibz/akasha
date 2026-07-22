@@ -1,3 +1,4 @@
+import contextlib
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -64,10 +65,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # the table may not exist on a fresh or unmigrated database).
         from datetime import UTC, datetime
 
-        try:
+        with contextlib.suppress(Exception):
             job_runner.repo.reclaim_expired(datetime.now(UTC))
-        except Exception:
-            pass
         try:
             yield
         finally:

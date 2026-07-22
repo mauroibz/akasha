@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Mapping
 from datetime import UTC, datetime
-from typing import Any, Mapping
+from typing import Any
 
-from sqlalchemy import Engine, select, text
+from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter

@@ -1305,6 +1305,77 @@
         "title": "ItemResponse",
         "type": "object"
       },
+      "JobProgressResponse": {
+        "properties": {
+          "attempts": {
+            "default": 0,
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "batch_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Batch Id"
+          },
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "finished_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Finished At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "progress": {
+            "additionalProperties": true,
+            "title": "Progress",
+            "type": "object"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "state",
+          "created_at"
+        ],
+        "title": "JobProgressResponse",
+        "type": "object"
+      },
       "ManualItemBody": {
         "properties": {
           "authors": {
@@ -1682,6 +1753,54 @@
           "is_primary"
         ],
         "title": "SourceResponse",
+        "type": "object"
+      },
+      "UndoEffectSummary": {
+        "properties": {
+          "batch_id": {
+            "title": "Batch Id",
+            "type": "string"
+          },
+          "retained": {
+            "title": "Retained",
+            "type": "integer"
+          },
+          "retained_items": {
+            "default": 0,
+            "title": "Retained Items",
+            "type": "integer"
+          },
+          "reverted": {
+            "title": "Reverted",
+            "type": "integer"
+          },
+          "reverted_entries": {
+            "default": 0,
+            "title": "Reverted Entries",
+            "type": "integer"
+          },
+          "reverted_items": {
+            "default": 0,
+            "title": "Reverted Items",
+            "type": "integer"
+          },
+          "skipped": {
+            "title": "Skipped",
+            "type": "integer"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "batch_id",
+          "state",
+          "reverted",
+          "retained",
+          "skipped"
+        ],
+        "title": "UndoEffectSummary",
         "type": "object"
       },
       "ValidationError": {
@@ -2235,6 +2354,48 @@
         "summary": "Ready"
       }
     },
+    "/api/import/batches/{batch_id}": {
+      "delete": {
+        "operationId": "undo_batch_api_import_batches__batch_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UndoEffectSummary"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Undo Batch",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/api/import/calibre/commit": {
       "post": {
         "operationId": "calibre_commit_api_import_calibre_commit_post",
@@ -2394,6 +2555,48 @@
           }
         },
         "summary": "Preview",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_progress_api_import_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobProgressResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Job Progress",
         "tags": [
           "imports"
         ]
