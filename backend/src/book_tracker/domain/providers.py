@@ -26,6 +26,7 @@ class SearchCandidate:
     language: str | None
     metadata: Mapping[str, Any]
     original_year: int | None = None
+    cover_fallback_urls: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

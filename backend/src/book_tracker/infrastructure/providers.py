@@ -1,5 +1,6 @@
 import json
 from collections.abc import Mapping
+from dataclasses import replace
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -44,6 +45,8 @@ async def _bounded_json(
 
 def _year(value: object) -> int | None:
     try:
+        if isinstance(value, list):
+            value = value[0] if value else None
         text = str(value)
         return int(text[:4]) if len(text) >= 4 else None
     except (TypeError, ValueError):
@@ -151,12 +154,35 @@ class OpenLibraryProvider:
         docs = body.get("docs", [])
         if not isinstance(docs, list):
             raise ProviderPayloadError("Open Library docs must be a list")
-        return [
+        candidates = [
             candidate
             for row in docs
             if isinstance(row, dict)
             if (candidate := self._candidate(row))
         ]
+        enriched: list[SearchCandidate] = []
+        for row, candidate in zip(
+            (value for value in docs if isinstance(value, dict)), candidates, strict=False
+        ):
+            work_id = str(row.get("key", "")).removeprefix("/works/")
+            if candidate.year is None and work_id and not enriched:
+                try:
+                    editions = await self.resolve_work(work_id, limit=20)
+                except (httpx.HTTPError, ProviderPayloadError):
+                    editions = []
+                if editions:
+                    edition = editions[0]
+                    candidate = replace(
+                        edition,
+                        title=candidate.title,
+                        subtitle=candidate.subtitle or edition.subtitle,
+                        authors=candidate.authors,
+                        cover_url=edition.cover_url or candidate.cover_url,
+                        original_year=candidate.original_year,
+                        metadata=candidate.metadata,
+                    )
+            enriched.append(candidate)
+        return enriched
 
     async def fetch(self, source_id: str) -> ItemPayload:
         row = await self._json(f"https://openlibrary.org/books/{source_id}.json")
@@ -183,12 +209,17 @@ class OpenLibraryProvider:
             else {}
         )
         identifiers = _isbn(list(row.get("isbn_13", [])) + list(row.get("isbn_10", [])))
-        cover_ids = row.get("covers", [])
+        edition_covers = row.get("covers", [])
+        work_covers = work.get("covers", [])
+        cover_ids = edition_covers if edition_covers else work_covers
         cover = cover_ids[0] if isinstance(cover_ids, list) and cover_ids else None
         publisher = next(
             (str(value).strip() for value in row.get("publishers", []) if str(value).strip()), None
         )
         subjects = row.get("subjects") or work.get("subjects") or []
+        created = work.get("created")
+        created_value = created.get("value") if isinstance(created, dict) else created
+        original_year = _year(work.get("first_publish_date") or created_value)
         metadata = {
             "authors": list(authors),
             "publisher": publisher,
@@ -198,20 +229,20 @@ class OpenLibraryProvider:
             or _description(work.get("description")),
             "subjects": [str(value) for value in subjects if value],
             "series": next(iter(row.get("series", [])), None),
-            "original_year": _year(
-                work.get("first_publish_date") or work.get("created", {}).get("value")
-            ),
+            "original_year": original_year,
         }
         metadata = {
             key: value for key, value in metadata.items() if value not in (None, "", [], {})
         }
-        cover_url = None
+        cover_urls: list[str] = []
         if cover:
-            cover_url = f"https://covers.openlibrary.org/b/id/{cover}-L.jpg?default=false"
-        elif source_id:
-            cover_url = f"https://covers.openlibrary.org/b/olid/{source_id}-L.jpg?default=false"
-        elif identifiers.get("isbn13"):
-            cover_url = (
+            cover_urls.append(f"https://covers.openlibrary.org/b/id/{cover}-L.jpg?default=false")
+        if source_id:
+            cover_urls.append(
+                f"https://covers.openlibrary.org/b/olid/{source_id}-L.jpg?default=false"
+            )
+        if identifiers.get("isbn13"):
+            cover_urls.append(
                 f"https://covers.openlibrary.org/b/isbn/{identifiers['isbn13']}-L.jpg?default=false"
             )
         return ItemPayload(
@@ -222,11 +253,12 @@ class OpenLibraryProvider:
             subtitle=str(row["subtitle"]) if row.get("subtitle") else None,
             authors=authors,
             year=_year(row.get("publish_date")),
-            cover_url=cover_url,
+            cover_url=cover_urls[0] if cover_urls else None,
             identifiers=identifiers,
             language=_language(row.get("languages")),
             metadata=metadata,
-            original_year=metadata.get("original_year"),
+            original_year=original_year,
+            cover_fallback_urls=tuple(cover_urls[1:]),
         )
 
     async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
@@ -241,6 +273,14 @@ class OpenLibraryProvider:
             edition_id = str(entry.get("key", "")).removeprefix("/books/")
             if not edition_id or not entry.get("title"):
                 continue
+            cover_ids = entry.get("covers", [])
+            cover_id = cover_ids[0] if isinstance(cover_ids, list) and cover_ids else None
+            identifiers = _isbn(list(entry.get("isbn_13", [])) + list(entry.get("isbn_10", [])))
+            cover_url = (
+                f"https://covers.openlibrary.org/b/id/{cover_id}-L.jpg?default=false"
+                if cover_id
+                else f"https://covers.openlibrary.org/b/olid/{edition_id}-L.jpg?default=false"
+            )
             rows.append(
                 SearchCandidate(
                     source=self.name,
@@ -250,10 +290,8 @@ class OpenLibraryProvider:
                     subtitle=str(entry["subtitle"]) if entry.get("subtitle") else None,
                     authors=(),
                     year=_year(entry.get("publish_date")),
-                    cover_url=None,
-                    identifiers=_isbn(
-                        list(entry.get("isbn_13", [])) + list(entry.get("isbn_10", []))
-                    ),
+                    cover_url=cover_url,
+                    identifiers=identifiers,
                     language=_language(entry.get("languages")),
                     metadata={},
                 )
@@ -261,6 +299,8 @@ class OpenLibraryProvider:
         return sorted(
             rows,
             key=lambda row: (
+                row.year is None,
+                row.cover_url is None,
                 not bool(row.identifiers),
                 row.language not in {"es", "en"},
                 row.source_id,

@@ -435,11 +435,15 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
     if payload.language is not None:
         metadata["language"] = payload.language
     prepared = None
-    if payload.cover_url:
+    cover_urls = ([payload.cover_url] if payload.cover_url else []) + list(
+        payload.cover_fallback_urls
+    )
+    for cover_url in cover_urls:
         try:
             prepared = await prepare_cover(
-                request.app.state.provider_client, payload.cover_url, request.app.state.data_dir
+                request.app.state.provider_client, cover_url, request.app.state.data_dir
             )
+            break
         except CoverError:
             prepared = None
     refreshed = library.overwrite_provider_fields(

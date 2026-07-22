@@ -14,6 +14,7 @@ ALLOWED_COVER_HOSTS = {
     "covers.openlibrary.org",
     "books.google.com",
     "books.googleusercontent.com",
+    "archive.org",
 }
 
 
@@ -58,7 +59,9 @@ def prepare_uploaded_cover(content: bytes, content_type: str, data_dir: Path) ->
 async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> Path:
     def validate_url(value: str) -> None:
         parsed = urlsplit(value)
-        if parsed.scheme != "https" or parsed.hostname not in ALLOWED_COVER_HOSTS:
+        host = parsed.hostname or ""
+        allowed = host in ALLOWED_COVER_HOSTS or host.endswith(".us.archive.org")
+        if parsed.scheme != "https" or not allowed:
             raise CoverError("cover URL must use an allowlisted HTTPS host")
 
     validate_url(url)

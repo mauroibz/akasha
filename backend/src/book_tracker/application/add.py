@@ -107,6 +107,7 @@ class AddService:
     ) -> dict[str, Any]:
         if manual is not None:
             cover_url = None
+            cover_fallback_urls: Sequence[str] = ()
             title = str(manual["title"]).strip()
             authors = tuple(
                 str(value).strip() for value in manual.get("authors", []) if str(value).strip()
@@ -125,6 +126,7 @@ class AddService:
             assert source is not None and source_id is not None
             payload = await self._provider_payload(source, source_id, supplied_refs)
             cover_url = payload.cover_url
+            cover_fallback_urls = payload.cover_fallback_urls
             title = payload.title
             subtitle = payload.subtitle
             authors = payload.authors
@@ -138,11 +140,16 @@ class AddService:
                 for ref in payload.source_refs
             ]
         prepared_cover: Path | None = None
-        if cover_url and self.cover_client is not None and self.data_dir is not None:
-            try:
-                prepared_cover = await prepare_cover(self.cover_client, cover_url, self.data_dir)
-            except CoverError:
-                prepared_cover = None
+        cover_urls = ([cover_url] if cover_url else []) + list(cover_fallback_urls)
+        if self.cover_client is not None and self.data_dir is not None:
+            for candidate_url in cover_urls:
+                try:
+                    prepared_cover = await prepare_cover(
+                        self.cover_client, candidate_url, self.data_dir
+                    )
+                    break
+                except CoverError:
+                    prepared_cover = None
         near_matches = self.repository.near_entry_ids(title, authors[0] if authors else "")
         exact = self.repository.match(identifiers=identifiers, sources=sources)
         if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
