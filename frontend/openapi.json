@@ -359,6 +359,21 @@
         "title": "BulkSet",
         "type": "object"
       },
+      "CalibrePreviewBody": {
+        "properties": {
+          "library_path": {
+            "maxLength": 500,
+            "minLength": 1,
+            "title": "Library Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "library_path"
+        ],
+        "title": "CalibrePreviewBody",
+        "type": "object"
+      },
       "CommitBody": {
         "properties": {
           "batch_id": {
@@ -887,12 +902,50 @@
             "title": "Authors",
             "type": "array"
           },
+          "calibre_book_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibre Book Id"
+          },
+          "calibre_uuid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Calibre Uuid"
+          },
           "candidates": {
             "items": {
               "type": "integer"
             },
             "title": "Candidates",
             "type": "array"
+          },
+          "connection_mode": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Connection Mode"
+          },
+          "cover_staged": {
+            "default": false,
+            "title": "Cover Staged",
+            "type": "boolean"
           },
           "date_added": {
             "anyOf": [
@@ -916,6 +969,17 @@
             ],
             "title": "Date Finished"
           },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description"
+          },
           "errors": {
             "items": {
               "additionalProperties": true,
@@ -925,8 +989,15 @@
             "type": "array"
           },
           "goodreads_book_id": {
-            "title": "Goodreads Book Id",
-            "type": "string"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Goodreads Book Id"
           },
           "isbn": {
             "anyOf": [
@@ -980,6 +1051,17 @@
             ],
             "title": "Publisher"
           },
+          "query_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Query Only"
+          },
           "record_id": {
             "title": "Record Id",
             "type": "integer"
@@ -1019,6 +1101,17 @@
             "title": "Score Provisional",
             "type": "boolean"
           },
+          "series": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Series"
+          },
           "shelves": {
             "items": {
               "type": "string"
@@ -1056,7 +1149,6 @@
         "required": [
           "record_id",
           "row_number",
-          "goodreads_book_id",
           "title",
           "authors",
           "isbn",
@@ -2136,6 +2228,88 @@
           }
         },
         "summary": "Ready"
+      }
+    },
+    "/api/import/calibre/commit": {
+      "post": {
+        "operationId": "calibre_commit_api_import_calibre_commit_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CommitBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CommitResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Calibre Commit",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/calibre/preview": {
+      "post": {
+        "operationId": "calibre_preview_api_import_calibre_preview_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CalibrePreviewBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Calibre Preview",
+        "tags": [
+          "imports"
+        ]
       }
     },
     "/api/import/goodreads/commit": {

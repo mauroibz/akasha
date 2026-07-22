@@ -171,12 +171,14 @@ async def test_calibre_minimal_schema_and_resync_fill_only(tmp_path: Path) -> No
             item_id = connection.execute(
                 text(
                     "INSERT INTO items(title,year,metadata,created_at,updated_at) "
-                    "VALUES('Manual title',NULL,'{\"authors\":[],\"publisher\":\"Manual\"}','n','n') RETURNING id"
+                    'VALUES(\'Manual title\',NULL,\'{"authors":[],"publisher":"Manual"}\','
+                    "'n','n') RETURNING id"
                 )
             ).scalar_one()
             connection.execute(
                 text(
-                    "INSERT INTO item_identifiers(item_id,kind,normalized_value,value,created_at,updated_at) "
+                    "INSERT INTO item_identifiers("
+                    "item_id,kind,normalized_value,value,created_at,updated_at) "
                     "VALUES(:id,'calibre_uuid','uuid-1','uuid-1','n','n')"
                 ),
                 {"id": item_id},

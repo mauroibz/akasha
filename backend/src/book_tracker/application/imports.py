@@ -14,8 +14,8 @@ from book_tracker.domain.calibre import CalibreAdapter
 from book_tracker.domain.goodreads import parse_goodreads
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.matching import MatchKind
-from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_uploaded_cover
+from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
 from book_tracker.infrastructure.repositories import DomainRepository, ImportRepository
 
 
@@ -116,10 +116,16 @@ class GoodreadsImportService:
         return self.imports.commit(batch_id, choices)
 
 
-class CalibreImportService(GoodreadsImportService):
+class CalibreImportService:
     def __init__(self, engine: Engine, data_dir: Path, calibre_dir: Path) -> None:
-        super().__init__(engine, data_dir)
+        self.engine = engine
+        self.data_dir = data_dir
+        self.domain = DomainRepository(engine)
+        self.imports = ImportRepository(engine)
         self.adapter = CalibreAdapter(calibre_dir)
+
+    def get_preview(self, batch_id: str) -> dict[str, Any]:
+        return GoodreadsImportService(self.engine, self.data_dir).get_preview(batch_id)
 
     def preview(self, library_path: str) -> dict[str, Any]:
         snapshot = self.adapter.read(library_path)

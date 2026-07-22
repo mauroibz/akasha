@@ -77,6 +77,7 @@ class CalibreAdapter:
         records: list[dict[str, Any]] = []
         for row_number, book in enumerate(connection.execute("SELECT * FROM books ORDER BY id"), 2):
             book_id = int(book["id"])
+            columns = set(book.keys())
             authors = [
                 row[0]
                 for row in connection.execute(
@@ -137,15 +138,15 @@ class CalibreAdapter:
                     if not 1 <= score <= 10:
                         errors.append({"field": "rating", "code": "invalid_rating"})
                         score = None
-            pubdate = book["pubdate"] if "pubdate" in book.keys() else None
+            pubdate = book["pubdate"] if "pubdate" in columns else None
             year = int(str(pubdate)[:4]) if pubdate and str(pubdate)[:4].isdigit() else None
-            book_path = str(book["path"] or "") if "path" in book.keys() else ""
+            book_path = str(book["path"] or "") if "path" in columns else ""
             cover_source = self._cover(library, book_path)
             records.append(
                 {
                     "row_number": row_number,
                     "calibre_book_id": str(book_id),
-                    "calibre_uuid": str(book["uuid"] or "") if "uuid" in book.keys() else "",
+                    "calibre_uuid": str(book["uuid"] or "") if "uuid" in columns else "",
                     "title": str(book["title"] or "").strip(),
                     "authors": authors,
                     "isbn": isbn,
