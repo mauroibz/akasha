@@ -55,3 +55,17 @@ Entry format:
 - Blocked/open: none.
 - Next: claim Sprint 003 and add application/API contracts in acceptance order, beginning with
   failing entry and shelf mutation tests.
+
+## 2026-07-22 — Sprint 003 (complete)
+- Done: delivered typed library CRUD, normalized filter/facet/list queries, all-sort opaque keyset
+  pagination, atomic bulk/suggested mutations, list indexes, and generated OpenAPI (`7c8435b`);
+  fixed deterministic generated-contract formatting (`26c5c4f`); expanded Sprint 004.
+- Verified: 49 backend and 2 frontend tests pass; focused ASGI tests cover CRUD/domain errors,
+  static route precedence, bulk rollback, all six asc/desc sorts, duplicate/null/deleted cursor
+  cases, normalized search, and query-plan index use. Required format/check/test/build/project
+  validation and `git diff --check` pass.
+- Deviations: deterministic connection-level SQLite normalization replaces the vague stored
+  normalization/collation wording; technical spec section 7.2 and DEC-015 record the contract.
+- Blocked/open: none.
+- Next: claim Sprint 004 and begin with failing typed library loading/empty/error/populated component
+  tests before adding the application shell and virtualization.

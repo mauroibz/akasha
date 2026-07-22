@@ -1,6 +1,6 @@
 # Sprint 003 — Entries, shelves, filtering, and keyset API
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 002
 **Roadmap revision:** 2
 
@@ -91,5 +91,22 @@ tests through the ASGI application.
 
 ## Outcome
 
-_Not started. The implementing agent replaces this section with delivered behavior, tests/commands
-and results, commit IDs, deviations, and downstream changes before marking the sprint complete._
+Delivered typed entries/items/shelves CRUD, attachment replacement, stable domain errors, normalized
+search, exact totals/facets, opaque query-bound cursors for every v1 sort, atomic bulk selection and
+suggested-status acceptance, composite list indexes, and a generated OpenAPI contract.
+
+- `7c8435b` adds application services, API schemas/routes, deterministic cursor and SQLite text
+  normalization, migration `0003_list_indexes`, and focused ASGI/file-backed tests.
+- `26c5c4f` fixes deterministic OpenAPI formatting by excluding the generated artifact from Prettier
+  and makes response metadata pass strict typing.
+- Verification: project validation, `make format`, `make check`, `make test` (49 backend and 2
+  frontend tests), `make build`, and `git diff --check` passed. Focused tests cover all six sorts in
+  both directions, duplicate/null values, deleted cursor boundaries, malformed/mismatched cursors,
+  normalized search, composite query-plan selection, static-route precedence, and bulk rollback.
+- Deviation: the planned generic “stored normalization/collation” was resolved to a deterministic
+  per-connection SQLite `normalize_text` function so Unicode search/order/cursors share exact
+  semantics without duplicated columns; technical spec section 7.2 and DEC-015 record this. Sprint
+  011 retains measurement of whether a stored text-sort projection is warranted.
+- Downstream review: Sprint 004 was expanded against the generated `EntryListResponse` contract;
+  Sprints 006 and 010 can reuse typed CRUD/bulk filters unchanged, and Sprint 011 now explicitly
+  owns measured text-sort index hardening if needed.

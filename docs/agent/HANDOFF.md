@@ -1,25 +1,27 @@
 # Agent handoff
 
-**State:** Sprint 002 completed; Sprint 003 is ready and unclaimed.
-**Active sprint:** [`003-entries-shelves-api.md`](../sprints/003-entries-shelves-api.md)
-**Worktree expectation:** clean after the Sprint 002 closure commit.
+**State:** Sprint 003 completed; Sprint 004 is ready and unclaimed.
+**Active sprint:** [`004-frontend-library.md`](../sprints/004-frontend-library.md)
+**Worktree expectation:** clean after the Sprint 003 closure commit.
 
 ## Current reality
 
-- Alembic head `0002_domain_schema` contains the complete v1 tables, constraints, and indexes;
-  downgrade to the foundation and re-upgrade are tested on real files.
-- Framework-independent ISBN/text/shelf normalization, matching decisions, enums, and fill-empty
-  behavior live under `backend/src/book_tracker/domain/`.
-- All schema tables are mapped under `infrastructure/models.py`; `DomainRepository` uses short
-  `BEGIN IMMEDIATE` writes for identity/entry creation, fill-empty union, and shelf lifecycle.
-- Exact ISBN/provider identities and per-user entries deduplicate; split exact identities raise a
-  typed conflict without mutation, and title/author similarities remain advisory.
-- Only health HTTP routes exist; Sprint 003 owns application services, list/cursor queries, and API.
+- Alembic head is `0003_list_indexes`; real-file downgrade/upgrade and common query-plan index use
+  are tested.
+- `/api/entries`, `/api/items`, and `/api/shelves` expose typed CRUD, exact counts/facets, all six
+  stable keyset sorts, atomic bulk mutations, and suggested-status acceptance.
+- Static bulk routes precede integer detail routes; domain failures use stable error envelopes and
+  validation remains FastAPI 422.
+- Unicode search, text order, and cursor values share the deterministic per-connection SQLite
+  `normalize_text` function recorded in DEC-015.
+- `frontend/openapi.json` is the checked generated contract and is excluded from Prettier so
+  `make format` and `make openapi-check` remain deterministic.
+- The frontend is still the health-only Sprint 001 page; Sprint 004 owns the library UI.
 
 ## First action
 
-Follow `AGENTS.md`, claim Sprint 003, inspect the actual domain repositories/tests, and begin with
-failing entry and shelf application-service tests.
+Follow `AGENTS.md`, claim Sprint 004, inspect the generated OpenAPI and current frontend tests, and
+begin with failing library loading/empty/error/populated component tests.
 
 ## Known blockers
 

@@ -2,7 +2,7 @@
 
 **Plan revision:** 2
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 003](003-entries-shelves-api.md)
+**Active sprint:** [Sprint 004](004-frontend-library.md)
 
 ## Dependency graph
 
@@ -29,8 +29,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 |---|---|---|---|---|
 | 001 | Reproducible monorepo foundation | Backend/frontend hello slices, migration, all quality gates and dev commands work | — | completed |
 | 002 | Domain model and durable persistence | Migrations and repositories enforce identity, score/status, source, and shelf invariants | 001 | completed |
-| 003 | Entries, shelves, filtering, keyset API | CRUD and list API pass contract tests including null-safe asc/desc cursors | 002 | ready |
-| 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | planned |
+| 003 | Entries, shelves, filtering, keyset API | CRUD and list API pass contract tests including null-safe asc/desc cursors | 002 | completed |
+| 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | ready |
 | 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | planned |
 | 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | planned |
 | 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | planned |
@@ -182,7 +182,7 @@ Acceptance:
 
 Scope:
 
-- Query/index measurement, 10k-entry benchmark, accessibility audit and fixes.
+- Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark, accessibility audit and fixes.
 - Error boundaries, degraded provider states, reduced motion, cancellation/race tests.
 - Complete critical E2E regression suite and security limits.
 
