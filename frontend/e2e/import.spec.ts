@@ -204,3 +204,110 @@ test("malformed and oversized uploads remain recoverable", async ({ page }) => {
   await expect(page.getByRole("alert")).toContainText("exceeds 5 MiB");
   await expect(upload).toBeVisible();
 });
+
+test("undo flow from import history", async ({ page }) => {
+  let commitCount = 0;
+  await page.route("**/api/import/goodreads/preview", (route) =>
+    route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "undo-batch",
+        fingerprint: "abc",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [record],
+      },
+    }),
+  );
+  await page.route("**/api/import/goodreads/commit", (route) => {
+    commitCount += 1;
+    return route.fulfill({
+      json: {
+        batch_id: "undo-batch",
+        state: "committed",
+        created_items: 1,
+        created_entries: 1,
+        unchanged_entries: 0,
+      },
+    });
+  });
+  await page.route("**/api/import/batches/undo-batch", (route) =>
+    route.fulfill({
+      json: {
+        batch_id: "undo-batch",
+        state: "undone",
+        reverted: 2,
+        retained: 0,
+        skipped: 0,
+        reverted_entries: 1,
+        reverted_items: 1,
+        retained_items: 0,
+      },
+    }),
+  );
+  await page.goto("/import");
+  await page.getByLabel(/goodreads csv/i).setInputFiles({
+    name: "library.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("csv"),
+  });
+  await page.getByRole("button", { name: /preview import/i }).click();
+  await page.getByRole("button", { name: /import 1 ready row/i }).click();
+  await expect(page.getByRole("status")).toContainText("1 book added");
+  await expect(page.getByRole("button", { name: /undo this import/i })).toBeVisible();
+  await page.getByRole("button", { name: /undo this import/i }).click();
+  await expect(page.getByRole("button", { name: /confirm undo/i })).toBeVisible();
+  await page.getByRole("button", { name: /confirm undo/i }).click();
+  await expect(page.getByRole("status")).toContainText("Import undone");
+  await expect(page.getByRole("status")).toContainText("2 changes reverted");
+  expect(commitCount).toBe(1);
+});
+
+test("undo expired batch shows error", async ({ page }) => {
+  await page.route("**/api/import/goodreads/preview", (route) =>
+    route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "expired-batch",
+        fingerprint: "abc",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [record],
+      },
+    }),
+  );
+  await page.route("**/api/import/goodreads/commit", (route) =>
+    route.fulfill({
+      json: {
+        batch_id: "expired-batch",
+        state: "committed",
+        created_items: 1,
+        created_entries: 1,
+        unchanged_entries: 0,
+      },
+    }),
+  );
+  await page.route("**/api/import/batches/expired-batch", (route) =>
+    route.fulfill({
+      status: 409,
+      json: {
+        error: {
+          code: "undo_expired",
+          message: "Undo window has expired (24 hours since commit)",
+          details: {},
+        },
+      },
+    }),
+  );
+  await page.goto("/import");
+  await page.getByLabel(/goodreads csv/i).setInputFiles({
+    name: "library.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("csv"),
+  });
+  await page.getByRole("button", { name: /preview import/i }).click();
+  await page.getByRole("button", { name: /import 1 ready row/i }).click();
+  await page.getByRole("button", { name: /undo this import/i }).click();
+  await page.getByRole("button", { name: /confirm undo/i }).click();
+  await expect(page.getByRole("alert")).toContainText("expired");
+});

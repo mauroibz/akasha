@@ -11,10 +11,12 @@ from sqlalchemy.exc import SQLAlchemyError
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
+from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.library import LibraryError
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
+from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import schema_is_current, upgrade
@@ -47,6 +49,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if google.enabled:
             providers.append(google)
         app.state.providers = {provider.name: provider for provider in providers}
+        # Durable job runner for background enrichment (Sprint 011)
+        rate_limiter = RateLimiter(min_interval_seconds=0.5)
+        enrichment_handler = EnrichmentHandler(
+            app.state.engine, app.state.providers, rate_limiter=rate_limiter
+        )
+        job_runner = JobRunner(
+            app.state.engine,
+            {"enrich_item": enrichment_handler},
+            rate_limiter=rate_limiter,
+        )
+        app.state.job_runner = job_runner
+        # Reclaim expired jobs from a potential crash (best-effort;
+        # the table may not exist on a fresh or unmigrated database).
+        from datetime import UTC, datetime
+
+        try:
+            job_runner.repo.reclaim_expired(datetime.now(UTC))
+        except Exception:
+            pass
         try:
             yield
         finally:

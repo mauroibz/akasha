@@ -6,8 +6,10 @@ import {
   commitCalibre,
   previewCalibre,
   previewGoodreads,
+  undoBatch,
   type ImportPreview,
   type ImportResult,
+  type UndoResult,
 } from "@/api/imports";
 
 export function ImportPage() {
@@ -17,10 +19,14 @@ export function ImportPage() {
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [choices, setChoices] = useState<Record<number, number | "new">>({});
   const [result, setResult] = useState<ImportResult | null>(null);
+  const [undoResult, setUndoResult] = useState<UndoResult | null>(null);
   const [error, setError] = useState("");
   const [pending, setPending] = useState(false);
+  const [undoPending, setUndoPending] = useState(false);
+  const [confirmUndo, setConfirmUndo] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
   const resultRef = useRef<HTMLParagraphElement>(null);
+  const undoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (preview) heading.current?.focus();
@@ -28,6 +34,9 @@ export function ImportPage() {
   useEffect(() => {
     if (result) resultRef.current?.focus();
   }, [result]);
+  useEffect(() => {
+    if (undoResult) undoRef.current?.focus();
+  }, [undoResult]);
 
   const unresolved =
     preview?.records.filter(
@@ -241,6 +250,67 @@ export function ImportPage() {
           {result.created_entries === 1 ? "book" : "books"} added;{" "}
           {result.unchanged_entries} already present.
         </p>
+      )}
+      {result && !undoResult && (
+        <div className="mt-5 rounded-2xl bg-zinc-900 p-4">
+          <p className="text-sm text-zinc-400">
+            You can undo this import for 24 hours after commit. The undo
+            reverses only fields that still match the imported values — your
+            later edits are preserved.
+          </p>
+          {!confirmUndo ? (
+            <button
+              className="focus-ring mt-3 rounded-full bg-red-900 px-5 py-2 text-sm"
+              onClick={() => setConfirmUndo(true)}
+            >
+              Undo this import
+            </button>
+          ) : (
+            <div className="mt-3 flex gap-2">
+              <button
+                className="focus-ring rounded-full bg-red-700 px-5 py-2 text-sm disabled:opacity-50"
+                disabled={undoPending}
+                onClick={() => {
+                  setUndoPending(true);
+                  setError("");
+                  void undoBatch(result.batch_id)
+                    .then((res) => {
+                      setUndoResult(res);
+                      setConfirmUndo(false);
+                    })
+                    .catch((reason: Error) => setError(reason.message))
+                    .finally(() => setUndoPending(false));
+                }}
+              >
+                {undoPending ? "Undoing…" : "Confirm undo"}
+              </button>
+              <button
+                className="focus-ring rounded-full bg-zinc-800 px-5 py-2 text-sm"
+                onClick={() => setConfirmUndo(false)}
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+        </div>
+      )}
+      {undoResult && (
+        <div
+          ref={undoRef}
+          tabIndex={-1}
+          className="mt-5 rounded-2xl bg-zinc-900 p-4"
+          role="status"
+        >
+          <h2 className="text-lg font-semibold">Import undone</h2>
+          <p className="mt-1 text-sm text-zinc-300">
+            {undoResult.reverted}{" "}
+            {undoResult.reverted === 1 ? "change" : "changes"} reverted
+            {undoResult.retained > 0 && ` · ${undoResult.retained} retained (edited after import)`}
+          </p>
+          <Link className="focus-ring mt-3 inline-block text-fuchsia-400" to="/">
+            ← Back to library
+          </Link>
+        </div>
       )}
     </main>
   );

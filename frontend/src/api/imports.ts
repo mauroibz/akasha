@@ -31,6 +31,27 @@ export interface ImportResult {
   created_entries: number;
   unchanged_entries: number;
 }
+export interface JobProgress {
+  id: string;
+  batch_id: string | null;
+  kind: string;
+  state: string;
+  progress: Record<string, unknown>;
+  error: string | null;
+  attempts: number;
+  created_at: string;
+  finished_at: string | null;
+}
+export interface UndoResult {
+  batch_id: string;
+  state: string;
+  reverted: number;
+  retained: number;
+  skipped: number;
+  reverted_entries: number;
+  reverted_items: number;
+  retained_items: number;
+}
 
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
@@ -79,4 +100,16 @@ export function commitCalibre(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ batch_id: batchId, choices }),
   }).then((response) => responseJson<ImportResult>(response));
+}
+
+export function getJobProgress(jobId: string) {
+  return fetch(`/api/import/jobs/${jobId}`).then((response) =>
+    responseJson<JobProgress>(response),
+  );
+}
+
+export function undoBatch(batchId: string) {
+  return fetch(`/api/import/batches/${batchId}`, {
+    method: "DELETE",
+  }).then((response) => responseJson<UndoResult>(response));
 }
