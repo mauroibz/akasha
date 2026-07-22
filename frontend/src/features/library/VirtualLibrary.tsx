@@ -2,6 +2,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
 import type { LibraryEntry } from "@/api/library";
 import type { LibraryView } from "./library";
@@ -168,26 +169,15 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 aria-label={`Open ${entry.item.title}`}
                 onClick={() => void navigate(`/books/${entry.id}`)}
               >
-                {entry.item.cover_url ? (
-                  <img
-                    className={
-                      props.view === "table"
-                        ? "h-14 w-10 shrink-0 rounded object-cover"
-                        : "aspect-[2/3] rounded-xl object-cover"
-                    }
-                    src={entry.item.cover_url}
-                    alt=""
-                  />
-                ) : (
-                  <div
-                    className={
-                      props.view === "table"
-                        ? "h-14 w-10 shrink-0 rounded bg-zinc-800"
-                        : "aspect-[2/3] rounded-xl bg-zinc-800"
-                    }
-                    aria-label="No cover"
-                  />
-                )}
+                <CoverImage
+                  src={entry.item.cover_url}
+                  alt={`Cover of ${entry.item.title}`}
+                  className={
+                    props.view === "table"
+                      ? "h-14 w-10 shrink-0"
+                      : "aspect-[2/3] rounded-xl"
+                  }
+                />
                 <div className="min-w-0 flex-1">
                   <h2 className="truncate font-semibold">{entry.item.title}</h2>
                   <p className="truncate text-sm text-zinc-400">

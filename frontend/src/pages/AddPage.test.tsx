@@ -16,6 +16,7 @@ function renderPage() {
         <Routes>
           <Route path="/add" element={<AddPage />} />
           <Route path="/books/:id" element={<h1>Book detail</h1>} />
+          <Route path="/" element={<h1>Library page</h1>} />
         </Routes>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -133,7 +134,7 @@ describe("AddPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /add separate edition/i }),
     );
-    await screen.findByRole("heading", { name: /book detail/i });
+    await screen.findByRole("heading", { name: /library page/i });
     expect(posts).toBe(2);
   });
 });

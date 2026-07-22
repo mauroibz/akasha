@@ -67,8 +67,11 @@ test("manual add is keyboard-complete and cached detail edits persist", async ({
   await expect(page.getByLabel(/^title$/i)).toBeFocused();
   await page.getByLabel(/^title$/i).fill("Rayuela");
   await page.getByRole("button", { name: /add to library/i }).press("Enter");
-  await expect(page).toHaveURL(/\/books\/7/);
+  // New entries return to the library with a success toast
+  await expect(page).toHaveURL("/");
   expect(posted).toBe(1);
+  // Navigate to detail to verify the entry was created
+  await page.goto("/books/7");
   await expect(page.getByText("Cached while providers are down")).toBeVisible();
   await page.getByRole("button", { name: /edit book metadata/i }).click();
   await page.getByLabel(/^title$/i).fill("Rayuela corregida");

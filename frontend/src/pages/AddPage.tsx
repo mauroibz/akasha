@@ -8,6 +8,7 @@ import {
   type ManualItem,
   type SearchCandidate,
 } from "@/api/add";
+import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
 import type { EntryStatus } from "@/api/library";
 
@@ -27,24 +28,31 @@ export function AddPage() {
   );
   const [shelfIds, setShelfIds] = useState<number[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
+  const searchRequestId = useRef(0);
   const statusRef = useRef<HTMLSelectElement>(null);
   const nearRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   useEffect(() => {
     if (query.trim().length < 2) return setResults([]);
+    const requestId = ++searchRequestId.current;
     const timer = window.setTimeout(() => {
       setPending(true);
       setError("");
       void searchBooks(query)
         .then((value) => {
+          if (searchRequestId.current !== requestId) return;
           setResults(value.items);
           setWarning(value.warning ?? "");
         })
         .catch((e: Error) => {
+          if (searchRequestId.current !== requestId) return;
           setError(e.message);
           setWarning("You can still enter this book manually.");
         })
-        .finally(() => setPending(false));
+        .finally(() => {
+          if (searchRequestId.current !== requestId) return;
+          setPending(false);
+        });
     }, 300);
     return () => window.clearTimeout(timer);
   }, [query]);
@@ -101,11 +109,12 @@ export function AddPage() {
       }
       if (result.already_exists) {
         sessionStorage.setItem("akasha.toast", "Already in your library");
+        navigate(`/books/${result.entry.id}`);
       } else {
         sessionStorage.setItem("akasha.new-entry", String(result.entry.id));
         sessionStorage.setItem("akasha.toast", "Book added");
+        navigate("/");
       }
-      navigate(`/books/${result.entry.id}`);
     } catch (e) {
       if (e instanceof NearMatchError) {
         setNear(e.entryIds);
@@ -151,18 +160,11 @@ export function AddPage() {
                 onClick={() => setSelected(row)}
               >
                 <span className="grid grid-cols-[64px_1fr] gap-3">
-                  {row.cover_url ? (
-                    <img
-                      className="aspect-[2/3] w-16 rounded object-cover"
-                      src={row.cover_url}
-                      alt=""
-                    />
-                  ) : (
-                    <span
-                      className="aspect-[2/3] w-16 rounded bg-zinc-800"
-                      aria-hidden="true"
-                    />
-                  )}
+                  <CoverImage
+                    src={row.cover_url}
+                    alt={`Cover of ${row.title}`}
+                    className="aspect-[2/3] w-16"
+                  />
                   <span>
                     <strong>{row.title}</strong>
                     <span className="mt-1 block text-zinc-400">
@@ -170,6 +172,10 @@ export function AddPage() {
                     </span>
                     <span className="block text-sm">
                       Edition year: {row.year ?? "unknown"}
+                      {row.metadata?.publisher
+                        ? ` · ${row.metadata.publisher}`
+                        : ""}
+                      {row.language ? ` · ${row.language}` : ""}
                     </span>
                     {row.original_year && row.original_year !== row.year && (
                       <span className="block text-sm">
