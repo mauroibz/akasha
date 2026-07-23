@@ -30,6 +30,7 @@ function EntryControls({
   return (
     <div
       className="flex items-center gap-2"
+      data-card-controls=""
       onClick={(e) => e.stopPropagation()}
     >
       <label className="sr-only" htmlFor={`status-${entry.id}`}>
@@ -169,16 +170,18 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 aria-label={`Open ${entry.item.title}`}
                 onClick={() => void navigate(`/books/${entry.id}`)}
               >
-                <CoverImage
-                  src={entry.item.cover_url}
-                  alt={`Cover of ${entry.item.title}`}
-                  className={
-                    props.view === "table"
-                      ? "h-14 w-10 shrink-0"
-                      : "aspect-[2/3] rounded-xl"
-                  }
-                />
-                <div className="min-w-0 flex-1">
+                <div data-card-cover="">
+                  <CoverImage
+                    src={entry.item.cover_url}
+                    alt={`Cover of ${entry.item.title}`}
+                    className={
+                      props.view === "table"
+                        ? "h-14 w-10 shrink-0"
+                        : "aspect-[2/3] rounded-xl"
+                    }
+                  />
+                </div>
+                <div className="min-w-0 flex-1" data-card-meta="">
                   <h2 className="truncate font-semibold">{entry.item.title}</h2>
                   <p className="truncate text-sm text-zinc-400">
                     {entry.item.sort_author ?? "Unknown author"}

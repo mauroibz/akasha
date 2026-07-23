@@ -67,6 +67,7 @@ export function ScorePicker({
     <div
       ref={containerRef}
       className="inline-flex flex-col gap-1"
+      data-score-panel=""
       role="group"
       aria-label={label}
     >

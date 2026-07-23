@@ -1,6 +1,6 @@
 # Sprint 013 — Library grid layout diagnosis and repair
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 012
 **Roadmap revision:** 5
 
