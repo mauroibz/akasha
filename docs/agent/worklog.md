@@ -244,3 +244,24 @@ expanded from the roadmap before implementation can begin.
 
 **Next:** Sprint 013 (scale-accessibility-resilience) — status `ready`, sprint
 file created at `docs/sprints/013-scale-accessibility-resilience.md`.
+
+## Session 2026-07-23 — Roadmap revision 5 (planning only)
+
+**Done:**
+- Diagnosed the reported library grid overlap from the actual `VirtualLibrary`, `CoverImage`, and
+  `ScorePicker` implementation. The two-column article has three layout responsibilities; cover and
+  metadata compete inside a 128px cell, controls cannot wrap, expanded score editing exceeds 320px,
+  and fixed 310px virtual rows cannot absorb overflow.
+- Inserted a focused, ready Sprint 013 with TDD spatial assertions and required Chromium checks at
+  375px, 768px, and 1440px. Renumbered hardening/release to Sprints 014/015 and synchronized state,
+  roadmap, workflow, decision log, completed-sprint forward references, and handoff (DEC-022).
+- No application implementation was changed, as requested.
+
+**Verified:**
+- Initial `python scripts/validate_project.py` passed before edits.
+- A local Vite server started for diagnostic inspection; the headless probe yielded no captured
+  measurements, so the recorded diagnosis relies on direct DOM/CSS contract inspection and must be
+  encoded as the sprint's initial failing Playwright test.
+
+**Next:** Execute Sprint 013, beginning with the specified failing overlap regression; do not begin
+Sprint 014 hardening until the grid repair is verified and closed.

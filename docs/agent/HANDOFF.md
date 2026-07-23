@@ -1,43 +1,29 @@
 # Handoff — current reality
 
 **Last completed:** Sprint 012 (bulk-first-triage), 2026-07-22.
-**Next:** Sprint 013 (scale-accessibility-resilience) — status `ready`, sprint
-file at `docs/sprints/013-scale-accessibility-resilience.md`.
+**Next:** Sprint 013 (library-grid-layout-repair) — status `ready`, file at
+`docs/sprints/013-library-grid-layout-repair.md`.
 
-## What was delivered in Sprint 012
+## Diagnosed issue
 
-- Triage page at `/triage` with virtualized dense table (56px rows), checkbox
-  selection with shift-range, Ctrl/Cmd+A select-all-matching with exclusions,
-  bulk action bar (status/score/clear-provisional), and accept-suggested button.
-- Keyboard shortcuts: j/k + arrows for navigation, r/t/w/d/g/u for status,
-  1-9/0 for score, Enter to open/advance, Escape to clear. All guarded by
-  isEditableTarget except Ctrl/Cmd+A.
-- Frontend API functions: `bulkUpdateEntries`, `acceptSuggestedStatuses` in
-  `frontend/src/api/library.ts`.
-- HomePage Inbox button navigates to /triage (DEC-021).
-- 6 new e2e tests in `frontend/e2e/triage.spec.ts`.
+- `VirtualLibrary` calls the mode a grid but renders one full-width, fixed-height virtual row per
+  entry; there is no responsive multi-column card layout.
+- The grid article declares `grid-cols-[128px_1fr]` but cover and metadata share the first 128px
+  grid child. The grid-mode cover has an aspect ratio but no explicit width/height.
+- Status and score controls occupy the second grid cell without wrapping. Expanded score editing
+  alone needs more than 320px for ten buttons, so controls overflow at constrained widths.
+- Fixed 310px virtual offsets allow overflowing/wrapped content to paint into adjacent entries.
 
-## Key files to know
+## Next-agent boundary
 
-- `frontend/src/pages/TriagePage.tsx` — the triage page (597 lines)
-- `frontend/src/api/library.ts` — bulk API functions at bottom
-- `frontend/src/components/AppShell.tsx` — nav items (now 5)
-- `frontend/e2e/triage.spec.ts` — triage e2e tests
-- Backend bulk API: `backend/src/book_tracker/api/library.py` (PATCH /bulk,
-  POST /accept-suggested — already existed from Sprint 010)
-- Backend bulk service: `backend/src/book_tracker/application/library.py`
-  (`bulk_update`, `accept_suggested` methods)
+- Start with a failing Playwright spatial regression, including the expanded score picker and long
+  metadata, then implement the smallest coherent responsive/virtualization repair.
+- Preserve table mode, preference persistence, editing/navigation/keyboard behavior, pagination,
+  and the 5,000-entry mounted-DOM bound.
+- Browser-check 375px, 768px, and 1440px widths. Unit tests alone cannot close the sprint.
+- Hardening is now Sprint 014; container/release is Sprint 015 (DEC-022).
 
 ## State
 
-- All work committed to `main`, pushed to origin.
-- Worktree clean.
-- `make check`, `make test`, `make build`, all e2e tests pass.
-- Sprint 013 file exists and is `ready`; no code work started yet.
-
-## For the next agent
-
-Sprint 013 is about performance, accessibility, and resilience — no new
-features. Read the sprint file, then the technical spec sections 12 and 13 for
-performance budgets and accessibility requirements. The 10k-entry benchmark
-should use the existing SQLite database — check if a seed script exists.
+- Planning revision 5 points to Sprint 013; no Sprint 013 implementation has started.
+- Sprint 012's recorded quality gates were green. Re-run the Sprint 013 required checks during work.

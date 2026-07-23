@@ -16,7 +16,7 @@ risking later user edits, shared items, or pre-existing entries.
 2. `docs/specs/product-spec.md` sections 5 and 8 (enrichment and undo)
 3. `docs/specs/technical-spec.md` sections 6, 9, and 11 (jobs, import effects, undo)
 4. `docs/decisions.md` DEC-002 (import ledger), DEC-013 (conflict audit data), DEC-016, DEC-017
-5. Sprint 009 and 010 Outcomes and roadmap Sprints 011–014
+5. Sprint 009 and 010 Outcomes and roadmap Sprints 011–015
 6. `docs/agent/WORKFLOW.md`, latest worklog entry, and `docs/agent/HANDOFF.md`
 7. The actual import batch/effect tables, job models, provider adapters, and all existing tests; inspect
    the migration history and repository code rather than relying on summaries
@@ -75,8 +75,9 @@ git diff --check
 ## Explicit non-scope
 
 - No bulk triage, conflict grouping, or server-wide bulk deletion (Sprint 012).
-- No accessibility audit, performance budgets, or full E2E hardening (Sprint 013).
-- No container, backup, or release work (Sprint 014).
+- No library grid remediation (Sprint 013).
+- No accessibility audit, performance budgets, or full E2E hardening (Sprint 014).
+- No container, backup, or release work (Sprint 015).
 - No new provider adapters beyond the existing Open Library and Google Books.
 
 ## Commit checkpoints
@@ -173,7 +174,7 @@ the alert region.
 
 - Sprint 012 (bulk triage): can use `JobRepository` to enqueue bulk
   operations and `ImportEffectRow` to audit changes.
-- Sprint 013 (E2E hardening): the undo e2e tests are already in place;
+- Sprint 014 (E2E hardening): the undo e2e tests are already in place;
   the progress API can be exercised end-to-end.
-- Sprint 014 (container): the job runner starts automatically in the
+- Sprint 015 (container): the job runner starts automatically in the
   lifespan; no additional process management needed for v1.

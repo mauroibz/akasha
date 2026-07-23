@@ -216,3 +216,20 @@ Append-only record of material architecture choices, product-default resolutions
 - **Consequences:** Users who previously used the Inbox button to filter the
   library now land on the triage page. The library page status chips remain
   available for filtering.
+
+## DEC-022 — Repair the library grid before product hardening
+
+- **Date:** 2026-07-23
+- **Status:** accepted; supersedes DEC-017 only for downstream sprint numbering
+- **Context:** After Sprint 012, the owner reported overlapping elements in the library grid. Code
+  inspection found a structural layout defect: a two-column `128px 1fr` article receives a combined
+  cover/metadata child plus a non-wrapping controls child, expanded score controls exceed available
+  width, and fixed 310px virtual rows cannot absorb overflow. Existing browser tests do not assert
+  spatial separation or responsive grid behavior.
+- **Decision:** Insert a focused Sprint 013 to encode the failure, repair the responsive virtualized
+  grid, and preserve table/keyboard/editing/pagination behavior. Shift hardening and release to
+  Sprints 014 and 015. This planning change does not authorize implementation during the planning
+  session.
+- **Consequence:** The visible regression is repaired before broad accessibility/performance E2E
+  hardening, and Sprint 014 inherits explicit responsive layout coverage. Final-project validation
+  closes after Sprint 015.

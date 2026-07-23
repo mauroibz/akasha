@@ -17,7 +17,7 @@ knowing routes or reaching for an undocumented API.
 2. `docs/specs/product-spec.md` sections 1–7, especially 4.3–4.5, 6, and 7
 3. `docs/specs/technical-spec.md` sections 5.2, 7, 8, 9, and 10
 4. `docs/decisions.md` DEC-006, DEC-011, DEC-012, DEC-016, and DEC-017
-5. Sprint 009 Outcome and roadmap Sprints 010–014
+5. Sprint 009 Outcome and roadmap Sprints 010–015
 6. `docs/agent/WORKFLOW.md`, latest worklog entry, and `docs/agent/HANDOFF.md`
 7. The actual frontend routes/pages/components/API clients and all component/Chromium tests; inspect
    the shelf and entry APIs rather than relying on this baseline
@@ -168,5 +168,6 @@ Delivered the editorial UI redesign across four implementation commits and one e
 **Impact on future sprints:**
 - Sprint 011 (durable jobs, enrichment, undo) is unaffected; no job/undo contracts were pulled forward.
 - Sprint 012 (triage) is unaffected; Inbox filtering is not a substitute for triage.
-- Sprint 013 (hardening) can build on the e2e suite and accessibility primitives established here.
-- Sprint 014 (container, release) is unaffected.
+- Sprint 013 repairs the library grid layout while preserving the e2e and accessibility primitives established here.
+- Sprint 014 (hardening) can build on that expanded responsive layout coverage.
+- Sprint 015 (container, release) is unaffected.

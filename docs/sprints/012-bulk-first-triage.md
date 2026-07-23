@@ -65,8 +65,9 @@ git diff --check
 
 ## Explicit non-scope
 
-- No accessibility audit, performance budgets, or full E2E hardening (Sprint 013).
-- No container, backup, or release work (Sprint 014).
+- No library grid remediation (Sprint 013).
+- No accessibility audit, performance budgets, or full E2E hardening (Sprint 014).
+- No container, backup, or release work (Sprint 015).
 
 ## Commit checkpoints
 

@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 4
+**Plan revision:** 5
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 010](010-editorial-ui-redesign.md)
+**Active sprint:** [Sprint 013](013-library-grid-layout-repair.md)
 
 ## Dependency graph
 
@@ -19,8 +19,9 @@
                          └─ 010 Editorial UI redesign + completion
                              └─ 011 Durable enrichment + undo
                                  └─ 012 Triage workflow
-                                     └─ 013 Scale, accessibility, resilience
-                                         └─ 014 Container, backup, release
+                                     └─ 013 Library grid layout repair
+                                         └─ 014 Scale, accessibility, resilience
+                                             └─ 015 Container, backup, release
 ```
 
 Sprints 003 and 005 are architecturally parallel but are intentionally sequenced for one-agent worktrees and simpler handoffs. Frontend vertical slices begin only after stable API contracts exist.
@@ -39,10 +40,11 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | completed |
 | 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | completed |
 | 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | completed |
-| 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | planned |
-| 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | planned |
-| 013 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 012 | planned |
-| 014 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 013 | planned |
+| 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | completed |
+| 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | completed |
+| 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | ready |
+| 014 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 013 | planned |
+| 015 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 014 | planned |
 
 ## Detailed future sprint contracts
 
@@ -191,7 +193,15 @@ Acceptance:
 - A Playwright scenario imports and triages hundreds of rows without one request per row.
 - Conflicting values remain visible until explicitly resolved.
 
-### [Sprint 013 — Scale, accessibility, and resilience](013-scale-accessibility-resilience.md)
+### [Sprint 013 — Library grid layout diagnosis and repair](013-library-grid-layout-repair.md)
+
+Scope and acceptance are detailed in the linked sprint contract. The diagnosed defect is a
+structural mismatch in `VirtualLibrary`: a `128px 1fr` outer grid receives a cover-and-metadata
+flex child plus a non-wrapping controls child, while fixed 310px virtual rows cannot absorb their
+overflow. The repair must establish a real responsive card grid and retain bounded virtualization,
+keyboard behavior, inline editing, pagination, and table view.
+
+### [Sprint 014 — Scale, accessibility, and resilience](014-scale-accessibility-resilience.md)
 
 Scope:
 
@@ -206,7 +216,7 @@ Acceptance:
 - Upload/image/path/provider limits and log redaction tests pass.
 - No uncaught frontend errors in E2E console.
 
-### Sprint 014 — Container, backup, and v1 release
+### Sprint 015 — Container, backup, and v1 release
 
 Scope:
 
