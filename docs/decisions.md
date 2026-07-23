@@ -233,3 +233,23 @@ Append-only record of material architecture choices, product-default resolutions
 - **Consequence:** The visible regression is repaired before broad accessibility/performance E2E
   hardening, and Sprint 014 inherits explicit responsive layout coverage. Final-project validation
   closes after Sprint 015.
+
+## DEC-023 — The library grid virtualizes rows of cards
+
+- **Date:** 2026-07-23
+- **Status:** accepted
+- **Context:** Sprint 013 confirmed the reported overlap by measurement: in grid mode the cover
+  collapsed to the 32px placeholder glyph because it shared a 128px grid column with the metadata
+  block, and the expanded score picker (ten 32px buttons in a non-wrapping row) escaped its
+  fixed-height 310px full-width row at 375px. The mode called "Grid" was a single full-width column
+  at every width.
+- **Decision:** Grid mode virtualizes rows of cards. `gridColumnCount` derives the column count from
+  the measured scroll-container width (1/2/4 columns at 375/768/1440), a virtual row is one
+  fixed-height band of that many fixed-height 280px cards, and each card holds a fixed 128x192 cover,
+  clamped metadata, and a non-wrapping control row. The compact score picker expands into an overlay
+  anchored above its trigger inside the card instead of expanding in flow.
+- **Consequences:** Fixed-size virtualization is preserved, so the technical-spec virtualization
+  contract still holds. The mounted-DOM budget is now two bounds rather than one: mounted virtual
+  rows stay under 20 as before, and mounted cards stay under 48 (rows x columns, with a smaller grid
+  overscan of 2). Sprint 014's performance work inherits the per-card bound. Sprint 004's original
+  "fewer than 20 mounted entries" phrasing applies to table mode and to rows, not to grid cards.

@@ -1,6 +1,6 @@
 # Sprint 014 — Scale, accessibility, and resilience
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 013
 **Roadmap revision:** 5
 
@@ -14,16 +14,18 @@ handles errors gracefully, and has comprehensive E2E regression coverage.
 1. `AGENTS.md`
 2. `docs/specs/product-spec.md` section 6 (non-functional requirements)
 3. `docs/specs/technical-spec.md` section 12 (performance budgets) and section 13 (accessibility)
-4. `docs/decisions.md` DEC-002, DEC-018, DEC-019, and DEC-022
+4. `docs/decisions.md` DEC-002, DEC-018, DEC-019, DEC-022, and DEC-023
 5. Sprint 013 Outcome and `docs/agent/WORKFLOW.md`
 6. Existing `frontend/src/` test infrastructure and `frontend/e2e/` test suite
 
 ## Current implementation baseline
 
-After Sprint 012, the application has a bulk-first triage page with server-side
-select-all, keyboard shortcuts, and 27 passing e2e tests. Sprint 013 is scheduled
-to repair the reported library grid overlap and add responsive spatial regression
-coverage. Performance has not been measured against documented budgets, and no
+After Sprint 013 the Chromium e2e suite is 33 passing plus 2 pre-existing skips,
+and `frontend/e2e/library.spec.ts` carries responsive spatial regressions at
+375/768/1440 with an expanded-score-picker containment check. The library grid
+virtualizes rows of cards (DEC-023): the mounted-DOM budget is two bounds —
+mounted virtual rows under 20 and mounted cards under 48 — and both are already
+asserted. Performance has not been measured against documented budgets, and no
 automated accessibility checks exist.
 
 ## Deliverables
@@ -31,7 +33,7 @@ automated accessibility checks exist.
 - Query/index measurement with 10k-entry benchmark; stored projection for normalized text sorts if needed.
 - Automated axe accessibility checks on core screens.
 - Error boundaries, degraded provider states, reduced-motion support, cancellation/race tests.
-- Complete critical E2E regression suite, including the Sprint 013 grid coverage.
+- Complete critical E2E regression suite, extending rather than replacing the Sprint 013 grid coverage.
 - Security limits: upload/image/path/provider limits, log redaction.
 
 ## Acceptance criteria
@@ -43,8 +45,10 @@ automated accessibility checks exist.
 
 ## Required tests (TDD)
 
-- Performance: 10k-entry benchmark script with documented results.
-- Accessibility: axe automated checks on library, triage, detail, import, add pages.
+- Performance: 10k-entry benchmark script with documented results, measured against both mounted-DOM
+  bounds from DEC-023 (rows and cards) rather than a single row count.
+- Accessibility: axe automated checks on library, triage, detail, import, add pages, including grid
+  mode with an expanded score-picker overlay open.
 - Resilience: error boundary renders fallback, provider degradation shows message, cancellation is clean.
 - Security: upload size limits, path traversal blocked, provider rate limits, log redaction.
 
@@ -80,6 +84,8 @@ git diff --check
 - Whether normalized text sorts need a stored projection column.
 - axe integration: CI vs local-only.
 - Reduced-motion implementation: CSS vs JS-driven.
+- The compact score picker is an overlay inside a fixed-height card (DEC-023); accessibility work on
+  it must not restore in-flow expansion, which is the defect Sprint 013 repaired.
 
 ## Outcome
 

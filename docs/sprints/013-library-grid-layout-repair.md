@@ -1,6 +1,6 @@
 # Sprint 013 — Library grid layout diagnosis and repair
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 012
 **Roadmap revision:** 5
 
@@ -104,4 +104,77 @@ Also inspect the seeded grid in Chromium at 375px, 768px, and 1440px widths and 
 
 ## Outcome
 
-_Not started. On completion record the reproduced failure and root cause, delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+**Status:** completed 2026-07-23.
+
+### Reproduced failure and root cause
+
+`test: reproduce library grid overlap` (8f47088) added bounding-box assertions and failed for the
+diagnosed reasons before any implementation change:
+
+- `entry 1 cover width: expected >= 48, received 32` at all three widths — the grid cover had only
+  `aspect-[2/3]` and shared the 128px grid column with the metadata block, so it collapsed to the
+  intrinsic width of the placeholder glyph.
+- `mobile: score panel x=286 y=616 w=338 h=64 escapes card x=20 y=493 w=335 h=310` — the expanded
+  compact picker rendered ten 32px buttons in a non-wrapping flex row inside the `1fr` column.
+- `desktop columns: expected >= 2, received 1` — grid mode was one full-width virtual row per entry.
+
+### Delivered behavior
+
+- `gridColumnCount` (`frontend/src/features/library/library.ts`) derives columns from the measured
+  scroll-container width, capped at 4 and floored at 1, never below `cardMinWidth` 260px.
+- `VirtualLibrary` virtualizes rows of cards: `count = ceil(entries / columns)`, fixed 300px row
+  band (280px card + 20px gap), grid overscan 2, `ResizeObserver` on the scroll container, and
+  `scrollToIndex(floor(entryIndex / columns))` for focus restoration.
+- A card is a fixed box: 128x192 cover, `line-clamp` metadata, and an `h-11` control row whose status
+  select absorbs free width so the score control cannot be pushed out.
+- The compact `ScorePicker` expands into an overlay (`absolute bottom-full right-0 z-20`, two rows of
+  five) anchored inside the card, so expanding never changes the card's layout box.
+- Table mode keeps `role="table"`, its 84px fixed rows, overscan 4, and truncating metadata.
+
+### Verification (actual results)
+
+| Command | Result |
+|---|---|
+| `python scripts/validate_project.py` | passed |
+| `make format` | clean, no residual changes |
+| `make check` | ruff, prettier, eslint, mypy (33 files), tsc, OpenAPI export check, frontend type check, validator — all passed |
+| `make test` | backend 122 passed; frontend 38 passed (8 files) |
+| `npm run test:e2e -- --project=chromium e2e/library.spec.ts` | 8 passed |
+| `npx playwright test --project=chromium` (full suite) | 33 passed, 2 skipped (pre-existing), 0 failed |
+| `make build` | backend wheel/sdist built; frontend 343.79 kB JS (105.40 kB gzip), 19.21 kB CSS |
+| `git diff --check` | clean |
+
+### Chromium inspection (required browser check)
+
+Seeded grid with one long-title/long-author fixture, score picker expanded on entry 1, screenshots
+reviewed at each width:
+
+| Viewport | Columns | Mounted rows | Mounted cards | Horizontal page overflow |
+|---|---|---|---|---|
+| 375x812 | 1 | 4 | 4 | 0px |
+| 768x1024 | 2 | 5 | 10 | 0px |
+| 1440x900 | 4 | 5 | 20 | 0px |
+
+Observed layout: covers render at full 128x192 in every card, long titles clamp to three lines and
+long authors to two, the status select shrinks instead of overflowing, and the expanded score panel
+sits over its own card's cover area without touching any neighbor. Table mode at 1440 renders
+unchanged single-line rows with the full long title visible.
+
+### Commits
+
+- `8f47088` test: reproduce library grid overlap
+- `64f3cf9` fix: repair responsive virtual library grid
+- `6aac5c5` test: cover grid layout regressions across viewports
+- closing documentation/state commit
+
+### Deviations and decisions
+
+- **DEC-023.** The mounted-DOM budget is now expressed as two bounds — mounted virtual rows under 20
+  (unchanged) and mounted cards under 48 — because a grid row mounts `columns` cards. The existing
+  e2e assertion on `data-mounted-count` was kept at `< 20`; the card-count assertion was moved from
+  `< 20` to `< 48` and grid overscan reduced from 4 to 2 to keep the budget tight. No test was
+  weakened in intent: the DOM is still bounded and still asserted after deep scrolling.
+- The technical spec's frontend section gained an explicit grid-virtualization and card-box contract.
+- Non-behavioral `data-card-cover` / `data-card-meta` / `data-card-controls` / `data-score-panel`
+  test hooks were added so spatial assertions can address layout regions directly.
+- No API, schema, or product-behavior change.

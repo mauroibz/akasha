@@ -2,7 +2,7 @@
 
 **Plan revision:** 5
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 013](013-library-grid-layout-repair.md)
+**Active sprint:** [Sprint 014](014-scale-accessibility-resilience.md)
 
 ## Dependency graph
 
@@ -42,8 +42,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | completed |
 | 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | completed |
 | 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | completed |
-| 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | ready |
-| 014 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 013 | planned |
+| 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | completed |
+| 014 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 013 | ready |
 | 015 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 014 | planned |
 
 ## Detailed future sprint contracts
@@ -205,7 +205,7 @@ keyboard behavior, inline editing, pagination, and table view.
 
 Scope:
 
-- Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark, accessibility audit and fixes.
+- Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark against both DEC-023 mounted-DOM bounds, accessibility audit and fixes.
 - Error boundaries, degraded provider states, reduced motion, cancellation/race tests.
 - Complete critical E2E regression suite and security limits.
 

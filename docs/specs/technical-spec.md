@@ -311,6 +311,8 @@ Cross-cutting behavior:
 - Keyboard shortcuts are disabled while an input, textarea, select, dialog, or content-editable element owns focus unless explicitly relevant.
 - `0` means score 10 only in score-shortcut context; Escape cancels an edit.
 - Virtual rows have stable keys and fixed measured sizes. Sort/filter changes crossfade the container; rows do not use layout animations.
+- The library grid virtualizes rows of cards, not single entries. The column count is derived from the measured scroll-container width so no card falls below its minimum width; a virtual row is one fixed-height band of that many fixed-height cards. Mounted DOM is therefore bounded per row and per card, and both bounds are asserted.
+- A library card is a fixed box: fixed-size cover, clamped metadata, and a control row that never wraps. Controls that expand (the compact score picker) render as an overlay anchored inside the card, so expanding a control never changes a card's layout box or paints into a neighbor.
 - Selection is independent of mounted rows: either explicit selected IDs or `all_matching=true` with excluded IDs. `Ctrl/Cmd+A` means all server rows matching the current filter, not merely loaded rows.
 
 The product spec defines each screen. Sprint acceptance tests must include the critical keyboard flows and reduced-motion behavior.

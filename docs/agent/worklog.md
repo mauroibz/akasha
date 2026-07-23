@@ -265,3 +265,42 @@ file created at `docs/sprints/013-scale-accessibility-resilience.md`.
 
 **Next:** Execute Sprint 013, beginning with the specified failing overlap regression; do not begin
 Sprint 014 hardening until the grid repair is verified and closed.
+
+## Session 2026-07-23 — Sprint 013 (library-grid-layout-repair)
+
+**Done:**
+- Reproduced the reported overlap with bounding-box Playwright assertions before touching the
+  implementation. Recorded failures: grid cover width 32px (expected >= 48) at all three widths, the
+  expanded score panel at 375px measuring `x=286 w=338` against a card at `x=20 w=335`, and grid mode
+  reporting 1 column at 1440px.
+- Rewrote grid mode as a virtualized multi-column card grid. `gridColumnCount` in
+  `frontend/src/features/library/library.ts` derives the column count from the measured scroll
+  container; `VirtualLibrary` virtualizes rows of `columns` fixed-height 280px cards inside a 300px
+  band and uses `ResizeObserver` plus `scrollToIndex(floor(index / columns))`.
+- Made the compact `ScorePicker` expand into an overlay anchored above its trigger (two rows of five)
+  so expanded editing cannot alter or escape the card box.
+- Added non-behavioral `data-card-cover` / `data-card-meta` / `data-card-controls` /
+  `data-score-panel` hooks so spatial assertions address layout regions directly.
+- Recorded DEC-023 and added the grid-virtualization/card-box contract to technical spec section 8.
+
+**Verified:**
+- `python scripts/validate_project.py`, `make format`, `make check` — all passed.
+- `make test` — backend 122 passed, frontend 38 passed.
+- `npx playwright test --project=chromium e2e/library.spec.ts` — 8 passed; full Chromium suite
+  33 passed / 2 pre-existing skips / 0 failed.
+- `make build` — frontend 343.79 kB JS (105.40 kB gzip), 19.21 kB CSS. `git diff --check` clean.
+- Chromium inspection with screenshots at 375/768/1440: 1/2/4 columns, 4/10/20 mounted cards,
+  4/5/5 mounted virtual rows, 0px horizontal page overflow at every width. Table mode re-checked
+  visually at 1440 and unchanged.
+
+**Deviations:**
+- The single mounted-DOM assertion became two bounds (rows `< 20` unchanged, cards `< 48`) because a
+  grid row now mounts `columns` cards; grid overscan was reduced from 4 to 2 to keep the budget
+  tight. Recorded as DEC-023 rather than silently relaxing the old number.
+- A throwaway `e2e/grid-inspect.spec.ts` was used to capture the required screenshots and geometry,
+  then deleted; it asserted nothing and did not belong in the suite. Re-create it if the inspection
+  needs repeating.
+- Commit messages in this repository carry no `Co-Authored-By` trailer, per owner instruction.
+
+**Next:** Sprint 014 (scale-accessibility-resilience) — status `ready`. Benchmark against both
+DEC-023 mounted-DOM bounds and keep the score-picker overlay when doing accessibility work.
