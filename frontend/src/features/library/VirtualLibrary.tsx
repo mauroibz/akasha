@@ -1,11 +1,17 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useRef } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
 import type { LibraryEntry } from "@/api/library";
-import type { LibraryView } from "./library";
+import {
+  gridColumnCount,
+  gridLayout,
+  gridRowHeight,
+  tableRowHeight,
+  type LibraryView,
+} from "./library";
 
 interface VirtualLibraryProps {
   entries: LibraryEntry[];
@@ -24,12 +30,14 @@ function EntryControls({
   entry,
   onScore,
   onStatus,
+  stretch,
 }: Pick<VirtualLibraryProps, "onScore" | "onStatus"> & {
   entry: LibraryEntry;
+  stretch?: boolean;
 }) {
   return (
     <div
-      className="flex items-center gap-2"
+      className="flex h-11 shrink-0 items-center gap-2"
       data-card-controls=""
       onClick={(e) => e.stopPropagation()}
     >
@@ -38,7 +46,11 @@ function EntryControls({
       </label>
       <select
         id={`status-${entry.id}`}
-        className="min-h-11 rounded-lg bg-zinc-800 px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-fuchsia-400"
+        className={`min-h-11 rounded-lg bg-zinc-800 px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-fuchsia-400 ${
+          // In a card the select absorbs the free width so it can never push the
+          // score control past the card edge.
+          stretch ? "min-w-0 flex-1" : ""
+        }`}
         value={entry.status}
         onChange={(event) =>
           onStatus(entry, event.target.value as LibraryEntry["status"])
@@ -67,24 +79,72 @@ function EntryControls({
   );
 }
 
+function EntryMetadata({
+  entry,
+  grid,
+}: {
+  entry: LibraryEntry;
+  grid: boolean;
+}) {
+  return (
+    <div className="min-w-0 flex-1" data-card-meta="">
+      <h2
+        className={`font-semibold leading-snug ${grid ? "line-clamp-3" : "truncate"}`}
+      >
+        {entry.item.title}
+      </h2>
+      <p
+        className={`text-sm text-zinc-400 ${grid ? "mt-1 line-clamp-2" : "truncate"}`}
+      >
+        {entry.item.sort_author ?? "Unknown author"}
+      </p>
+      <p className={`text-xs text-zinc-500 ${grid ? "mt-1 truncate" : ""}`}>
+        Edition year: {entry.item.year ?? "unknown"}
+        {entry.item.metadata.original_year &&
+        entry.item.metadata.original_year !== entry.item.year
+          ? ` · Original: ${entry.item.metadata.original_year}`
+          : ""}
+      </p>
+    </div>
+  );
+}
+
 export function VirtualLibrary(props: VirtualLibraryProps) {
   const parentRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const rowHeight = props.view === "table" ? 84 : 310;
+  const isGrid = props.view !== "table";
+  const [containerWidth, setContainerWidth] = useState(0);
+
+  useLayoutEffect(() => {
+    const element = parentRef.current;
+    if (!element) return;
+    const measure = () => setContainerWidth(element.clientWidth);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
+
+  const columns = isGrid ? gridColumnCount(containerWidth) : 1;
+  const rowHeight = isGrid ? gridRowHeight : tableRowHeight;
+  const rowCount = Math.ceil(props.entries.length / columns);
   const virtualizer = useVirtualizer({
-    count: props.entries.length,
+    count: rowCount,
     getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
-    overscan: 4,
-    getItemKey: (index) => props.entries[index]?.id ?? index,
+    // A grid row mounts `columns` cards, so it uses a smaller overscan to keep
+    // the mounted-DOM budget comparable to the table.
+    overscan: isGrid ? 2 : 4,
+    getItemKey: (index) => props.entries[index * columns]?.id ?? index,
     initialRect: { width: 1000, height: 640 },
   });
   const virtualItems = virtualizer.getVirtualItems();
-  const mountedItems = virtualItems.length
+  const mountedRows = virtualItems.length
     ? virtualItems
-    : props.entries.slice(0, 5).map((entry, index) => ({
+    : Array.from({ length: Math.min(5, rowCount) }, (_, index) => ({
         index,
-        key: entry.id,
+        key: props.entries[index * columns]?.id ?? index,
         size: rowHeight,
         start: index * rowHeight,
         end: (index + 1) * rowHeight,
@@ -95,12 +155,12 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
     const last = virtualItems.at(-1);
     if (
       last &&
-      last.index >= props.entries.length - 3 &&
+      last.index >= rowCount - 3 &&
       props.hasNextPage &&
       !props.isFetchingNextPage
     )
       props.loadNextPage();
-  }, [props, virtualItems]);
+  }, [props, rowCount, virtualItems]);
 
   useEffect(() => {
     if (props.focusedId === null) return;
@@ -115,92 +175,110 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
       (entry) => entry.id === props.focusedId,
     );
     if (index < 0) return;
-    virtualizer.scrollToIndex(index, { align: "auto" });
+    virtualizer.scrollToIndex(Math.floor(index / columns), { align: "auto" });
     window.requestAnimationFrame(() => {
       parentRef.current
         ?.querySelector<HTMLElement>(`[data-entry-id="${props.focusedId}"]`)
         ?.focus();
     });
-  }, [props.entries, props.focusedId, virtualizer]);
+  }, [columns, props.entries, props.focusedId, virtualizer]);
+
+  const renderEntry = (entry: LibraryEntry) => {
+    const isHighlighted = props.highlightId === entry.id;
+    const ring = isHighlighted ? "ring-2 ring-fuchsia-400" : "";
+    const focusRing =
+      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400";
+    return (
+      <article
+        aria-label={entry.item.title}
+        className={
+          isGrid
+            ? `flex h-full flex-col gap-3 overflow-hidden rounded-2xl bg-zinc-900/60 p-4 ${focusRing} ${ring}`
+            : `flex h-full w-full items-center gap-4 border-b border-zinc-800 px-4 ${focusRing} ${ring}`
+        }
+        data-entry-id={entry.id}
+        data-provisional={entry.score_provisional ? "true" : "false"}
+        data-highlighted={isHighlighted ? "true" : "false"}
+        key={entry.id}
+        onFocus={() => props.onFocusEntry(entry.id)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            void navigate(`/books/${entry.id}`);
+          }
+        }}
+        role={isGrid ? undefined : "row"}
+        tabIndex={0}
+      >
+        <button
+          type="button"
+          className={`flex min-w-0 flex-1 gap-4 overflow-hidden text-left focus-visible:outline-none ${
+            isGrid ? "items-start" : "items-center"
+          }`}
+          aria-label={`Open ${entry.item.title}`}
+          onClick={() => void navigate(`/books/${entry.id}`)}
+        >
+          <div className="shrink-0" data-card-cover="">
+            <CoverImage
+              src={entry.item.cover_url}
+              alt={`Cover of ${entry.item.title}`}
+              className={isGrid ? "h-48 w-32 rounded-xl" : "h-14 w-10"}
+            />
+          </div>
+          <EntryMetadata entry={entry} grid={isGrid} />
+        </button>
+        <EntryControls
+          entry={entry}
+          onScore={props.onScore}
+          onStatus={props.onStatus}
+          stretch={isGrid}
+        />
+      </article>
+    );
+  };
 
   return (
     <div
       ref={parentRef}
-      className="library-scroll mt-5 h-[min(70vh,760px)] overflow-auto rounded-2xl bg-zinc-900/40"
-      role={props.view === "table" ? "table" : "feed"}
+      className="library-scroll mt-5 h-[min(70vh,760px)] overflow-y-auto overflow-x-hidden rounded-2xl bg-zinc-900/40"
+      role={isGrid ? "feed" : "table"}
       aria-label="Library"
-      data-mounted-count={mountedItems.length}
+      data-mounted-count={mountedRows.length}
+      data-columns={columns}
     >
       <div
         className="relative w-full"
         style={{ height: virtualizer.getTotalSize() }}
       >
-        {mountedItems.map((row) => {
-          const entry = props.entries[row.index];
-          const isHighlighted = props.highlightId === entry.id;
+        {mountedRows.map((row) => {
+          const rowEntries = props.entries.slice(
+            row.index * columns,
+            row.index * columns + columns,
+          );
           return (
-            <article
-              aria-label={entry.item.title}
-              className={
-                props.view === "table"
-                  ? `absolute left-0 top-0 flex w-full items-center gap-4 border-b border-zinc-800 px-4 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400 ${isHighlighted ? "ring-2 ring-fuchsia-400" : ""}`
-                  : `absolute left-0 top-0 grid w-full grid-cols-[128px_1fr] gap-5 px-4 py-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400 ${isHighlighted ? "ring-2 ring-fuchsia-400" : ""}`
-              }
-              data-entry-id={entry.id}
-              data-provisional={entry.score_provisional ? "true" : "false"}
-              data-highlighted={isHighlighted ? "true" : "false"}
-              key={entry.id}
-              onFocus={() => props.onFocusEntry(entry.id)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  void navigate(`/books/${entry.id}`);
-                }
-              }}
-              role={props.view === "table" ? "row" : undefined}
+            <div
+              className={`absolute left-0 top-0 w-full ${isGrid ? "px-4" : ""}`}
+              key={row.key}
               style={{
                 height: row.size,
                 transform: `translateY(${row.start}px)`,
               }}
-              tabIndex={0}
             >
-              <button
-                type="button"
-                className="flex min-w-0 flex-1 items-center gap-4 text-left focus-visible:outline-none"
-                aria-label={`Open ${entry.item.title}`}
-                onClick={() => void navigate(`/books/${entry.id}`)}
+              <div
+                className="grid"
+                style={
+                  isGrid
+                    ? {
+                        gap: gridLayout.gap,
+                        gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+                        height: gridLayout.cardHeight,
+                      }
+                    : { height: row.size }
+                }
               >
-                <div data-card-cover="">
-                  <CoverImage
-                    src={entry.item.cover_url}
-                    alt={`Cover of ${entry.item.title}`}
-                    className={
-                      props.view === "table"
-                        ? "h-14 w-10 shrink-0"
-                        : "aspect-[2/3] rounded-xl"
-                    }
-                  />
-                </div>
-                <div className="min-w-0 flex-1" data-card-meta="">
-                  <h2 className="truncate font-semibold">{entry.item.title}</h2>
-                  <p className="truncate text-sm text-zinc-400">
-                    {entry.item.sort_author ?? "Unknown author"}
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    Edition year: {entry.item.year ?? "unknown"}
-                    {entry.item.metadata.original_year &&
-                    entry.item.metadata.original_year !== entry.item.year
-                      ? ` · Original: ${entry.item.metadata.original_year}`
-                      : ""}
-                  </p>
-                </div>
-              </button>
-              <EntryControls
-                entry={entry}
-                onScore={props.onScore}
-                onStatus={props.onStatus}
-              />
-            </article>
+                {rowEntries.map(renderEntry)}
+              </div>
+            </div>
           );
         })}
       </div>

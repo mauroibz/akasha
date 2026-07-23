@@ -40,44 +40,45 @@ export function ScorePicker({
     };
   }, [editing]);
 
-  if (!editing) {
-    return (
-      <button
-        type="button"
-        className={cn(
-          "min-h-11 rounded-lg border px-3 text-center focus-ring",
-          provisional
-            ? "border-amber-400/60 text-amber-200"
-            : "border-zinc-700 text-zinc-200",
-          value === null && "text-zinc-500",
-          compact && "h-9 min-h-0 px-2 text-sm",
-        )}
-        onClick={() => setEditing(true)}
-        aria-label={`${label}: ${value ?? "unscored"}`}
-      >
-        {value ?? "—"}
-        {provisional && (
-          <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
-        )}
-      </button>
-    );
-  }
+  const trigger = (
+    <button
+      type="button"
+      className={cn(
+        "min-h-11 rounded-lg border px-3 text-center focus-ring",
+        provisional
+          ? "border-amber-400/60 text-amber-200"
+          : "border-zinc-700 text-zinc-200",
+        value === null && "text-zinc-500",
+        compact && "h-9 min-h-0 shrink-0 px-2 text-sm",
+      )}
+      aria-expanded={editing}
+      aria-label={`${label}: ${value ?? "unscored"}`}
+      onClick={() => setEditing((open) => !open)}
+    >
+      {value ?? "—"}
+      {provisional && (
+        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+      )}
+    </button>
+  );
 
-  return (
+  const panel = (
     <div
-      ref={containerRef}
-      className="inline-flex flex-col gap-1"
+      className="flex flex-col gap-1"
       data-score-panel=""
       role="group"
       aria-label={label}
     >
-      <div className="flex gap-0.5">
+      {/* Compact mode wraps into two rows of five so the whole picker fits
+          inside a library card at the narrowest supported viewport. */}
+      <div className={compact ? "grid grid-cols-5 gap-1" : "flex gap-0.5"}>
         {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
           <button
             key={n}
             type="button"
             className={cn(
-              "h-11 w-8 rounded text-sm font-medium transition-colors focus-ring",
+              "w-8 rounded text-sm font-medium transition-colors focus-ring",
+              compact ? "h-9" : "h-11",
               n === value
                 ? "bg-fuchsia-500 text-zinc-950"
                 : value !== null && n <= value
@@ -97,7 +98,7 @@ export function ScorePicker({
       </div>
       <button
         type="button"
-        className="self-start text-xs text-zinc-500 hover:text-zinc-300 focus-ring rounded"
+        className="self-start rounded text-xs text-zinc-500 hover:text-zinc-300 focus-ring"
         onClick={() => {
           onChange(null);
           setEditing(false);
@@ -105,6 +106,29 @@ export function ScorePicker({
       >
         Clear score
       </button>
+    </div>
+  );
+
+  // Compact pickers live inside fixed-height virtual cards, so the expanded
+  // panel is an overlay anchored above the trigger: it never changes the card's
+  // layout box and cannot push neighbouring content around.
+  if (compact)
+    return (
+      <div className="relative shrink-0" ref={containerRef}>
+        {trigger}
+        {editing && (
+          <div className="absolute bottom-full right-0 z-20 mb-2 w-max rounded-xl border border-zinc-700 bg-zinc-950 p-2 shadow-2xl">
+            {panel}
+          </div>
+        )}
+      </div>
+    );
+
+  if (!editing) return trigger;
+
+  return (
+    <div className="inline-flex" ref={containerRef}>
+      {panel}
     </div>
   );
 }
