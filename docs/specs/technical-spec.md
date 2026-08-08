@@ -220,7 +220,15 @@ The domain defines separate immutable models: `SearchCandidate`, `ItemPayload`, 
 - Return a typed `providers_unavailable` error only if every enabled provider fails.
 - Google Books is disabled, not failed, when no key exists.
 - Bound result count and response size.
-- Mock all provider traffic in tests; no default test contacts public APIs.
+- Mock all provider traffic in tests; no default test contacts public APIs. Mocking transport is required; substituting a mock for the provider method under test is not a proof of that method and does not satisfy a correctness criterion. Boundary behavior is proven by replaying a committed recorded response (DEC-025).
+
+Open Library edition lookup by ISBN uses `https://openlibrary.org/isbn/{isbn}.json`. That endpoint answers with a redirect to the edition record, so the shared provider client must follow redirects. `https://openlibrary.org/books/{id}.json` accepts an OLID only and returns 404 for an ISBN; it is never used for ISBN lookup.
+
+Background enrichment tries Open Library first and falls back to Google Books when Open Library fails or returns nothing usable. A job that exhausts both providers records a typed, human-readable reason retrievable through `GET /api/import/jobs/{id}`; enrichment failures are never swallowed.
+
+Merged search results preserve the relevance ordering the providers returned. Each candidate retains its provider-returned position, the two providers are interleaved fairly, and title-match, language, and cover-presence signals act only as tie-breakers. Merging must never re-sort results by title.
+
+Provider availability is reported on the health endpoint so the interface can render a degraded-search state, and the absence of `GOOGLE_BOOKS_API_KEY` is logged at startup rather than silently reducing search to one provider.
 
 Open Library search must not map work-level `first_publish_year` into edition publication year. It may expose that value separately as `original_year`; `items.year` is populated only from edition data. A work URL resolves to an edition-picker list, preferring editions with valid ISBNs and useful language metadata for ranking, but never silently chooses one. A chosen result always carries an edition identity.
 
@@ -295,9 +303,10 @@ Use strict TypeScript, React Router, TanStack Query, TanStack Virtual, React Hoo
 
 Design tokens:
 
-- dark-first zinc near-black surfaces, not pure black;
-- a deliberate non-default saturated accent;
-- Geist or Inter with bundled/local or privacy-safe loading;
+- dark-first zinc near-black surfaces, not pure black: zinc-950 background, zinc-900 surface, zinc-800 border, zinc-50 text, zinc-400 muted;
+- a deliberate non-default saturated accent: amber-400 on a zinc-950 foreground, with a score ramp of red-400 (1–3), amber-400 (4–6), lime-400 (7–8), emerald-400 (9–10) (DEC-026);
+- Geist or Inter with bundled/local or privacy-safe loading. Inter is self-hosted and bundled; naming a font without loading it is not compliance;
+- these are declared once as Tailwind theme tokens and CSS variables. Inline colour literals in components are a defect;
 - no generic border-shadow card grid;
 - visible focus rings and touch targets at least 44 px where practical;
 - all motion disabled/reduced under `prefers-reduced-motion`.
@@ -313,6 +322,8 @@ Cross-cutting behavior:
 - Virtual rows have stable keys and fixed measured sizes. Sort/filter changes crossfade the container; rows do not use layout animations.
 - The library grid virtualizes rows of cards, not single entries. The column count is derived from the measured scroll-container width so no card falls below its minimum width; a virtual row is one fixed-height band of that many fixed-height cards. Mounted DOM is therefore bounded per row and per card, and both bounds are asserted.
 - A library card is a fixed box: fixed-size cover, clamped metadata, and a control row that never wraps. Controls that expand (the compact score picker) render as an overlay anchored inside the card, so expanding a control never changes a card's layout box or paints into a neighbor.
+- Two components are deliberately bespoke rather than library primitives, and must stay that way (DEC-026). The score picker may not become a portalled primitive, because its expanded panel is required to remain geometrically inside its card; portalling to `document.body` breaks that by construction. The library card box may not adopt a primitive carrying its own intrinsic padding, because the card height is pinned for fixed-size virtualization and the column calculation subtracts a matched row padding.
+- Every user action produces visible feedback. An accessible live region is a complement to a visible confirmation, never a substitute for one: feedback rendered only into a visually hidden element is a defect, not an implementation.
 - Selection is independent of mounted rows: either explicit selected IDs or `all_matching=true` with excluded IDs. `Ctrl/Cmd+A` means all server rows matching the current filter, not merely loaded rows.
 
 The product spec defines each screen. Sprint acceptance tests must include the critical keyboard flows and reduced-motion behavior.
@@ -344,6 +355,10 @@ Test pyramid:
 - container smoke test with persistent `/data`, read-only `/calibre`, readiness, and SPA fallback.
 
 `make check` must format-check, lint, type-check, validate docs/state, and verify generated API types. `make test` must run deterministic unit/integration/component tests. Network-dependent and live-provider smoke tests are opt-in and never gates for normal commits.
+
+CI runs the Chromium Playwright suite as its own job. The layout and keyboard regressions are the only automated guardrail on the virtualization and grid contracts in section 8, and they are not part of `make test`.
+
+Automated gates are necessary and not sufficient. A sprint touching user-visible behavior additionally requires the walkthrough gate in `AGENTS.md` section 3: the application is run against realistic data, the sprint's flow is performed end to end, and the observations are recorded in the worklog. This requirement exists because thirteen sprints closed green on a product with an invisible feedback layer and a wholly failing enrichment pipeline (DEC-025).
 
 Coverage is a diagnostic, not a target to game. Critical domain and import code should have branch coverage; acceptance criteria are behavior-based.
 

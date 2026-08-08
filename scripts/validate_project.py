@@ -124,9 +124,9 @@ def validate_state(errors: list[str]) -> None:
             errors.append("complete project must have null active sprint and file")
         if state.get("active_sprint_status") is not None:
             errors.append("complete project must have null active_sprint_status")
-        expected_all = [f"{number:03d}" for number in range(1, 13)]
+        expected_all = [f"{number:03d}" for number in range(1, 19)]
         if completed != expected_all:
-            errors.append("complete project must list completed_sprints 001 through 012 in order")
+            errors.append("complete project must list completed_sprints 001 through 018 in order")
     else:
         active_id = state.get("active_sprint")
         active_file_value = state.get("active_sprint_file")

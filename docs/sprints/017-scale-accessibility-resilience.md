@@ -1,8 +1,8 @@
-# Sprint 014 — Scale, accessibility, and resilience
+# Sprint 017 — Scale, accessibility, and resilience
 
-**Status:** ready
-**Depends on:** 013
-**Roadmap revision:** 5
+**Status:** planned
+**Depends on:** 016
+**Roadmap revision:** 6
 
 ## Objective
 
@@ -14,19 +14,27 @@ handles errors gracefully, and has comprehensive E2E regression coverage.
 1. `AGENTS.md`
 2. `docs/specs/product-spec.md` section 6 (non-functional requirements)
 3. `docs/specs/technical-spec.md` section 12 (performance budgets) and section 13 (accessibility)
-4. `docs/decisions.md` DEC-002, DEC-018, DEC-019, DEC-022, and DEC-023
-5. Sprint 013 Outcome and `docs/agent/WORKFLOW.md`
+4. `docs/decisions.md` DEC-002, DEC-018, DEC-019, DEC-022, DEC-023, and DEC-024
+5. Sprint 016 Outcome and `docs/agent/WORKFLOW.md`
 6. Existing `frontend/src/` test infrastructure and `frontend/e2e/` test suite
 
 ## Current implementation baseline
 
-After Sprint 013 the Chromium e2e suite is 33 passing plus 2 pre-existing skips,
-and `frontend/e2e/library.spec.ts` carries responsive spatial regressions at
-375/768/1440 with an expanded-score-picker containment check. The library grid
-virtualizes rows of cards (DEC-023): the mounted-DOM budget is two bounds —
-mounted virtual rows under 20 and mounted cards under 48 — and both are already
-asserted. Performance has not been measured against documented budgets, and no
-automated accessibility checks exist.
+Re-derive this section at activation; the figures below predate Sprints 014–016 and must be
+measured again rather than copied.
+
+As of Sprint 013 the Chromium e2e suite was 33 passing plus 2 pre-existing skips, and
+`frontend/e2e/library.spec.ts` carried responsive spatial regressions at 375/768/1440 with an
+expanded-score-picker containment check. The library grid virtualizes rows of cards (DEC-023):
+the mounted-DOM budget is two bounds — mounted virtual rows under 20 and mounted cards under 48
+— and both are already asserted. Performance has not been measured against documented budgets,
+and no automated accessibility checks exist.
+
+Sprints 014–016 changed the surface this sprint audits. Sprint 015 replaced every control with a
+shadcn primitive and rewrote several e2e selectors, so the suite size and the mounted-DOM margins
+differ. Sprint 016 added Motion, so reduced-motion assertions are no longer vacuous and bundle
+size grew. Accessibility work here runs against real Radix primitives, which changes what axe
+reports.
 
 ## Deliverables
 
@@ -68,7 +76,7 @@ git diff --check
 
 ## Explicit non-scope
 
-- No container, backup, or release work (Sprint 015).
+- No container, backup, or release work (Sprint 018).
 
 ## Commit checkpoints
 
@@ -77,7 +85,7 @@ git diff --check
 3. `feat: add error boundaries and degraded provider states`
 4. `test: add security limit and log redaction tests`
 5. `test: complete critical E2E regression suite`
-6. final `docs(sprint-014): close sprint and hand off`
+6. final `docs(sprint-017): close sprint and hand off`
 
 ## Risks and decisions to surface
 

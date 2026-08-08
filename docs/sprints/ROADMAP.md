@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 5
+**Plan revision:** 6
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 014](014-scale-accessibility-resilience.md)
+**Active sprint:** [Sprint 014](014-metadata-correctness-search.md)
 
 ## Dependency graph
 
@@ -20,8 +20,11 @@
                              └─ 011 Durable enrichment + undo
                                  └─ 012 Triage workflow
                                      └─ 013 Library grid layout repair
-                                         └─ 014 Scale, accessibility, resilience
-                                             └─ 015 Container, backup, release
+                                         └─ 014 Metadata correctness + search relevance
+                                             └─ 015 Design system + components
+                                                 └─ 016 Motion + interaction polish
+                                                     └─ 017 Scale, accessibility, resilience
+                                                         └─ 018 Container, backup, release
 ```
 
 Sprints 003 and 005 are architecturally parallel but are intentionally sequenced for one-agent worktrees and simpler handoffs. Frontend vertical slices begin only after stable API contracts exist.
@@ -43,8 +46,11 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | completed |
 | 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | completed |
 | 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | completed |
-| 014 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 013 | ready |
-| 015 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 014 | planned |
+| 014 | Metadata correctness and search relevance | Searching finds the intended edition; added and imported books acquire real metadata and cached covers, proven against recorded provider responses | 013 | ready |
+| 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | planned |
+| 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | planned |
+| 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | planned |
+| 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | planned |
 
 ## Detailed future sprint contracts
 
@@ -201,7 +207,34 @@ flex child plus a non-wrapping controls child, while fixed 310px virtual rows ca
 overflow. The repair must establish a real responsive card grid and retain bounded virtualization,
 keyboard behavior, inline editing, pagination, and table view.
 
-### [Sprint 014 — Scale, accessibility, and resilience](014-scale-accessibility-resilience.md)
+### [Sprint 014 — Metadata correctness and search relevance](014-metadata-correctness-search.md)
+
+Scope and acceptance are detailed in the linked sprint contract. It repairs four defects
+confirmed against live providers and running code on 2026-08-08: Open Library ISBN enrichment
+requests an OLID endpoint and has always failed, merged search results are re-sorted
+alphabetically and lose provider relevance, Google Books never registers because no key is
+configured, and only the first search result resolves an edition year. Backend only, so it does
+not collide with the frontend rebuild, and it makes real covers and metadata exist before the
+UI that displays them is judged.
+
+### [Sprint 015 — Design system and component foundation](015-design-system-components.md)
+
+Scope and acceptance are detailed in the linked sprint contract. `technical-spec.md` section 8
+requires shadcn/ui primitives, Tailwind tokens, and React Hook Form with schema validation; none
+were installed, so every control is hand-rolled, there are no design tokens, and every toast is
+rendered `sr-only` and therefore invisible. This sprint installs the specified stack, commits to
+the DEC-026 token set, and makes feedback visible. The Sprint 013 grid contract and the bespoke
+`ScorePicker` overlay are explicitly out of scope for replacement.
+
+### [Sprint 016 — Motion and interaction polish](016-motion-interaction-polish.md)
+
+Scope and acceptance are detailed in the linked sprint contract. `motion` has been a dependency
+since Sprint 004 and is imported zero times, so every microinteraction in product-spec section 7
+is missing. Animation is spent on interactions, never on scrolling: the container crossfades on
+sort and filter change and rows never carry layout animations, per technical-spec section 8. Both
+DEC-023 mounted-DOM bounds are re-asserted with animation enabled.
+
+### [Sprint 017 — Scale, accessibility, and resilience](017-scale-accessibility-resilience.md)
 
 Scope:
 
@@ -216,7 +249,7 @@ Acceptance:
 - Upload/image/path/provider limits and log redaction tests pass.
 - No uncaught frontend errors in E2E console.
 
-### Sprint 015 — Container, backup, and v1 release
+### Sprint 018 — Container, backup, and v1 release
 
 Scope:
 

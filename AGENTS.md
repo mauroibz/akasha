@@ -39,6 +39,15 @@ Run every command in the sprint's `Verification` section, then run `make check` 
 
 A sprint is not complete if required verification is skipped. If the environment makes a check impossible, leave the sprint `in_progress`, document the exact blocker and command output in `docs/agent/HANDOFF.md`, and do not claim completion.
 
+### Walkthrough gate
+
+A sprint touching user-visible behavior is not complete until you have run the application against realistic data, performed the sprint's user flow end to end, and recorded in `docs/agent/worklog.md` what you exercised, what you observed, and anything that felt wrong. Passing tests are not evidence that a flow works.
+
+This gate exists because thirteen sprints closed with green gates on a product whose entire feedback layer was invisible and whose enrichment pipeline had never once succeeded (DEC-025). Two rules follow from that failure:
+
+- A test that substitutes a mock for the unit under test does not satisfy a correctness acceptance criterion. Behavior at an external boundary is proven against recorded real responses.
+- Report what you saw, including what looked wrong but was out of scope. A defect noticed and left unrecorded is the failure mode this gate is meant to prevent.
+
 ## 4. Reconcile plan and implementation
 
 Before the completion commit:
@@ -56,7 +65,7 @@ Document observed reality. Do not change the product spec merely to excuse an in
 Only after all acceptance criteria and verification pass:
 
 1. Mark the active sprint `completed` in its file.
-2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if Sprint 015 just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
+2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if Sprint 018 just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
 3. Append a `docs/agent/worklog.md` entry for this session (done, verified-and-how, deviations, next), then rewrite `docs/agent/HANDOFF.md` for the next agent as concise current reality, not a transcript.
 4. Run `python scripts/validate_project.py`, `make check`, and `make test` once more.
 5. Create the final documentation/state commit: `docs(sprint-NNN): close sprint and hand off`.

@@ -304,3 +304,52 @@ Sprint 014 hardening until the grid repair is verified and closed.
 
 **Next:** Sprint 014 (scale-accessibility-resilience) — status `ready`. Benchmark against both
 DEC-023 mounted-DOM bounds and keep the score-picker overlay when doing accessibility work.
+
+## Session 2026-08-08 — Roadmap revision 6 (assessment and replan, planning only)
+
+**Done:**
+- Audited the project end to end after the owner reported the product as a candidate failure.
+  Wrote `docs/assessment.md` with the evidence: three libraries required by technical-spec
+  section 8 (shadcn/ui, Motion, React Hook Form + zod) were never installed, and four defects
+  were confirmed against live systems and running code.
+- Inserted three sprints and renumbered downstream work. New Sprint 014 (metadata correctness and
+  search relevance, backend only, `ready`), Sprint 015 (design system and component foundation),
+  Sprint 016 (motion and interaction polish). Hardening moved to 017 (file renamed via `git mv`,
+  content preserved, baseline section marked for re-derivation), release to 018.
+- Recorded DEC-024 (the replan), DEC-025 (walkthrough gate and E2E in CI), DEC-026 (amber design
+  direction, component library adoption, and the two deliberately bespoke components).
+- Added the walkthrough gate to `AGENTS.md` section 3 and a `playwright` job to
+  `.github/workflows/ci.yml`. The Chromium suite had never run in CI.
+- Patched `docs/specs/technical-spec.md`: section 6.2 records the `/isbn/` plus redirect contract,
+  the Google Books enrichment fallback, relevance preservation, and that mocking the unit under
+  test is not proof of it; section 8 pins the concrete token set and the bespoke-component
+  exceptions and forbids feedback rendered only into a hidden element; section 10 records the
+  walkthrough gate and CI E2E.
+- Corrected stale hardcodes that predate this session: `scripts/validate_project.py` bounded the
+  complete-project check at `range(1, 13)` while the plan had already reached 015; `AGENTS.md`
+  and `docs/agent/WORKFLOW.md` both hardcoded Sprint 015 as final. All now reference 018.
+
+**Verified:**
+- `python scripts/validate_project.py` — passed with the new numbering.
+- `make check` — passed (ruff format/lint, prettier, eslint zero-warning, mypy, tsc, OpenAPI
+  export and type check, validator).
+- `make test` — backend 122 passed, frontend 38 passed. Unchanged; this session touched no source.
+- `git diff --check` clean. `docs/sprints/` holds exactly one file per number 001–017 with no
+  duplicate prefixes, and exactly one file reads `**Status:** ready` (014).
+- `grep -rn "014-scale" --include=*.md .` returns nothing; every markdown link resolves.
+
+**Deviations:**
+- Sprint 018 remains roadmap-only per `ROADMAP.md` line 51 — the closing agent of 017 expands it.
+  Sprints 015 and 016 were written as full files now rather than left as roadmap contracts, so the
+  owner has an executable path without a planning session between each sprint.
+- Sprint 014 includes one small frontend change (sourcing the shelf filter from
+  `GET /api/shelves`) despite being described as backend-only. It is a data-correctness defect,
+  not presentation, and fixing it in 015 would mix it with a full rewrite.
+- No implementation was performed. This session changed documentation, state, protocol, and CI
+  configuration only, matching how DEC-022 handled the Sprint 013 insertion.
+
+**Next:** Sprint 014 (metadata correctness and search relevance) — status `ready`. It is blocked
+on the owner supplying `GOOGLE_BOOKS_API_KEY` in `.env` before its walkthrough can be completed;
+the code and tests can proceed without it. Start by writing the recorded-response test for
+`OpenLibraryProvider.fetch_by_isbn` and observing it fail against the current `/books/{isbn}`
+implementation.

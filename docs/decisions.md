@@ -253,3 +253,80 @@ Append-only record of material architecture choices, product-default resolutions
   rows stay under 20 as before, and mounted cards stay under 48 (rows x columns, with a smaller grid
   overscan of 2). Sprint 014's performance work inherits the per-card bound. Sprint 004's original
   "fewer than 20 mounted entries" phrasing applies to table mode and to rows, not to grid cards.
+
+## DEC-024 — Insert correctness and UI-foundation sprints before hardening
+
+- **Date:** 2026-08-08
+- **Status:** accepted; supersedes DEC-022 only for downstream sprint numbering
+- **Context:** After Sprint 013 the owner reported the product as a candidate failure: clunky UI,
+  incomplete flows, searched books not found, books added without metadata, missing polish. An
+  end-to-end audit found the cause is neither the stack, the specs, nor problem difficulty. Three
+  libraries required by technical-spec section 8 — shadcn/ui, Motion, and React Hook Form with
+  schema validation — were never installed, so there is no component library, no design tokens,
+  and no microinteractions. Four defects were confirmed against live systems: Open Library ISBN
+  enrichment requests `/books/{isbn}` (measured 404) instead of `/isbn/{isbn}` (measured 302) and
+  has therefore always failed silently; `merge_and_rank` re-sorts merged results alphabetically
+  and discards provider relevance; Google Books never registers because no key is configured; and
+  every toast is rendered `sr-only` and is invisible. All 160 tests pass, because the enrichment
+  method is replaced by an `AsyncMock` in all five of its tests and Playwright reads hidden text.
+- **Decision:** Insert three sprints. Sprint 014 repairs metadata correctness and search
+  relevance, backend only. Sprint 015 installs the specified component library, design tokens, and
+  form stack, and makes feedback visible. Sprint 016 implements the product-spec section 7
+  microinteractions. Hardening moves to Sprint 017 and release to Sprint 018. The backend is kept:
+  its layering, migrations, keyset pagination, leased job runner, and import ledger are sound. The
+  frontend is rebuilt on the specified stack rather than patched, with no compatibility shims. This
+  planning change does not authorize implementation during the planning session.
+- **Consequences:** Correctness precedes presentation, so Sprints 015 and 016 are judged against
+  real covers and metadata rather than blank rows. Sprint 017 hardens a working product. The
+  Sprint 013 grid contract (DEC-023) constrains Sprint 015 rather than being reopened by it.
+  Final-project validation closes after Sprint 018, and the `range(1, 13)` bound in
+  `scripts/validate_project.py` — already stale at plan revision 5 — is corrected to match.
+
+## DEC-025 — Verification requires using the application, and E2E runs in CI
+
+- **Date:** 2026-08-08
+- **Status:** accepted
+- **Context:** Thirteen sprints closed green while the product did not work. `AGENTS.md` section 3
+  defined verification as the sprint's commands plus `make check`, `make test`, and Playwright.
+  Every gate passed honestly every time. Nothing in the protocol required opening the application
+  and using it, so an invisible feedback layer and a wholly dead enrichment pipeline survived
+  thirteen closures. Playwright is additionally not part of CI at all: `.github/workflows/ci.yml`
+  runs `make check`, `make test`, and `make build`, and `make test` runs pytest and vitest only.
+  The eight Sprint 013 layout regressions — the only guardrail on the grid contract — have never
+  run in CI.
+- **Decision:** `AGENTS.md` section 3 gains a mandatory walkthrough gate: a sprint touching
+  user-visible behavior is not complete until the agent has run the application against realistic
+  data, performed the sprint's user flow end to end, and recorded in the worklog what was
+  exercised, what was observed, and anything that felt wrong. Passing tests are not evidence that
+  a flow works. A `playwright` job is added to CI. Tests that substitute a mock for the unit under
+  test do not satisfy a correctness criterion; provider-boundary behavior is proven against
+  recorded real responses.
+- **Consequences:** Every UI-touching sprint costs a manual pass and produces a qualitative
+  worklog record alongside command output. CI runtime grows by the Chromium suite. Sprints 014
+  through 017 carry the walkthrough in their Verification sections explicitly.
+
+## DEC-026 — Design direction, component library, and the bespoke score picker
+
+- **Date:** 2026-08-08
+- **Status:** accepted
+- **Context:** Product spec section 7 asked for a real design direction rather than a default, and
+  technical-spec section 8 required "a deliberate non-default saturated accent" without naming
+  one. The implementation used ad-hoc `fuchsia-*` and `zinc-*` literals with an empty Tailwind
+  theme and no CSS variables, and named Inter without ever loading it. Separately, converting the
+  score picker to a portalled primitive would break a real invariant rather than a cosmetic one.
+- **Decision:** The owner selected a warm amber direction. Tokens: zinc-950 background, zinc-900
+  surface, zinc-800 border, zinc-50 text, zinc-400 muted, amber-400 accent on a zinc-950
+  foreground, and a score ramp of red-400 (1–3), amber-400 (4–6), lime-400 (7–8), emerald-400
+  (9–10). Inter is self-hosted and bundled. shadcn/ui, `react-hook-form` with `zod`, and
+  `lucide-react` are installed and used for every control, with two documented exceptions:
+  `ScorePicker` and the library card box remain bespoke. `ScorePicker` must not become a Radix
+  `Popover` — Radix portals to `document.body`, and the expanded panel is required to stay
+  geometrically inside its card (DEC-023, and the exact defect Sprint 013 repaired). The library
+  card must not become a shadcn `Card` because `gridLayout.cardHeight` is pinned at 280px for
+  fixed-size virtualization and `gridColumnCount` subtracts a hard-coded 32px padding matched to
+  the row.
+- **Consequences:** Colour, radius, spacing, and typography become tokens, so later theme changes
+  are one edit rather than a sweep. Adopting Radix changes DOM shape, so `selectOption()` and
+  `input[type="checkbox"]` selectors across three e2e specs must be rewritten in Sprint 015. The
+  two bespoke components are now explicitly documented as intentional, so a future agent does not
+  "finish the migration" and reintroduce the Sprint 013 defect.

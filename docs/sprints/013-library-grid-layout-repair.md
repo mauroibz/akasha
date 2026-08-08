@@ -87,7 +87,7 @@ Also inspect the seeded grid in Chromium at 375px, 768px, and 1440px widths and 
 - No broad visual redesign, new library features, or changes to product branding.
 - No triage-page redesign unless shared component changes are required to prevent a verified regression.
 - No performance/accessibility/security hardening beyond regressions directly affected by this repair (Sprint 014).
-- No container, backup, or release work (Sprint 015).
+- No container, backup, or release work (Sprint 018).
 
 ## Commit checkpoints
 
