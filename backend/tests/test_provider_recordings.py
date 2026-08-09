@@ -5,16 +5,14 @@ No test in this module may substitute a mock for the provider method it is provi
 
 from __future__ import annotations
 
-import httpx
 import pytest
+from recordings import recording, redirect_location, replay
 
 from book_tracker.infrastructure.providers import (
     OpenLibraryProvider,
     ProviderPayloadError,
     create_provider_client,
 )
-
-from recordings import recording, redirect_location, replay
 
 
 @pytest.fixture
@@ -35,7 +33,9 @@ EDITION_ROUTES = {
 async def test_fetch_by_isbn_replays_the_real_isbn_redirect_into_a_populated_payload() -> None:
     """The recorded 302 is the whole point: /books/{isbn} answers 404 for an ISBN."""
     requested: list[str] = []
-    transport = replay(EDITION_ROUTES, on_request=lambda request: requested.append(request.url.path))
+    transport = replay(
+        EDITION_ROUTES, on_request=lambda request: requested.append(request.url.path)
+    )
 
     async with create_provider_client(transport=transport) as client:
         payload = await OpenLibraryProvider(client, "test@example.invalid").fetch_by_isbn(

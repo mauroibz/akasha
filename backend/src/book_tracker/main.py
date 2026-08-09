@@ -3,7 +3,6 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-import httpx
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from sqlalchemy import text
@@ -18,7 +17,11 @@ from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
-from book_tracker.infrastructure.providers import GoogleBooksProvider, OpenLibraryProvider
+from book_tracker.infrastructure.providers import (
+    GoogleBooksProvider,
+    OpenLibraryProvider,
+    create_provider_client,
+)
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import schema_is_current, upgrade
 
@@ -35,9 +38,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             assert configured.database_url is not None
             upgrade(configured.database_url)
         app.state.engine = create_engine(configured)
-        provider_client = httpx.AsyncClient(
-            timeout=httpx.Timeout(5), limits=httpx.Limits(max_connections=10)
-        )
+        provider_client = create_provider_client()
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
         app.state.calibre_dir = configured.calibre_dir

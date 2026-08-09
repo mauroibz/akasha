@@ -11,7 +11,15 @@ from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRe
 
 
 class ProviderPayloadError(ValueError):
-    pass
+    """A provider answered, but not with data we can use.
+
+    `code` is the stable machine-readable reason; the message is written for a person
+    reading a failed enrichment job.
+    """
+
+    def __init__(self, message: str, *, code: str = "provider_payload_invalid") -> None:
+        super().__init__(message)
+        self.code = code
 
 
 MAX_PROVIDER_BYTES = 2 * 1024 * 1024
@@ -26,6 +34,9 @@ def create_provider_client(transport: httpx.AsyncBaseTransport | None = None) ->
     return httpx.AsyncClient(
         timeout=httpx.Timeout(5),
         limits=httpx.Limits(max_connections=10),
+        # `https://openlibrary.org/isbn/{isbn}.json` answers 302 to the edition record.
+        # Without this a redirect passes `raise_for_status` and then fails JSON parsing.
+        follow_redirects=True,
         transport=transport,
     )
 
@@ -199,9 +210,14 @@ class OpenLibraryProvider:
 
     async def fetch(self, source_id: str) -> ItemPayload:
         row = await self._json(f"https://openlibrary.org/books/{source_id}.json")
+        return await self._edition_payload(row, source_id)
+
+    async def _edition_payload(self, row: Mapping[str, Any], source_id: str) -> ItemPayload:
         title = row.get("title")
         if not title:
-            raise ProviderPayloadError("Open Library edition has no title")
+            raise ProviderPayloadError(
+                "Open Library edition has no title", code="edition_incomplete"
+            )
         author_ids = _keys(row.get("authors"), "/authors/")
         author_records = []
         for author_id in author_ids:
@@ -275,8 +291,35 @@ class OpenLibraryProvider:
         )
 
     async def fetch_by_isbn(self, isbn: str) -> ItemPayload:
-        """Fetch edition data by ISBN. Used by background enrichment."""
-        return await self.fetch(isbn)
+        """Fetch edition data by ISBN. Used by background enrichment.
+
+        `/books/{id}.json` accepts an OLID only and answers 404 for an ISBN, so this
+        goes through `/isbn/{isbn}.json`, which redirects to the edition record.
+        """
+        try:
+            row = await self._json(f"https://openlibrary.org/isbn/{isbn}.json")
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code == 404:
+                raise ProviderPayloadError(
+                    f"Open Library has no edition for ISBN {isbn}", code="edition_not_found"
+                ) from error
+            raise ProviderPayloadError(
+                f"Open Library returned HTTP {error.response.status_code} for ISBN {isbn}",
+                code="provider_http_error",
+            ) from error
+        except httpx.HTTPError as error:
+            raise ProviderPayloadError(
+                f"Open Library could not be reached for ISBN {isbn}", code="provider_unreachable"
+            ) from error
+        key = str(row.get("key", ""))
+        if not key.startswith("/books/"):
+            # `/isbn/` can redirect to a work rather than an edition; `items.year` must
+            # never be populated from work-level data.
+            raise ProviderPayloadError(
+                f"Open Library resolved ISBN {isbn} to {key or 'no record'}, not an edition",
+                code="edition_not_found",
+            )
+        return await self._edition_payload(row, key.removeprefix("/books/"))
 
     async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._json(
