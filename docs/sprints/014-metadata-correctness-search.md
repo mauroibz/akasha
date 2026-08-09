@@ -1,6 +1,6 @@
 # Sprint 014 — Metadata correctness and search relevance
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 013
 **Roadmap revision:** 6
 

@@ -1,0 +1,11 @@
+HTTP/2 302 
+server: nginx/1.30.4
+date: Sun, 09 Aug 2026 21:51:48 GMT
+content-type: text/html
+access-control-allow-origin: *
+access-control-allow-method: GET, OPTIONS
+access-control-max-age: 86400
+location: https://openlibrary.org/books/OL19845805M.json
+x-ol-stats: "IB 1 0.076 MC 1 0.001 TT 0 0.078"
+referrer-policy: no-referrer-when-downgrade
+

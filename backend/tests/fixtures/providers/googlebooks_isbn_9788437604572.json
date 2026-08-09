@@ -1,0 +1,75 @@
+{
+  "kind": "books#volumes",
+  "totalItems": 300,
+  "items": [
+    {
+      "kind": "books#volume",
+      "id": "B-JeAAAAMAAJ",
+      "etag": "/ufhw4Nl9pw",
+      "selfLink": "https://www.googleapis.com/books/v1/volumes/B-JeAAAAMAAJ",
+      "volumeInfo": {
+        "title": "Rayuela",
+        "authors": [
+          "Julio Cortázar"
+        ],
+        "publisher": "Ediciones Catedra S.A.",
+        "publishedDate": "1984",
+        "description": "En Rayuela (1963) se trata de representar el absurdo, el caos y el problema existencial mediante una tecnica nueva conscientemente elaborada con este proposito. Es una novela escrita para ser leida como si fuera un juego infantil, su estructura no es fija, es cambiante. Todo el conjunto de materiales que aporta la edicion, como las abundantes notas, plano y fotografias, serviran para comprender mejor y disfrutar mas con esta gran novela repleta de humor, de busqueda, de nostalgia, de juego.",
+        "industryIdentifiers": [
+          {
+            "type": "OTHER",
+            "identifier": "UOM:39015008575477"
+          }
+        ],
+        "readingModes": {
+          "text": false,
+          "image": false
+        },
+        "pageCount": 762,
+        "printType": "BOOK",
+        "categories": [
+          "Fiction"
+        ],
+        "maturityRating": "NOT_MATURE",
+        "allowAnonLogging": false,
+        "contentVersion": "0.17.5.0.preview.0",
+        "panelizationSummary": {
+          "containsEpubBubbles": false,
+          "containsImageBubbles": false
+        },
+        "imageLinks": {
+          "smallThumbnail": "http://books.google.com/books/content?id=B-JeAAAAMAAJ&printsec=frontcover&img=1&zoom=5&source=gbs_api",
+          "thumbnail": "http://books.google.com/books/content?id=B-JeAAAAMAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+        },
+        "language": "es",
+        "previewLink": "http://books.google.com.ar/books?id=B-JeAAAAMAAJ&dq=isbn:9788437604572&hl=&cd=1&source=gbs_api",
+        "infoLink": "http://books.google.com.ar/books?id=B-JeAAAAMAAJ&dq=isbn:9788437604572&hl=&source=gbs_api",
+        "canonicalVolumeLink": "https://books.google.com/books/about/Rayuela.html?hl=&id=B-JeAAAAMAAJ"
+      },
+      "saleInfo": {
+        "country": "AR",
+        "saleability": "NOT_FOR_SALE",
+        "isEbook": false
+      },
+      "accessInfo": {
+        "country": "AR",
+        "viewability": "NO_PAGES",
+        "embeddable": false,
+        "publicDomain": false,
+        "textToSpeechPermission": "ALLOWED",
+        "epub": {
+          "isAvailable": false
+        },
+        "pdf": {
+          "isAvailable": false
+        },
+        "webReaderLink": "http://play.google.com/books/reader?id=B-JeAAAAMAAJ&hl=&source=gbs_api",
+        "accessViewStatus": "NONE",
+        "quoteSharingAllowed": false
+      },
+      "searchInfo": {
+        "textSnippet": "En Rayuela (1963) se trata de representar el absurdo, el caos y el problema existencial mediante una tecnica nueva conscientemente elaborada con este proposito."
+      }
+    }
+  ]
+}

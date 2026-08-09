@@ -17,6 +17,19 @@ class ProviderPayloadError(ValueError):
 MAX_PROVIDER_BYTES = 2 * 1024 * 1024
 
 
+def create_provider_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
+    """Build the shared client every provider uses.
+
+    Tests construct it with a replay transport so they exercise the same redirect and
+    timeout behaviour the application runs with.
+    """
+    return httpx.AsyncClient(
+        timeout=httpx.Timeout(5),
+        limits=httpx.Limits(max_connections=10),
+        transport=transport,
+    )
+
+
 async def _bounded_json(
     client: httpx.AsyncClient,
     url: str,
