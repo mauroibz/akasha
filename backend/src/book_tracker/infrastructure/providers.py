@@ -1,4 +1,6 @@
+import asyncio
 import json
+import re
 from collections.abc import Mapping
 from dataclasses import replace
 from typing import Any
@@ -23,6 +25,9 @@ class ProviderPayloadError(ValueError):
 
 
 MAX_PROVIDER_BYTES = 2 * 1024 * 1024
+# Undated search results are resolved against `/works/{id}/editions.json`. Bounded so a
+# 20-result search never opens 20 simultaneous connections to Open Library.
+WORK_RESOLUTION_CONCURRENCY = 5
 
 
 def create_provider_client(transport: httpx.AsyncBaseTransport | None = None) -> httpx.AsyncClient:
@@ -67,14 +72,24 @@ async def _bounded_json(
     return decoded
 
 
+_YEAR_PATTERN = re.compile(r"\b(1[0-9]{3}|20[0-9]{2})\b")
+
+
 def _year(value: object) -> int | None:
-    try:
-        if isinstance(value, list):
-            value = value[0] if value else None
-        text = str(value)
-        return int(text[:4]) if len(text) >= 4 else None
-    except (TypeError, ValueError):
+    """Read a publication year out of whatever shape a provider used.
+
+    Open Library publishes edition dates as `"1984"`, `"1984-03"`, and `"Mar 09, 2005"`
+    alike. Taking the first four characters read the last of those as `"Mar "` and threw
+    the year away, which is why most search results arrived without one.
+    """
+    if isinstance(value, list):
+        value = value[0] if value else None
+    if value is None:
         return None
+    if isinstance(value, int) and not isinstance(value, bool):
+        return value if 1000 <= value <= 2999 else None
+    match = _YEAR_PATTERN.search(str(value))
+    return int(match.group(1)) if match else None
 
 
 def _isbn(values: list[object]) -> dict[str, str]:
@@ -178,35 +193,59 @@ class OpenLibraryProvider:
         docs = body.get("docs", [])
         if not isinstance(docs, list):
             raise ProviderPayloadError("Open Library docs must be a list")
-        candidates = [
-            candidate
+        # Pair each candidate with the work it came from. Rows that yield no candidate
+        # are dropped, so building the two lists separately would misalign them.
+        paired = [
+            (str(row.get("key", "")).removeprefix("/works/"), candidate)
             for row in docs
             if isinstance(row, dict)
             if (candidate := self._candidate(row))
         ]
-        enriched: list[SearchCandidate] = []
-        for row, candidate in zip(
-            (value for value in docs if isinstance(value, dict)), candidates, strict=False
-        ):
-            work_id = str(row.get("key", "")).removeprefix("/works/")
-            if candidate.year is None and work_id and not enriched:
+        return await self._resolve_missing_years(paired)
+
+    async def _resolve_missing_years(
+        self, paired: list[tuple[str, SearchCandidate]]
+    ) -> list[SearchCandidate]:
+        """Fill the edition year on every result the search response left undated.
+
+        This used to run for the first row only, so results 2..20 reached the picker
+        without a year. Every undated row is resolved now, concurrently and behind a
+        semaphore so a 20-result search cannot fan out 20 simultaneous requests at
+        Open Library.
+        """
+        gate = asyncio.Semaphore(WORK_RESOLUTION_CONCURRENCY)
+
+        async def resolve(
+            index: int, work_id: str, candidate: SearchCandidate
+        ) -> tuple[int, SearchCandidate]:
+            if candidate.year is not None or not work_id:
+                return index, candidate
+            async with gate:
                 try:
                     editions = await self.resolve_work(work_id, limit=20)
                 except (httpx.HTTPError, ProviderPayloadError):
-                    editions = []
-                if editions:
-                    edition = editions[0]
-                    candidate = replace(
-                        edition,
-                        title=candidate.title,
-                        subtitle=candidate.subtitle or edition.subtitle,
-                        authors=candidate.authors,
-                        cover_url=edition.cover_url or candidate.cover_url,
-                        original_year=candidate.original_year,
-                        metadata=candidate.metadata,
-                    )
-            enriched.append(candidate)
-        return enriched
+                    return index, candidate
+            edition = next((row for row in editions if row.year is not None), None)
+            if edition is None:
+                return index, candidate
+            return index, replace(
+                edition,
+                title=candidate.title,
+                subtitle=candidate.subtitle or edition.subtitle,
+                authors=candidate.authors,
+                cover_url=edition.cover_url or candidate.cover_url,
+                original_year=candidate.original_year,
+                metadata=candidate.metadata,
+            )
+
+        resolved = await asyncio.gather(
+            *(
+                resolve(index, work_id, candidate)
+                for index, (work_id, candidate) in enumerate(paired)
+            )
+        )
+        # Ordering is the provider's relevance ordering and must survive the fan-out.
+        return [candidate for _index, candidate in sorted(resolved, key=lambda row: row[0])]
 
     async def fetch(self, source_id: str) -> ItemPayload:
         row = await self._json(f"https://openlibrary.org/books/{source_id}.json")

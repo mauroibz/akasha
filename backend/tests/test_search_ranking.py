@@ -100,6 +100,44 @@ def test_signals_only_break_ties_between_equally_ranked_results() -> None:
     assert [row.source_id for row in merge_and_rank("Rayuela", candidates)] == ["g1", "OL1M"]
 
 
+QUIJOTE_ROUTES = {
+    "/search.json": (200, recording("search_don_quijote.json")),
+    # Result 7 has no datable edition anywhere; result 14 does, and is the one the
+    # `and not enriched` gate never reached.
+    "/works/OL17741305W/editions.json": (200, recording("editions_OL17741305W.json")),
+    "/works/OL34762840W/editions.json": (200, recording("editions_OL34762840W.json")),
+}
+
+
+@pytest.mark.anyio
+async def test_every_result_resolves_an_edition_year_not_only_the_first() -> None:
+    async with create_provider_client(transport=replay(QUIJOTE_ROUTES)) as client:
+        rows = await OpenLibraryProvider(client, "test@example.invalid").search(
+            "Don Quijote de la Mancha"
+        )
+
+    assert [row.title for row in rows if row.year is None] == []
+    # 19 of the 20 recorded works resolve to an edition. The twentieth carries no
+    # edition identity at all and is dropped rather than shown without one.
+    assert len(rows) == 19
+
+
+@pytest.mark.anyio
+async def test_a_prose_publish_date_still_yields_a_year() -> None:
+    """The recorded editions publish as "Mar 09, 2005"; a four-character slice fails."""
+    async with create_provider_client(transport=replay(QUIJOTE_ROUTES)) as client:
+        rows = await OpenLibraryProvider(client, "test@example.invalid").search(
+            "Don Quijote de la Mancha"
+        )
+    resolved = next(row for row in rows if row.title == "Don Quijote de La Mancha")
+    recorded_years = {
+        int(entry["publish_date"][-4:])
+        for entry in recording("editions_OL34762840W.json")["entries"]
+        if entry.get("publish_date")
+    }
+    assert resolved.year in recorded_years
+
+
 @pytest.mark.anyio
 async def test_search_providers_preserves_ranking_end_to_end() -> None:
     async with create_provider_client(transport=replay(RAYUELA_ROUTES)) as client:
