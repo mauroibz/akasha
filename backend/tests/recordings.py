@@ -8,8 +8,9 @@ commands used to capture each file.
 
 from __future__ import annotations
 
+import contextlib
 import json
-from collections.abc import Callable, Mapping
+from collections.abc import AsyncIterator, Callable, Mapping
 from pathlib import Path
 from typing import Any
 
@@ -61,3 +62,71 @@ def replay(
         return httpx.Response(status, json=body, headers=headers)
 
     return httpx.MockTransport(handler)
+
+
+# --------------------------------------------------------------------------------------
+# Route sets shared by the provider and enrichment suites
+# --------------------------------------------------------------------------------------
+
+RECORDED_ISBN = "9788437604572"
+
+OPENLIBRARY_HIT: Mapping[str, Route] = {
+    f"/isbn/{RECORDED_ISBN}.json": (
+        302,
+        None,
+        {"location": redirect_location("isbn_9788437604572.headers")},
+    ),
+    "/books/OL19845805M.json": (200, recording("edition_OL19845805M.json")),
+    "/authors/OL2631008A.json": (200, recording("author_OL2631008A.json")),
+    "/works/OL14860424W.json": (200, recording("work_OL14860424W.json")),
+}
+OPENLIBRARY_MISS: Mapping[str, Route] = {
+    f"/isbn/{RECORDED_ISBN}.json": (404, {"error": "notfound"})
+}
+GOOGLE_HIT: Mapping[str, Route] = {
+    "/books/v1/volumes": (200, recording("googlebooks_isbn_9788437604572.json"))
+}
+GOOGLE_MISS: Mapping[str, Route] = {
+    "/books/v1/volumes": (200, recording("googlebooks_isbn_9789994444441_empty.json"))
+}
+
+
+def unreachable_transport() -> httpx.MockTransport:
+    """A transport that fails the test if the code under test calls a provider at all."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        raise AssertionError(f"unexpected provider call to {request.url}")
+
+    return httpx.MockTransport(handler)
+
+
+@contextlib.asynccontextmanager
+async def enrichment_providers(
+    *,
+    openlibrary: Mapping[str, Route] | None = None,
+    google: Mapping[str, Route] | None = None,
+    forbid_calls: bool = False,
+) -> AsyncIterator[dict[str, Any]]:
+    """Yield real provider instances whose transports replay committed recordings."""
+    from book_tracker.infrastructure.providers import (
+        GoogleBooksProvider,
+        OpenLibraryProvider,
+        create_provider_client,
+    )
+
+    providers: dict[str, Any] = {}
+    clients: list[httpx.AsyncClient] = []
+    try:
+        if openlibrary is not None or forbid_calls:
+            transport = unreachable_transport() if forbid_calls else replay(openlibrary or {})
+            client = create_provider_client(transport=transport)
+            clients.append(client)
+            providers["openlibrary"] = OpenLibraryProvider(client, "test@example.invalid")
+        if google is not None:
+            client = create_provider_client(transport=replay(google))
+            clients.append(client)
+            providers["googlebooks"] = GoogleBooksProvider(client, "test-key")
+        yield providers
+    finally:
+        for client in clients:
+            await client.aclose()

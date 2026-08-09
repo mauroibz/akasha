@@ -84,6 +84,7 @@ class JobProgressResponse(BaseModel):
     state: str
     progress: dict[str, Any] = Field(default_factory=dict)
     error: str | None = None
+    error_code: str | None = None
     attempts: int = 0
     created_at: str
     finished_at: str | None = None

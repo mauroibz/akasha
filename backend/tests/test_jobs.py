@@ -4,20 +4,17 @@ import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
-from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
-from sqlalchemy import Engine, select, text
+from sqlalchemy import Engine, text
 from sqlalchemy.orm import Session
 
-from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.undo import UndoExpiredError, UndoService
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
-from book_tracker.domain.providers import ItemPayload, SourceRef
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
-from book_tracker.infrastructure.models import ImportEffectRow, JobRow
+from book_tracker.infrastructure.models import JobRow
 from book_tracker.main import create_app
 from book_tracker.migrations import upgrade
 
@@ -388,159 +385,6 @@ class TestRateLimiting:
 
 
 # ---------------------------------------------------------------------------
-# AC6: Enrichment fills only empty fields, never overwrites
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.anyio
-async def test_enrichment_fills_empty_fields_only(tmp_path: Path) -> None:
-    """AC6: Enrichment fills only empty fields and never overwrites."""
-    app = create_app(settings(tmp_path))
-    async with app.router.lifespan_context(app):
-        item_id = _create_item(app.state.engine, "Test Book")
-        repo = JobRepository(app.state.engine)
-        job_id = repo.enqueue(None, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"})
-        now = datetime.now(UTC)
-        mock_provider = MagicMock()
-        mock_provider.fetch_by_isbn = AsyncMock(
-            return_value=ItemPayload(
-                source="openlibrary",
-                source_id="OL123M",
-                source_refs=(SourceRef("openlibrary", "OL123M"),),
-                title="Test Book",
-                subtitle=None,
-                authors=("Author",),
-                year=2000,
-                cover_url=None,
-                identifiers={"isbn13": "9780141187761"},
-                language="en",
-                metadata={"publisher": "Penguin", "page_count": 300},
-            )
-        )
-        handler = EnrichmentHandler(
-            app.state.engine, {"openlibrary": mock_provider}, rate_limiter=None
-        )
-        result = await handler.process(job_id, now)
-        assert result["state"] == "succeeded"
-        filled = result.get("progress", {}).get("filled", [])
-        assert "year" in filled
-        assert "metadata.publisher" in filled
-        with app.state.engine.connect() as conn:
-            row = conn.execute(
-                text("SELECT year, metadata FROM items WHERE id=:id"), {"id": item_id}
-            ).one()
-            assert row.year == 2000
-            metadata = json.loads(row.metadata)
-            assert metadata["publisher"] == "Penguin"
-            assert metadata["page_count"] == 300
-
-
-@pytest.mark.anyio
-async def test_enrichment_never_overwrites_existing_values(tmp_path: Path) -> None:
-    """AC6: Enrichment never overwrites existing user data or manual edits."""
-    app = create_app(settings(tmp_path))
-    async with app.router.lifespan_context(app):
-        item_id = _create_item(
-            app.state.engine,
-            "My Book",
-            year=1950,
-            metadata={"authors": ["Author"], "publisher": "Manual Press"},
-        )
-        repo = JobRepository(app.state.engine)
-        job_id = repo.enqueue(None, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"})
-        now = datetime.now(UTC)
-        mock_provider = MagicMock()
-        mock_provider.fetch_by_isbn = AsyncMock(
-            return_value=ItemPayload(
-                source="openlibrary",
-                source_id="OL123M",
-                source_refs=(SourceRef("openlibrary", "OL123M"),),
-                title="Different Title",
-                subtitle=None,
-                authors=("Different Author",),
-                year=2000,
-                cover_url=None,
-                identifiers={"isbn13": "9780141187761"},
-                language="en",
-                metadata={
-                    "publisher": "Penguin",
-                    "page_count": 300,
-                    "description": "A description",
-                },
-            )
-        )
-        handler = EnrichmentHandler(
-            app.state.engine, {"openlibrary": mock_provider}, rate_limiter=None
-        )
-        await handler.process(job_id, now)
-        with app.state.engine.connect() as conn:
-            row = conn.execute(
-                text("SELECT title, year, metadata FROM items WHERE id=:id"),
-                {"id": item_id},
-            ).one()
-            assert row.title == "My Book"
-            assert row.year == 1950
-            metadata = json.loads(row.metadata)
-            assert metadata["publisher"] == "Manual Press"
-            assert metadata["authors"] == ["Author"]
-            assert metadata.get("description") == "A description"
-
-
-@pytest.mark.anyio
-async def test_enrichment_records_import_effect(tmp_path: Path) -> None:
-    """Enrichment fills append import_effects for undo coverage."""
-    app = create_app(settings(tmp_path))
-    async with app.router.lifespan_context(app):
-        item_id = _create_item(app.state.engine, "Test Book")
-        batch_id = _create_committed_batch(app.state.engine)
-        # Link the item to the import record for effect lookup
-        with app.state.engine.begin() as conn:
-            conn.execute(
-                text("UPDATE import_records SET matched_item_id=:iid WHERE batch_id=:bid"),
-                {"iid": item_id, "bid": batch_id},
-            )
-        repo = JobRepository(app.state.engine)
-        job_id = repo.enqueue(
-            batch_id, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"}
-        )
-        now = datetime.now(UTC)
-        mock_provider = MagicMock()
-        mock_provider.fetch_by_isbn = AsyncMock(
-            return_value=ItemPayload(
-                source="openlibrary",
-                source_id="OL123M",
-                source_refs=(SourceRef("openlibrary", "OL123M"),),
-                title="Test Book",
-                subtitle=None,
-                authors=("Author",),
-                year=2000,
-                cover_url=None,
-                identifiers={"isbn13": "9780141187761"},
-                language="en",
-                metadata={"publisher": "Penguin"},
-            )
-        )
-        handler = EnrichmentHandler(
-            app.state.engine, {"openlibrary": mock_provider}, rate_limiter=None
-        )
-        await handler.process(job_id, now)
-        with Session(app.state.engine) as session:
-            effects = list(
-                session.scalars(
-                    select(ImportEffectRow)
-                    .where(ImportEffectRow.batch_id == batch_id)
-                    .order_by(ImportEffectRow.effect_id)
-                )
-            )
-            fill_effects = [e for e in effects if e.effect_type == "fill_empty"]
-            assert len(fill_effects) >= 1
-            for e in fill_effects:
-                before = json.loads(e.before_values)
-                after = json.loads(e.after_values)
-                assert before != after
-
-
-# ---------------------------------------------------------------------------
 # AC3: Safe undo — revert matching, preserve edited, shared, pre-existing
 # ---------------------------------------------------------------------------
 
@@ -698,35 +542,6 @@ class TestLateJobCancellation:
         with Session(engine) as session:
             job = session.get(JobRow, job_id)
             assert job.state == "cancelled"
-
-    @pytest.mark.anyio
-    async def test_enrichment_handler_skips_cancelled_batch(self, tmp_path: Path) -> None:
-        """AC5: A late enrichment job for an undone batch is a no-op."""
-        app = create_app(settings(tmp_path))
-        async with app.router.lifespan_context(app):
-            batch_id = _create_committed_batch(app.state.engine)
-            item_id = _create_item(app.state.engine, "Test")
-            with app.state.engine.begin() as conn:
-                conn.execute(
-                    text("UPDATE import_batches SET state='undone' WHERE id=:id"),
-                    {"id": batch_id},
-                )
-            repo = JobRepository(app.state.engine)
-            job_id = repo.enqueue(
-                batch_id, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"}
-            )
-            now = datetime.now(UTC)
-            mock_provider = MagicMock()
-            mock_provider.fetch_by_isbn = AsyncMock()
-            handler = EnrichmentHandler(
-                app.state.engine, {"openlibrary": mock_provider}, rate_limiter=None
-            )
-            result = await handler.process(job_id, now)
-            assert result["state"] == "cancelled"
-            mock_provider.fetch_by_isbn.assert_not_called()
-            with Session(app.state.engine) as session:
-                job = session.get(JobRow, job_id)
-                assert job.state == "cancelled"
 
 
 # ---------------------------------------------------------------------------

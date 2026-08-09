@@ -131,6 +131,7 @@ class JobRow(Base):
     payload: Mapped[str]
     progress: Mapped[str]
     error: Mapped[str | None]
+    error_code: Mapped[str | None]
     attempts: Mapped[int]
     available_at: Mapped[str]
     heartbeat_at: Mapped[str | None]

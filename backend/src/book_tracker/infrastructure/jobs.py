@@ -78,6 +78,7 @@ class JobRepository:
                     payload=json.dumps(dict(payload)),
                     progress="{}",
                     error=None,
+                    error_code=None,
                     attempts=0,
                     available_at=available,
                     heartbeat_at=None,
@@ -141,7 +142,13 @@ class JobRepository:
             row.updated_at = now_iso
 
     def fail(
-        self, job_id: str, error: str, now: datetime, *, max_retries: int = DEFAULT_MAX_RETRIES
+        self,
+        job_id: str,
+        error: str,
+        now: datetime,
+        *,
+        code: str | None = None,
+        max_retries: int = DEFAULT_MAX_RETRIES,
     ) -> None:
         now_iso = now.isoformat().replace("+00:00", "Z")
         with self._write() as session:
@@ -150,6 +157,7 @@ class JobRepository:
                 raise LookupError(job_id)
             row.attempts += 1
             row.error = error
+            row.error_code = code
             row.lease_expires_at = None
             row.heartbeat_at = None
             if row.attempts >= max_retries:
@@ -230,6 +238,7 @@ class JobRepository:
                 "payload": json.loads(row.payload),
                 "progress": json.loads(row.progress),
                 "error": row.error,
+                "error_code": row.error_code,
                 "attempts": row.attempts,
                 "created_at": row.created_at,
                 "updated_at": row.updated_at,
@@ -251,6 +260,7 @@ class JobRepository:
                     "state": row.state,
                     "progress": json.loads(row.progress),
                     "error": row.error,
+                    "error_code": row.error_code,
                     "attempts": row.attempts,
                     "created_at": row.created_at,
                     "finished_at": row.finished_at,
@@ -303,7 +313,12 @@ class JobRunner:
             return False
         handler = self.handlers.get(claimed.kind)
         if handler is None:
-            self.repo.fail(claimed.id, f"no_handler:{claimed.kind}", now)
+            self.repo.fail(
+                claimed.id,
+                f"No handler is registered for {claimed.kind} jobs",
+                now,
+                code="no_handler",
+            )
             return True
         try:
             result = await handler.process(claimed.id, now)
@@ -312,7 +327,19 @@ class JobRunner:
             elif result["state"] == "cancelled":
                 self.repo.cancel(claimed.id)
             else:
-                self.repo.fail(claimed.id, result.get("error", "unknown"), now)
+                self.repo.fail(
+                    claimed.id,
+                    result.get("error", "unknown"),
+                    now,
+                    code=result.get("error_code"),
+                )
         except Exception as exc:
-            self.repo.fail(claimed.id, str(exc)[:200], now)
+            # A handler raising is a defect, not an expected provider outcome; keep the
+            # type so the job row says something better than the bare message.
+            self.repo.fail(
+                claimed.id,
+                f"{type(exc).__name__}: {exc}"[:200],
+                now,
+                code="handler_crashed",
+            )
         return True
