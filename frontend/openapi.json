@@ -1534,6 +1534,56 @@
         "title": "PreviewSummary",
         "type": "object"
       },
+      "ProviderHealth": {
+        "properties": {
+          "degraded": {
+            "title": "Degraded",
+            "type": "boolean"
+          },
+          "providers": {
+            "items": {
+              "$ref": "#/components/schemas/ProviderStatus"
+            },
+            "title": "Providers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "providers",
+          "degraded"
+        ],
+        "title": "ProviderHealth",
+        "type": "object"
+      },
+      "ProviderStatus": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "name",
+          "available"
+        ],
+        "title": "ProviderStatus",
+        "type": "object"
+      },
       "RefreshBody": {
         "properties": {
           "overwrite": {
@@ -2347,6 +2397,25 @@
           }
         },
         "summary": "Live"
+      }
+    },
+    "/api/health/providers": {
+      "get": {
+        "description": "Which metadata providers are configured, so the UI can say search is degraded.\n\nDeliberately separate from readiness: a missing API key must never make the\napplication look down (technical spec 8).",
+        "operationId": "provider_health_api_health_providers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProviderHealth"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Provider Health"
       }
     },
     "/api/health/ready": {

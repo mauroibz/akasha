@@ -1,10 +1,12 @@
 import contextlib
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
@@ -24,6 +26,17 @@ from book_tracker.infrastructure.providers import (
 )
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import schema_is_current, upgrade
+
+
+class ProviderStatus(BaseModel):
+    name: str
+    available: bool
+    reason: str | None = None
+
+
+class ProviderHealth(BaseModel):
+    providers: list[ProviderStatus]
+    degraded: bool
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -50,6 +63,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         google = GoogleBooksProvider(provider_client, configured.google_books_api_key)
         if google.enabled:
             providers.append(google)
+        else:
+            # Silently running on one provider is how search lost its Spanish-language
+            # coverage without anyone noticing (product spec 4.2, DEC-024).
+            logging.getLogger(__name__).warning(
+                "GOOGLE_BOOKS_API_KEY is not set; search and enrichment run on Open "
+                "Library alone and Spanish-language coverage will be poor"
+            )
         app.state.providers = {provider.name: provider for provider in providers}
         # Durable job runner for background enrichment (Sprint 011)
         rate_limiter = RateLimiter(min_interval_seconds=0.5)
@@ -117,6 +137,28 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 },
             )
         return JSONResponse({"status": "ready"})
+
+    @app.get("/api/health/providers", response_model=ProviderHealth)
+    async def provider_health() -> ProviderHealth:
+        """Which metadata providers are configured, so the UI can say search is degraded.
+
+        Deliberately separate from readiness: a missing API key must never make the
+        application look down (technical spec 8).
+        """
+        configured_providers = getattr(app.state, "providers", {})
+        rows = [
+            ProviderStatus(name="openlibrary", available="openlibrary" in configured_providers),
+            ProviderStatus(
+                name="googlebooks",
+                available="googlebooks" in configured_providers,
+                reason=(
+                    None
+                    if "googlebooks" in configured_providers
+                    else "GOOGLE_BOOKS_API_KEY is not set"
+                ),
+            ),
+        ]
+        return ProviderHealth(providers=rows, degraded=not all(row.available for row in rows))
 
     app.include_router(library_router)
     app.include_router(providers_router)
