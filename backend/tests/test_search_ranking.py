@@ -50,7 +50,7 @@ async def test_the_intended_edition_survives_alphabetically_earlier_noise() -> N
     top = [row.source_id for row in ranked[:3]]
     assert INTENDED_EDITION in top, [row.title for row in ranked[:3]]
     # The titles that used to win purely by sorting early.
-    displacers = {"Claves de una novelística existencial", "Cuaderno de bitácora de \"Rayuela\""}
+    displacers = {"Claves de una novelística existencial", 'Cuaderno de bitácora de "Rayuela"'}
     assert not displacers & {row.title for row in ranked[: top.index(INTENDED_EDITION)]}
 
 

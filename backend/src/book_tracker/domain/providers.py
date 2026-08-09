@@ -1,3 +1,4 @@
+from collections import Counter
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Protocol
@@ -53,6 +54,16 @@ def _isbn(candidate: SearchCandidate) -> str | None:
         return None
 
 
+SOURCE_PREFERENCE = ("openlibrary", "googlebooks")
+
+
+def _source_rank(source: str) -> tuple[int, str]:
+    """Product spec 4.3 prefers Open Library's record; alphabetical order does not."""
+    if source in SOURCE_PREFERENCE:
+        return (SOURCE_PREFERENCE.index(source), "")
+    return (len(SOURCE_PREFERENCE), source)
+
+
 def _merge_group(group: Sequence[SearchCandidate]) -> SearchCandidate:
     primary = next((row for row in group if row.source == "openlibrary"), group[0])
     cover = primary.cover_url or next((row.cover_url for row in group if row.cover_url), None)
@@ -90,25 +101,45 @@ def _merge_group(group: Sequence[SearchCandidate]) -> SearchCandidate:
 
 
 def merge_and_rank(query: str, candidates: Sequence[SearchCandidate]) -> list[SearchCandidate]:
-    groups: list[list[SearchCandidate]] = []
-    keyed: dict[str, list[SearchCandidate]] = {}
+    """Merge duplicate editions and rank without discarding provider relevance.
+
+    Providers already rank their own results; re-sorting them by title threw that away
+    and buried the obvious answer under alphabetically earlier noise. Each candidate
+    keeps the position its provider gave it, the providers interleave by position so
+    neither one monopolises the top of the list, and the deliberately dumb signals from
+    product spec 4.3 — exact title match, language, cover presence — only break ties
+    between results the providers ranked equally.
+    """
+    seen_per_source: Counter[str] = Counter()
+    positions: list[int] = []
     for candidate in candidates:
+        positions.append(seen_per_source[candidate.source])
+        seen_per_source[candidate.source] += 1
+
+    groups: list[list[tuple[int, SearchCandidate]]] = []
+    keyed: dict[str, list[tuple[int, SearchCandidate]]] = {}
+    for position, candidate in zip(positions, candidates, strict=True):
         isbn = _isbn(candidate)
         if isbn:
-            keyed.setdefault(isbn, []).append(candidate)
+            keyed.setdefault(isbn, []).append((position, candidate))
         else:
-            groups.append([candidate])
+            groups.append([(position, candidate)])
     groups.extend(keyed.values())
-    merged = [_merge_group(group) for group in groups]
+
+    # A result merged from both providers takes the best rank either one gave it.
+    ranked = [
+        (min(position for position, _row in group), _merge_group([row for _position, row in group]))
+        for group in groups
+    ]
     normalized_query = normalize_text(query)
-    return sorted(
-        merged,
-        key=lambda row: (
-            normalize_text(row.title) != normalized_query,
-            row.language not in {"es", "en"},
-            row.cover_url is None,
-            normalize_text(row.title),
-            row.source,
-            row.source_id,
-        ),
+    ranked.sort(
+        key=lambda entry: (
+            entry[0],
+            normalize_text(entry[1].title) != normalized_query,
+            entry[1].language not in {"es", "en"},
+            entry[1].cover_url is None,
+            _source_rank(entry[1].source),
+            entry[1].source_id,
+        )
     )
+    return [row for _position, row in ranked]
