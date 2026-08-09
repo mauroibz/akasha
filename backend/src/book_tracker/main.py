@@ -1,3 +1,4 @@
+import asyncio
 import contextlib
 import logging
 from collections.abc import AsyncIterator
@@ -10,6 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from book_tracker.api.imports import enrichment_router
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
@@ -74,7 +76,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # Durable job runner for background enrichment (Sprint 011)
         rate_limiter = RateLimiter(min_interval_seconds=0.5)
         enrichment_handler = EnrichmentHandler(
-            app.state.engine, app.state.providers, rate_limiter=rate_limiter
+            app.state.engine,
+            app.state.providers,
+            rate_limiter=rate_limiter,
+            cover_client=provider_client,
+            data_dir=configured.data_dir,
         )
         job_runner = JobRunner(
             app.state.engine,
@@ -88,9 +94,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         with contextlib.suppress(Exception):
             job_runner.repo.reclaim_expired(datetime.now(UTC))
+        # Nothing drove the runner before Sprint 014, so enqueued enrichment never ran.
+        worker = asyncio.create_task(job_runner.run_forever())
         try:
             yield
         finally:
+            job_runner.stop()
+            worker.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await worker
             await provider_client.aclose()
             app.state.engine.dispose()
 
@@ -163,6 +175,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(library_router)
     app.include_router(providers_router)
     app.include_router(imports_router)
+    app.include_router(enrichment_router)
 
     @app.api_route(
         "/api/{path:path}",

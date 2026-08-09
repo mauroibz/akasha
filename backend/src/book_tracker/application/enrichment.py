@@ -6,13 +6,15 @@ import json
 import logging
 from collections.abc import Mapping
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 import httpx
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
 from book_tracker.domain.providers import ItemPayload
+from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import (
     ImportBatchRow,
@@ -57,10 +59,14 @@ class EnrichmentHandler:
         providers: Mapping[str, Any],
         *,
         rate_limiter: RateLimiter | None = None,
+        cover_client: httpx.AsyncClient | None = None,
+        data_dir: Path | None = None,
     ) -> None:
         self.engine = engine
         self.providers = providers
         self.rate_limiter = rate_limiter
+        self.cover_client = cover_client
+        self.data_dir = data_dir
         self.repo = JobRepository(engine)
 
     async def _fetch(
@@ -161,12 +167,15 @@ class EnrichmentHandler:
 
         # Fill only empty fields
         filled: list[str] = []
+        needs_cover = False
         now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
         with self.engine.connect() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
             session = Session(bind=connection)
             try:
                 item = session.get(ItemRow, item_id)
+                if item is not None:
+                    needs_cover = not item.cover_path
                 if item is None:
                     connection.rollback()
                     return {
@@ -234,4 +243,85 @@ class EnrichmentHandler:
             finally:
                 session.close()
 
+        # Cover work happens after the write lock is released: it is remote and image
+        # work, and a failed cover must never undo a successful metadata fill.
+        if needs_cover and await self._install_cover(item_id, payload_data):
+            filled.append("cover")
+
         return {"state": "succeeded", "progress": {"filled": filled, "provider": source_name}}
+
+    async def _install_cover(self, item_id: int, payload: ItemPayload) -> bool:
+        """Download and install a cover for an item that has none. Never fatal."""
+        if self.cover_client is None or self.data_dir is None:
+            return False
+        urls = [url for url in (payload.cover_url, *payload.cover_fallback_urls) if url]
+        for url in urls:
+            try:
+                prepared = await prepare_cover(self.cover_client, url, self.data_dir)
+            except CoverError:
+                continue
+            try:
+                install_cover(prepared, self.data_dir, item_id)
+            except CoverError:
+                return False
+            with self.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "UPDATE items SET cover_path=:path, updated_at=:now "
+                        "WHERE id=:id AND (cover_path IS NULL OR cover_path='')"
+                    ),
+                    {
+                        "path": f"covers/{item_id}.jpg",
+                        "now": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                        "id": item_id,
+                    },
+                )
+            return True
+        if urls:
+            logger.warning("enrichment could not install a cover", extra={"item_id": item_id})
+        return False
+
+
+def enqueue_enrichment_backfill(engine: Engine, *, batch_id: str | None = None) -> int:
+    """Queue enrichment for persisted items an ISBN lookup could still improve.
+
+    Every enrichment job failed between Sprint 011 and Sprint 014, so libraries imported
+    in that window hold rows with an ISBN and nothing else. This is the explicit path
+    back: it only ever queues work, and the handler it queues fills empty fields only.
+    """
+    rows = _backfillable_items(engine)
+    repository = JobRepository(engine)
+    for item_id, isbn in rows:
+        repository.enqueue(batch_id, "enrich_item", {"item_id": item_id, "isbn": isbn})
+    return len(rows)
+
+
+def _backfillable_items(engine: Engine) -> list[tuple[int, str]]:
+    with engine.connect() as connection:
+        result = connection.execute(
+            text(
+                """
+                SELECT items.id AS item_id, MIN(ident.normalized_value) AS isbn
+                FROM items
+                JOIN item_identifiers AS ident
+                  ON ident.item_id = items.id AND ident.kind = 'isbn'
+                WHERE (
+                        items.cover_path IS NULL
+                     OR items.cover_path = ''
+                     OR items.year IS NULL
+                     OR json_extract(items.metadata, '$.publisher') IS NULL
+                     OR json_extract(items.metadata, '$.page_count') IS NULL
+                     OR json_extract(items.metadata, '$.description') IS NULL
+                  )
+                  AND NOT EXISTS (
+                        SELECT 1 FROM jobs
+                        WHERE jobs.kind = 'enrich_item'
+                          AND jobs.state IN ('queued', 'running')
+                          AND json_extract(jobs.payload, '$.item_id') = items.id
+                  )
+                GROUP BY items.id
+                ORDER BY items.id
+                """
+            )
+        )
+        return [(row.item_id, row.isbn) for row in result]

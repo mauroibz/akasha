@@ -9,7 +9,12 @@ from book_tracker.domain.calibre import CalibreError
 from book_tracker.domain.goodreads import GoodreadsCSVError
 
 router = APIRouter(prefix="/api/import", tags=["imports"])
+enrichment_router = APIRouter(prefix="/api/enrichment", tags=["enrichment"])
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
+
+
+class BackfillResponse(BaseModel):
+    queued: int
 
 
 class ImportRecordResponse(BaseModel):
@@ -185,6 +190,18 @@ async def get_job_progress(job_id: str, request: Request) -> JobProgressResponse
     if job is None:
         raise LibraryError("job_not_found", "Job was not found", status_code=404)
     return JobProgressResponse.model_validate(job)
+
+
+@enrichment_router.post("/backfill", status_code=202, response_model=BackfillResponse)
+async def backfill_enrichment(request: Request) -> BackfillResponse:
+    """Queue enrichment for persisted items an ISBN lookup could still improve.
+
+    Explicit and operator-driven: it only queues work, and the handler it queues fills
+    empty fields only, so it can never overwrite a hand edit.
+    """
+    from book_tracker.application.enrichment import enqueue_enrichment_backfill
+
+    return BackfillResponse(queued=enqueue_enrichment_backfill(request.app.state.engine))
 
 
 @router.delete("/batches/{batch_id}", response_model=UndoEffectSummary)

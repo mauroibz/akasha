@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from book_tracker.application.enrichment import enqueue_enrichment_backfill
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.calibre import CalibreAdapter
 from book_tracker.domain.goodreads import parse_goodreads
@@ -113,7 +114,9 @@ class GoodreadsImportService:
             }
 
     def commit(self, batch_id: str, choices: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
-        return self.imports.commit(batch_id, choices)
+        result = self.imports.commit(batch_id, choices)
+        enqueue_enrichment_backfill(self.engine, batch_id=batch_id)
+        return result
 
 
 class CalibreImportService:
@@ -223,4 +226,7 @@ class CalibreImportService:
                 self.domain.set_cover_path(item_id, f"covers/{item_id}.jpg")
             except CoverError:
                 pass
+        # After staged Calibre covers are installed, so an item that already has one is
+        # not queued for a cover it does not need.
+        enqueue_enrichment_backfill(self.engine, batch_id=batch_id)
         return result

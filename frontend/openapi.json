@@ -50,6 +50,19 @@
         "title": "AmbiguityChoice",
         "type": "object"
       },
+      "BackfillResponse": {
+        "properties": {
+          "queued": {
+            "title": "Queued",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "queued"
+        ],
+        "title": "BackfillResponse",
+        "type": "object"
+      },
       "Body_preview_api_import_goodreads_preview_post": {
         "properties": {
           "file": {
@@ -1905,6 +1918,28 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/enrichment/backfill": {
+      "post": {
+        "description": "Queue enrichment for persisted items an ISBN lookup could still improve.\n\nExplicit and operator-driven: it only queues work, and the handler it queues fills\nempty fields only, so it can never overwrite a hand edit.",
+        "operationId": "backfill_enrichment_api_enrichment_backfill_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BackfillResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Backfill Enrichment",
+        "tags": [
+          "enrichment"
+        ]
+      }
+    },
     "/api/entries": {
       "get": {
         "operationId": "list_entries_api_entries_get",

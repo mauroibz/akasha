@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
+import logging
 import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -19,6 +21,8 @@ from book_tracker.infrastructure.models import JobRow
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
+
+logger = logging.getLogger(__name__)
 
 LEASE_DURATION = timedelta(minutes=5)
 DEFAULT_MAX_RETRIES = 3
@@ -304,6 +308,29 @@ class JobRunner:
         self.rate_limiter = rate_limiter
         self.poll_interval = poll_interval
         self.max_retries = max_retries
+        self._running = False
+
+    async def run_forever(self) -> None:
+        """Drain the queue for as long as the application is running.
+
+        Nothing called `tick` before Sprint 014, so no enqueued job had ever been
+        processed. Reclaiming expired leases on each idle pass is what returns work
+        abandoned by a crash.
+        """
+        self._running = True
+        while self._running:
+            try:
+                now = datetime.now(UTC)
+                if not await self.tick(now):
+                    self.repo.reclaim_expired(now)
+                    await asyncio.sleep(self.poll_interval)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("job runner poll failed")
+                await asyncio.sleep(self.poll_interval)
+
+    def stop(self) -> None:
         self._running = False
 
     async def tick(self, now: datetime) -> bool:
