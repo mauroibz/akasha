@@ -1,6 +1,7 @@
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -16,6 +17,7 @@ import {
   type LibraryPage,
   type SortKey,
 } from "@/api/library";
+import { getShelves } from "@/api/shelves";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
 import {
   isEditableTarget,
@@ -127,17 +129,20 @@ export function HomePage() {
       mergeUniqueEntries(library.data?.pages.map((page) => page.items) ?? []),
     [library.data],
   );
-  const shelves = useMemo(
-    () =>
-      Array.from(
-        new Map(
-          entries
-            .flatMap((entry) => entry.shelves)
-            .map((shelf) => [shelf.slug, shelf]),
-        ).values(),
-      ).sort((a, b) => a.name.localeCompare(b.name)),
-    [entries],
-  );
+  // Every shelf, not only the ones on the pages loaded so far: a shelf whose books
+  // are all further down the list was previously unfilterable.
+  const shelfQuery = useQuery({
+    queryKey: ["shelves"],
+    queryFn: getShelves,
+    retry: false,
+  });
+  const shelves = useMemo(() => {
+    // The shelf filter is a convenience; a failed or odd-shaped shelves response must
+    // not take the whole library page down with it.
+    const rows = shelfQuery.data;
+    if (!Array.isArray(rows)) return [];
+    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  }, [shelfQuery.data]);
   const firstPage = library.data?.pages[0];
 
   const mutation = useMutation({

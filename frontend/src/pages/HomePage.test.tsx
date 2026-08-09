@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { act, render, screen, waitFor } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
@@ -67,12 +67,15 @@ test("announces loading and then renders the populated library and inbox facet",
   let resolveResponse: ((response: Response) => void) | undefined;
   vi.stubGlobal(
     "fetch",
-    vi.fn(
-      () =>
-        new Promise<Response>((resolve) => {
-          resolveResponse = resolve;
-        }),
-    ),
+    vi.fn((request: string | URL | Request) => {
+      // The page also loads the shelf list; only the library request is held open.
+      if (String(request).startsWith("/api/shelves")) {
+        return Promise.resolve(new Response("[]", { status: 200 }));
+      }
+      return new Promise<Response>((resolve) => {
+        resolveResponse = resolve;
+      });
+    }),
   );
   renderPage();
   expect(screen.getByRole("status")).toHaveTextContent("Loading your library");
@@ -235,6 +238,39 @@ test("Inbox count applies the unsorted filter", async () => {
   const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
   await user.click(inboxButtons[0]);
   await screen.findByText("Triage");
+});
+
+test("the shelf filter lists every shelf, not only those on loaded pages", async () => {
+  // No loaded entry carries a shelf, so a filter derived from `entries` is empty.
+  const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    if (String(request).startsWith("/api/shelves")) {
+      return new Response(
+        JSON.stringify([
+          { id: 3, name: "Ensayo", slug: "ensayo", entry_count: 12 },
+          { id: 1, name: "Argentina", slug: "argentina", entry_count: 40 },
+        ]),
+        { status: 200 },
+      );
+    }
+    return new Response(JSON.stringify(populated), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  await screen.findByText("Rayuela");
+
+  const filter = screen.getByRole("combobox", { name: "Filter by shelf" });
+  await waitFor(() =>
+    expect(
+      within(filter).getByRole("option", { name: "Argentina" }),
+    ).toBeInTheDocument(),
+  );
+  expect(
+    within(filter).getByRole("option", { name: "Ensayo" }),
+  ).toBeInTheDocument();
+  // Alphabetical, regardless of the order the endpoint returned.
+  expect(
+    Array.from(filter.querySelectorAll("option")).map((o) => o.textContent),
+  ).toEqual(["All shelves", "Argentina", "Ensayo"]);
 });
 
 test("a library row opens detail by pointer", async () => {
