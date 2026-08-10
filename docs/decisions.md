@@ -330,3 +330,33 @@ Append-only record of material architecture choices, product-default resolutions
   `input[type="checkbox"]` selectors across three e2e specs must be rewritten in Sprint 015. The
   two bespoke components are now explicitly documented as intentional, so a future agent does not
   "finish the migration" and reintroduce the Sprint 013 defect.
+
+## DEC-027 — The enrichment queue had no producer and no consumer
+
+- **Date:** 2026-08-09
+- **Status:** accepted
+- **Context:** Sprint 014 was planned around one enrichment defect: `fetch_by_isbn` requested
+  `/books/{isbn}.json`, which answers 404 for an ISBN. Implementing the fix exposed that the
+  broken URL was never reached. `JobRepository.enqueue` was called from no production code path —
+  neither importer enqueued anything on commit — and `JobRunner.tick` was called from no
+  production code path either, only from tests. The runner was constructed in the lifespan and
+  then never driven. DEC-025 recorded that the enrichment pipeline "had never once succeeded";
+  the truth is stronger, in that it had never once started. Sprint 011 shipped a durable job
+  queue, retries, leasing, and crash recovery, all of it correct and all of it unreachable,
+  because its tests exercised `JobRepository` and `JobRunner` directly.
+- **Decision:** Repair the pipeline as prerequisite work inside Sprint 014, since AC2, AC6, and
+  the sprint's own walkthrough are unverifiable without it. Committing either importer enqueues
+  `enrich_item` for the rows that batch created or matched. The lifespan starts a background task
+  that drains the queue and cancels it on shutdown. Enrichment installs a missing cover after its
+  metadata transaction commits. `POST /api/enrichment/backfill` and
+  `GET /api/health/providers` are added to the API surface, and `jobs.error_code` is added by
+  migration `0006` so a failure carries a stable type next to its human-readable sentence.
+- **Consequences:** Enrichment now performs real network work in the background of a running
+  application, rate-limited to ~2 req/s by the existing limiter. Two endpoints exist that the
+  product spec's API list did not name; both are recorded there now. The backfill endpoint is the
+  owner's path to repairing libraries imported while the pipeline was dead — it is explicitly
+  operator-triggered rather than automatic, because it re-queries providers for every item that
+  is still missing a field, including items no provider will ever have data for.
+- **Also recorded:** a test that drives a queue's internals is not evidence that anything fills
+  that queue. The gap here was not a wrong assertion but an absent one, and no coverage number
+  would have shown it: every line of `jobs.py` was covered.

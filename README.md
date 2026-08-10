@@ -20,6 +20,22 @@ make dev-frontend  # terminal 2, UI at http://localhost:5173
 
 The first backend startup creates the local `data/` directories and applies the foundation Alembic migration. Sprint 001 intentionally seeds no book-domain rows.
 
+### Metadata providers
+
+Put a Google Books API key in `.env` as `GOOGLE_BOOKS_API_KEY`. Without it the backend still runs, but search and enrichment use Open Library alone, which covers Spanish-language editions poorly. Startup logs a warning in that case, and `GET /api/health/providers` reports which providers are configured:
+
+```bash
+curl -s localhost:8000/api/health/providers   # {"providers":[…],"degraded":false}
+```
+
+Metadata and covers are filled in the background after an import. If a library was imported while enrichment was failing, re-queue it — this only fills fields that are still empty and never overwrites an edit:
+
+```bash
+curl -s -X POST localhost:8000/api/enrichment/backfill   # {"queued": 12}
+```
+
+Progress and any failure reason for a job are at `GET /api/import/jobs/{id}`.
+
 ## Quality and build commands
 
 ```bash

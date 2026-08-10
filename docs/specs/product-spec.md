@@ -248,8 +248,13 @@ Required for Argentine and small-press editions that neither source indexes.
 3. Merge: dedupe on normalised ISBN13. If both sources have the same ISBN13,
    keep one card but retain both `source_id`s; prefer Open Library's record and
    Google Books' cover if OL has none.
-4. Rank: exact-ish title matches first, then results whose language is `es` or
-   `en`, then by presence of a cover. Deliberately dumb — the human picks.
+4. Rank: keep the order the providers returned, interleaving the two by
+   position so neither monopolises the top. Within one position, prefer
+   exact-ish title matches, then `es`/`en`, then presence of a cover.
+   Deliberately dumb — the human picks. "Dumb" means not over-engineering the
+   ranking, *not* discarding the relevance the providers already computed:
+   sorting the merged list alphabetically by title buried the obvious answer
+   under unrelated books for thirteen sprints (DEC-024).
 5. Render a picker grid: cover, title, subtitle, authors, year, publisher,
    language, source badge. Always include a **"None of these — enter manually"**
    card at the end.
@@ -460,6 +465,11 @@ POST   /api/import/calibre/preview     → {library_path}, returns dry-run repor
 POST   /api/import/calibre/commit      → {batch_id, options}
 GET    /api/import/jobs/{id}           → progress for background enrichment
 DELETE /api/import/batches/{id}        → undo an import batch
+
+POST   /api/enrichment/backfill        → re-queue enrichment for items whose
+                                          metadata or cover is still empty
+GET    /api/health/providers           → which providers are configured, and
+                                          whether search is degraded
 ```
 
 `POST /api/entries` is deliberately one client call: given a provider hit, it

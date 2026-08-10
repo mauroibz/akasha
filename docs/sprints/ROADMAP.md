@@ -46,8 +46,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | completed |
 | 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | completed |
 | 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | completed |
-| 014 | Metadata correctness and search relevance | Searching finds the intended edition; added and imported books acquire real metadata and cached covers, proven against recorded provider responses | 013 | ready |
-| 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | planned |
+| 014 | Metadata correctness and search relevance | Searching finds the intended edition; added and imported books acquire real metadata and cached covers, proven against recorded provider responses | 013 | completed |
+| 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | ready |
 | 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | planned |
 | 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | planned |
 | 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | planned |

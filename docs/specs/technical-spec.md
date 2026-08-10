@@ -224,11 +224,17 @@ The domain defines separate immutable models: `SearchCandidate`, `ItemPayload`, 
 
 Open Library edition lookup by ISBN uses `https://openlibrary.org/isbn/{isbn}.json`. That endpoint answers with a redirect to the edition record, so the shared provider client must follow redirects. `https://openlibrary.org/books/{id}.json` accepts an OLID only and returns 404 for an ISBN; it is never used for ISBN lookup.
 
-Background enrichment tries Open Library first and falls back to Google Books when Open Library fails or returns nothing usable. A job that exhausts both providers records a typed, human-readable reason retrievable through `GET /api/import/jobs/{id}`; enrichment failures are never swallowed.
+Background enrichment tries Open Library first and falls back to Google Books when Open Library fails or returns nothing usable — a payload carrying no year, no cover, and no metadata counts as nothing usable. A job that exhausts both providers records a typed, human-readable reason retrievable through `GET /api/import/jobs/{id}`; enrichment failures are never swallowed. The reason is two columns: `jobs.error` holds the sentence a person reads, `jobs.error_code` the stable machine-readable type, and the endpoint returns both.
+
+The enrichment queue has exactly one producer and one consumer, and both must exist. Committing an import enqueues `enrich_item` for the rows *that batch* created or matched, and for those only, so batch progress never reports work the import did not cause. The job runner is driven by a background task started in the application lifespan, which reclaims expired leases on idle passes and is cancelled on shutdown. `POST /api/enrichment/backfill` queues the same work for items already persisted with empty fields; it only ever enqueues, and the handler it enqueues fills empty fields only, so no path through it can overwrite a hand edit.
+
+Enrichment installs a missing cover after its metadata transaction commits, never inside it: covers are remote and image work, and a cover failure must not undo a metadata fill. An item that already has a cover is never re-fetched.
+
+Undated search results are resolved against `/works/{id}/editions.json` for every result, not the first, bounded by a concurrency semaphore. Publication dates are parsed by finding a year anywhere in the value, because Open Library publishes `"1984"`, `"1984-03"`, and `"Mar 09, 2005"` interchangeably.
 
 Merged search results preserve the relevance ordering the providers returned. Each candidate retains its provider-returned position, the two providers are interleaved fairly, and title-match, language, and cover-presence signals act only as tie-breakers. Merging must never re-sort results by title.
 
-Provider availability is reported on the health endpoint so the interface can render a degraded-search state, and the absence of `GOOGLE_BOOKS_API_KEY` is logged at startup rather than silently reducing search to one provider.
+Provider availability is reported by `GET /api/health/providers` — one row per provider with `available` and a `reason`, plus a `degraded` flag — so the interface can render a degraded-search state. The absence of `GOOGLE_BOOKS_API_KEY` is logged at startup rather than silently reducing search to one provider. This endpoint is deliberately separate from readiness: a missing key must never make the application look down.
 
 Open Library search must not map work-level `first_publish_year` into edition publication year. It may expose that value separately as `original_year`; `items.year` is populated only from edition data. A work URL resolves to an edition-picker list, preferring editions with valid ISBNs and useful language metadata for ranking, but never silently chooses one. A chosen result always carries an edition identity.
 
@@ -287,7 +293,7 @@ The product-spec route list is authoritative, with these refinements:
   expose normalized Calibre UUID/book identity and whether a local cover was staged, never a source
   filesystem path.
 - Cover files are served from a controlled route or static mount with immutable cache headers; database paths are relative and never accepted from clients.
-- Add `GET /api/health/live` and `GET /api/health/ready`; readiness verifies DB access and migration head, not public provider availability.
+- Add `GET /api/health/live` and `GET /api/health/ready`; readiness verifies DB access and migration head, not public provider availability. `GET /api/health/providers` reports provider configuration separately and never affects readiness.
 
 OpenAPI is the API contract. Generate or validate frontend request/response types from it in CI so backend/frontend drift fails checks.
 

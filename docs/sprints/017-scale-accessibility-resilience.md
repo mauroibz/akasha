@@ -41,6 +41,11 @@ reports.
 - Query/index measurement with 10k-entry benchmark; stored projection for normalized text sorts if needed.
 - Automated axe accessibility checks on core screens.
 - Error boundaries, degraded provider states, reduced-motion support, cancellation/race tests.
+  The provider-state data source exists (`GET /api/health/providers`) and Sprint 015 renders it;
+  what remains here is behavior under failure, not the indicator itself.
+- Benchmarks must account for the background job runner, which Sprint 014 started driving in the
+  application lifespan (DEC-027). A 10k-entry import now enqueues real enrichment work that
+  competes for the SQLite write lock; measure with the queue draining, not idle.
 - Complete critical E2E regression suite, extending rather than replacing the Sprint 013 grid coverage.
 - Security limits: upload/image/path/provider limits, log redaction.
 

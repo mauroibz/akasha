@@ -353,3 +353,82 @@ on the owner supplying `GOOGLE_BOOKS_API_KEY` in `.env` before its walkthrough c
 the code and tests can proceed without it. Start by writing the recorded-response test for
 `OpenLibraryProvider.fetch_by_isbn` and observing it fail against the current `/books/{isbn}`
 implementation.
+
+## Session 2026-08-09 — Sprint 014 (metadata correctness and search relevance)
+
+**Done:**
+- All seven acceptance criteria, in the planned checkpoint order. Commits `97a7fd1`, `706a1aa`,
+  `3437647`, `91118c5`, `31c5b8e`, `394926b`, `4f838df`, `4e3d825`, `bbf2371`, `4dcd8c2`.
+- **Found a defect larger than the one the sprint was written around.** Nothing in production
+  code ever called `JobRepository.enqueue`, and nothing ever called `JobRunner.tick`. The
+  enrichment queue had no producer and no consumer, so the broken `/books/{isbn}` URL was never
+  even reached. Repaired as prerequisite work: importers enqueue on commit, the lifespan drives
+  the runner, enrichment installs covers. Recorded as DEC-027.
+- Committed real recorded provider responses under `backend/tests/fixtures/providers/` with a
+  README documenting provenance and forbidding silent re-recording. Deleted the five `AsyncMock`
+  substitutions of `fetch_by_isbn` in `test_jobs.py` and replaced the behaviors they covered with
+  tests driving real providers over those recordings.
+
+**Verified:**
+- `python scripts/validate_project.py`, `make format`, `make check`, `make build`, and
+  `git diff --check` all clean. `make test`: backend 154, frontend 39.
+  `npm run test:e2e -- --project=chromium`: 33 passed, 2 skipped (the live-provider specs).
+- **Walkthrough**, against a copy of the real `data/` directory with the owner's key, backend on
+  port 8100, UI driven through Playwright at 4173:
+  - `/api/health/providers` → both available with the key; `degraded: true` with reason
+    `GOOGLE_BOOKS_API_KEY is not set` when removed. Readiness stayed 200 in both cases.
+  - Live search `Rayuela Cortázar`: intended edition ranked **first** (`OL47684105M`), cover and
+    year present, providers interleaved. Before the fix the same query put "Claves de una
+    novelística existencial" first. `Don Quijote de la Mancha`, `Cien años de soledad`,
+    `El túnel Sabato`, `Los detectives salvajes Bolaño` each ranked the intended title first.
+    **20/20 results carried an edition year in every query.** Latency: 1.24 s and 1.28 s and
+    1.32 s where no year resolution was needed, 2.62 s and 3.63 s where several works had to be
+    resolved — roughly +1.3 to +2.4 s, one extra bounded round trip to Open Library.
+  - Added `100 años de soledad`, `Harry Potter y la piedra filosofal`, `La sombra del viento`
+    through the UI. Each reached its detail page with real metadata and a cover on local disk
+    (`covers/6.jpg` 1.6 KB, `covers/7.jpg` 33 KB). The first resolved to an existing item, took
+    the duplicate path, and filled that item's previously empty cover and description.
+  - Calibre import of a synthetic 4-book library whose rows carried an ISBN and nothing else —
+    no pubdate, no comments, no cover file. Commit created 4 items and 4 unsorted entries and
+    queued exactly 4 jobs. All drained in **~3 s**; every row acquired year, publisher,
+    description, language, page count, and a cached cover. `entries` unchanged.
+  - `POST /api/enrichment/backfill` over the pre-existing library queued 5, drained in ~3 s,
+    filled a cover and metadata empty since Sprint 011. `entries` dumped before and after was
+    byte-identical.
+  - Offline: restarted with `HTTPS_PROXY=http://127.0.0.1:1` so both providers were genuinely
+    unreachable. All 7 detail pages and the library rendered from cache; `grep` of the log counted
+    **0 outbound provider calls** during the browse. Search returned a typed
+    `providers_unavailable` 503, and readiness stayed 200.
+  - Shelf filter: created two shelves with zero entries; the `/` filter listed both,
+    alphabetically. Under the old code it would have been empty. Checked with a throwaway
+    `e2e/tmp-shelf-check.spec.ts`, then deleted — it asserted nothing worth keeping now that
+    `HomePage.test.tsx` covers the case.
+
+**Two defects were found by running the application, not by tests:**
+- A four-row import queued **seven** enrichment jobs and attributed all seven to that batch,
+  because the commit-time enqueue reused the library-wide backfill scan. Its progress display
+  would have reported work the import never caused. Fixed in `4dcd8c2` with a scoped scan plus a
+  regression test.
+- `live-metadata.spec.ts`, the walkthrough vehicle, asserted that adding a book navigates to the
+  detail page. Product spec section 7 says a new entry returns to `/` highlighted; only an exact
+  duplicate goes to detail. The spec had never run — it is gated behind an env var nobody set.
+
+**Observed, out of scope, left alone:**
+- `100 años de Soledad` (ISBN 9781516909629) still has no cover. Open Library returns an edition,
+  but every cover URL for it 404s, and Google Books is not consulted because the edition data is
+  otherwise usable. Enrichment falls back on a *miss*, not to complete individual empty fields.
+  Worth deciding whether per-field completion across providers is wanted.
+- `/api/shelves` was requested 7 times during one short browse; each navigation refetches it. A
+  `staleTime` belongs in Sprint 015 when that component is rebuilt.
+- Entries added through the UI carry no score, and the detail page shows an unset score control.
+  Correct, but it reads oddly beside imported rows that have one.
+
+**Deviations:** see the sprint Outcome. Principally DEC-027 (prerequisite pipeline repair), two
+new endpoints, a product-spec 4.3 ranking reconciliation, and a validator exemption for recorded
+fixtures.
+
+**Next:** Sprint 015 (design system and component foundation) — status `ready`. It installs
+shadcn/ui, real tokens, and visible feedback. Note that it will break `selectOption()` and
+`input[type="checkbox"]` selectors across three e2e specs by construction; that is its scope, not
+a regression. The degraded-search indicator it renders is already fed by
+`GET /api/health/providers`.

@@ -1,6 +1,6 @@
 # Sprint 015 — Design system and component foundation
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 014
 **Roadmap revision:** 6
 
@@ -64,7 +64,9 @@ It is load-bearing and constrains this sprint (see Explicit non-scope).
   (7–8), emerald-400 (9–10). Inter self-hosted and bundled, no third-party font request.
 - Every raw primitive replaced. Known clusters: the four hand-rolled modals and roughly eighteen
   fields in `DetailPage.tsx`; the delete dialog in `ShelvesPage.tsx`; search, sort, and shelf
-  controls in `HomePage.tsx`; filter, bulk status, bulk score, and row checkboxes in
+  controls in `HomePage.tsx` — note the shelf control now reads `GET /api/shelves` through a
+  `useQuery` rather than the loaded entries, so converting it to a shadcn `select` must keep that
+  source (Sprint 014 AC7); filter, bulk status, bulk score, and row checkboxes in
   `TriagePage.tsx`; file input, Calibre path, per-row ambiguity select, and the hand-rolled
   tablist in `ImportPage.tsx`; search and manual-entry form in `AddPage.tsx`; the status select
   inside the library card in `VirtualLibrary.tsx`.
@@ -73,6 +75,9 @@ It is load-bearing and constrains this sprint (see Explicit non-scope).
   screen readers — the defect was that they were the only channel, not that they exist.
 - All `FormData`-read forms converted to React Hook Form with zod resolvers.
 - Navigation icons replaced with `lucide-react`.
+- A degraded-search indicator fed by `GET /api/health/providers`, which Sprint 014 added
+  (`getProviderHealth` in `src/api/health.ts` already types it). When `degraded` is true, say
+  which provider is unavailable and why, rather than silently returning half the results.
 - Cleanup with no compatibility layer: delete `frontend/src/pages/ComingSoonPage.tsx` (dead and
   unrouted since Sprint 004); delete the `.dialog` and `.field` component classes from
   `index.css` once nothing references them; remove every inline colour literal in favour of

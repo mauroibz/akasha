@@ -1,6 +1,6 @@
 # Sprint 014 — Metadata correctness and search relevance
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 013
 **Roadmap revision:** 6
 
@@ -168,5 +168,101 @@ complete this sprint.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Status:** completed 2026-08-09.
+
+### Delivered behavior, per acceptance criterion
+
+1. **Open Library ISBN lookup works.** `fetch_by_isbn` requests `/isbn/{isbn}.json`, reads the
+   edition key from the redirect target, and rejects a target that is not an edition. The shared
+   client is built by one factory with `follow_redirects=True` that the application and the tests
+   both use. Proven by `tests/test_provider_recordings.py` replaying the captured 302 and edition
+   record; 404, unreachable, malformed, and titleless responses raise `ProviderPayloadError` with
+   a stable `code`. No test of this method uses an `AsyncMock`. Commits `97a7fd1`, `706a1aa`.
+2. **Google Books fallback and typed failures.** Enrichment walks Open Library then Google Books,
+   treating a payload with no year, cover, or metadata as a miss. The bare `except Exception` is
+   gone; each attempt contributes a sentence, and migration `0006` adds `jobs.error_code`, which
+   `GET /api/import/jobs/{id}` returns beside `error`. `tests/test_enrichment.py` proves the
+   fallback, the typed reason, and the unconfigured-provider wording against recordings.
+   Commit `3437647`.
+3. **Relevance preserved.** `merge_and_rank` keeps each candidate's provider-returned position,
+   takes the better position for merged duplicates, interleaves providers, and demotes
+   title/language/cover to tie-breakers. The normalized title is no longer a sort key.
+   `tests/test_search_ranking.py` replays a real "Rayuela Cortázar" search where the intended
+   edition sorts fifth alphabetically and first by relevance. Commits `91118c5`, `31c5b8e`.
+4. **Every result carries a year.** The `not enriched` gate is removed; undated results resolve
+   concurrently behind a semaphore of 5. Candidates are paired with their work at construction,
+   which also fixed a latent misalignment when a row yields no candidate. `_year` now finds a year
+   anywhere in the value, so Open Library's `"Mar 09, 2005"` dates parse. Commit `394926b`.
+5. **Provider health.** Startup warns when `GOOGLE_BOOKS_API_KEY` is absent;
+   `GET /api/health/providers` reports per-provider availability and a `degraded` flag; readiness
+   stays about the database. Commit `4f838df`.
+6. **Backfill.** `POST /api/enrichment/backfill` queues items with an ISBN and an empty cover,
+   year, publisher, page count, or description, skipping those already pending. Filling never
+   touches a populated field or any `entries` row. Commits `4e3d825`, `4dcd8c2`.
+7. **Shelf filter.** `/` reads `GET /api/shelves` instead of deriving the list from loaded pages.
+   Commit `bbf2371`.
+
+### Deviations and prerequisite repair
+
+- **The enrichment queue had neither a producer nor a consumer** (DEC-027). Nothing in production
+  code called `enqueue`, and nothing called `tick`. The broken ISBN URL was never even reached.
+  Repaired inside this sprint because AC2, AC6, and the walkthrough are unverifiable without it:
+  importers now enqueue on commit, the lifespan drives the runner, and enrichment installs a
+  missing cover after its transaction commits.
+- Two endpoints were added that the product spec's API list did not name
+  (`POST /api/enrichment/backfill`, `GET /api/health/providers`). Both are now listed there.
+- Product spec 4.3's ranking rule was reconciled with the relevance-preserving behavior; "dumb"
+  means not over-engineering the ranking, not discarding provider relevance.
+- `scripts/validate_project.py` exempts `backend/tests/fixtures/providers/` from text hygiene:
+  recordings are byte-faithful captures and reformatting them would change what tests assert.
+- Sprint 013's `AsyncMock` enrichment tests were replaced rather than kept alongside; the four
+  behaviors they covered are now proven against recordings.
+
+### Verification
+
+| Command | Result |
+|---|---|
+| `python scripts/validate_project.py` | passed |
+| `make format` | applied, no residual diff |
+| `make check` | passed (ruff, prettier, eslint, mypy, tsc, OpenAPI export/type check, validator) |
+| `make test` | backend **154 passed**, frontend **39 passed** |
+| `npm run test:e2e -- --project=chromium` | **33 passed, 2 skipped** (the two live-provider specs) |
+| `make build` | backend wheel + `dist/` built |
+| `git diff --check` | clean |
+
+### Walkthrough (mandatory gate, AGENTS.md section 3)
+
+Run against a copy of the real `data/` directory with the owner's `GOOGLE_BOOKS_API_KEY`.
+Full narrative in `docs/agent/worklog.md`. Summary:
+
+- `GET /api/health/providers` reported both providers available with the key, and
+  `degraded: true` with a reason for Google Books when the key was removed.
+- Live search: `Rayuela Cortázar` returned the intended edition first with a cover and year;
+  `Don Quijote de la Mancha`, `Cien años de soledad`, `El túnel Sabato`, and
+  `Los detectives salvajes Bolaño` each ranked the intended title first. **20/20 results carried
+  an edition year** in every query. Latency 1.2–1.3 s with no year resolution needed, 2.6–3.6 s
+  when several works had to be resolved.
+- Added three Spanish titles through the UI; each landed with real metadata and a locally cached
+  cover on disk.
+- Imported a synthetic 4-book Calibre library whose rows had an ISBN and nothing else. All four
+  acquired year, publisher, description, language, page count, and a cached cover in about six
+  seconds. No `entries` row changed.
+- Backfill over the pre-existing library queued 5 items and filled a cover and metadata that had
+  been empty since Sprint 011, with a byte-identical `entries` table before and after.
+- With both providers unreachable, every library and detail page still rendered from cache with
+  **zero provider calls**, and search returned a typed `providers_unavailable` 503.
+
+Two defects were found by running the application and fixed in `4dcd8c2`: a four-row import
+queued seven enrichment jobs and attributed them all to that batch, and `live-metadata.spec.ts`
+asserted a post-add navigation no build has ever performed.
+
+### Observed but out of scope
+
+- `100 años de Soledad` (ISBN 9781516909629) still has no cover: Open Library returns an edition
+  but every cover URL 404s, and the fallback does not run because the edition data is otherwise
+  usable. Enrichment consults the second provider only when the first returns nothing usable, not
+  to complete individual empty fields.
+- The add flow leaves `score` empty and the detail page shows the score control unset; the
+  library still renders those entries fine, but it reads oddly next to imported rows.
+- `/api/shelves` is requested repeatedly on the library page (seven times during one browse),
+  since each navigation refetches it. Harmless locally, worth a `staleTime` in Sprint 015.
