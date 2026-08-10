@@ -2,7 +2,7 @@
 
 **Plan revision:** 6
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 014](014-metadata-correctness-search.md)
+**Active sprint:** [Sprint 015](015-design-system-components.md)
 
 ## Dependency graph
 
@@ -264,6 +264,42 @@ Acceptance:
 - Backup/restore drill recovers representative scores, notes, shelves, and covers.
 - LAN-only warning is prominent; no public exposure or auth is implied.
 - Clean-machine Compose smoke test passes and tags the v1 release only when explicitly requested.
+
+## Open questions
+
+Items raised but deliberately not decided. They are not assigned to a sprint and no
+implementation approach has been chosen. **Do not resolve one of these by implementing it** —
+each needs an owner decision first, and that decision belongs in `docs/decisions.md`.
+
+### OQ-001 — Should enrichment complete individual empty fields across providers?
+
+- **Raised:** 2026-08-09 by the owner, after the Sprint 014 walkthrough.
+- **Status:** open, owner deciding. No technical decision has been taken.
+- **Current behavior:** enrichment tries Open Library, and consults Google Books only when Open
+  Library fails or returns nothing usable. A record that comes back usable but incomplete — an
+  edition with a year and a publisher but no cover — is accepted as-is, and the second provider is
+  never asked. The owner would like missing fields filled from whichever provider has them.
+- **What the specs already say**, which matters because this may be a narrowing rather than a new
+  feature: product spec 4.3 already specifies per-field completion at search time — "prefer Open
+  Library's record and Google Books' cover if OL has none" — and `_merge_group` in
+  `domain/providers.py` implements it for search results. Product spec 5.3 describes enrichment as
+  "Open Library/Google Books lookups" without ordering. The fallback-only rule comes from Sprint
+  014's deliverable list and technical spec 6.2, both written this revision.
+- **Open considerations, none resolved:**
+  - Provider traffic per job doubles, so a large import enriches roughly half as fast under the
+    existing shared rate limiter.
+  - `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an `isbn:` search, which is not
+    guaranteed to be the same edition. Merging its publisher or page count into an Open Library
+    edition without verifying the returned volume carries the requested ISBN13 risks attaching one
+    edition's data to another.
+  - Failure semantics change shape: Open Library succeeding while Google Books errors is a
+    successful enrichment, not a failed job.
+  - The fill-empty-only invariant is unaffected either way — merging happens before the write, and
+    the write still only touches empty columns and metadata keys.
+  - It would not necessarily fix the case that raised it: `100 años de Soledad`
+    (ISBN 9781516909629, a CreateSpace edition) needs Google Books to hold a cover for that exact
+    ISBN, which has not been checked.
+- **Related:** DEC-027, Sprint 014 Outcome, technical spec 6.2.
 
 ## Cross-sprint definition of done
 

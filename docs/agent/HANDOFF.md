@@ -62,8 +62,10 @@ that directory from text hygiene so the bytes stay as captured.
 
 - `100 años de Soledad` (ISBN 9781516909629) has no cover: Open Library returns an edition but all
   its cover URLs 404, and Google Books is not consulted because the edition is otherwise usable.
-  Enrichment falls back on a miss, never to complete individual empty fields. If per-field
-  completion across providers is wanted, that is a product decision, not a bug fix.
+  Enrichment falls back on a miss, never to complete individual empty fields.
+  **The owner has this under consideration as `OQ-001` in `docs/sprints/ROADMAP.md`. It is open
+  and unassigned — do not implement it, and do not fold it into a sprint, until the owner
+  decides.**
 - Entries added through the UI carry no score; the detail page shows an unset control. Correct,
   but it reads oddly beside imported rows.
 
