@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Collection, Mapping
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -282,25 +282,42 @@ class EnrichmentHandler:
         return False
 
 
-def enqueue_enrichment_backfill(engine: Engine, *, batch_id: str | None = None) -> int:
+def enqueue_enrichment_backfill(
+    engine: Engine, *, batch_id: str | None = None, item_ids: Collection[int] | None = None
+) -> int:
     """Queue enrichment for persisted items an ISBN lookup could still improve.
 
     Every enrichment job failed between Sprint 011 and Sprint 014, so libraries imported
     in that window hold rows with an ISBN and nothing else. This is the explicit path
     back: it only ever queues work, and the handler it queues fills empty fields only.
+
+    `item_ids` restricts the scan. An importer passes the rows its own batch touched, so
+    a four-row import does not attribute seven jobs — three of them for books it never
+    saw — to its batch and its progress display.
     """
-    rows = _backfillable_items(engine)
+    if item_ids is not None and not item_ids:
+        return 0
+    rows = _backfillable_items(engine, item_ids)
     repository = JobRepository(engine)
     for item_id, isbn in rows:
         repository.enqueue(batch_id, "enrich_item", {"item_id": item_id, "isbn": isbn})
     return len(rows)
 
 
-def _backfillable_items(engine: Engine) -> list[tuple[int, str]]:
+def _backfillable_items(
+    engine: Engine, item_ids: Collection[int] | None = None
+) -> list[tuple[int, str]]:
+    scope = ""
+    parameters: dict[str, Any] = {}
+    if item_ids is not None:
+        # Bound and parameterised rather than interpolated.
+        placeholders = ", ".join(f":item_{index}" for index, _ in enumerate(item_ids))
+        scope = f"AND items.id IN ({placeholders})"
+        parameters = {f"item_{index}": value for index, value in enumerate(item_ids)}
     with engine.connect() as connection:
         result = connection.execute(
             text(
-                """
+                f"""
                 SELECT items.id AS item_id, MIN(ident.normalized_value) AS isbn
                 FROM items
                 JOIN item_identifiers AS ident
@@ -319,9 +336,11 @@ def _backfillable_items(engine: Engine) -> list[tuple[int, str]]:
                           AND jobs.state IN ('queued', 'running')
                           AND json_extract(jobs.payload, '$.item_id') = items.id
                   )
+                  {scope}
                 GROUP BY items.id
                 ORDER BY items.id
                 """
-            )
+            ),
+            parameters,
         )
         return [(row.item_id, row.isbn) for row in result]

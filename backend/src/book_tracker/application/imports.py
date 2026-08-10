@@ -24,6 +24,23 @@ def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
+def batch_item_ids(engine: Engine, batch_id: str) -> list[int]:
+    """The items this batch created or matched, and only those."""
+    with Session(engine) as session:
+        return [
+            item_id
+            for item_id in session.scalars(
+                select(ImportRecordRow.matched_item_id)
+                .where(
+                    ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.matched_item_id.is_not(None),
+                )
+                .distinct()
+            )
+            if item_id is not None
+        ]
+
+
 class GoodreadsImportService:
     def __init__(self, engine: Engine, data_dir: Path) -> None:
         self.engine = engine
@@ -115,7 +132,9 @@ class GoodreadsImportService:
 
     def commit(self, batch_id: str, choices: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
         result = self.imports.commit(batch_id, choices)
-        enqueue_enrichment_backfill(self.engine, batch_id=batch_id)
+        enqueue_enrichment_backfill(
+            self.engine, batch_id=batch_id, item_ids=batch_item_ids(self.engine, batch_id)
+        )
         return result
 
 
@@ -228,5 +247,7 @@ class CalibreImportService:
                 pass
         # After staged Calibre covers are installed, so an item that already has one is
         # not queued for a cover it does not need.
-        enqueue_enrichment_backfill(self.engine, batch_id=batch_id)
+        enqueue_enrichment_backfill(
+            self.engine, batch_id=batch_id, item_ids=batch_item_ids(self.engine, batch_id)
+        )
         return result

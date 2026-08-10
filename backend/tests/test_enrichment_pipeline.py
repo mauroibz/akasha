@@ -106,6 +106,32 @@ async def test_committing_an_import_enqueues_enrichment_for_rows_with_an_isbn(
 
 
 @pytest.mark.anyio
+async def test_a_commit_queues_only_its_own_rows_not_the_whole_library(tmp_path: Path) -> None:
+    """Found in the Sprint 014 walkthrough: a four-row import queued seven jobs."""
+    app = create_app(settings(tmp_path))
+    content = (FIXTURES / "goodreads_valid.csv").read_bytes()
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        engine = app.state.engine
+        # An ISBN neither fixture row carries, so it can only be swept up by a
+        # library-wide scan.
+        stranger = create_item_with_isbn(engine, "Nothing to do with the import", "9788420437989")
+        preview = await client.post(
+            "/api/import/goodreads/preview",
+            files={"file": ("library.csv", content, "text/csv")},
+        )
+        batch_id = preview.json()["batch_id"]
+        await client.post("/api/import/goodreads/commit", json={"batch_id": batch_id})
+        jobs = JobRepository(engine).list_batch_jobs(batch_id)
+        queued = queued_item_ids(engine)
+
+    assert len(jobs) == 1
+    assert stranger not in queued
+
+
+@pytest.mark.anyio
 async def test_re_committing_the_same_batch_does_not_duplicate_jobs(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     content = (FIXTURES / "goodreads_valid.csv").read_bytes()

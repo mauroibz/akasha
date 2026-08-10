@@ -28,6 +28,7 @@ PROJECT_STATUSES = {"ready", "in_progress", "blocked", "complete"}
 SPRINT_STATUSES = {"planned", "ready", "in_progress", "blocked", "completed"}
 ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
+RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
 SPRINT_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*([a-z_]+)", re.MULTILINE)
 SPRINT_ID_RE = re.compile(r"^(\d{3})-")
@@ -234,6 +235,11 @@ def validate_markdown_links(errors: list[str]) -> None:
 def validate_text_hygiene(errors: list[str]) -> None:
     for path in sorted(ROOT.rglob("*")):
         if not path.is_file() or any(part in GENERATED_DIRECTORIES for part in path.parts):
+            continue
+        if RECORDINGS_DIRECTORY in path.parents:
+            # Recorded provider responses are byte-faithful captures of what a live
+            # provider actually sent (DEC-025). Reformatting them would quietly change
+            # what the regression tests assert against.
             continue
         if path.suffix not in {".md", ".json", ".py", ".yml", ".yaml", ".toml"} and path.name not in {
             ".gitignore",

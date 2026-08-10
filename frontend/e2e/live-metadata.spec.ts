@@ -36,9 +36,29 @@ test("live provider editions add with metadata and cached covers", async ({
     await expect(result).toContainText(/Edition year:\s*\d{4}/);
     await result.click();
     await page.getByRole("button", { name: /add to library/i }).click();
+    // Two legitimate destinations. A new entry "returns to `/` with the new entry
+    // highlighted" (product spec §7); a book already held is an exact duplicate and
+    // goes straight to its detail page (§4.3). This spec used to assert only the
+    // second, which no build does for a new add — it never ran, being gated behind
+    // an env var.
+    await expect(page).toHaveURL(/\/(books\/\d+|(\?.*)?$)/, {
+      timeout: 20_000,
+    });
+    if (!/\/books\/\d+/.test(page.url())) {
+      const added = page.getByRole("article").filter({ hasText: book.author });
+      await expect(added.first()).toBeVisible({ timeout: 20_000 });
+      await added.first().getByRole("heading").click();
+    }
+
     await expect(page).toHaveURL(/\/books\/\d+/, { timeout: 20_000 });
+    // The URL changes before the detail view paints, so wait for a control only the
+    // detail page has. Without this the assertions below race the library list, whose
+    // cards also carry an "Edition year:".
+    await expect(page.getByRole("button", { name: "← Library" })).toBeVisible({
+      timeout: 20_000,
+    });
     await expect(page.locator("main img").first()).toBeVisible();
-    await expect(page.getByText(/Edition year:/)).toBeVisible();
+    await expect(page.locator("main")).toContainText(/Edition year:\s*\d{4}/);
     const detailText = await page.locator("main").textContent();
     const editionYear =
       detailText?.match(/Edition year:\s*(\d{4})/)?.[1] ?? "unknown";
