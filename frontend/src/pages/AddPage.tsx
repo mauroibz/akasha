@@ -1,4 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
+import { m } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,7 @@ import {
   type SearchCandidate,
 } from "@/api/add";
 import { CoverImage } from "@/components/CoverImage";
+import { useMotionPresets } from "@/lib/motion";
 import { ProviderHealthNotice } from "@/components/ProviderHealthNotice";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
@@ -31,6 +33,10 @@ import type { EntryStatus } from "@/api/library";
 export function AddPage() {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchCandidate[]>([]);
+  const presets = useMotionPresets();
+  // Identity of the committed result set, so a new search re-staggers and a
+  // re-render of the same results does not.
+  const resultsKey = results.map((row) => row.source_id).join("|");
   const [selected, setSelected] = useState<SearchCandidate | null>(null);
   const [manual, setManual] = useState(false);
   const [status, setStatus] = useState<EntryStatus>("read");
@@ -183,13 +189,21 @@ export function AddPage() {
           {pending && <p role="status">Searching metadata providers…</p>}
           {error && <p role="alert">{error}</p>}
           {warning && <p role="status">{warning}</p>}
-          <section
+          {/* Results arrive in sequence rather than all at once. The delay
+              stops growing after a handful of cards: a twenty-result search
+              would otherwise take most of a second to finish arriving, which
+              reads as slow rather than as considered. */}
+          <m.section
             aria-label="Search results"
             className="mt-6 grid gap-3 sm:grid-cols-2"
+            key={resultsKey}
+            initial="hidden"
+            animate="show"
           >
-            {results.map((row) => (
-              <button
+            {results.map((row, index) => (
+              <m.button
                 key={`${row.source}:${row.source_id}`}
+                variants={presets.staggerItem(index)}
                 className="min-h-28 rounded-2xl bg-surface p-4 text-left focus-ring"
                 onClick={() => setSelected(row)}
               >
@@ -221,20 +235,28 @@ export function AddPage() {
                     </span>
                   </span>
                 </span>
-              </button>
+              </m.button>
             ))}
-            <button
+            {/* Part of the same list, and the option a reader reaches for last,
+                so it arrives last rather than ahead of the results it follows. */}
+            <m.button
+              variants={presets.staggerItem(results.length)}
               className="min-h-28 rounded-2xl border border-dashed border-border p-4 text-left focus-ring"
               onClick={() => setManual(true)}
             >
               None of these — enter manually
-            </button>
-          </section>
+            </m.button>
+          </m.section>
         </>
       )}
       {editing && (
-        <form
+        // Enter only, and never `mode="wait"`: the form focuses its status
+        // control on mount, and delaying that mount behind an exit animation
+        // moves the keyboard flow's first focus a tenth of a second late.
+        <m.form
           className="mt-8 space-y-5"
+          initial={presets.formEnter.initial}
+          animate={presets.formEnter.animate}
           noValidate
           onSubmit={(e) => {
             e.preventDefault();
@@ -307,9 +329,21 @@ export function AddPage() {
               </Field>
             </div>
           ) : (
-            <div>
-              <h2 className="text-2xl font-semibold">{selected?.title}</h2>
-              <p>{selected?.authors.join(", ")}</p>
+            // The card the reader just clicked, carried to the top of the
+            // form: the selection stays visible instead of being replaced by a
+            // bare title.
+            <div className="flex items-start gap-4">
+              {selected && (
+                <CoverImage
+                  src={selected.cover_url}
+                  alt={`Cover of ${selected.title}`}
+                  className="aspect-[2/3] w-[72px] shrink-0 rounded-lg"
+                />
+              )}
+              <div>
+                <h2 className="text-2xl font-semibold">{selected?.title}</h2>
+                <p>{selected?.authors.join(", ")}</p>
+              </div>
             </div>
           )}
           <div className="flex flex-wrap gap-4">
@@ -383,7 +417,7 @@ export function AddPage() {
           <Button disabled={pending} className="rounded-full px-6">
             {pending ? "Adding…" : "Add to library"}
           </Button>
-        </form>
+        </m.form>
       )}
     </main>
   );

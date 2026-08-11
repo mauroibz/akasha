@@ -90,6 +90,12 @@ export function HomePage() {
     setFocusedId(id);
     // Consume it so a back/forward navigation does not re-highlight.
     window.history.replaceState({}, "");
+    // The ring says "this is the one you just added" and then stops saying it.
+    // Left permanent it becomes a second, meaningless selection state sitting
+    // beside the keyboard focus ring. `focusedId` is deliberately not cleared:
+    // it is where j/k resume from.
+    const timer = window.setTimeout(() => setHighlightId(null), 2200);
+    return () => window.clearTimeout(timer);
   }, [location.state]);
 
   useEffect(() => {

@@ -249,6 +249,7 @@ test("animated surfaces really do animate without the preference", async ({
   await seedLibrary(page);
   await page.goto("/");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  await expectAnimated(page, animatedSurfaces.card, "card");
   await expectAnimated(page, animatedSurfaces.cover, "cover");
   await expectAnimated(page, animatedSurfaces.scoreTrigger, "score trigger");
 });

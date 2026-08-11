@@ -171,7 +171,10 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
 
   const renderEntry = (entry: LibraryEntry) => {
     const isHighlighted = props.highlightId === entry.id;
-    const ring = isHighlighted ? "ring-2 ring-primary" : "";
+    // The ring fades rather than vanishing, so the eye is handed back to the
+    // list instead of having the marker snatched away. A shadow transition,
+    // not a layout one: the card box is pinned by DEC-023.
+    const ring = `transition-shadow duration-500 ${isHighlighted ? "ring-2 ring-primary" : ""}`;
     const focusRing =
       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
     return (

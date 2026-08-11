@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { sampleAnimations } from "./motion";
+
 const candidate = (id: string, year: number) => ({
   source: "openlibrary",
   source_id: id,
@@ -145,4 +147,40 @@ test("mobile detail confirms refresh and reports cover failure without motion", 
     "previous cover is unchanged",
   );
   await expect(page.locator("main")).toBeVisible();
+});
+
+test("search results stagger in and selecting one keeps the keyboard flow", async ({
+  page,
+}) => {
+  await common(page);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: Array.from({ length: 6 }, (_, index) =>
+        candidate(`OL${index + 1}M`, 1963 + index),
+      ),
+    }),
+  );
+  await page.goto("/add");
+
+  const samples = await sampleAnimations(page, async () => {
+    await page.getByRole("searchbox", { name: "Search books" }).fill("Rayuela");
+    await expect(
+      page.getByRole("button", { name: /None of these/ }),
+    ).toBeVisible();
+    await expect(
+      page.locator("section[aria-label='Search results'] button"),
+    ).toHaveCount(7);
+  });
+  // Six results plus the manual fallback, each entering in its own right. The
+  // fallback is part of the list, so it arrives last rather than ahead of the
+  // results it follows.
+  expect(samples.length).toBeGreaterThan(0);
+
+  await page
+    .getByRole("button", { name: /Rayuela/ })
+    .first()
+    .click();
+  // The form animates in, but nothing waits for it: focus is where a keyboard
+  // reader needs it on the frame the form mounts.
+  await expect(page.getByRole("combobox", { name: /status/i })).toBeFocused();
 });
