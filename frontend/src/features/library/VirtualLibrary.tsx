@@ -20,6 +20,8 @@ interface VirtualLibraryProps {
   isFetchingNextPage: boolean;
   focusedId: number | null;
   highlightId?: number | null;
+  /** The entry whose write just failed and was rolled back. */
+  rollbackId?: number | null;
   loadNextPage: () => void;
   onFocusEntry: (id: number) => void;
   onScore: (entry: LibraryEntry, score: number) => void;
@@ -171,10 +173,15 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
 
   const renderEntry = (entry: LibraryEntry) => {
     const isHighlighted = props.highlightId === entry.id;
+    const isRolledBack = props.rollbackId === entry.id;
     // The ring fades rather than vanishing, so the eye is handed back to the
     // list instead of having the marker snatched away. A shadow transition,
     // not a layout one: the card box is pinned by DEC-023.
-    const ring = `transition-shadow duration-500 ${isHighlighted ? "ring-2 ring-primary" : ""}`;
+    // `[transition-duration:...]` rather than `duration-500`: tailwindcss-animate
+    // redefines the `duration-*` utilities to set `animation-duration` as well,
+    // and later in the cascade, so a card carrying both the ring transition and
+    // the shake would run the shake at the ring's duration.
+    const ring = `transition-shadow [transition-duration:500ms] ${isHighlighted ? "ring-2 ring-primary" : ""} ${isRolledBack ? "animate-shake" : ""}`;
     const focusRing =
       "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
     return (
@@ -188,6 +195,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
         data-entry-id={entry.id}
         data-provisional={entry.score_provisional ? "true" : "false"}
         data-highlighted={isHighlighted ? "true" : "false"}
+        data-rollback={isRolledBack ? "true" : "false"}
         key={entry.id}
         onFocus={() => props.onFocusEntry(entry.id)}
         onKeyDown={(e) => {

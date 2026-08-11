@@ -8,10 +8,11 @@ import { Toaster } from "@/components/ui/sonner";
 import { findToast } from "@/test/toast";
 import { HomePage } from "./HomePage";
 
-function renderPage(initialEntry = "/") {
-  const client = new QueryClient({
-    defaultOptions: { queries: { retry: false } },
-  });
+function makeClient() {
+  return new QueryClient({ defaultOptions: { queries: { retry: false } } });
+}
+
+function renderPage(initialEntry = "/", client = makeClient()) {
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialEntry]}>
@@ -177,6 +178,60 @@ test("optimistically clears provisional score styling and rolls back with an ann
   expect(
     screen.getByRole("button", { name: /score for rayuela: 9/i }),
   ).toBeVisible();
+  // The toast names no book. The marker is what says which row reverted, and
+  // it is visual state only -- no text, no role, no second live region, so the
+  // confirmation is still announced exactly once (DEC-028).
+  await waitFor(() => expect(row).toHaveAttribute("data-rollback", "true"));
+  expect(row?.className).toContain("animate-shake");
+});
+
+test("the rollback restores the query key it snapshotted, not the one on screen", async () => {
+  // The snapshot is taken against the key that was active when the write
+  // started. Restoring it into whatever key the component happens to be
+  // rendering when the write fails writes one sort's list into another sort's
+  // cache -- input silently lost, which technical spec section 8 forbids.
+  let rejectPatch: ((reason?: unknown) => void) | undefined;
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH")
+        return new Promise<Response>((_resolve, reject) => {
+          rejectPatch = reject;
+        });
+      return Promise.resolve(
+        new Response(JSON.stringify(populated), { status: 200 }),
+      );
+    }),
+  );
+  const client = makeClient();
+  renderPage("/", client);
+  const user = userEvent.setup();
+  await user.click(
+    await screen.findByRole("button", { name: /score for rayuela: 9/i }),
+  );
+  await user.click(screen.getByRole("button", { name: "Score 4" }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("button", { name: /score for rayuela: 4/i }),
+    ).toBeVisible(),
+  );
+
+  await user.click(screen.getByRole("combobox", { name: "Sort library" }));
+  await user.click(screen.getByRole("option", { name: /Score ↓/ }));
+  await waitFor(() =>
+    expect(
+      screen.getByRole("combobox", { name: "Sort library" }),
+    ).toHaveTextContent(/Score/),
+  );
+
+  const writes = vi.spyOn(client, "setQueryData");
+  rejectPatch?.(new Error("offline"));
+  expect(await findToast(/previous value was restored/)).toBeInTheDocument();
+  const restored = writes.mock.calls.map(
+    ([key]) => key as [string, { sort: string }],
+  );
+  expect(restored.length).toBeGreaterThan(0);
+  for (const [, filters] of restored) expect(filters.sort).toBe("date_added");
 });
 
 test("score shortcuts apply to a focused row but editable controls keep their keystrokes", async () => {

@@ -75,6 +75,7 @@ export function HomePage() {
   const [view, setView] = useState<LibraryView>(readViewPreference);
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
+  const [rollbackId, setRollbackId] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
@@ -97,6 +98,14 @@ export function HomePage() {
     const timer = window.setTimeout(() => setHighlightId(null), 2200);
     return () => window.clearTimeout(timer);
   }, [location.state]);
+
+  // The shake runs once and is over in a third of a second; the marker is
+  // held longer so the row stays identifiable while the toast is still up.
+  useEffect(() => {
+    if (rollbackId === null) return;
+    const timer = window.setTimeout(() => setRollbackId(null), 1200);
+    return () => window.clearTimeout(timer);
+  }, [rollbackId]);
 
   useEffect(() => {
     const trimmed = search.trim();
@@ -155,10 +164,14 @@ export function HomePage() {
       changes: Partial<Pick<LibraryEntry, "score" | "status">>;
     }) => patchEntry(entry.id, changes),
     onMutate: async ({ entry, changes }) => {
-      await queryClient.cancelQueries({ queryKey: ["library", filters] });
-      const snapshot = queryClient.getQueryData(["library", filters]);
+      // Captured here and carried in the context. Reading `filters` again in
+      // `onError` would read whatever sort is on screen when the write fails,
+      // which is not necessarily the one this snapshot came from.
+      const key = ["library", filters] as const;
+      await queryClient.cancelQueries({ queryKey: key });
+      const snapshot = queryClient.getQueryData(key);
       queryClient.setQueryData<{ pages: LibraryPage[]; pageParams: unknown[] }>(
-        ["library", filters],
+        key,
         (old) =>
           old && {
             ...old,
@@ -179,10 +192,14 @@ export function HomePage() {
             })),
           },
       );
-      return { snapshot };
+      return { key, snapshot };
     },
-    onError: (_error, _variables, context) => {
-      queryClient.setQueryData(["library", filters], context?.snapshot);
+    onError: (_error, { entry }, context) => {
+      if (context) queryClient.setQueryData(context.key, context.snapshot);
+      // The toast names no book, so the row itself says which value reverted.
+      // Visual state only: no text, no role, no second live region, so the
+      // failure is still announced exactly once (DEC-028).
+      setRollbackId(entry.id);
       toast.error("Your change could not be saved", {
         description: "The previous value was restored.",
       });
@@ -451,6 +468,7 @@ export function HomePage() {
               view={view}
               focusedId={focusedId}
               highlightId={highlightId}
+              rollbackId={rollbackId}
               hasNextPage={library.hasNextPage}
               isFetchingNextPage={library.isFetchingNextPage}
               loadNextPage={() => void library.fetchNextPage()}

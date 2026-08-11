@@ -70,6 +70,14 @@ export default {
         sans: ["var(--font-sans)"],
       },
       keyframes: {
+        // A rejected write, said in the only language a row has. Four pixels
+        // either side: inside the grid gap, so it cannot touch a neighbour,
+        // and a transform, so it cannot perturb the virtualizer's geometry.
+        shake: {
+          "0%, 100%": { transform: "translateX(0)" },
+          "20%, 60%": { transform: "translateX(-4px)" },
+          "40%, 80%": { transform: "translateX(4px)" },
+        },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -80,6 +88,7 @@ export default {
         },
       },
       animation: {
+        shake: "shake 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },

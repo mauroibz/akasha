@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { stillDurations } from "./motion";
+
 /**
  * Product spec section 4.3 and technical spec section 8 require that every user
  * action produces *visible* feedback, and that an accessible live region is a
@@ -235,3 +237,70 @@ for (const size of widths) {
     });
   });
 }
+
+/**
+ * The failure path, which this file has never covered. A confirmation that is
+ * only ever tested when the write succeeds is half a feedback layer.
+ */
+test.describe("a rejected write", () => {
+  async function stubOneEntryLibrary(page: Page) {
+    await page.route("**/api/entries?**", (route) =>
+      route.fulfill({
+        json: {
+          items: [entry],
+          next_cursor: null,
+          total: 1,
+          facets: { status_counts: { reading: 1 } },
+        },
+      }),
+    );
+    await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
+    await page.route("**/api/entries/7", async (route) => {
+      if (route.request().method() !== "PATCH") return route.fallback();
+      await route.fulfill({ status: 500, json: { error: { message: "no" } } });
+    });
+  }
+
+  test("rolls the row back, shakes it, and says so on the toast surface", async ({
+    page,
+  }) => {
+    await stubOneEntryLibrary(page);
+    await page.goto("/");
+    const row = page.locator("[data-entry-id='7']");
+    await expect(row).toBeVisible();
+    await row.getByRole("button", { name: /score/i }).click();
+    await page.getByRole("button", { name: "Score 3", exact: true }).click();
+
+    await expectVisibleToast(page, /could not be saved/);
+    await expect(row).toHaveAttribute("data-rollback", "true");
+    const shake = await row.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return { name: style.animationName, duration: style.animationDuration };
+    });
+    expect(shake.name).not.toBe("none");
+    expect(shake.duration).toBe("0.32s");
+    // The user's input is never silently lost: the prior score is what the
+    // control reads once the write has failed.
+    await expect(row.getByRole("button", { name: /score.*8/i })).toBeVisible();
+  });
+
+  test("shakes nothing when the reader asked for less motion", async ({
+    page,
+  }) => {
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await stubOneEntryLibrary(page);
+    await page.goto("/");
+    const row = page.locator("[data-entry-id='7']");
+    await row.getByRole("button", { name: /score/i }).click();
+    await page.getByRole("button", { name: "Score 3", exact: true }).click();
+
+    // The failure is still reported and the marker is still set; only the
+    // movement is gone.
+    await expectVisibleToast(page, /could not be saved/);
+    await expect(row).toHaveAttribute("data-rollback", "true");
+    const duration = await row.evaluate(
+      (element) => getComputedStyle(element).animationDuration,
+    );
+    expect(stillDurations).toContain(duration);
+  });
+});
