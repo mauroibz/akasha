@@ -1,5 +1,6 @@
 import { expect, test } from "@playwright/test";
 
+import { sampleAnimations } from "./motion";
 import { chooseOption } from "./radix";
 
 function makeEntries(count: number) {
@@ -257,4 +258,35 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
 
   await expect(page.getByText("200 entries updated")).toBeVisible();
   expect(bulkCallCount).toBe(1);
+});
+
+test("the bulk action bar enters without animating a single row", async ({
+  page,
+}) => {
+  const entries = makeEntries(12);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: 12,
+        facets: { status_counts: { unsorted: 12 } },
+      },
+    }),
+  );
+  await page.goto("/triage");
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+
+  const samples = await sampleAnimations(page, async () => {
+    await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
+    await expect(
+      page.getByRole("toolbar", { name: "Bulk actions" }),
+    ).toBeVisible();
+  });
+  // Triage is the other virtualized list. Same rule, same proof: the bar is a
+  // surface that does not scroll, the rows underneath it are not.
+  const rowLevel = samples.filter(
+    (sample) => sample.target === "row" || sample.target === "card",
+  );
+  expect(rowLevel, JSON.stringify(rowLevel.slice(0, 5))).toEqual([]);
 });

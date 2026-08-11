@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { m } from "motion/react";
 import { toast } from "sonner";
 import {
   useInfiniteQuery,
@@ -30,6 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { chooseableStatuses } from "@/features/library/labels";
+import { useMotionPresets } from "@/lib/motion";
 import { scoreBand, scoreTextClass } from "@/lib/score";
 import {
   isEditableTarget,
@@ -79,6 +81,7 @@ export function TriagePage() {
   const [lastShiftIndex, setLastShiftIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const presets = useMotionPresets();
   const navigate = useNavigate();
 
   // Debounce search. Same guard as the library: writing an identical query
@@ -449,10 +452,16 @@ export function TriagePage() {
         <>
           {/* Bulk action bar */}
           {selectionCount > 0 && (
-            <div
+            // Transform and opacity only. The bar sits in normal flow, so
+            // animating its height or margin would push the table underneath it
+            // on every selection change. No exit either: dismissing a selection
+            // should feel immediate.
+            <m.div
               className="sticky top-3 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-surface-raised p-3 shadow-lg"
               role="toolbar"
               aria-label="Bulk actions"
+              initial={presets.actionBar.initial}
+              animate={presets.actionBar.animate}
             >
               <span className="px-2 text-sm text-foreground">
                 {selectionCount} selected
@@ -523,7 +532,7 @@ export function TriagePage() {
               >
                 Clear selection
               </Button>
-            </div>
+            </m.div>
           )}
 
           {/* Virtualized table */}
