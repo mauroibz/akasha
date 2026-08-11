@@ -18,6 +18,7 @@ export default defineConfig({
       "clsx",
       "cmdk",
       "lucide-react",
+      "motion/react",
       "react",
       "react-dom",
       "react-hook-form",

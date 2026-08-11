@@ -1,5 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 
+import { installMatchMedia, setPrefersReducedMotion } from "./matchMedia";
+
 /**
  * jsdom implements neither the Pointer Capture API nor `scrollIntoView`, and
  * Radix's Select and Dialog primitives call both while opening. Without these
@@ -17,3 +19,17 @@ if (!Element.prototype.hasPointerCapture) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined;
 }
+
+/**
+ * Every test runs under `prefers-reduced-motion: reduce` unless it opts out
+ * with `setPrefersReducedMotion(false)`. Two reasons, and the second is the
+ * important one:
+ *
+ * 1. Motion's fallback when `matchMedia` is absent is "animations allowed", and
+ *    an unadvanced frameloop then leaves entering elements at `opacity: 0`.
+ * 2. It makes the whole suite a standing proof of the Sprint 016 claim that
+ *    every flow remains fully usable with motion disabled — add, score, delete,
+ *    triage, import — at no authoring cost.
+ */
+installMatchMedia();
+setPrefersReducedMotion(true);

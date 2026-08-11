@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { act, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -60,6 +60,66 @@ describe("ScorePicker", () => {
     expect(
       screen.getByRole("button", { name: "Score 10" }).className,
     ).toContain("bg-surface-raised");
+  });
+
+  it("previews the ramp on hover without committing a score", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    // Compact mode, because that is where the trigger and the panel coexist:
+    // the full-size picker replaces its trigger with the panel while open.
+    render(<ScorePicker value={2} onChange={onChange} compact />);
+    const trigger = screen.getByRole("button", { name: /score: 2/i });
+    await user.click(trigger);
+    // Sweeping the segments recolours the trigger live, so the ramp is legible
+    // before the commit rather than only after it.
+    await user.hover(screen.getByRole("button", { name: "Score 9" }));
+    expect(trigger.className).toContain("text-score-top");
+    expect(screen.getByRole("button", { name: "Score 9" }).className).toContain(
+      "bg-score-top",
+    );
+    expect(onChange).not.toHaveBeenCalled();
+    await user.unhover(screen.getByRole("button", { name: "Score 9" }));
+    expect(trigger.className).toContain("text-score-low");
+    expect(trigger.textContent).toContain("2");
+  });
+
+  it("previews on keyboard focus too, so the ramp is not pointer-only", async () => {
+    const user = userEvent.setup();
+    render(<ScorePicker value={1} onChange={() => {}} compact />);
+    const trigger = screen.getByRole("button", { name: /score: 1/i });
+    await user.click(trigger);
+    await act(async () =>
+      screen.getByRole("button", { name: "Score 7" }).focus(),
+    );
+    expect(trigger.className).toContain("text-score-high");
+  });
+
+  it("previews the fill in the full-size picker, which has no visible trigger", async () => {
+    const user = userEvent.setup();
+    render(<ScorePicker value={2} onChange={() => {}} />);
+    await user.click(screen.getByRole("button", { name: /score: 2/i }));
+    await user.hover(screen.getByRole("button", { name: "Score 8" }));
+    expect(screen.getByRole("button", { name: "Score 8" }).className).toContain(
+      "bg-score-high",
+    );
+    expect(screen.getByRole("button", { name: "Score 3" }).className).toContain(
+      "bg-score-high/25",
+    );
+  });
+
+  it("commits once and closes in the same tick", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<ScorePicker value={4} onChange={onChange} compact />);
+    await user.click(screen.getByRole("button", { name: /score: 4/i }));
+    await user.click(screen.getByRole("button", { name: "Score 10" }));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenCalledWith(10);
+    // The panel disappearing is the confirmation that the commit landed; it is
+    // deliberately not deferred behind an exit animation.
+    expect(
+      screen.queryByRole("button", { name: "Score 10" }),
+    ).not.toBeInTheDocument();
   });
 
   it("clears the score via the clear button", async () => {
