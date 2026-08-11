@@ -1,6 +1,6 @@
 # Sprint 016 — Motion and interaction polish
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 015
 **Roadmap revision:** 6
 

@@ -360,3 +360,54 @@ Append-only record of material architecture choices, product-default resolutions
 - **Also recorded:** a test that drives a queue's internals is not evidence that anything fills
   that queue. The gap here was not a wrong assertion but an absent one, and no coverage number
   would have shown it: every line of `jobs.py` was covered.
+
+## DEC-028 — One visible feedback surface, one live region
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** Sprint 015 replaced the invisible feedback layer described in DEC-024. The sprint
+  contract asked for visible toasts via Sonner while retaining the existing `aria-live`
+  announcement paragraphs, on the reasoning that the defect was that they were the *only* channel
+  rather than that they existed. Implementing it showed the two cannot coexist as written: Sonner
+  wraps its toasts in its own `<section aria-live="polite" aria-relevant="additions text">`, so a
+  retained paragraph carrying the same sentence announces every confirmation twice. Separately,
+  Sonner v2 does not put `role="status"` on each toast; the polite region is on the container.
+- **Decision:** There is exactly one confirmation channel. Sonner is mounted once in `AppShell`,
+  every confirmation and every failed-write error goes through it, and the `sr-only`
+  `aria-live="assertive"` paragraphs in `HomePage` and `TriagePage` are deleted rather than
+  retained. The sprint's "toast surfaces keep `role='status'`" requirement is met by Sonner's
+  container region rather than per toast. Visible loading and error states that are not
+  confirmations — `role="status"` on "Loading your library…", `role="alert"` on a failed load —
+  stay where they are.
+- **Consequences:** A confirmation is announced once and seen once. The toast surface sits
+  bottom-right rather than top-centre, because every screen puts its primary controls in the
+  header and a toast there covers the control the reader just used. `e2e/feedback.spec.ts` asserts
+  rendered geometry — width, height, and resting position inside the viewport — because
+  Playwright's `toBeVisible()` accepts an `sr-only` element, which is exactly how DEC-024 went
+  unnoticed for thirteen sprints. A test that queries a confirmation by role or text alone is not
+  evidence that anyone saw it.
+
+## DEC-029 — Portalled primitives inside the virtualized library
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** Sprint 015 flagged as a risk that a Radix `Select` inside a virtualized row portals
+  its listbox to `document.body` while the row that owns the trigger can unmount on scroll, and
+  required the answer to be measured rather than assumed. It also flagged that
+  `isEditableTarget` guarded global keyboard shortcuts with a tag-name check plus a
+  `[role="dialog"]` ancestor.
+- **Decision:** Measured: while a Radix Select listbox is open the rest of the document is inert —
+  pointer events are blocked and scrolling is locked — so a wheel gesture cannot move the
+  virtualizer underneath it and the owning row cannot be recycled. A portalled Select is therefore
+  safe inside a fixed-size virtual row, and `e2e/library.spec.ts` asserts it. Two consequences are
+  recorded rather than worked around: the `feed` role is `aria-hidden` while a listbox is open, so
+  tests that address the scroll container during that window must use a class rather than a role;
+  and a page-level error rendered behind an open modal is unreachable, so a failed delete reports
+  inside its own dialog. `isEditableTarget` now guards on the `dialog`, `alertdialog`, `combobox`,
+  `listbox`, and `menu` roles, because Radix renders a Select trigger as a `button` and a tag-name
+  check would let `7` set a score while a status dropdown had focus.
+- **Consequences:** The DEC-026 exception list is unchanged — `ScorePicker` and the library card
+  box stay bespoke — but for a narrower reason than "portals are unsafe here". Portalling is fine;
+  what `ScorePicker` cannot do is portal *and* satisfy the DEC-023 requirement that its expanded
+  panel stay geometrically inside its card. Sprint 016 may animate portalled content without
+  re-litigating this, provided both mounted-DOM bounds still hold.

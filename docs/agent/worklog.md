@@ -432,3 +432,63 @@ shadcn/ui, real tokens, and visible feedback. Note that it will break `selectOpt
 `input[type="checkbox"]` selectors across three e2e specs by construction; that is its scope, not
 a regression. The degraded-search indicator it renders is already fed by
 `GET /api/health/providers`.
+
+## 2026-08-11 — Sprint 015 (complete)
+
+**Done:** Installed the component library, form stack, and tokens that technical-spec section 8
+has required since Sprint 004 and that DEC-024 found were never installed. Eight commits,
+`0192b52`..`dad0b5a`; full inventory and per-criterion evidence in the sprint Outcome.
+
+**Verified and how:**
+- `python scripts/validate_project.py`, `make format`, `make check` (ruff, mypy 33 files, tsc,
+  openapi, validator), `make test` = backend **154** / frontend **51**, `make build`,
+  `git diff --check` clean.
+- Chromium e2e **44 passed / 2 skipped**, run three consecutive times clean. The two skips are
+  `live-metadata.spec.ts` behind `LIVE_METADATA_MODE`.
+- Walkthrough against a real backend on `:8100` with the owner's Google Books key, a fresh
+  database, and a 30-book Goodreads CSV. 42 screenshots at 375/768/1440. Zero uncaught page
+  errors. Enrichment ran live and real covers appeared mid-session. The degraded-search notice was
+  verified against a genuinely degraded backend by restarting without the key.
+- DEC-023 bounds re-measured, not assumed: 7 rows / 28 cards against the 5,000-entry fixture
+  (bounds 20 / 48); 4/2/1 columns with 5/5/4 rows and 20/10/4 cards against 30 real books. The
+  spec now prints the measurement on every run.
+
+**Dead ends and things a later session should not rediscover:**
+- `npx shadcn add` wrote the components to a literal `frontend/@/` directory instead of resolving
+  the alias, and pulled `next-themes` in for the Sonner wrapper. Both were corrected by hand.
+- `buttonVariants` cannot be exported from `button.tsx`: `react-refresh/only-export-components`
+  is a warning and lint runs `--max-warnings=0`. It lives in `button-variants.ts`.
+- jsdom implements neither Pointer Capture nor `scrollIntoView`, so every Radix interaction test
+  throws `hasPointerCapture is not a function` until the shims in `src/test/setup.ts` are present.
+- Radix `AlertDialog` is `role="alertdialog"`, and `AlertDialogTitle` sets `aria-labelledby`,
+  which overrides any `aria-label` on the content. Dialogs are addressed by visible title now.
+- An intermittent e2e failure (a click landing on a row being replaced) was **not** a flaky test.
+  Two real causes: the search-debounce effect wrote an unchanged query back to the URL on every
+  page load, re-rendering the whole virtualized list a quarter second in; and Vite discovered the
+  new dependencies during the first navigation and force-reloaded the page. Both fixed in source
+  and `vite.config.ts`. Confirmed against the previous commit that the flake did not pre-exist.
+- The dialog looked transparent in the first screenshots. That was the 200 ms enter animation, not
+  a missing background. Screenshot dialogs after they settle.
+
+**Observed, out of scope, left alone:**
+- The edition-year line on a library card is `truncate`d inside a narrow metadata column, so
+  `Edition year: 1994` shows as `Edition year: 199…`. A Sprint 014 correctness win clipped by
+  Sprint 013 geometry; fixing it means changing the card, which DEC-023 pins. Recorded against
+  Sprint 017.
+- The triage score cell renders a provisional score as `6·` with no legend.
+- The bundle is 610 kB of JavaScript and the build now warns about chunk size.
+- Imported rows land `unsorted`, so the library reads as empty until triage runs. Correct, but it
+  looks briefly like the import did nothing.
+- Inline score and status edits deliberately produce no toast — they are optimistic writes that
+  render instantly. Failures do toast.
+
+**Deviations:** DEC-028 (one feedback surface; the `sr-only` announcement paragraphs are deleted
+rather than retained, because Sonner's own region would announce every confirmation twice) and
+DEC-029 (portalled primitives are safe inside a virtual row because Radix makes the document
+inert; `isEditableTarget` widened from tag names to roles). Checkpoints 6 and 7 landed as one
+commit because the e2e rewrite is not separable from the DOM change that forces it.
+
+**Next:** Sprint 016 (motion and interaction polish) — status `ready`. `motion` is still imported
+zero times. It starts from a token layer rather than a blank page, and must decide which Radix
+enter/exit transitions to keep before adding its own. Re-assert both DEC-023 bounds with animation
+enabled; current headroom is 7/20 rows and 28/48 cards.

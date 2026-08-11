@@ -312,6 +312,7 @@ Design tokens:
 - dark-first zinc near-black surfaces, not pure black: zinc-950 background, zinc-900 surface, zinc-800 border, zinc-50 text, zinc-400 muted;
 - a deliberate non-default saturated accent: amber-400 on a zinc-950 foreground, with a score ramp of red-400 (1–3), amber-400 (4–6), lime-400 (7–8), emerald-400 (9–10) (DEC-026);
 - Geist or Inter with bundled/local or privacy-safe loading. Inter is self-hosted and bundled; naming a font without loading it is not compliance;
+- small controls carry their own radius token: at the card radius a 16 px checkbox reads as a radio button;
 - these are declared once as Tailwind theme tokens and CSS variables. Inline colour literals in components are a defect;
 - no generic border-shadow card grid;
 - visible focus rings and touch targets at least 44 px where practical;
@@ -323,13 +324,13 @@ Cross-cutting behavior:
 - Optimistic mutations snapshot and roll back cache; failed writes announce an accessible error and never silently lose input.
 - Search input is debounced and cancellable; stale responses cannot replace newer results.
 - Route-level error boundaries and useful empty/loading states are mandatory.
-- Keyboard shortcuts are disabled while an input, textarea, select, dialog, or content-editable element owns focus unless explicitly relevant.
+- Keyboard shortcuts are disabled while an input, textarea, select, dialog, or content-editable element owns focus unless explicitly relevant. The component library renders these as buttons carrying roles rather than as native tags, so the guard is on the `dialog`, `alertdialog`, `combobox`, `listbox`, and `menu` roles as well as on tag names (DEC-029).
 - `0` means score 10 only in score-shortcut context; Escape cancels an edit.
 - Virtual rows have stable keys and fixed measured sizes. Sort/filter changes crossfade the container; rows do not use layout animations.
 - The library grid virtualizes rows of cards, not single entries. The column count is derived from the measured scroll-container width so no card falls below its minimum width; a virtual row is one fixed-height band of that many fixed-height cards. Mounted DOM is therefore bounded per row and per card, and both bounds are asserted.
 - A library card is a fixed box: fixed-size cover, clamped metadata, and a control row that never wraps. Controls that expand (the compact score picker) render as an overlay anchored inside the card, so expanding a control never changes a card's layout box or paints into a neighbor.
 - Two components are deliberately bespoke rather than library primitives, and must stay that way (DEC-026). The score picker may not become a portalled primitive, because its expanded panel is required to remain geometrically inside its card; portalling to `document.body` breaks that by construction. The library card box may not adopt a primitive carrying its own intrinsic padding, because the card height is pinned for fixed-size virtualization and the column calculation subtracts a matched row padding.
-- Every user action produces visible feedback. An accessible live region is a complement to a visible confirmation, never a substitute for one: feedback rendered only into a visually hidden element is a defect, not an implementation.
+- Every user action produces visible feedback. Feedback rendered only into a visually hidden element is a defect, not an implementation. The visible surface carries the accessible announcement rather than sitting beside a second, duplicate live region (DEC-028): a confirmation is announced once and seen once.
 - Selection is independent of mounted rows: either explicit selected IDs or `all_matching=true` with excluded IDs. `Ctrl/Cmd+A` means all server rows matching the current filter, not merely loaded rows.
 
 The product spec defines each screen. Sprint acceptance tests must include the critical keyboard flows and reduced-motion behavior.

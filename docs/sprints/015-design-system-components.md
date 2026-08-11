@@ -1,6 +1,6 @@
 # Sprint 015 — Design system and component foundation
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 014
 **Roadmap revision:** 6
 
@@ -190,5 +190,140 @@ complete this sprint.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Status: completed 2026-08-11.**
+
+### Delivered
+
+`frontend/src/components/ui/` now holds twelve shadcn primitives. Every interactive control on
+every screen is a primitive or one of the two documented bespoke components; no native `<select>`
+remains in `frontend/src`. `tailwind.config.ts` and `index.css` carry the DEC-026 token set, Inter
+ships from the bundle as seven local `woff2` subsets, and `grep -rn "fuchsia-" frontend/src`
+returns nothing. Feedback is visible: Sonner is mounted once in `AppShell`, the
+`sessionStorage["akasha.toast"]` handoff is deleted, and the new-entry highlight travels as router
+state. All `FormData` reads are gone; the three forms validate through zod and keep typed input
+when a write fails. Navigation icons are `lucide-react` (`LibraryIcon` and `ShelfIcon` were the
+same three lines). `/add` shows a degraded-search notice fed by `GET /api/health/providers`.
+`ComingSoonPage` and the `.field`/`.dialog` classes are deleted.
+
+### Commits
+
+| Commit | Subject |
+|---|---|
+| `0192b52` | build: install shadcn primitives, form stack, and icons |
+| `4f56e7f` | feat: define design tokens and self-host Inter |
+| `ed34c54` | feat: add visible toast surface and remove sessionStorage handoff |
+| `4f30eeb` | refactor: rebuild library and triage on shadcn primitives |
+| `d2954e3` | refactor: rebuild add, import, shelves, and the nav shell on shadcn primitives |
+| `004f1b5` | refactor: convert forms to react-hook-form with zod schemas |
+| `5ec996b` | chore: remove dead page and superseded css classes |
+| `dad0b5a` | fix: give small controls their own radius token |
+
+Checkpoints 6 and 7 landed as one commit: the e2e selector rewrite is not separable from the DOM
+change that forces it, and committing the rewrite alone would have meant committing a red suite.
+
+### Acceptance criteria
+
+1. **Met.** Twelve primitives under `src/components/ui/`; `grep -rn "<select" frontend/src`
+   returns nothing. `ScorePicker` and the library card box remain bespoke per DEC-026.
+2. **Met.** Verified in a browser at 375px and 1440px by `e2e/feedback.spec.ts`, which asserts
+   rendered geometry rather than `toBeVisible()` alone, and again by hand in the walkthrough:
+   add `Book added`, duplicate `Already in your library`, delete `Book removed from your library`,
+   rename `Shelf renamed to "Renombrada"`, import `Import complete: 30 books added`.
+3. **Met.** `grep -rn "sessionStorage\|akasha.toast" frontend/src` returns one comment explaining
+   why the handoff is gone. `localStorage` for the view preference is untouched; AC3 names
+   `sessionStorage` only.
+4. **Met.** `grep -rn "fuchsia-" frontend/src` is empty and no hard-coded hex appears outside the
+   token definitions in `index.css`, which name the palette entries they encode in comments.
+5. **Met.** `make build` emits seven `inter-*.woff2` files; `grep -roE "googleapis|gstatic"` over
+   `dist/` returns nothing.
+6. **Met.** `opinionSchema`, `metadataSchema`, and `manualBookSchema` in
+   `src/features/detail/schemas.ts`. Errors are `role="alert"`, referenced by `aria-describedby`
+   from a control carrying `aria-invalid`. Six tests cover invalid date range, out-of-range reread
+   count, empty title on both forms, malformed ISBN, and a rejected write preserving input.
+7. **Met and re-measured.** Against the 5,000-entry fixture: 7 mounted rows, 28 mounted cards
+   (bounds: under 20 and under 48). Against 30 real books: 4/2/1 columns at 1440/768/375 with
+   5/5/4 mounted rows and 20/10/4 mounted cards. The primitives add nodes per card but no cards or
+   rows, so the margin is unchanged. `e2e/library.spec.ts` now prints the measurement.
+8. **Met.** Chromium: **44 passed, 2 skipped**, no uncaught page errors. The two skips are
+   `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE`. Asserted behaviours increased: the
+   suite gained `feedback.spec.ts` (10 tests) and a virtualizer/listbox test, and the import
+   ambiguity test now also asserts that choosing enables the commit.
+9. **Met.** `make check` passes including `eslint --max-warnings=0`.
+
+### Verification
+
+```text
+python scripts/validate_project.py   passed
+make format                          clean
+make check                           passed (ruff, mypy 33 files, tsc, openapi, validator)
+make test                            backend 154 passed / frontend 51 passed
+npm run test:e2e -- --project=chromium   44 passed, 2 skipped (three consecutive clean runs)
+make build                           backend wheel + frontend bundle, 610 kB js / 34 kB css
+git diff --check                     clean
+```
+
+### Walkthrough (AGENTS.md section 3)
+
+Run against a real backend on `:8100` with the owner's `GOOGLE_BOOKS_API_KEY`, a fresh database,
+and a 30-row Goodreads CSV of real Spanish-language and translated fiction. 42 screenshots at
+375/768/1440. **Zero uncaught page errors across the whole pass.**
+
+Exercised: Goodreads preview and commit (30 rows), triage selection and bulk status, accept-all
+suggested, library grid at three widths, sort by score, shelf filter, free-text search, inline
+score and status editing, table view, detail view, opinion edit with an invalid date range,
+metadata edit with an empty title, delete with confirmation, provider search, manual add with a
+malformed ISBN, shelf rename and delete, the Calibre tab, and reduced motion.
+
+Observed:
+
+- Enrichment ran live during the pass and real covers appeared for `Ficciones`, `Cien años de
+  soledad`, and `Rayuela` while the library was open.
+- Provider search for "El hacedor Borges" returned 20 results across both providers, each with an
+  edition year, publisher, language, and provider badge.
+- The degraded-search notice was verified against a genuinely degraded backend (server restarted
+  without the key): *"Search is running on fewer providers — googlebooks is unavailable:
+  GOOGLE_BOOKS_API_KEY is not set"*, at both 375px and 1440px.
+- Imported rows land `unsorted`, so the library is empty until triage runs. Correct per DEC and
+  the status-facet default, but it reads as "the import did nothing" for a moment.
+- Inline score and status edits produce no toast. Deliberate: they are optimistic writes that
+  render instantly, and a toast per keystroke-speed edit would be noise. Failures do toast.
+
+Things noticed and left (see `docs/agent/HANDOFF.md`):
+
+- On a library card the edition-year line is `truncate`d inside a narrow metadata column, so
+  `Edition year: 1994` renders as `Edition year: 199…`. The year is a Sprint 014 correctness win
+  being clipped by Sprint 013 geometry; fixing it means changing the card, which DEC-023 pins.
+- The triage score cell renders a provisional score as `6·`, which is cryptic without the legend
+  the library card has.
+
+### Deviations and decisions
+
+- **DEC-028** records the toast surface: Sonner's own `aria-live` region replaces the two
+  `sr-only` announcement paragraphs rather than joining them, because keeping both announces every
+  confirmation twice. Sonner v2 puts the polite region on the container rather than
+  `role="status"` on each toast, so the sprint's "toast surfaces keep `role='status'`" is met one
+  level up.
+- **DEC-029** records that Radix makes the document inert while a Select listbox is open, which is
+  what makes a portalled listbox safe inside a virtualized row, and that `isEditableTarget` had to
+  widen from tag names to roles.
+- Confirmation dialogs are addressed by their visible title now, because Radix derives the
+  accessible name from `AlertDialogTitle` via `aria-labelledby`, which overrides `aria-label`.
+- `--radius-control` was added after the walkthrough showed a 16px checkbox rendering as a circle
+  at the card radius.
+- Two prerequisite defects were fixed because they blocked verification: the search-debounce
+  effect wrote an unchanged query back to the URL on every page load, and Vite discovered the new
+  dependencies mid-navigation and force-reloaded the page.
+
+### Impact on future sprints
+
+- **016 (motion):** the token layer, `tailwindcss-animate`, and Sonner's own transitions are in
+  place, so animation work starts from tokens rather than literals. It must re-assert the two
+  DEC-023 bounds with animation on; the current margin is 7/20 rows and 28/48 cards. The
+  crossfade-on-sort work now has a stable list container to key. `motion` is still imported zero
+  times.
+- **017 (hardening):** the accessibility audit inherits labelled controls, `aria-invalid` /
+  `aria-describedby` on every field, and Radix focus management, so it should find fewer defects
+  than planned. It also inherits a 610 kB JS bundle that now warrants the code-splitting the build
+  warns about, and the two cosmetic defects listed above.
+- **018 (release):** unchanged. The build still produces a single static bundle with no runtime
+  font or CDN dependency, which keeps the LAN-only invariant intact.

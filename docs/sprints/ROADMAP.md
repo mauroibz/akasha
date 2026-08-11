@@ -2,7 +2,7 @@
 
 **Plan revision:** 6
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 015](015-design-system-components.md)
+**Active sprint:** [Sprint 016](016-motion-interaction-polish.md)
 
 ## Dependency graph
 
@@ -47,8 +47,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | completed |
 | 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | completed |
 | 014 | Metadata correctness and search relevance | Searching finds the intended edition; added and imported books acquire real metadata and cached covers, proven against recorded provider responses | 013 | completed |
-| 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | ready |
-| 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | planned |
+| 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | completed |
+| 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | ready |
 | 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | planned |
 | 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | planned |
 
@@ -234,11 +234,21 @@ is missing. Animation is spent on interactions, never on scrolling: the containe
 sort and filter change and rows never carry layout animations, per technical-spec section 8. Both
 DEC-023 mounted-DOM bounds are re-asserted with animation enabled.
 
+Sprint 015 changed what this inherits. Colour, radius, and typography are tokens now, so a spring
+or a colour shift is written against `--score-*` and `--primary` rather than against literals, and
+`tailwindcss-animate` is installed. Radix supplies its own enter/exit transitions on dialogs,
+selects, and toasts, so the first job is deciding which of those to keep rather than adding
+motion to a blank page. The measured headroom against the 5,000-entry fixture is 7 of 20 mounted
+rows and 28 of 48 mounted cards. DEC-029 records that portalling is safe inside a virtual row, so
+animating portalled content does not reopen DEC-023 — but the score picker still may not portal.
+
 ### [Sprint 017 — Scale, accessibility, and resilience](017-scale-accessibility-resilience.md)
 
 Scope:
 
-- Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark against both DEC-023 mounted-DOM bounds, accessibility audit and fixes.
+- Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark against both DEC-023 mounted-DOM bounds, accessibility audit and fixes. The audit inherits labelled controls, `aria-invalid`/`aria-describedby` on every field, and Radix focus management from Sprint 015, so it should confirm more than it repairs.
+- Bundle size: Sprint 015 took the frontend to 610 kB of JavaScript and the build now emits a chunk-size warning. Decide whether to code-split or to raise the limit deliberately.
+- Two cosmetic defects recorded in the Sprint 015 walkthrough: the edition-year line is truncated on library cards, and the triage score cell renders a provisional score as an unexplained `6·`.
 - Error boundaries, degraded provider states, reduced motion, cancellation/race tests.
 - Complete critical E2E regression suite and security limits.
 

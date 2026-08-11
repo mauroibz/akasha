@@ -1,53 +1,87 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 014 (metadata-correctness-search), 2026-08-09.
-**Next:** Sprint 015 (design-system-components) — status `ready`, file at
-`docs/sprints/015-design-system-components.md`.
+**Last completed:** Sprint 015 (design-system-components), 2026-08-11.
+**Next:** Sprint 016 (motion-interaction-polish) — status `ready`, file at
+`docs/sprints/016-motion-interaction-polish.md`.
 
 ## Read this first
 
-The backend now does what the product promised. Search returns the intended edition first, every
-result carries an edition year, and imported and added books acquire real metadata and locally
-cached covers. This was verified by using the application against live providers with the owner's
-Google Books key, not only by tests — see the walkthrough section of the Sprint 014 worklog entry.
+The frontend is now built on the stack technical-spec section 8 has always specified. Twelve
+shadcn primitives live in `frontend/src/components/ui/`, colour and radius and type come from
+tokens, Inter ships from the bundle, and every form validates through zod. There is no native
+`<select>` left in `frontend/src`.
 
-**The enrichment pipeline had never run at all** (DEC-027). Sprint 014 was planned around a broken
-Open Library URL; that URL was never reached, because nothing in production code called
-`JobRepository.enqueue` and nothing called `JobRunner.tick`. Sprint 011 built a correct durable job
-queue that no code path used. Both ends are connected now: importers enqueue on commit, and the
-application lifespan drives the runner. If you touch either end, there is no test that will notice
-you disconnected them again except `test_enrichment_pipeline.py` — keep it.
+**Feedback is visible.** Sonner is mounted once in `AppShell`, bottom-right. The
+`sessionStorage["akasha.toast"]` handoff is gone, and so are the two `sr-only` announcement
+paragraphs — DEC-028 explains why keeping both would announce every confirmation twice. If you add
+a confirmation, it goes through `toast()`; there is no second channel to also update.
 
-`AGENTS.md` section 3 carries the **walkthrough gate**, and it earned its place this sprint: two
-defects were found by running the application and none of them by the test suite.
+This was verified by using the application, not only by tests: a 30-book Goodreads import against
+a real backend with the owner's Google Books key, 42 screenshots at 375/768/1440, zero uncaught
+page errors. Enrichment ran live during the pass and real covers appeared while the library was
+open.
 
 ## Plan shape
 
 | Sprint | Scope | Status |
 |---|---|---|
-| 015 | Design system, shadcn/ui, visible feedback | `ready` |
-| 016 | Motion and interaction polish | `planned` |
+| 016 | Motion and interaction polish | `ready` |
 | 017 | Scale, accessibility, resilience | `planned` |
 | 018 | Container, backup, release | roadmap contract |
 
-## What Sprint 015 must know
+## What Sprint 016 must know
 
-- **It will break e2e selectors by construction.** `selectOption()` and
-  `input[type="checkbox"]` across `library.spec.ts`, `triage.spec.ts`, and `import.spec.ts` stop
-  matching once controls become Radix primitives. Rewriting them is in scope, not a regression.
-- **Two components stay bespoke** (DEC-026). `ScorePicker` must not become a Radix `Popover`:
-  Radix portals to `document.body`, and `frontend/e2e/library.spec.ts` asserts the expanded panel
-  stays geometrically inside its card. The library card must not become a shadcn `Card`.
-- **The Sprint 013 grid contract is not reopened.** `gridColumnCount`, the 280px pinned card
-  height, rows-of-cards virtualization with `overscan: isGrid ? 2 : 4`, and the `data-card-*` /
-  `data-score-panel` / `data-mounted-count` / `data-columns` attributes are load-bearing
-  (DEC-023, technical-spec section 8).
-- **The shelf filter's data source changed.** `HomePage` reads `GET /api/shelves` through a
-  `useQuery`, not `entries.flatMap(...)`. Converting the control to a shadcn `select` must keep
-  that source. It refetches on every navigation; a `staleTime` would be welcome.
-- **The degraded-search indicator has its data already.** `GET /api/health/providers` returns a
-  row per provider plus a `degraded` flag, and `getProviderHealth` in `src/api/health.ts` types
-  it. Render it; do not invent a new endpoint.
+- **`motion` is still imported zero times.** That has not changed since Sprint 004.
+- **You are not starting from a blank page.** Radix already animates dialogs, selects, and toasts
+  on enter and exit, and `tailwindcss-animate` is installed and wired into `tailwind.config.ts`.
+  Decide what to keep before adding more.
+- **Animate against tokens.** `--score-low/mid/high/top`, `--primary`, `--radius`,
+  `--radius-control`. `grep -rn "fuchsia-" frontend/src` is empty and should stay that way.
+- **The DEC-023 bounds have headroom but are not slack.** Measured this sprint: 7 of 20 mounted
+  rows and 28 of 48 mounted cards against the 5,000-entry fixture. `e2e/library.spec.ts` prints
+  the numbers on every run. Re-assert both with animation enabled; if a bound tightens, say so
+  rather than relaxing it.
+- **Portalling is safe inside a virtual row; the score picker still may not portal.** DEC-029
+  measured that Radix makes the document inert while a listbox is open, so the virtualizer cannot
+  recycle the owning row. The `ScorePicker` exception is narrower than "portals are unsafe": its
+  expanded panel is required to stay geometrically inside its card, and `e2e/library.spec.ts`
+  asserts that.
+- **The score ramp already exists.** `src/lib/score.ts` maps 1–10 onto four bands and is used by
+  the picker and by triage score text. The product spec's "colour shifts across the range" is a
+  transition between bands that already exist, not a new palette.
+
+## Gotchas that will cost you an hour each
+
+- `eslint --max-warnings=0` plus `react-refresh/only-export-components` means a component file
+  exports components only. That is why `buttonVariants` lives in `button-variants.ts`.
+- jsdom has neither Pointer Capture nor `scrollIntoView`. `src/test/setup.ts` shims them; without
+  it every Radix interaction test throws before asserting anything.
+- Radix `AlertDialog` is `role="alertdialog"`, and its title sets `aria-labelledby`, which
+  overrides `aria-label`. Address confirmation dialogs by their visible title.
+- While a Radix listbox is open the rest of the document is `aria-hidden` and pointer-events-none.
+  A test that needs the scroll container during that window addresses it by class, and a
+  page-level error rendered behind an open modal is unreachable — report inside the dialog.
+- `e2e/radix.ts` has `chooseOption` and `expectSelected`. `selectOption()` and `toHaveValue()` do
+  not work on a Radix Select.
+- `e2e/feedback.spec.ts` asserts rendered geometry, not `toBeVisible()`. An `sr-only` element is
+  "visible" to Playwright — that is exactly how DEC-024 survived thirteen sprints. Do not weaken
+  it back to a text query.
+
+## Things noticed and deliberately left
+
+- **The edition-year line is truncated on library cards.** `Edition year: 1994` renders as
+  `Edition year: 199…` because the metadata column is narrow and the line is `truncate`d. A
+  Sprint 014 correctness win clipped by Sprint 013 geometry. Recorded against Sprint 017; fixing
+  it means changing the card, which DEC-023 pins.
+- **The triage score cell shows a provisional score as `6·`** with no legend.
+- **The bundle is 610 kB of JavaScript** and the build now emits a chunk-size warning. Sprint 017
+  decides whether to code-split or raise the limit deliberately.
+- **Imports land `unsorted`**, so the library looks empty until triage runs. Correct, but it reads
+  briefly as "the import did nothing".
+- **`100 años de Soledad` (ISBN 9781516909629) still has no cover.** This is `OQ-001` in
+  `docs/sprints/ROADMAP.md`, open and unassigned. Do not implement it or fold it into a sprint
+  until the owner decides.
+- Entries added through the UI carry no score; the detail page shows an unset control.
 
 ## Provider recordings
 
@@ -58,27 +92,19 @@ them silently** — a fixture is a pinned observation of an external contract, a
 refreshing one turns a regression test into a rubber stamp. `scripts/validate_project.py` exempts
 that directory from text hygiene so the bytes stay as captured.
 
-## Things noticed and deliberately left
-
-- `100 años de Soledad` (ISBN 9781516909629) has no cover: Open Library returns an edition but all
-  its cover URLs 404, and Google Books is not consulted because the edition is otherwise usable.
-  Enrichment falls back on a miss, never to complete individual empty fields.
-  **The owner has this under consideration as `OQ-001` in `docs/sprints/ROADMAP.md`. It is open
-  and unassigned — do not implement it, and do not fold it into a sprint, until the owner
-  decides.**
-- Entries added through the UI carry no score; the detail page shows an unset control. Correct,
-  but it reads oddly beside imported rows.
-
 ## State
 
-- Planning revision 6; state points to Sprint 015, project status `ready`.
+- Planning revision 6; state points to Sprint 016, project status `ready`.
 - Gates at close: validator passed, `make check` passed, `make test` backend **154** / frontend
-  **39**, Playwright chromium **33 passed / 2 skipped**, `make build` succeeded,
-  `git diff --check` clean.
+  **51**, Playwright chromium **44 passed / 2 skipped** across three consecutive runs,
+  `make build` succeeded, `git diff --check` clean.
 - The two skipped e2e tests are `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a
   live backend. Run them with
   `BOOK_TRACKER_E2E_BACKEND=http://127.0.0.1:8100 LIVE_METADATA_MODE=add npx playwright test e2e/live-metadata.spec.ts`.
-- Migration head is `0006_job_error_code`.
+- Migration head is `0006_job_error_code`. No backend change this sprint.
 - `.env` exists locally with the owner's `GOOGLE_BOOKS_API_KEY` and is gitignored. It is never
-  committed.
+  committed. Note that `make dev-backend` does not load it; export it yourself if you want live
+  Google Books during a walkthrough.
+- `data/` is gitignored and holds whatever the last walkthrough imported. Delete it for a clean
+  run.
 - Commit messages in this repository carry no `Co-Authored-By` trailer.
