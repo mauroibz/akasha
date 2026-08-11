@@ -1,6 +1,6 @@
 # Sprint 015 — Design system and component foundation
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 014
 **Roadmap revision:** 6
 

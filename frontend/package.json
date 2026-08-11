@@ -16,14 +16,31 @@
     "api:check": "node scripts/check-openapi-types.mjs"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
+    "@hookform/resolvers": "^5.7.1",
+    "@radix-ui/react-alert-dialog": "^1.1.23",
+    "@radix-ui/react-checkbox": "^1.3.11",
+    "@radix-ui/react-dialog": "^1.1.23",
+    "@radix-ui/react-label": "^2.1.15",
+    "@radix-ui/react-popover": "^1.1.23",
+    "@radix-ui/react-select": "^2.3.7",
+    "@radix-ui/react-slot": "^1.3.3",
+    "@radix-ui/react-tabs": "^1.1.21",
     "@tanstack/react-query": "^5.66.0",
     "@tanstack/react-virtual": "^3.11.0",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "cmdk": "^1.1.1",
+    "lucide-react": "^1.31.0",
     "motion": "^12.0.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-hook-form": "^7.85.0",
     "react-router-dom": "^7.1.0",
-    "tailwind-merge": "^3.0.0"
+    "sonner": "^2.0.8",
+    "tailwind-merge": "^3.0.0",
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
