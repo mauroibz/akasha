@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 import {
   createShelf,
@@ -15,7 +16,6 @@ export function ShelvesPage() {
   const cache = useQueryClient();
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
   const [renamingId, setRenamingId] = useState<number | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [deletingShelf, setDeletingShelf] = useState<ShelfWithCount | null>(
@@ -35,9 +35,10 @@ export function ShelvesPage() {
 
   const create = useMutation({
     mutationFn: (name: string) => createShelf(name),
-    onSuccess: () => {
+    onSuccess: (_data, name) => {
       setError("");
       setNewName("");
+      toast.success(`Shelf "${name}" created`);
       void cache.invalidateQueries({ queryKey: ["shelves"] });
     },
     onError: (e: Error) => setError(e.message),
@@ -46,9 +47,10 @@ export function ShelvesPage() {
   const rename = useMutation({
     mutationFn: ({ id, name }: { id: number; name: string }) =>
       renameShelf(id, name),
-    onSuccess: () => {
+    onSuccess: (_data, { name }) => {
       setRenamingId(null);
       setError("");
+      toast.success(`Shelf renamed to "${name}"`);
       void cache.invalidateQueries({ queryKey: ["shelves"] });
     },
     onError: (e: Error) => setError(e.message),
@@ -58,7 +60,9 @@ export function ShelvesPage() {
     mutationFn: (id: number) => deleteShelf(id),
     onSuccess: () => {
       setDeletingShelf(null);
-      setToast("Shelf deleted. Your books are retained.");
+      toast.success("Shelf deleted", {
+        description: "Your books are retained.",
+      });
       void cache.invalidateQueries({ queryKey: ["shelves"] });
     },
     onError: (e: Error) => setError(e.message),
@@ -109,11 +113,6 @@ export function ShelvesPage() {
           {error}
         </p>
       )}
-      {toast && (
-        <p role="status" className="mt-4 text-fuchsia-300">
-          {toast}
-        </p>
-      )}
 
       {/* Shelf list */}
       {shelves.isPending && (
@@ -140,6 +139,7 @@ export function ShelvesPage() {
                 <div className="flex flex-1 items-center gap-2">
                   <input
                     className="field flex-1"
+                    aria-label={`New name for ${shelf.name}`}
                     value={renameValue}
                     autoFocus
                     onChange={(e) => setRenameValue(e.target.value)}

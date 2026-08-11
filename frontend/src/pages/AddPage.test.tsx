@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Toaster } from "@/components/ui/sonner";
+import { findToast } from "@/test/toast";
 import { AddPage } from "./AddPage";
 
 function renderPage() {
@@ -18,6 +20,7 @@ function renderPage() {
           <Route path="/books/:id" element={<h1>Book detail</h1>} />
           <Route path="/" element={<h1>Library page</h1>} />
         </Routes>
+        <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -91,9 +94,32 @@ describe("AddPage", () => {
     expect(
       request.mock.calls.filter(([, init]) => init?.method === "POST"),
     ).toHaveLength(1);
-    expect(sessionStorage.getItem("akasha.toast")).toBe(
-      "Already in your library",
+    expect(await findToast("Already in your library")).toBeInTheDocument();
+  });
+
+  it("confirms a successful add on the visible toast surface", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/shelves"
+        ? new Response("[]")
+        : new Response(
+            JSON.stringify({
+              entry: { id: 11 },
+              already_exists: false,
+              near_matches: [],
+            }),
+            { status: 201 },
+          ),
     );
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: /enter manually/i }),
+    );
+    await userEvent.type(screen.getByLabelText(/^title$/i), "Rayuela");
+    await userEvent.click(
+      screen.getByRole("button", { name: /add to library/i }),
+    );
+    await screen.findByRole("heading", { name: /library page/i });
+    expect(await findToast("Book added")).toBeInTheDocument();
   });
 
   it("requires explicit confirmation before adding a near-match edition", async () => {

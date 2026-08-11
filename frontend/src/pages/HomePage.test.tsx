@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 
+import { Toaster } from "@/components/ui/sonner";
+import { findToast } from "@/test/toast";
 import { HomePage } from "./HomePage";
 
 function renderPage(initialEntry = "/") {
@@ -18,6 +20,7 @@ function renderPage(initialEntry = "/") {
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
           <Route path="/triage" element={<h1>Triage</h1>} />
         </Routes>
+        <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -170,9 +173,7 @@ test("optimistically clears provisional score styling and rolls back with an ann
   );
   expect(row).toHaveAttribute("data-provisional", "false");
   rejectPatch?.(new Error("offline"));
-  expect(
-    await screen.findByText(/previous value was restored/),
-  ).toBeInTheDocument();
+  expect(await findToast(/previous value was restored/)).toBeInTheDocument();
   expect(
     screen.getByRole("button", { name: /score for rayuela: 9/i }),
   ).toBeVisible();

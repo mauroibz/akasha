@@ -104,10 +104,14 @@ test("work resolution exposes edition choice and exact duplicate navigates", asy
   await page.getByRole("button", { name: /Rayuela.*1999/i }).click();
   await page.getByRole("button", { name: /add to library/i }).click();
   await expect(page).toHaveURL(/\/books\/7/);
-  // The toast is displayed on the detail page
-  await expect(page.getByRole("status")).toContainText(
-    "Already in your library",
-  );
+  // The confirmation is a visible toast on the destination route. It used to be
+  // an sr-only paragraph, which is why this assertion could not tell the
+  // difference (DEC-024); e2e/feedback.spec.ts now checks the geometry too.
+  await expect(
+    page
+      .locator("[data-sonner-toast]")
+      .filter({ hasText: "Already in your library" }),
+  ).toBeVisible();
 });
 
 test("mobile detail confirms refresh and reports cover failure without motion", async ({

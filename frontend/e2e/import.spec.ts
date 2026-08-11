@@ -262,8 +262,18 @@ test("undo flow from import history", async ({ page }) => {
     page.getByRole("button", { name: /confirm undo/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: /confirm undo/i }).click();
-  await expect(page.getByText("Import undone")).toBeVisible();
-  await expect(page.getByText("2 changes reverted")).toBeVisible();
+  // The in-page record of the undo, plus the toast that confirms it happened.
+  await expect(
+    page.getByRole("heading", { name: "Import undone" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("2 changes reverted", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page
+      .locator("[data-sonner-toast]")
+      .filter({ hasText: "Import undone: 2 changes reverted" }),
+  ).toBeVisible();
   expect(commitCount).toBe(1);
 });
 

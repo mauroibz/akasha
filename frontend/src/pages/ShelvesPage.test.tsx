@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Toaster } from "@/components/ui/sonner";
+import { findToast } from "@/test/toast";
 import { ShelvesPage } from "./ShelvesPage";
 
 function renderPage() {
@@ -14,6 +16,7 @@ function renderPage() {
     <QueryClientProvider client={client}>
       <MemoryRouter>
         <ShelvesPage />
+        <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -104,6 +107,7 @@ describe("ShelvesPage", () => {
     await user.type(input, "Best");
     await user.click(screen.getByRole("button", { name: /save/i }));
     await waitFor(() => expect(screen.getByText("Best")).toBeVisible());
+    expect(await findToast('Shelf renamed to "Best"')).toBeInTheDocument();
   });
 
   it("confirms deletion and states books are retained", async () => {
@@ -129,6 +133,7 @@ describe("ShelvesPage", () => {
     await user.click(screen.getByRole("button", { name: /delete shelf/i }));
     await waitFor(() => expect(deleted).toBe(true));
     expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
+    expect(await findToast("Shelf deleted")).toBeInTheDocument();
   });
 
   it("surfaces duplicate slug errors", async () => {

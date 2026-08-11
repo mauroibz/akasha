@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { Toaster } from "@/components/ui/sonner";
+import { findToast } from "@/test/toast";
 import { DetailPage } from "./DetailPage";
 
 const entry = {
@@ -55,6 +57,7 @@ function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
           <Route path="/books/:entryId" element={<DetailPage />} />
           <Route path="/" element={extraRoutes ?? <div>Library page</div>} />
         </Routes>
+        <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -149,10 +152,11 @@ describe("DetailPage", () => {
     expect(deleteReq).toBeDefined();
     // Navigated back to library
     await waitFor(() => expect(screen.getByText("Library page")).toBeVisible());
-    // Toast was set
-    expect(sessionStorage.getItem("akasha.toast")).toBe(
-      "Book removed from your library",
-    );
+    // The confirmation is shown on the visible toast surface, not stashed in
+    // storage for the next route to render into a hidden paragraph.
+    expect(
+      await findToast("Book removed from your library"),
+    ).toBeInTheDocument();
   });
 
   it("cancel preserves the entry and does not call DELETE", async () => {

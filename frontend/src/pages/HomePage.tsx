@@ -5,7 +5,8 @@ import {
   useQueryClient,
 } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 
 import {
   entryStatuses,
@@ -75,32 +76,21 @@ export function HomePage() {
   const [view, setView] = useState<LibraryView>(readViewPreference);
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
-  const [announcement, setAnnouncement] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  // Restore toast from session storage (set by add page on exact duplicate)
+  // Highlight the newly added entry. The add page hands the id over as router
+  // state; confirmation itself is a toast rendered by the app shell.
   useEffect(() => {
-    const toast = sessionStorage.getItem("akasha.toast");
-    if (toast) {
-      setAnnouncement(toast);
-      sessionStorage.removeItem("akasha.toast");
-    }
-  }, []);
-
-  // Highlight newly added entry (set by add page via location state)
-  useEffect(() => {
-    const stored = sessionStorage.getItem("akasha.new-entry");
-    if (stored) {
-      const id = Number(stored);
-      if (id) {
-        setHighlightId(id);
-        setFocusedId(id);
-      }
-      sessionStorage.removeItem("akasha.new-entry");
-    }
-  }, []);
+    const id = (location.state as { newEntryId?: number } | null)?.newEntryId;
+    if (!id) return;
+    setHighlightId(id);
+    setFocusedId(id);
+    // Consume it so a back/forward navigation does not re-highlight.
+    window.history.replaceState({}, "");
+  }, [location.state]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -182,9 +172,9 @@ export function HomePage() {
     },
     onError: (_error, _variables, context) => {
       queryClient.setQueryData(["library", filters], context?.snapshot);
-      setAnnouncement(
-        "Your change could not be saved. The previous value was restored.",
-      );
+      toast.error("Your change could not be saved", {
+        description: "The previous value was restored.",
+      });
     },
     onSuccess: (saved, { changes }) => {
       const activeKeyChanged =
@@ -439,9 +429,6 @@ export function HomePage() {
           }
         />
       )}
-      <p className="sr-only" aria-live="assertive">
-        {announcement}
-      </p>
     </main>
   );
 }

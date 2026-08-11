@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   deleteEntry,
   getEntry,
@@ -30,7 +31,6 @@ export function DetailPage() {
     "opinion" | "metadata" | "refresh" | "delete" | null
   >(null);
   const [error, setError] = useState("");
-  const [toast, setToast] = useState("");
   const [newShelfName, setNewShelfName] = useState("");
   const [opinionScore, setOpinionScore] = useState<number | null>(null);
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -53,14 +53,6 @@ export function DetailPage() {
     },
     onError: (value: Error) => setError(value.message),
   });
-
-  useEffect(() => {
-    const stored = sessionStorage.getItem("akasha.toast");
-    if (stored) {
-      setToast(stored);
-      sessionStorage.removeItem("akasha.toast");
-    }
-  }, []);
 
   useEffect(() => {
     if (detail.data) headingRef.current?.focus();
@@ -103,7 +95,7 @@ export function DetailPage() {
     try {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: ["library"] });
-      sessionStorage.setItem("akasha.toast", "Book removed from your library");
+      toast.success("Book removed from your library");
       navigate("/");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Entry could not be deleted");
@@ -126,14 +118,6 @@ export function DetailPage() {
       <button className="focus-ring" onClick={() => navigate("/")}>
         ← Library
       </button>
-      {toast && (
-        <p
-          role="status"
-          className="mt-4 rounded-lg bg-fuchsia-500/15 px-4 py-2 text-fuchsia-300"
-        >
-          {toast}
-        </p>
-      )}
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
           {item.cover_url ? (

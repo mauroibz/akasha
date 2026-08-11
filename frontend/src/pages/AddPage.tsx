@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 import {
   createEntry,
   getShelves,
@@ -108,12 +109,16 @@ export function AddPage() {
         return;
       }
       if (result.already_exists) {
-        sessionStorage.setItem("akasha.toast", "Already in your library");
+        toast("Already in your library", {
+          description: "Opened the entry you already have.",
+        });
         navigate(`/books/${result.entry.id}`);
       } else {
-        sessionStorage.setItem("akasha.new-entry", String(result.entry.id));
-        sessionStorage.setItem("akasha.toast", "Book added");
-        navigate("/");
+        toast.success("Book added");
+        // The destination highlights the new row. This travels as router state
+        // rather than sessionStorage so a reload does not resurrect a stale
+        // highlight, and so the handoff is visible in the navigation itself.
+        navigate("/", { state: { newEntryId: result.entry.id } });
       }
     } catch (e) {
       if (e instanceof NearMatchError) {

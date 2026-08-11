@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 
 import {
   commitGoodreads,
@@ -233,7 +234,15 @@ export function ImportPage() {
                   item_id: value === "new" ? null : value,
                 })),
               )
-                .then(setResult)
+                .then((committed) => {
+                  setResult(committed);
+                  toast.success(
+                    `Import complete: ${committed.created_entries} ${
+                      committed.created_entries === 1 ? "book" : "books"
+                    } added`,
+                    { description: "Undo stays available for 24 hours." },
+                  );
+                })
                 .catch((reason: Error) => setError(reason.message))
                 .finally(() => setPending(false));
             }}
@@ -277,6 +286,11 @@ export function ImportPage() {
                     .then((res) => {
                       setUndoResult(res);
                       setConfirmUndo(false);
+                      toast.success(
+                        `Import undone: ${res.reverted} ${
+                          res.reverted === 1 ? "change" : "changes"
+                        } reverted`,
+                      );
                     })
                     .catch((reason: Error) => setError(reason.message))
                     .finally(() => setUndoPending(false));

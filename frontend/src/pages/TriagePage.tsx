@@ -1,6 +1,7 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import {
   useInfiniteQuery,
   useMutation,
@@ -61,7 +62,6 @@ export function TriagePage() {
   const [allMatching, setAllMatching] = useState(false);
   const [excludedIds, setExcludedIds] = useState<Set<number>>(new Set());
   const [focusedId, setFocusedId] = useState<number | null>(null);
-  const [announcement, setAnnouncement] = useState("");
   const [lastShiftIndex, setLastShiftIndex] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
@@ -109,24 +109,24 @@ export function TriagePage() {
     mutationFn: (body: Parameters<typeof bulkUpdateEntries>[0]) =>
       bulkUpdateEntries(body),
     onSuccess: (affected) => {
-      setAnnouncement(`${affected} entries updated`);
+      toast.success(`${affected} entries updated`);
       setSelectedIds(new Set());
       setAllMatching(false);
       setExcludedIds(new Set());
       void queryClient.invalidateQueries({ queryKey: ["triage"] });
       void queryClient.invalidateQueries({ queryKey: ["library"] });
     },
-    onError: () => setAnnouncement("Bulk update failed"),
+    onError: () => toast.error("Bulk update failed"),
   });
 
   const acceptMutation = useMutation({
     mutationFn: () => acceptSuggestedStatuses({ status: filters.statuses }),
     onSuccess: (affected) => {
-      setAnnouncement(`${affected} suggested statuses accepted`);
+      toast.success(`${affected} suggested statuses accepted`);
       void queryClient.invalidateQueries({ queryKey: ["triage"] });
       void queryClient.invalidateQueries({ queryKey: ["library"] });
     },
-    onError: () => setAnnouncement("Could not accept suggested statuses"),
+    onError: () => toast.error("Could not accept suggested statuses"),
   });
 
   const selectionCount = allMatching
@@ -585,9 +585,6 @@ export function TriagePage() {
           </div>
         </>
       )}
-      <p className="sr-only" aria-live="assertive">
-        {announcement}
-      </p>
     </main>
   );
 }
