@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { chooseOption } from "./radix";
+
 function makeEntries(count: number) {
   const entries = Array.from({ length: count }, (_, i) => ({
     id: i + 1,
@@ -117,15 +119,19 @@ test("triage bulk status update with selection", async ({ page }) => {
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Select rows 1-3 via checkboxes
-  await page.locator('[data-entry-id="1"] input[type="checkbox"]').click();
-  await page.locator('[data-entry-id="2"] input[type="checkbox"]').click();
-  await page.locator('[data-entry-id="3"] input[type="checkbox"]').click();
+  await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
+  await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
+  await page.locator('[data-entry-id="3"] [role="checkbox"]').click();
 
   // Bulk action bar should appear
   await expect(page.getByText("3 selected")).toBeVisible();
 
   // Set status to read
-  await page.getByLabel("Set status for selected").selectOption("read");
+  await chooseOption(
+    page,
+    page.getByRole("combobox", { name: "Set status for selected" }),
+    "Read",
+  );
 
   await expect
     .poll(() => bulkBody)
@@ -166,13 +172,17 @@ test("triage Ctrl+A selects all matching with server-side exclusions", async ({
   await expect(page.getByText("200 selected")).toBeVisible();
 
   // Deselect row 1 (exclusion)
-  await page.locator('[data-entry-id="1"] input[type="checkbox"]').click();
+  await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
 
   // Should show 199 selected
   await expect(page.getByText("199 selected")).toBeVisible();
 
   // Set status to read
-  await page.getByLabel("Set status for selected").selectOption("read");
+  await chooseOption(
+    page,
+    page.getByRole("combobox", { name: "Set status for selected" }),
+    "Read",
+  );
 
   // The bulk body should use filter + exclusions, not entry_ids
   await expect

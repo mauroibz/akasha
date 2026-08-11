@@ -1,6 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
+import {
+  scoreBand,
+  scoreFillClass,
+  scoreTextClass,
+  scoreTrailClass,
+} from "@/lib/score";
 
 interface ScorePickerProps {
   value: number | null;
@@ -10,6 +16,13 @@ interface ScorePickerProps {
   compact?: boolean;
 }
 
+/**
+ * Deliberately bespoke rather than a Radix `Popover` (DEC-026). Radix portals
+ * its content to `document.body`; the compact panel is required to stay
+ * geometrically inside its library card, which is the DEC-023 virtualization
+ * contract and the exact defect Sprint 013 repaired. `frontend/e2e/library.spec.ts`
+ * asserts that containment. Do not "finish the migration" here.
+ */
 export function ScorePicker({
   value,
   provisional,
@@ -44,20 +57,27 @@ export function ScorePicker({
     <button
       type="button"
       className={cn(
-        "min-h-11 rounded-lg border px-3 text-center focus-ring",
-        provisional
-          ? "border-amber-400/60 text-amber-200"
-          : "border-zinc-700 text-zinc-200",
-        value === null && "text-zinc-500",
+        "min-h-11 rounded-lg border px-3 text-center font-medium focus-ring",
+        // A provisional score is an import's guess, not the owner's verdict, so
+        // it is marked by an unfinished-looking border rather than by a colour
+        // that would collide with the ramp.
+        provisional ? "border-dashed border-primary/60" : "border-border",
+        value === null
+          ? "text-muted-foreground"
+          : scoreTextClass[scoreBand(value)],
         compact && "h-9 min-h-0 shrink-0 px-2 text-sm",
       )}
       aria-expanded={editing}
       aria-label={`${label}: ${value ?? "unscored"}`}
+      data-provisional={provisional ? "true" : "false"}
       onClick={() => setEditing((open) => !open)}
     >
       {value ?? "—"}
       {provisional && (
-        <span className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-amber-400" />
+        <span
+          aria-hidden="true"
+          className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary"
+        />
       )}
     </button>
   );
@@ -77,13 +97,13 @@ export function ScorePicker({
             key={n}
             type="button"
             className={cn(
-              "w-8 rounded text-sm font-medium transition-colors focus-ring",
+              "w-8 rounded-md text-sm font-medium transition-colors focus-ring",
               compact ? "h-9" : "h-11",
               n === value
-                ? "bg-fuchsia-500 text-zinc-950"
-                : value !== null && n <= value
-                  ? "bg-fuchsia-500/30 text-fuchsia-200"
-                  : "bg-zinc-800 text-zinc-400 hover:bg-zinc-700",
+                ? scoreFillClass[scoreBand(n)]
+                : value !== null && n < value
+                  ? scoreTrailClass[scoreBand(value)]
+                  : "bg-surface-raised text-muted-foreground hover:bg-surface-raised/70",
             )}
             aria-label={`Score ${n}`}
             aria-pressed={n === value}
@@ -98,7 +118,7 @@ export function ScorePicker({
       </div>
       <button
         type="button"
-        className="self-start rounded text-xs text-zinc-500 hover:text-zinc-300 focus-ring"
+        className="self-start rounded text-xs text-muted-foreground hover:text-foreground focus-ring"
         onClick={() => {
           onChange(null);
           setEditing(false);
@@ -117,7 +137,7 @@ export function ScorePicker({
       <div className="relative shrink-0" ref={containerRef}>
         {trigger}
         {editing && (
-          <div className="absolute bottom-full right-0 z-20 mb-2 w-max rounded-xl border border-zinc-700 bg-zinc-950 p-2 shadow-2xl">
+          <div className="absolute bottom-full right-0 z-20 mb-2 w-max rounded-xl border border-border bg-popover p-2 shadow-2xl">
             {panel}
           </div>
         )}

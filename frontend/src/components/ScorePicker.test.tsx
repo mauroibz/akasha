@@ -32,10 +32,34 @@ describe("ScorePicker", () => {
     expect(score).toBe(9);
   });
 
-  it("shows provisional styling with a dot indicator", () => {
-    render(<ScorePicker value={6} provisional onChange={() => {}} />);
-    const button = screen.getByRole("button", { name: /6/i });
-    expect(button.className).toContain("amber");
+  it("marks a provisional score distinctly from the score ramp", () => {
+    const { rerender } = render(
+      <ScorePicker value={6} provisional onChange={() => {}} />,
+    );
+    const provisional = screen.getByRole("button", { name: /6/i });
+    expect(provisional).toHaveAttribute("data-provisional", "true");
+    // Provisional is a border treatment, not a colour: amber already means
+    // "score 4-6" on the DEC-026 ramp and cannot also mean "imported guess".
+    expect(provisional.className).toContain("border-dashed");
+    rerender(<ScorePicker value={6} onChange={() => {}} />);
+    expect(screen.getByRole("button", { name: /6/i })).toHaveAttribute(
+      "data-provisional",
+      "false",
+    );
+  });
+
+  it("colours the trigger and segments by the DEC-026 score ramp", async () => {
+    const user = userEvent.setup();
+    render(<ScorePicker value={2} onChange={() => {}} />);
+    const trigger = screen.getByRole("button", { name: /score: 2/i });
+    expect(trigger.className).toContain("text-score-low");
+    await user.click(trigger);
+    expect(screen.getByRole("button", { name: "Score 2" }).className).toContain(
+      "bg-score-low",
+    );
+    expect(
+      screen.getByRole("button", { name: "Score 10" }).className,
+    ).toContain("bg-surface-raised");
   });
 
   it("clears the score via the clear button", async () => {

@@ -5,6 +5,7 @@ import {
   defaultLibraryFilters,
   gridColumnCount,
   gridLayout,
+  isEditableTarget,
   mergeUniqueEntries,
   readViewPreference,
 } from "./library";
@@ -47,6 +48,40 @@ test("grid columns follow the measured width and never starve a card", () => {
     if (columns > 1)
       expect(cardWidth).toBeGreaterThanOrEqual(gridLayout.cardMinWidth);
   }
+});
+
+test("global shortcuts stay disabled while a control owns the keystroke", () => {
+  const make = (html: string) => {
+    const host = document.createElement("div");
+    host.innerHTML = html;
+    return host.firstElementChild as HTMLElement;
+  };
+  // Native controls, as before.
+  expect(isEditableTarget(make("<input />"))).toBe(true);
+  expect(isEditableTarget(make("<textarea></textarea>"))).toBe(true);
+  expect(isEditableTarget(make("<select></select>"))).toBe(true);
+  // `contenteditable` is covered by the implementation but not asserted here:
+  // jsdom does not implement HTMLElement.isContentEditable, so the assertion
+  // would test jsdom rather than this guard.
+  // Radix renders a Select trigger as a button and portals both the dialog and
+  // the listbox to document.body. Guarding only on tagName would let `7` set a
+  // score while a status dropdown has focus, and guarding only on a dialog
+  // ancestor would miss the portalled listbox entirely.
+  expect(isEditableTarget(make('<button role="combobox"></button>'))).toBe(
+    true,
+  );
+  expect(
+    isEditableTarget(make('<div role="listbox"><span></span></div>')),
+  ).toBe(true);
+  expect(isEditableTarget(make('<div role="dialog"><button /></div>'))).toBe(
+    true,
+  );
+  expect(
+    isEditableTarget(make('<div role="alertdialog"><button /></div>')),
+  ).toBe(true);
+  // An ordinary row is still fair game for j/k and score digits.
+  expect(isEditableTarget(make("<article></article>"))).toBe(false);
+  expect(isEditableTarget(null)).toBe(false);
 });
 
 test("default server filters omit status so the API excludes inbox", () => {

@@ -55,11 +55,30 @@ export function mergeUniqueEntries(pages: LibraryEntry[][]): LibraryEntry[] {
   });
 }
 
+/**
+ * Roles that own their keystrokes even though the element is not a native form
+ * control. Radix renders a Select trigger as `button[role="combobox"]`, portals
+ * its listbox to `document.body`, and does the same for Dialog and AlertDialog
+ * content — so a tagName check alone stopped covering these the moment the app
+ * adopted the component library, and `7` would have set a score while a status
+ * dropdown had focus.
+ */
+const shortcutBlockingRoles = [
+  "dialog",
+  "alertdialog",
+  "combobox",
+  "listbox",
+  "menu",
+];
+const shortcutBlockingSelector = shortcutBlockingRoles
+  .map((role) => `[role="${role}"]`)
+  .join(",");
+
 export function isEditableTarget(target: EventTarget | null): boolean {
   if (!(target instanceof HTMLElement)) return false;
   return (
     target.isContentEditable ||
     ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName) ||
-    target.closest('[role="dialog"]') !== null
+    target.closest(shortcutBlockingSelector) !== null
   );
 }

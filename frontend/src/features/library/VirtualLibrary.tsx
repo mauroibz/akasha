@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 
 import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
+import { StatusSelect } from "@/components/StatusSelect";
 import type { LibraryEntry } from "@/api/library";
 import {
   gridColumnCount,
@@ -41,31 +42,14 @@ function EntryControls({
       data-card-controls=""
       onClick={(e) => e.stopPropagation()}
     >
-      <label className="sr-only" htmlFor={`status-${entry.id}`}>
-        Status for {entry.item.title}
-      </label>
-      <select
-        id={`status-${entry.id}`}
-        className={`min-h-11 rounded-lg bg-zinc-800 px-2 text-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-fuchsia-400 ${
-          // In a card the select absorbs the free width so it can never push the
-          // score control past the card edge.
-          stretch ? "min-w-0 flex-1" : ""
-        }`}
+      <StatusSelect
         value={entry.status}
-        onChange={(event) =>
-          onStatus(entry, event.target.value as LibraryEntry["status"])
-        }
-      >
-        <option value="read">Read</option>
-        <option value="reading">Reading</option>
-        <option value="to_read">To read</option>
-        <option value="wishlist">Wishlist</option>
-        <option value="dropped">Dropped</option>
-        <option value="unsorted">Inbox</option>
-      </select>
-      <label className="sr-only" htmlFor={`score-${entry.id}`}>
-        Score for {entry.item.title}
-      </label>
+        onValueChange={(status) => onStatus(entry, status)}
+        label={`Status for ${entry.item.title}`}
+        // In a card the select absorbs the free width so it can never push the
+        // score control past the card edge.
+        className={stretch ? "h-9 min-w-0 flex-1" : "h-9 w-auto"}
+      />
       <ScorePicker
         value={entry.score}
         provisional={entry.score_provisional}
@@ -94,11 +78,13 @@ function EntryMetadata({
         {entry.item.title}
       </h2>
       <p
-        className={`text-sm text-zinc-400 ${grid ? "mt-1 line-clamp-2" : "truncate"}`}
+        className={`text-sm text-muted-foreground ${grid ? "mt-1 line-clamp-2" : "truncate"}`}
       >
         {entry.item.sort_author ?? "Unknown author"}
       </p>
-      <p className={`text-xs text-zinc-500 ${grid ? "mt-1 truncate" : ""}`}>
+      <p
+        className={`text-xs text-muted-foreground/80 ${grid ? "mt-1 truncate" : ""}`}
+      >
         Edition year: {entry.item.year ?? "unknown"}
         {entry.item.metadata.original_year &&
         entry.item.metadata.original_year !== entry.item.year
@@ -185,16 +171,16 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
 
   const renderEntry = (entry: LibraryEntry) => {
     const isHighlighted = props.highlightId === entry.id;
-    const ring = isHighlighted ? "ring-2 ring-fuchsia-400" : "";
+    const ring = isHighlighted ? "ring-2 ring-primary" : "";
     const focusRing =
-      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400";
+      "focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring";
     return (
       <article
         aria-label={entry.item.title}
         className={
           isGrid
-            ? `flex h-full flex-col gap-3 overflow-hidden rounded-2xl bg-zinc-900/60 p-4 ${focusRing} ${ring}`
-            : `flex h-full w-full items-center gap-4 border-b border-zinc-800 px-4 ${focusRing} ${ring}`
+            ? `flex h-full flex-col gap-3 overflow-hidden rounded-2xl bg-surface/60 p-4 ${focusRing} ${ring}`
+            : `flex h-full w-full items-center gap-4 border-b border-border px-4 ${focusRing} ${ring}`
         }
         data-entry-id={entry.id}
         data-provisional={entry.score_provisional ? "true" : "false"}
@@ -240,7 +226,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   return (
     <div
       ref={parentRef}
-      className="library-scroll mt-5 h-[min(70vh,760px)] overflow-y-auto overflow-x-hidden rounded-2xl bg-zinc-900/40"
+      className="library-scroll mt-5 h-[min(70vh,760px)] overflow-y-auto overflow-x-hidden rounded-2xl bg-surface/40"
       role={isGrid ? "feed" : "table"}
       aria-label="Library"
       data-mounted-count={mountedRows.length}

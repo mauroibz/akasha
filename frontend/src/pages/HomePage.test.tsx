@@ -259,18 +259,23 @@ test("the shelf filter lists every shelf, not only those on loaded pages", async
   renderPage();
   await screen.findByText("Rayuela");
 
+  // Radix renders the trigger as button[role="combobox"] and portals the
+  // listbox to document.body, so the options only exist once it is opened.
   const filter = screen.getByRole("combobox", { name: "Filter by shelf" });
-  await waitFor(() =>
-    expect(
-      within(filter).getByRole("option", { name: "Argentina" }),
-    ).toBeInTheDocument(),
-  );
+  const user = userEvent.setup();
+  await user.click(filter);
+  const listbox = await screen.findByRole("listbox");
   expect(
-    within(filter).getByRole("option", { name: "Ensayo" }),
+    within(listbox).getByRole("option", { name: "Argentina" }),
+  ).toBeInTheDocument();
+  expect(
+    within(listbox).getByRole("option", { name: "Ensayo" }),
   ).toBeInTheDocument();
   // Alphabetical, regardless of the order the endpoint returned.
   expect(
-    Array.from(filter.querySelectorAll("option")).map((o) => o.textContent),
+    within(listbox)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
   ).toEqual(["All shelves", "Argentina", "Ensayo"]);
 });
 

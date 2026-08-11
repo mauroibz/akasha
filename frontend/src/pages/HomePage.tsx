@@ -19,7 +19,17 @@ import {
   type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
+import { sortLabels, statusLabels } from "@/features/library/labels";
 import {
   isEditableTarget,
   mergeUniqueEntries,
@@ -28,22 +38,8 @@ import {
   type LibraryView,
 } from "@/features/library/library";
 
-const statusLabels: Record<EntryStatus, string> = {
-  unsorted: "Inbox",
-  read: "Read",
-  reading: "Reading",
-  to_read: "To read",
-  wishlist: "Wishlist",
-  dropped: "Dropped",
-};
-const sortLabels: Record<SortKey, string> = {
-  date_added: "Recently added",
-  score: "Score",
-  title: "Title",
-  sort_author: "Author",
-  year: "Year",
-  date_finished: "Finished",
-};
+/** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
+const allShelves = "__all__";
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
@@ -255,27 +251,28 @@ export function HomePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-zinc-800 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-fuchsia-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
             Personal library
           </p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">Akasha</h1>
         </div>
         <div className="flex items-center gap-3">
-          <button
-            className="min-h-11 rounded-full border border-zinc-800 px-4 text-sm focus-ring aria-pressed:border-fuchsia-400 aria-pressed:text-fuchsia-300"
+          <Button
+            variant="outline"
+            className="rounded-full aria-pressed:border-primary aria-pressed:text-primary"
             aria-pressed={filters.statuses.includes("unsorted")}
             onClick={() => void navigate("/triage")}
           >
             Inbox {inboxCount}
-          </button>
-          <button
-            className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
+          </Button>
+          <Button
+            className="rounded-full px-5"
             onClick={() => void navigate("/add")}
           >
             Add book
-          </button>
+          </Button>
         </div>
       </header>
       <section
@@ -284,79 +281,84 @@ export function HomePage() {
       >
         <label className="relative min-w-60 flex-1">
           <span className="sr-only">Search library</span>
-          <input
+          <Input
             ref={searchRef}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Search title or author  /"
-            className="h-11 w-full rounded-full bg-zinc-900 px-4 outline-none focus-ring"
+            className="h-11 rounded-full bg-surface"
           />
         </label>
-        <label>
-          <span className="sr-only">Sort library</span>
-          <select
+        <Select
+          value={`${filters.sort}:${filters.order}`}
+          onValueChange={(value) => {
+            const [sort, order] = value.split(":") as [SortKey, "asc" | "desc"];
+            updateFilters({ sort, order });
+          }}
+        >
+          <SelectTrigger
             aria-label="Sort library"
-            className="h-11 rounded-full bg-zinc-900 px-4 focus-ring"
-            value={`${filters.sort}:${filters.order}`}
-            onChange={(event) => {
-              const [sort, order] = event.target.value.split(":") as [
-                SortKey,
-                "asc" | "desc",
-              ];
-              updateFilters({ sort, order });
-            }}
+            className="h-11 w-auto gap-2 rounded-full bg-surface"
           >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {Object.entries(sortLabels).flatMap(([key, label]) => [
-              <option key={`${key}:desc`} value={`${key}:desc`}>
+              <SelectItem key={`${key}:desc`} value={`${key}:desc`}>
                 {label} ↓
-              </option>,
-              <option key={`${key}:asc`} value={`${key}:asc`}>
+              </SelectItem>,
+              <SelectItem key={`${key}:asc`} value={`${key}:asc`}>
                 {label} ↑
-              </option>,
+              </SelectItem>,
             ])}
-          </select>
-        </label>
-        <label>
-          <span className="sr-only">Filter by shelf</span>
-          <select
+          </SelectContent>
+        </Select>
+        <Select
+          value={filters.shelves[0] ?? allShelves}
+          onValueChange={(value) =>
+            updateFilters({ shelves: value === allShelves ? [] : [value] })
+          }
+        >
+          <SelectTrigger
             aria-label="Filter by shelf"
-            className="h-11 rounded-full bg-zinc-900 px-4 focus-ring"
-            value={filters.shelves[0] ?? ""}
-            onChange={(event) =>
-              updateFilters({
-                shelves: event.target.value ? [event.target.value] : [],
-              })
-            }
+            className="h-11 w-auto gap-2 rounded-full bg-surface"
           >
-            <option value="">All shelves</option>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={allShelves}>All shelves</SelectItem>
             {shelves.map((shelf) => (
-              <option key={shelf.id} value={shelf.slug}>
+              <SelectItem key={shelf.id} value={shelf.slug}>
                 {shelf.name}
-              </option>
+              </SelectItem>
             ))}
-          </select>
-        </label>
+          </SelectContent>
+        </Select>
         <div
-          className="flex rounded-full bg-zinc-900 p-1"
+          className="flex rounded-full bg-surface p-1"
           aria-label="Library view"
         >
-          <button
+          <Button
+            variant="ghost"
+            size="sm"
             aria-label="Grid view"
             aria-pressed={view === "grid"}
-            className="h-9 rounded-full px-3 aria-pressed:bg-zinc-700 focus-ring"
+            className="rounded-full aria-pressed:bg-surface-raised"
             onClick={() => setLibraryView("grid")}
           >
             Grid
-          </button>
-          <button
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
             aria-label="Table view"
             aria-pressed={view === "table"}
-            className="h-9 rounded-full px-3 aria-pressed:bg-zinc-700 focus-ring"
+            className="rounded-full aria-pressed:bg-surface-raised"
             onClick={() => setLibraryView("table")}
           >
             Table
-          </button>
+          </Button>
         </div>
       </section>
       <div className="mt-4 flex flex-wrap gap-2" aria-label="Filter by status">
@@ -366,7 +368,7 @@ export function HomePage() {
             <button
               key={status}
               aria-pressed={active}
-              className="min-h-11 rounded-full border border-zinc-800 px-4 text-sm aria-pressed:border-fuchsia-400 aria-pressed:text-fuchsia-300 focus-ring"
+              className="min-h-11 rounded-full border border-border px-4 text-sm aria-pressed:border-primary aria-pressed:text-primary focus-ring"
               onClick={() =>
                 updateFilters({
                   statuses: active
@@ -383,7 +385,7 @@ export function HomePage() {
       </div>
       {library.isPending && (
         <div
-          className="py-24 text-center text-zinc-400"
+          className="py-24 text-center text-muted-foreground"
           aria-live="polite"
           role="status"
         >
@@ -395,18 +397,18 @@ export function HomePage() {
           <h2 className="text-xl font-semibold">
             Your library could not be loaded
           </h2>
-          <button
-            className="mt-5 min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
+          <Button
+            className="mt-5 rounded-full px-5"
             onClick={() => void library.refetch()}
           >
             Try again
-          </button>
+          </Button>
         </div>
       )}
       {firstPage?.items.length === 0 && (
         <section className="py-24 text-center">
           <h2 className="text-2xl font-semibold">Your library is waiting</h2>
-          <p className="mt-2 text-zinc-400">
+          <p className="mt-2 text-muted-foreground">
             Add a book or visit the inbox to get started.
           </p>
         </section>

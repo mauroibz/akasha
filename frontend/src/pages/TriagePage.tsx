@@ -16,7 +16,21 @@ import {
   type LibraryFilters,
   type SortKey,
 } from "@/api/library";
+import { ChevronRight } from "lucide-react";
+
 import { CoverImage } from "@/components/CoverImage";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { chooseableStatuses } from "@/features/library/labels";
+import { scoreBand, scoreTextClass } from "@/lib/score";
 import {
   isEditableTarget,
   mergeUniqueEntries,
@@ -352,15 +366,15 @@ export function TriagePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-zinc-800 pb-6">
+      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
         <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-fuchsia-400">
+          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
             Triage
           </p>
           <h1 className="mt-2 text-4xl font-semibold tracking-tight">
             Inbox
             {firstPage?.total ? (
-              <span className="ml-3 text-lg text-zinc-500">
+              <span className="ml-3 text-lg text-muted-foreground">
                 {firstPage.total} unsorted
               </span>
             ) : null}
@@ -368,20 +382,21 @@ export function TriagePage() {
         </div>
         <div className="flex items-center gap-3">
           {firstPage?.total ? (
-            <button
-              className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring disabled:opacity-50"
+            <Button
+              className="rounded-full px-5"
               disabled={acceptMutation.isPending}
               onClick={() => acceptMutation.mutate()}
             >
               {acceptMutation.isPending ? "Accepting…" : "Accept all suggested"}
-            </button>
+            </Button>
           ) : null}
-          <button
-            className="min-h-11 rounded-full border border-zinc-800 px-4 text-sm focus-ring"
+          <Button
+            variant="outline"
+            className="rounded-full"
             onClick={() => void navigate("/")}
           >
             ← Library
-          </button>
+          </Button>
         </div>
       </header>
       <section
@@ -390,37 +405,39 @@ export function TriagePage() {
       >
         <label className="relative min-w-60 flex-1">
           <span className="sr-only">Filter triage</span>
-          <input
+          <Input
             ref={searchRef}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder="Filter by title or author  /"
-            className="h-11 w-full rounded-full bg-zinc-900 px-4 outline-none focus-ring"
+            className="h-11 rounded-full bg-surface"
           />
         </label>
       </section>
 
       {library.isPending && (
-        <div className="py-24 text-center text-zinc-400" role="status">
+        <div className="py-24 text-center text-muted-foreground" role="status">
           Loading inbox…
         </div>
       )}
       {library.isError && (
         <div className="py-24 text-center" role="alert">
           <h2 className="text-xl font-semibold">Inbox could not be loaded</h2>
-          <button
-            className="mt-5 min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
+          <Button
+            className="mt-5 rounded-full px-5"
             onClick={() => void library.refetch()}
           >
             Try again
-          </button>
+          </Button>
         </div>
       )}
       {firstPage?.items.length === 0 && (
         <section className="py-24 text-center">
           <h2 className="text-2xl font-semibold">Inbox is clear</h2>
-          <p className="mt-2 text-zinc-400">Import books to start triaging.</p>
+          <p className="mt-2 text-muted-foreground">
+            Import books to start triaging.
+          </p>
         </section>
       )}
 
@@ -429,52 +446,60 @@ export function TriagePage() {
           {/* Bulk action bar */}
           {selectionCount > 0 && (
             <div
-              className="sticky top-3 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-zinc-800 p-3 shadow-lg"
+              className="sticky top-3 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl bg-surface-raised p-3 shadow-lg"
               role="toolbar"
               aria-label="Bulk actions"
             >
-              <span className="px-2 text-sm text-zinc-300">
+              <span className="px-2 text-sm text-foreground">
                 {selectionCount} selected
               </span>
-              <select
-                className="min-h-11 rounded-full bg-zinc-700 px-4 text-sm focus-ring"
+              {/* An action menu, not a stateful field: it fires and resets, so
+                  it carries no value and shows its prompt as a placeholder. */}
+              <Select
                 value=""
-                onChange={(event) => {
-                  if (event.target.value)
-                    bulkMutation.mutate(
-                      buildBulkBody({
-                        status: event.target.value as EntryStatus,
-                      }),
-                    );
-                }}
-                aria-label="Set status for selected"
+                onValueChange={(value) =>
+                  bulkMutation.mutate(
+                    buildBulkBody({ status: value as EntryStatus }),
+                  )
+                }
               >
-                <option value="">Set status…</option>
-                <option value="read">Read</option>
-                <option value="reading">Reading</option>
-                <option value="to_read">To read</option>
-                <option value="wishlist">Wishlist</option>
-                <option value="dropped">Dropped</option>
-              </select>
-              <select
-                className="min-h-11 rounded-full bg-zinc-700 px-4 text-sm focus-ring"
+                <SelectTrigger
+                  aria-label="Set status for selected"
+                  className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
+                >
+                  <SelectValue placeholder="Set status…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {chooseableStatuses.map((status) => (
+                    <SelectItem key={status} value={status}>
+                      {statusLabels[status]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
                 value=""
-                onChange={(event) => {
-                  const score = Number(event.target.value);
-                  if (score >= 1 && score <= 10)
-                    bulkMutation.mutate(buildBulkBody({ score }));
-                }}
-                aria-label="Set score for selected"
+                onValueChange={(value) =>
+                  bulkMutation.mutate(buildBulkBody({ score: Number(value) }))
+                }
               >
-                <option value="">Set score…</option>
-                {Array.from({ length: 10 }, (_, i) => i + 1).map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-              <button
-                className="min-h-11 rounded-full bg-zinc-700 px-4 text-sm focus-ring"
+                <SelectTrigger
+                  aria-label="Set score for selected"
+                  className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
+                >
+                  <SelectValue placeholder="Set score…" />
+                </SelectTrigger>
+                <SelectContent>
+                  {Array.from({ length: 10 }, (_, i) => i + 1).map((score) => (
+                    <SelectItem key={score} value={String(score)}>
+                      {score}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="secondary"
+                className="rounded-full text-sm"
                 onClick={() =>
                   bulkMutation.mutate(
                     buildBulkBody({ clear_provisional: true }),
@@ -482,9 +507,10 @@ export function TriagePage() {
                 }
               >
                 Clear provisional
-              </button>
-              <button
-                className="min-h-11 rounded-full bg-zinc-700 px-4 text-sm focus-ring"
+              </Button>
+              <Button
+                variant="secondary"
+                className="rounded-full text-sm"
                 onClick={() => {
                   setSelectedIds(new Set());
                   setAllMatching(false);
@@ -492,14 +518,14 @@ export function TriagePage() {
                 }}
               >
                 Clear selection
-              </button>
+              </Button>
             </div>
           )}
 
           {/* Virtualized table */}
           <div
             ref={parentRef}
-            className="triage-scroll mt-4 h-[min(70vh,760px)] overflow-auto rounded-2xl bg-zinc-900/40"
+            className="triage-scroll mt-4 h-[min(70vh,760px)] overflow-auto rounded-2xl bg-surface/40"
             role="table"
             aria-label="Triage table"
           >
@@ -519,7 +545,7 @@ export function TriagePage() {
                     data-provisional={entry.score_provisional}
                     role="row"
                     tabIndex={0}
-                    className={`absolute left-0 top-0 flex w-full items-center gap-3 border-b border-zinc-800 px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-fuchsia-400 ${selected ? "bg-fuchsia-900/20" : ""}`}
+                    className={`absolute left-0 top-0 flex w-full items-center gap-3 border-b border-border px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${selected ? "bg-primary/10" : ""}`}
                     style={{
                       height: rowHeight,
                       transform: `translateY(${row.start}px)`,
@@ -527,7 +553,9 @@ export function TriagePage() {
                     onClick={(e) => {
                       if (
                         e.target instanceof HTMLElement &&
-                        e.target.closest("button, a, select, input")
+                        e.target.closest(
+                          'button, a, select, input, [role="checkbox"]',
+                        )
                       )
                         return;
                       setFocusedId(entry.id);
@@ -535,12 +563,10 @@ export function TriagePage() {
                     }}
                     onFocus={() => setFocusedId(entry.id)}
                   >
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4 shrink-0 accent-fuchsia-500"
+                    <Checkbox
+                      className="shrink-0"
                       checked={selected}
                       aria-label={`Select ${entry.item.title}`}
-                      onChange={() => {}}
                       onClick={(e) => {
                         e.stopPropagation();
                         toggleSelect(entry.id, row.index, e.shiftKey);
@@ -555,7 +581,7 @@ export function TriagePage() {
                       <p className="truncate text-sm font-medium">
                         {entry.item.title}
                       </p>
-                      <p className="truncate text-xs text-zinc-500">
+                      <p className="truncate text-xs text-muted-foreground">
                         {entry.item.sort_author ?? "Unknown"}
                       </p>
                     </div>
@@ -567,17 +593,25 @@ export function TriagePage() {
                         {statusLabels[entry.suggested_status!]}
                       </span>
                     )}
-                    <span className="shrink-0 text-xs text-zinc-400">
+                    <span
+                      className={`shrink-0 text-xs font-medium ${
+                        entry.score === null
+                          ? "text-muted-foreground"
+                          : scoreTextClass[scoreBand(entry.score)]
+                      }`}
+                    >
                       {entry.score ?? "—"}
                       {entry.score_provisional ? "·" : ""}
                     </span>
-                    <button
-                      className="shrink-0 rounded-full bg-zinc-800 px-2 py-1 text-xs text-zinc-400 focus-ring"
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground"
                       aria-label={`Open ${entry.item.title}`}
                       onClick={() => void navigate(`/books/${entry.id}`)}
                     >
-                      →
-                    </button>
+                      <ChevronRight />
+                    </Button>
                   </div>
                 );
               })}

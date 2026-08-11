@@ -165,8 +165,15 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div data-route-key={location.pathname}>{children}</div>
       <div className="h-16 sm:hidden" aria-hidden="true" />
       {/* The application's one visible feedback surface. Mounted at the shell so
-          a confirmation survives the navigation that follows the action. */}
-      <Toaster position="top-center" closeButton />
+          a confirmation survives the navigation that follows the action.
+          Bottom-right, not top-centre: every screen puts its primary controls in
+          the header, and a toast there covers the control the reader just used.
+          The mobile offset clears the fixed bottom navigation. */}
+      <Toaster
+        position="bottom-right"
+        closeButton
+        mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
+      />
     </div>
   );
 }

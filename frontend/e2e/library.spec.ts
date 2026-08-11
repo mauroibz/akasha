@@ -1,5 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { chooseOption, expectSelected } from "./radix";
+
 const pixelCover =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
 
@@ -142,7 +144,15 @@ test("the deterministic 5,000-entry library mounts only overscanned rows", async
     .toBeLessThan(20);
   // A multi-column grid mounts `columns` cards per virtual row; the DOM budget
   // is therefore expressed per card as well as per row.
-  expect(await page.locator("[data-entry-id]").count()).toBeLessThan(48);
+  const mountedCards = await page.locator("[data-entry-id]").count();
+  const mountedRows = Number(await library.getAttribute("data-mounted-count"));
+  // Reported so a future sprint can see how much headroom is left rather than
+  // discovering the bound only when it is breached. Adopting shadcn primitives
+  // in Sprint 015 added DOM nodes per card but no cards or rows.
+  console.log(
+    `mounted rows=${mountedRows} cards=${mountedCards} (DEC-023 bounds: <20 rows, <48 cards)`,
+  );
+  expect(mountedCards).toBeLessThan(48);
 });
 
 test("keyboard guards and reduced motion remain effective", async ({
@@ -302,6 +312,62 @@ test("an expanded score picker stays inside its card at every width", async ({
   expect(pageErrors).toEqual([]);
 });
 
+test("a card status listbox is not recycled out from under the reader", async ({
+  page,
+}) => {
+  // DEC-023 pins the card height for fixed-size virtualization, and a Radix
+  // Select portals its listbox to document.body while the row that owns the
+  // trigger can unmount on scroll. Sprint 015 flagged this as a risk to measure
+  // rather than assume, and the measured answer is that Radix makes the rest of
+  // the document inert while the listbox is open: pointer events are blocked
+  // and scrolling is locked, so the virtualizer cannot recycle the owning row.
+  const pageErrors: string[] = [];
+  page.on("pageerror", (error) => pageErrors.push(error.message));
+  await page.route("**/api/entries/*", async (route) => {
+    const request = route.request();
+    if (request.method() !== "PATCH") return route.fallback();
+    const body = JSON.parse(request.postData() ?? "{}") as Record<
+      string,
+      unknown
+    >;
+    await route.fulfill({ json: { ...entry(1), ...body } });
+  });
+  await seedLibrary(page);
+  await page.goto("/");
+
+  const card = page.locator("[data-entry-id='1']");
+  await expect(card).toBeVisible();
+  // Addressed by class, not by role: while the listbox is open Radix marks the
+  // rest of the document aria-hidden, so the feed role is deliberately absent
+  // from the accessibility tree until it closes.
+  const scroller = page.locator(".library-scroll");
+  const box = (await scroller.boundingBox())!;
+  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+
+  await card.getByRole("combobox").click();
+  const listbox = page.getByRole("listbox");
+  await expect(listbox).toBeVisible();
+
+  // A real scroll gesture over the list, which is what a reader would do.
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.wheel(0, 4000);
+  await expect(listbox).toBeVisible();
+  await expect(card).toBeVisible();
+  expect(await scroller.evaluate((node) => node.scrollTop)).toBe(0);
+
+  await page.getByRole("option", { name: "Reading", exact: true }).click();
+  await expect(listbox).toBeHidden();
+  await expectSelected(card.getByRole("combobox"), "Reading");
+
+  // Once it is closed the list scrolls normally again.
+  await page.mouse.move(centre.x, centre.y);
+  await page.mouse.wheel(0, 4000);
+  await expect
+    .poll(() => scroller.evaluate((node) => node.scrollTop))
+    .toBeGreaterThan(0);
+  expect(pageErrors).toEqual([]);
+});
+
 test("grid view is multi-column where space permits and reflows on resize", async ({
   page,
 }) => {
@@ -361,8 +427,8 @@ test("grid and table views both keep inline editing, navigation and persistence"
     card.getByRole("button", { name: /Score for .*: 4/i }),
   ).toBeVisible();
 
-  await card.getByRole("combobox").selectOption("reading");
-  await expect(card.getByRole("combobox")).toHaveValue("reading");
+  await chooseOption(page, card.getByRole("combobox"), "Reading");
+  await expectSelected(card.getByRole("combobox"), "Reading");
 
   await page.getByRole("button", { name: "Table view" }).click();
   await expect(page.getByRole("table", { name: "Library" })).toBeVisible();
