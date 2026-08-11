@@ -31,8 +31,13 @@ afterEach(() => vi.restoreAllMocks());
 describe("AddPage", () => {
   it("debounces provider search and offers keyboard-accessible manual fallback", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input) === "/api/shelves"
-        ? new Response("[]")
+      String(input) === "/api/shelves" ||
+      String(input) === "/api/health/providers"
+        ? new Response(
+            String(input) === "/api/shelves"
+              ? "[]"
+              : JSON.stringify({ providers: [], degraded: false }),
+          )
         : new Response(
             JSON.stringify([
               {
@@ -57,7 +62,16 @@ describe("AddPage", () => {
       screen.getByRole("searchbox", { name: /search books/i }),
       "Rayuela",
     );
-    await waitFor(() => expect(fetch).toHaveBeenCalledTimes(1));
+    // One search request for the whole typed string, not one per keystroke.
+    await waitFor(() =>
+      expect(
+        vi
+          .mocked(fetch)
+          .mock.calls.filter(([input]) =>
+            String(input).startsWith("/api/search"),
+          ),
+      ).toHaveLength(1),
+    );
     expect(
       await screen.findByRole("button", { name: /Rayuela/i }),
     ).toBeVisible();
@@ -73,14 +87,16 @@ describe("AddPage", () => {
       .mockImplementation(async (input) =>
         String(input) === "/api/shelves"
           ? new Response("[]")
-          : new Response(
-              JSON.stringify({
-                entry: { id: 7 },
-                already_exists: true,
-                near_matches: [],
-              }),
-              { status: 200 },
-            ),
+          : String(input) === "/api/health/providers"
+            ? new Response(JSON.stringify({ providers: [], degraded: false }))
+            : new Response(
+                JSON.stringify({
+                  entry: { id: 7 },
+                  already_exists: true,
+                  near_matches: [],
+                }),
+                { status: 200 },
+              ),
       );
     renderPage();
     await userEvent.click(
@@ -101,14 +117,16 @@ describe("AddPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
       String(input) === "/api/shelves"
         ? new Response("[]")
-        : new Response(
-            JSON.stringify({
-              entry: { id: 11 },
-              already_exists: false,
-              near_matches: [],
-            }),
-            { status: 201 },
-          ),
+        : String(input) === "/api/health/providers"
+          ? new Response(JSON.stringify({ providers: [], degraded: false }))
+          : new Response(
+              JSON.stringify({
+                entry: { id: 11 },
+                already_exists: false,
+                near_matches: [],
+              }),
+              { status: 201 },
+            ),
     );
     renderPage();
     await userEvent.click(
@@ -126,6 +144,8 @@ describe("AddPage", () => {
     let posts = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
       posts += 1;
       if (posts === 1)
         return new Response(

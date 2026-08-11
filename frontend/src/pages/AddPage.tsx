@@ -10,7 +10,13 @@ import {
   type SearchCandidate,
 } from "@/api/add";
 import { CoverImage } from "@/components/CoverImage";
+import { ProviderHealthNotice } from "@/components/ProviderHealthNotice";
 import { ScorePicker } from "@/components/ScorePicker";
+import { StatusSelect } from "@/components/StatusSelect";
+import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import type { EntryStatus } from "@/api/library";
 
 export function AddPage() {
@@ -30,7 +36,7 @@ export function AddPage() {
   const [shelfIds, setShelfIds] = useState<number[]>([]);
   const titleRef = useRef<HTMLInputElement>(null);
   const searchRequestId = useRef(0);
-  const statusRef = useRef<HTMLSelectElement>(null);
+  const statusRef = useRef<HTMLButtonElement>(null);
   const nearRef = useRef<HTMLButtonElement>(null);
   const navigate = useNavigate();
   useEffect(() => {
@@ -133,24 +139,25 @@ export function AddPage() {
   const editing = manual || selected;
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <button className="focus-ring" onClick={() => navigate("/")}>
+      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
         ← Library
-      </button>
+      </Button>
       <h1 className="mt-6 text-4xl font-semibold">Add a book</h1>
       {!editing && (
         <>
           <label className="mt-8 block">
             <span className="sr-only">Search books</span>
-            <input
+            <Input
               autoFocus
               role="searchbox"
               aria-label="Search books"
-              className="h-12 w-full rounded-full bg-zinc-900 px-5 focus-ring"
+              className="h-12 rounded-full bg-surface px-5"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Title, author, ISBN, or URL"
             />
           </label>
+          <ProviderHealthNotice />
           {pending && <p role="status">Searching metadata providers…</p>}
           {error && <p role="alert">{error}</p>}
           {warning && <p role="status">{warning}</p>}
@@ -161,7 +168,7 @@ export function AddPage() {
             {results.map((row) => (
               <button
                 key={`${row.source}:${row.source_id}`}
-                className="min-h-28 rounded-2xl bg-zinc-900 p-4 text-left focus-ring"
+                className="min-h-28 rounded-2xl bg-surface p-4 text-left focus-ring"
                 onClick={() => setSelected(row)}
               >
                 <span className="grid grid-cols-[64px_1fr] gap-3">
@@ -172,7 +179,7 @@ export function AddPage() {
                   />
                   <span>
                     <strong>{row.title}</strong>
-                    <span className="mt-1 block text-zinc-400">
+                    <span className="mt-1 block text-muted-foreground">
                       {row.authors.join(", ") || "Unknown author"}
                     </span>
                     <span className="block text-sm">
@@ -187,7 +194,7 @@ export function AddPage() {
                         Originally published: {row.original_year}
                       </span>
                     )}
-                    <span className="text-xs uppercase text-fuchsia-400">
+                    <span className="text-xs uppercase text-primary">
                       {row.source}
                     </span>
                   </span>
@@ -195,7 +202,7 @@ export function AddPage() {
               </button>
             ))}
             <button
-              className="min-h-28 rounded-2xl border border-dashed border-zinc-700 p-4 text-left focus-ring"
+              className="min-h-28 rounded-2xl border border-dashed border-border p-4 text-left focus-ring"
               onClick={() => setManual(true)}
             >
               None of these — enter manually
@@ -213,32 +220,47 @@ export function AddPage() {
         >
           {manual ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              <label>
-                Title
-                <input ref={titleRef} required name="title" className="field" />
-              </label>
-              <label>
-                Authors, comma separated
-                <input name="authors" className="field" />
-              </label>
-              <label>
-                Subtitle
-                <input name="subtitle" className="field" />
-              </label>
-              <label>
-                Year
-                <input
+              <div>
+                <Label htmlFor="manual-title">Title</Label>
+                <Input
+                  id="manual-title"
+                  ref={titleRef}
+                  required
+                  name="title"
+                  className="mt-1 h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-authors">Authors, comma separated</Label>
+                <Input
+                  id="manual-authors"
+                  name="authors"
+                  className="mt-1 h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-subtitle">Subtitle</Label>
+                <Input
+                  id="manual-subtitle"
+                  name="subtitle"
+                  className="mt-1 h-11"
+                />
+              </div>
+              <div>
+                <Label htmlFor="manual-year">Year</Label>
+                <Input
+                  id="manual-year"
                   name="year"
                   min="0"
                   max="9999"
                   type="number"
-                  className="field"
+                  className="mt-1 h-11"
                 />
-              </label>
-              <label>
-                ISBN
-                <input name="isbn" className="field" />
-              </label>
+              </div>
+              <div>
+                <Label htmlFor="manual-isbn">ISBN</Label>
+                <Input id="manual-isbn" name="isbn" className="mt-1 h-11" />
+              </div>
             </div>
           ) : (
             <div>
@@ -247,22 +269,16 @@ export function AddPage() {
             </div>
           )}
           <div className="flex flex-wrap gap-4">
-            <label>
-              Status
-              <select
-                ref={statusRef}
-                className="field"
+            <div>
+              <span className="mb-1 block text-sm">Status</span>
+              <StatusSelect
+                triggerRef={statusRef}
                 value={status}
-                onChange={(e) => setStatus(e.target.value as EntryStatus)}
-              >
-                <option value="read">Read</option>
-                <option value="reading">Reading</option>
-                <option value="to_read">To read</option>
-                <option value="wishlist">Wishlist</option>
-                <option value="dropped">Dropped</option>
-                <option value="unsorted">Inbox</option>
-              </select>
-            </label>
+                onValueChange={setStatus}
+                label="Status"
+                className="w-44"
+              />
+            </div>
             <div>
               <span className="mb-1 block text-sm">Score</span>
               <ScorePicker
@@ -276,20 +292,20 @@ export function AddPage() {
               <legend>Shelves</legend>
               <div className="flex flex-wrap gap-3">
                 {shelves.map((shelf) => (
-                  <label key={shelf.id}>
-                    <input
-                      type="checkbox"
+                  <div key={shelf.id} className="flex items-center gap-2">
+                    <Checkbox
+                      id={`shelf-${shelf.id}`}
                       checked={shelfIds.includes(shelf.id)}
-                      onChange={(e) =>
+                      onCheckedChange={(checked) =>
                         setShelfIds((old) =>
-                          e.target.checked
+                          checked
                             ? [...old, shelf.id]
                             : old.filter((id) => id !== shelf.id),
                         )
                       }
-                    />{" "}
-                    {shelf.name}
-                  </label>
+                    />
+                    <Label htmlFor={`shelf-${shelf.id}`}>{shelf.name}</Label>
+                  </div>
                 ))}
               </div>
             </fieldset>
@@ -300,28 +316,29 @@ export function AddPage() {
                 A similar edition is already in your library. Add this edition
                 anyway?
               </p>
-              <button
+              <Button
                 ref={nearRef}
                 type="button"
+                variant="secondary"
+                className="mt-2 rounded-full"
                 onClick={(e) => void submit(e.currentTarget.form!, true)}
               >
                 Add separate edition
-              </button>{" "}
-              <button
+              </Button>{" "}
+              <Button
                 type="button"
+                variant="ghost"
+                className="mt-2 rounded-full"
                 onClick={() => navigate(`/books/${near[0]}`)}
               >
                 Open existing entry
-              </button>
+              </Button>
             </div>
           )}
           {error && <p role="alert">{error}</p>}
-          <button
-            disabled={pending}
-            className="min-h-11 rounded-full bg-fuchsia-500 px-6 font-semibold text-zinc-950 focus-ring"
-          >
+          <Button disabled={pending} className="rounded-full px-6">
             {pending ? "Adding…" : "Add to library"}
-          </button>
+          </Button>
         </form>
       )}
     </main>

@@ -207,9 +207,19 @@ describe("ImportPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /preview import/i }),
     );
-    expect(
-      await screen.findByLabelText(/choice for Ficciones/i),
-    ).toBeRequired();
+    // Radix has no `required` attribute to assert; the enforcement is that the
+    // commit stays disabled until every ambiguous row has an explicit choice.
+    const choice = await screen.findByRole("combobox", {
+      name: /choice for Ficciones/i,
+    });
+    expect(choice).toHaveTextContent(/choose/i);
     expect(screen.getByRole("button", { name: /import/i })).toBeDisabled();
+
+    await userEvent.click(choice);
+    await userEvent.click(
+      await screen.findByRole("option", { name: /use existing item 7/i }),
+    );
+    expect(choice).toHaveTextContent(/use existing item 7/i);
+    expect(screen.getByRole("button", { name: /import/i })).toBeEnabled();
   });
 });

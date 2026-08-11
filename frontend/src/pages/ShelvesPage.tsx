@@ -4,6 +4,20 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { cn } from "@/lib/utils";
+import {
   createShelf,
   deleteShelf,
   getShelves,
@@ -70,9 +84,9 @@ export function ShelvesPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-5 py-8">
-      <button className="focus-ring" onClick={() => navigate("/")}>
+      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
         ← Library
-      </button>
+      </Button>
       <h1
         ref={headingRef}
         tabIndex={-1}
@@ -80,15 +94,16 @@ export function ShelvesPage() {
       >
         Shelves
       </h1>
-      <p className="mt-2 text-zinc-400">
+      <p className="mt-2 text-muted-foreground">
         Organize your library with custom shelves. Deleting a shelf removes the
         tag from your books but never deletes the books themselves.
       </p>
 
       {/* Create shelf */}
       <section className="mt-6 flex gap-2">
-        <input
-          className="field flex-1"
+        <Input
+          className="h-11 flex-1"
+          aria-label="New shelf name"
           placeholder="New shelf name"
           value={newName}
           onChange={(e) => setNewName(e.target.value)}
@@ -99,46 +114,48 @@ export function ShelvesPage() {
             }
           }}
         />
-        <button
-          className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring disabled:opacity-50"
+        <Button
+          className="rounded-full px-5"
           disabled={!newName.trim() || create.isPending}
           onClick={() => create.mutate(newName.trim())}
         >
           Create shelf
-        </button>
+        </Button>
       </section>
 
       {error && (
-        <p role="alert" className="mt-4 text-red-300">
+        <p role="alert" className="mt-4 text-destructive">
           {error}
         </p>
       )}
 
       {/* Shelf list */}
       {shelves.isPending && (
-        <p role="status" className="mt-8 text-zinc-400">
+        <p role="status" className="mt-8 text-muted-foreground">
           Loading shelves…
         </p>
       )}
       {shelves.isError && (
-        <p role="alert" className="mt-8 text-red-300">
+        <p role="alert" className="mt-8 text-destructive">
           Shelves could not be loaded
         </p>
       )}
       {shelves.data && shelves.data.length === 0 && (
-        <p className="mt-8 text-zinc-400">No shelves yet. Create one above.</p>
+        <p className="mt-8 text-muted-foreground">
+          No shelves yet. Create one above.
+        </p>
       )}
       {shelves.data && shelves.data.length > 0 && (
         <ul className="mt-6 space-y-3">
           {shelves.data.map((shelf) => (
             <li
               key={shelf.id}
-              className="flex items-center justify-between rounded-xl border border-zinc-800 px-5 py-4"
+              className="flex items-center justify-between rounded-xl border border-border px-5 py-4"
             >
               {renamingId === shelf.id ? (
                 <div className="flex flex-1 items-center gap-2">
-                  <input
-                    className="field flex-1"
+                  <Input
+                    className="h-11 flex-1"
                     aria-label={`New name for ${shelf.name}`}
                     value={renameValue}
                     autoFocus
@@ -154,33 +171,35 @@ export function ShelvesPage() {
                       if (e.key === "Escape") setRenamingId(null);
                     }}
                   />
-                  <button
-                    className="min-h-11 rounded-full bg-fuchsia-500 px-4 font-semibold text-zinc-950 focus-ring"
+                  <Button
+                    className="rounded-full"
                     onClick={() =>
                       rename.mutate({ id: shelf.id, name: renameValue.trim() })
                     }
                   >
                     Save
-                  </button>
-                  <button
-                    className="focus-ring rounded-full px-3 text-zinc-400"
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    className="rounded-full"
                     onClick={() => setRenamingId(null)}
                   >
                     Cancel
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <>
                   <div>
                     <p className="font-semibold">{shelf.name}</p>
-                    <p className="text-sm text-zinc-500">
+                    <p className="text-sm text-muted-foreground">
                       {shelf.entry_count}{" "}
                       {shelf.entry_count === 1 ? "book" : "books"}
                     </p>
                   </div>
                   <div className="flex gap-2">
-                    <button
-                      className="min-h-11 rounded-full border border-zinc-700 px-4 text-sm focus-ring"
+                    <Button
+                      variant="outline"
+                      className="rounded-full text-sm"
                       aria-label={`Rename ${shelf.name}`}
                       onClick={() => {
                         setRenamingId(shelf.id);
@@ -188,14 +207,15 @@ export function ShelvesPage() {
                       }}
                     >
                       Rename
-                    </button>
-                    <button
-                      className="min-h-11 rounded-full border border-red-800 px-4 text-sm text-red-300 focus-ring"
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="rounded-full border-destructive/60 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
                       aria-label={`Delete ${shelf.name}`}
                       onClick={() => setDeletingShelf(shelf)}
                     >
                       Delete
-                    </button>
+                    </Button>
                   </div>
                 </>
               )}
@@ -204,34 +224,38 @@ export function ShelvesPage() {
         </ul>
       )}
 
-      {/* Delete confirmation dialog */}
-      {deletingShelf && (
-        <div
-          role="dialog"
-          aria-label="Confirm shelf deletion"
-          aria-modal="true"
-          className="dialog"
-        >
-          <h2>Delete &ldquo;{deletingShelf.name}&rdquo;?</h2>
-          <p>
-            This shelf will be removed from all your books. The books themselves
-            are retained and remain in your library.
-          </p>
-          <button
-            autoFocus
-            className="min-h-11 rounded-full bg-red-600 px-5 font-semibold text-zinc-950 focus-ring"
-            onClick={() => remove.mutate(deletingShelf.id)}
-          >
-            Delete shelf
-          </button>
-          <button
-            className="focus-ring rounded-full px-4"
-            onClick={() => setDeletingShelf(null)}
-          >
-            Cancel
-          </button>
-        </div>
-      )}
+      {/* Delete confirmation. Confirmation dialogs are limited to delete and
+          explicit provider refresh (product spec section 7). */}
+      <AlertDialog
+        open={deletingShelf !== null}
+        onOpenChange={(open) => {
+          if (!open) setDeletingShelf(null);
+        }}
+      >
+        <AlertDialogContent aria-label="Confirm shelf deletion">
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Delete &ldquo;{deletingShelf?.name}&rdquo;?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              This shelf will be removed from all your books. The books
+              themselves are retained and remain in your library.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                buttonVariants({ variant: "destructive" }),
+                "rounded-full px-5",
+              )}
+              onClick={() => deletingShelf && remove.mutate(deletingShelf.id)}
+            >
+              Delete shelf
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </main>
   );
 }

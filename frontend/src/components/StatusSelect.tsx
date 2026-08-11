@@ -1,3 +1,5 @@
+import type { Ref } from "react";
+
 import type { EntryStatus } from "@/api/library";
 import {
   Select,
@@ -24,6 +26,8 @@ interface StatusSelectProps {
   /** Accessible name. Radix has no implicit label, so this is required. */
   label: string;
   className?: string;
+  /** The trigger, for screens that move focus here after another action. */
+  triggerRef?: Ref<HTMLButtonElement>;
 }
 
 /**
@@ -37,13 +41,18 @@ export function StatusSelect({
   onValueChange,
   label,
   className,
+  triggerRef,
 }: StatusSelectProps) {
   return (
     <Select
       value={value}
       onValueChange={(next) => onValueChange(next as EntryStatus)}
     >
-      <SelectTrigger aria-label={label} className={cn("h-11", className)}>
+      <SelectTrigger
+        ref={triggerRef}
+        aria-label={label}
+        className={cn("h-11", className)}
+      >
         <SelectValue />
       </SelectTrigger>
       <SelectContent>

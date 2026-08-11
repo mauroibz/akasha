@@ -2,6 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   commitGoodreads,
   commitCalibre,
@@ -53,36 +64,32 @@ export function ImportPage() {
         ← Library
       </Link>
       <h1 className="mt-6 text-4xl font-semibold">Import books</h1>
-      <p className="mt-2 text-zinc-400">
+      <p className="mt-2 text-muted-foreground">
         Preview a source before anything enters your library. Existing values
         are preserved when a re-sync only supplies missing metadata.
       </p>
       {!preview && (
-        <div
-          className="mt-7 flex gap-2"
-          role="tablist"
-          aria-label="Import source"
+        <Tabs
+          className="mt-7"
+          value={source}
+          onValueChange={(value) => {
+            setSource(value as "goodreads" | "calibre");
+            setError("");
+          }}
         >
-          {(["goodreads", "calibre"] as const).map((value) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={source === value}
-              className={`focus-ring rounded-full px-5 py-2 capitalize ${source === value ? "bg-fuchsia-600" : "bg-zinc-800"}`}
-              onClick={() => {
-                setSource(value);
-                setError("");
-              }}
-            >
-              {value}
-            </button>
-          ))}
-        </div>
+          <TabsList aria-label="Import source">
+            <TabsTrigger value="goodreads" className="capitalize">
+              goodreads
+            </TabsTrigger>
+            <TabsTrigger value="calibre" className="capitalize">
+              calibre
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
       )}
       {!preview && (
         <form
-          className="mt-8 space-y-5 rounded-2xl bg-zinc-900 p-5"
+          className="mt-8 space-y-5 rounded-2xl bg-surface p-5"
           onSubmit={(event) => {
             event.preventDefault();
             if (source === "goodreads" && !file) return;
@@ -100,38 +107,40 @@ export function ImportPage() {
           }}
         >
           {source === "goodreads" ? (
-            <label className="block">
-              Goodreads CSV
-              <input
+            <div className="block">
+              <Label htmlFor="goodreads-csv">Goodreads CSV</Label>
+              <Input
+                id="goodreads-csv"
                 autoFocus
-                className="field"
+                className="mt-1 h-11 py-2"
                 type="file"
                 accept=".csv,text/csv"
                 onChange={(event) => setFile(event.target.files?.[0] ?? null)}
               />
-            </label>
+            </div>
           ) : (
             <>
-              <p className="rounded-xl bg-zinc-800 p-4 text-sm text-zinc-300">
+              <p className="rounded-xl bg-surface-raised p-4 text-sm text-foreground">
                 Akasha opens this library read-only inside the configured
                 Calibre mount. Enter a relative folder only; absolute paths and
                 parent traversal are rejected. Covers are copied during preview
                 so the source is never needed during commit.
               </p>
-              <label className="block">
-                Calibre library path
-                <input
+              <div className="block">
+                <Label htmlFor="calibre-path">Calibre library path</Label>
+                <Input
+                  id="calibre-path"
                   autoFocus
-                  className="field"
+                  className="mt-1 h-11"
                   value={libraryPath}
                   placeholder="Library"
                   onChange={(event) => setLibraryPath(event.target.value)}
                 />
-              </label>
+              </div>
             </>
           )}
-          <button
-            className="focus-ring rounded-full bg-fuchsia-600 px-5 py-3"
+          <Button
+            className="rounded-full px-5"
             disabled={
               pending || (source === "goodreads" ? !file : !libraryPath.trim())
             }
@@ -141,11 +150,11 @@ export function ImportPage() {
               : source === "calibre"
                 ? "Preview Calibre library"
                 : "Preview import"}
-          </button>
+          </Button>
         </form>
       )}
       {error && (
-        <p className="mt-4 text-red-300" role="alert">
+        <p className="mt-4 text-destructive" role="alert">
           {error}
         </p>
       )}
@@ -162,12 +171,12 @@ export function ImportPage() {
             {preview.records.map((record) => (
               <article
                 key={record.record_id}
-                className="rounded-2xl bg-zinc-900 p-4"
+                className="rounded-2xl bg-surface p-4"
               >
                 <h3 className="font-semibold">
                   {record.title || `Row ${record.row_number}`}
                 </h3>
-                <p className="text-sm text-zinc-400">
+                <p className="text-sm text-muted-foreground">
                   {record.authors.join(", ") || "Author missing"}
                   {record.score
                     ? record.score_provisional
@@ -179,48 +188,56 @@ export function ImportPage() {
                     : ""}
                 </p>
                 {record.cover_staged && (
-                  <p className="text-sm text-emerald-300">Local cover staged</p>
+                  <p className="text-sm text-score-top">Local cover staged</p>
                 )}
                 {record.errors.map((row, index) => (
                   <p
                     key={`${row.field}-${index}`}
-                    className="text-sm text-red-300"
+                    className="text-sm text-destructive"
                   >
                     {row.field}: {row.code}
                   </p>
                 ))}
                 {record.planned_action === "ambiguous" && (
-                  <label className="mt-3 block">
-                    Choice for {record.title}
-                    <select
-                      required
-                      className="field"
-                      value={choices[record.record_id] ?? ""}
-                      onChange={(event) =>
+                  <div className="mt-3 block">
+                    <Label htmlFor={`choice-${record.record_id}`}>
+                      Choice for {record.title}
+                    </Label>
+                    <Select
+                      value={String(choices[record.record_id] ?? "")}
+                      onValueChange={(value) =>
                         setChoices((old) => ({
                           ...old,
                           [record.record_id]:
-                            event.target.value === "new"
-                              ? "new"
-                              : Number(event.target.value),
+                            value === "new" ? "new" : Number(value),
                         }))
                       }
                     >
-                      <option value="">Choose…</option>
-                      {record.candidates.map((id) => (
-                        <option key={id} value={id}>
-                          Use existing item {id}
-                        </option>
-                      ))}
-                      <option value="new">Create a separate edition</option>
-                    </select>
-                  </label>
+                      <SelectTrigger
+                        id={`choice-${record.record_id}`}
+                        aria-label={`Choice for ${record.title}`}
+                        className="mt-1 h-11"
+                      >
+                        <SelectValue placeholder="Choose…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {record.candidates.map((id) => (
+                          <SelectItem key={id} value={String(id)}>
+                            Use existing item {id}
+                          </SelectItem>
+                        ))}
+                        <SelectItem value="new">
+                          Create a separate edition
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
               </article>
             ))}
           </div>
-          <button
-            className="mt-6 rounded-full bg-fuchsia-600 px-5 py-3 focus-ring disabled:opacity-50"
+          <Button
+            className="mt-6 rounded-full px-5"
             disabled={pending || unresolved > 0 || ready === 0}
             onClick={() => {
               setPending(true);
@@ -250,7 +267,7 @@ export function ImportPage() {
             {pending
               ? "Importing…"
               : `Import ${ready} ready ${ready === 1 ? "row" : "rows"}`}
-          </button>
+          </Button>
         </section>
       )}
       {result && (
@@ -261,23 +278,25 @@ export function ImportPage() {
         </p>
       )}
       {result && !undoResult && (
-        <div className="mt-5 rounded-2xl bg-zinc-900 p-4">
-          <p className="text-sm text-zinc-400">
+        <div className="mt-5 rounded-2xl bg-surface p-4">
+          <p className="text-sm text-muted-foreground">
             You can undo this import for 24 hours after commit. The undo
             reverses only fields that still match the imported values — your
             later edits are preserved.
           </p>
           {!confirmUndo ? (
-            <button
-              className="focus-ring mt-3 rounded-full bg-red-900 px-5 py-2 text-sm"
+            <Button
+              variant="outline"
+              className="mt-3 rounded-full border-destructive/60 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
               onClick={() => setConfirmUndo(true)}
             >
               Undo this import
-            </button>
+            </Button>
           ) : (
             <div className="mt-3 flex gap-2">
-              <button
-                className="focus-ring rounded-full bg-red-700 px-5 py-2 text-sm disabled:opacity-50"
+              <Button
+                variant="destructive"
+                className="rounded-full text-sm"
                 disabled={undoPending}
                 onClick={() => {
                   setUndoPending(true);
@@ -297,13 +316,14 @@ export function ImportPage() {
                 }}
               >
                 {undoPending ? "Undoing…" : "Confirm undo"}
-              </button>
-              <button
-                className="focus-ring rounded-full bg-zinc-800 px-5 py-2 text-sm"
+              </Button>
+              <Button
+                variant="secondary"
+                className="rounded-full text-sm"
                 onClick={() => setConfirmUndo(false)}
               >
                 Cancel
-              </button>
+              </Button>
             </div>
           )}
         </div>
@@ -312,20 +332,17 @@ export function ImportPage() {
         <div
           ref={undoRef}
           tabIndex={-1}
-          className="mt-5 rounded-2xl bg-zinc-900 p-4"
+          className="mt-5 rounded-2xl bg-surface p-4"
           role="status"
         >
           <h2 className="text-lg font-semibold">Import undone</h2>
-          <p className="mt-1 text-sm text-zinc-300">
+          <p className="mt-1 text-sm text-foreground">
             {undoResult.reverted}{" "}
             {undoResult.reverted === 1 ? "change" : "changes"} reverted
             {undoResult.retained > 0 &&
               ` · ${undoResult.retained} retained (edited after import)`}
           </p>
-          <Link
-            className="focus-ring mt-3 inline-block text-fuchsia-400"
-            to="/"
-          >
+          <Link className="focus-ring mt-3 inline-block text-primary" to="/">
             ← Back to library
           </Link>
         </div>
