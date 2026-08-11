@@ -18,6 +18,30 @@ export interface Shelf {
   slug: string;
 }
 
+/** The edition. Shared by everyone who owns it; never carries opinion data. */
+export interface LibraryItem {
+  id: number;
+  type: string;
+  title: string;
+  subtitle: string | null;
+  year: number | null;
+  sort_author: string | null;
+  cover_url?: string | null;
+  cover_path?: string | null;
+  metadata: {
+    authors?: string[];
+    publisher?: string | null;
+    language?: string | null;
+    page_count?: number | null;
+    description?: string | null;
+    subjects?: string[];
+    series?: string | null;
+    original_year?: number | null;
+  };
+  identifiers: Record<string, string>;
+  sources: Array<{ source: string; source_id: string; is_primary: boolean }>;
+}
+
 export interface LibraryEntry {
   id: number;
   item_id: number;
@@ -30,28 +54,7 @@ export interface LibraryEntry {
   reread_count: number;
   score_provisional: boolean;
   suggested_status: EntryStatus | null;
-  item: {
-    id: number;
-    type: string;
-    title: string;
-    subtitle: string | null;
-    year: number | null;
-    sort_author: string | null;
-    cover_url?: string | null;
-    cover_path?: string | null;
-    metadata: {
-      authors?: string[];
-      publisher?: string | null;
-      language?: string | null;
-      page_count?: number | null;
-      description?: string | null;
-      subjects?: string[];
-      series?: string | null;
-      original_year?: number | null;
-    };
-    identifiers: Record<string, string>;
-    sources: Array<{ source: string; source_id: string; is_primary: boolean }>;
-  };
+  item: LibraryItem;
   shelves: Shelf[];
 }
 

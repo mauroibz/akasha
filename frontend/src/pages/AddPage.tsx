@@ -1,4 +1,6 @@
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect, useRef, useState } from "react";
+import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -17,6 +19,13 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Field } from "@/features/detail/Field";
+import {
+  manualBookSchema,
+  optionalInt,
+  splitList,
+  type ManualBookValues,
+} from "@/features/detail/schemas";
 import type { EntryStatus } from "@/api/library";
 
 export function AddPage() {
@@ -34,7 +43,7 @@ export function AddPage() {
     [],
   );
   const [shelfIds, setShelfIds] = useState<number[]>([]);
-  const titleRef = useRef<HTMLInputElement>(null);
+  const titleRef = useRef<HTMLInputElement | null>(null);
   const searchRequestId = useRef(0);
   const statusRef = useRef<HTMLButtonElement>(null);
   const nearRef = useRef<HTMLButtonElement>(null);
@@ -78,21 +87,17 @@ export function AddPage() {
     if (near.length) nearRef.current?.focus();
   }, [near]);
 
-  async function submit(form: HTMLFormElement, confirmed = false) {
+  async function submit(values: ManualBookValues, confirmed = false) {
     if (near.length && !confirmed) return;
     setPending(true);
     setError("");
-    const data = new FormData(form);
     const item: ManualItem | undefined = manual
       ? {
-          title: String(data.get("title") ?? "").trim(),
-          subtitle: String(data.get("subtitle") ?? "") || undefined,
-          authors: String(data.get("authors") ?? "")
-            .split(",")
-            .map((v) => v.trim())
-            .filter(Boolean),
-          year: data.get("year") ? Number(data.get("year")) : undefined,
-          isbn: String(data.get("isbn") ?? "") || undefined,
+          title: values.title.trim(),
+          subtitle: values.subtitle || undefined,
+          authors: splitList(values.authors),
+          year: optionalInt(values.year) ?? undefined,
+          isbn: values.isbn || undefined,
         }
       : undefined;
     try {
@@ -136,6 +141,23 @@ export function AddPage() {
       setPending(false);
     }
   }
+  const form = useForm<ManualBookValues>({
+    resolver: zodResolver(manualBookSchema),
+    defaultValues: {
+      title: "",
+      authors: "",
+      subtitle: "",
+      year: "",
+      isbn: "",
+    },
+  });
+  const errors = form.formState.errors;
+  // A chosen search result carries its own metadata and renders no fields, so
+  // running the manual-entry schema over it would reject an add that has
+  // nothing to validate.
+  const submitForm = manual
+    ? form.handleSubmit((values) => submit(values))
+    : () => submit(form.getValues());
   const editing = manual || selected;
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
@@ -213,54 +235,76 @@ export function AddPage() {
       {editing && (
         <form
           className="mt-8 space-y-5"
+          noValidate
           onSubmit={(e) => {
             e.preventDefault();
-            void submit(e.currentTarget);
+            void submitForm(e);
           }}
         >
           {manual ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <Label htmlFor="manual-title">Title</Label>
-                <Input
-                  id="manual-title"
-                  ref={titleRef}
-                  required
-                  name="title"
-                  className="mt-1 h-11"
-                />
-              </div>
-              <div>
-                <Label htmlFor="manual-authors">Authors, comma separated</Label>
-                <Input
-                  id="manual-authors"
-                  name="authors"
-                  className="mt-1 h-11"
-                />
-              </div>
-              <div>
-                <Label htmlFor="manual-subtitle">Subtitle</Label>
-                <Input
-                  id="manual-subtitle"
-                  name="subtitle"
-                  className="mt-1 h-11"
-                />
-              </div>
-              <div>
-                <Label htmlFor="manual-year">Year</Label>
-                <Input
-                  id="manual-year"
-                  name="year"
-                  min="0"
-                  max="9999"
-                  type="number"
-                  className="mt-1 h-11"
-                />
-              </div>
-              <div>
-                <Label htmlFor="manual-isbn">ISBN</Label>
-                <Input id="manual-isbn" name="isbn" className="mt-1 h-11" />
-              </div>
+              <Field
+                id="manual-title"
+                label="Title"
+                error={errors.title?.message}
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    className="h-11"
+                    {...form.register("title")}
+                    ref={(node) => {
+                      form.register("title").ref(node);
+                      titleRef.current = node;
+                    }}
+                  />
+                )}
+              </Field>
+              <Field
+                id="manual-authors"
+                label="Authors, comma separated"
+                error={errors.authors?.message}
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    className="h-11"
+                    {...form.register("authors")}
+                  />
+                )}
+              </Field>
+              <Field
+                id="manual-subtitle"
+                label="Subtitle"
+                error={errors.subtitle?.message}
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    className="h-11"
+                    {...form.register("subtitle")}
+                  />
+                )}
+              </Field>
+              <Field id="manual-year" label="Year" error={errors.year?.message}>
+                {(props) => (
+                  <Input
+                    {...props}
+                    type="number"
+                    className="h-11"
+                    {...form.register("year")}
+                  />
+                )}
+              </Field>
+              <Field id="manual-isbn" label="ISBN" error={errors.isbn?.message}>
+                {(props) => (
+                  <Input
+                    {...props}
+                    className="h-11"
+                    {...form.register("isbn")}
+                  />
+                )}
+              </Field>
             </div>
           ) : (
             <div>
@@ -321,7 +365,7 @@ export function AddPage() {
                 type="button"
                 variant="secondary"
                 className="mt-2 rounded-full"
-                onClick={(e) => void submit(e.currentTarget.form!, true)}
+                onClick={() => void submit(form.getValues(), true)}
               >
                 Add separate edition
               </Button>{" "}

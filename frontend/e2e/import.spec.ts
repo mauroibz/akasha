@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { chooseOption } from "./radix";
+
 const record = {
   record_id: 1,
   row_number: 2,
@@ -164,7 +166,11 @@ test("row errors and ambiguity require an explicit choice", async ({
   await expect(page.getByText("date_read: invalid_date")).toBeVisible();
   const commit = page.getByRole("button", { name: /import 1 ready row/i });
   await expect(commit).toBeDisabled();
-  await page.getByLabel(/choice for Rayuela/i).selectOption("new");
+  await chooseOption(
+    page,
+    page.getByRole("combobox", { name: /choice for Rayuela/i }),
+    "Create a separate edition",
+  );
   await expect(commit).toBeEnabled();
 });
 

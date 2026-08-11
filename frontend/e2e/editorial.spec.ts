@@ -106,9 +106,7 @@ test("detail renders all metadata regions", async ({ page }) => {
   await page.goto("/books/7");
   await expect(page.getByText("Sudamericana")).toBeVisible();
   // Language "es" is in the edition-facts dl
-  await expect(page.locator("dl dt:has-text('Language') + dd")).toContainText(
-    "es",
-  );
+  await expect(page.locator("[data-fact='language'] dd")).toContainText("es");
   await expect(page.getByText("736")).toBeVisible();
   await expect(page.getByText("Argentine fiction")).toBeVisible();
   await expect(page.getByText("Favorites")).toBeVisible();
@@ -136,14 +134,14 @@ test("confirmed deletion removes the entry and returns to library", async ({
     .first()
     .click();
   await expect(
-    page.getByRole("dialog", { name: /confirm entry deletion/i }),
+    page.getByRole("alertdialog", { name: /remove this book/i }),
   ).toBeVisible();
   // The dialog states books remain
   await expect(page.getByText(/remain/i)).toBeVisible();
   // Confirm deletion
   await page
+    .getByRole("alertdialog", { name: /remove this book/i })
     .getByRole("button", { name: /delete entry/i })
-    .nth(1)
     .click();
   await expect(page).toHaveURL("/");
   expect(deleted).toBe(true);
@@ -157,12 +155,12 @@ test("delete cancel preserves the entry", async ({ page }) => {
     .first()
     .click();
   await expect(
-    page.getByRole("dialog", { name: /confirm entry deletion/i }),
+    page.getByRole("alertdialog", { name: /remove this book/i }),
   ).toBeVisible();
   // Press Escape to cancel
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("dialog", { name: /confirm entry deletion/i }),
+    page.getByRole("alertdialog", { name: /remove this book/i }),
   ).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
 });
@@ -222,17 +220,22 @@ test("shelf management creates, renames, and deletes shelves", async ({
   // Create a new shelf
   await page.getByPlaceholder(/new shelf name/i).fill("Sci-fi");
   await page.getByRole("button", { name: /create shelf/i }).click();
-  await expect(page.getByText("Sci-fi")).toBeVisible();
+  // Anchored on the list row: the confirmation toast repeats the shelf name.
+  await expect(
+    page.getByRole("button", { name: /rename sci-fi/i }),
+  ).toBeVisible();
 
   // Delete with confirmation
   await page.getByRole("button", { name: /delete sci-fi/i }).click();
   await expect(
-    page.getByRole("dialog", { name: /confirm shelf deletion/i }),
+    page.getByRole("alertdialog", { name: /delete .sci-fi./i }),
   ).toBeVisible();
   await expect(page.getByText(/retain/i)).toBeVisible();
   await page.getByRole("button", { name: /delete shelf/i }).click();
   // Wait for the shelf to disappear
-  await expect(page.getByText("Sci-fi")).toHaveCount(0, { timeout: 5000 });
+  await expect(
+    page.getByRole("button", { name: /rename sci-fi/i }),
+  ).toHaveCount(0, { timeout: 5000 });
 });
 
 test("unknown route shows a useful 404", async ({ page }) => {

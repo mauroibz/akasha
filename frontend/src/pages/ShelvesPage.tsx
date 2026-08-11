@@ -232,7 +232,7 @@ export function ShelvesPage() {
           if (!open) setDeletingShelf(null);
         }}
       >
-        <AlertDialogContent aria-label="Confirm shelf deletion">
+        <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
               Delete &ldquo;{deletingShelf?.name}&rdquo;?

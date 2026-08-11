@@ -81,13 +81,17 @@ export function TriagePage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Debounce search
+  // Debounce search. Same guard as the library: writing an identical query
+  // string back to the URL re-rendered the whole virtualized table a quarter
+  // second after every page load, and reset the selection with it.
   useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed === filters.query) return;
     const timer = window.setTimeout(() => {
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          if (search.trim()) next.set("q", search.trim());
+          if (trimmed) next.set("q", trimmed);
           else next.delete("q");
           return next;
         },
@@ -95,7 +99,7 @@ export function TriagePage() {
       );
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [search, setSearchParams]);
+  }, [search, filters.query, setSearchParams]);
 
   // Reset selection when filters change
   useEffect(() => {

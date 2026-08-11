@@ -153,7 +153,7 @@ for (const size of widths) {
         .first()
         .click();
       await page
-        .getByRole("dialog", { name: /confirm entry deletion/i })
+        .getByRole("alertdialog", { name: /remove this book/i })
         .getByRole("button", { name: /delete entry/i })
         .click();
       await expect(page).toHaveURL("/");

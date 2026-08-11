@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -139,11 +139,13 @@ describe("DetailPage", () => {
     );
     // Confirmation dialog appears
     expect(
-      screen.getByRole("dialog", { name: /confirm entry deletion/i }),
+      screen.getByRole("alertdialog", { name: /remove this book/i }),
     ).toBeVisible();
     // Click the confirm button inside the dialog
     await user.click(
-      screen.getAllByRole("button", { name: /delete entry/i })[1],
+      within(
+        screen.getByRole("alertdialog", { name: /remove this book/i }),
+      ).getByRole("button", { name: /delete entry/i }),
     );
     // DELETE was called
     const deleteReq = requests.find(
@@ -198,11 +200,116 @@ describe("DetailPage", () => {
       screen.getAllByRole("button", { name: /delete entry/i })[0],
     );
     await user.click(
-      screen.getAllByRole("button", { name: /delete entry/i })[1],
+      within(
+        screen.getByRole("alertdialog", { name: /remove this book/i }),
+      ).getByRole("button", { name: /delete entry/i }),
     );
-    // Entry remains visible with error
+    // The failure is reported inside the dialog, which is still open. An alert
+    // rendered behind a modal is an alert nobody sees.
+    const dialog = screen.getByRole("alertdialog", {
+      name: /remove this book/i,
+    });
+    expect(await within(dialog).findByRole("alert")).toBeVisible();
+    // Nothing was deleted: dismissing the dialog reveals the entry again.
+    await user.keyboard("{Escape}");
+    expect(
+      await screen.findByRole("heading", { name: "Rayuela" }),
+    ).toBeVisible();
+  });
+
+  it("refuses an impossible date range and keeps the typed values", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      if (init?.method === "PATCH") throw new Error("must not be reached");
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    await user.click(screen.getByRole("button", { name: /edit opinion/i }));
+
+    await user.type(screen.getByLabelText(/^started$/i), "2026-05-10");
+    await user.type(screen.getByLabelText(/^finished$/i), "2026-01-02");
+    await user.type(screen.getByLabelText(/^notes$/i), " and a note");
+    await user.click(screen.getByRole("button", { name: /save opinion/i }));
+
+    const finished = screen.getByLabelText(/^finished$/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /finished cannot be before started/i,
+    );
+    expect(finished).toHaveAttribute("aria-invalid", "true");
+    // The dialog is still open and nothing typed was thrown away.
+    expect(
+      screen.getByRole("dialog", { name: /edit your opinion/i }),
+    ).toBeVisible();
+    expect(screen.getByLabelText(/^started$/i)).toHaveValue("2026-05-10");
+    expect(screen.getByLabelText(/^notes$/i)).toHaveValue(
+      "Cached note and a note",
+    );
+  });
+
+  it("refuses an out-of-range reread count", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    await user.click(screen.getByRole("button", { name: /edit opinion/i }));
+    const rereads = screen.getByLabelText(/reread count/i);
+    await user.clear(rereads);
+    await user.type(rereads, "99999");
+    await user.click(screen.getByRole("button", { name: /save opinion/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /rereads must be between 0 and 9999/i,
+    );
+  });
+
+  it("keeps typed metadata when the write fails", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      if (init?.method === "PATCH")
+        return new Response(JSON.stringify({ error: { code: "conflict" } }), {
+          status: 409,
+        });
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    await user.click(
+      screen.getByRole("button", { name: /edit book metadata/i }),
+    );
+    await user.clear(screen.getByLabelText(/^title$/i));
+    await user.type(screen.getByLabelText(/^title$/i), "Rayuela corregida");
+    await user.click(screen.getByRole("button", { name: /save metadata/i }));
+
+    // Technical spec section 8: a failed write announces an error and never
+    // silently loses input.
     expect(await screen.findByRole("alert")).toBeVisible();
-    expect(screen.getByRole("heading", { name: "Rayuela" })).toBeVisible();
+    expect(
+      screen.getByRole("dialog", { name: /edit shared book metadata/i }),
+    ).toBeVisible();
+    expect(screen.getByLabelText(/^title$/i)).toHaveValue("Rayuela corregida");
+  });
+
+  it("rejects an empty title on the metadata form", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    await user.click(
+      screen.getByRole("button", { name: /edit book metadata/i }),
+    );
+    await user.clear(screen.getByLabelText(/^title$/i));
+    await user.click(screen.getByRole("button", { name: /save metadata/i }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /a book needs a title/i,
+    );
   });
 
   it("Escape closes dialogs", async () => {
@@ -215,11 +322,11 @@ describe("DetailPage", () => {
     await screen.findByRole("heading", { name: "Rayuela" });
     await user.click(screen.getByRole("button", { name: /delete entry/i }));
     expect(
-      screen.getByRole("dialog", { name: /confirm entry deletion/i }),
+      screen.getByRole("alertdialog", { name: /remove this book/i }),
     ).toBeVisible();
     await user.keyboard("{Escape}");
     expect(
-      screen.queryByRole("dialog", { name: /confirm entry deletion/i }),
+      screen.queryByRole("alertdialog", { name: /remove this book/i }),
     ).not.toBeInTheDocument();
   });
 });

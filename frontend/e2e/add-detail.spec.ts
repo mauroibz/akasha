@@ -132,7 +132,7 @@ test("mobile detail confirms refresh and reports cover failure without motion", 
   await page.goto("/books/7");
   await page.getByRole("button", { name: /refresh from provider/i }).click();
   await expect(
-    page.getByRole("dialog", { name: /confirm metadata refresh/i }),
+    page.getByRole("alertdialog", { name: /overwrite cached metadata/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: /confirm refresh/i }).click();
   await expect(page.getByRole("alert")).toContainText("not changed");

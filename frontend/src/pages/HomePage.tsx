@@ -89,11 +89,16 @@ export function HomePage() {
   }, [location.state]);
 
   useEffect(() => {
+    const trimmed = search.trim();
+    // Nothing to write on mount, or when the box already agrees with the URL.
+    // Replacing the entry anyway re-rendered the whole list a quarter second
+    // after every page load, for no change.
+    if (trimmed === filters.query) return;
     const timer = window.setTimeout(() => {
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev);
-          if (search.trim()) next.set("q", search.trim());
+          if (trimmed) next.set("q", trimmed);
           else next.delete("q");
           return next;
         },
@@ -101,7 +106,7 @@ export function HomePage() {
       );
     }, 250);
     return () => window.clearTimeout(timer);
-  }, [search, setSearchParams]);
+  }, [search, filters.query, setSearchParams]);
 
   const library = useInfiniteQuery({
     queryKey: ["library", filters],

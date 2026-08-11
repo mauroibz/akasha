@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
+
 import {
   deleteEntry,
   getEntry,
@@ -9,19 +10,46 @@ import {
   patchItem,
   refreshItem,
   replaceCover,
-  type EntryStatus,
 } from "@/api/library";
 import { createShelf, getShelves } from "@/api/shelves";
-import { ScorePicker } from "@/components/ScorePicker";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { MetadataDialog } from "@/features/detail/MetadataDialog";
+import { OpinionDialog } from "@/features/detail/OpinionDialog";
+import { optionalInt, splitList } from "@/features/detail/schemas";
+import { statusLabels } from "@/features/library/labels";
+import { scoreBand, scoreTextClass } from "@/lib/score";
+import { cn } from "@/lib/utils";
 
-const statusLabels: Record<EntryStatus, string> = {
-  unsorted: "Inbox",
-  read: "Read",
-  reading: "Reading",
-  to_read: "To read",
-  wishlist: "Wishlist",
-  dropped: "Dropped",
-};
+/** One term/definition pair, addressable by name instead of by CSS adjacency. */
+function Fact({
+  name,
+  label,
+  children,
+}: {
+  name: string;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div data-fact={name}>
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd>{children}</dd>
+    </div>
+  );
+}
 
 export function DetailPage() {
   const entryId = Number(useParams().entryId);
@@ -31,8 +59,7 @@ export function DetailPage() {
     "opinion" | "metadata" | "refresh" | "delete" | null
   >(null);
   const [error, setError] = useState("");
-  const [newShelfName, setNewShelfName] = useState("");
-  const [opinionScore, setOpinionScore] = useState<number | null>(null);
+  const [deleteError, setDeleteError] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const detail = useQuery({
     queryKey: ["entry", entryId],
@@ -58,33 +85,9 @@ export function DetailPage() {
     if (detail.data) headingRef.current?.focus();
   }, [detail.data]);
 
-  // Sync opinionScore when opening the opinion dialog
-  useEffect(() => {
-    if (dialog === "opinion" && detail.data) setOpinionScore(detail.data.score);
-  }, [dialog, detail.data]);
-
-  // Restore focus to the dialog's first focusable element when it opens
-  useEffect(() => {
-    if (dialog) {
-      const timer = window.setTimeout(() => {
-        const el = document.querySelector<HTMLElement>(
-          '[role="dialog"] [autofocus], [role="dialog"] input, [role="dialog"] select, [role="dialog"] button',
-        );
-        el?.focus();
-      }, 0);
-      return () => window.clearTimeout(timer);
-    }
-  }, [dialog]);
-
-  // Close dialog on Escape
-  useEffect(() => {
-    if (!dialog) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setDialog(null);
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [dialog]);
+  // Focus trapping, initial focus, and Escape-to-close were all hand-rolled
+  // here. Radix Dialog owns them now, so the hand-rolled versions are gone
+  // rather than left to fight it.
 
   if (detail.isPending) return <p role="status">Loading book detail…</p>;
   if (!detail.data) return <p role="alert">Book detail could not be loaded</p>;
@@ -92,22 +95,26 @@ export function DetailPage() {
   const item = entry.item;
 
   async function handleDelete() {
+    setDeleteError("");
     try {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: ["library"] });
       toast.success("Book removed from your library");
       navigate("/");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Entry could not be deleted");
+      // Reported inside the dialog, which is still open and still covering the
+      // page: an alert rendered behind a modal is an alert nobody sees.
+      setDeleteError(
+        e instanceof Error ? e.message : "Entry could not be deleted",
+      );
     }
   }
 
-  async function handleCreateShelf() {
-    if (!newShelfName.trim()) return;
+  async function handleCreateShelf(name: string) {
     try {
-      await createShelf(newShelfName.trim());
-      setNewShelfName("");
+      await createShelf(name);
       void cache.invalidateQueries({ queryKey: ["shelves"] });
+      toast.success(`Shelf "${name}" created`);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Shelf could not be created");
     }
@@ -115,9 +122,9 @@ export function DetailPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <button className="focus-ring" onClick={() => navigate("/")}>
+      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
         ← Library
-      </button>
+      </Button>
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
           {item.cover_url ? (
@@ -128,13 +135,15 @@ export function DetailPage() {
             />
           ) : (
             <div
-              className="aspect-[2/3] rounded-xl bg-zinc-800"
+              className="aspect-[2/3] rounded-xl bg-surface-raised"
               aria-label="No cover"
             />
           )}
-          <label className="mt-3 block text-sm">
-            Replace cover
-            <input
+          <div className="mt-3 block text-sm">
+            <Label htmlFor="replace-cover">Replace cover</Label>
+            <Input
+              id="replace-cover"
+              className="mt-1 h-11 py-2"
               type="file"
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => {
@@ -142,7 +151,7 @@ export function DetailPage() {
                 if (file) update.mutate(() => replaceCover(item.id, file));
               }}
             />
-          </label>
+          </div>
         </aside>
         <section>
           <h1
@@ -153,12 +162,12 @@ export function DetailPage() {
             {item.title}
           </h1>
           {item.subtitle && (
-            <p className="text-lg text-zinc-400">{item.subtitle}</p>
+            <p className="text-lg text-muted-foreground">{item.subtitle}</p>
           )}
-          <p className="mt-2 text-zinc-300">
+          <p className="mt-2 text-foreground">
             {item.sort_author ?? "Unknown author"}
           </p>
-          <p className="text-sm text-zinc-500">
+          <p className="text-sm text-muted-foreground">
             Edition year: {item.year ?? "unknown"}
             {item.metadata.original_year &&
             item.metadata.original_year !== item.year
@@ -168,483 +177,269 @@ export function DetailPage() {
 
           {/* Personal reading region */}
           <section
-            className="mt-6 rounded-xl border border-zinc-800 p-5"
+            className="mt-6 rounded-xl border border-border p-5"
             aria-label="Your reading data"
           >
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-fuchsia-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
               Your reading data
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
-              <div>
-                <dt className="text-xs text-zinc-500">Status</dt>
-                <dd>{statusLabels[entry.status]}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Score</dt>
-                <dd>
+              <Fact name="status" label="Status">
+                {statusLabels[entry.status]}
+              </Fact>
+              <Fact name="score" label="Score">
+                <span
+                  className={
+                    entry.score === null
+                      ? "text-muted-foreground"
+                      : `font-medium ${scoreTextClass[scoreBand(entry.score)]}`
+                  }
+                >
                   {entry.score ?? "—"}
-                  {entry.score_provisional && (
-                    <span className="ml-1 text-xs text-amber-400">
-                      (provisional)
-                    </span>
-                  )}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Started</dt>
-                <dd>{entry.date_started ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Finished</dt>
-                <dd>{entry.date_finished ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Rereads</dt>
-                <dd>{entry.reread_count}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Shelves</dt>
-                <dd>{entry.shelves.map((s) => s.name).join(", ") || "—"}</dd>
-              </div>
+                </span>
+                {entry.score_provisional && (
+                  <span className="ml-1 text-xs text-muted-foreground">
+                    (provisional)
+                  </span>
+                )}
+              </Fact>
+              <Fact name="started" label="Started">
+                {entry.date_started ?? "—"}
+              </Fact>
+              <Fact name="finished" label="Finished">
+                {entry.date_finished ?? "—"}
+              </Fact>
+              <Fact name="rereads" label="Rereads">
+                {entry.reread_count}
+              </Fact>
+              <Fact name="shelves" label="Shelves">
+                {entry.shelves.map((s) => s.name).join(", ") || "—"}
+              </Fact>
             </dl>
             {entry.notes && (
               <div className="mt-4">
-                <p className="text-xs text-zinc-500">Notes</p>
-                <p className="mt-1 whitespace-pre-wrap text-zinc-300">
+                <p className="text-xs text-muted-foreground">Notes</p>
+                <p className="mt-1 whitespace-pre-wrap text-foreground">
                   {entry.notes}
                 </p>
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
+              <Button
+                className="rounded-full px-5"
                 onClick={() => setDialog("opinion")}
               >
                 Edit opinion
-              </button>
-              <button
-                className="min-h-11 rounded-full border border-red-800 px-5 text-red-300 focus-ring"
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-full border-destructive/60 px-5 text-destructive hover:bg-destructive/10 hover:text-destructive"
                 onClick={() => setDialog("delete")}
               >
                 Delete entry
-              </button>
+              </Button>
             </div>
           </section>
 
           {/* Edition facts region */}
           <section
-            className="mt-6 rounded-xl border border-zinc-800 p-5"
+            className="mt-6 rounded-xl border border-border p-5"
             aria-label="Edition facts"
           >
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-fuchsia-400">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
               Edition facts
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
-              <div>
-                <dt className="text-xs text-zinc-500">Publisher</dt>
-                <dd>{item.metadata.publisher || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Language</dt>
-                <dd>{item.metadata.language || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Pages</dt>
-                <dd>{item.metadata.page_count ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Series</dt>
-                <dd>{item.metadata.series || "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Identifiers</dt>
-                <dd>
-                  {Object.entries(item.identifiers).map(([k, v]) => (
-                    <span key={k} className="block text-sm">
-                      {k}: {v}
-                    </span>
-                  ))}
-                  {!Object.keys(item.identifiers).length && "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-xs text-zinc-500">Sources</dt>
-                <dd>
-                  {item.sources.map((s) => (
-                    <span
-                      key={`${s.source}:${s.source_id}`}
-                      className="block text-sm"
-                    >
-                      {s.source}
-                      {s.is_primary ? " (primary)" : ""}
-                    </span>
-                  ))}
-                  {!item.sources.length && "—"}
-                </dd>
-              </div>
+              <Fact name="publisher" label="Publisher">
+                {item.metadata.publisher || "—"}
+              </Fact>
+              <Fact name="language" label="Language">
+                {item.metadata.language || "—"}
+              </Fact>
+              <Fact name="pages" label="Pages">
+                {item.metadata.page_count ?? "—"}
+              </Fact>
+              <Fact name="series" label="Series">
+                {item.metadata.series || "—"}
+              </Fact>
+              <Fact name="identifiers" label="Identifiers">
+                {Object.entries(item.identifiers).map(([k, v]) => (
+                  <span key={k} className="block text-sm">
+                    {k}: {v}
+                  </span>
+                ))}
+                {!Object.keys(item.identifiers).length && "—"}
+              </Fact>
+              <Fact name="sources" label="Sources">
+                {item.sources.map((s) => (
+                  <span
+                    key={`${s.source}:${s.source_id}`}
+                    className="block text-sm"
+                  >
+                    {s.source}
+                    {s.is_primary ? " (primary)" : ""}
+                  </span>
+                ))}
+                {!item.sources.length && "—"}
+              </Fact>
             </dl>
             {item.metadata.subjects && item.metadata.subjects.length > 0 && (
               <div className="mt-4">
-                <p className="text-xs text-zinc-500">Subjects</p>
-                <p className="mt-1 text-zinc-300">
+                <p className="text-xs text-muted-foreground">Subjects</p>
+                <p className="mt-1 text-foreground">
                   {item.metadata.subjects.join(", ")}
                 </p>
               </div>
             )}
             {item.metadata.description && (
               <div className="mt-4">
-                <p className="text-xs text-zinc-500">Description</p>
-                <p className="mt-1 whitespace-pre-wrap text-zinc-300">
+                <p className="text-xs text-muted-foreground">Description</p>
+                <p className="mt-1 whitespace-pre-wrap text-foreground">
                   {item.metadata.description}
                 </p>
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-3">
-              <button
-                className="min-h-11 rounded-full border border-zinc-700 px-5 focus-ring"
+              <Button
+                variant="outline"
+                className="rounded-full px-5"
                 onClick={() => setDialog("metadata")}
               >
                 Edit book metadata
-              </button>
-              <button
-                className="min-h-11 rounded-full border border-zinc-700 px-5 focus-ring"
+              </Button>
+              <Button
+                variant="outline"
+                className="rounded-full px-5"
                 onClick={() => setDialog("refresh")}
               >
                 Refresh from provider
-              </button>
+              </Button>
             </div>
           </section>
         </section>
       </div>
 
-      {/* Opinion dialog */}
-      {dialog === "opinion" && (
-        <form
-          role="dialog"
-          aria-label="Edit opinion"
-          aria-modal="true"
-          className="dialog"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const data = new FormData(e.currentTarget);
-            update.mutate(() =>
+      <OpinionDialog
+        open={dialog === "opinion"}
+        onOpenChange={(open) => setDialog(open ? "opinion" : null)}
+        entry={entry}
+        shelves={shelves.data ?? []}
+        onSave={(values) =>
+          update
+            .mutateAsync(() =>
               patchEntry(entry.id, {
-                status: String(data.get("status")) as EntryStatus,
-                score: opinionScore,
-                notes: String(data.get("notes") ?? ""),
-                date_started: String(data.get("date_started") ?? "") || null,
-                date_finished: String(data.get("date_finished") ?? "") || null,
-                reread_count: Number(data.get("reread_count") ?? 0),
-                shelf_ids: data.getAll("shelf_ids").map(Number),
+                status: values.status,
+                score: values.score,
+                notes: values.notes,
+                date_started: values.date_started || null,
+                date_finished: values.date_finished || null,
+                reread_count: Number(values.reread_count || 0),
+                shelf_ids: values.shelf_ids,
               }),
-            );
-            setDialog(null);
-          }}
-        >
-          <h2>Edit your opinion</h2>
-          <label>
-            Status
-            <select name="status" defaultValue={entry.status} className="field">
-              <option value="read">Read</option>
-              <option value="reading">Reading</option>
-              <option value="to_read">To read</option>
-              <option value="wishlist">Wishlist</option>
-              <option value="dropped">Dropped</option>
-              <option value="unsorted">Inbox</option>
-            </select>
-          </label>
-          <div>
-            <span className="mb-1 block text-sm">Score</span>
-            <ScorePicker
-              value={opinionScore}
-              provisional={entry.score_provisional}
-              onChange={setOpinionScore}
-            />
-          </div>
-          <label>
-            Notes
-            <textarea
-              name="notes"
-              defaultValue={entry.notes ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Started
-            <input
-              name="date_started"
-              type="date"
-              defaultValue={entry.date_started ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Finished
-            <input
-              name="date_finished"
-              type="date"
-              defaultValue={entry.date_finished ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Reread count
-            <input
-              name="reread_count"
-              type="number"
-              min="0"
-              defaultValue={entry.reread_count}
-              className="field"
-            />
-          </label>
-          {shelves.data && (
-            <fieldset>
-              <legend>Shelves</legend>
-              {shelves.data.map((shelf) => (
-                <label key={shelf.id} className="block">
-                  <input
-                    name="shelf_ids"
-                    type="checkbox"
-                    value={shelf.id}
-                    defaultChecked={entry.shelves.some(
-                      (value) => value.id === shelf.id,
-                    )}
-                  />{" "}
-                  {shelf.name}
-                </label>
-              ))}
-            </fieldset>
-          )}
-          {/* Inline shelf creation */}
-          <div className="flex gap-2">
-            <input
-              className="field flex-1"
-              placeholder="New shelf name"
-              value={newShelfName}
-              onChange={(e) => setNewShelfName(e.target.value)}
-            />
-            <button
-              type="button"
-              className="min-h-11 rounded-full border border-zinc-700 px-4 focus-ring"
-              onClick={() => void handleCreateShelf()}
-            >
-              Create shelf
-            </button>
-          </div>
-          <button className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring">
-            Save opinion
-          </button>
-          <button type="button" onClick={() => setDialog(null)}>
-            Cancel
-          </button>
-        </form>
-      )}
+            )
+            .then(() => undefined)
+        }
+        onCreateShelf={handleCreateShelf}
+      />
 
-      {/* Metadata dialog */}
-      {dialog === "metadata" && (
-        <form
-          role="dialog"
-          aria-label="Edit book metadata"
-          aria-modal="true"
-          className="dialog"
-          onSubmit={(e) => {
-            e.preventDefault();
-            const data = new FormData(e.currentTarget);
-            update.mutate(() =>
+      <MetadataDialog
+        open={dialog === "metadata"}
+        onOpenChange={(open) => setDialog(open ? "metadata" : null)}
+        item={item}
+        onSave={(values) =>
+          update
+            .mutateAsync(() =>
               patchItem(item.id, {
-                title: String(data.get("title")),
-                subtitle: String(data.get("subtitle") ?? "") || null,
-                year: data.get("year") ? Number(data.get("year")) : null,
+                title: values.title.trim(),
+                subtitle: values.subtitle || null,
+                year: optionalInt(values.year),
                 metadata: {
                   ...item.metadata,
-                  authors: String(data.get("authors") ?? "")
-                    .split(",")
-                    .map((v) => v.trim())
-                    .filter(Boolean),
-                  publisher: String(data.get("publisher") ?? ""),
-                  language: String(data.get("language") ?? ""),
-                  page_count: data.get("page_count")
-                    ? Number(data.get("page_count"))
-                    : null,
-                  description: String(data.get("description") ?? "") || null,
-                  subjects: String(data.get("subjects") ?? "")
-                    .split(",")
-                    .map((v) => v.trim())
-                    .filter(Boolean),
-                  series: String(data.get("series") ?? "") || null,
-                  original_year: data.get("original_year")
-                    ? Number(data.get("original_year"))
-                    : null,
+                  authors: splitList(values.authors),
+                  publisher: values.publisher,
+                  language: values.language,
+                  page_count: optionalInt(values.page_count),
+                  description: values.description || null,
+                  subjects: splitList(values.subjects),
+                  series: values.series || null,
+                  original_year: optionalInt(values.original_year),
                 },
               }),
-            );
-            setDialog(null);
-          }}
-        >
-          <h2>Edit shared book metadata</h2>
-          <p>Your score, status, dates, notes, and shelves are separate.</p>
-          <label>
-            Title
-            <input
-              autoFocus
-              name="title"
-              defaultValue={item.title}
-              className="field"
-            />
-          </label>
-          <label>
-            Subtitle
-            <input
-              name="subtitle"
-              defaultValue={item.subtitle ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Year
-            <input
-              name="year"
-              type="number"
-              defaultValue={item.year ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Authors
-            <input
-              name="authors"
-              defaultValue={
-                Array.isArray(item.metadata.authors)
-                  ? item.metadata.authors.join(", ")
-                  : ""
-              }
-              className="field"
-            />
-          </label>
-          <label>
-            Publisher
-            <input
-              name="publisher"
-              defaultValue={String(item.metadata.publisher ?? "")}
-              className="field"
-            />
-          </label>
-          <label>
-            Language
-            <input
-              name="language"
-              defaultValue={String(item.metadata.language ?? "")}
-              className="field"
-            />
-          </label>
-          <label>
-            Page count
-            <input
-              name="page_count"
-              type="number"
-              min="1"
-              defaultValue={item.metadata.page_count ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Description
-            <textarea
-              name="description"
-              defaultValue={item.metadata.description ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Subjects, comma separated
-            <input
-              name="subjects"
-              defaultValue={(item.metadata.subjects ?? []).join(", ")}
-              className="field"
-            />
-          </label>
-          <label>
-            Series
-            <input
-              name="series"
-              defaultValue={item.metadata.series ?? ""}
-              className="field"
-            />
-          </label>
-          <label>
-            Original publication year
-            <input
-              name="original_year"
-              type="number"
-              defaultValue={item.metadata.original_year ?? ""}
-              className="field"
-            />
-          </label>
-          <button className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring">
-            Save metadata
-          </button>
-          <button type="button" onClick={() => setDialog(null)}>
-            Cancel
-          </button>
-        </form>
-      )}
+            )
+            .then(() => undefined)
+        }
+      />
 
-      {/* Refresh dialog */}
-      {dialog === "refresh" && (
-        <div
-          role="dialog"
-          aria-label="Confirm metadata refresh"
-          aria-modal="true"
-          className="dialog"
-        >
-          <h2>Overwrite cached metadata?</h2>
-          <p>
-            Provider-managed fields will be replaced. Opinion data is preserved.
-          </p>
-          <button
-            autoFocus
-            className="min-h-11 rounded-full bg-fuchsia-500 px-5 font-semibold text-zinc-950 focus-ring"
-            onClick={() => {
-              update.mutate(() => refreshItem(item.id));
-              setDialog(null);
-            }}
-          >
-            Confirm refresh
-          </button>
-          <button type="button" onClick={() => setDialog(null)}>
-            Cancel
-          </button>
-        </div>
-      )}
+      {/* Product spec section 7: confirmation dialogs are limited to delete and
+          explicit provider refresh overwrite. */}
+      <AlertDialog
+        open={dialog === "refresh"}
+        onOpenChange={(open) => setDialog(open ? "refresh" : null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Overwrite cached metadata?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Provider-managed fields will be replaced. Opinion data is
+              preserved.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(buttonVariants(), "rounded-full px-5")}
+              onClick={() => update.mutate(() => refreshItem(item.id))}
+            >
+              Confirm refresh
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Delete dialog */}
-      {dialog === "delete" && (
-        <div
-          role="dialog"
-          aria-label="Confirm entry deletion"
-          aria-modal="true"
-          className="dialog"
-        >
-          <h2>Remove this book from your library?</h2>
-          <p>
-            Your score, status, notes, and shelf assignments will be deleted.
-            The book metadata and cover remain cached so re-adding is instant.
-          </p>
-          <button
-            autoFocus
-            className="min-h-11 rounded-full bg-red-600 px-5 font-semibold text-zinc-950 focus-ring"
-            onClick={() => void handleDelete()}
-          >
-            Delete entry
-          </button>
-          <button type="button" onClick={() => setDialog(null)}>
-            Cancel
-          </button>
-        </div>
-      )}
+      <AlertDialog
+        open={dialog === "delete"}
+        onOpenChange={(open) => {
+          setDialog(open ? "delete" : null);
+          if (!open) setDeleteError("");
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              Remove this book from your library?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Your score, status, notes, and shelf assignments will be deleted.
+              The book metadata and cover remain cached so re-adding is instant.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {deleteError && (
+            <p role="alert" className="text-sm text-destructive">
+              {deleteError}
+            </p>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                buttonVariants({ variant: "destructive" }),
+                "rounded-full px-5",
+              )}
+              onClick={(event) => {
+                // Kept open until the request settles, so a failure is
+                // reported instead of silently dismissing the dialog.
+                event.preventDefault();
+                void handleDelete();
+              }}
+            >
+              Delete entry
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {error && (
-        <p role="alert" className="mt-4 text-red-300">
+        <p role="alert" className="mt-4 text-destructive">
           {error}
         </p>
       )}

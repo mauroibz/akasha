@@ -140,6 +140,67 @@ describe("AddPage", () => {
     expect(await findToast("Book added")).toBeInTheDocument();
   });
 
+  it("refuses an empty title and keeps everything else typed", async () => {
+    const request = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input) =>
+        String(input) === "/api/shelves"
+          ? new Response("[]")
+          : new Response(JSON.stringify({ providers: [], degraded: false })),
+      );
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: /enter manually/i }),
+    );
+    await userEvent.type(
+      screen.getByLabelText(/^authors, comma separated$/i),
+      "Julio Cortázar",
+    );
+    await userEvent.type(screen.getByLabelText(/^year$/i), "1963");
+    await userEvent.click(
+      screen.getByRole("button", { name: /add to library/i }),
+    );
+
+    // The field error is announced and tied to the control that caused it.
+    const title = screen.getByLabelText(/^title$/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /a book needs a title/i,
+    );
+    expect(title).toHaveAttribute("aria-invalid", "true");
+    expect(title).toHaveAttribute(
+      "aria-describedby",
+      screen.getByRole("alert").id,
+    );
+    // Nothing was sent, and nothing typed was discarded.
+    expect(
+      request.mock.calls.filter(([, init]) => init?.method === "POST"),
+    ).toHaveLength(0);
+    expect(screen.getByLabelText(/^authors, comma separated$/i)).toHaveValue(
+      "Julio Cortázar",
+    );
+    expect(screen.getByLabelText(/^year$/i)).toHaveValue(1963);
+  });
+
+  it("refuses a malformed ISBN without discarding the rest of the form", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/shelves"
+        ? new Response("[]")
+        : new Response(JSON.stringify({ providers: [], degraded: false })),
+    );
+    renderPage();
+    await userEvent.click(
+      screen.getByRole("button", { name: /enter manually/i }),
+    );
+    await userEvent.type(screen.getByLabelText(/^title$/i), "Rayuela");
+    await userEvent.type(screen.getByLabelText(/^isbn$/i), "not-an-isbn");
+    await userEvent.click(
+      screen.getByRole("button", { name: /add to library/i }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(/isbn/i);
+    expect(screen.getByLabelText(/^title$/i)).toHaveValue("Rayuela");
+    expect(screen.getByLabelText(/^isbn$/i)).toHaveValue("not-an-isbn");
+  });
+
   it("requires explicit confirmation before adding a near-match edition", async () => {
     let posts = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
