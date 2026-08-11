@@ -22,14 +22,14 @@ export function CoverImage({
     return (
       <div
         className={cn(
-          "flex items-center justify-center rounded bg-zinc-800",
+          "flex items-center justify-center rounded bg-surface-raised",
           placeholderClassName ?? className,
         )}
         aria-label={!src ? "No cover" : "Cover failed to load"}
       >
         <svg
           aria-hidden="true"
-          className="h-8 w-8 text-zinc-600"
+          className="h-8 w-8 text-muted-foreground/60"
           fill="none"
           stroke="currentColor"
           strokeWidth={1}
@@ -50,7 +50,7 @@ export function CoverImage({
       {!loaded && (
         <div
           className={cn(
-            "absolute inset-0 animate-pulse rounded bg-zinc-800",
+            "absolute inset-0 animate-pulse rounded bg-surface-raised",
             className,
           )}
           aria-hidden="true"

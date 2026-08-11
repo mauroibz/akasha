@@ -76,17 +76,6 @@
   }
 }
 
-@layer components {
-  /* Superseded by shadcn primitives; removed once the last hand-rolled dialog
-     and field are converted. */
-  .field {
-    @apply mt-1 min-h-11 w-full rounded-lg bg-surface px-3 focus-ring;
-  }
-  .dialog {
-    @apply fixed inset-x-4 top-1/2 z-20 mx-auto grid max-h-[90vh] max-w-lg -translate-y-1/2 gap-4 overflow-auto rounded-2xl border border-border bg-background p-6 shadow-2xl;
-  }
-}
-
 @layer utilities {
   .focus-ring {
     @apply focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring;

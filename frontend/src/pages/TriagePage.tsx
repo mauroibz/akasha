@@ -591,7 +591,7 @@ export function TriagePage() {
                     </div>
                     {hasConflict && (
                       <span
-                        className="shrink-0 rounded-full bg-amber-900/40 px-2 py-0.5 text-xs text-amber-300"
+                        className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
                         title={`Suggested: ${statusLabels[entry.suggested_status!]}`}
                       >
                         {statusLabels[entry.suggested_status!]}
