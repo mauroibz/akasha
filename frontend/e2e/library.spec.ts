@@ -254,6 +254,77 @@ test("animated surfaces really do animate without the preference", async ({
   await expectAnimated(page, animatedSurfaces.scoreTrigger, "score trigger");
 });
 
+test("a cover that arrives late shifts nothing in its card", async ({
+  page,
+}) => {
+  await seedLibrary(page);
+  // Every even entry asks for this cover; it is held back so the card can be
+  // measured while the image is genuinely still in flight.
+  await page.route("**/covers/late.png", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    await route.fulfill({
+      contentType: "image/png",
+      body: Buffer.from(pixelCover.split(",")[1], "base64"),
+    });
+  });
+  await page.route("**/api/entries?**", async (route) => {
+    const items = Array.from({ length: 60 }, (_, index) => {
+      const row = entry(index + 1);
+      return { ...row, item: { ...row.item, cover_url: "/covers/late.png" } };
+    });
+    await route.fulfill({
+      contentType: "application/json",
+      body: JSON.stringify({
+        items,
+        next_cursor: null,
+        total: 60,
+        facets: { status_counts: { read: 60 } },
+      }),
+    });
+  });
+  await page.goto("/");
+
+  const card = page.locator("[data-entry-id='1']");
+  await expect(card.locator("img")).toHaveAttribute(
+    "data-cover-state",
+    "loading",
+  );
+  const before = {
+    card: await card.boundingBox(),
+    cover: await card.locator("[data-card-cover]").boundingBox(),
+    meta: await card.locator("[data-card-meta]").boundingBox(),
+  };
+
+  await expect(card.locator("img")).toHaveAttribute(
+    "data-cover-state",
+    "loaded",
+    { timeout: 5000 },
+  );
+  const after = {
+    card: await card.boundingBox(),
+    cover: await card.locator("[data-card-cover]").boundingBox(),
+    meta: await card.locator("[data-card-meta]").boundingBox(),
+  };
+
+  for (const region of ["card", "cover", "meta"] as const) {
+    const a = before[region]!;
+    const b = after[region]!;
+    expect(
+      Math.abs(a.x - b.x) +
+        Math.abs(a.y - b.y) +
+        Math.abs(a.width - b.width) +
+        Math.abs(a.height - b.height),
+      `${describeBox(`${region} before`, a)} -> ${describeBox(`${region} after`, b)}`,
+    ).toBeLessThanOrEqual(1);
+  }
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(1);
+});
+
 test("keyboard guards and reduced motion remain effective", async ({
   page,
 }) => {

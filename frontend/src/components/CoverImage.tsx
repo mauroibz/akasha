@@ -56,14 +56,28 @@ export function CoverImage({
           aria-hidden="true"
         />
       )}
+      {/* A decode-reveal, not a blur-up: the blur is on the real asset as it
+          arrives, because a true blur-up needs a low-resolution placeholder the
+          API does not expose. No layout shift either way -- the wrapper above
+          carries the caller's box, so it is at full size before a byte of this
+          image exists, and the image never sizes anything.
+
+          `decoding="async"` but deliberately not `loading="lazy"`: the
+          virtualizer already bounds how many covers are mounted, and lazy
+          loading would delay them during a fast scroll, which is the pop-in
+          this treatment exists to remove. */}
       <img
         className={cn(
-          "rounded object-cover transition-opacity duration-200",
+          "rounded object-cover transition-[opacity,filter,transform] duration-300",
           className,
-          loaded ? "opacity-100" : "opacity-0",
+          loaded
+            ? "opacity-100 blur-0 scale-100"
+            : "opacity-0 blur-[6px] scale-[1.03]",
         )}
         src={src}
         alt={alt}
+        decoding="async"
+        data-cover-state={loaded ? "loaded" : "loading"}
         onLoad={() => setLoaded(true)}
         onError={() => setFailed(true)}
       />
