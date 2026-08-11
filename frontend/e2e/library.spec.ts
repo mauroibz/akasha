@@ -1,6 +1,11 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { animatedSurfaces, expectAnimated, sampleAnimations } from "./motion";
+import {
+  animatedSurfaces,
+  expectAnimated,
+  expectStill,
+  sampleAnimations,
+} from "./motion";
 import { chooseOption, expectSelected } from "./radix";
 
 const pixelCover =
@@ -254,6 +259,38 @@ test("animated surfaces really do animate without the preference", async ({
   await expectAnimated(page, animatedSurfaces.scoreTrigger, "score trigger");
 });
 
+test("reduced motion reaches the animations no stylesheet can touch", async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await seedLibrary(page);
+  await page.goto("/");
+  await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+
+  // The `*` block in index.css cannot help here. Motion drives the Web
+  // Animations API and inline styles, which no stylesheet overrides -- which is
+  // the entire reason the preset layer reads the preference in JavaScript.
+  const samples = await sampleAnimations(page, async () => {
+    await chooseOption(
+      page,
+      page.getByRole("combobox", { name: "Sort library" }),
+      "Score ↓",
+    );
+    await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+    await page.locator("[data-entry-id='1'] [data-provisional]").click();
+    await page.getByRole("button", { name: "Score 4" }).click();
+  });
+  const moving = samples.filter((sample) => sample.duration > 0.01);
+  expect(moving, JSON.stringify(moving.slice(0, 5))).toEqual([]);
+
+  const stillRunning = await page.evaluate(() =>
+    document
+      .getAnimations()
+      .map((animation) => Number(animation.effect?.getTiming().duration ?? 0)),
+  );
+  expect(stillRunning.every((duration) => duration <= 0.01)).toBe(true);
+});
+
 test("a cover that arrives late shifts nothing in its card", async ({
   page,
 }) => {
@@ -340,15 +377,29 @@ test("keyboard guards and reduced motion remain effective", async ({
   await expect(
     page.getByRole("searchbox", { name: "Search library" }),
   ).toHaveValue("a");
-  const duration = await page
-    .locator("article")
-    .first()
-    .evaluate((element) => getComputedStyle(element).transitionDuration);
-  expect(["0s", "0.00001s", "1e-05s"]).toContain(duration);
   const firstRow = page.locator("[data-entry-id='1']");
   await firstRow.focus();
   await page.keyboard.press("j");
   await expect(page.locator("[data-entry-id='2']")).toBeFocused();
+
+  // Sampling one element's transition duration is what made this assertion
+  // vacuous for three sprints: `article` carried no transition at all, so it
+  // was true of a page with no animation in it. Every surface this sprint
+  // animates is checked now, on both properties, including one that Radix
+  // portals out of the card entirely.
+  await expectStill(page, animatedSurfaces.card, "card");
+  await expectStill(page, animatedSurfaces.container, "library container");
+  await expectStill(page, animatedSurfaces.cover, "cover");
+  await expectStill(page, animatedSurfaces.scoreTrigger, "score trigger");
+
+  const card = page.locator("[data-entry-id='1']");
+  await card.locator("[data-provisional]").click();
+  await expectStill(page, "[data-score-panel]", "score panel");
+  await page.keyboard.press("Escape");
+
+  await card.getByRole("combobox").click();
+  await expectStill(page, "[role='listbox']", "portalled status listbox");
+  await page.keyboard.press("Escape");
   await page.getByRole("heading", { name: "Akasha" }).click();
   await page.keyboard.press("a");
   await expect(page).toHaveURL("/add");
