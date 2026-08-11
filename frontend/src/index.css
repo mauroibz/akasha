@@ -49,6 +49,9 @@
     --score-top: 158 64% 51.6%; /* emerald-400, 9-10 */
 
     --radius: 0.625rem;
+    /* Small controls are sized independently of the card radius: at 10px a
+       16px checkbox reads as a radio button. */
+    --radius-control: 0.25rem;
     --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
 
     color-scheme: dark;
