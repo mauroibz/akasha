@@ -42,6 +42,26 @@ export function gridColumnCount(containerWidth: number): number {
   );
 }
 
+/**
+ * The identity of the list container for crossfade purposes: every server-side
+ * filter and sort value, and nothing else.
+ *
+ * What it deliberately excludes is the point. Appending a page during infinite
+ * scroll and patching one row optimistically both leave the filters untouched,
+ * so neither re-keys the container and neither triggers a fade. Technical spec
+ * section 8: sort and filter changes crossfade the container; rows do not
+ * animate.
+ */
+export function libraryMotionKey(filters: LibraryFilters): string {
+  return [
+    filters.sort,
+    filters.order,
+    [...filters.statuses].sort().join("+"),
+    [...filters.shelves].sort().join("+"),
+    filters.query.trim(),
+  ].join("|");
+}
+
 export function readViewPreference(): LibraryView {
   return localStorage.getItem(viewPreferenceKey) === "table" ? "table" : "grid";
 }

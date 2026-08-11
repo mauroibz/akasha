@@ -244,6 +244,11 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
           return (
             <div
               className={`absolute left-0 top-0 w-full ${isGrid ? "px-4" : ""}`}
+              // Addressable so `e2e/library.spec.ts` can assert that no
+              // animation is ever registered against a virtual row. The row's
+              // position is an inline transform owned by the virtualizer;
+              // animating it would fight the thing that places it.
+              data-virtual-row=""
               key={row.key}
               style={{
                 height: row.size,

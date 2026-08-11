@@ -1,4 +1,4 @@
-import { expect, test } from "vitest";
+import { describe, expect, it, test } from "vitest";
 
 import type { LibraryEntry } from "@/api/library";
 import {
@@ -6,6 +6,7 @@ import {
   gridColumnCount,
   gridLayout,
   isEditableTarget,
+  libraryMotionKey,
   mergeUniqueEntries,
   readViewPreference,
 } from "./library";
@@ -87,4 +88,33 @@ test("global shortcuts stay disabled while a control owns the keystroke", () => 
 test("default server filters omit status so the API excludes inbox", () => {
   expect(defaultLibraryFilters.statuses).toEqual([]);
   expect(defaultLibraryFilters.sort).toBe("date_added");
+});
+
+describe("libraryMotionKey", () => {
+  const base = defaultLibraryFilters;
+
+  it("is stable across everything that is not a server filter", () => {
+    // Loading another page or patching one row's score in the cache produces
+    // the same filters object; re-keying on those would crossfade the whole
+    // list on every scroll and every inline edit.
+    expect(libraryMotionKey(base)).toBe(libraryMotionKey({ ...base }));
+  });
+
+  it("changes with sort, order, status, shelf, and query", () => {
+    const key = libraryMotionKey(base);
+    expect(libraryMotionKey({ ...base, sort: "score" })).not.toBe(key);
+    expect(libraryMotionKey({ ...base, order: "asc" })).not.toBe(key);
+    expect(libraryMotionKey({ ...base, statuses: ["read"] })).not.toBe(key);
+    expect(libraryMotionKey({ ...base, shelves: ["3"] })).not.toBe(key);
+    expect(libraryMotionKey({ ...base, query: "borges" })).not.toBe(key);
+  });
+
+  it("ignores the order the reader happened to tick the filters in", () => {
+    expect(libraryMotionKey({ ...base, statuses: ["read", "reading"] })).toBe(
+      libraryMotionKey({ ...base, statuses: ["reading", "read"] }),
+    );
+    expect(libraryMotionKey({ ...base, shelves: ["2", "9"] })).toBe(
+      libraryMotionKey({ ...base, shelves: ["9", "2"] }),
+    );
+  });
 });

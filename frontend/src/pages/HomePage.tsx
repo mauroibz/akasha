@@ -4,6 +4,7 @@ import {
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
+import { AnimatePresence, m } from "motion/react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -19,6 +20,7 @@ import {
   type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
+import { useMotionPresets } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -32,6 +34,7 @@ import { VirtualLibrary } from "@/features/library/VirtualLibrary";
 import { sortLabels, statusLabels } from "@/features/library/labels";
 import {
   isEditableTarget,
+  libraryMotionKey,
   mergeUniqueEntries,
   readViewPreference,
   viewPreferenceKey,
@@ -74,6 +77,7 @@ export function HomePage() {
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
+  const presets = useMotionPresets();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -389,8 +393,11 @@ export function HomePage() {
         })}
       </div>
       {library.isPending && (
+        // Holds the list's height while the new page resolves. Without it the
+        // page collapses to a short message between two lists and the whole
+        // layout jumps underneath the crossfade.
         <div
-          className="py-24 text-center text-muted-foreground"
+          className="flex min-h-[min(70vh,760px)] items-center justify-center py-24 text-center text-muted-foreground"
           aria-live="polite"
           role="status"
         >
@@ -418,24 +425,40 @@ export function HomePage() {
           </p>
         </section>
       )}
-      {entries.length > 0 && (
-        <VirtualLibrary
-          entries={entries}
-          view={view}
-          focusedId={focusedId}
-          highlightId={highlightId}
-          hasNextPage={library.hasNextPage}
-          isFetchingNextPage={library.isFetchingNextPage}
-          loadNextPage={() => void library.fetchNextPage()}
-          onFocusEntry={setFocusedId}
-          onScore={(entry, score) =>
-            mutation.mutate({ entry, changes: { score } })
-          }
-          onStatus={(entry, status) =>
-            mutation.mutate({ entry, changes: { status } })
-          }
-        />
-      )}
+      {/* The crossfade is on the container and nowhere else. `mode="wait"` is
+          not a stylistic choice: with the default, moving to a filter TanStack
+          already has cached mounts the old and new lists in the same commit,
+          and two virtualized stacks -- each with its own scroll container and
+          its own total-size spacer -- double both the mounted-card count and
+          the page height for the duration. */}
+      <AnimatePresence mode="wait" initial={false}>
+        {entries.length > 0 && (
+          <m.div
+            key={libraryMotionKey(filters)}
+            data-library-container=""
+            initial={presets.crossfade.initial}
+            animate={presets.crossfade.animate}
+            exit={presets.crossfade.exit}
+          >
+            <VirtualLibrary
+              entries={entries}
+              view={view}
+              focusedId={focusedId}
+              highlightId={highlightId}
+              hasNextPage={library.hasNextPage}
+              isFetchingNextPage={library.isFetchingNextPage}
+              loadNextPage={() => void library.fetchNextPage()}
+              onFocusEntry={setFocusedId}
+              onScore={(entry, score) =>
+                mutation.mutate({ entry, changes: { score } })
+              }
+              onStatus={(entry, status) =>
+                mutation.mutate({ entry, changes: { status } })
+              }
+            />
+          </m.div>
+        )}
+      </AnimatePresence>
     </main>
   );
 }

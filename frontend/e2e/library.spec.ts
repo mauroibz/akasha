@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { animatedSurfaces, expectAnimated, sampleAnimations } from "./motion";
 import { chooseOption, expectSelected } from "./radix";
 
 const pixelCover =
@@ -153,6 +154,103 @@ test("the deterministic 5,000-entry library mounts only overscanned rows", async
     `mounted rows=${mountedRows} cards=${mountedCards} (DEC-023 bounds: <20 rows, <48 cards)`,
   );
   expect(mountedCards).toBeLessThan(48);
+});
+
+test("changing sort crossfades the container and animates no row", async ({
+  page,
+}) => {
+  await seedLibrary(page);
+  await page.goto("/");
+  await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  // Stamp the live container so a second one can be told from a re-rendered
+  // first one: exactly one re-key must happen, not zero and not two.
+  await page
+    .locator("[data-library-container]")
+    .evaluate((element) => element.setAttribute("data-probe", "before"));
+
+  const samples = await sampleAnimations(page, async () => {
+    await chooseOption(
+      page,
+      page.getByRole("combobox", { name: "Sort library" }),
+      "Score ↓",
+    );
+    await expect(page.locator("[data-library-container]")).not.toHaveAttribute(
+      "data-probe",
+      "before",
+    );
+    await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  });
+
+  // Technical spec section 8: rows do not use layout animations. Not "should
+  // not" -- the sampler watched every frame of the transition and would have
+  // caught one.
+  const rowLevel = samples.filter(
+    (sample) => sample.target === "card" || sample.target === "row",
+  );
+  expect(rowLevel, JSON.stringify(rowLevel.slice(0, 5))).toEqual([]);
+  expect(samples.some((sample) => sample.target === "container")).toBe(true);
+  await expect(page.locator("[data-library-container]")).toHaveCount(1);
+});
+
+test("the mounted-DOM budget holds through a crossfade", async ({ page }) => {
+  await seedLibrary(page);
+  await page.goto("/");
+  await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  await page.evaluate(() => {
+    const peak = { cards: 0, rows: 0, containers: 0 };
+    const tick = () => {
+      peak.cards = Math.max(
+        peak.cards,
+        document.querySelectorAll("[data-entry-id]").length,
+      );
+      peak.rows = Math.max(
+        peak.rows,
+        document.querySelectorAll("[data-virtual-row]").length,
+      );
+      peak.containers = Math.max(
+        peak.containers,
+        document.querySelectorAll("[data-library-container]").length,
+      );
+      handle = requestAnimationFrame(tick);
+    };
+    let handle = requestAnimationFrame(tick);
+    Object.assign(window, {
+      __peak: peak,
+      __peakStop: () => cancelAnimationFrame(handle),
+    });
+  });
+  await chooseOption(
+    page,
+    page.getByRole("combobox", { name: "Sort library" }),
+    "Title ↓",
+  );
+  await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  const peak = await page.evaluate(() => {
+    const store = window as unknown as {
+      __peak: { cards: number; rows: number; containers: number };
+      __peakStop: () => void;
+    };
+    store.__peakStop();
+    return store.__peak;
+  });
+  console.log(
+    `crossfade peak rows=${peak.rows} cards=${peak.cards} containers=${peak.containers} (DEC-023 bounds: <20 rows, <48 cards)`,
+  );
+  // The whole reason the crossfade waits for the outgoing list to leave: two
+  // simultaneous virtualized stacks would breach both bounds at once.
+  expect(peak.containers).toBe(1);
+  expect(peak.rows).toBeLessThan(20);
+  expect(peak.cards).toBeLessThan(48);
+});
+
+test("animated surfaces really do animate without the preference", async ({
+  page,
+}) => {
+  await seedLibrary(page);
+  await page.goto("/");
+  await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  await expectAnimated(page, animatedSurfaces.cover, "cover");
+  await expectAnimated(page, animatedSurfaces.scoreTrigger, "score trigger");
 });
 
 test("keyboard guards and reduced motion remain effective", async ({
