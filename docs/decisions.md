@@ -523,3 +523,35 @@ Append-only record of material architecture choices, product-default resolutions
   placeholder, not in `CoverImage.tsx`. `loading="lazy"` was deliberately not added: the
   virtualizer already bounds how many covers are mounted, and lazy loading would delay them during
   a fast scroll, which is the pop-in this treatment exists to remove.
+
+## DEC-035 — Metadata completeness is wanted, but must prove it is affordable first
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** OQ-001 has been open since the Sprint 014 walkthrough: enrichment consults Google
+  Books only when Open Library fails outright, so a record that comes back usable but missing a
+  cover keeps the gap. The Sprint 016 walkthrough added a second symptom of the same shape — a
+  provider "image not available" placeholder JPEG stored as a real cover, with no second candidate
+  to fall back to. The owner was asked to decide and did.
+- **Decision:** The feature is wanted. The owner's stated goal is metadata entries that build
+  towards completeness from whichever provider has the missing piece, and specifically the ability
+  to **choose a cover from the editions that were actually fetched** rather than accepting whatever
+  the default resolved to. What the owner explicitly declined to decide is whether this is
+  affordable, naming three unknowns: implementation complexity, performance under a large import,
+  and the risk of exhausting or being blocked by free-tier provider limits — plus a fourth
+  judgement, whether it improves or degrades the feel of the system. Therefore this becomes
+  **Sprint 019, structured as a gate**: Phase A measures viability and impact and produces a
+  written verdict with numbers, changing nothing user-visible; Phase B builds only what Phase A
+  justifies, and only with an explicit go-ahead. Placed after the v1 release sprint, because it is
+  additive and carries third-party unknowns that should not hold a working release hostage. The
+  owner also directed that no assessment be performed at the time of this decision, so none was:
+  this entry records intent and structure only.
+- **Consequences:** OQ-001 closes as resolved-into-Sprint-019 rather than remaining an open
+  question. The placeholder-cover observation is folded into it rather than tracked separately, on
+  the owner's reading that cross-provider cover completion would give that case a way out; if
+  Phase A concludes the feature is not worth building, that observation resurfaces on its own and
+  needs its own answer. Sprint 019 becomes the final planned sprint, so the release-state rule in
+  `WORKFLOW.md`, the closure step in `AGENTS.md`, and the completeness bound in
+  `scripts/validate_project.py` all move from 018 to 019. Plan revision is now 7. **Phase A is
+  permitted to conclude that the feature is not worth its cost**, and that outcome must be reported
+  plainly rather than softened into a partial implementation.

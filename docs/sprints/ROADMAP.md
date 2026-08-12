@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 6
+**Plan revision:** 7
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [Sprint 017](017-scale-accessibility-resilience.md)
 
@@ -51,6 +51,7 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | completed |
 | 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | ready |
 | 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | planned |
+| 019 | Metadata completeness: viability, then build | A measured verdict on cross-provider field completion and edition choice, then whatever that verdict says is worth building | 018 | planned |
 
 ## Detailed future sprint contracts
 
@@ -249,7 +250,6 @@ Scope:
 - Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark against both DEC-023 mounted-DOM bounds, accessibility audit and fixes. The audit inherits labelled controls, `aria-invalid`/`aria-describedby` on every field, and Radix focus management from Sprint 015, so it should confirm more than it repairs.
 - Bundle size, and this is now the sharper number: Sprint 016 took the frontend to **696 kB** of JavaScript (219.66 kB gzip), +86 kB on Sprint 015's 610 kB and roughly double the Sprint 013 baseline of 343.79 kB. The build still emits a chunk-size warning. Decide whether to code-split or to raise the limit deliberately.
 - Two cosmetic defects recorded in the Sprint 015 walkthrough and confirmed still present in the Sprint 016 walkthrough: the edition-year line is truncated on library cards, and the triage score cell renders a provisional score as an unexplained `6·`.
-- Raised by the Sprint 016 walkthrough: a provider "image not available" placeholder image is accepted and stored as a cover, because it arrives as a successful response carrying a non-cover. Decide whether that is worth detecting.
 - Error boundaries, degraded provider states, reduced motion, cancellation/race tests. Reduced motion is partly discharged: DEC-033 pairs every reduced-motion assertion with a positive one, the unit suite runs under `reduce` by default, and a reusable per-frame animation sampler lives at `frontend/e2e/motion.ts`. What remains here is the rest of the surface, not the library.
 - Complete critical E2E regression suite and security limits.
 
@@ -276,41 +276,100 @@ Acceptance:
 - LAN-only warning is prominent; no public exposure or auth is implied.
 - Clean-machine Compose smoke test passes and tags the v1 release only when explicitly requested.
 
+### Sprint 019 — Metadata completeness: viability, then build
+
+**This sprint is gated. Its first half decides whether its second half happens, and how much of
+it.** The owner's decision (DEC-035) is that richer, more complete metadata is wanted; what is
+*not* decided is whether it can be had at an acceptable cost. An agent that arrives here and
+starts implementing cross-provider merging has skipped the entire point.
+
+Placed after v1 release deliberately: this is additive, it carries real unknowns about third-party
+rate limits, and blocking a working release on it would be the wrong trade.
+
+#### What the owner asked for
+
+More complete metadata entries, built up from whatever provider has the missing piece. The
+motivating example is covers: you get a sensible default, but you can **choose a different one
+from the editions that were actually fetched**, rather than being stuck with a bad cover or none.
+The same appetite applies to the other fields.
+
+The concerns are equally explicit and are the reason this is gated:
+
+- **Complexity** — unknown, and worth knowing before committing.
+- **Performance** — provider traffic per enrichment job goes up, and a large import is many jobs.
+- **Free-tier limits** — Open Library and Google Books are free services. Doubling traffic per
+  book must not get the application rate-limited or blocked.
+- **Feel and usability** — a cover chooser is only a feature if it stays out of the way. More
+  metadata is not automatically better if it makes the common path slower or noisier.
+
+#### Phase A — viability and impact assessment (no product change)
+
+Deliverable is a written verdict with numbers behind it, recorded in `docs/decisions.md`. Nothing
+user-visible ships in this phase. It must answer, with measurement rather than reasoning:
+
+- What each provider's published and observed rate limits actually are, and what a 500-book and a
+  5,000-book import would cost against them under per-field completion.
+- Measured wall-clock impact on a realistic import, against the current fallback-only behavior as
+  the baseline.
+- Whether a fetched candidate can be **verified to be the same edition** before its fields are
+  merged. Already on record as the sharp edge here: `GoogleBooksProvider.fetch_by_isbn` takes the
+  first hit of an `isbn:` search, which is not guaranteed to carry the requested ISBN13, so merging
+  its publisher or page count risks attaching one edition's data to another.
+- What storing multiple cover candidates costs on disk, and whether they are fetched eagerly or on
+  demand when the chooser is opened.
+- How failure semantics change shape: one provider succeeding while another errors is a successful
+  enrichment, not a failed job.
+- Whether the fill-empty-only invariant (DEC-008) survives unchanged. It should — merging happens
+  before the write — but that must be demonstrated, not assumed.
+
+Phase A may conclude that the full feature is not worth its cost. **That is a legitimate outcome**
+and must be reported plainly rather than softened into a partial implementation. It may also
+conclude that a narrow slice — say, cover choice alone, on demand, with no change to automatic
+enrichment — carries most of the value at a fraction of the risk.
+
+#### Phase B — build what Phase A justified
+
+Scope is set by Phase A's verdict and by an explicit owner go-ahead, not by this document.
+Whatever is built inherits the existing invariants without exception: imported user data is never
+overwritten, network providers are never consulted while rendering cached library pages, and
+enrichment still only fills empty fields.
+
+Acceptance:
+
+- Phase A's verdict is recorded with the measurements that support it, including the ones that
+  argue against building.
+- If Phase B proceeds: no regression in import throughput beyond the budget Phase A set, no
+  provider blocking or rate-limit errors under a full-library run, and the fill-empty-only
+  invariant proven intact.
+- If a cover chooser ships: it is reachable from the detail page, defaults to the current cover,
+  and never blocks the page it lives on.
+
 ## Open questions
 
 Items raised but deliberately not decided. They are not assigned to a sprint and no
 implementation approach has been chosen. **Do not resolve one of these by implementing it** —
 each needs an owner decision first, and that decision belongs in `docs/decisions.md`.
 
-### OQ-001 — Should enrichment complete individual empty fields across providers?
+### OQ-001 — Should enrichment complete individual empty fields across providers? — **decided**
 
 - **Raised:** 2026-08-09 by the owner, after the Sprint 014 walkthrough.
-- **Status:** open, owner deciding. No technical decision has been taken.
-- **Current behavior:** enrichment tries Open Library, and consults Google Books only when Open
-  Library fails or returns nothing usable. A record that comes back usable but incomplete — an
-  edition with a year and a publisher but no cover — is accepted as-is, and the second provider is
-  never asked. The owner would like missing fields filled from whichever provider has them.
-- **What the specs already say**, which matters because this may be a narrowing rather than a new
-  feature: product spec 4.3 already specifies per-field completion at search time — "prefer Open
-  Library's record and Google Books' cover if OL has none" — and `_merge_group` in
-  `domain/providers.py` implements it for search results. Product spec 5.3 describes enrichment as
-  "Open Library/Google Books lookups" without ordering. The fallback-only rule comes from Sprint
-  014's deliverable list and technical spec 6.2, both written this revision.
-- **Open considerations, none resolved:**
-  - Provider traffic per job doubles, so a large import enriches roughly half as fast under the
-    existing shared rate limiter.
-  - `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an `isbn:` search, which is not
-    guaranteed to be the same edition. Merging its publisher or page count into an Open Library
-    edition without verifying the returned volume carries the requested ISBN13 risks attaching one
-    edition's data to another.
-  - Failure semantics change shape: Open Library succeeding while Google Books errors is a
-    successful enrichment, not a failed job.
-  - The fill-empty-only invariant is unaffected either way — merging happens before the write, and
-    the write still only touches empty columns and metadata keys.
-  - It would not necessarily fix the case that raised it: `100 años de Soledad`
-    (ISBN 9781516909629, a CreateSpace edition) needs Google Books to hold a cover for that exact
-    ISBN, which has not been checked.
-- **Related:** DEC-027, Sprint 014 Outcome, technical spec 6.2.
+- **Status:** **resolved 2026-08-11 into Sprint 019.** See DEC-035. The owner wants richer
+  metadata, including the ability to choose a cover from the editions that were actually fetched;
+  what remains undecided is whether it is affordable, which is Sprint 019's Phase A.
+- **Current behavior, unchanged until Sprint 019:** enrichment tries Open Library and consults
+  Google Books only when Open Library fails or returns nothing usable. A record that comes back
+  usable but incomplete — an edition with a year and a publisher but no cover — is accepted as-is.
+- **Subsumed:** the observation from the Sprint 016 walkthrough that a provider "image not
+  available" placeholder JPEG is accepted and stored as a real cover. The owner's read is that
+  cross-provider cover completion, if it proves viable, addresses this case — a second candidate
+  would exist to fall back to or choose. It is therefore not tracked as a separate question. If
+  Sprint 019 Phase A concludes the feature is not worth building, this resurfaces on its own and
+  needs its own answer, because a white JPEG reading "image not available" is a successful HTTP
+  response and nothing detects it.
+- **Note for whoever runs Sprint 019:** product spec 4.3 already specifies per-field completion at
+  *search* time — "prefer Open Library's record and Google Books' cover if OL has none" — and
+  `_merge_group` in `domain/providers.py` implements it there. So this may be narrowing an
+  inconsistency between search and enrichment rather than inventing a new behavior.
 
 ## Cross-sprint definition of done
 

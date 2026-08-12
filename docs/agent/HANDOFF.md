@@ -71,13 +71,15 @@ components individually, so `import { m } from "motion/react-m"` gives you `unde
 
 ## Things noticed and deliberately left
 
-- **A provider "image not available" placeholder is accepted and stored as a cover.**
-  `La invención de Morel` acquired a white JPEG reading "image not available". It arrives as a
-  successful response carrying a non-cover, and nothing in the pipeline detects that. Added to the
-  Sprint 017 roadmap entry as a question to decide, not a task to do.
-- **`100 años de Soledad` (ISBN 9781516909629) still has no cover.** `OQ-001` in
-  `docs/sprints/ROADMAP.md`, open and unassigned. Do not implement it or fold it into a sprint
-  until the owner decides.
+- **Metadata completeness is now Sprint 019, and it is gated.** The owner decided (DEC-035) that
+  richer cross-provider metadata is wanted, including choosing a cover from the editions actually
+  fetched, but that it must first prove it is affordable in provider traffic, free-tier limits, and
+  feel. Phase A measures and produces a verdict; Phase B builds only what Phase A justifies.
+  **Do not start implementing merging because the feature is "approved" — it is the assessment
+  that is approved.** Phase A is allowed to conclude it is not worth building.
+- Two long-standing observations are folded into that sprint and are no longer tracked separately:
+  a provider "image not available" placeholder JPEG stored as a real cover, and
+  `100 años de Soledad` (ISBN 9781516909629) still having no cover.
 - Entries added through the UI carry no score; the detail page shows an unset control.
 - Imports land `unsorted`, so the library looks briefly as though the import did nothing.
 

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_revision": 6,
+  "plan_revision": 7,
   "project_status": "ready",
   "active_sprint": "017",
   "active_sprint_file": "docs/sprints/017-scale-accessibility-resilience.md",
@@ -25,5 +25,5 @@
     "016"
   ],
   "started_at": "",
-  "updated_at": "2026-08-11T21:30:00-03:00"
+  "updated_at": "2026-08-11T22:10:00-03:00"
 }
