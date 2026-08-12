@@ -411,3 +411,115 @@ Append-only record of material architecture choices, product-default resolutions
   what `ScorePicker` cannot do is portal *and* satisfy the DEC-023 requirement that its expanded
   panel stay geometrically inside its card. Sprint 016 may animate portalled content without
   re-litigating this, provided both mounted-DOM bounds still hold.
+
+## DEC-030 — The Motion feature set is the guardrail, not the rule
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** Technical spec section 8 and DEC-023 forbid layout animations on virtualized rows,
+  for a reason with history: rows unmount as they scroll out and would re-animate on every return.
+  Until Sprint 016 that prohibition was a sentence in a document. Motion's `layout` and `layoutId`
+  props are one word each, and nothing in the codebase would have stopped a future agent adding
+  one to a card while implementing something else.
+- **Decision:** `AppShell` mounts `<LazyMotion features={domAnimation} strict>` and components
+  import `m` from `motion/react`. `domAnimation` deliberately omits Motion's projection features,
+  so `layout` and `layoutId` do nothing anywhere in the application — the prohibition is
+  structural, and violating it now requires changing the provider. `strict` turns an accidental
+  eager `motion.*` into a runtime error rather than a silent full-feature bundle. Two
+  `no-restricted-imports` rules back it up: the eager `motion` factory is banned everywhere, and
+  Motion is banned outright inside `VirtualLibrary.tsx`. Every timing lives in
+  `src/lib/motion.ts`; a `transition` literal in a component is a defect. Radix dialogs stay
+  CSS-animated rather than being converted, because Radix gates unmount on `animationend` and a
+  Motion version needs `forceMount` plus a hand-rolled presence bridge, putting focus trapping and
+  Escape handling at risk for no visible gain.
+- **Consequences:** Shared-layout transitions are unavailable application-wide. That is what ruled
+  out morphing the selected add-flow card into the form; it ships as a carried-identity enter
+  instead, which is also robust to the cover image not having loaded when the morph would have
+  measured it. A future sprint wanting a shared-layout transition must justify `domMax` and accept
+  that it re-arms the DEC-023 hazard.
+
+## DEC-031 — The library crossfade waits, and resets scroll
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** Technical spec section 8 requires that sort and filter changes crossfade the
+  container while rows do not animate. The container's children are absolutely positioned inside a
+  spacer sized to the virtualizer's total height, which makes a naive crossfade of two lists a
+  geometry problem rather than an opacity one.
+- **Decision:** `AnimatePresence mode="wait"`, keyed on `libraryMotionKey(filters)` — every
+  server-side filter and sort value and nothing else, so page appends and optimistic cache patches
+  never re-key. `mode="wait"` is load-bearing rather than stylistic: moving to a filter TanStack
+  already has cached resolves synchronously, and under the default mode both lists mount in the
+  same commit, producing two scroll containers and two total-size spacers, doubling both the
+  mounted-card count and the page height. `popLayout` was rejected because it requires the
+  projection features DEC-030 removes. The pending state now holds the list's height so the page
+  does not collapse between two lists.
+- **Consequences:** Scroll position resets to the top of the list on a sort or filter change. That
+  was already the behavior via the pending state, and preserving it is not meaningful anyway: the
+  offset referred to data the new query key discards. Measured at the peak of a crossfade against
+  the 5,000-entry fixture: 4 mounted rows, 16 mounted cards, exactly one container.
+
+## DEC-032 — A rolled-back write is visual state, not a second announcement
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** Product spec section 7 asks a failed optimistic write to "roll back with a shake".
+  DEC-028 established that there is exactly one confirmation channel and that a second live region
+  announcing the same sentence is a defect. Whether a shake reopens that is a real question, and
+  the honest answer decides where the treatment can live.
+- **Decision:** The failing row carries a `data-rollback` marker and a CSS-keyframe shake. It has
+  no text, no role and no live region, so the toast remains the only announcement; what the shake
+  adds is *which* row, which a bottom-right toast naming no book cannot convey. CSS keyframes
+  rather than Motion, for three reasons that all bite: the failing row may be scrolled out and
+  remounted, so the treatment must derive from a prop rather than be held against a node; jsdom has
+  no Web Animations API, so a Motion shake would be unassertable at the unit layer; and the
+  `prefers-reduced-motion` block in `index.css` already covers a CSS animation. Scope is inline
+  single-entry writes on `/` — the only optimistic writes in the application, covering both the
+  pointer and number-key paths. `DetailPage` and `TriagePage` keep their existing error surfaces; a
+  failed bulk write would shake N rows, and the object that failed is the selection, not a row.
+- **Consequences:** Prerequisite repair, found by writing the test first: the rollback restored its
+  snapshot into `["library", filters]` read from the render in scope when the write *failed*, not
+  the key the snapshot was taken from, so changing sort while a PATCH was in flight and having it
+  fail wrote one sort's list into another sort's cache. The key now travels in the mutation
+  context. Also found: `tailwindcss-animate` redefines the `duration-*` utilities to set
+  `animation-duration`, later in the cascade, so an element carrying both a `duration-*` transition
+  and an `animate-*` keyframe runs the keyframe at the transition's duration.
+
+## DEC-033 — A reduced-motion assertion is only meaningful in a pair
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** `e2e/library.spec.ts` had asserted since Sprint 004 that a card's computed
+  transition duration is effectively zero under `prefers-reduced-motion`. The card carried no
+  transition at all, so the assertion was true of a page containing no animation — it passed
+  vacuously for eleven sprints, the same shape of failure as DEC-024.
+- **Decision:** Reduced motion is proven on both sides. One test asserts that every animated
+  surface — card, container, cover, score trigger, expanded score panel, and a status listbox Radix
+  portals out of the card — reports zero transition *and* animation duration under the preference;
+  a paired test asserts the same surfaces report a non-zero duration without it. A third watches
+  every animation the browser starts across a sort change and a score commit under the preference,
+  because the `*` block in `index.css` cannot touch Motion, which drives the Web Animations API and
+  inline styles. Separately, the unit suite installs a controllable `matchMedia` and defaults every
+  test to `reduce`; tests needing the animated path opt out explicitly.
+- **Consequences:** Deleting the animation layer now fails the suite rather than passing it. The
+  unit-suite default has a second effect worth more than the first: all sixty-eight tests are a
+  standing proof that add, score, delete, triage and import remain fully usable with motion
+  disabled, at no authoring cost.
+
+## DEC-034 — The cover treatment is a decode-reveal, not a blur-up
+
+- **Date:** 2026-08-11
+- **Status:** accepted
+- **Context:** Product spec section 7 asks for "blur-up or skeleton, never layout shift" on cover
+  load. A blur-up shows a tiny low-resolution image immediately and swaps in the full one; it
+  requires the server to supply that placeholder.
+- **Decision:** The API exposes no LQIP or blurhash, and adding one is backend work outside a
+  frontend sprint, so what ships is a decode-reveal: the skeleton stays, and the real asset arrives
+  blurred and sharpens. This is named honestly in the component, here, and in the sprint Outcome
+  rather than being filed as "blur-up done". The no-layout-shift half was already structurally
+  guaranteed — the wrapper carries the caller's box and exists before a byte of the image does — so
+  it is now asserted rather than rebuilt, against a cover deliberately held back 700ms.
+- **Consequences:** If a real blur-up is wanted, it starts at the metadata boundary with a stored
+  placeholder, not in `CoverImage.tsx`. `loading="lazy"` was deliberately not added: the
+  virtualizer already bounds how many covers are mounted, and lazy loading would delay them during
+  a fast scroll, which is the pop-in this treatment exists to remove.

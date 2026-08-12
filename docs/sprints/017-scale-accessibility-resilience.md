@@ -1,6 +1,6 @@
 # Sprint 017 — Scale, accessibility, and resilience
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 016
 **Roadmap revision:** 6
 
@@ -14,7 +14,7 @@ handles errors gracefully, and has comprehensive E2E regression coverage.
 1. `AGENTS.md`
 2. `docs/specs/product-spec.md` section 6 (non-functional requirements)
 3. `docs/specs/technical-spec.md` section 12 (performance budgets) and section 13 (accessibility)
-4. `docs/decisions.md` DEC-002, DEC-018, DEC-019, DEC-022, DEC-023, and DEC-024
+4. `docs/decisions.md` DEC-002, DEC-018, DEC-019, DEC-022, DEC-023, DEC-024, and DEC-030 through DEC-034 (the Sprint 016 motion layer, including why `layout` animations are inert application-wide)
 5. Sprint 016 Outcome and `docs/agent/WORKFLOW.md`
 6. Existing `frontend/src/` test infrastructure and `frontend/e2e/` test suite
 

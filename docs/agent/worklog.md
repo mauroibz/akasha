@@ -492,3 +492,73 @@ commit because the e2e rewrite is not separable from the DOM change that forces 
 zero times. It starts from a token layer rather than a blank page, and must decide which Radix
 enter/exit transitions to keep before adding its own. Re-assert both DEC-023 bounds with animation
 enabled; current headroom is 7/20 rows and 28/48 cards.
+
+## 2026-08-11 — Sprint 016 (complete)
+
+**Done:** Motion is imported for the first time since it became a dependency in Sprint 004. Seven
+commits, `6bb995c`..`f218578`; per-criterion evidence in the sprint Outcome.
+
+**Verified and how:**
+- `python scripts/validate_project.py`, `make format`, `make check`, `make test` = backend **154** /
+  frontend **68**, `make build`, `git diff --check` clean.
+- Chromium e2e **53 passed / 2 skipped** (the two skips are `live-metadata.spec.ts` behind
+  `LIVE_METADATA_MODE`). Frontend unit 51 -> 68, e2e 44 -> 53.
+- Walkthrough against a real backend on `:8100` with the owner's key, both providers available, and
+  a **throwaway data directory** — the owner's `data/` was not touched. 30-row Goodreads CSV,
+  Chromium at 375/768/1440, 25 screenshots, plus a full second pass under reduced motion.
+
+**Measurements worth not re-deriving:**
+- DEC-023 at rest against the 5,000-entry fixture: 7 rows / 28 cards (bounds 20 / 48). At the peak
+  of a crossfade: 4 rows / 16 cards / exactly **1** container. Both printed on every e2e run.
+- Real library: 1/2/4 columns at 375/768/1440, 4/5/5 rows, 4/10/20 cards.
+- Score ramp measured in the browser: unscored `rgb(161,161,170)`, hover 2 `rgb(248,113,113)`,
+  hover 9 `rgb(53,211,153)`. The trigger previews the band; the number keeps showing the committed
+  value.
+- Reduced motion: 522 animations observed across sorts, a commit and a search; **none** above 0.01s.
+- Bundle **696.24 kB** JS / 219.66 kB gzip / 36.88 kB CSS. +86 kB on Sprint 015, roughly double
+  Sprint 013. More than the contract's 30-45 kB estimate; flagged to Sprint 017.
+
+**Dead ends and things a later session should not rediscover:**
+- `m` is exported from `motion/react`, not from `motion/react-m`. The `react-m` subpath exports the
+  tag components individually (`button`, `div`, …), so `import { m } from "motion/react-m"` yields
+  `undefined` and fails at `m.button`.
+- `m` and `useAnimationControls` work fine outside a `LazyMotion` provider: features are simply not
+  loaded, so nothing animates. That is what lets component tests render in isolation.
+- `tailwindcss-animate` **redefines the `duration-*` utilities to set `animation-duration`**, later
+  in the cascade than the core transition-duration rule. A card carrying both `duration-500` for a
+  transition and `animate-shake` ran the shake at 500ms. Use `[transition-duration:...]` when both
+  live on one element. Found by an e2e assertion on the computed duration, not by looking.
+- Motion's `useReducedMotion` is one-shot per component and reads a module global kept current only
+  by a `change` event, so `setPrefersReducedMotion` must be called **before** `render` and must
+  dispatch the event. With `matchMedia` absent entirely, Motion's fallback is "animations allowed".
+- The non-compact `ScorePicker` replaces its trigger with the panel while open, so a test asserting
+  the trigger recolours on hover must use `compact`.
+- A raw `element.focus()` in a unit test is not act-wrapped, so React never flushes the resulting
+  state before the assertion. Wrap it.
+- `node_modules` was found materially incomplete at session start (`lucide-react`, `sonner`, `zod`
+  and others absent) and `npm ci` was needed before anything typechecked. Not caused by any change
+  in this sprint.
+- The walkthrough's own scaffolding cost two false starts: the import page needs `Preview import`
+  clicked before the commit button exists, and provider search takes ~5s, so a 4s wait reports zero
+  results.
+
+**Observed, out of scope, left alone:**
+- Several walkthrough covers are wrong (a Mariana Enriquez title showing a Luisgé Martín cover).
+  **This is the fixture, not the app**: the ISBN13s in that CSV were invented for the pass and
+  resolve to real but unrelated editions. Do not chase it.
+- A provider "image not available" placeholder JPEG is accepted and stored as a cover
+  (`La invención de Morel`). It arrives as a successful response carrying a non-cover and nothing
+  detects that. Added to the Sprint 017 roadmap entry as something to decide.
+- The edition-year truncation and the triage `6·` cell are both still present, as recorded.
+- Entries added through the UI still carry no score.
+
+**Deviations:** DEC-030 through DEC-034. Two deliverables ship narrower than the contract's wording
+and are named as such rather than quietly redefined: the cover treatment is a decode-reveal rather
+than a blur-up (no server-side LQIP exists), and the add-flow selection is a carried-identity enter
+rather than a shared-layout morph (projection is deliberately unavailable, and the source cover may
+not have loaded). One prerequisite repair: the optimistic rollback restored its snapshot into the
+query key on screen at failure time rather than the key it snapshotted.
+
+**Next:** Sprint 017 (scale, accessibility, resilience) — status `ready`. It inherits a 696 kB
+bundle and now owns that decision with a sharper number, a reusable animation sampler at
+`frontend/e2e/motion.ts`, and a unit suite that already runs under reduced motion.
