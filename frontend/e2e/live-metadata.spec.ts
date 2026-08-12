@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./console";
 import { readFileSync, writeFileSync } from "node:fs";
 
 const mode = process.env.LIVE_METADATA_MODE;

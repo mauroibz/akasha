@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
 import { chooseOption } from "./radix";
@@ -326,4 +326,92 @@ test("the bulk action bar enters without animating a single row", async ({
     (sample) => sample.target === "row" || sample.target === "card",
   );
   expect(rowLevel, JSON.stringify(rowLevel.slice(0, 5))).toEqual([]);
+});
+
+test("digits score the focused row and Enter opens it", async ({ page }) => {
+  // The MAL-style rhythm from product spec section 7: move, score, commit,
+  // advance. `j`/`k` and the status letters were already covered; the digits
+  // and Enter were not.
+  const entries = makeEntries(5);
+  const bulkBodies: unknown[] = [];
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: 5,
+        facets: { status_counts: { unsorted: 5 } },
+      },
+    }),
+  );
+  await page.route("**/api/entries/bulk", (route) => {
+    bulkBodies.push(route.request().postDataJSON());
+    return route.fulfill({ json: { affected: 1 } });
+  });
+  await page.route("**/api/entries/2", (route) =>
+    route.fulfill({ json: { ...entries[1], item: entries[1].item } }),
+  );
+
+  await page.goto("/triage");
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+  await page.locator('[data-entry-id="1"]').focus();
+
+  await page.keyboard.press("8");
+  await expect
+    .poll(() => bulkBodies.at(-1))
+    .toEqual({ entry_ids: [1], set: { score: 8 } });
+
+  // `0` is ten, and only in score context.
+  await page.keyboard.press("0");
+  await expect
+    .poll(() => bulkBodies.at(-1))
+    .toEqual({ entry_ids: [1], set: { score: 10 } });
+
+  // With nothing selected, Enter opens the focused row rather than advancing.
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL("/books/1");
+});
+
+test("triage animates its action bar but not under reduced motion", async ({
+  page,
+}) => {
+  // DEC-033: a reduced-motion assertion only means something paired with a
+  // positive one. Sprint 016 proved this for the library; triage is the other
+  // surface with an entering element.
+  const entries = makeEntries(8);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: 8,
+        facets: { status_counts: { unsorted: 8 } },
+      },
+    }),
+  );
+
+  await page.goto("/triage");
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+  const moving = await sampleAnimations(page, async () => {
+    await page.locator('[data-entry-id="1"]').click();
+    await expect(
+      page.getByRole("combobox", { name: "Set status for selected" }),
+    ).toBeVisible();
+  });
+  expect(
+    moving.some((sample) => sample.duration > 0.01),
+    JSON.stringify(moving.slice(0, 5)),
+  ).toBe(true);
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await page.reload();
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+  const still = await sampleAnimations(page, async () => {
+    await page.locator('[data-entry-id="1"]').click();
+    await expect(
+      page.getByRole("combobox", { name: "Set status for selected" }),
+    ).toBeVisible();
+  });
+  const long = still.filter((sample) => sample.duration > 0.01);
+  expect(long, JSON.stringify(long.slice(0, 5))).toEqual([]);
 });
