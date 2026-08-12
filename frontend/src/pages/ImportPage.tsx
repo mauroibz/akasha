@@ -12,7 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   commitGoodreads,
   commitCalibre,
@@ -85,41 +85,42 @@ export function ImportPage() {
               calibre
             </TabsTrigger>
           </TabsList>
-        </Tabs>
-      )}
-      {!preview && (
-        <form
-          className="mt-8 space-y-5 rounded-2xl bg-surface p-5"
-          onSubmit={(event) => {
-            event.preventDefault();
-            if (source === "goodreads" && !file) return;
-            if (source === "calibre" && !libraryPath.trim()) return;
-            setPending(true);
-            setError("");
-            const request =
-              source === "goodreads"
-                ? previewGoodreads(file as File)
-                : previewCalibre(libraryPath.trim());
-            void request
-              .then(setPreview)
-              .catch((reason: Error) => setError(reason.message))
-              .finally(() => setPending(false));
-          }}
-        >
-          {source === "goodreads" ? (
-            <div className="block">
-              <Label htmlFor="goodreads-csv">Goodreads CSV</Label>
-              <Input
-                id="goodreads-csv"
-                autoFocus
-                className="mt-1 h-11 py-2"
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-              />
-            </div>
-          ) : (
-            <>
+          {/* The panel each trigger names has to exist. Without it Radix still
+              writes `aria-controls` pointing at nothing, which axe reports as a
+              critical invalid attribute value and which leaves a screen reader
+              unable to reach the fields the tab just switched to (DEC-038). */}
+          <form
+            className="mt-8 space-y-5 rounded-2xl bg-surface p-5"
+            onSubmit={(event) => {
+              event.preventDefault();
+              if (source === "goodreads" && !file) return;
+              if (source === "calibre" && !libraryPath.trim()) return;
+              setPending(true);
+              setError("");
+              const request =
+                source === "goodreads"
+                  ? previewGoodreads(file as File)
+                  : previewCalibre(libraryPath.trim());
+              void request
+                .then(setPreview)
+                .catch((reason: Error) => setError(reason.message))
+                .finally(() => setPending(false));
+            }}
+          >
+            <TabsContent value="goodreads" className="mt-0">
+              <div className="block">
+                <Label htmlFor="goodreads-csv">Goodreads CSV</Label>
+                <Input
+                  id="goodreads-csv"
+                  autoFocus
+                  className="mt-1 h-11 py-2"
+                  type="file"
+                  accept=".csv,text/csv"
+                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
+                />
+              </div>
+            </TabsContent>
+            <TabsContent value="calibre" className="mt-0 space-y-5">
               <p className="rounded-xl bg-surface-raised p-4 text-sm text-foreground">
                 Akasha opens this library read-only inside the configured
                 Calibre mount. Enter a relative folder only; absolute paths and
@@ -137,21 +138,22 @@ export function ImportPage() {
                   onChange={(event) => setLibraryPath(event.target.value)}
                 />
               </div>
-            </>
-          )}
-          <Button
-            className="rounded-full px-5"
-            disabled={
-              pending || (source === "goodreads" ? !file : !libraryPath.trim())
-            }
-          >
-            {pending
-              ? "Reading source…"
-              : source === "calibre"
-                ? "Preview Calibre library"
-                : "Preview import"}
-          </Button>
-        </form>
+            </TabsContent>
+            <Button
+              className="rounded-full px-5"
+              disabled={
+                pending ||
+                (source === "goodreads" ? !file : !libraryPath.trim())
+              }
+            >
+              {pending
+                ? "Reading source…"
+                : source === "calibre"
+                  ? "Preview Calibre library"
+                  : "Preview import"}
+            </Button>
+          </form>
+        </Tabs>
       )}
       {error && (
         <p className="mt-4 text-destructive" role="alert">

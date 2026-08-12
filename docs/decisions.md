@@ -612,3 +612,35 @@ Append-only record of material architecture choices, product-default resolutions
   limit is the regression guard: raising it to accommodate the next 696 kB bundle would be a
   visible, arguable act rather than a silent one. Route transitions can now show a brief loading
   state, so E2E navigation assertions must address content rather than assume synchronous mounts.
+
+## DEC-038 — Both list surfaces are feeds of articles, not ARIA tables
+
+- **Date:** 2026-08-12
+- **Status:** accepted
+- **Context:** Sprint 017 added `@axe-core/playwright` checks to the Chromium suite and they failed
+  immediately on three screens. The library in compact view declared `role="table"` over
+  `role="row"` elements containing no cells, and `/triage` did the same; axe reports that as a
+  **critical** `aria-required-children` failure, and a screen reader given a table it cannot
+  navigate is worse off than one given a list. The cover placeholder carried `aria-label` on a bare
+  `<div>` (`aria-prohibited-attr`, serious): ARIA ignores the attribute on a generic element, so
+  "No cover" was written but never announced. The import page rendered `TabsList` with no
+  `TabsContent` at all, so every tab's `aria-controls` pointed at an element that did not exist
+  (`aria-valid-attr-value`, critical) and the fields a tab switched to were associated with
+  nothing.
+- **Decision:** Neither list was ever tabular — no column headers, no cells, a checkbox and a
+  cover and a control row. Both become `role="feed"` with `article` children, which is the role
+  ARIA defines for a scrollable, virtualized, incrementally-loaded list. Each article carries
+  `aria-posinset` and `aria-setsize` from the server-side total, so a mounted window of 28 cards
+  out of 10,000 announces where it sits instead of announcing nothing; the feed carries
+  `aria-busy` while a page is in flight. The cover placeholder takes `role="img"`, making its
+  label legal and audible. The import tabs get real `TabsContent` panels inside the form, one per
+  source.
+- **Consequences:** Twelve axe checks gate CI alongside the layout regressions — library grid,
+  library compact, the score-picker overlay open inside its card, triage, triage with a selection,
+  detail, the opinion dialog, add, the manual form, the degraded-provider notice, import, and
+  shelves — asserting zero `serious` or `critical` violations under WCAG 2.0/2.1 A and AA. Lesser
+  impacts are printed rather than failed, so a severity change in a future axe release cannot break
+  an unrelated change; at adoption there were none of those either. Tests that addressed
+  `role="table"` now address `role="feed"`. axe covers only what is computable from the rendered
+  tree, so the keyboard and focus half of the acceptance criterion stays a hand-walked checklist
+  recorded in the worklog.

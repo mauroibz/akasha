@@ -136,6 +136,7 @@ export function DetailPage() {
           ) : (
             <div
               className="aspect-[2/3] rounded-xl bg-surface-raised"
+              role="img"
               aria-label="No cover"
             />
           )}

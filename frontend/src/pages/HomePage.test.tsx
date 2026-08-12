@@ -136,7 +136,13 @@ test("persists the compact table preference", async () => {
   await screen.findByText("Rayuela");
   await user.click(screen.getByRole("button", { name: "Table view" }));
   expect(localStorage.getItem("akasha.library.view")).toBe("table");
-  expect(screen.getByRole("table", { name: "Library" })).toBeVisible();
+  // Both densities are a feed of articles. The compact view used to claim
+  // `role="table"` over rows that contained no cells (DEC-038), so what is
+  // asserted here is the preference and the density, not a table.
+  expect(screen.getByRole("feed", { name: "Library" })).toBeVisible();
+  expect(screen.getByRole("article", { name: "Rayuela" }).className).toContain(
+    "items-center",
+  );
 });
 
 test("optimistically clears provisional score styling and rolls back with an announcement", async () => {

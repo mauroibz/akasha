@@ -465,6 +465,7 @@ export function HomePage() {
           >
             <VirtualLibrary
               entries={entries}
+              total={firstPage?.total ?? entries.length}
               view={view}
               focusedId={focusedId}
               highlightId={highlightId}

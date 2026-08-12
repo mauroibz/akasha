@@ -16,6 +16,8 @@ import {
 
 interface VirtualLibraryProps {
   entries: LibraryEntry[];
+  /** Server-side match count, so a feed item can say which of how many it is. */
+  total: number;
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
   focusedId: number | null;
@@ -171,7 +173,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
     });
   }, [columns, props.entries, props.focusedId, virtualizer]);
 
-  const renderEntry = (entry: LibraryEntry) => {
+  const renderEntry = (entry: LibraryEntry, position: number) => {
     const isHighlighted = props.highlightId === entry.id;
     const isRolledBack = props.rollbackId === entry.id;
     // The ring fades rather than vanishing, so the eye is handed back to the
@@ -204,7 +206,13 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
             void navigate(`/books/${entry.id}`);
           }
         }}
-        role={isGrid ? undefined : "row"}
+        // Both views are the same list of entries at two densities, so both
+        // are a feed of articles. Table mode used to claim `role="row"` inside
+        // `role="table"` with no cells beneath it, which axe reports as a
+        // critical `aria-required-children` failure and which gave a screen
+        // reader a table it could not navigate (DEC-038).
+        aria-posinset={position}
+        aria-setsize={props.total}
         tabIndex={0}
       >
         <button
@@ -238,8 +246,9 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
     <div
       ref={parentRef}
       className="library-scroll mt-5 h-[min(70vh,760px)] overflow-y-auto overflow-x-hidden rounded-2xl bg-surface/40"
-      role={isGrid ? "feed" : "table"}
+      role="feed"
       aria-label="Library"
+      aria-busy={props.isFetchingNextPage}
       data-mounted-count={mountedRows.length}
       data-columns={columns}
     >
@@ -278,7 +287,12 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                     : { height: row.size }
                 }
               >
-                {rowEntries.map(renderEntry)}
+                {rowEntries.map((entry, column) =>
+                  // A virtualized feed mounts a window, so without an explicit
+                  // position a screen reader announces "article" with no idea
+                  // where in ten thousand it sits.
+                  renderEntry(entry, row.index * columns + column + 1),
+                )}
               </div>
             </div>
           );

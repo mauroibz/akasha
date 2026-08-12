@@ -25,6 +25,10 @@ export function CoverImage({
           "flex items-center justify-center rounded bg-surface-raised",
           placeholderClassName ?? className,
         )}
+        // `role="img"` is what makes the label legal and legible: ARIA
+        // prohibits `aria-label` on a generic element, so without it axe
+        // reports the attribute and a screen reader ignores it.
+        role="img"
         aria-label={!src ? "No cover" : "Cover failed to load"}
       >
         <svg

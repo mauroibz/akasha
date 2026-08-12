@@ -539,8 +539,11 @@ export function TriagePage() {
           <div
             ref={parentRef}
             className="triage-scroll mt-4 h-[min(70vh,760px)] overflow-auto rounded-2xl bg-surface/40"
-            role="table"
-            aria-label="Triage table"
+            // A feed, not a table: these rows carry no column headers and no
+            // cells, so `role="table"` promised a structure that was not there
+            // and axe reported the missing children as critical (DEC-038).
+            role="feed"
+            aria-label="Triage inbox"
           >
             <div
               className="relative w-full"
@@ -556,7 +559,9 @@ export function TriagePage() {
                     data-entry-id={entry.id}
                     data-selected={selected}
                     data-provisional={entry.score_provisional}
-                    role="row"
+                    role="article"
+                    aria-posinset={row.index + 1}
+                    aria-setsize={firstPage?.total ?? entries.length}
                     tabIndex={0}
                     className={`absolute left-0 top-0 flex w-full items-center gap-3 border-b border-border px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${selected ? "bg-primary/10" : ""}`}
                     style={{

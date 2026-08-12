@@ -107,9 +107,7 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   // Table mode is the other half of DEC-023: one entry per row, so the card
   // bound and the row bound coincide there and both still have to hold.
   await page.getByRole("button", { name: "Table view" }).click();
-  // Table mode renders the same container as `role="table"`, so the grid
-  // locator does not survive the switch.
-  const table = page.getByRole("table", { name: "Library" });
+  const table = page.getByRole("feed", { name: "Library" });
   await expect(page.locator("[data-entry-id]").first()).toBeVisible();
   await table.evaluate((element) => {
     element.scrollTop = 120_000;
@@ -617,9 +615,9 @@ test("grid and table views both keep inline editing, navigation and persistence"
   await expectSelected(card.getByRole("combobox"), "Reading");
 
   await page.getByRole("button", { name: "Table view" }).click();
-  await expect(page.getByRole("table", { name: "Library" })).toBeVisible();
+  await expect(page.getByRole("feed", { name: "Library" })).toBeVisible();
   await page.reload();
-  await expect(page.getByRole("table", { name: "Library" })).toBeVisible();
+  await expect(page.getByRole("feed", { name: "Library" })).toBeVisible();
 
   await page.getByRole("button", { name: "Grid view" }).click();
   await expect(page.getByRole("feed", { name: "Library" })).toBeVisible();
