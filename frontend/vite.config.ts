@@ -28,6 +28,25 @@ export default defineConfig({
       "zod",
     ],
   },
+  build: {
+    rollupOptions: {
+      output: {
+        // Split by change rate, not by size. The framework and data layers
+        // barely move between sprints, so a browser that has them cached keeps
+        // them across a deploy that only touched application code.
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          query: ["@tanstack/react-query", "@tanstack/react-virtual"],
+          motion: ["motion", "motion/react"],
+          forms: ["react-hook-form", "@hookform/resolvers/zod", "zod"],
+        },
+      },
+    },
+    // Deliberately below Rollup's 500 kB default rather than above it: the point
+    // of the split is that no chunk should approach the old 696 kB again, and a
+    // limit raised to accommodate a regression would not notice one (DEC-037).
+    chunkSizeWarningLimit: 300,
+  },
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     proxy: {

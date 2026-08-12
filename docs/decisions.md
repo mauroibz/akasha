@@ -588,3 +588,27 @@ Append-only record of material architecture choices, product-default resolutions
   is deleting per-row UDF calls. The projection's contents are pinned to `normalize_text`'s current
   behaviour; changing that function requires a new migration to re-backfill, and
   `test_persistence.py` fails if the two ever disagree.
+
+## DEC-037 — Route-level code splitting, and a lowered chunk warning
+
+- **Date:** 2026-08-12
+- **Status:** accepted
+- **Context:** Sprint 016 closed with a single 696.24 kB JavaScript bundle (219.66 kB gzip), up
+  86 kB on Sprint 015 and roughly double the Sprint 013 baseline, with Rollup's chunk-size warning
+  emitted on every build. Sprint 017 was handed the decision with the number attached: split, or
+  raise the limit and say why. The deployment target is a ZimaBoard on a LAN with a documented
+  first-library-page budget of 500 ms, and every cold load was parsing all 696 kB before rendering
+  a screen that uses a fraction of it.
+- **Decision:** Split, and lower the warning rather than raise it. `/` stays in the entry chunk
+  because it is the screen the application opens on; `/add`, `/books/:id`, `/import`, `/shelves`,
+  and `/triage` are `React.lazy` and arrive on navigation, behind a `role="status"` fallback so the
+  wait is announced rather than silent. Vendor code is chunked by change rate rather than by size —
+  `react`, `query`, `motion`, `forms` — so a deploy touching only application code leaves a cached
+  browser's framework chunks valid. `build.chunkSizeWarningLimit` drops to 300 kB.
+- **Consequences:** Eager JavaScript for the first paint falls from 696.24 kB to **510.96 kB**
+  across four chunks (entry 188.54, react 169.02, motion 80.03, query 73.37), the largest single
+  chunk is 193 kB, and the build emits no warning. The 104 kB form stack — `react-hook-form`, its
+  zod resolver, and zod — no longer loads for a user who only browses their library. The lowered
+  limit is the regression guard: raising it to accommodate the next 696 kB bundle would be a
+  visible, arguable act rather than a silent one. Route transitions can now show a brief loading
+  state, so E2E navigation assertions must address content rather than assume synchronous mounts.
