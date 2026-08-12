@@ -372,7 +372,7 @@ Coverage is a diagnostic, not a target to game. Critical domain and import code 
 
 ## 11. Observability and operations
 
-Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes.
+Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes, and do not rely on call sites to remember: `logging.py` redacts a denylist of keys (notes, review, description, payload, row/record, api_key, token and kin), scrubs configured secret values out of any string so a key embedded in a logged URL cannot escape, truncates oversized values under innocent keys, and recurses into nested structures. Standard-library records are routed through the same chain, so a `logger.warning(..., extra={...})` is rendered and redacted rather than having its structured fields silently dropped.
 
 The final image runs as a non-root user, has a healthcheck, and receives signals directly. Compose mounts:
 
