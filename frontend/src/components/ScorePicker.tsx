@@ -91,7 +91,17 @@ export function ScorePicker({
         compact && "h-9 min-h-0 shrink-0 px-2 text-sm",
       )}
       aria-expanded={editing}
-      aria-label={`${label}: ${value ?? "unscored"}`}
+      // The dashed border and the dot say "provisional" to someone who already
+      // knows what they mean. Everyone else — including every screen reader —
+      // needs the word.
+      aria-label={`${label}: ${value ?? "unscored"}${
+        provisional ? " (provisional)" : ""
+      }`}
+      title={
+        provisional
+          ? "Provisional score, carried from the import. Setting a score confirms it."
+          : undefined
+      }
       data-provisional={provisional ? "true" : "false"}
       onClick={() => setEditing((open) => !open)}
     >

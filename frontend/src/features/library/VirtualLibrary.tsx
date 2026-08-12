@@ -94,7 +94,13 @@ function EntryMetadata({
           where it costs no pixels, and the years are what a reader needs. */}
       <p className={`text-xs text-muted-foreground/80 ${grid ? "mt-1" : ""}`}>
         <span className="sr-only">Edition year: </span>
-        {entry.item.year ?? "unknown"}
+        {/* A bare "unknown" under an author reads as a broken field. With a
+            year present the number speaks for itself; without one it needs the
+            noun, and "Year unknown" still fits the 88px column. */}
+        {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
+        {entry.item.year === null || entry.item.year === undefined ? (
+          <span className="sr-only">unknown</span>
+        ) : null}
         {entry.item.metadata.original_year &&
         entry.item.metadata.original_year !== entry.item.year ? (
           <>
