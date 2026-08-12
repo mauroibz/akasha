@@ -1,8 +1,8 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
+import { BrowserRouter, Route, Routes } from "react-router-dom";
 
-import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
 import { HomePage } from "@/pages/HomePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
@@ -42,26 +42,6 @@ function RouteFallback() {
   );
 }
 
-/**
- * A caught error is state about one route, so it is discarded when the route
- * changes. Keying the boundary on the pathname remounts it on navigation, which
- * means a user who hits a broken screen can leave it by clicking a nav link
- * rather than being stuck with the fallback pinned over every later page.
- */
-function RoutedErrorBoundary({ children }: { children: React.ReactNode }) {
-  const location = useLocation();
-  return (
-    <ErrorBoundary
-      key={location.pathname}
-      fallback={(error, reset) => (
-        <RouteErrorPage error={error} reset={reset} />
-      )}
-    >
-      {children}
-    </ErrorBoundary>
-  );
-}
-
 const queryClient = new QueryClient();
 
 export function App() {
@@ -69,7 +49,11 @@ export function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <AppShell>
-          <RoutedErrorBoundary>
+          <RoutedErrorBoundary
+            fallback={(error, reset) => (
+              <RouteErrorPage error={error} reset={reset} />
+            )}
+          >
             <Suspense fallback={<RouteFallback />}>
               <Routes>
                 <Route path="/" element={<HomePage />} />

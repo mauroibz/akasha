@@ -129,7 +129,8 @@ export function HomePage() {
 
   const library = useInfiniteQuery({
     queryKey: ["library", filters],
-    queryFn: ({ pageParam }) => getLibraryPage(filters, pageParam),
+    queryFn: ({ pageParam, signal }) =>
+      getLibraryPage(filters, pageParam, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
     retry: false,

@@ -124,6 +124,36 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   expect(tableCards).toBeLessThan(48);
 });
 
+test("the edition year line is readable at every width, not clipped", async ({
+  page,
+}) => {
+  // The Sprint 015 and 016 walkthroughs both recorded this line rendering as
+  // "Edition year: 201…" on library cards: a 260px card leaves its metadata
+  // column 88px once the fixed cover and padding are taken out. Measured, not
+  // eyeballed — `scrollWidth > clientWidth` is what truncation actually is.
+  await seedLibrary(page);
+  await page.goto("/");
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await expect(
+      page.getByRole("heading", { name: "Seeded book 0003" }),
+    ).toBeVisible();
+    const overflowing = await page.evaluate(() =>
+      Array.from(document.querySelectorAll("[data-card-meta] p:last-of-type"))
+        .filter((line) => line.scrollWidth > line.clientWidth + 1)
+        .map((line) => line.textContent ?? ""),
+    );
+    expect(
+      overflowing,
+      `${viewport.name}: clipped year lines ${JSON.stringify(overflowing.slice(0, 3))}`,
+    ).toEqual([]);
+  }
+  // And the label a sighted reader no longer needs is still announced.
+  await expect(
+    page.locator("[data-entry-id='3'] [data-card-meta]"),
+  ).toContainText("Edition year:");
+});
+
 test("changing sort crossfades the container and animates no row", async ({
   page,
 }) => {

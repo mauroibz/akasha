@@ -86,13 +86,20 @@ export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
   return params.toString();
 }
 
+/**
+ * The `signal` is TanStack Query's, and passing it is the whole point: changing
+ * a filter or sort abandons the previous key, and without a signal the browser
+ * kept fetching a page nobody would render, holding one of six connections
+ * while the user typed the next character (technical spec section 8).
+ */
 export async function getLibraryPage(
   filters: LibraryFilters,
   cursor?: string,
+  signal?: AbortSignal,
 ): Promise<LibraryPage> {
   const response = await fetch(
     `/api/entries?${libraryQueryString(filters, cursor)}`,
-    { headers: { Accept: "application/json" }, signal: undefined },
+    { headers: { Accept: "application/json" }, signal },
   );
   if (!response.ok) throw new Error("Your library could not be loaded");
   return (await response.json()) as LibraryPage;

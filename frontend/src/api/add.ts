@@ -42,12 +42,12 @@ async function json<T>(response: Response, message: string): Promise<T> {
   if (!response.ok) throw new Error(message);
   return response.json() as Promise<T>;
 }
-export function searchBooks(value: string) {
+export function searchBooks(value: string, signal?: AbortSignal) {
   const resolved = /^(https?:\/\/|[\dXx -]{10,17}$)/.test(value.trim());
   const route = resolved
     ? `/api/search/resolve?url=${encodeURIComponent(value.trim())}`
     : `/api/search?q=${encodeURIComponent(value.trim())}`;
-  return fetch(route, { headers: { Accept: "application/json" } }).then(
+  return fetch(route, { headers: { Accept: "application/json" }, signal }).then(
     async (response) => ({
       items: await json<SearchCandidate[]>(
         response,

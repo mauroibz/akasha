@@ -81,6 +81,94 @@ describe("AddPage", () => {
     expect(screen.getByLabelText(/^title$/i)).toHaveFocus();
   });
 
+  it("aborts a superseded search and reports no error for it", async () => {
+    // Provider search takes about five seconds against the real backend, so a
+    // second query routinely starts while the first is still open. Two things
+    // must hold: the first request is actually cancelled rather than left to
+    // run against a rate-limited free API, and its abort is never shown to the
+    // reader as a failure.
+    const signals: AbortSignal[] = [];
+    let resolveFirst: ((value: Response) => void) | undefined;
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (input, init) =>
+        new Promise<Response>((resolve) => {
+          const url = String(input);
+          if (url === "/api/shelves") return resolve(new Response("[]"));
+          if (url === "/api/health/providers")
+            return resolve(
+              new Response(JSON.stringify({ providers: [], degraded: false })),
+            );
+          signals.push(init!.signal as AbortSignal);
+          if (signals.length === 1) {
+            resolveFirst = resolve;
+            return;
+          }
+          resolve(
+            new Response(
+              JSON.stringify([
+                {
+                  source: "openlibrary",
+                  source_id: "OL2M",
+                  source_refs: [{ source: "openlibrary", source_id: "OL2M" }],
+                  title: "Second search result",
+                  subtitle: null,
+                  authors: ["Someone"],
+                  year: 1970,
+                  cover_url: null,
+                  identifiers: {},
+                  language: "es",
+                  metadata: {},
+                },
+              ]),
+              { status: 200 },
+            ),
+          );
+        }),
+    );
+    renderPage();
+    const search = screen.getByRole("searchbox", { name: /search books/i });
+    await userEvent.type(search, "first");
+    await waitFor(() => expect(signals).toHaveLength(1));
+    await userEvent.clear(search);
+    await userEvent.type(search, "second");
+    await waitFor(() => expect(signals).toHaveLength(2));
+
+    expect(signals[0].aborted).toBe(true);
+    expect(signals[1].aborted).toBe(false);
+
+    // Let the abandoned request answer late. It must change nothing.
+    resolveFirst?.(new Response("[]", { status: 200 }));
+    expect(
+      await screen.findByRole("button", { name: /Second search result/i }),
+    ).toBeVisible();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("keeps the manual escape hatch when providers fail outright", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
+      return new Response("upstream is down", { status: 502 });
+    });
+    renderPage();
+    await userEvent.type(
+      screen.getByRole("searchbox", { name: /search books/i }),
+      "Rayuela",
+    );
+    // A failed search is a dead end unless it says so and offers the way past
+    // it. Both halves are the behaviour, not just the error text.
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /providers are unavailable/i,
+    );
+    expect(screen.getByText(/still enter this book manually/i)).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: /enter manually/i }),
+    );
+    expect(screen.getByLabelText(/^title$/i)).toHaveFocus();
+  });
+
   it("submits a manual entry once and announces exact duplicates", async () => {
     const request = vi
       .spyOn(globalThis, "fetch")

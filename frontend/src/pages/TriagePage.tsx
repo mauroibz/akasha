@@ -113,7 +113,8 @@ export function TriagePage() {
 
   const library = useInfiniteQuery({
     queryKey: ["triage", filters],
-    queryFn: ({ pageParam }) => getLibraryPage(filters, pageParam),
+    queryFn: ({ pageParam, signal }) =>
+      getLibraryPage(filters, pageParam, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
     retry: false,
@@ -386,6 +387,15 @@ export function TriagePage() {
               </span>
             ) : null}
           </h1>
+          {entries.some((entry) => entry.score_provisional) ? (
+            // The bare interpunct that used to mark these read as a typo. A
+            // marker nobody can decode is not a marker.
+            <p className="mt-2 text-xs text-muted-foreground">
+              <span aria-hidden="true">*</span> a provisional score, converted
+              from an imported rating and not yet confirmed. &ldquo;Clear
+              provisional&rdquo; removes it from a selection.
+            </p>
+          ) : null}
         </div>
         <div className="flex items-center gap-3">
           {firstPage?.total ? (
@@ -617,9 +627,19 @@ export function TriagePage() {
                           ? "text-muted-foreground"
                           : scoreTextClass[scoreBand(entry.score)]
                       }`}
+                      title={
+                        entry.score_provisional
+                          ? "Provisional score, carried from the import"
+                          : undefined
+                      }
                     >
                       {entry.score ?? "—"}
-                      {entry.score_provisional ? "·" : ""}
+                      {entry.score_provisional ? (
+                        <>
+                          <span aria-hidden="true">*</span>
+                          <span className="sr-only"> (provisional)</span>
+                        </>
+                      ) : null}
                     </span>
                     <Button
                       variant="ghost"

@@ -56,17 +56,27 @@ export function AddPage() {
   const navigate = useNavigate();
   useEffect(() => {
     if (query.trim().length < 2) return setResults([]);
+    // Two guards, and both earn their place. The request id decides which
+    // response is allowed to land, so a slow first search can never overwrite a
+    // fast second one. The abort actually stops the first one: provider search
+    // takes about five seconds, so without it a few keystrokes leave several
+    // multi-second requests running against a rate-limited free API for results
+    // that will be thrown away (technical spec section 8).
     const requestId = ++searchRequestId.current;
+    const controller = new AbortController();
     const timer = window.setTimeout(() => {
       setPending(true);
       setError("");
-      void searchBooks(query)
+      void searchBooks(query, controller.signal)
         .then((value) => {
           if (searchRequestId.current !== requestId) return;
           setResults(value.items);
           setWarning(value.warning ?? "");
         })
         .catch((e: Error) => {
+          // An abort is this effect's own cleanup, not a failure the reader
+          // needs to be told about.
+          if (e.name === "AbortError") return;
           if (searchRequestId.current !== requestId) return;
           setError(e.message);
           setWarning("You can still enter this book manually.");
@@ -76,7 +86,10 @@ export function AddPage() {
           setPending(false);
         });
     }, 300);
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, [query]);
   useEffect(() => {
     void getShelves()

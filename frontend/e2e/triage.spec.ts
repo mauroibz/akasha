@@ -33,6 +33,43 @@ function makeEntries(count: number) {
   return entries;
 }
 
+test("a provisional score is marked and the marker is explained", async ({
+  page,
+}) => {
+  // The walkthrough recorded this cell rendering as a bare "6·". A marker with
+  // no legend is not a marker; it reads as a typo.
+  const entries = makeEntries(6).map((entry, index) => ({
+    ...entry,
+    score: 6,
+    score_provisional: index === 0,
+  }));
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: { status_counts: { unsorted: entries.length } },
+      },
+    }),
+  );
+  await page.goto("/triage");
+  await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
+
+  const marked = page.locator("[data-entry-id='1'][data-provisional='true']");
+  await expect(marked).toHaveCount(1);
+  await expect(marked).toContainText("6*");
+  // Screen readers get the word, not the glyph.
+  await expect(marked.getByText("(provisional)")).toHaveCount(1);
+  await expect(
+    page.getByText(/converted from an imported rating/i),
+  ).toBeVisible();
+
+  // A row that is not provisional carries neither the glyph nor the word.
+  const plain = page.locator("[data-entry-id='2']");
+  await expect(plain).not.toContainText("6*");
+});
+
 test("triage page renders and bulk-accepts suggested statuses", async ({
   page,
 }) => {

@@ -86,14 +86,24 @@ function EntryMetadata({
       >
         {entry.item.sort_author ?? "Unknown author"}
       </p>
-      <p
-        className={`text-xs text-muted-foreground/80 ${grid ? "mt-1 truncate" : ""}`}
-      >
-        Edition year: {entry.item.year ?? "unknown"}
+      {/* A grid card is 260px wide and gives its metadata column 88px once the
+          fixed cover and the padding are subtracted, so "Edition year: 2015 ·
+          Original: 1963" could only ever render as "Edition year: 201…". The
+          card box is pinned (DEC-023) and the cover cannot shrink, so the text
+          shortens and wraps instead: the label survives for screen readers,
+          where it costs no pixels, and the years are what a reader needs. */}
+      <p className={`text-xs text-muted-foreground/80 ${grid ? "mt-1" : ""}`}>
+        <span className="sr-only">Edition year: </span>
+        {entry.item.year ?? "unknown"}
         {entry.item.metadata.original_year &&
-        entry.item.metadata.original_year !== entry.item.year
-          ? ` · Original: ${entry.item.metadata.original_year}`
-          : ""}
+        entry.item.metadata.original_year !== entry.item.year ? (
+          <>
+            {" · "}
+            <span className="sr-only">originally published </span>
+            <span aria-hidden="true">orig. </span>
+            {entry.item.metadata.original_year}
+          </>
+        ) : null}
       </p>
     </div>
   );

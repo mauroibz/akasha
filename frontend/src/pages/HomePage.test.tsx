@@ -125,6 +125,44 @@ test("announces a library error and offers retry", async () => {
   expect(screen.getByRole("button", { name: "Try again" })).toBeVisible();
 });
 
+test("abandons the in-flight page when the sort changes again", async () => {
+  // Changing sort abandons the previous query key. Without a signal reaching
+  // `fetch`, the browser kept downloading a page nobody would ever render,
+  // holding one of six connections while the reader kept adjusting filters
+  // (technical spec section 8).
+  const signals: AbortSignal[] = [];
+  let hang = false;
+  vi.spyOn(globalThis, "fetch").mockImplementation(
+    async (input, init) =>
+      new Promise<Response>((resolve) => {
+        if (!String(input).startsWith("/api/entries")) {
+          return resolve(new Response("[]", { status: 200 }));
+        }
+        signals.push(init!.signal as AbortSignal);
+        // Only the sort-triggered fetches are left open; the first has to
+        // land or there is no page to interact with.
+        if (hang) return;
+        resolve(new Response(JSON.stringify(populated), { status: 200 }));
+      }),
+  );
+  renderPage();
+  await screen.findByText("Rayuela");
+  hang = true;
+
+  const user = userEvent.setup();
+  const chooseSort = async (name: string) => {
+    await user.click(screen.getByRole("combobox", { name: /sort library/i }));
+    await user.click(await screen.findByRole("option", { name }));
+  };
+  await chooseSort("Score ↓");
+  await waitFor(() => expect(signals).toHaveLength(2));
+  await chooseSort("Score ↑");
+  await waitFor(() => expect(signals).toHaveLength(3));
+
+  expect(signals[1].aborted).toBe(true);
+  expect(signals[2].aborted).toBe(false);
+});
+
 test("persists the compact table preference", async () => {
   localStorage.clear();
   vi.stubGlobal(
