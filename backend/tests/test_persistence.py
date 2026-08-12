@@ -229,7 +229,6 @@ def test_item_without_authors_projects_a_null_sort_author(tmp_path: Path) -> Non
 
 def test_projection_migration_backfills_rows_written_before_it(tmp_path: Path) -> None:
     from alembic import command
-
     from book_tracker.domain.normalization import normalize_text
 
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")

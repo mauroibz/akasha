@@ -28,9 +28,8 @@ import json
 
 import sqlalchemy as sa
 
-from book_tracker.domain.normalization import normalize_text
-
 from alembic import op
+from book_tracker.domain.normalization import normalize_text
 
 revision = "0007_normalized_sort_projection"
 down_revision = "0006_job_error_code"
@@ -67,7 +66,6 @@ def upgrade() -> None:
             ),
             updates,
         )
-
 
 
 def downgrade() -> None:
