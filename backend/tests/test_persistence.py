@@ -123,3 +123,148 @@ def test_source_primary_and_shelf_relationship_constraints(tmp_path: Path) -> No
             )
         with pytest.raises(IntegrityError):
             connection.execute(text("INSERT INTO entry_shelves(entry_id,shelf_id) VALUES(99,99)"))
+
+
+# Sprint 017 / DEC-036: the normalized sort projection.
+#
+# The columns exist so text ordering stops invoking the `normalize_text` UDF once
+# per candidate row. That only holds if their contents are indistinguishable from
+# what the UDF would have returned, so these tests pin the equivalence rather than
+# asserting the columns are merely non-empty.
+
+
+def test_normalized_projection_matches_the_domain_function_on_insert(tmp_path: Path) -> None:
+    from sqlalchemy.orm import Session
+
+    from book_tracker.domain.normalization import normalize_text
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    title = "  Cien años—de SOLEDAD! "
+    author = "García Márquez, Gabriel"
+    with Session(engine) as session:
+        session.add(
+            ItemRow(
+                type="book",
+                title=title,
+                subtitle=None,
+                year=1967,
+                cover_path=None,
+                identifiers="{}",
+                metadata_json=f'{{"authors": ["{author}"]}}',
+                created_at="now",
+                updated_at="now",
+            )
+        )
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT title_normalized, sort_author_normalized, sort_author FROM items")
+        ).one()
+    assert stored[0] == normalize_text(title)
+    assert stored[1] == normalize_text(author)
+    # The projection must track the generated column it stands in for.
+    assert stored[2] == author
+
+
+def test_normalized_projection_follows_a_later_title_and_author_change(tmp_path: Path) -> None:
+    from sqlalchemy.orm import Session
+
+    from book_tracker.domain.normalization import normalize_text
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    with Session(engine) as session:
+        item = ItemRow(
+            type="book",
+            title="Original",
+            subtitle=None,
+            year=None,
+            cover_path=None,
+            identifiers="{}",
+            metadata_json='{"authors": ["Original Author"]}',
+            created_at="now",
+            updated_at="now",
+        )
+        session.add(item)
+        session.commit()
+        item.title = "Rayuela"
+        item.metadata_json = '{"authors": ["Cortázar, Julio"]}'
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT title_normalized, sort_author_normalized FROM items")
+        ).one()
+    assert stored[0] == normalize_text("Rayuela")
+    assert stored[1] == normalize_text("Cortázar, Julio")
+
+
+def test_item_without_authors_projects_a_null_sort_author(tmp_path: Path) -> None:
+    from sqlalchemy.orm import Session
+
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    with Session(engine) as session:
+        session.add(
+            ItemRow(
+                type="book",
+                title="Anonymous",
+                subtitle=None,
+                year=None,
+                cover_path=None,
+                identifiers="{}",
+                metadata_json="{}",
+                created_at="now",
+                updated_at="now",
+            )
+        )
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT sort_author, sort_author_normalized FROM items")
+        ).one()
+    assert stored == (None, None)
+
+
+def test_projection_migration_backfills_rows_written_before_it(tmp_path: Path) -> None:
+    from alembic import command
+
+    from book_tracker.domain.normalization import normalize_text
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    config = alembic_config(configured.database_url)
+    command.upgrade(config, "0006_job_error_code")
+    engine = create_engine(configured)
+    rows = [
+        ("Pedro Páramo", '{"authors": ["Rulfo, Juan"]}'),
+        ("Ædificium", '{"authors": []}'),
+        ("Metadata that is not an object", "[]"),
+    ]
+    with engine.begin() as connection:
+        for index, (title, metadata) in enumerate(rows, start=1):
+            connection.execute(
+                text(
+                    "INSERT INTO items (id, type, title, identifiers, metadata,"
+                    " created_at, updated_at)"
+                    " VALUES (:id, 'book', :title, '{}', :metadata, 'now', 'now')"
+                ),
+                {"id": index, "title": title, "metadata": metadata},
+            )
+    command.upgrade(config, "head")
+    engine = create_engine(configured)
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT title_normalized, sort_author_normalized FROM items ORDER BY id")
+        ).all()
+    assert stored[0] == (normalize_text("Pedro Páramo"), normalize_text("Rulfo, Juan"))
+    assert stored[1] == (normalize_text("Ædificium"), None)
+    # `metadata` is only guaranteed to be JSON, not to be an object carrying
+    # authors. Such a row still gets a usable title projection instead of
+    # failing the migration for the whole library.
+    assert stored[2] == (normalize_text("Metadata that is not an object"), None)
+    command.downgrade(config, "0006_job_error_code")
+    assert "title_normalized" not in {
+        column["name"] for column in inspect(create_engine(configured)).get_columns("items")
+    }

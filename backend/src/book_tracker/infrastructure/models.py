@@ -1,5 +1,9 @@
-from sqlalchemy import Computed, ForeignKey
+import json
+
+from sqlalchemy import Computed, ForeignKey, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from book_tracker.domain.normalization import normalize_text
 
 
 class Base(DeclarativeBase):
@@ -19,8 +23,41 @@ class ItemRow(Base):
     sort_author: Mapped[str | None] = mapped_column(
         Computed("json_extract(metadata, '$.authors[0]')")
     )
+    # Sorting and filtering by text used to call the connection-level
+    # `normalize_text` UDF once per candidate row, which Sprint 017 measured at
+    # 8x the cost of an indexed column and over budget while the job queue
+    # drained. These columns hold the same values, maintained by the mapper
+    # event below rather than by a generated column: SQLite generated columns
+    # may only call built-in functions.
+    title_normalized: Mapped[str | None]
+    sort_author_normalized: Mapped[str | None]
     created_at: Mapped[str]
     updated_at: Mapped[str]
+
+
+def _first_author(metadata_json: str | None) -> str | None:
+    """Mirror `json_extract(metadata, '$.authors[0]')`, which defines `sort_author`."""
+    decoded = json.loads(metadata_json or "{}")
+    authors = decoded.get("authors") if isinstance(decoded, dict) else None
+    first = authors[0] if isinstance(authors, list) and authors else None
+    return first if isinstance(first, str) else None
+
+
+def _project_normalized_text(_mapper: object, _connection: object, item: "ItemRow") -> None:
+    """Keep the normalized projection in step with every write to an item.
+
+    Attached to the mapper rather than to each call site so a future write path
+    cannot forget it and leave a row unsortable. `sort_author` is a generated
+    column with no value on the Python object before flush, so the author is read
+    from the same JSON path the generated column uses.
+    """
+    item.title_normalized = normalize_text(item.title or "")
+    author = _first_author(item.metadata_json)
+    item.sort_author_normalized = normalize_text(author) if author else None
+
+
+event.listen(ItemRow, "before_insert", _project_normalized_text)
+event.listen(ItemRow, "before_update", _project_normalized_text)
 
 
 class ItemIdentifierRow(Base):

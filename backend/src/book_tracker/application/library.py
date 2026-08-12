@@ -338,10 +338,13 @@ class LibraryService:
             )
         if q:
             pattern = f"%{normalize_text(q)}%"
+            # The stored projection holds exactly what `normalize_text` returns
+            # (DEC-036), so filtering reads a column instead of invoking the UDF
+            # once per row.
             query = query.where(
                 or_(
-                    func.normalize_text(ItemRow.title).like(pattern),
-                    func.normalize_text(ItemRow.sort_author).like(pattern),
+                    ItemRow.title_normalized.like(pattern),
+                    ItemRow.sort_author_normalized.like(pattern),
                 )
             )
         return query
@@ -360,8 +363,8 @@ class LibraryService:
         sort_expressions = {
             "date_added": EntryRow.date_added,
             "score": EntryRow.score,
-            "title": func.normalize_text(ItemRow.title),
-            "sort_author": func.normalize_text(ItemRow.sort_author),
+            "title": ItemRow.title_normalized,
+            "sort_author": ItemRow.sort_author_normalized,
             "year": ItemRow.year,
             "date_finished": EntryRow.date_finished,
         }
@@ -418,8 +421,12 @@ class LibraryService:
                 values: dict[str, Any] = {
                     "date_added": last.date_added,
                     "score": last.score,
-                    "title": normalize_text(item.title),
-                    "sort_author": normalize_text(item.sort_author) if item.sort_author else None,
+                    # Read back the stored projection rather than recomputing it:
+                    # the cursor is compared against that column in SQL, so any
+                    # divergence between the two would silently skip or repeat a
+                    # page.
+                    "title": item.title_normalized,
+                    "sort_author": item.sort_author_normalized,
                     "year": item.year,
                     "date_finished": last.date_finished,
                 }

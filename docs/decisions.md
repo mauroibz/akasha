@@ -555,3 +555,36 @@ Append-only record of material architecture choices, product-default resolutions
   `scripts/validate_project.py` all move from 018 to 019. Plan revision is now 7. **Phase A is
   permitted to conclude that the feature is not worth its cost**, and that outcome must be reported
   plainly rather than softened into a partial implementation.
+
+## DEC-036 — Text sorting uses a stored normalized projection
+
+- **Date:** 2026-08-12
+- **Status:** accepted; supersedes the deferral in DEC-015
+- **Context:** DEC-015 registered a deterministic `normalize_text` SQLite function on every
+  connection and used it for title/first-author ordering, search, and cursor values, explicitly
+  deferring a stored projection "only if measurement shows text sorting needs it". Sprint 017
+  measured it. `scripts/benchmark_library.py` at 10,000 entries, on a developer workstation
+  considerably faster than the target ZimaBoard: first page by `title` 73.8 ms p50 idle against
+  39.4 ms for an indexed column, and **312 ms p95** with the job queue draining; `sort_author` at
+  page 26 reached **627 ms p95** and the text filter **988 ms p95**, against a documented budget of
+  500 ms (technical-spec section 1). The cause is not the plan but the call count: the UDF is a
+  Python function invoked once per candidate row, so a 10,000-row scan is 10,000 interpreter
+  round-trips inside SQLite.
+- **Decision:** Store the projection. Migration `0007_normalized_sort_projection` adds
+  `items.title_normalized` and `items.sort_author_normalized`, backfilled in Python with the domain
+  function so Alembic still depends on no application-registered SQLite function. The columns are
+  maintained by a mapper-level `before_insert`/`before_update` event in
+  `infrastructure/models.py` rather than at each call site, so a future write path cannot forget
+  them; `sort_author` is a generated column with no pre-flush value, so the event reads the author
+  from the same `$.authors[0]` JSON path the generated column uses. Ordering, the `q` filter, and
+  the cursor value all read the columns, the last of these by reading the stored value back rather
+  than recomputing it, because a divergence between cursor and column would silently skip or repeat
+  a page. The connection-level `normalize_text` registration is removed, having no remaining caller.
+- **Consequences:** Every scenario is inside budget: `title` first page 82 ms p95 contended
+  (was 312), `sort_author` page 26 78 ms (was 627), text filter 10 ms (was 988). **No index
+  accompanies the columns, and that is measured rather than forgotten**: the list query drives from
+  `entries` and reaches `items` by rowid, so SQLite builds a temp B-tree for the ORDER BY with or
+  without the leading null-bucket CASE, verified by `EXPLAIN QUERY PLAN` both ways. The entire win
+  is deleting per-row UDF calls. The projection's contents are pinned to `normalize_text`'s current
+  behaviour; changing that function requires a new migration to re-backfill, and
+  `test_persistence.py` fails if the two ever disagree.

@@ -6,11 +6,6 @@ from sqlalchemy import create_engine as sqlalchemy_create_engine
 from sqlalchemy.engine import Connection
 
 from book_tracker.config import Settings
-from book_tracker.domain.normalization import normalize_text
-
-
-def _sqlite_normalize_text(value: str | None) -> str | None:
-    return normalize_text(value) if value is not None else None
 
 
 def create_engine(settings: Settings) -> Engine:
@@ -24,9 +19,6 @@ def create_engine(settings: Settings) -> Engine:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms:d}")
         cursor.close()
-        dbapi_connection.create_function(
-            "normalize_text", 1, _sqlite_normalize_text, deterministic=True
-        )
 
     return engine
 
