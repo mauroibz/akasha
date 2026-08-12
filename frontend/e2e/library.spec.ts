@@ -7,65 +7,7 @@ import {
   sampleAnimations,
 } from "./motion";
 import { chooseOption, expectSelected } from "./radix";
-
-const pixelCover =
-  "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
-
-const longTitle =
-  "A Ludicrously Long Title About The Consequences Of Unbounded Metadata In Virtualized Grids And Their Discontents";
-const longAuthor =
-  "Vandermeer-Vandermeer de la Fuente y Castellanos de Aragón, María Purificación";
-
-function entry(id: number) {
-  return {
-    id,
-    item_id: id,
-    status: "read",
-    score: (id % 10) + 1,
-    notes: null,
-    date_added: "2026-07-22T00:00:00Z",
-    date_started: null,
-    date_finished: null,
-    reread_count: 0,
-    score_provisional: id % 3 === 0,
-    suggested_status: null,
-    item: {
-      id,
-      type: "book",
-      // The first two entries carry deliberately hostile metadata so layout
-      // assertions cover long titles/authors, and every other entry carries a
-      // real cover so both populated and empty covers are exercised.
-      title:
-        id <= 2
-          ? `${longTitle} ${String(id).padStart(4, "0")}`
-          : `Seeded book ${String(id).padStart(4, "0")}`,
-      subtitle: null,
-      year: 1900 + (id % 126),
-      sort_author: id <= 2 ? longAuthor : `Author ${id % 200}`,
-      cover_url: id % 2 === 0 ? pixelCover : null,
-      cover_path: null,
-      metadata: {},
-      identifiers: {},
-      sources: [],
-    },
-    shelves: [],
-  };
-}
-
-async function seedLibrary(page: Page) {
-  const items = Array.from({ length: 5000 }, (_, index) => entry(index + 1));
-  await page.route("**/api/entries?**", async (route) => {
-    await route.fulfill({
-      contentType: "application/json",
-      body: JSON.stringify({
-        items,
-        next_cursor: null,
-        total: 5000,
-        facets: { status_counts: { read: 5000, unsorted: 27 } },
-      }),
-    });
-  });
-}
+import { entry, pixelCover, seedLibrary } from "./seed";
 
 interface Box {
   x: number;
@@ -129,10 +71,12 @@ const viewports = [
   { name: "desktop", width: 1440, height: 900 },
 ];
 
-test("the deterministic 5,000-entry library mounts only overscanned rows", async ({
+test("the deterministic 10,000-entry library mounts only overscanned rows", async ({
   page,
 }) => {
-  await seedLibrary(page);
+  // Ten thousand is the figure the technical spec budgets against, so the
+  // mounted-DOM bounds are asserted at that size rather than at half of it.
+  await seedLibrary(page, 10_000);
   await page.goto("/");
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
@@ -156,9 +100,30 @@ test("the deterministic 5,000-entry library mounts only overscanned rows", async
   // discovering the bound only when it is breached. Adopting shadcn primitives
   // in Sprint 015 added DOM nodes per card but no cards or rows.
   console.log(
-    `mounted rows=${mountedRows} cards=${mountedCards} (DEC-023 bounds: <20 rows, <48 cards)`,
+    `grid 10k: mounted rows=${mountedRows} cards=${mountedCards} (DEC-023 bounds: <20 rows, <48 cards)`,
   );
   expect(mountedCards).toBeLessThan(48);
+
+  // Table mode is the other half of DEC-023: one entry per row, so the card
+  // bound and the row bound coincide there and both still have to hold.
+  await page.getByRole("button", { name: "Table view" }).click();
+  // Table mode renders the same container as `role="table"`, so the grid
+  // locator does not survive the switch.
+  const table = page.getByRole("table", { name: "Library" });
+  await expect(page.locator("[data-entry-id]").first()).toBeVisible();
+  await table.evaluate((element) => {
+    element.scrollTop = 120_000;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect
+    .poll(async () => Number(await table.getAttribute("data-mounted-count")))
+    .toBeLessThan(20);
+  const tableCards = await page.locator("[data-entry-id]").count();
+  const tableRows = Number(await table.getAttribute("data-mounted-count"));
+  console.log(
+    `table 10k: mounted rows=${tableRows} cards=${tableCards} (DEC-023 bounds: <20 rows, <48 cards)`,
+  );
+  expect(tableCards).toBeLessThan(48);
 });
 
 test("changing sort crossfades the container and animates no row", async ({
