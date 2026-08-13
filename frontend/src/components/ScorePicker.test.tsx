@@ -52,7 +52,7 @@ describe("ScorePicker", () => {
     const user = userEvent.setup();
     render(<ScorePicker value={2} onChange={() => {}} />);
     const trigger = screen.getByRole("button", { name: /score: 2/i });
-    expect(trigger.className).toContain("text-score-low");
+    expect(trigger.className).toContain("bg-score-low");
     await user.click(trigger);
     expect(screen.getByRole("button", { name: "Score 2" }).className).toContain(
       "bg-score-low",
@@ -73,13 +73,13 @@ describe("ScorePicker", () => {
     // Sweeping the segments recolours the trigger live, so the ramp is legible
     // before the commit rather than only after it.
     await user.hover(screen.getByRole("button", { name: "Score 9" }));
-    expect(trigger.className).toContain("text-score-top");
+    expect(trigger.className).toContain("bg-score-top");
     expect(screen.getByRole("button", { name: "Score 9" }).className).toContain(
       "bg-score-top",
     );
     expect(onChange).not.toHaveBeenCalled();
     await user.unhover(screen.getByRole("button", { name: "Score 9" }));
-    expect(trigger.className).toContain("text-score-low");
+    expect(trigger.className).toContain("bg-score-low");
     expect(trigger.textContent).toContain("2");
   });
 
@@ -91,7 +91,7 @@ describe("ScorePicker", () => {
     await act(async () =>
       screen.getByRole("button", { name: "Score 7" }).focus(),
     );
-    expect(trigger.className).toContain("text-score-high");
+    expect(trigger.className).toContain("bg-score-high");
   });
 
   it("previews the fill in the full-size picker, which has no visible trigger", async () => {
@@ -158,5 +158,43 @@ describe("ScorePicker", () => {
     expect(
       screen.queryByRole("button", { name: "Score 5" }),
     ).not.toBeInTheDocument();
+  });
+  it("fills a scored trigger and leaves an unscored one as muted text", () => {
+    // The defect this replaces: a score rendered as ramp-coloured text on a
+    // dark card, which carried the right hue and almost no weight.
+    const { rerender } = render(<ScorePicker value={9} onChange={() => {}} />);
+    const scored = screen.getByRole("button", { name: /score: 9/i });
+    expect(scored.className).toContain("bg-score-top");
+    expect(scored.className).toContain("text-background");
+
+    rerender(<ScorePicker value={null} onChange={() => {}} />);
+    const unscored = screen.getByRole("button", { name: /score: unscored/i });
+    expect(unscored.className).toContain("text-muted-foreground");
+    expect(unscored.className).not.toContain("bg-score");
+    expect(unscored.textContent).toContain("\u2014");
+  });
+
+  it("keeps the provisional marker legible against the fill it sits on", async () => {
+    // The dashed border and the dot were amber, tuned against a transparent
+    // trigger. Amber-on-amber is the 4-6 band, so both markers are knocked out
+    // in the background colour instead -- the same treatment as the numeral,
+    // which reads on all four bands. The fill is not what changes here.
+    render(<ScorePicker value={5} provisional onChange={() => {}} />);
+    const trigger = screen.getByRole("button", { name: /score: 5/i });
+    expect(trigger).toHaveAttribute("data-provisional", "true");
+    expect(trigger.className).toContain("border-dashed");
+    expect(trigger.className).toContain("border-background");
+    expect(trigger.className).not.toContain("border-primary");
+    const dot = trigger.querySelector("span[aria-hidden='true']");
+    expect(dot?.className).toContain("bg-background");
+  });
+
+  it("marks an unscored provisional entry in the accent, having no fill to sit on", () => {
+    // Nothing is filled, so the knock-out has no ground and the original
+    // accent-coloured marker is still the legible one.
+    render(<ScorePicker value={null} provisional onChange={() => {}} />);
+    const trigger = screen.getByRole("button", { name: /score: unscored/i });
+    expect(trigger.className).toContain("border-dashed");
+    expect(trigger.className).toContain("border-primary");
   });
 });

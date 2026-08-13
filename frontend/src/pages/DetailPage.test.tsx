@@ -329,4 +329,19 @@ describe("DetailPage", () => {
       screen.queryByRole("alertdialog", { name: /remove this book/i }),
     ).not.toBeInTheDocument();
   });
+  it("shows the score as a filled chip, the same treatment as the library", () => {
+    // DEC-026: the ramp means the same thing wherever the eye lands, so the
+    // detail page carries the chip rather than the coloured text it used to.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/shelves"
+        ? new Response("[]")
+        : new Response(JSON.stringify(entry)),
+    );
+    renderPage();
+    return waitFor(() => {
+      const score = document.querySelector("[data-fact='score'] span");
+      expect(score?.className).toContain("bg-score-high");
+      expect(score?.className).toContain("text-background");
+    });
+  });
 });

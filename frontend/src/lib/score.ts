@@ -39,3 +39,25 @@ export const scoreTrailClass: Record<ScoreBand, string> = {
   high: "bg-score-high/25 text-score-high",
   top: "bg-score-top/25 text-score-top",
 };
+
+/**
+ * The chip: the ramp as ground rather than as ink. A score reads at a glance
+ * from across the room, which colour-on-dark did not, and every surface that
+ * shows a score uses it — library card, triage row, detail page — so the ramp
+ * means the same thing wherever the eye lands (DEC-026).
+ *
+ * Only a real score fills. An unscored entry is an absence, not a band.
+ */
+export function scoreChipClass(score: number | null): string {
+  if (score === null) return "text-muted-foreground";
+  return scoreFillClass[scoreBand(score)];
+}
+
+/**
+ * Shared chip geometry for the read-only surfaces, so the triage row and the
+ * detail page cannot drift apart. The `ScorePicker` trigger deliberately keeps
+ * its own box: its height and padding are part of the geometry DEC-023 pins
+ * inside a virtualized card, and this is a paint change, not a layout one.
+ */
+export const scoreChipShape =
+  "inline-block rounded-md px-1.5 py-0.5 font-medium tabular-nums";

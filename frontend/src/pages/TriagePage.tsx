@@ -32,7 +32,8 @@ import {
 } from "@/components/ui/select";
 import { chooseableStatuses } from "@/features/library/labels";
 import { useMotionPresets } from "@/lib/motion";
-import { scoreBand, scoreTextClass } from "@/lib/score";
+import { cn } from "@/lib/utils";
+import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import {
   isEditableTarget,
   mergeUniqueEntries,
@@ -622,11 +623,12 @@ export function TriagePage() {
                       </span>
                     )}
                     <span
-                      className={`shrink-0 text-xs font-medium ${
-                        entry.score === null
-                          ? "text-muted-foreground"
-                          : scoreTextClass[scoreBand(entry.score)]
-                      }`}
+                      className={cn(
+                        scoreChipShape,
+                        scoreChipClass(entry.score),
+                        "shrink-0 text-xs",
+                        entry.score === null && "px-0",
+                      )}
                       title={
                         entry.score_provisional
                           ? "Provisional score, carried from the import"

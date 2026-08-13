@@ -30,7 +30,7 @@ import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
 import { optionalInt, splitList } from "@/features/detail/schemas";
 import { statusLabels } from "@/features/library/labels";
-import { scoreBand, scoreTextClass } from "@/lib/score";
+import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 /** One term/definition pair, addressable by name instead of by CSS adjacency. */
@@ -190,11 +190,13 @@ export function DetailPage() {
               </Fact>
               <Fact name="score" label="Score">
                 <span
-                  className={
-                    entry.score === null
-                      ? "text-muted-foreground"
-                      : `font-medium ${scoreTextClass[scoreBand(entry.score)]}`
-                  }
+                  className={cn(
+                    scoreChipShape,
+                    scoreChipClass(entry.score),
+                    // Nothing to fill, so nothing to pad: an absent score is a
+                    // dash, not an empty chip.
+                    entry.score === null && "px-0",
+                  )}
                 >
                   {entry.score ?? "—"}
                 </span>

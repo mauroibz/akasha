@@ -68,6 +68,15 @@ test("a provisional score is marked and the marker is explained", async ({
   // A row that is not provisional carries neither the glyph nor the word.
   const plain = page.locator("[data-entry-id='2']");
   await expect(plain).not.toContainText("6*");
+
+  // The score is a filled chip here exactly as it is on a library card: one
+  // ramp, one treatment, whichever screen the eye lands on (DEC-026). Asserted
+  // as painted colour rather than as a class name, because the class only
+  // matters if Tailwind emitted it.
+  const chip = plain.locator("span", { hasText: /^6$/ }).first();
+  // Amber, the 4-6 band -- not the lime of 7-8.
+  await expect(chip).toHaveCSS("background-color", "rgb(251, 189, 35)");
+  await expect(chip).toHaveCSS("color", "rgb(9, 9, 11)");
 });
 
 test("triage page renders and bulk-accepts suggested statuses", async ({

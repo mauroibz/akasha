@@ -5,8 +5,8 @@ import { useMotionPresets } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import {
   scoreBand,
+  scoreChipClass,
   scoreFillClass,
-  scoreTextClass,
   scoreTrailClass,
 } from "@/lib/score";
 
@@ -83,11 +83,17 @@ export function ScorePicker({
         "min-h-11 rounded-lg border px-3 text-center font-medium transition-colors focus-ring",
         // A provisional score is an import's guess, not the owner's verdict, so
         // it is marked by an unfinished-looking border rather than by a colour
-        // that would collide with the ramp.
-        provisional ? "border-dashed border-primary/60" : "border-border",
-        shown === null
-          ? "text-muted-foreground"
-          : scoreTextClass[scoreBand(shown)],
+        // that would collide with the ramp. On a filled chip that border is
+        // knocked out of the fill, the way the numeral is: the accent is amber,
+        // and amber is the 4-6 band, so accent-on-fill disappears exactly where
+        // a reader most needs to see it. With no score there is no fill to knock
+        // out of, and the accent is the legible choice.
+        provisional
+          ? shown === null
+            ? "border-dashed border-primary/60"
+            : "border-dashed border-background/80"
+          : "border-border",
+        scoreChipClass(shown),
         compact && "h-9 min-h-0 shrink-0 px-2 text-sm",
       )}
       aria-expanded={editing}
@@ -109,7 +115,10 @@ export function ScorePicker({
       {provisional && (
         <span
           aria-hidden="true"
-          className="ml-1 inline-block h-1.5 w-1.5 rounded-full bg-primary"
+          className={cn(
+            "ml-1 inline-block h-1.5 w-1.5 rounded-full",
+            value === null ? "bg-primary" : "bg-background",
+          )}
         />
       )}
     </m.button>

@@ -1,6 +1,6 @@
 # Sprint 019 — Post-v1 polish and ledger clearing
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 018
 **Roadmap revision:** 8
 
