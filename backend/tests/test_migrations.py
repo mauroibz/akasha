@@ -15,7 +15,7 @@ import pytest
 from book_tracker.application.library import LibraryService
 from book_tracker.backup import read_manifest, verify_backup
 from book_tracker.config import Settings
-from book_tracker.main import create_app
+from book_tracker.main import _back_up_before_migrating, create_app
 from book_tracker.migrations import alembic_config, pending_revisions, upgrade
 
 PRE_PROJECTION = "0006_job_error_code"
@@ -238,3 +238,26 @@ def test_the_backfill_reaches_rows_written_before_the_projection_existed(tmp_pat
         ("Zurita", "zurita", "zoe valdes"),
         ("Ébano", "ebano", "ernesto sabato"),
     ]
+
+
+@pytest.mark.anyio
+async def test_a_failing_migration_does_not_write_a_backup_per_restart(tmp_path: Path) -> None:
+    """`restart: unless-stopped` turns a failing migration into a loop.
+
+    Sprint 018's upgrade drill produced six identical pre-migration backups in
+    eleven seconds. Nightly retention is scoped by label and never prunes these,
+    so a loop would fill the disk with copies of the same database.
+    """
+    configured = database_at(tmp_path / "data", PRE_PROJECTION)
+    seed_accented_library(configured.data_dir / "books.db")
+    app = create_app(configured)
+    assert configured.backup_dir is not None
+
+    for _ in range(3):
+        _back_up_before_migrating(configured)
+
+    backups = list(configured.backup_dir.glob("pre-migration-*"))
+    assert len(backups) == 1
+    # Still the copy taken before the first attempt, which is the useful one.
+    assert verify_backup(backups[0])["alembic_revision"] == PRE_PROJECTION
+    assert app is not None

@@ -2,6 +2,23 @@ import { defineConfig } from "vitest/config";
 import react from "@vitejs/plugin-react";
 import { fileURLToPath, URL } from "node:url";
 
+const MOTION = new Set([
+  "motion",
+  "framer-motion",
+  "motion-dom",
+  "motion-utils",
+]);
+const FORMS = new Set(["react-hook-form", "zod"]);
+const UI = new Set([
+  "class-variance-authority",
+  "clsx",
+  "cmdk",
+  "lucide-react",
+  "sonner",
+  "tailwind-merge",
+  "vaul",
+]);
+
 export default defineConfig({
   plugins: [react()],
   // Pre-bundled at server start rather than discovered during the first
@@ -34,11 +51,35 @@ export default defineConfig({
         // Split by change rate, not by size. The framework and data layers
         // barely move between sprints, so a browser that has them cached keeps
         // them across a deploy that only touched application code.
-        manualChunks: {
-          react: ["react", "react-dom", "react-router-dom"],
-          query: ["@tanstack/react-query", "@tanstack/react-virtual"],
-          motion: ["motion", "motion/react"],
-          forms: ["react-hook-form", "@hookform/resolvers/zod", "zod"],
+        //
+        // This is a function and not the object form on purpose. Naming
+        // packages ("react", "react-dom") assigns only those exact entry
+        // modules; their transitive runtime — scheduler, jsx-runtime,
+        // use-sync-external-store — stays unassigned and lands wherever Rollup
+        // puts it, which produced a cycle where the react chunk imported the
+        // query chunk and React was undefined at evaluation time. The whole
+        // application rendered a blank page in every production build, and no
+        // test caught it because Playwright runs against the dev server, which
+        // does not chunk at all.
+        //
+        // Falling through to one vendor chunk means a module can never be left
+        // unassigned, so that failure cannot come back by adding a dependency.
+        // Every group below depends on vendor and nothing in vendor depends on
+        // them, which is what keeps the graph acyclic.
+        manualChunks(id: string) {
+          const match =
+            /[\\/]node_modules[\\/](@[^\\/]+[\\/][^\\/]+|[^\\/]+)/.exec(id);
+          const pkg = match?.[1]?.replace(/\\/g, "/");
+          if (pkg === undefined) return undefined;
+          // Matching on the resolved package name rather than on a substring of
+          // the path: "motion" also has to catch framer-motion, motion-dom and
+          // motion-utils, which are its transitive runtime and are what a
+          // hand-written list forgets.
+          if (MOTION.has(pkg)) return "motion";
+          if (pkg.startsWith("@tanstack/")) return "query";
+          if (FORMS.has(pkg) || pkg.startsWith("@hookform/")) return "forms";
+          if (UI.has(pkg) || pkg.startsWith("@radix-ui/")) return "ui";
+          return "vendor";
         },
       },
     },

@@ -29,7 +29,10 @@ jobs:
         working-directory: frontend
       - run: npx playwright install --with-deps chromium
         working-directory: frontend
-      - run: npm run test:e2e -- --project=chromium
+      # Both projects: chromium against the dev server, production-bundle
+      # against a real build, which is the only thing that can catch a
+      # mis-split bundle (DEC-041).
+      - run: npm run test:e2e
         working-directory: frontend
       - uses: actions/upload-artifact@v4
         if: failure()

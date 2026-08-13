@@ -6,7 +6,10 @@ artifact is refused.
 """
 
 import json
+import os
 import sqlite3
+import subprocess
+import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -278,3 +281,38 @@ def test_retention_ignores_directories_it_did_not_write(tmp_path: Path) -> None:
 
     assert enforce_retention(dest, keep=0, label="nightly") == []
     assert sorted(p.name for p in dest.iterdir()) == ["books.db", "holiday-photos"]
+
+
+def test_the_backup_cli_does_not_need_the_application_configured(tmp_path: Path) -> None:
+    """A restore happens on a bare machine, often before anything is configured.
+
+    Importing the package used to build the FastAPI app, whose Settings refuse to
+    construct in production without USER_AGENT_CONTACT, so `akasha-backup restore`
+    died on a validation error about a metadata provider.
+    """
+    data_dir = populated_data_dir(tmp_path)
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        label="nightly",
+    )
+    environment = {
+        key: value
+        for key, value in os.environ.items()
+        if key not in {"USER_AGENT_CONTACT", "GOOGLE_BOOKS_API_KEY"}
+    } | {"BOOK_TRACKER_ENVIRONMENT": "production"}
+
+    completed = subprocess.run(
+        [sys.executable, "-m", "book_tracker.backup", "verify", str(result.path)],
+        capture_output=True,
+        text=True,
+        env=environment,
+        check=False,
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "verified" in completed.stdout
+    # runpy re-executes a module that the package already imported, which used to
+    # print a RuntimeWarning into every nightly log.
+    assert "RuntimeWarning" not in completed.stderr

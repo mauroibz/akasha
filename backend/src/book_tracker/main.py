@@ -1,6 +1,7 @@
 import asyncio
 import contextlib
 import logging
+import sqlite3
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -17,7 +18,7 @@ from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.library import LibraryError
-from book_tracker.backup import BackupError, create_backup
+from book_tracker.backup import BackupError, create_backup, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
@@ -42,6 +43,33 @@ class ProviderHealth(BaseModel):
     degraded: bool
 
 
+def _current_revision(database_path: Path) -> str | None:
+    connection = sqlite3.connect(database_path)
+    try:
+        row = connection.execute("SELECT version_num FROM alembic_version").fetchone()
+    except sqlite3.DatabaseError:
+        return None
+    finally:
+        connection.close()
+    return str(row[0]) if row else None
+
+
+def _existing_pre_migration_backup(backup_dir: Path, revision: str | None) -> Path | None:
+    if revision is None or not backup_dir.is_dir():
+        return None
+    for candidate in sorted(backup_dir.iterdir()):
+        if not candidate.is_dir():
+            continue
+        manifest = read_manifest(candidate)
+        if (
+            manifest is not None
+            and manifest.get("label") == "pre-migration"
+            and manifest.get("alembic_revision") == revision
+        ):
+            return candidate
+    return None
+
+
 def _back_up_before_migrating(configured: Settings) -> None:
     """Copy an existing library before a migration touches it.
 
@@ -59,6 +87,20 @@ def _back_up_before_migrating(configured: Settings) -> None:
     if not pending:
         return
     logger = logging.getLogger(__name__)
+    current = _current_revision(database_path)
+    existing = _existing_pre_migration_backup(configured.backup_dir, current)
+    if existing is not None:
+        # `restart: unless-stopped` plus a migration that keeps failing is a
+        # loop, and this ran once per attempt: six identical copies in eleven
+        # seconds during Sprint 018's upgrade drill. Nightly retention is scoped
+        # by label and deliberately never prunes these, so the loop would fill
+        # the disk. The rollback point wanted is the one from before the first
+        # attempt anyway.
+        logger.info(
+            "pre_migration_backup_reused",
+            extra={"path": str(existing), "revision": current},
+        )
+        return
     try:
         result = create_backup(
             database_path=database_path,
