@@ -106,8 +106,14 @@ async def enrichment_providers(
     openlibrary: Mapping[str, Route] | None = None,
     google: Mapping[str, Route] | None = None,
     forbid_calls: bool = False,
+    on_request: Callable[[httpx.Request], None] | None = None,
 ) -> AsyncIterator[dict[str, Any]]:
-    """Yield real provider instances whose transports replay committed recordings."""
+    """Yield real provider instances whose transports replay committed recordings.
+
+    `on_request` observes every request the providers actually make. One enrichment is
+    not one HTTP call — an Open Library edition drags in its authors and its work — and
+    counting them is what turns a per-book cost into an import-sized one.
+    """
     from book_tracker.infrastructure.providers import (
         GoogleBooksProvider,
         OpenLibraryProvider,
@@ -118,12 +124,16 @@ async def enrichment_providers(
     clients: list[httpx.AsyncClient] = []
     try:
         if openlibrary is not None or forbid_calls:
-            transport = unreachable_transport() if forbid_calls else replay(openlibrary or {})
+            transport = (
+                unreachable_transport()
+                if forbid_calls
+                else replay(openlibrary or {}, on_request=on_request)
+            )
             client = create_provider_client(transport=transport)
             clients.append(client)
             providers["openlibrary"] = OpenLibraryProvider(client, "test@example.invalid")
         if google is not None:
-            client = create_provider_client(transport=replay(google))
+            client = create_provider_client(transport=replay(google, on_request=on_request))
             clients.append(client)
             providers["googlebooks"] = GoogleBooksProvider(client, "test-key")
         yield providers

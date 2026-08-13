@@ -43,17 +43,35 @@ from typing import Any
 BACKEND_SRC = Path(__file__).resolve().parents[1] / "backend" / "src"
 if str(BACKEND_SRC) not in sys.path:
     sys.path.insert(0, str(BACKEND_SRC))
+# The replay helper and the committed provider recordings live with the tests that own
+# them. Counting requests against a recording rather than the live API keeps this part
+# of the benchmark deterministic and free (DEC-025 forbids proving provider behaviour
+# with a mock; it does not ask us to spend quota to count requests).
+BACKEND_TESTS = Path(__file__).resolve().parents[1] / "backend" / "tests"
+if str(BACKEND_TESTS) not in sys.path:
+    sys.path.insert(0, str(BACKEND_TESTS))
 
+import httpx  # noqa: E402
+from recordings import (  # noqa: E402
+    GOOGLE_HIT,
+    OPENLIBRARY_HIT,
+    OPENLIBRARY_MISS,
+    RECORDED_ISBN,
+    enrichment_providers,
+)
 from sqlalchemy import Engine, text  # noqa: E402
 
+from book_tracker.application.enrichment import EnrichmentHandler  # noqa: E402
 from book_tracker.application.library import LibraryService  # noqa: E402
 from book_tracker.config import Settings  # noqa: E402
 from book_tracker.database import create_engine  # noqa: E402
-from book_tracker.infrastructure.jobs import JobRepository  # noqa: E402
+from book_tracker.infrastructure.jobs import JobRepository, RateLimiter  # noqa: E402
 from book_tracker.migrations import upgrade  # noqa: E402
 
 PAGE_SIZE = 100
 FIRST_PAGE_BUDGET_MS = 500.0
+# Import sizes the metadata-completeness assessment has to price (Sprint 020, Phase A).
+IMPORT_SIZES = (500, 5_000)
 SORTS = ("date_added", "score", "title", "sort_author", "year", "date_finished")
 STATUSES = ("read", "reading", "to_read", "wishlist", "dropped", "unsorted")
 
@@ -295,11 +313,15 @@ def query_plans(engine: Engine, service: LibraryService) -> list[tuple[str, list
     plans: list[tuple[str, list[str]]] = []
     for sort in SORTS:
         query = service._filtered_entries(None, (), None)  # noqa: SLF001
+        # These mirror `LibraryService._sort_column`. DEC-036 replaced the
+        # connection-level `normalize_text` UDF with stored projection columns and
+        # removed the registration; this table kept naming the function, so every run
+        # of this script has failed with `no such function: normalize_text` since.
         expression = {
             "date_added": "entries.date_added",
             "score": "entries.score",
-            "title": "normalize_text(items.title)",
-            "sort_author": "normalize_text(items.sort_author)",
+            "title": "items.title_normalized",
+            "sort_author": "items.sort_author_normalized",
             "year": "items.year",
             "date_finished": "entries.date_finished",
         }[sort]
@@ -314,7 +336,169 @@ def query_plans(engine: Engine, service: LibraryService) -> list[tuple[str, list
     return plans
 
 
-def run(count: int, iterations: int, jobs: int) -> int:
+# --------------------------------------------------------------------------------------
+# Provider requests per enrichment job (Sprint 020, Phase A)
+# --------------------------------------------------------------------------------------
+
+
+def _placeholder_jpeg() -> bytes:
+    """A real JPEG, so `prepare_cover` does image work rather than erroring early."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (400, 600), (32, 32, 32)).save(buffer, "JPEG", quality=85)
+    return buffer.getvalue()
+
+
+def _cover_transport(counter: list[httpx.Request], body: bytes) -> httpx.MockTransport:
+    """Serve any allowlisted cover URL, counting the request.
+
+    Deliberately a catch-all rather than a keyed replay: the point here is how many
+    cover requests one enrichment makes, not which bytes come back. It is therefore the
+    optimistic case — the first candidate URL always succeeds. A real run that misses
+    falls through up to three Open Library URLs before giving up, so treat the cover
+    figure below as a floor.
+    """
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        counter.append(request)
+        return httpx.Response(
+            200, content=body, headers={"content-type": "image/jpeg"}
+        )
+
+    return httpx.MockTransport(handler)
+
+
+async def _enrichment_requests(
+    data_dir: Path, scenario: str, routes: dict[str, Any]
+) -> tuple[str, int, int, list[str]]:
+    """Run one real enrichment job against recordings and count every request it makes."""
+    settings = Settings(data_dir=data_dir, user_agent_contact="benchmark@example.invalid")
+    assert settings.database_url is not None
+    upgrade(settings.database_url)
+    engine = create_engine(settings)
+    try:
+        with engine.begin() as connection:
+            item_id = connection.execute(
+                text(
+                    "INSERT INTO items"
+                    "(title,year,cover_path,identifiers,metadata,created_at,updated_at) "
+                    "VALUES(:title,NULL,NULL,'{}','{}',:now,:now) RETURNING id"
+                ),
+                {"title": "Rayuela", "now": _now_iso()},
+            ).scalar_one()
+
+        metadata_requests: list[httpx.Request] = []
+        cover_requests: list[httpx.Request] = []
+        cover_client = httpx.AsyncClient(
+            transport=_cover_transport(cover_requests, _placeholder_jpeg())
+        )
+        try:
+            async with enrichment_providers(
+                on_request=metadata_requests.append, **routes
+            ) as providers:
+                job_id = JobRepository(engine).enqueue(
+                    None, "enrich_item", {"item_id": item_id, "isbn": RECORDED_ISBN}
+                )
+                handler = EnrichmentHandler(
+                    engine,
+                    providers,
+                    rate_limiter=None,
+                    cover_client=cover_client,
+                    data_dir=data_dir,
+                )
+                result = await handler.process(job_id, datetime.now(UTC))
+        finally:
+            await cover_client.aclose()
+
+        if result["state"] != "succeeded":
+            scenario = f"{scenario} [{result['state']}]"
+        paths = [str(request.url.path) for request in metadata_requests]
+        paths += [f"{request.url.host}{request.url.path}" for request in cover_requests]
+        return scenario, len(metadata_requests), len(cover_requests), paths
+    finally:
+        engine.dispose()
+
+
+def provider_requests(latency_ms: float) -> int:
+    """Print the per-book request cost of enrichment and what it projects to.
+
+    This is the number the metadata-completeness gate turns on: today's enrichment is
+    fallback-only, so a book costs one provider's requests, and per-field completion
+    would cost both providers' on every book rather than only when the first one fails.
+    """
+    import asyncio
+
+    scenarios: list[tuple[str, dict[str, Any]]] = [
+        ("open library hit (today's common path)", {"openlibrary": OPENLIBRARY_HIT}),
+        (
+            "open library miss then google fallback",
+            {"openlibrary": OPENLIBRARY_MISS, "google": GOOGLE_HIT},
+        ),
+        (
+            "both providers consulted (per-field completion)",
+            {"openlibrary": OPENLIBRARY_HIT, "google": GOOGLE_HIT},
+        ),
+    ]
+
+    print("PROVIDER REQUESTS PER ENRICHMENT JOB")
+    print(f"  {'scenario':<46}{'metadata':>10}{'cover':>8}{'total':>8}")
+    measured: dict[str, int] = {}
+    details: list[tuple[str, list[str]]] = []
+    for scenario, routes in scenarios:
+        with tempfile.TemporaryDirectory(prefix="akasha-enrich-") as directory:
+            label, metadata, covers, paths = asyncio.run(
+                _enrichment_requests(Path(directory), scenario, routes)
+            )
+        measured[scenario] = metadata + covers
+        details.append((label, paths))
+        print(f"  {label:<46}{metadata:>10}{covers:>8}{metadata + covers:>8}")
+    print()
+    for label, paths in details:
+        print(f"  {label}")
+        for path in paths:
+            print(f"    {path}")
+    print()
+
+    # `RateLimiter` gates the whole queue, not one provider, and a job that loses the
+    # gate fails and is retried rather than sleeping. Two jobs a second is the ceiling.
+    limiter_interval = RateLimiter().min_interval.total_seconds()
+    print("PROJECTED IMPORT COST")
+    print(
+        f"  rate limiter: one job per {limiter_interval:.1f}s "
+        f"({1 / limiter_interval:.0f} books/s ceiling, whole queue not per provider)"
+    )
+    print(f"  assumed provider latency per request: {latency_ms:.0f} ms")
+    print(f"  {'scenario':<46}{'books':>8}{'requests':>10}{'floor':>12}{'network':>12}")
+    for scenario, per_book in measured.items():
+        for size in IMPORT_SIZES:
+            floor = size * limiter_interval
+            network = size * per_book * (latency_ms / 1000)
+            print(
+                f"  {scenario:<46}{size:>8}{size * per_book:>10}"
+                f"{_duration(floor):>12}{_duration(network):>12}"
+            )
+    print()
+    print(
+        "  'floor' is the rate limiter alone; 'network' is requests x latency with no\n"
+        "  concurrency. Real wall clock sits between them: enrichment jobs run one at a\n"
+        "  time through the queue, so the two do not overlap across books."
+    )
+    print()
+    return max(measured.values())
+
+
+def _duration(seconds: float) -> str:
+    if seconds < 90:
+        return f"{seconds:.0f}s"
+    if seconds < 5400:
+        return f"{seconds / 60:.1f}m"
+    return f"{seconds / 3600:.1f}h"
+
+
+def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
     with tempfile.TemporaryDirectory(prefix="akasha-benchmark-") as directory:
         data_dir = Path(directory)
         settings = Settings(data_dir=data_dir)
@@ -331,6 +515,8 @@ def run(count: int, iterations: int, jobs: int) -> int:
         print(f"database: {settings.database_url}")
         print(f"non-unsorted entries visible to the default list: {total}")
         print(f"iterations per scenario: {iterations}\n")
+
+        provider_requests(latency_ms)
 
         print("QUERY PLANS (first page, descending)")
         for sort, plan in query_plans(engine, service):
@@ -379,8 +565,19 @@ def main() -> int:
     parser.add_argument("--entries", type=int, default=10_000)
     parser.add_argument("--iterations", type=int, default=25)
     parser.add_argument("--jobs", type=int, default=200)
+    parser.add_argument(
+        "--provider-latency-ms",
+        type=float,
+        default=900.0,
+        help=(
+            "Per-request provider latency used for the import projection. The default is"
+            " a placeholder; scripts/assess_provider_completeness.py measures the real one."
+        ),
+    )
     arguments = parser.parse_args()
-    return run(arguments.entries, arguments.iterations, arguments.jobs)
+    return run(
+        arguments.entries, arguments.iterations, arguments.jobs, arguments.provider_latency_ms
+    )
 
 
 if __name__ == "__main__":
