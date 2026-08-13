@@ -1,6 +1,6 @@
 # Sprint 019 — Post-v1 polish and ledger clearing
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 018
 **Roadmap revision:** 8
 
@@ -146,5 +146,104 @@ scored library, import something, and record what you saw.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Delivered.** All five acceptance criteria met. Commits `18362c8`, `5eeed99`, `984e508` and this
+closing commit.
+
+### 1. High-contrast score chip — `18362c8`
+
+`scoreChipClass` was added to `lib/score.ts` and returns the existing `scoreFillClass` for a score
+and `text-muted-foreground` for `null`, so the collapsed `ScorePicker` trigger, the `/triage` score
+cell and the detail page's score fact all read from one function. No new token, no new colour, and
+the DEC-026 band boundaries are asserted directly in the new `lib/score.test.ts`.
+
+**All three surfaces follow the chip**, decided by the owner during planning against the alternative
+of chip-on-card-only: DEC-026's rule is that the ramp means the same thing wherever the eye lands,
+and that is now literally true. `TriagePage.tsx` and `DetailPage.tsx` share a `scoreChipShape`
+constant so they cannot drift; the picker trigger keeps its own box, because its height and padding
+are part of the geometry DEC-023 pins inside a virtualized card.
+
+**The provisional marker was re-judged and changed, as the sprint file required.** A dashed
+`border-primary/60` and a `bg-primary` dot are amber, and amber is the 4–6 band, so both markers
+vanished on exactly the scores where they matter. Both are now knocked out in `--background` like
+the numeral, and both keep the accent colour when there is no score and therefore no fill to knock
+out of. Verified against all four bands in the walkthrough: dashes and dot legible on red-400,
+amber-400, lime-400 and emerald-400.
+
+### 2. `s` on `/triage` — `5eeed99`
+
+**Retired, not implemented** — the second branch of acceptance criterion 3, chosen by the owner.
+`s` is removed from product spec section 7, which now states that shelving is not in the triage
+keyboard flow and that shelves are assigned from a book's detail page. DEC-043 records the reasoning:
+`/triage` has no shelf surface at all, so the work is an autocomplete panel with create-on-miss and
+focused-row-versus-selection semantics — a feature, not a key binding. The bulk API was already
+ready (`add_shelves`/`remove_shelves`), which is what made the surface, not the plumbing, the cost.
+
+DEC-043 also names what stays unbuilt: section 7's action-bar line still promises *Add shelves*.
+It is deliberately left unowned rather than given a sprint number the owner has not scheduled, and
+is carried in `HANDOFF.md` so it is not mistaken for delivered.
+
+### 3. Post-import affordance — `984e508`
+
+`ImportRepository.commit` now returns `unsorted_entries`, computed in its existing write session at
+**both** return paths — including the already-committed replay, which reconstructs its answer from
+the batch's persisted counters and would otherwise omit a required field on a re-commit. The count
+is deliberately not stored in `counters`: it is how many rows are waiting now, including an earlier
+import's leftovers, and freezing it would make the second import's number wrong.
+`test_commit_reports_everything_waiting_in_triage_not_only_its_own_rows` pins that by committing two
+batches and asserting `[1, 2]`.
+
+The import result panel names the count, says that the library hides unsorted books, and offers
+`Open Triage →`. The existing `role="status"` panel was reused and the toast remains the single
+confirmation channel (DEC-028); no live region was added.
+
+### Verification — commands and actual results
+
+- `python scripts/validate_project.py` — passed.
+- `make format`, `make check` — passed (lint, mypy, `openapi-check`, frontend `api:check`, validator).
+- `make test` — backend **187 passed** (186 + the new commit-count test), frontend **83 passed**
+  (74 + 4 `scoreChipClass` + 4 picker/chip + 1 detail chip).
+- `cd frontend && npm run test:e2e` — **75 passed, 2 skipped** across both Playwright projects,
+  `chromium` and `production-bundle` (DEC-041). The two skips are `live-metadata.spec.ts`.
+- `make build` — clean, no chunk-size warning.
+- `git diff --check` — clean.
+
+The DEC-023 mounted-DOM bounds tests and the axe gate both still pass, which is AC5: measured in the
+walkthrough, the picker trigger is still 36px high, a library card is still 280px, and every triage
+row is still 56px. A fill stayed a paint change.
+
+### Walkthrough
+
+Container built and run against a **copy** of the owner's library, so nothing here touched real
+data. Startup took a pre-migration backup before applying `0007` to the copy, exactly as DEC-039
+promises, and shutdown logged `Application shutdown complete`.
+
+Observed: chips filled correctly per band and, imported through a five-row Goodreads CSV spanning
+ratings 5/4/3/1/0, every band appeared as a provisional chip with a legible knock-out marker. The
+commit reported *5 books are waiting in Triage*, the link landed on `/triage` showing `Inbox 5
+unsorted`, and `Accept all suggested` then cleared it. The same score read identically on card,
+triage row and detail page. No console errors anywhere in the run.
+
+`docs/brand/screenshots/library.png` and `detail.png` recaptured from that container, framed to
+match the shots they replace.
+
+### Deviations
+
+- **`v1.0.0` was tagged**, which the sprint file listed as a question to ask rather than an action.
+  The owner said yes when asked. Annotated, local, unpushed, at `4ccf431` — the last commit before
+  this sprint, so it includes the brand and CI repairs that followed Sprint 018 and none of Sprint
+  019. `docs/operations/release-notes-v1.md` no longer says "not tagged".
+- The commit response gained a field, so this sprint moved an API contract that its plan described
+  as frontend-only work. `frontend/openapi.json` was regenerated.
+- One extra e2e assertion was added rather than a new spec: `e2e/triage.spec.ts` asserts the chip's
+  *painted* colour, since a class name only matters if Tailwind emitted it.
+
+### Impact on future sprints
+
+- **Sprint 020** is unaffected and stays gated. It inherits one new fact: `unsorted_entries` exists
+  on the commit response, so an import assessment can report triage state without a second query.
+- **Sprint 022** (creator sort) is unaffected. **Sprint 023** (export) is unaffected.
+- **Sprints 024–026**: `scoreChipClass` and `scoreChipShape` are domain-agnostic — a score is a
+  score for an album or a game — so the score surface is one of the things a second domain will not
+  need to touch. Worth confirming in 024's Phase A list rather than assuming.
+- Nothing in this sprint changed the entry model, the job runner, keyset pagination or the import
+  ledger.

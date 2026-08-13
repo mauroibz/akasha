@@ -1,6 +1,6 @@
 # Sprint 020 — Metadata completeness: viability, then build
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 019
 **Roadmap revision:** 8
 

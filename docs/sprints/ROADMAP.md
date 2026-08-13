@@ -2,7 +2,7 @@
 
 **Plan revision:** 8
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 019](019-post-v1-polish.md)
+**Active sprint:** [Sprint 020](020-metadata-completeness.md)
 
 ## Shape of the plan
 
@@ -58,8 +58,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [016](016-motion-interaction-polish.md) | Motion and interaction polish | 015 | completed |
 | [017](017-scale-accessibility-resilience.md) | Production-quality hardening | 016 | completed |
 | [018](018-container-backup-release.md) | Deployable v1 | 017 | completed |
-| [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | **ready** |
-| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | planned |
+| [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | completed |
+| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | **ready** |
 | 021 | Attachments: viability, then a narrow slice | 020 | planned |
 | 022 | Creator sort names | 020 | planned |
 | 023 | Export | 020 | planned |

@@ -1,22 +1,19 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 018 (container, backup, release), 2026-08-13.
-**Next:** Sprint 019 (post-v1 polish) — status `ready`, file at
-`docs/sprints/019-post-v1-polish.md`.
+**Last completed:** Sprint 019 (post-v1 polish), 2026-08-13.
+**Next:** Sprint 020 (metadata completeness) — status `ready`, file at
+`docs/sprints/020-metadata-completeness.md`.
 
 ## Read this first
 
-**The roadmap was re-planned on 2026-08-13 (revision 8, DEC-042).** v1 is released and the plan now
-runs to Sprint 026. Two things a returning agent will otherwise get wrong:
+**Sprint 020 is an assessment, not a build.** DEC-035 approves measuring whether cross-provider
+field completion and edition choice are affordable; DEC-042 made that gate shape the default for
+Sprints 021, 024 and 026 too. Phase A concluding *no* is a complete, correct outcome. Do not start
+Phase B without an explicit owner go-ahead recorded in `docs/decisions.md`.
 
-- **Sprint 019 is no longer metadata completeness.** That work is now Sprint 020, file renamed to
-  `docs/sprints/020-metadata-completeness.md`, still `planned` and still **gated**. Sprint 019 is
-  three small user-visible fixes. Older documents — Sprint 018's Outcome, the worklog — say
-  "Sprint 019" when they mean the metadata work; they are audit history and were left as written.
-- **Sprint 020 is an assessment, not a build.** DEC-035 approves measuring whether cross-provider
-  field completion and edition choice are affordable. Phase A concluding *no* is a complete,
-  correct outcome. Do not start Phase B without an explicit owner go-ahead in `docs/decisions.md`.
-  The same gate shape now applies to Sprints 021, 024 and 026.
+**One item in Sprint 020 does not wait on the gate.** `GoogleBooksProvider.fetch_by_isbn` takes the
+first hit of an `isbn:` search, which is not guaranteed to carry the requested ISBN13. DEC-042
+promoted it to a live defect repaired whatever the verdict.
 
 **A green test suite is not evidence about the shipped artifact.** Sprint 018's walkthrough found
 the production bundle had been a blank page since Sprint 017 — every gate green the whole time,
@@ -43,27 +40,14 @@ Akasha brand or of future domains (`AGENTS.md`, reaffirmed in DEC-042). Do not r
 
 | Sprint | Scope | Status |
 |---|---|---|
-| 019 | Post-v1 polish: score chip, triage `s`, post-import affordance | `ready` |
-| 020 | Metadata completeness, **gated** | `planned` |
+| 020 | Metadata completeness, **gated** | `ready` |
 | 021 | Attachments, **gated** | `planned` |
 | 022 | Creator sort names | `planned` |
 | 023 | Export | `planned` |
 | 024–026 | Domains: albums (**gated**), games, series (**gated**) | `planned` |
 
-Only 019 and 020 have sprint files. The rest are contracts in `ROADMAP.md` and get expanded from
+Only 020 has a sprint file. The rest are contracts in `ROADMAP.md` and get expanded from
 `TEMPLATE.md` when activated.
-
-## What Sprint 019 must know
-
-- The filled score treatment already exists as `scoreFillClass` in `frontend/src/lib/score.ts` and
-  is what the open picker uses for its selected segment. This is a reuse job, not a design job.
-- The provisional affordance — dashed border plus dot — was tuned against a transparent trigger and
-  has a `data-provisional` assertion in the e2e suite. Re-judge it visually against a filled chip.
-- `DetailPage.tsx` and `TriagePage.tsx` use `scoreTextClass` directly rather than through the
-  picker, so they do not follow automatically. Decide deliberately and record which.
-- `docs/brand/screenshots/library.png` and `detail.png` show the old treatment and need recapturing.
-- Everything in this sprint is user-visible, so the walkthrough gate and the `production-bundle`
-  project both apply.
 
 ## What Sprint 020 must know
 
@@ -71,12 +55,15 @@ Only 019 and 020 have sprint files. The rest are contracts in `ROADMAP.md` and g
   that damages a library is recoverable. `scripts/benchmark_library.py` already measures at 10,000
   entries idle and with the queue draining; adding provider-request counting extends it rather than
   starting a harness.
-- The sharp edge is on record: `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an
-  `isbn:` search, which is not guaranteed to carry the requested ISBN13. DEC-042 promoted this to a
-  live defect repaired whatever the verdict.
-- Sprint 018's walkthrough saw both long-standing observations again: a provider "image not
-  available" placeholder stored as a real cover, and search for *Pedro Páramo* offering a 2024
-  reprint above the 1955 original.
+- Sprint 019's walkthrough saw both long-standing observations again in earlier sprints but did not
+  re-look for them: a provider "image not available" placeholder stored as a real cover, and search
+  for *Pedro Páramo* offering a 2024 reprint above the 1955 original.
+- `unsorted_entries` now rides on the import commit response, so an assessment can report triage
+  state without a second query.
+- **New in Sprint 019, and unowned:** a provider description containing HTML renders as literal
+  markup on the detail page (`<p>To stay competitive…`). It is escaped, so it is a display decision
+  rather than an injection risk, and it depends on which provider answered. It sits closest to this
+  sprint's provider work.
 
 ## Provider recordings
 
@@ -93,7 +80,7 @@ Deployment and container:
 
 - **`chown 10001:10001` the data and backup directories.** Missing it surfaces as `attempt to write
   a readonly database`, which reads like corruption and is only permissions. This cost the most
-  time in Sprint 018.
+  time in Sprint 018. Without root, `chmod -R 777` on a throwaway copy is enough for a walkthrough.
 - Compose runs the image under tini, so a perfectly graceful stop exits **143**, not 0. Assert the
   application logged `Application shutdown complete`; the exit code proves nothing.
 - **The SPA catch-all answers every unmatched path with index.html and a 200.** A test that fetches
@@ -106,22 +93,29 @@ Deployment and container:
   runtime unassigned. Any new grouping must be a package-name match with the fall-through to
   `vendor` intact, and must include its transitive members — `motion` means `framer-motion`,
   `motion-dom` and `motion-utils`, and missing one produced a second, different cycle.
+- `compose.yaml` requires `USER_AGENT_CONTACT`, and the owner's `.env` carries only
+  `GOOGLE_BOOKS_API_KEY`. Export it in the shell for a one-off container rather than editing `.env`.
 
 Backend and tests:
 
 - **Build fixture ISBNs by querying `/api/search` first.** Invented ISBNs resolve to real but
-  unrelated editions and every cover comes out wrong.
+  unrelated editions and every cover comes out wrong. Sprint 019 proved it again by ignoring it.
 - **httpx normalizes `/../x` to `/x` before sending it**, so the obvious path-traversal test proves
   the client normalizes and nothing about the server. Use `%2e%2e` / `..%2f`.
 - Do not do `root.handlers = [handler]` in logging setup; it removes pytest's `caplog`.
+- `ImportRepository.commit` has **two** return paths — the normal one and an already-committed
+  replay that rebuilds its answer from the batch's persisted `counters`. Any field added to the
+  commit response must be added to both, or a re-commit answers a different shape.
 
 Frontend and e2e:
 
 - Provider search takes about five seconds. A four-second wait reports zero results and looks like
   a bug.
 - The library card score picker is plain buttons whose accessible names are `Score 8`, not options.
-  Add-page results are buttons wrapping the whole card; clicking one selects it, and a separate
-  `Add to library` confirms. Notes and shelves live in the `Edit opinion` dialog, not on the page.
+  The card itself also carries `data-provisional`, so a selector for the trigger needs
+  `button[data-provisional]`. Add-page results are buttons wrapping the whole card; clicking one
+  selects it, and a separate `Add to library` confirms. Notes and shelves live in the
+  `Edit opinion` dialog, not on the page.
 - Radix `Tabs` writes `aria-controls` on every trigger whether or not a matching `TabsContent`
   exists. Assert axe results as one-line strings, or a failure is a several-thousand-line diff.
 - An e2e test that wants a visible error state cannot "fail only the first request": the URL-sync
@@ -134,29 +128,37 @@ Frontend and e2e:
 - Components: `eslint --max-warnings=0` means a component file exports components only; jsdom has
   neither Pointer Capture nor `scrollIntoView`; a Radix `AlertDialog` is addressed by its visible
   title.
+- `/triage` shows two headings matching `/inbox/i` when the inbox is empty — the `h1` and
+  "Inbox is clear". Address the `h1` by `level: 1`.
 
 ## Things noticed and deliberately left
-
-Each of these now has a sprint number; none is unowned.
 
 - **Author sort is a given-name sort.** `sort_author` is `$.authors[0]` as providers give it, so
   "Adolfo Bioy Casares" sorts before "Jorge Luis Borges" — Sprint 022, where the Spanish
   double-surname problem is why it needs a stored sort name rather than a heuristic.
+- **The *Add shelves* bulk action in product spec section 7 is unbuilt and unowned.** DEC-043
+  retired the `s` shortcut and named this in the same entry rather than quietly leaving it. If it is
+  ever scheduled, it and `s` are the same feature from two angles and should be built together: one
+  autocomplete surface, reachable from the action bar and from the keyboard. The bulk API is already
+  there (`add_shelves`/`remove_shelves` on `PATCH /api/entries/bulk`); the surface is the work.
+- **A provider description containing HTML renders as literal markup** on the detail page. Escaped,
+  so cosmetic rather than dangerous. Publisher can also arrive quoted: `"O'Reilly Media, Inc."`.
 - Entries added through the UI carry no score until you set one.
-- **No v1 tag exists.** The owner declined it in Sprint 018.
-  `docs/operations/release-notes-v1.md` has the one-line command if that changes.
 
 ## State
 
-- Planning revision 8; state points to Sprint 019, project status `ready`.
-- Gates at Sprint 018's close: validator passed, `make check` passed, `make test` backend **186** /
-  frontend **74**, Playwright **75 passed / 2 skipped** across both projects, `make build` with no
-  chunk-size warning, `make smoke-container` green, `git diff --check` clean. Revision 8 changed
-  documentation and `scripts/validate_project.py` only; no application code moved.
+- Planning revision 8; state points to Sprint 020, project status `ready`.
+- Gates at Sprint 019's close: validator passed, `make check` passed, `make test` backend **187** /
+  frontend **83**, Playwright **75 passed / 2 skipped** across both projects, `make build` with no
+  chunk-size warning, `git diff --check` clean.
 - The two skipped e2e tests are `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a
-  live backend.
-- Image `akasha:local`, 242 MB, user 10001:10001, no Node, `STOPSIGNAL SIGTERM`.
-- Migration head is `0007_normalized_sort_projection`.
+  live backend. `make smoke-container` was not re-run in Sprint 019; the walkthrough exercised a
+  real container instead, including startup migration, backup and graceful shutdown.
+- **`v1.0.0` exists** as an annotated local tag at `4ccf431`. Nothing was pushed;
+  `git push origin v1.0.0` publishes it.
+- Image `akasha:local`, user 10001:10001, no Node, `STOPSIGNAL SIGTERM`.
+- Migration head is `0007_normalized_sort_projection`. The repo's own `data/books.db` is one
+  migration behind, so the next container start against it will back up and migrate.
 - `.env` exists locally with the owner's `GOOGLE_BOOKS_API_KEY` and is gitignored. `make dev-backend`
   does not load it; export it yourself for a walkthrough. Compose does load it.
 - Commit messages in this repository carry no `Co-Authored-By` trailer.

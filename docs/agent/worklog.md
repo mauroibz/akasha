@@ -745,3 +745,61 @@ was not asked for a commit.
 `docs/sprints/019-post-v1-polish.md`. Three small user-visible fixes; the walkthrough gate and the
 `production-bundle` Playwright project both apply. Sprint 020 is the renumbered metadata sprint and
 is still **gated**.
+
+## 2026-08-13 — Sprint 019 (post-v1 polish and ledger clearing)
+
+**Done:** The three defects that survived v1 are cleared. (1) The score chip: `scoreChipClass` in
+`lib/score.ts` returns the existing `scoreFillClass`, and the picker trigger, the triage cell and the
+detail fact all read from it, so a score is a filled ramp-coloured chip with the numeral knocked out
+in `--background` on all three surfaces. The owner chose all-three over chip-on-card-only, reading
+DEC-026's "the colour means the same thing wherever the eye lands" strictly. The provisional marker
+had to change with it: dashed `border-primary/60` and a `bg-primary` dot are amber, and amber is the
+4–6 band, so both vanished on the scores that most need them — both are now knock-outs, keeping the
+accent only for an unscored provisional entry, where there is no fill to knock out of. (2) `s` on
+triage: retired rather than built, at the owner's choice, with DEC-043 recording why and product spec
+section 7 rewritten. (3) Post-import affordance: `unsorted_entries` on the commit response, and a
+result panel that names the waiting count, says the library hides unsorted books, and links to
+Triage. `v1.0.0` tagged, annotated and local, at `4ccf431`.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **187** / frontend **83**;
+`npm run test:e2e` **75 passed / 2 skipped** across both projects; `make build` clean with no
+chunk-size warning; `git diff --check` clean.
+
+Walkthrough ran against a container mounted on a **copy** of the owner's library, never the real
+one. Startup wrote a pre-migration backup before applying `0007` to the copy (DEC-039 working as
+designed, since the repo's `data/books.db` had never been started since that migration landed), and
+`docker stop` logged `Application shutdown complete`. A five-row Goodreads CSV with ratings
+5/4/3/1/0 put one provisional chip in every band; all four knock-out markers are legible. The result
+panel read *5 books are waiting in Triage*, the link landed on `Inbox 5 unsorted`, and
+`Accept all suggested` cleared it. Geometry measured rather than assumed: picker trigger 36px, card
+280px, every triage row 56px — unchanged, so the fill stayed a paint change (AC5). No console errors
+in the whole run. Screenshots recaptured from that container.
+
+**Seen and left:**
+
+- **A provider description containing HTML renders as literal markup.** The detail page for
+  *Escaping the Build Trap* shows `<p>To stay competitive…` with the tag visible, and *Cien años de
+  soledad* has `<p> <b>`. Descriptions are escaped, so this is a display decision, not an injection
+  risk. Not every book has it — *Shadow of the Wind*'s description is clean — so it depends on which
+  provider answered. This is the first time it has been recorded; it belongs near Sprint 020's
+  provider work.
+- Publisher renders as `"O'Reilly Media, Inc."`, quotes included, from the provider payload.
+- The *Add shelves* bulk action promised by product spec section 7 is still unbuilt and now has no
+  sprint. DEC-043 names it deliberately.
+- One walkthrough cover came out wrong (*La ciudad y los perros* got the *Cien años de soledad*
+  cover). That is the documented gotcha rather than a defect: the ISBN came from my own test CSV
+  instead of from `/api/search`, and unverified ISBNs resolve to real but unrelated editions. The
+  entry was deleted from the throwaway copy before the screenshots were taken.
+- Not re-observed this time, but neither was it looked for: the "image not available" placeholder
+  cover and the *Pedro Páramo* reprint-over-original ranking, both Sprint 020's.
+
+**Deviations:** the v1 tag was created, which the sprint file listed as a question rather than an
+action — asked and answered yes. The commit response gained a field, so a sprint planned as
+frontend-only moved an API contract and regenerated `frontend/openapi.json`.
+
+**Next:** Sprint 020 (metadata completeness) — status `ready`, file at
+`docs/sprints/020-metadata-completeness.md`. **It is gated:** Phase A measures whether
+cross-provider field completion and edition choice are affordable, and concluding *no* is a complete
+outcome. Do not start Phase B without an explicit owner go-ahead in `docs/decisions.md`. One item
+does not wait on the gate: `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an `isbn:`
+search and is repaired whatever the verdict.

@@ -4,13 +4,12 @@ A self-hosted, keyboard-first personal book tracker. It tracks opinions, not
 ebook files: what you thought of a book, when you read it, and where it sits in
 your library. Built to run on one small home server.
 
-**Not tagged.** The v1 tag is created only when the owner asks for it. To cut it:
+**Tagged `v1.0.0`** during Sprint 019, at the owner's request. The tag sits at
+`4ccf431`, the last commit before post-v1 work began, so it includes the brand
+and the CI repairs that followed Sprint 018 and none of Sprint 019.
 
-```bash
-git tag -a v1.0.0 -m "Akasha v1.0.0"
-```
-
-Nothing is pushed by the agent workflow, tags included.
+The tag is local. Nothing is pushed by the agent workflow, tags included, so
+publishing it is `git push origin v1.0.0` when you want it on the remote.
 
 ## What v1 does
 
