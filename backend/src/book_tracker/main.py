@@ -17,6 +17,7 @@ from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.library import LibraryError
+from book_tracker.backup import BackupError, create_backup
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
@@ -27,7 +28,7 @@ from book_tracker.infrastructure.providers import (
     create_provider_client,
 )
 from book_tracker.logging import configure_logging
-from book_tracker.migrations import schema_is_current, upgrade
+from book_tracker.migrations import pending_revisions, schema_is_current, upgrade
 
 
 class ProviderStatus(BaseModel):
@@ -41,16 +42,52 @@ class ProviderHealth(BaseModel):
     degraded: bool
 
 
+def _back_up_before_migrating(configured: Settings) -> None:
+    """Copy an existing library before a migration touches it.
+
+    Migration 0007 rewrites every item row. On a home server nobody is watching
+    the upgrade, so it takes a rollback point first and refuses to run without
+    one. A database with nothing in it yet is skipped: there is nothing to lose,
+    and a first start should not pay for a backup of an empty schema.
+    """
+    assert configured.database_url is not None
+    assert configured.backup_dir is not None
+    database_path = configured.data_dir / "books.db"
+    if not database_path.is_file():
+        return
+    pending = pending_revisions(configured.database_url)
+    if not pending:
+        return
+    logger = logging.getLogger(__name__)
+    try:
+        result = create_backup(
+            database_path=database_path,
+            data_dir=configured.data_dir,
+            dest=configured.backup_dir,
+            label="pre-migration",
+        )
+    except (BackupError, OSError) as error:
+        raise RuntimeError(
+            "Refusing to migrate without a backup: "
+            f"could not write to {configured.backup_dir} ({error})"
+        ) from error
+    logger.info(
+        "pre_migration_backup_written",
+        extra={"path": str(result.path), "pending": pending},
+    )
+
+
 def create_app(settings: Settings | None = None) -> FastAPI:
     configured = settings or Settings()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(configured.log_level, scrub=(configured.google_books_api_key,))
-        for directory in ("", "covers", "imports", "backups"):
+        for directory in ("", "covers", "imports"):
             (configured.data_dir / directory).mkdir(parents=True, exist_ok=True)
         if not getattr(app.state, "skip_migrations", False):
             assert configured.database_url is not None
+            _back_up_before_migrating(configured)
             upgrade(configured.database_url)
         app.state.engine = create_engine(configured)
         provider_client = create_provider_client()
