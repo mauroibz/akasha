@@ -3,6 +3,7 @@ import { LazyMotion, domAnimation } from "motion/react";
 import { type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
+import { AkashaMark } from "@/components/AkashaMark";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
@@ -35,6 +36,20 @@ export function AppShell({ children }: { children: ReactNode }) {
           aria-label="Primary"
           className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
         >
+          {/* Decorative, not a second home link: "Library" below already goes to
+            "/", and duplicating it would make a screen reader announce the same
+            destination twice. Sized to 20px so it reads as a sibling of the
+            Lucide icons beside it rather than as a foreign object
+            (docs/brand/BRAND.md). */}
+          <AkashaMark
+            size={20}
+            className="mx-3 shrink-0 text-foreground"
+            aria-hidden="true"
+          />
+          <span
+            className="mr-2 h-5 w-px shrink-0 bg-border"
+            aria-hidden="true"
+          />
           {navItems.map((item) => (
             <NavLink
               key={item.to}

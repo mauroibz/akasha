@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" role="img" aria-label="Akasha">
+  <rect width="16" height="16" fill="#09090b" shape-rendering="crispEdges"/>
+  <path d="M3 15V7a5 5 0 0 1 10 0v8" fill="none" stroke="#fafafa" stroke-width="2" stroke-linecap="butt" stroke-linejoin="miter"/>
+  <rect x="7" y="7" width="2" height="2" fill="#fbbf24" shape-rendering="crispEdges"/>
+</svg>

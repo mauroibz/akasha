@@ -20,6 +20,7 @@ import {
   type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
+import { AkashaMark } from "@/components/AkashaMark";
 import { useMotionPresets } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -285,11 +286,23 @@ export function HomePage() {
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
       <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Personal library
-          </p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">Akasha</h1>
+        {/* The horizontal lockup: mark at 48px, then the wide-tracked eyebrow
+          over the tight-tracked wordmark. Mirrors
+          docs/brand/source/lockup-horizontal.svg. */}
+        <div className="flex items-center gap-4">
+          <AkashaMark
+            size={48}
+            className="shrink-0 text-foreground"
+            aria-hidden="true"
+          />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
+              Personal library
+            </p>
+            <h1 className="mt-2 text-4xl font-semibold tracking-tight">
+              Akasha
+            </h1>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Button

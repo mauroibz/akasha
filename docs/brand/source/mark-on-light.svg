@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="96" height="96" viewBox="0 0 24 24" fill="none" role="img" aria-label="Akasha">
+  <!-- Companion to mark-on-dark.svg for GitHub's light theme. The arch takes
+       the ground colour; the amber dot is unchanged and reads on both. -->
+  <path d="M4 21V10a8 8 0 0 1 16 0v11" stroke="#09090b" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="12" cy="11" r="2" fill="#fbbf24"/>
+</svg>
