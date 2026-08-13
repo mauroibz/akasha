@@ -195,8 +195,18 @@ exit_code="$(docker inspect --format '{{.State.ExitCode}}' "$container")"
 # reports 128+SIGTERM even for a clean stop. What matters is that the
 # application ran its own shutdown, so the job runner was cancelled and SQLite
 # was closed rather than killed mid-write.
-docker compose logs --no-color akasha 2>&1 | grep -q "Application shutdown complete" \
-  || fail "the application did not run a graceful shutdown"
+# `docker compose stop` returns before the log driver has necessarily flushed
+# the container's final lines, so a single grep here races the shutdown it is
+# trying to observe: CI has seen this fail with the line arriving 80ms later.
+shutdown_logged=""
+for _ in $(seq 1 30); do
+  if docker compose logs --no-color akasha 2>&1 | grep -q "Application shutdown complete"; then
+    shutdown_logged="yes"
+    break
+  fi
+  sleep 1
+done
+[ -n "$shutdown_logged" ] || fail "the application did not run a graceful shutdown"
 printf 'stopped in %ss with exit code %s, shutdown was graceful\n' "$elapsed" "$exit_code"
 
 printf '\nContainer smoke test passed: healthcheck, non-root, no Node, API persistence across\n'

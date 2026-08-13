@@ -7,10 +7,17 @@ jobs:
   checks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
-        with: { enable-cache: true, python-version: "3.12" }
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10
+        with:
+          enable-cache: true
+          python-version: "3.12"
+          # The Makefile pins UV_CACHE_DIR on every uv invocation, so the
+          # action's own default directory is never written to and its
+          # cache-save step fails the job on a path that does not exist. Point
+          # it at the directory the build actually uses.
+          cache-local-path: /tmp/akasha-uv-cache
+      - uses: actions/setup-node@v7
         with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: make bootstrap
       - run: make check
@@ -22,8 +29,8 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
         with: { node-version: "22", cache: npm, cache-dependency-path: frontend/package-lock.json }
       - run: npm ci
         working-directory: frontend
@@ -34,7 +41,7 @@ jobs:
       # mis-split bundle (DEC-041).
       - run: npm run test:e2e
         working-directory: frontend
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-traces
@@ -43,5 +50,5 @@ jobs:
   container:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: make smoke-container
