@@ -80,6 +80,8 @@ class CommitResponse(BaseModel):
     created_items: int
     created_entries: int
     unchanged_entries: int
+    #: Everything waiting in triage after this commit, not only the rows it created.
+    unsorted_entries: int
 
 
 class JobProgressResponse(BaseModel):

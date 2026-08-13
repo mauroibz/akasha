@@ -1,6 +1,7 @@
 import { expect, test } from "./console";
 
 import { chooseOption } from "./radix";
+import { entry } from "./seed";
 
 const record = {
   record_id: 1,
@@ -25,6 +26,21 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
   await page.setViewportSize({ width: 375, height: 740 });
   let previews = 0;
   let commitBody: unknown;
+  // Followed at the end of this test, so triage has to have something to show,
+  // and the three rows it shows are the three the result panel promised.
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [1, 2, 3].map((id) => ({
+          ...entry(id),
+          status: "unsorted",
+        })),
+        next_cursor: null,
+        total: 3,
+        facets: { status_counts: { unsorted: 3 } },
+      },
+    }),
+  );
   await page.route("**/api/import/goodreads/preview", async (route) => {
     previews += 1;
     await route.fulfill({
@@ -47,6 +63,7 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
         created_items: 1,
         created_entries: 1,
         unchanged_entries: 0,
+        unsorted_entries: 3,
       },
     });
   });
@@ -65,6 +82,16 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
     .getByRole("button", { name: /import 1 ready row/i })
     .press("Enter");
   await expect(page.getByRole("status")).toContainText("1 book added");
+  // Imports land `unsorted` and the default library view hides `unsorted`, so
+  // the result panel names the pile and offers the click that reaches it.
+  await expect(page.getByRole("status")).toContainText(
+    "3 books are waiting in Triage",
+  );
+  await page.getByRole("link", { name: /open triage/i }).click();
+  await expect(page).toHaveURL(/\/triage/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /inbox/i }),
+  ).toContainText("3 unsorted");
   expect(previews).toBe(1);
   expect(commitBody).toEqual({ batch_id: "batch-1", choices: [] });
   await expect(page.locator("main")).toBeVisible();
@@ -110,6 +137,7 @@ test("Calibre preview and re-sync are keyboard-complete at mobile width", async 
         created_items: 1,
         created_entries: 1,
         unchanged_entries: 0,
+        unsorted_entries: 3,
       },
     });
   });
@@ -234,6 +262,7 @@ test("undo flow from import history", async ({ page }) => {
         created_items: 1,
         created_entries: 1,
         unchanged_entries: 0,
+        unsorted_entries: 3,
       },
     });
   });
@@ -304,6 +333,7 @@ test("undo expired batch shows error", async ({ page }) => {
         created_items: 1,
         created_entries: 1,
         unchanged_entries: 0,
+        unsorted_entries: 3,
       },
     }),
   );

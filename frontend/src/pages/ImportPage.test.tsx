@@ -49,6 +49,7 @@ describe("ImportPage", () => {
           created_items: 1,
           created_entries: 1,
           unchanged_entries: 0,
+          unsorted_entries: 4,
         }),
       );
     });
@@ -132,6 +133,7 @@ describe("ImportPage", () => {
           created_items: 1,
           created_entries: 1,
           unchanged_entries: 0,
+          unsorted_entries: 4,
         }),
       );
     });
@@ -221,5 +223,73 @@ describe("ImportPage", () => {
     );
     expect(choice).toHaveTextContent(/use existing item 7/i);
     expect(screen.getByRole("button", { name: /import/i })).toBeEnabled();
+  });
+  it("sends a finished import to the rows it left unsorted", async () => {
+    // The defect: a commit reported "1 book added" and the library showed
+    // nothing, because imports land `unsorted` and the default view hides
+    // exactly that. The result panel now says where the rows went.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input).endsWith("/preview")
+        ? new Response(
+            JSON.stringify({
+              batch_id: "batch-9",
+              fingerprint: "abc",
+              state: "previewed",
+              summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+              records: [
+                {
+                  record_id: 1,
+                  row_number: 2,
+                  goodreads_book_id: "101",
+                  title: "Rayuela",
+                  authors: ["Julio Cort\u00e1zar"],
+                  isbn: "9788437604572",
+                  suggested_status: "read",
+                  score: 8,
+                  score_provisional: true,
+                  shelves: [],
+                  errors: [],
+                  planned_action: "create_item",
+                  match_kind: "new",
+                  candidates: [],
+                },
+              ],
+            }),
+            { status: 201 },
+          )
+        : new Response(
+            JSON.stringify({
+              batch_id: "batch-9",
+              state: "committed",
+              created_items: 1,
+              created_entries: 1,
+              unchanged_entries: 0,
+              // More than this batch created: an earlier import left rows there
+              // too, and the whole waiting pile is what the reader needs.
+              unsorted_entries: 7,
+            }),
+          ),
+    );
+    render(
+      <MemoryRouter>
+        <ImportPage />
+      </MemoryRouter>,
+    );
+    await userEvent.upload(
+      screen.getByLabelText(/goodreads csv/i),
+      new File(["csv"], "library.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview import/i }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /import 1 ready row/i }),
+    );
+    const result = await screen.findByRole("status");
+    expect(result).toHaveTextContent(/7 books are waiting in triage/i);
+    expect(screen.getByRole("link", { name: /triage/i })).toHaveAttribute(
+      "href",
+      "/triage",
+    );
   });
 });

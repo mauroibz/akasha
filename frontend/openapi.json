@@ -428,6 +428,10 @@
           "unchanged_entries": {
             "title": "Unchanged Entries",
             "type": "integer"
+          },
+          "unsorted_entries": {
+            "title": "Unsorted Entries",
+            "type": "integer"
           }
         },
         "required": [
@@ -435,7 +439,8 @@
           "state",
           "created_items",
           "created_entries",
-          "unchanged_entries"
+          "unchanged_entries",
+          "unsorted_entries"
         ],
         "title": "CommitResponse",
         "type": "object"

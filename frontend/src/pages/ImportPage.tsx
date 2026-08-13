@@ -37,7 +37,7 @@ export function ImportPage() {
   const [undoPending, setUndoPending] = useState(false);
   const [confirmUndo, setConfirmUndo] = useState(false);
   const heading = useRef<HTMLHeadingElement>(null);
-  const resultRef = useRef<HTMLParagraphElement>(null);
+  const resultRef = useRef<HTMLDivElement>(null);
   const undoRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -259,7 +259,11 @@ export function ImportPage() {
                     `Import complete: ${committed.created_entries} ${
                       committed.created_entries === 1 ? "book" : "books"
                     } added`,
-                    { description: "Undo stays available for 24 hours." },
+                    {
+                      description: committed.unsorted_entries
+                        ? `${committed.unsorted_entries} waiting in Triage. Undo stays available for 24 hours.`
+                        : "Undo stays available for 24 hours.",
+                    },
                   );
                 })
                 .catch((reason: Error) => setError(reason.message))
@@ -273,11 +277,29 @@ export function ImportPage() {
         </section>
       )}
       {result && (
-        <p ref={resultRef} tabIndex={-1} className="mt-8 text-xl" role="status">
-          Import complete: {result.created_entries}{" "}
-          {result.created_entries === 1 ? "book" : "books"} added;{" "}
-          {result.unchanged_entries} already present.
-        </p>
+        <div ref={resultRef} tabIndex={-1} className="mt-8" role="status">
+          <p className="text-xl">
+            Import complete: {result.created_entries}{" "}
+            {result.created_entries === 1 ? "book" : "books"} added;{" "}
+            {result.unchanged_entries} already present.
+          </p>
+          {/* Imported rows land `unsorted`, and the library's default view
+              excludes `unsorted`, so a successful import used to look like a
+              no-op: the count went up and the shelf stayed empty. Say where the
+              rows went and offer the one click that gets there. The count is
+              everything waiting, which can exceed what this batch added. */}
+          {result.unsorted_entries > 0 && (
+            <p className="mt-2 text-muted-foreground">
+              {result.unsorted_entries}{" "}
+              {result.unsorted_entries === 1 ? "book is" : "books are"} waiting
+              in Triage. Your library hides unsorted books until you sort them,
+              so this is where the import went.{" "}
+              <Link className="focus-ring text-primary" to="/triage">
+                Open Triage →
+              </Link>
+            </p>
+          )}
+        </div>
       )}
       {result && !undoResult && (
         <div className="mt-5 rounded-2xl bg-surface p-4">

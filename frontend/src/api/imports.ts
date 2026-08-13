@@ -30,6 +30,8 @@ export interface ImportResult {
   created_items: number;
   created_entries: number;
   unchanged_entries: number;
+  /** Everything waiting in triage after the commit, not only the rows it created. */
+  unsorted_entries: number;
 }
 export interface JobProgress {
   id: string;

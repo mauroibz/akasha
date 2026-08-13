@@ -99,6 +99,41 @@ def csv_row(
 
 
 @pytest.mark.anyio
+async def test_commit_reports_everything_waiting_in_triage_not_only_its_own_rows(
+    tmp_path: Path,
+) -> None:
+    """`unsorted_entries` is a live count, not a per-batch counter.
+
+    What the reader needs to know after an import is how many rows are waiting
+    in triage, which includes anything an earlier import left there. Storing it
+    in the batch's persisted counters would freeze it at commit time and make
+    the second number wrong.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        counts = []
+        for book_id, title, isbn in (
+            ("1", "Ficciones", "9780802130303"),
+            ("2", "Rayuela", "9788437604572"),
+        ):
+            content = csv_row(book_id=book_id, title=title, isbn=isbn)
+            preview = await client.post(
+                "/api/import/goodreads/preview", files={"file": ("x.csv", content, "text/csv")}
+            )
+            assert preview.status_code == 201
+            committed = await client.post(
+                "/api/import/goodreads/commit", json={"batch_id": preview.json()["batch_id"]}
+            )
+            assert committed.status_code == 200
+            assert committed.json()["created_entries"] == 1
+            counts.append(committed.json()["unsorted_entries"])
+        assert counts == [1, 2]
+
+
+@pytest.mark.anyio
 async def test_commit_is_atomic_idempotent_and_records_ordered_effects(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     content = csv_row() + csv_row(book_id="2").split(b"\n", 1)[1]
@@ -116,6 +151,10 @@ async def test_commit_is_atomic_idempotent_and_records_ordered_effects(tmp_path:
         assert committed.json()["created_items"] == 1
         assert committed.json()["created_entries"] == 1
         assert committed.json()["unchanged_entries"] == 1
+        # The import left a row waiting in triage, and the response says so: the
+        # default library view hides `unsorted`, so a commit that reports only
+        # its own counters looks like a commit that did nothing.
+        assert committed.json()["unsorted_entries"] == 1
         retried = await client.post("/api/import/goodreads/commit", json={"batch_id": batch_id})
         assert retried.json() == committed.json()
         with app.state.engine.connect() as connection:

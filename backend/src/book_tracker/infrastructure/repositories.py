@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Engine, delete, select
+from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -396,6 +396,23 @@ class DomainRepository:
             session.execute(delete(ShelfRow).where(ShelfRow.id == shelf_id))
 
 
+def _count_unsorted(session: Session, user_id: int) -> int:
+    """How many entries are waiting in triage.
+
+    A committed import lands its rows `unsorted`, and a library list with no
+    `status` filter excludes `unsorted` (see `LibraryService`), so an import
+    that reports only its own counters looks like an import that did nothing.
+    """
+    return (
+        session.scalar(
+            select(func.count())
+            .select_from(EntryRow)
+            .where(EntryRow.user_id == user_id, EntryRow.status == "unsorted")
+        )
+        or 0
+    )
+
+
 class ImportRepository:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
@@ -474,7 +491,12 @@ class ImportRepository:
             if batch is None or batch.kind != kind:
                 raise LookupError("import_batch_not_found")
             if batch.state == "committed":
-                return {"batch_id": batch.id, "state": batch.state, **json.loads(batch.counters)}
+                return {
+                    "batch_id": batch.id,
+                    "state": batch.state,
+                    **json.loads(batch.counters),
+                    "unsorted_entries": _count_unsorted(session, user_id),
+                }
             if batch.state != "previewed":
                 raise ValueError("import_batch_not_committable")
             rows = list(
@@ -740,4 +762,12 @@ class ImportRepository:
                 (datetime.now(UTC) + timedelta(hours=24)).isoformat().replace("+00:00", "Z")
             )
             batch.updated_at = now
-            return {"batch_id": batch.id, "state": "committed", **counters}
+            # Deliberately not part of `counters`: the persisted counters are facts
+            # about this batch, and this is how many rows are waiting in triage
+            # right now, including whatever an earlier import left there.
+            return {
+                "batch_id": batch.id,
+                "state": "committed",
+                **counters,
+                "unsorted_entries": _count_unsorted(session, user_id),
+            }
