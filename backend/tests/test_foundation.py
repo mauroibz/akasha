@@ -126,3 +126,26 @@ async def test_spa_fallback_does_not_capture_api_routes(tmp_path: Path) -> None:
     assert "Akasha SPA" in frontend.text
     assert missing_api.status_code == 404
     assert missing_api.headers["content-type"].startswith("application/json")
+
+
+def test_backup_dir_defaults_beside_the_data_directory(tmp_path: Path) -> None:
+    """The container mounts `/data` and `/backups` as siblings, so derive rather than hardcode.
+
+    A backup written inside the volume it backs up dies with that volume (DEC-040).
+    """
+    configured = Settings(data_dir=tmp_path / "data", user_agent_contact="test@example.invalid")
+
+    assert configured.backup_dir == tmp_path / "backups"
+    assert Settings(data_dir=Path("/data"), user_agent_contact="x@y.invalid").backup_dir == Path(
+        "/backups"
+    )
+
+
+def test_backup_dir_is_overridable(tmp_path: Path) -> None:
+    configured = Settings(
+        data_dir=tmp_path,
+        backup_dir=tmp_path / "elsewhere",
+        user_agent_contact="test@example.invalid",
+    )
+
+    assert configured.backup_dir == tmp_path / "elsewhere"
