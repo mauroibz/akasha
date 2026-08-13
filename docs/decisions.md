@@ -773,3 +773,35 @@ Append-only record of material architecture choices, product-default resolutions
   re-plan and **rejected on the existing invariant** in `AGENTS.md`: internal names are permanent
   and only user-facing copy follows the brand. Multi-domain content in a package named
   `book_tracker` is accepted as a cosmetic cost. Plan revision is now 8.
+
+## DEC-043 — The triage shelf shortcut is retired unbuilt, not implemented
+
+- **Date:** 2026-08-13
+- **Status:** accepted
+- **Context:** Product spec section 7 listed `s` on `/triage` as opening shelf autocomplete. Every
+  other key in that list works — `j`/`k`, the digits, the status letters, `Enter`, `Escape` — and
+  `s` never did. Sprint 017 looked at it and recorded it as feature work rather than a shortcut;
+  Sprint 018 carried it again; the release notes shipped it as a known issue. Sprint 019 exists so
+  that it stops being carried, and its acceptance criterion 3 allowed either branch: implement it,
+  or remove it from the spec and record why.
+  What `s` actually needs is not a key binding. `/triage` has no shelf surface at all — the bulk
+  action bar offers status, score, clear-provisional and clear-selection, and nothing shelves. So
+  the work is an autocomplete panel with filter-as-you-type over existing shelves, create-on-miss,
+  focused-row versus whole-selection semantics, and the same input-focus guards as every other
+  triage key. The API is ready — `add_shelves` and `remove_shelves` already exist on the bulk
+  endpoint's `set` — but the surface is a feature.
+- **Decision:** Retire it. `s` is removed from product spec section 7, which now says explicitly
+  that shelving is not in the triage keyboard flow and that shelves are assigned from a book's
+  detail page. The owner chose this over implementing it when the alternative was presented, on the
+  reasoning that Sprint 019 is deliberately small and a shelf-autocomplete surface is not polish.
+- **Consequences:** Shelf assignment stays where it already works: the `Edit opinion` dialog on a
+  book's detail page, one entry at a time, plus whatever shelves an import carries. Triaging several
+  hundred books cannot shelve them in bulk.
+  **Section 7's action-bar line still promises *Add shelves*, and that is still unbuilt.** It is
+  named here and in `HANDOFF.md` so it is not mistaken for delivered, and it is deliberately left
+  unowned rather than assigned a sprint number the owner has not scheduled. If it is ever scheduled,
+  it and `s` are the same feature seen from two angles and should be built together — one
+  autocomplete surface, reachable from the action bar and from the keyboard.
+  A spec line was deleted rather than an implementation added, which `AGENTS.md` permits only when
+  product intent is clear and the decision is recorded. The intent here is the owner's explicit
+  choice, not an excuse for an incomplete implementation, and this entry is the record.

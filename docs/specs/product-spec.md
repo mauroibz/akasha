@@ -608,9 +608,12 @@ unless you choose it.
   action, scoped to the current filter. For a Goodreads import that alone
   clears most of the backlog.
 - **Keyboard flow for the rest** — `j`/`k` move, digits set score, `r`/`t`/`w`/
-  `d` set status, `s` opens shelf autocomplete, `Enter` commits and advances.
-  This is the MAL-style rhythm, and it's what makes the leftover hundred books
-  tolerable.
+  `d` set status, `Enter` commits and advances. This is the MAL-style rhythm,
+  and it's what makes the leftover hundred books tolerable. Shelving is not on
+  this list: `s` was specified here as a shelf-autocomplete shortcut and
+  retired unbuilt in Sprint 019 (DEC-043), because the surface it needs is a
+  feature rather than a shortcut. Shelves are assigned from a book's detail
+  page. The *Add shelves* bulk action listed above is also still unbuilt.
 - **Conflicts** — rows with unresolved conflicts in their joined import audit
   records show a marker; clicking expands both values inline with one click to
   choose. Never a modal.

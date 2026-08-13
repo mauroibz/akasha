@@ -52,8 +52,10 @@ restore that has actually been performed rather than described.
 
 ## Known issues carried into v1
 
-- `s` on the triage page does nothing. The product spec lists it as the
-  shelf-autocomplete shortcut; every other triage key works.
+- `s` on the triage page does nothing, and no longer promises to: the spec
+  listed it as the shelf-autocomplete shortcut, and Sprint 019 retired it
+  unbuilt rather than carrying it further (DEC-043). Shelves are assigned from
+  a book's detail page. Triage's *Add shelves* bulk action is still unbuilt.
 - Author sort is a first-name sort, because providers give `authors[0]` in
   natural order. "Adolfo Bioy Casares" sorts before "Jorge Luis Borges".
 - Some providers return an "image not available" placeholder that is stored as
