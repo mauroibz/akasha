@@ -1,6 +1,6 @@
 # Sprint 017 — Scale, accessibility, and resilience
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 016
 **Roadmap revision:** 7
 
@@ -106,5 +106,114 @@ git diff --check
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-08-12. Nine implementation commits plus this closure.
+
+### AC1 — latency and render budgets
+
+`scripts/benchmark_library.py` (new) seeds 10,000 entries into a migrated file-backed SQLite
+database and times `list_entries` for every sort key in both directions, first page and page 26,
+with and without a text filter, **twice**: idle, and with a thread draining the job queue through
+the real `JobRepository` so every sample competes for the write lock (DEC-027). Query plans print
+alongside the numbers.
+
+It failed on first run, and decisively. Ordering by `normalize_text(title)` invokes a Python
+function once per candidate row:
+
+| scenario (contended p95) | before | after |
+|---|---|---|
+| first page, `title` | 312 ms | 82 ms |
+| first page, `sort_author` | 412 ms | 85 ms |
+| page 26, `sort_author` | 627 ms | 78 ms |
+| text filter `q=garcia` | 988 ms | 10 ms |
+
+Budget is 500 ms (technical spec section 1), on a workstation faster than the target ZimaBoard.
+DEC-036 stores the projection: `items.title_normalized` and `items.sort_author_normalized`
+(migration `0007`), maintained by a mapper event so no write path can forget them, read by
+ordering, filtering and the cursor alike. **No index accompanies them, and that is measured**: the
+query drives from `entries` and reaches `items` by rowid, so SQLite builds a temp B-tree either
+way, verified with and without the null-bucket CASE. Every scenario is now inside budget; the
+dead `normalize_text` UDF registration is gone.
+
+Bundle: DEC-037 splits the five non-landing routes and chunks vendor code by change rate. Eager
+JavaScript **696.24 kB → 511.55 kB** across four chunks, largest chunk 193.67 kB, no chunk-size
+warning; `chunkSizeWarningLimit` lowered to 300 kB as the regression guard. The 104 kB form stack
+no longer loads for someone who only browses.
+
+DEC-023 bounds re-asserted at 10,000 entries rather than 5,000, and in table mode for the first
+time: **grid 7 rows / 28 cards, table 15 / 15**, against bounds of 20 and 48. Printed on every run.
+
+### AC2 — accessibility
+
+`e2e/accessibility.spec.ts` (new) runs `@axe-core/playwright` over twelve states in the existing
+CI Playwright job: library grid, library compact, the score-picker overlay expanded inside its
+card, triage, triage with a selection, detail, the opinion dialog, add, the manual form, the
+degraded-provider notice, import, and shelves. Zero `serious`/`critical` violations under WCAG
+2.0/2.1 A and AA; lesser impacts print rather than fail, and there are currently none of those
+either.
+
+Seven failed on first run and three were real defects (DEC-038): both list surfaces claimed
+`role="table"` over rows containing no cells; the cover placeholder carried `aria-label` on a bare
+`div` where ARIA ignores it; and the import page rendered tab triggers with no panels, so every
+`aria-controls` pointed at nothing. Both lists are now feeds of articles carrying
+`aria-posinset`/`aria-setsize`. The keyboard and focus half was walked by hand — see the worklog.
+
+### AC3 — security limits and log redaction
+
+`tests/test_security_limits.py` (new) covers what nothing covered: static-path containment,
+provider timeout, and redaction. The rest of technical spec section 9 was already implemented and
+tested next to its own code and is listed in that file's docstring rather than re-asserted.
+
+Log redaction did not exist. `logging.py` configured structlog with a JSON renderer nothing used,
+while every call site went through the standard library under a `%(message)s` format that dropped
+`extra` entirely. Both halves are fixed: stdlib records route through the same chain, and a
+processor removes a denylist of keys, scrubs configured secrets out of any string, truncates
+oversized values under innocent keys, and recurses into nested structures.
+
+The traversal test uses percent-encoded paths only. httpx collapses a literal `/../secret.txt`
+before sending it, so the obvious form of that assertion proves the client normalizes and nothing
+about the server — verified by probe.
+
+### AC4 — no uncaught frontend errors
+
+`e2e/console.ts` fails any test whose page logged `console.error` or threw, as an auto fixture
+across all nine specs, with an annotation to opt out. Verified by probe that it bites and that the
+opt-out works. Zero errors across the suite, and zero during the walkthrough.
+
+### Commands
+
+| command | result |
+|---|---|
+| `python scripts/validate_project.py` | passed |
+| `make format` | clean |
+| `make check` | passed (lint, typecheck, OpenAPI, validator) |
+| `make test` | backend **164** (was 154), frontend **74** (was 68) |
+| `npm run test:e2e -- --project=chromium` | **73 passed / 2 skipped** (was 53 / 2) |
+| `make build` | succeeded, no chunk-size warning |
+| `git diff --check` | clean |
+
+The 2 skips remain `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a live backend.
+
+### Commits
+
+`76253e8` benchmark and projection · `65d072f` code split · `513e0dc` 10k bounds · `9d67bbb` axe
+and its repairs · `7f699bb` error boundaries, cancellation, two labels · `addea8a` security limits
+and redaction · `1ac6e65` import order · `80c9c43` console guard and coverage gaps · `b172366`
+walkthrough fixes.
+
+### Deviations and decisions
+
+- **DEC-036** supersedes DEC-015's deferral of a stored projection.
+- **DEC-037** bundle split, with the warning limit lowered rather than raised.
+- **DEC-038** both list surfaces become feeds of articles.
+- Two prerequisite repairs: `configure_logging` replaced every root handler, which removed
+  pytest's `caplog` and broke an unrelated provider-health test; and the error boundary never
+  reset, so a caught error stayed pinned over every later route.
+- Two defects beyond the two the roadmap named were found in the walkthrough and fixed: the
+  library score control marked a provisional score with a dot and a dashed border that nothing
+  explained (the same defect as the triage cell, on a surface nobody had listed), and a book with
+  no year rendered a bare "unknown".
+- **Not done, and deliberately:** product spec section 7 lists `s` as a triage shortcut opening
+  shelf autocomplete. It is not implemented, and adding a keyboard shortcut is feature work, not
+  hardening. Recorded for a later sprint rather than smuggled in here.
+- This sprint's own `Required context` cited two technical-spec sections that do not exist; the
+  references were corrected.

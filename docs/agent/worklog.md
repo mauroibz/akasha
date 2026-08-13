@@ -562,3 +562,83 @@ query key on screen at failure time rather than the key it snapshotted.
 **Next:** Sprint 017 (scale, accessibility, resilience) — status `ready`. It inherits a 696 kB
 bundle and now owns that decision with a sharper number, a reusable animation sampler at
 `frontend/e2e/motion.ts`, and a unit suite that already runs under reduced motion.
+
+## 2026-08-12 — Sprint 017 (complete)
+
+**Done:** all four acceptance criteria, nine implementation commits (`76253e8`..`b172366`) plus
+closure. Owner decisions taken during planning: route-level code splitting over raising the chunk
+limit, and axe gating in CI rather than local-only.
+
+**Verified:** validator, `make format`, `make check`, `make test` (backend **164**, frontend
+**74**), Chromium e2e **73 passed / 2 skipped**, `make build`, `git diff --check`. Plus a
+walkthrough against a real backend on `:8100` with the owner's key, both providers available, and a
+**throwaway data directory** — the owner's `data/` was not touched.
+
+**Measurements worth not re-deriving:**
+- Text sorting was over budget and is not any more. Contended p95 at 10,000 entries: `title` first
+  page 312 → 82 ms, `sort_author` page 26 627 → 78 ms, text filter 988 → **10 ms**. Budget 500 ms.
+  Rerun with `cd backend && uv run python ../scripts/benchmark_library.py`.
+- The cause was call count, not the plan: `normalize_text` is a Python UDF invoked once per
+  candidate row. **The projection is not index-backed and does not need to be** — the query drives
+  from `entries` and reaches `items` by rowid, so SQLite builds a temp B-tree with or without the
+  null-bucket CASE. Checked both ways with `EXPLAIN QUERY PLAN`; do not "fix" this by adding an
+  index.
+- Eager JavaScript 696.24 → **511.55 kB** across four chunks; largest chunk 193.67 kB; no warning.
+- DEC-023 bounds at 10,000 entries: grid **7 rows / 28 cards**, table **15 / 15** (bounds 20 / 48).
+  Unchanged from 5,000, as virtualization implies — which is why it was worth measuring.
+- axe: twelve screens, **zero** serious/critical and zero moderate/minor.
+
+**Walkthrough, 6-row Goodreads CSV with ISBNs verified against the live provider first:**
+- Preview → commit → triage → "Accept all suggested" cleared the inbox in one action.
+- Enrichment produced **5 real covers out of 5 resolvable books**; the sixth is a deliberately
+  invented title with no ISBN and correctly shows the placeholder.
+- Accent-insensitive search through the new projection, against real data: `paramo` and `PÁRAMO`
+  both find *Pedro Páramo*; `cortazar` finds *Rayuela*; `bolano` finds *Los detectives salvajes*.
+- Title sort orders *Ficciones, La invención de Morel, Los detectives salvajes, Pedro Páramo,
+  Rayuela* — accents folded correctly.
+- Keyboard: tab reaches the card `article`, then Open / Status / Score. Digit shortcuts score the
+  focused row on both `/` and `/triage`.
+- **Zero console errors across the whole walkthrough.**
+
+**Dead ends and things a later session should not rediscover:**
+- httpx normalizes a literal `/../secret.txt` to `/secret.txt` **before sending**, so a traversal
+  test written that way asserts nothing about the server. Use percent-encoded forms
+  (`/%2e%2e/…`, `/..%2f…`). Found by probe.
+- `configure_logging` originally did `root.handlers = [handler]`, which removes pytest's `caplog`
+  and broke an unrelated provider-health test. Replace only the handler you installed.
+- Radix `Tabs` writes `aria-controls` on every trigger whether or not a `TabsContent` exists. The
+  import page had none at all.
+- A `role="feed"` locator does not survive a switch to compact view if the test grabbed
+  `role="table"`; both densities are `role="feed"` now (DEC-038).
+- `@axe-core/playwright` is a dev dependency and needs **no** `optimizeDeps` entry — that list is
+  for runtime deps only.
+- Asserting axe results as raw violation objects produces a several-thousand-line diff. Map them to
+  one line each first.
+- A route-failure test must stub the *module* request (`**/TriagePage.tsx*` in dev, the hashed
+  chunk in a build), and must carry the `ALLOW_CONSOLE_ERRORS` annotation.
+- "Fail only the first request" does not produce a visible error state: the URL-sync effect re-keys
+  the query on mount, so the retry heals it before anything renders. Drive it with a flag.
+- The score-picker options are named `Score N`, not `Set score N`; the add search input is
+  `role="searchbox"`; the triage bulk controls are comboboxes, not buttons.
+
+**Observed, out of scope, left alone:**
+- **`s` is not implemented.** Product spec section 7 lists it as the triage shelf-autocomplete
+  shortcut. `j`/`k`, the digits, the status letters, `Enter` and `Escape` all exist; `s` does
+  nothing. Adding a shortcut is feature work, not hardening, so it was recorded rather than slipped
+  in.
+- Sorting by author sorts by the author string as providers give it — "Adolfo Bioy Casares" before
+  "Jorge Luis Borges" — so it is a given-name sort despite the column being called `sort_author`.
+  Correct against its own definition, probably not what the owner means by author order.
+- Imports still land `unsorted`, so the library looks briefly as though the import did nothing.
+  One click of "Accept all suggested" fixes it; the delay is the enrichment, not the import.
+
+**Deviations:** DEC-036, DEC-037, DEC-038. Two prerequisite repairs (the root-handler wipe above,
+and an error boundary that never reset so its fallback stayed pinned over every later route). Two
+defects beyond the two the roadmap named were found in the walkthrough and fixed: the library score
+control's unexplained provisional marker — the same defect as the triage cell, on a surface nobody
+had listed — and a bare "unknown" where a year should be.
+
+**Next:** Sprint 018 (container, backup, release) — status `ready`, file expanded at
+`docs/sprints/018-container-backup-release.md`. It inherits two things from this sprint: migration
+`0007` backfills every item row, making the "when do migrations run" question real; and the
+frontend now emits several chunks instead of one.

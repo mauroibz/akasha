@@ -2,7 +2,7 @@
 
 **Plan revision:** 7
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 017](017-scale-accessibility-resilience.md)
+**Active sprint:** [Sprint 018](018-container-backup-release.md)
 
 ## Dependency graph
 
@@ -49,8 +49,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 014 | Metadata correctness and search relevance | Searching finds the intended edition; added and imported books acquire real metadata and cached covers, proven against recorded provider responses | 013 | completed |
 | 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | completed |
 | 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | completed |
-| 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | ready |
-| 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | planned |
+| 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | completed |
+| 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | ready |
 | 019 | Metadata completeness: viability, then build | A measured verdict on cross-provider field completion and edition choice, then whatever that verdict says is worth building | 018 | planned |
 
 ## Detailed future sprint contracts
@@ -260,7 +260,7 @@ Acceptance:
 - Upload/image/path/provider limits and log redaction tests pass.
 - No uncaught frontend errors in E2E console.
 
-### Sprint 018 — Container, backup, and v1 release
+### [Sprint 018 — Container, backup, and v1 release](018-container-backup-release.md)
 
 Scope:
 
@@ -276,6 +276,13 @@ Acceptance:
 - LAN-only warning is prominent; no public exposure or auth is implied.
 - Clean-machine Compose smoke test passes and tags the v1 release only when explicitly requested.
 
+Sprint 017 added two things this sprint must account for. Migration `0007` backfills every row in
+`items` (DEC-036), making it the first migration that does real work on the owner's data at deploy
+time — so whether migrations run at container start or as an explicit step is now a real decision
+rather than a stylistic one, and the upgrade must be exercised against a pre-`0007` database. And
+the frontend emits several chunks instead of one (DEC-037), so any image or proxy step assuming a
+single asset filename needs checking.
+
 ### Sprint 019 — Metadata completeness: viability, then build
 
 **This sprint is gated. Its first half decides whether its second half happens, and how much of
@@ -285,6 +292,11 @@ starts implementing cross-provider merging has skipped the entire point.
 
 Placed after v1 release deliberately: this is additive, it carries real unknowns about third-party
 rate limits, and blocking a working release on it would be the wrong trade.
+
+Sprint 017 leaves Phase A better equipped than planned. `scripts/benchmark_library.py` already
+measures library latency at 10,000 entries both idle and with the job queue draining, so the
+"performance under a large import" question has a harness rather than needing one built; extending
+it to count provider requests per enrichment job is a smaller job than starting from nothing.
 
 #### What the owner asked for
 
