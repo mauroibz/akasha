@@ -642,3 +642,65 @@ had listed — and a bare "unknown" where a year should be.
 `docs/sprints/018-container-backup-release.md`. It inherits two things from this sprint: migration
 `0007` backfills every item row, making the "when do migrations run" question real; and the
 frontend now emits several chunks instead of one.
+
+## 2026-08-13 — Sprint 018: container, backup, and v1 release
+
+**Done:** Compose gained the read-only Calibre mount that had sat commented out since Sprint 008
+behind a note promising Sprint 008 would enable it, plus a `/backups` mount deliberately outside
+the data volume; the LAN-only warning moved from a label to the top of the file. `book_tracker.backup`
+provides online backup, verification, restore and label-scoped retention behind the `akasha-backup`
+console script, with `scripts/backup.sh` as the host cron wrapper. Startup takes a backup before
+applying pending migrations and refuses to migrate without one. `scripts/smoke_container.sh` was
+rewritten to drive `docker compose` against the real API. Operator runbook, v1 release notes,
+DEC-039/040/041, and README plus technical-spec section 11 brought in line. Sprint 019 expanded
+from the roadmap contract, with its gate restated at the top.
+
+**Verified and how:** validator, `make check`, `make test` backend **186** / frontend **74**,
+Playwright **75 passed / 2 skipped** across both projects, `make build` with no chunk-size warning,
+`make smoke-container` green end to end, `git diff --check` clean. Image 242 MB, user 10001:10001,
+no Node, `STOPSIGNAL SIGTERM` with a graceful shutdown asserted from the logs rather than from the
+exit code — compose runs the image under tini, which reports 143 for a perfectly clean stop.
+
+The walkthrough ran against the **container**, not `make dev`, with throwaway `DATA_DIR` and
+`BACKUP_DIR`. The owner's `data/` was not touched. Two real books added through the UI (ISBNs taken
+from `/api/search` first, per the standing note), scored 8 and 9, a note each, one on a new shelf,
+both with provider covers rendering. Backup taken from the running instance, the data directory
+then **deleted outright**, restored into an empty one, stack restarted: both scores, both notes,
+the shelf and both cover files came back, and `q=paramo` still matched `Pedro Páramo`. Separately,
+a database seeded at `0006` with accented rows was started under the container: exactly one
+pre-migration backup at revision `0006`, then head, then `Ávila, Ébano, Zurita` in the UI.
+
+**Three defects found by the walkthrough that no test could have caught:**
+
+- **The production bundle had been rendering a blank page since Sprint 017.** DEC-037's
+  `manualChunks` object form names packages, which assigns only those exact entry modules and
+  leaves `scheduler`, `jsx-runtime` and friends to fall wherever Rollup puts them; React ended up
+  spread across chunks that imported each other and the entry threw before first render. Every gate
+  was green because Playwright runs against the dev server, which does not chunk at all. Fixed by
+  resolving each module to its package name with a fall-through vendor chunk — and the first
+  attempt at that fix still missed `framer-motion`, a transitive dependency of `motion`, producing
+  a different cycle. Guarded now by a second Playwright project that loads a real build (DEC-041).
+- **The pre-migration backup ran once per restart.** `restart: unless-stopped` plus a migration
+  that kept failing wrote ten copies of the same database in ninety seconds, and nightly retention
+  deliberately never prunes pre-migration backups. Now taken once per revision.
+- **`akasha-backup restore` needed `USER_AGENT_CONTACT`.** `book_tracker/__init__` imported `main`,
+  which built the FastAPI app at import time, so restoring onto a bare machine died on a validation
+  error about a metadata provider. The package init is now empty.
+
+**Seen and left:** the crash-loop diagnosis was slow because a missing `chown 10001:10001` on the
+data directory surfaces as `attempt to write a readonly database`, which reads like corruption and
+is only permissions — that is now the first thing the runbook says. The Sprint 019 observations
+appeared again: a provider "image not available" placeholder stored as a real cover, and search for
+*Pedro Páramo* offering a 2024 reprint above the 1955 original. `s` on triage still does nothing,
+and author sort is still a given-name sort. No v1 tag was created, per the owner.
+
+**Deviations:** a sixth checkpoint was added for the pre-migration backup, which the owner chose
+during planning and the sprint file's five did not cover. Documentation was written after the tests
+rather than before, so the runbook could record what the drills actually did. The Calibre mount
+took a `:-./calibre` default the sprint file omitted, without which Compose interpolation fails for
+anyone with no Calibre library.
+
+**Next:** Sprint 019 (metadata completeness) — status `ready`, file expanded at
+`docs/sprints/019-metadata-completeness.md`. **It is gated:** DEC-035 approves an assessment, not
+an implementation, and Phase A concluding the feature is not worth building is a legitimate
+outcome. It is also the final planned sprint, so `WORKFLOW.md`'s final-sprint rule applies on close.

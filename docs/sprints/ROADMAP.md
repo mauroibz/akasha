@@ -2,7 +2,7 @@
 
 **Plan revision:** 7
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 018](018-container-backup-release.md)
+**Active sprint:** [Sprint 019](019-metadata-completeness.md)
 
 ## Dependency graph
 
@@ -50,8 +50,8 @@ Sprints 003 and 005 are architecturally parallel but are intentionally sequenced
 | 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | completed |
 | 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | completed |
 | 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | completed |
-| 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | ready |
-| 019 | Metadata completeness: viability, then build | A measured verdict on cross-provider field completion and edition choice, then whatever that verdict says is worth building | 018 | planned |
+| 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | completed |
+| 019 | Metadata completeness: viability, then build | A measured verdict on cross-provider field completion and edition choice, then whatever that verdict says is worth building | 018 | ready |
 
 ## Detailed future sprint contracts
 
@@ -283,7 +283,18 @@ rather than a stylistic one, and the upgrade must be exercised against a pre-`00
 the frontend emits several chunks instead of one (DEC-037), so any image or proxy step assuming a
 single asset filename needs checking.
 
-### Sprint 019 — Metadata completeness: viability, then build
+**Sprint 018 closed 2026-08-13.** Its impact on Sprint 019: Phase A inherits a working deployment,
+so measurements can be taken against the container rather than a dev server, and
+`scripts/backup.sh` means an experiment that damages a library is recoverable. Three things Sprint
+018 learned apply directly. A suite that only exercises the dev server is not evidence about the
+shipped artifact (DEC-041) — anything user-visible in Phase B needs the `production-bundle`
+Playwright project and a container walkthrough, not just the chromium project. Backups now live
+outside the data volume and pre-migration copies are never pruned (DEC-039, DEC-040), so any new
+migration in Phase B gets a rollback point for free. And the walkthrough saw both of the
+observations this sprint already owns: a provider "image not available" placeholder stored as a
+real cover, and edition choice picking a 2024 reprint of *Pedro Páramo* over the 1955 original.
+
+### [Sprint 019 — Metadata completeness: viability, then build](019-metadata-completeness.md)
 
 **This sprint is gated. Its first half decides whether its second half happens, and how much of
 it.** The owner's decision (DEC-035) is that richer, more complete metadata is wanted; what is

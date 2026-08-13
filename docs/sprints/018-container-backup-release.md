@@ -1,6 +1,6 @@
 # Sprint 018 — Container, backup, and v1 release
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 017
 **Roadmap revision:** 7
 
@@ -114,5 +114,82 @@ what was read back, and the pre-`0007` upgrade.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Completed 2026-08-13.** Akasha runs on one non-root container, keeps its data across recreation,
+and has a backup that was restored from rather than merely written.
+
+### Delivered
+
+- `b04b6bc` — Compose gained the read-only Calibre mount that had been commented out since Sprint
+  008 with a note saying Sprint 008 would enable it, plus a `${BACKUP_DIR:-./backups}:/backups`
+  mount kept outside the data volume. `backup_dir` derives as a sibling of `data_dir`, so `/data`
+  and `/backups` in the container and `./data` and `./backups` in a checkout both fall out of one
+  rule. The LAN-only warning moved from a Compose label nobody reads to the top of the file.
+  Dockerfile gained `STOPSIGNAL SIGTERM` and a `/backups` directory owned by uid 10001.
+- `2c8d790` — `book_tracker/backup.py` with `create_backup`, `verify_backup`, `restore_backup` and
+  label-scoped `enforce_retention`, exposed as the `akasha-backup` console script and driven from
+  the host by `scripts/backup.sh`. Python rather than shell so it ships in the image and runs under
+  mypy, ruff and pytest.
+- `319b3c6` — Startup takes an online backup before applying pending migrations and refuses to
+  migrate if it cannot (DEC-039). Fresh databases are skipped. `migrations.upgrade` accepts a
+  revision and `pending_revisions` was added.
+- `98a11d0` — `scripts/smoke_container.sh` rewritten to drive `docker compose` against the real
+  API. It had been writing to `schema_probe`, the placeholder table Sprint 001 created and nothing
+  has used since.
+- `8de2dbc` — Three defects the walkthrough found, below.
+- `1555e7a` — Operator runbook, v1 release notes, DEC-039/040/041, technical-spec section 11 and
+  README brought in line.
+
+### Verified
+
+- **AC1** — image 242 MB, `Config.User` 10001:10001, `command -v node` finds nothing. Asserted in
+  `make smoke-container`.
+- **AC2** — an entry written through `POST /api/entries`, scored and annotated, read back
+  identically after `docker compose down && docker compose up -d`. `touch /calibre/breakin` fails
+  at the mount, and `CalibreAdapter` reads the same mount with `query_only` on.
+- **AC3** — walkthrough drill: two real books added through the UI in the container, scored 8 and
+  9, one note each, one on a shelf, both with provider covers. Backup taken from the running
+  instance (`{"covers": 2, "entries": 2, "items": 2, "shelves": 1}`), the data directory then
+  deleted outright, restored into an empty one, stack restarted. Both scores, both notes, the
+  shelf membership and both cover files came back; `/api/items/1/cover` and `/2/cover` served 7772
+  and 29477 bytes.
+- **AC4** — a database seeded at `0006_job_error_code` with accented rows, started under the
+  container: exactly one `pre-migration-*` backup at revision `0006`, then head. Sorting returned
+  `Ávila, Ébano, Zurita` and `q=avila` matched `Ávila`, in the API and in the UI.
+- **AC5** — LAN-only warning is the first thing in `compose.yaml`, repeated in `.env.example`, the
+  README, the runbook and the release notes.
+- **AC6** — `make smoke-container` passes end to end. **No v1 tag was created**, per the owner.
+- Gates: validator, `make check`, `make test` backend **186** / frontend **74**, Playwright **75
+  passed / 2 skipped** across both projects, `make build` with no chunk-size warning,
+  `git diff --check` clean.
+
+### Three defects found by the walkthrough, none by the tests
+
+- **The production bundle rendered a blank page**, and had since Sprint 017. DEC-037's
+  `manualChunks` object form assigns only the exact modules named and leaves their transitive
+  runtime unassigned, so React was spread across chunks that imported each other and the entry
+  threw `Cannot read properties of undefined (reading 'createContext')`. Nothing caught it because
+  Playwright runs against the dev server, which does not chunk. Fixed by matching resolved package
+  names with a fall-through vendor chunk, and guarded by a second Playwright project that loads a
+  real build (DEC-041). Entry chunk 194 kB to 36 kB.
+- **The pre-migration backup ran once per restart.** `restart: unless-stopped` plus a migration
+  that kept failing wrote ten copies of the same database in ninety seconds, and nightly retention
+  deliberately never prunes pre-migration backups. Now taken once per revision.
+- **`akasha-backup restore` could not run without `USER_AGENT_CONTACT`**, because
+  `book_tracker/__init__` imported `main`, which built the FastAPI app at import. That is exactly
+  the variable a bare machine being restored onto has not set. The package init is now empty.
+
+### Deviations
+
+- **A sixth checkpoint was added** for the pre-migration backup (`319b3c6`); the sprint file listed
+  five and the owner chose the guarded-automatic option during planning.
+- **Documentation was written after the tests**, not before them as the checkpoint order implied,
+  so the runbook could record what the drills actually did rather than what they were expected to.
+- The Calibre mount default is `${CALIBRE_DIR:-./calibre}`; the sprint file wrote `${CALIBRE_DIR}`
+  with no default, which fails Compose interpolation for anyone without a Calibre library.
+
+### Impact on Sprint 019
+
+Sprint 019 Phase A is an assessment and inherits a working deployment plus `scripts/backup.sh`, so
+it can measure against a container rather than a dev server. Two observations it already owns were
+seen again during this walkthrough: a provider "image not available" placeholder stored as a real
+cover, and edition choice picking a 2024 reprint of *Pedro Páramo* over the 1955 original.
