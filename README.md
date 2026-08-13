@@ -9,8 +9,6 @@
 
 **A self-hosted book tracker that records what you thought of a book.**
 
-Not the file. Not the metadata. The opinion.
-
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-fbbf24?style=flat-square)](LICENSE)
 [![Self-hosted](https://img.shields.io/badge/deploy-LAN%20only-a1a1aa?style=flat-square)](SECURITY.md)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-a1a1aa?style=flat-square)](backend/pyproject.toml)
@@ -32,7 +30,7 @@ ten, write a note, put it on a shelf.
 
 It exists because reading trackers optimise for other people seeing your shelves.
 This one optimises for you remembering, three years later, whether a book was any
-good and why.
+good and why. No social media features, fully offline.
 
 > [!WARNING]
 > **v1 has no authentication of any kind.** Anyone who can reach the port can read
