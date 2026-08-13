@@ -54,14 +54,25 @@ Set a real contact address for future provider requests, then build and start th
 
 ```bash
 cp .env.example .env
-docker compose up --build
+mkdir -p data backups calibre
+sudo chown -R 10001:10001 data backups   # the container runs as uid 10001
+docker compose up -d --build
 ```
 
-Compose persists `${DATA_DIR:-./data}` at `/data`. The image serves the SPA and API on port 8000,
-runs as a non-root user, contains no Node runtime, and uses `/api/health/ready` for health checks.
-Calibre libraries are addressed by a relative folder beneath the read-only `/calibre` mount.
+Compose persists `${DATA_DIR:-./data}` at `/data` and writes backups to
+`${BACKUP_DIR:-./backups}` at `/backups`, deliberately outside the data volume. The image serves
+the SPA and API on port 8000, runs as a non-root user, contains no Node runtime, and uses
+`/api/health/ready` for health checks. Calibre libraries are addressed by a relative folder
+beneath the read-only `/calibre` mount.
 
-Run the repeatable image proof with `make smoke-container`; it builds the image, checks readiness and SPA routing, recreates the container over persistent data, confirms the process is non-root, and verifies Node is absent.
+Migrations run at startup and take an online backup first whenever an existing database has
+pending revisions. Nightly backups are a host cron entry calling `scripts/backup.sh`; restore and
+rollback are in [the operator runbook](docs/operations/runbook.md).
+
+Run the repeatable image proof with `make smoke-container`. It builds the image, waits on the
+container's own healthcheck, writes an entry through the API and reads it back after
+`docker compose down && up`, fetches every emitted asset chunk, proves `/calibre` rejects writes at
+the mount and in code, takes and restores a backup, and confirms a SIGTERM stop is graceful.
 
 ## Repository guidance
 

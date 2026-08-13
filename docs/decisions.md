@@ -644,3 +644,74 @@ Append-only record of material architecture choices, product-default resolutions
   `role="table"` now address `role="feed"`. axe covers only what is computable from the rendered
   tree, so the keyboard and focus half of the acceptance criterion stays a hand-walked checklist
   recorded in the worklog.
+
+## DEC-039 — Migrations run automatically, guarded by a pre-migration backup
+
+- **Date:** 2026-08-13
+- **Status:** accepted
+- **Context:** Migrations have run inside the application lifespan since Sprint 001, which was
+  unremarkable while every migration was a schema change on an empty or small table. Migration
+  `0007` is different: it rewrites every row in `items` to backfill the normalized projection
+  (DEC-036). On the ZimaBoard nobody watches a restart, so a migration that dies halfway leaves a
+  partially rewritten table and no way back — Alembic here is forward-only and there was no backup
+  of any kind. The alternative considered was an explicit deploy step, with the container refusing
+  to serve until an operator ran the upgrade; `/api/health/ready` already returns 503
+  `schema_not_current`, so it would have worked. The owner chose automatic, on the grounds that a
+  single-user home server should come back by itself after a power cut.
+- **Decision:** Startup keeps migrating automatically, but takes an online backup first whenever
+  `pending_revisions` is non-empty and the database already carries an `alembic_version`. If that
+  backup cannot be written, startup fails rather than migrating unprotected. A fresh database is
+  skipped: there is nothing to lose, and a first start should not pay for a backup of an empty
+  schema.
+- **Consequences:** Every upgrade of an existing library leaves a labelled rollback point in
+  `BACKUP_DIR`, which nightly retention never prunes. The backup is taken once per revision, not
+  once per attempt: `restart: unless-stopped` plus a failing migration is a loop, and the first
+  version of this wrote ten copies of the same database in ninety seconds during the Sprint 018
+  upgrade drill. The rollback procedure is a restore plus an older image, and it is written down in
+  `docs/operations/runbook.md`.
+
+## DEC-040 — Backups live outside the data volume, seven nightly
+
+- **Date:** 2026-08-13
+- **Status:** accepted
+- **Context:** Product spec section 8 sketches `sqlite3 books.db ".backup /data/backups/..."`, and
+  `main.py` had been creating an unused `data/backups` directory since Sprint 001. Writing backups
+  inside the volume they back up protects against the owner's mistakes and against nothing else: a
+  deleted or corrupted volume takes every copy with it, and that is the failure a backup exists
+  for.
+- **Decision:** A separate `${BACKUP_DIR:-./backups}:/backups` mount, with `backup_dir` derived as
+  a sibling of `data_dir` rather than a child, so the container's `/data` and `/backups` and a
+  developer's `./data` and `./backups` both fall out of the same rule. Retention keeps seven
+  nightly backups, the owner's choice. Retention is scoped by label, so nightly housekeeping cannot
+  delete a pre-migration rollback point, and it only ever deletes directories carrying an Akasha
+  manifest — a routine that globs an operator-supplied path and removes what it finds is a footgun.
+- **Consequences:** `BACKUP_DIR` can point at a NAS share. The mount must be owned by uid 10001 or
+  the nightly cron fails silently at 3am, which the runbook says in the install section rather than
+  in a troubleshooting appendix. `data/backups` is no longer created. The backup itself is a Python
+  module in the package rather than a shell script, so it ships in the image, runs under mypy and
+  ruff, and is covered by unit tests that restore and read values back.
+
+## DEC-041 — Vendor chunks are assigned by resolved package, and a build is tested
+
+- **Date:** 2026-08-13
+- **Status:** accepted
+- **Context:** Sprint 018's walkthrough loaded the containerised application and got a blank page
+  and `Cannot read properties of undefined (reading 'createContext')`. DEC-037's `manualChunks`
+  used Rollup's object form, which assigns only the exact entry modules named — `react`,
+  `react-dom` — and leaves their transitive runtime (`scheduler`, `jsx-runtime`,
+  `use-sync-external-store`) unassigned to fall wherever Rollup puts it. React ended up spread
+  across chunks that imported one another, and the entry evaluated before React existed. Every gate
+  was green: unit tests run in jsdom, and Playwright runs against the Vite dev server, which serves
+  unbundled modules and cannot express this failure at all. The production bundle had never been
+  loaded by anything.
+- **Decision:** `manualChunks` is a function that resolves each module to its package name and
+  matches on that, with a fall-through to a single `vendor` chunk so no module can be left
+  unassigned. Matching by package also catches the transitive members of a group — `motion` has to
+  mean `framer-motion`, `motion-dom` and `motion-utils`, and the first attempt at this fix missed
+  `framer-motion` and produced a different cycle. A second Playwright project,
+  `production-bundle`, builds the application and loads it through `vite preview`, asserting that
+  the entry renders and that a lazily loaded route chunk initialises after it.
+- **Consequences:** Six chunks, entry down to 36 kB from 194 kB, no chunk-size warning. CI runs
+  both Playwright projects; `--project=chromium` still gives the fast loop. The cost is a build
+  inside the e2e job. The wider lesson is recorded here rather than in a commit message: a test
+  suite that only ever exercises the dev server is not evidence about the artifact that ships.
