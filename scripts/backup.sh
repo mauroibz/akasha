@@ -26,5 +26,4 @@ if ! docker compose ps --status running --services 2>/dev/null | grep -qx "$serv
 fi
 
 docker compose exec -T "$service" \
-  python -m book_tracker.backup create \
-  --data-dir /data --dest /backups --label "$label" --keep "$keep"
+  akasha-backup create --data-dir /data --dest /backups --label "$label" --keep "$keep"

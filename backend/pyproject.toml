@@ -19,6 +19,12 @@ dependencies = [
   "uvicorn>=0.34,<1",
 ]
 
+[project.scripts]
+# Console script rather than `python -m`: the package __init__ imports main,
+# which imports this module, so runpy would execute it a second time under
+# __main__ and warn about it in every nightly cron log.
+akasha-backup = "book_tracker.backup:main"
+
 [dependency-groups]
 dev = [
   "mypy>=1.14,<2",

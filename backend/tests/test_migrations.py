@@ -12,6 +12,7 @@ from pathlib import Path
 import httpx
 import pytest
 
+from book_tracker.application.library import LibraryService
 from book_tracker.backup import read_manifest, verify_backup
 from book_tracker.config import Settings
 from book_tracker.main import create_app
@@ -184,3 +185,56 @@ def test_alembic_config_still_resolves_a_named_revision(tmp_path: Path) -> None:
 
     assert alembic_config(configured.database_url) is not None
     assert read_manifest(tmp_path) is None
+
+
+@pytest.mark.anyio
+async def test_accented_sorting_and_search_survive_the_projection_backfill(
+    tmp_path: Path,
+) -> None:
+    """AC4 is about behaviour after the backfill, not about the columns existing.
+
+    The rows below were written the way 0006 knew how, with no projection at all.
+    If the backfill missed them they sort by raw code point and an unaccented
+    query matches nothing.
+    """
+    configured = database_at(tmp_path / "data", PRE_PROJECTION)
+    seed_accented_library(configured.data_dir / "books.db")
+    app = create_app(configured)
+
+    async with app.router.lifespan_context(app):
+        service = LibraryService(app.state.engine)
+        by_title = service.list_entries(sort="title", order="asc")
+        unaccented_query = service.list_entries(q="avila")
+        author_query = service.list_entries(q="sabato")
+        by_author = service.list_entries(sort="sort_author", order="asc")
+
+    # "Ávila" before "Ébano" before "Zurita": accent-folded, not code-point order,
+    # which would put every accented capital after "Z".
+    assert [row["item"]["title"] for row in by_title["items"]] == ["Ávila", "Ébano", "Zurita"]
+    assert [row["item"]["title"] for row in unaccented_query["items"]] == ["Ávila"]
+    assert [row["item"]["title"] for row in author_query["items"]] == ["Ébano"]
+    assert [row["item"]["sort_author"] for row in by_author["items"]] == [
+        "Ángela Ruiz",
+        "Ernesto Sábato",
+        "Zoé Valdés",
+    ]
+
+
+def test_the_backfill_reaches_rows_written_before_the_projection_existed(tmp_path: Path) -> None:
+    configured = database_at(tmp_path / "data", PRE_PROJECTION)
+    seed_accented_library(configured.data_dir / "books.db")
+    assert configured.database_url is not None
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    projected = connection.execute(
+        "SELECT title, title_normalized, sort_author_normalized FROM items ORDER BY id"
+    ).fetchall()
+    connection.close()
+
+    assert projected == [
+        ("Ávila", "avila", "angela ruiz"),
+        ("Zurita", "zurita", "zoe valdes"),
+        ("Ébano", "ebano", "ernesto sabato"),
+    ]
