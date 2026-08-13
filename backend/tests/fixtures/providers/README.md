@@ -9,7 +9,8 @@ of the exact broken method.
 If a provider changes shape, re-record deliberately, in its own commit, and say so in the
 sprint outcome — otherwise a regression test quietly starts asserting the new bug.
 
-Captured 2026-08-09 with `User-Agent: Akasha/0.1 (mauro0094@gmail.com)`.
+Captured 2026-08-09 with `User-Agent: Akasha/0.1 (<contact address>)`, the value
+`USER_AGENT_CONTACT` supplies at runtime.
 
 | File | Source |
 |---|---|

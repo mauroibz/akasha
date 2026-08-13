@@ -715,3 +715,61 @@ Append-only record of material architecture choices, product-default resolutions
   both Playwright projects; `--project=chromium` still gives the fast loop. The cost is a build
   inside the e2e job. The wider lesson is recorded here rather than in a commit message: a test
   suite that only ever exercises the dev server is not evidence about the artifact that ships.
+
+## DEC-042 — Post-v1 roadmap: sequence, and assess-then-build as the default shape
+
+- **Date:** 2026-08-13
+- **Status:** accepted; extends DEC-035, which is not superseded
+- **Context:** v1 shipped at Sprint 018 and the plan had exactly one sprint left on it, written as
+  though the project ended there — the release-state rule in `WORKFLOW.md`, the closure step in
+  `AGENTS.md`, and the completeness bound in `scripts/validate_project.py` all named Sprint 019 as
+  the last. The owner then named four further directions: a score-contrast fix, arbitrary file
+  attachments (epubs) kept inside the metadata-first framing, additional domains (albums, games,
+  series) informed by `docs/domain_metadata_roadmap_report.md`, and whatever deferred work had gone
+  unrecorded. The owner asked for a sequenced plan, with the large items scoped as *assess
+  viability and impact first, then decide*.
+- **Decision:** Roadmap revision 8 runs 019 post-v1 polish, 020 metadata completeness, then 021
+  attachments, 022 creator sort names, 023 export, and 024–026 the domain line beginning with
+  albums. Four ordering claims carry it. **Metadata precedes domains** because Phase A settles how
+  a candidate is verified before its fields are merged, and that is the provider contract every
+  later domain inherits; answering it once against books — where recorded fixtures and a working
+  baseline exist — beats answering it retrofitted across N domains. **Creator sort precedes
+  domains** because the repair generalizes from author to creator and N domains should not inherit
+  a broken projection. **Albums is the pilot domain** among the three named: MusicBrainz needs no
+  OAuth, release-group versus release maps onto the work-versus-edition problem already solved, and
+  Cover Art Archive exercises the separate-image-provider case metadata completeness will have just
+  settled. **Series is last** because it is gated on a product decision rather than an integration:
+  the entry model is one score, one status, one `reread_count` per item, and a season is not
+  expressible in it without giving entries hierarchy.
+  The gate structure DEC-035 invented for a single sprint is adopted as the **default shape for any
+  item whose cost is unknown** — 021, 024 and 026 are all Phase A / Phase B, and Phase A concluding
+  *no* remains a complete outcome in each.
+  Sprint 024's Phase A is specified as **a build rather than a document**: implement one domain end
+  to end on a branch, and the deliverable is the list of everything touched that was not the
+  provider adapter. The provider research already exists and repeating it as prose would produce a
+  confident answer about this codebase that the research cannot support.
+  Auth stays unscheduled at the owner's direction, remaining a product spec section 9 deferral and
+  the gate on any exposure beyond LAN. Export moves from deferred to Sprint 023, constrained to the
+  entity shape so a second domain does not force a v2 format.
+- **Consequences:** The metadata sprint is **renumbered 019 → 020** and its file renamed, because
+  `scripts/validate_project.py` requires `active_sprint == len(completed_sprints) + 1` and permits
+  exactly one non-completed sprint file; putting polish first therefore forces the renumber rather
+  than being a stylistic choice. Sprint 018's Outcome keeps its "Impact on Sprint 019" text as
+  written, with a bracketed pointer, because a completed sprint's Outcome is audit history.
+  The final-sprint bound moves from 019 to 026 in `WORKFLOW.md`, `AGENTS.md`, and
+  `validate_project.py`, where the literal is now the named `FINAL_SPRINT` constant; it stays
+  hardcoded rather than derived from files on disk, because its purpose is to stop a session
+  declaring the plan finished early.
+  `ROADMAP.md` drops the duplicated contract blocks for sprints 002–018 — every one of those
+  sprints has its own file carrying the same Deliverables and Acceptance criteria, and nothing
+  anchor-links into a roadmap section — taking it from 408 lines to 241 while covering eight more
+  sprints. OQ-001 is deleted rather than kept as a resolved open question restated in three places;
+  its one live paragraph, that product spec 4.3 already specifies per-field completion at *search*
+  time and `_merge_group` implements it there, moves into the Sprint 020 file.
+  One item is promoted out of the gate: `GoogleBooksProvider.fetch_by_isbn` taking the first hit of
+  an `isbn:` search is recorded as a **live v1 defect** repaired whatever Phase A concludes, not
+  only as a question the assessment asks.
+  The proposal to rename the `book_tracker` package to match the Akasha brand was raised during this
+  re-plan and **rejected on the existing invariant** in `AGENTS.md`: internal names are permanent
+  and only user-facing copy follows the brand. Multi-domain content in a package named
+  `book_tracker` is accepted as a cosmetic cost. Plan revision is now 8.

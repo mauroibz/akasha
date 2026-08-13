@@ -189,6 +189,9 @@ and has a backup that was restored from rather than merely written.
 
 ### Impact on Sprint 019
 
+_[Roadmap revision 8 renumbered this sprint: the metadata-completeness work described below
+is now Sprint 020, and Sprint 019 is post-v1 polish. Text left as written — see DEC-042.]_
+
 Sprint 019 Phase A is an assessment and inherits a working deployment plus `scripts/backup.sh`, so
 it can measure against a container rather than a dev server. Two observations it already owns were
 seen again during this walkthrough: a provider "image not available" placeholder stored as a real

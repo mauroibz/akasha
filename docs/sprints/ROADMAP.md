@@ -1,398 +1,231 @@
 # Implementation Roadmap
 
-**Plan revision:** 7
+**Plan revision:** 8
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 019](019-metadata-completeness.md)
+**Active sprint:** [Sprint 019](019-post-v1-polish.md)
 
-## Dependency graph
+## Shape of the plan
+
+Sprints 001–018 delivered v1 as a single dependency chain, each sprint depending on the one before
+it. That chain is closed. Its contracts live in the individual sprint files linked below, which are
+the source of truth for what each one promised and what it delivered; they are not restated here.
+
+Post-v1 work branches:
 
 ```text
-001 Foundation
- └─ 002 Domain + persistence
-     ├─ 003 Entries + shelves API
-     │   └─ 004 Frontend shell + library
-     └─ 005 Providers + cached add API
-         └─ 006 Add/detail/edit UI
-             └─ 007 Goodreads import
-                 └─ 008 Working metadata + covers
-                     └─ 009 Calibre import
-                         └─ 010 Editorial UI redesign + completion
-                             └─ 011 Durable enrichment + undo
-                                 └─ 012 Triage workflow
-                                     └─ 013 Library grid layout repair
-                                         └─ 014 Metadata correctness + search relevance
-                                             └─ 015 Design system + components
-                                                 └─ 016 Motion + interaction polish
-                                                     └─ 017 Scale, accessibility, resilience
-                                                         └─ 018 Container, backup, release
+018 v1 released
+ └─ 019 Post-v1 polish
+     └─ 020 Metadata completeness  [GATED]
+         ├─ 021 Attachments        [GATED]
+         ├─ 022 Creator sort names
+         ├─ 023 Export
+         └─ 024 Second domain: albums  [GATED]
+             ├─ 025 Third domain: games
+             └─ 026 Fourth domain: series  [GATED]
 ```
 
-Sprints 003 and 005 are architecturally parallel but are intentionally sequenced for one-agent worktrees and simpler handoffs. Frontend vertical slices begin only after stable API contracts exist.
+020 precedes the domain work because its Phase A settles how a candidate record is verified before
+its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
+it because the fix generalizes from author to creator, and N domains should not inherit a broken
+sort projection. 021 and 023 are independent of the domain line and may be reordered freely against
+each other.
+
+**GATED** marks a sprint whose first phase decides whether its second phase happens. Phase A
+measures and produces a written verdict in `docs/decisions.md`, changing nothing user-visible;
+Phase B builds only what that verdict and an explicit owner go-ahead justify. Phase A concluding
+*no* is a complete, correct outcome. This is the owner's preferred shape for any item large enough
+that its cost is unknown — see DEC-035 and DEC-042.
 
 ## Sprint index
 
-| Sprint | Outcome | Key acceptance signal | Depends on | Status |
-|---|---|---|---|---|
-| 001 | Reproducible monorepo foundation | Backend/frontend hello slices, migration, all quality gates and dev commands work | — | completed |
-| 002 | Domain model and durable persistence | Migrations and repositories enforce identity, score/status, source, and shelf invariants | 001 | completed |
-| 003 | Entries, shelves, filtering, keyset API | CRUD and list API pass contract tests including null-safe asc/desc cursors | 002 | completed |
-| 004 | Design system and virtualized library | `/` renders and edits a seeded multi-thousand-entry library by keyboard | 003 | completed |
-| 005 | Metadata providers and cached add API | Merged provider search, URL/ISBN resolve, dedupe, and local cover cache work with mocked failures | 002 | completed |
-| 006 | Add, detail, and metadata-edit UI | Manual/provider add and edit flows work end-to-end without mouse | 004, 005 | completed |
-| 007 | Goodreads preview and commit | Realistic CSV imports idempotently as unsorted with suggestions/provisional scores | 006 | completed |
-| 008 | Working book metadata and covers | Three real editions add with normalized metadata and render fully offline | 007 | completed |
-| 009 | Calibre preview and commit | Read-only synthetic Calibre library imports/resyncs without overwriting user data | 008 | completed |
-| 010 | Editorial UI redesign and completion | Every currently supported v1 workflow is coherent, navigable, responsive, and keyboard complete | 009 | completed |
-| 011 | Durable jobs, enrichment, ledger undo | Restart-safe enrichment and safe 24-hour undo pass crash/retry tests | 010 | completed |
-| 012 | Bulk-first triage | Hundreds of unsorted entries can be filtered, selected, bulk accepted, and keyboard-triaged | 011 | completed |
-| 013 | Library grid layout diagnosis and repair | Grid content and controls never overlap across supported widths while virtualization and table behavior remain intact | 012 | completed |
-| 014 | Metadata correctness and search relevance | Searching finds the intended edition; added and imported books acquire real metadata and cached covers, proven against recorded provider responses | 013 | completed |
-| 015 | Design system and component foundation | Every control is a shadcn primitive on real tokens; every action shows visible feedback | 014 | completed |
-| 016 | Motion and interaction polish | Product-spec section 7 microinteractions exist and respect reduced motion without regressing virtualization budgets | 015 | completed |
-| 017 | Production-quality hardening | Performance budgets, accessibility audit, error/reduced-motion behavior, full E2E suite pass | 016 | completed |
-| 018 | Deployable v1 | Non-root image, Compose, healthchecks, backup/restore drill, persisted smoke test pass | 017 | completed |
-| 019 | Metadata completeness: viability, then build | A measured verdict on cross-provider field completion and edition choice, then whatever that verdict says is worth building | 018 | ready |
+| Sprint | Outcome | Depends on | Status |
+|---|---|---|---|
+| [001](001-foundation.md) | Reproducible monorepo foundation | — | completed |
+| [002](002-domain-persistence.md) | Domain model and durable persistence | 001 | completed |
+| [003](003-entries-shelves-api.md) | Entries, shelves, filtering, keyset API | 002 | completed |
+| [004](004-frontend-library.md) | Design system and virtualized library | 003 | completed |
+| [005](005-providers-add-api.md) | Metadata providers and cached add API | 002 | completed |
+| [006](006-add-detail-edit-ui.md) | Add, detail, and metadata-edit UI | 004, 005 | completed |
+| [007](007-goodreads-import.md) | Goodreads preview and commit | 006 | completed |
+| [008](008-book-metadata-covers.md) | Working book metadata and covers | 007 | completed |
+| [009](009-calibre-import.md) | Calibre preview and commit | 008 | completed |
+| [010](010-editorial-ui-redesign.md) | Editorial UI redesign and completion | 009 | completed |
+| [011](011-durable-enrichment-undo.md) | Durable jobs, enrichment, ledger undo | 010 | completed |
+| [012](012-bulk-first-triage.md) | Bulk-first triage | 011 | completed |
+| [013](013-library-grid-layout-repair.md) | Library grid layout diagnosis and repair | 012 | completed |
+| [014](014-metadata-correctness-search.md) | Metadata correctness and search relevance | 013 | completed |
+| [015](015-design-system-components.md) | Design system and component foundation | 014 | completed |
+| [016](016-motion-interaction-polish.md) | Motion and interaction polish | 015 | completed |
+| [017](017-scale-accessibility-resilience.md) | Production-quality hardening | 016 | completed |
+| [018](018-container-backup-release.md) | Deployable v1 | 017 | completed |
+| [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | **ready** |
+| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | planned |
+| 021 | Attachments: viability, then a narrow slice | 020 | planned |
+| 022 | Creator sort names | 020 | planned |
+| 023 | Export | 020 | planned |
+| 024 | Second domain — albums: pilot, then verdict | 020 | planned |
+| 025 | Third domain — games | 024 | planned |
+| 026 | Fourth domain — series | 024 | planned |
+
+## Contracts for planned sprints
+
+These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
+the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
+incorporating actual deviations. Sprints 019 and 020 already have files; the rest do not.
+
+### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
+
+Three small user-visible defects that survived v1: the score chip reads as colour-on-dark instead
+of a filled chip, `s` does nothing on `/triage` despite product spec section 7, and a committed
+import lands rows `unsorted` where the default library hides them, so it looks as though nothing
+happened. Deliberately small and independent of everything after it.
+
+### [Sprint 020 — Metadata completeness: viability, then build](020-metadata-completeness.md)
+
+**Gated.** DEC-035 records that the owner wants richer metadata built up from whichever provider
+has the missing piece, and specifically the ability to choose a cover from the editions actually
+fetched — and that what was *not* decided is whether it is affordable. Phase A measures provider
+rate limits, wall-clock import cost, whether a candidate can be verified as the same edition before
+merging, disk cost of multiple cover candidates, failure semantics, and whether DEC-008's
+fill-empty-only invariant survives. Phase A may conclude a narrow slice — cover choice alone, on
+demand — carries most of the value at a fraction of the risk.
+
+One item does not wait on the gate: `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an
+`isbn:` search, which is not guaranteed to carry the requested ISBN13. That is a live defect and is
+repaired whatever the verdict.
+
+This sprint sets the provider contract Sprint 024 inherits, so its reasoning matters as much as its
+verdict.
+
+### Sprint 021 — Attachments: viability, then a narrow slice
+
+**Gated.** The owner wants to attach arbitrary files to an entry — epubs for books — while keeping
+the metadata-first framing. The scope risk is real and has a precise boundary: **an attachment is
+an opaque file, or it is a reader.** Everything that expands this feature past its usefulness
+follows from crossing that line.
+
+Phase A must answer:
+
+- **Backup.** `ARCHIVED_DIRECTORIES = ("covers", "imports")` in `backend/src/book_tracker/backup.py`
+  tars everything into every backup. Covers are ~50 KB; an epub is 1–5 MB and a comic or audiobook
+  far more. Seven nightly backups against a few hundred attached files is a different machine's
+  worth of disk. Either attachments go in the tar under a size cap, or they are excluded with a
+  documented separate story. **This is the decision that scopes the feature.**
+- **Where it hangs.** Item or entry. An epub is a property of the edition; an annotated personal
+  copy is a property of your entry. Item is the default and matches the metadata-first framing.
+- **Serving.** Covers go through a validated pipeline with a host allowlist and a pixel bound. An
+  arbitrary blob has no such thing, so size limits, content-type handling, and
+  `Content-Disposition: attachment` are required rather than optional.
+
+Phase B narrow slice, if justified: one or more opaque files per item, uploaded manually,
+size-capped, listed with filename and size, downloadable from the detail page. **No format parsing,
+no in-browser reader, no reading progress, no device sync.**
+
+Reading an uploaded epub's OPF as another metadata provider filling empty fields under DEC-008 is
+genuinely cheap and on-brand, and is named here so it is recognized as the natural next step rather
+than smuggled into the first slice. It is explicit non-scope for Phase B.
+
+### Sprint 022 — Creator sort names
+
+`sort_author` is `json_extract(metadata, '$.authors[0]')` verbatim, so "Adolfo Bioy Casares" sorts
+under A and "Gabriel García Márquez" under G.
+
+The obvious repair is wrong for this library specifically. Splitting on the last space gives
+*Márquez* for García Márquez and *Llosa* for Vargas Llosa, both of which are wrong, while giving
+the right answer for Rulfo. Spanish double surnames have no reliable heuristic, so the shape is a
+stored sort name seeded by a heuristic and correctable by the owner — a migration plus an edit
+surface, not a one-line fix.
+
+Name it **creator**, not author. An album has an artist and a game has a studio, and this projection
+should not need rewriting when Sprint 024 lands. Note that `title_normalized` and
+`sort_author_normalized` are maintained by a mapper event (DEC-036) precisely so a new write path
+cannot forget them; whatever replaces `sort_author` inherits that requirement.
 
-## Detailed future sprint contracts
+### Sprint 023 — Export
 
-These are binding outcome boundaries. Before a future sprint becomes active, the closing agent for the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`, incorporating actual deviations.
+`GET /api/export` dumping entries and items as JSON, plus a Goodreads-shaped CSV. Product spec
+section 9 deferred this to v2 as agreed-in-principle; the owner has now scheduled it. Backups
+(DEC-039, DEC-040) removed the urgency, but the repository is public and portability is now a
+user-facing story rather than only the owner's.
 
-### Sprint 002 — Domain model and persistence
+One design constraint, because it decides whether this survives the domain work: **export the
+entity shape — `type`, identifiers, and an opaque `metadata` object — not a book-specific schema.**
+The database is already shaped that way. A book-shaped export format would need a v2 the moment
+Sprint 024 lands.
 
-Scope:
+The Goodreads-shaped CSV is a book-only convenience and is allowed to stay book-only.
 
-- Item identifiers/sources, ISBN and text normalization, edition-safe ambiguity decisions, and fill-empty merge semantics.
-- Initial complete v1 schema for items, item identifiers, item sources, entries, shelves, import records/effects, and jobs.
-- SQLAlchemy repositories and transaction fixture.
+### Sprint 024 — Second domain, albums: pilot, then verdict
 
-Acceptance:
+**Gated, and its Phase A is a build rather than a document.** `docs/domain_metadata_roadmap_report.md`
+already did the provider research; repeating it as prose would produce a confident answer about
+this codebase that the research cannot support.
 
-- Alembic upgrade from empty DB and downgrade/upgrade round trip pass.
-- Foreign keys are demonstrably enabled on every connection.
-- Constraints reject invalid scores/statuses and duplicate authoritative identifiers/sources, including ISBN-10/13 conversion-equivalent races.
-- Repository tests prove exact item/entry dedupe, split exact identities produce a typed conflict without mutation, ambiguous title/author never auto-merges, and shelf behavior.
-- No API surface beyond health/config is required.
+Phase A: implement one domain end to end on a branch — search, add, cover, library card, detail,
+edit. The deliverable is **the list of everything that had to be touched that was not the provider
+adapter.** If that list is a type column, a provider registry, a per-type field config and a status
+vocabulary, the abstraction is justified and Phase B builds it properly. If it reaches into keyset
+pagination, the job runner, or the import ledger, that is the finding and it changes the plan.
 
-### Sprint 003 — Entries, shelves, filtering, keyset API
+What is already generic, and should be confirmed rather than rebuilt:
 
-Scope:
+- `items.type` exists and product spec 3.1 always described `items` as a domain-agnostic shell.
+- `Provider` in `domain/providers.py` is already a two-method protocol carrying `item_type`.
+- `normalize_identifier` in `domain/identity.py` already has a generic non-ISBN path.
+- `items`/`entries` are already split, which product spec section 9 called the entire preparation.
 
-- Entry/item/shelf read and mutation services and routes.
-- Server-side filters, counts, whitelisted sorting, opaque keyset cursors.
-- Bulk entry mutation accepts explicit IDs or server filter plus exclusions; accept-suggested uses the same validated filter contract.
+What is hardcoded, and is the real work:
 
-Acceptance:
+- `type="book"` at three `infrastructure/repositories.py` call sites, and `SOURCE_PREFERENCE` as a
+  module constant in `domain/providers.py`.
+- Book fields in `features/detail/MetadataDialog.tsx` and `features/detail/schemas.ts`, which a
+  per-type display config replaces.
+- **Status vocabulary.** "To read / Reading / Read" does not fit an album. This reaches the filter
+  chips, the triage keyboard map, the Goodreads status suggestions, and `entryStatuses`. Expect it
+  to be the largest single piece.
+- Literal "book"/"books" copy in `ShelvesPage.tsx` and `ImportPage.tsx`.
 
-- OpenAPI and API tests cover happy/error paths.
-- NULL-last pagination works in both directions with duplicate values, matching text collation, deleted boundaries, query-plan assertions, and reload after sort-key edits.
-- Default library excludes unsorted; explicit filters can find it.
-- Manual score changes clear provisional state.
-- Static `/entries/bulk` routing cannot be shadowed by `/{entry_id}`.
+Albums first, among the three domains the owner named. MusicBrainz needs no OAuth, unlike IGDB's
+Twitch credentials; release-group versus release maps directly onto the work-versus-edition problem
+this codebase already solved for books; and Cover Art Archive as a separate image provider exercises
+the two-provider composition Sprint 020 will have just settled.
 
-### Sprint 004 — Frontend shell and virtualized library
+The Goodreads and Calibre import pipelines stay book-only. That is not a gap.
 
-Scope:
+### Sprint 025 — Third domain, games
 
-- Design tokens, application shell, routing, typed API client, Query setup.
-- Grid/table library, filters, sort, search, status counts, fixed-size virtualization.
-- Optimistic inline score/status editing and keyboard guards.
+IGDB. Not gated: by this point the architecture verdict exists and this sprint either fits it or
+proves it wrong cheaply.
 
-Acceptance:
+The new infrastructure is authentication — IGDB requires Twitch OAuth client credentials and token
+refresh, where every provider so far has needed at most a static API key. Localization is
+enrichment, not a guarantee: keep the original title plus whatever alternate names the provider
+exposes rather than assuming a single translated-title field.
 
-- Seeded 5,000-entry fixture remains responsive and mounts only visible rows.
-- Grid/table preference persists.
-- Optimistic failure rolls back and is announced accessibly.
-- `/`, `a`, and score shortcuts obey input-focus rules and reduced motion.
+### Sprint 026 — Fourth domain, series
 
-### [Sprint 005 — Providers and cached add API](005-providers-add-api.md)
+**Gated on a product decision, not on a provider integration.** TMDB is the strongest provider in
+the research and the integration is the easy half.
 
-Scope:
+The entry model is one score, one status, one `reread_count` per item — settled deliberately in
+product spec section 10, item 4. A television series does not fit it. Either a series is one entry
+and "watched through season 3" is not expressible, or entries gain hierarchy, which reaches keyset
+pagination, triage selection semantics, bulk operations, and every count in the UI.
 
-- Open Library and optional Google Books adapters, merge/rank, edition-safe URL/ISBN resolution.
-- Manual payloads, exact duplicate constraints, advisory near matches, and work-URL edition picking.
-- Cover download/validation/resize/cache and one-call create orchestration.
+Phase A decides that and nothing else. It is last on the roadmap because the decision is much
+better made with two working domains in hand than with none.
 
-Acceptance:
+Note the vocabulary collision before it causes confusion: book-series already exists as a free-text
+`metadata` field, and product spec section 11 item 4 records the deliberate choice not to model it.
 
-- All external HTTP is mocked in normal tests.
-- Independent timeout/failure behavior returns partial success.
-- Search merging retains both source identities; Open Library work years never become edition years, and work URLs require edition choice.
-- Add holds no DB write lock during network/image work; cover failure cannot roll back a valid entry and double-submit is idempotent.
-- Existing entry returns a typed already-exists response; near edition only warns.
+## Not scheduled
 
-### [Sprint 006 — Add, detail, and metadata-edit UI](006-add-detail-edit-ui.md)
-
-Scope:
-
-- Search/manual picker and add form; entry detail; item metadata editor; cover upload; explicit refresh.
-- Complete keyboard path and duplicate affordances.
-
-Acceptance:
-
-- Manual and provider-backed Playwright add flows pass.
-- Existing duplicate navigates to detail with toast; near duplicate remains addable.
-- Metadata edit survives a fill-empty sync test.
-- Explicit refresh communicates overwrite, updates only fields present in a validated payload, preserves omitted fields, and leaves all old data on failure.
-
-### [Sprint 007 — Goodreads import](007-goodreads-import.md)
-
-Scope:
-
-- Size-limited staging, CSV parser (including Goodreads Book Id provenance), durable normalized preview records, explicit ambiguity decisions, and transactional effect ledger.
-- Goodreads status suggestions, shelf filtering, date conversion, provisional score conversion.
-- Import UI tab with preview and actionable row errors.
-
-Acceptance:
-
-- Excel-armored/empty ISBNs, malformed dates, UTF-8 text, missing columns, repeated files, and zero ratings have fixtures.
-- Preview changes no library entities, persists the exact commit plan, and exposes parse errors/ambiguities.
-- Commit is idempotent; new rows land unsorted while existing entries and manual edits remain untouched.
-- UI never uploads on commit a second time or exposes staged host paths.
-
-### [Sprint 008 — Working book metadata and covers](008-book-metadata-covers.md)
-
-Scope:
-
-- Normalize Open Library edition/work/author data and optional same-ISBN Google Books fill-empty data.
-- Type metadata patches, migrate legacy publishers, cache and serve versioned covers, and expose the edition/original-year distinction throughout the UI.
-
-Acceptance:
-
-- Provider and file-backed tests cover normalized metadata, identity-safe merging, patch clearing, refresh preservation, secure cover download/serving, and zero provider calls during rendering.
-- Component/Chromium tests cover search, virtual rows, detail/edit/refresh, mobile, keyboard, and missing-cover states; the specified three-title live smoke proves cached offline rendering.
-
-### [Sprint 009 — Calibre import and re-sync](009-calibre-import.md)
-
-Scope:
-
-- Path confinement, read-only Calibre connection, supported schema queries, and preview-time staging of normalized rows/cover preparation so commit never rereads a changed source.
-- Shared matching/commit pipeline and Calibre UI tab.
-
-Acceptance:
-
-- Synthetic Calibre libraries cover authors, identifiers, tags, descriptions, series, ratings, and absent optional data.
-- Symlink/path escapes are rejected.
-- `mode=ro` plus `query_only` is tested; source DB hash is unchanged after import.
-- Re-sync adds/fills only and native 1–10 scores are not provisional.
-
-### [Sprint 010 — Editorial UI redesign and product-spec completion](010-editorial-ui-redesign.md)
-
-Scope and acceptance are detailed in the linked sprint contract. It closes implemented-screen gaps,
-adds only shelf-count-level UI-enabling API data, and leaves jobs, full triage, and hardening separate.
-
-### [Sprint 011 — Durable enrichment and safe undo](011-durable-enrichment-undo.md)
-
-Scope and acceptance are detailed in the linked sprint contract. It delivers DB-backed job polling,
-rate-limited enrichment, and safe 24-hour undo using the import-effect ledger established in Sprints
-007–009.
-
-### [Sprint 012 — Bulk-first triage](012-bulk-first-triage.md)
-
-Scope:
-
-- Virtualized dense table, filters/grouping, selection/range/select-all semantics.
-- Bulk action bar, suggested-status acceptance, conflict expansion/resolution, keyboard rhythm.
-
-Acceptance:
-
-- Server-side select-all means all rows matching the current filter and uses exclusions; unloaded or hidden rows are mutated only when that contract explicitly includes them.
-- `j/k`, status, score, shelf, commit/advance shortcuts work with input guards.
-- A Playwright scenario imports and triages hundreds of rows without one request per row.
-- Conflicting values remain visible until explicitly resolved.
-
-### [Sprint 013 — Library grid layout diagnosis and repair](013-library-grid-layout-repair.md)
-
-Scope and acceptance are detailed in the linked sprint contract. The diagnosed defect is a
-structural mismatch in `VirtualLibrary`: a `128px 1fr` outer grid receives a cover-and-metadata
-flex child plus a non-wrapping controls child, while fixed 310px virtual rows cannot absorb their
-overflow. The repair must establish a real responsive card grid and retain bounded virtualization,
-keyboard behavior, inline editing, pagination, and table view.
-
-### [Sprint 014 — Metadata correctness and search relevance](014-metadata-correctness-search.md)
-
-Scope and acceptance are detailed in the linked sprint contract. It repairs four defects
-confirmed against live providers and running code on 2026-08-08: Open Library ISBN enrichment
-requests an OLID endpoint and has always failed, merged search results are re-sorted
-alphabetically and lose provider relevance, Google Books never registers because no key is
-configured, and only the first search result resolves an edition year. Backend only, so it does
-not collide with the frontend rebuild, and it makes real covers and metadata exist before the
-UI that displays them is judged.
-
-### [Sprint 015 — Design system and component foundation](015-design-system-components.md)
-
-Scope and acceptance are detailed in the linked sprint contract. `technical-spec.md` section 8
-requires shadcn/ui primitives, Tailwind tokens, and React Hook Form with schema validation; none
-were installed, so every control is hand-rolled, there are no design tokens, and every toast is
-rendered `sr-only` and therefore invisible. This sprint installs the specified stack, commits to
-the DEC-026 token set, and makes feedback visible. The Sprint 013 grid contract and the bespoke
-`ScorePicker` overlay are explicitly out of scope for replacement.
-
-### [Sprint 016 — Motion and interaction polish](016-motion-interaction-polish.md)
-
-Scope and acceptance are detailed in the linked sprint contract. `motion` has been a dependency
-since Sprint 004 and is imported zero times, so every microinteraction in product-spec section 7
-is missing. Animation is spent on interactions, never on scrolling: the container crossfades on
-sort and filter change and rows never carry layout animations, per technical-spec section 8. Both
-DEC-023 mounted-DOM bounds are re-asserted with animation enabled.
-
-Sprint 015 changed what this inherits. Colour, radius, and typography are tokens now, so a spring
-or a colour shift is written against `--score-*` and `--primary` rather than against literals, and
-`tailwindcss-animate` is installed. Radix supplies its own enter/exit transitions on dialogs,
-selects, and toasts, so the first job is deciding which of those to keep rather than adding
-motion to a blank page. The measured headroom against the 5,000-entry fixture is 7 of 20 mounted
-rows and 28 of 48 mounted cards. DEC-029 records that portalling is safe inside a virtual row, so
-animating portalled content does not reopen DEC-023 — but the score picker still may not portal.
-
-### [Sprint 017 — Scale, accessibility, and resilience](017-scale-accessibility-resilience.md)
-
-Scope:
-
-- Query/index measurement including whether normalized text sorts need a stored projection, 10k-entry benchmark against both DEC-023 mounted-DOM bounds, accessibility audit and fixes. The audit inherits labelled controls, `aria-invalid`/`aria-describedby` on every field, and Radix focus management from Sprint 015, so it should confirm more than it repairs.
-- Bundle size, and this is now the sharper number: Sprint 016 took the frontend to **696 kB** of JavaScript (219.66 kB gzip), +86 kB on Sprint 015's 610 kB and roughly double the Sprint 013 baseline of 343.79 kB. The build still emits a chunk-size warning. Decide whether to code-split or to raise the limit deliberately.
-- Two cosmetic defects recorded in the Sprint 015 walkthrough and confirmed still present in the Sprint 016 walkthrough: the edition-year line is truncated on library cards, and the triage score cell renders a provisional score as an unexplained `6·`.
-- Error boundaries, degraded provider states, reduced motion, cancellation/race tests. Reduced motion is partly discharged: DEC-033 pairs every reduced-motion assertion with a positive one, the unit suite runs under `reduce` by default, and a reusable per-frame animation sampler lives at `frontend/e2e/motion.ts`. What remains here is the rest of the surface, not the library.
-- Complete critical E2E regression suite and security limits.
-
-Acceptance:
-
-- Technical-spec latency/render budgets pass on documented hardware or deviations are approved.
-- Automated axe checks and manual keyboard/focus checklist pass core screens.
-- Upload/image/path/provider limits and log redaction tests pass.
-- No uncaught frontend errors in E2E console.
-
-### [Sprint 018 — Container, backup, and v1 release](018-container-backup-release.md)
-
-Scope:
-
-- Multi-stage non-root image, production static SPA routing, Compose mounts/config, healthcheck.
-- Alembic startup/deploy procedure, online backup script, host-scheduler example, retention/checksums/integrity check, restore documentation.
-- Fresh-install and upgrade smoke tests; operator runbook and release notes.
-
-Acceptance:
-
-- Final image contains no Node runtime and runs as non-root.
-- `/data` persists DB/covers across recreation; `/calibre` is read-only in mount and code.
-- Backup/restore drill recovers representative scores, notes, shelves, and covers.
-- LAN-only warning is prominent; no public exposure or auth is implied.
-- Clean-machine Compose smoke test passes and tags the v1 release only when explicitly requested.
-
-Sprint 017 added two things this sprint must account for. Migration `0007` backfills every row in
-`items` (DEC-036), making it the first migration that does real work on the owner's data at deploy
-time — so whether migrations run at container start or as an explicit step is now a real decision
-rather than a stylistic one, and the upgrade must be exercised against a pre-`0007` database. And
-the frontend emits several chunks instead of one (DEC-037), so any image or proxy step assuming a
-single asset filename needs checking.
-
-**Sprint 018 closed 2026-08-13.** Its impact on Sprint 019: Phase A inherits a working deployment,
-so measurements can be taken against the container rather than a dev server, and
-`scripts/backup.sh` means an experiment that damages a library is recoverable. Three things Sprint
-018 learned apply directly. A suite that only exercises the dev server is not evidence about the
-shipped artifact (DEC-041) — anything user-visible in Phase B needs the `production-bundle`
-Playwright project and a container walkthrough, not just the chromium project. Backups now live
-outside the data volume and pre-migration copies are never pruned (DEC-039, DEC-040), so any new
-migration in Phase B gets a rollback point for free. And the walkthrough saw both of the
-observations this sprint already owns: a provider "image not available" placeholder stored as a
-real cover, and edition choice picking a 2024 reprint of *Pedro Páramo* over the 1955 original.
-
-### [Sprint 019 — Metadata completeness: viability, then build](019-metadata-completeness.md)
-
-**This sprint is gated. Its first half decides whether its second half happens, and how much of
-it.** The owner's decision (DEC-035) is that richer, more complete metadata is wanted; what is
-*not* decided is whether it can be had at an acceptable cost. An agent that arrives here and
-starts implementing cross-provider merging has skipped the entire point.
-
-Placed after v1 release deliberately: this is additive, it carries real unknowns about third-party
-rate limits, and blocking a working release on it would be the wrong trade.
-
-Sprint 017 leaves Phase A better equipped than planned. `scripts/benchmark_library.py` already
-measures library latency at 10,000 entries both idle and with the job queue draining, so the
-"performance under a large import" question has a harness rather than needing one built; extending
-it to count provider requests per enrichment job is a smaller job than starting from nothing.
-
-#### What the owner asked for
-
-More complete metadata entries, built up from whatever provider has the missing piece. The
-motivating example is covers: you get a sensible default, but you can **choose a different one
-from the editions that were actually fetched**, rather than being stuck with a bad cover or none.
-The same appetite applies to the other fields.
-
-The concerns are equally explicit and are the reason this is gated:
-
-- **Complexity** — unknown, and worth knowing before committing.
-- **Performance** — provider traffic per enrichment job goes up, and a large import is many jobs.
-- **Free-tier limits** — Open Library and Google Books are free services. Doubling traffic per
-  book must not get the application rate-limited or blocked.
-- **Feel and usability** — a cover chooser is only a feature if it stays out of the way. More
-  metadata is not automatically better if it makes the common path slower or noisier.
-
-#### Phase A — viability and impact assessment (no product change)
-
-Deliverable is a written verdict with numbers behind it, recorded in `docs/decisions.md`. Nothing
-user-visible ships in this phase. It must answer, with measurement rather than reasoning:
-
-- What each provider's published and observed rate limits actually are, and what a 500-book and a
-  5,000-book import would cost against them under per-field completion.
-- Measured wall-clock impact on a realistic import, against the current fallback-only behavior as
-  the baseline.
-- Whether a fetched candidate can be **verified to be the same edition** before its fields are
-  merged. Already on record as the sharp edge here: `GoogleBooksProvider.fetch_by_isbn` takes the
-  first hit of an `isbn:` search, which is not guaranteed to carry the requested ISBN13, so merging
-  its publisher or page count risks attaching one edition's data to another.
-- What storing multiple cover candidates costs on disk, and whether they are fetched eagerly or on
-  demand when the chooser is opened.
-- How failure semantics change shape: one provider succeeding while another errors is a successful
-  enrichment, not a failed job.
-- Whether the fill-empty-only invariant (DEC-008) survives unchanged. It should — merging happens
-  before the write — but that must be demonstrated, not assumed.
-
-Phase A may conclude that the full feature is not worth its cost. **That is a legitimate outcome**
-and must be reported plainly rather than softened into a partial implementation. It may also
-conclude that a narrow slice — say, cover choice alone, on demand, with no change to automatic
-enrichment — carries most of the value at a fraction of the risk.
-
-#### Phase B — build what Phase A justified
-
-Scope is set by Phase A's verdict and by an explicit owner go-ahead, not by this document.
-Whatever is built inherits the existing invariants without exception: imported user data is never
-overwritten, network providers are never consulted while rendering cached library pages, and
-enrichment still only fills empty fields.
-
-Acceptance:
-
-- Phase A's verdict is recorded with the measurements that support it, including the ones that
-  argue against building.
-- If Phase B proceeds: no regression in import throughput beyond the budget Phase A set, no
-  provider blocking or rate-limit errors under a full-library run, and the fill-empty-only
-  invariant proven intact.
-- If a cover chooser ships: it is reachable from the detail page, defaults to the current cover,
-  and never blocks the page it lives on.
-
-## Open questions
-
-Items raised but deliberately not decided. They are not assigned to a sprint and no
-implementation approach has been chosen. **Do not resolve one of these by implementing it** —
-each needs an owner decision first, and that decision belongs in `docs/decisions.md`.
-
-### OQ-001 — Should enrichment complete individual empty fields across providers? — **decided**
-
-- **Raised:** 2026-08-09 by the owner, after the Sprint 014 walkthrough.
-- **Status:** **resolved 2026-08-11 into Sprint 019.** See DEC-035. The owner wants richer
-  metadata, including the ability to choose a cover from the editions that were actually fetched;
-  what remains undecided is whether it is affordable, which is Sprint 019's Phase A.
-- **Current behavior, unchanged until Sprint 019:** enrichment tries Open Library and consults
-  Google Books only when Open Library fails or returns nothing usable. A record that comes back
-  usable but incomplete — an edition with a year and a publisher but no cover — is accepted as-is.
-- **Subsumed:** the observation from the Sprint 016 walkthrough that a provider "image not
-  available" placeholder JPEG is accepted and stored as a real cover. The owner's read is that
-  cross-provider cover completion, if it proves viable, addresses this case — a second candidate
-  would exist to fall back to or choose. It is therefore not tracked as a separate question. If
-  Sprint 019 Phase A concludes the feature is not worth building, this resurfaces on its own and
-  needs its own answer, because a white JPEG reading "image not available" is a successful HTTP
-  response and nothing detects it.
-- **Note for whoever runs Sprint 019:** product spec 4.3 already specifies per-field completion at
-  *search* time — "prefer Open Library's record and Google Books' cover if OL has none" — and
-  `_merge_group` in `domain/providers.py` implements it there. So this may be narrowing an
-  inconsistency between search and enrichment rather than inventing a new behavior.
+- **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
+  owner during the revision-8 re-plan. It remains the gate on any exposure beyond LAN: no public
+  DNS, port-forwarding, tunnel, or internet-reachable proxy until it exists.
+- **Sharing, multiuser, Calibre write-back, OPDS.** Product spec section 9, unchanged.
+- **Wine and the remaining exploratory domains.** `docs/domain_metadata_roadmap_report.md` assesses
+  them; none is scheduled. Wine's weakness is access economics rather than catalogue geography.
 
 ## Cross-sprint definition of done
 

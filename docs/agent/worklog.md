@@ -704,3 +704,44 @@ anyone with no Calibre library.
 `docs/sprints/019-metadata-completeness.md`. **It is gated:** DEC-035 approves an assessment, not
 an implementation, and Phase A concluding the feature is not worth building is a legitimate
 outcome. It is also the final planned sprint, so `WORKFLOW.md`'s final-sprint rule applies on close.
+
+## 2026-08-13 — Roadmap re-plan, revision 8 (planning session, no sprint executed)
+
+**Done:** Owner reviewed post-v1 options and asked for a sequenced roadmap. Plan extended from one
+remaining sprint to eight, through Sprint 026. The metadata-completeness sprint was renumbered
+019 → 020 and its file renamed (`git mv`), because `scripts/validate_project.py` requires
+`active_sprint == len(completed_sprints) + 1` and permits exactly one non-completed sprint file, so
+putting the polish work first forced the renumber. New `docs/sprints/019-post-v1-polish.md` written
+from `TEMPLATE.md` and set `ready`. `ROADMAP.md` rewritten: duplicated contract blocks for sprints
+002–018 deleted (each sprint file carries the same Deliverables and Acceptance criteria; no document
+anchor-links into a roadmap section), OQ-001 deleted with its one live paragraph moved into the 020
+file, contracts added for 021–026. 408 lines → 241 while covering eight more sprints. Final-sprint
+bound moved 019 → 026 in `WORKFLOW.md`, `AGENTS.md`, and `validate_project.py`, where the literal
+became a named `FINAL_SPRINT` constant. DEC-042 appended. Product spec §9 updated: export scheduled
+as 023, second domain is albums (024) not wine. `HANDOFF.md` rewritten, including a cleanup pass
+that flattened the "everything Sprint 015/016 recorded still holds" chain into one grouped gotcha
+list with nothing dropped.
+
+**Verified:** `python scripts/validate_project.py` passed after each edit batch, including after
+the validator itself changed. `git diff --check` clean. Confirmed by inspection: exactly two
+non-completed sprint files (019 `ready`, 020 `planned`), `ROADMAP.md` references
+`019-post-v1-polish.md`, and the only surviving `019-metadata-completeness.md` reference is in this
+worklog, which is append-only. No application code was touched, so `make check` / `make test` were
+not run and are unaffected.
+
+**Deviations:** two proposals raised during the session were dropped rather than planned. Renaming
+the `book_tracker` package to match the Akasha brand was rejected on the existing `AGENTS.md`
+invariant that internal names are permanent. Auth stays unscheduled at the owner's direction, still
+a product spec §9 deferral. One item was promoted rather than deferred: the
+`GoogleBooksProvider.fetch_by_isbn` first-hit bug is now recorded as a live v1 defect repaired
+whatever Sprint 020's Phase A concludes, not only as a question the assessment asks. Sprint 018's
+Outcome keeps its "Impact on Sprint 019" text with a bracketed pointer rather than being rewritten,
+per the never-rewrite-history rule.
+
+**Blocked/open:** none. Nothing is committed — the worktree carries the whole re-plan and the owner
+was not asked for a commit.
+
+**Next:** Sprint 019 (post-v1 polish) — status `ready`, file at
+`docs/sprints/019-post-v1-polish.md`. Three small user-visible fixes; the walkthrough gate and the
+`production-bundle` Playwright project both apply. Sprint 020 is the renumbered metadata sprint and
+is still **gated**.

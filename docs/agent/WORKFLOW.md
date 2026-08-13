@@ -158,4 +158,4 @@ If tests and docs disagree, actual test output proves current behavior, while hi
 
 ## Final sprint
 
-After Sprint 019 passes, set project state to `complete`, set `active_sprint` and `active_sprint_file` to `null`, preserve the completed list, and write a release-state handoff. Do not tag, publish, deploy, or push unless the user asks.
+After the final planned sprint passes — Sprint 026 under roadmap revision 8 — set project state to `complete`, set `active_sprint` and `active_sprint_file` to `null`, preserve the completed list, and write a release-state handoff. Do not tag, publish, deploy, or push unless the user asks.

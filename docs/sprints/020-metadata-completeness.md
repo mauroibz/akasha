@@ -1,8 +1,8 @@
-# Sprint 019 — Metadata completeness: viability, then build
+# Sprint 020 — Metadata completeness: viability, then build
 
-**Status:** ready
-**Depends on:** 018
-**Roadmap revision:** 7
+**Status:** planned
+**Depends on:** 019
+**Roadmap revision:** 8
 
 ## Objective
 
@@ -17,8 +17,8 @@ legitimate, complete outcome.
 ## Required context
 
 1. `AGENTS.md`
-2. `docs/sprints/ROADMAP.md`, the Sprint 019 section and OQ-001 — the gate and the owner's framing
-   are stated there and this file does not replace them
+2. `docs/sprints/ROADMAP.md`, the Sprint 020 section — the gate and the owner's framing are stated
+   there and this file does not replace them
 3. `docs/specs/product-spec.md` section 4.3 (per-field completion) and section 5 (enrichment)
 4. `docs/specs/technical-spec.md` section 6 (providers), section 7 (jobs), section 1 (budgets)
 5. `docs/decisions.md` DEC-008 (enrichment fills empty fields only), DEC-025 (verification requires
@@ -52,13 +52,28 @@ with measurements behind every claim, answering:
 - Whether a fetched candidate can be **verified to be the same edition** before its fields are
   merged. The known sharp edge: `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an
   `isbn:` search, which is not guaranteed to carry the requested ISBN13, so merging its publisher
-  or page count risks attaching one edition's data to another.
+  or page count risks attaching one edition's data to another. **Treat this as a live v1 defect,
+  not only as a question.** It does not wait on the gate: the current fallback path already calls
+  `fetch_by_isbn`, so a wrong edition's data can already be written today. If Phase A concludes
+  against building the rest of the feature, repairing this still ships.
 - What storing multiple cover candidates costs on disk, and whether they are fetched eagerly or on
   demand when a chooser is opened.
 - How failure semantics change shape: one provider succeeding while another errors is a successful
   enrichment, not a failed job.
 - Whether DEC-008's fill-empty-only invariant survives unchanged. It should, because merging
   happens before the write, but that must be demonstrated rather than assumed.
+- **Whether a provider placeholder image can be detected at all, and by what** — byte-size
+  heuristic, perceptual hash against known placeholders, or nothing. DEC-035 folded the
+  "image not available" observation into this sprint on the reading that a second candidate gives
+  that case a way out. That is true for a chooser the owner opens deliberately; it is not true for
+  the automatic path, where a placeholder still resolves as the default cover and nothing notices.
+  Answer both paths or say plainly that only one is addressed.
+
+Two pieces of prior art belong in Phase A's reasoning rather than being rediscovered. Product spec
+4.3 already specifies per-field completion at **search** time — "prefer Open Library's record and
+Google Books' cover if OL has none" — and `_merge_group` in `domain/providers.py` implements it
+there. So this sprint may be narrowing an inconsistency between search and enrichment rather than
+inventing a behaviour, which lowers the complexity estimate and raises the argument for doing it.
 
 Phase A may conclude a narrow slice — cover choice alone, on demand, with no change to automatic
 enrichment — carries most of the value at a fraction of the risk. Report that plainly.
@@ -123,7 +138,7 @@ container (not `make dev`) if anything user-visible shipped.
 1. `feat: count provider requests per enrichment job in the benchmark`
 2. `docs: record the Phase A metadata completeness verdict`
 3. Phase B checkpoints, named once the verdict and the owner's go-ahead exist
-4. final `docs(sprint-019): close sprint and hand off`
+4. final `docs(sprint-020): close sprint and hand off`
 
 ## Risks and decisions to surface
 
@@ -131,9 +146,9 @@ container (not `make dev`) if anything user-visible shipped.
   `docs/decisions.md`.
 - Free-tier limits are the owner's exposure, not the agent's. Doubling traffic per book must not
   get the application rate-limited or blocked.
-- This is the final planned sprint. On close, follow `WORKFLOW.md`'s final-sprint rule: set the
-  project complete with null active fields, and write a release-state handoff. Do not tag, publish,
-  deploy or push unless the owner asks.
+- This sprint sets the provider contract that Sprint 024's domain pilot inherits. Whatever Phase A
+  concludes about verifying a candidate before merging its fields is the answer albums and games
+  will be built against, so record the reasoning, not only the verdict.
 
 ## Outcome
 

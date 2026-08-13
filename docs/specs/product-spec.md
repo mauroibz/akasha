@@ -657,12 +657,15 @@ enrichment. "Undo last import" for 24 hours.
 
 Listed so they're not re-litigated during build.
 
-**v2 — Export.** `GET /api/export` dumping entries + items as JSON, plus a
-Goodreads-shaped CSV. Agreed in principle, not a priority. Note the interim
-risk: until this exists, your only exit path is the SQLite file itself. That's
-genuinely fine — it's a documented open format you can query with any tool —
-but it means **the nightly DB backup (§8) is not optional in production.** Enable
-it with the first production deployment and the export can wait indefinitely.
+**Scheduled — Export.** `GET /api/export` dumping entries + items as JSON, plus
+a Goodreads-shaped CSV. Deferred through v1; **scheduled as Sprint 023** in
+roadmap revision 8, because the repository is public and portability is now a
+user-facing story rather than only the owner's. Until it exists the only exit
+path is the SQLite file itself — genuinely fine, it's a documented open format
+you can query with any tool — but it means **the nightly DB backup (§8) is not
+optional in production.** Export the entity shape (`type`, identifiers, opaque
+`metadata`), not a book-specific schema, or a second domain forces a v2 format;
+the Goodreads-shaped CSV is allowed to stay book-only.
 
 **v2 — Auth.** None in v1; LAN-only. Internal Nginx Proxy Manager routing is
 allowed, but there must be no public DNS, internet port-forwarding, tunnel, or
@@ -690,13 +693,21 @@ ever lives on a different machine than the tracker, Calibre's Content Server
 exposes `/ajax/search` and `/ajax/books` over HTTP. Direct `metadata.db` reads
 are simpler while both are on the ZimaBoard.
 
-**v3 — second domain (wine).** The `items`/`entries` split and the two-method
-provider shape are the entire preparation. When it arrives: add a wine provider,
-a per-type display config declaring sort fields and facets, and extract the
-provider registry from the two concrete cases. Expect wine to be
-manual-entry-first — there's no free equivalent of ISBN, and identity is
-producer + cuvée + vintage + format, all fuzzy. Do **not** build the plugin
-runtime before this exists.
+**Scheduled — second domain (albums).** The `items`/`entries` split and the
+two-method provider shape are the entire preparation. The second domain is
+**albums, scheduled as Sprint 024**, not wine as this section originally
+assumed: MusicBrainz needs no OAuth, release-group versus release maps onto the
+work-versus-edition problem already solved for books, and Cover Art Archive
+exercises the separate-image-provider case. Games (025) and series (026) follow.
+When a domain arrives: add its provider, a per-type display config declaring
+sort fields and facets, a status vocabulary that fits it, and extract the
+provider registry from the concrete cases. Do **not** build the plugin runtime
+before two of them exist.
+
+Wine stays exploratory and unscheduled — see `docs/domain_metadata_roadmap_report.md`.
+Expect it to be manual-entry-first: there's no free equivalent of ISBN, identity
+is producer + cuvée + vintage + format, all fuzzy, and the hosted option's
+weakness is access economics rather than catalogue geography.
 
 ---
 
@@ -712,7 +723,7 @@ Resolved during spec review; recorded so they aren't reopened.
 | 3 | Adding a book you already have | Exact dupe → navigate to existing entry with a toast. Different edition → warn on the picker card, don't block (§4.3) |
 | 4 | Rereads | Stay lossy: latest dates, one score, `reread_count`. No `readings` table |
 | 5 | Scale | TanStack Virtual + keyset pagination; animation budget spent on interactions, not scrolling (§6, §7) |
-| 6 | Export | Deferred to v2. Nightly DB backup becomes mandatory in the meantime (§9) |
+| 6 | Export | Deferred through v1; nightly DB backup mandatory in the meantime (§9). Scheduled as Sprint 023 in roadmap revision 8 |
 | 7 | Auth | Deferred to v2. LAN-only; internal NPM is allowed, but no internet-reachable proxy/DNS/forwarding until auth (§9) |
 
 ---

@@ -27,6 +27,11 @@ REQUIRED_PATHS = (
 PROJECT_STATUSES = {"ready", "in_progress", "blocked", "complete"}
 SPRINT_STATUSES = {"planned", "ready", "in_progress", "blocked", "completed"}
 ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
+# The last sprint on `docs/sprints/ROADMAP.md`. A project may only be marked complete when
+# every sprint through this one is completed, which is what stops a session from declaring
+# the plan finished early. Move it whenever the roadmap is extended, and record the move in
+# the decision that extends it (DEC-035 moved it to 19, DEC-042 to 26).
+FINAL_SPRINT = 26
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
@@ -125,9 +130,11 @@ def validate_state(errors: list[str]) -> None:
             errors.append("complete project must have null active sprint and file")
         if state.get("active_sprint_status") is not None:
             errors.append("complete project must have null active_sprint_status")
-        expected_all = [f"{number:03d}" for number in range(1, 20)]
+        expected_all = [f"{number:03d}" for number in range(1, FINAL_SPRINT + 1)]
         if completed != expected_all:
-            errors.append("complete project must list completed_sprints 001 through 019 in order")
+            errors.append(
+                f"complete project must list completed_sprints 001 through {FINAL_SPRINT:03d} in order"
+            )
     else:
         active_id = state.get("active_sprint")
         active_file_value = state.get("active_sprint_file")

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "plan_revision": 7,
+  "plan_revision": 8,
   "project_status": "ready",
   "active_sprint": "019",
-  "active_sprint_file": "docs/sprints/019-metadata-completeness.md",
+  "active_sprint_file": "docs/sprints/019-post-v1-polish.md",
   "active_sprint_status": "ready",
   "last_completed_sprint": "018",
   "completed_sprints": [
@@ -27,5 +27,5 @@
     "018"
   ],
   "started_at": "",
-  "updated_at": "2026-08-13T12:30:00-03:00"
+  "updated_at": "2026-08-13T17:30:00-03:00"
 }

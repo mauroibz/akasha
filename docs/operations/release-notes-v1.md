@@ -40,7 +40,7 @@ Nothing is pushed by the agent workflow, tags included.
 - **No multi-user support.** One library, one set of opinions.
 - **No ebook storage, reading or syncing.** Calibre is read, never written.
 - **No cross-provider metadata merging.** A book takes its metadata from one
-  provider; combining fields across providers is assessed in Sprint 019.
+  provider; combining fields across providers is assessed in Sprint 020.
 - **No mobile apps.** It is a responsive web application.
 
 ## Operating it
