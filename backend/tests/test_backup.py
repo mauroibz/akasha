@@ -443,3 +443,47 @@ def test_a_library_with_no_attachments_still_backs_up_and_restores(tmp_path: Pat
 
     assert result.manifest["attachments"] == []
     assert (tmp_path / "restored" / "books.db").is_file()
+
+
+def test_backups_share_blobs_even_when_the_data_volume_is_a_separate_filesystem(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The case the container actually deploys, and the one no fixture reproduces.
+
+    Compose mounts /data and /backups as separate volumes, so linking out of the
+    live store fails EXDEV on every run. Sprint 021's walkthrough found the first
+    version of this quietly writing a full copy each night — 67.9x rather than the
+    10.5x DEC-047 measured. Backups always share a filesystem with each other, so
+    the second night links from the first.
+    """
+    data_dir = populated_data_dir(tmp_path)
+    digest = attached(data_dir, b"y" * 150_000)
+    dest = tmp_path / "backups"
+    real_link = os.link
+
+    def link_only_within_the_backup_volume(source: str | Path, target: str | Path) -> None:
+        if Path(source).is_relative_to(data_dir):
+            raise OSError(18, "Invalid cross-device link")
+        real_link(source, target)
+
+    monkeypatch.setattr("book_tracker.backup.os.link", link_only_within_the_backup_volume)
+
+    first = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    second = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    one = (first.path / "attachments" / digest[:2] / digest).stat()
+    two = (second.path / "attachments" / digest[:2] / digest).stat()
+    assert (one.st_dev, one.st_ino) == (two.st_dev, two.st_ino)
+    verify_backup(second.path)
+    restore_backup(second.path, into=tmp_path / "restored")
+    assert (tmp_path / "restored" / "attachments" / digest[:2] / digest).is_file()

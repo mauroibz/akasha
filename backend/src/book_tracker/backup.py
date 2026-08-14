@@ -79,7 +79,7 @@ def create_backup(
         for directory in ARCHIVED_DIRECTORIES:
             _archive(data_dir / directory, path / f"{directory}.tar.gz")
         counts["covers"] = sum(1 for entry in (data_dir / "covers").glob("*") if entry.is_file())
-        attachments = _share_attachments(data_dir, path)
+        attachments = _share_attachments(data_dir, path, dest)
         counts["attachments"] = len(attachments)
         archived = [DATABASE_NAME, *(f"{name}.tar.gz" for name in ARCHIVED_DIRECTORIES)]
         manifest: dict[str, Any] = {
@@ -215,36 +215,75 @@ def _archive(source: Path, target: Path) -> None:
                 archive.add(entry, arcname=str(entry.relative_to(source)), recursive=False)
 
 
-def _share_attachments(data_dir: Path, backup_path: Path) -> list[dict[str, Any]]:
-    """Hardlink every blob in the live store into this backup.
+def _share_attachments(data_dir: Path, backup_path: Path, dest: Path) -> list[dict[str, Any]]:
+    """Hardlink every blob in the live store into this backup, twice-fallback.
 
-    Linked from the live store rather than from the previous backup: it is O(1),
-    it always finds the blob, and it means a backup keeps an attachment alive
-    after the owner deletes it, which is the entire point of having one. The
-    inode is shared, so `rmtree` on an expired backup only decrements a link
-    count and cannot take a blob another backup still needs.
+    A blob named for its own digest can never change, so sharing an inode is
+    always safe, and sharing is the difference DEC-047 measured between 10.5x the
+    current backup and 67.9x.
+
+    Two sources are tried, and the second one is not an optimisation -- it is what
+    makes this work at all in the deployment we actually ship. The container
+    mounts `/data` and `/backups` as separate volumes, so linking from the live
+    store fails `EXDEV` every single time, and the first version of this silently
+    wrote a full copy on every nightly run. Sprint 021's walkthrough caught it;
+    no test could, because they all run inside one filesystem.
+
+    So: link from the live store when they share a filesystem, otherwise link
+    from a sibling backup that already carries the blob -- backups are always on
+    one filesystem with each other -- and only copy when neither is possible,
+    which is a genuinely cold first backup on a separate disk.
 
     Not compressed and not tarred, because a tar shares nothing with the tar
-    written the night before -- which is exactly what makes the naive design cost
-    seven copies (DEC-047).
+    written the night before, which is exactly what makes the naive design cost
+    seven copies.
     """
     source = data_dir / ATTACHMENTS_DIR
     recorded: list[dict[str, Any]] = []
     if not source.is_dir():
         return recorded
+    siblings = _existing_backups(dest, exclude=backup_path)
     for blob in sorted(source.rglob("*")):
         if not blob.is_file():
             continue
-        target = backup_path / ATTACHMENTS_DIR / blob.relative_to(source)
+        relative = blob.relative_to(source)
+        target = backup_path / ATTACHMENTS_DIR / relative
         target.parent.mkdir(parents=True, exist_ok=True)
-        try:
-            os.link(blob, target)
-        except OSError:
-            # Another filesystem -- DEC-040 allows BACKUP_DIR on a NAS share --
-            # so pay for a copy rather than failing the backup.
-            target.write_bytes(blob.read_bytes())
+        if not _link_from(blob, target):
+            for sibling in siblings:
+                candidate = sibling / ATTACHMENTS_DIR / relative
+                if candidate.is_file() and _link_from(candidate, target):
+                    break
+            else:
+                target.write_bytes(blob.read_bytes())
         recorded.append({"sha256": blob.name, "bytes": target.stat().st_size})
     return recorded
+
+
+def _link_from(source: Path, target: Path) -> bool:
+    try:
+        os.link(source, target)
+    except OSError:
+        return False
+    return True
+
+
+def _existing_backups(dest: Path, *, exclude: Path) -> list[Path]:
+    """Our own backups under `dest`, newest first.
+
+    Only directories carrying an Akasha manifest, for the same reason retention
+    only deletes those: `dest` is an operator-supplied path and may hold anything.
+    """
+    found = []
+    if not dest.is_dir():
+        return found
+    for candidate in dest.iterdir():
+        if candidate == exclude or not candidate.is_dir():
+            continue
+        manifest = read_manifest(candidate)
+        if manifest is not None:
+            found.append((str(manifest.get("created_at", "")), candidate))
+    return [path for _, path in sorted(found, reverse=True)]
 
 
 def _revision(database_path: Path) -> str | None:
