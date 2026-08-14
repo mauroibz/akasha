@@ -805,3 +805,128 @@ Append-only record of material architecture choices, product-default resolutions
   A spec line was deleted rather than an implementation added, which `AGENTS.md` permits only when
   product intent is clear and the decision is recorded. The intent here is the owner's explicit
   choice, not an excuse for an incomplete implementation, and this entry is the record.
+
+## DEC-044 — Metadata completeness measured: the second provider adds almost nothing, and unverifiable candidates are rejected
+
+- **Date:** 2026-08-13
+- **Status:** accepted
+- **Context:** DEC-035 approved an assessment, not an implementation, and DEC-042 made
+  assess-then-build the default shape. Sprint 020's Phase A asked whether cross-provider field
+  completion and edition choice are affordable. Everything below was measured, not estimated.
+  Two instruments produced it: `scripts/assess_provider_completeness.py` against the live APIs on
+  2026-08-13 with a 60-ISBN sample harvested from provider search, and the new provider-request
+  counting in `scripts/benchmark_library.py` against the committed recordings.
+
+  **Request cost per enrichment.** One enrichment is not one request. An Open Library hit costs
+  **four** metadata requests plus one cover — the `/isbn/` redirect, the edition, each author, and
+  the work — where the Google Books fallback costs **two** plus a cover. `RateLimiter` gates the
+  whole queue at one job per 0.5 s, so a 5,000-book import has a **41.7-minute floor** before a
+  single byte crosses the network; at the measured latencies its network time is hours, and the two
+  do not overlap because jobs run one at a time.
+
+  **Observed latency and availability**, 60 ISBNs, both providers:
+
+  | | answered | p50 | p95 | max |
+  |---|---|---|---|---|
+  | Open Library | 44/60 | 1412 ms | 3957 ms | 6055 ms |
+  | Google Books | 56/60 | 1057 ms | 1153 ms | 1410 ms |
+
+  Open Library is the slower and less complete of the two by availability, failing
+  `edition_not_found` for 16 of 60, and its p95 nearly reaches the 5 s client timeout.
+  An **anonymous** Google Books request is answered **429 immediately**; with the owner's key the
+  same request answers 200. The free tier is ~1000 requests/day, so a 5,000-book import under
+  per-field completion would need ~15,000 Google requests and **exceed the daily quota threefold**.
+
+  **Edition verification is a tri-state, and the middle case is empty.** Of Google Books answers:
+  **80.4% confirmed, 19.6% unverifiable, 0% contradicted**. Open Library was **100% confirmed**
+  across all 44 answers, because it reaches an edition through the authoritative `/isbn/` redirect
+  rather than a search. So the risk is not that a provider returns a demonstrably wrong ISBN; it is
+  that Google Books frequently returns a scanned library volume exposing only a barcode
+  (`OTHER: UOM:39015008575477`) and no ISBN at all, which neither confirms nor denies anything.
+
+  **The defect is real and was observed in the wild.** For ISBN `9789583007828`, Open Library
+  returns *Crónica de una muerte anunciada* and Google Books returns ***Las venas abiertas de
+  América Latina*** — a different book by a different author, and unverifiable. Had Open Library
+  failed for that ISBN, today's code would have written Galeano's publisher, page count, year and
+  description onto García Márquez's book. The committed recording
+  `googlebooks_isbn_9788437604572.json` is a second instance and needed no re-recording.
+
+  **What the second provider would actually add**, over the 41 ISBNs where both answered:
+
+  | field | | | field | | |
+  |---|---|---|---|---|---|
+  | year | 0.0% | [edition] | description | 22.0% | [work] |
+  | publisher | 0.0% | [edition] | subjects | 7.3% | [work] |
+  | page_count | 12.2% | [edition] | authors | 0.0% | [work] |
+  | cover | **0.0%** | [edition] | language | 2.4% | [work] |
+
+- **Decision, and it is mostly a decision not to build.**
+
+  1. **Cross-provider field completion is not worth its cost.** It would multiply provider traffic
+     per book, breach the Google free tier on a large import, and buy a description in 22% of cases,
+     a page count in 12%, and nothing at all for year, publisher, authors or cover. This is the
+     outcome DEC-035 explicitly permitted and it is reported plainly rather than softened into a
+     partial implementation.
+  2. **The owner's stated headline want — choosing a cover from the editions actually fetched —
+     gains nothing from a second provider.** Open Library carried a cover for **100%** of the
+     editions it answered for, and Google Books added a cover in **0%** of cases. Cover *choice* is
+     nonetheless cheap from a source nobody had costed: the Open Library **work record already
+     fetched during every enrichment** lists **28 covers** for Rayuela and **33** for the sampled
+     *Cien años de soledad*. Candidate discovery therefore costs **zero additional provider
+     requests**; only the thumbnails a chooser displays cost anything, and only when it is opened.
+     At the measured mean stored cover size of **38.8 KB**, five candidates for 5,000 books is
+     ~947 MB eagerly and ~0 on demand, so **on demand** is the only defensible fetch strategy.
+     **This is the narrow slice Sprint 020's Phase A was allowed to identify, and it is offered to
+     the owner as a Phase B candidate. It is not started here: Phase B needs an explicit
+     go-ahead and does not have one.**
+  3. **An unverifiable candidate is rejected outright**, and this ships now as the repair of the
+     live defect DEC-042 promoted. The alternative considered was merging only work-level fields
+     (description, subjects) while dropping edition-specific ones — that option is **refuted by the
+     measurement**: the observed failure was not a right-book/wrong-printing mismatch but an
+     entirely different work, where the description is exactly as wrong as the page count.
+     Splitting by field would have preserved the worst error. The cost is explicit: **19.6% of
+     Google Books fallback answers are now discarded**, and for a book where Open Library also
+     failed that means no enrichment at all. Absent metadata is preferable to confidently wrong
+     metadata, which is the same reasoning DEC-008 applies to user data.
+  4. **DEC-008 survives unchanged**, demonstrated rather than assumed: merging happens in the
+     provider before the write, and `EnrichmentHandler.process` still fills only fields that are
+     empty. A test pins it.
+  5. **Failure semantics keep their current shape.** One provider erring while another answers is
+     already a successful enrichment — `_fetch` returns the first usable payload and only reports
+     failure when every provider is exhausted — so no change is needed and none is made.
+
+- **Consequences and the two folded observations (Sprint 020 AC5).**
+
+  **The placeholder cover is solved, and the answer is geometry, not bytes or hashes.** Google
+  Books' "image not available" image is **575×92** — an aspect ratio of 6.25:1 — at 316–1631 bytes,
+  where real covers measured 575×750 and 575×887, ratios of 0.66 and 0.77. A book cover is taller
+  than it is wide; the placeholder is a thin banner. `prepare_cover` rejects only images under
+  10px per side, so a placeholder passes today and is installed as a real cover. A ratio guard
+  ships with this sprint's repair, because a placeholder stored as a real cover is a defect in the
+  cover write path rather than a feature awaiting the gate. Open Library needs no such guard: its
+  URLs are already built with `?default=false`, which answers **404** instead of a placeholder —
+  verified, against **200 and 43 bytes** without the parameter. This answers both paths DEC-035
+  asked about: the automatic path is guarded by geometry, and a chooser, if one is ever built,
+  inherits the same guard.
+
+  **Edition choice preferring a reprint over the original is reproduced and deferred with a
+  reason.** For *Pedro Páramo*, `merge_and_rank` today returns a **1969** printing at rank 0
+  (`original_year` 1955) and a **2024** Google Books edition at rank 1; the 1955 original is not in
+  the top eight. This is search *ranking*, not enrichment, and it is governed by product spec 4.3's
+  deliberately dumb ranking plus DEC-024's rule that provider relevance is not to be discarded.
+  Changing it means changing what the picker offers, which is user-visible product behaviour and
+  outside an assessment's remit. It is **explicitly deferred**, unowned, and recorded here so it is
+  not mistaken for unnoticed.
+
+  **Two smaller observations, recorded because DEC-025 asks for what looked wrong.** Open Library
+  returns mojibake for some titles — `Cc3mo Leer a Garcc-A Mc!Rquez` for *Cómo leer a García
+  Márquez* — which is upstream data corruption this project cannot fix but could detect. And
+  `search_providers` runs against a client whose timeout is a hard **5 s** while Open Library's
+  search plus its year-resolution fan-out routinely exceeds it; the handoff's "provider search takes
+  about five seconds" is that, and it means a slow search silently returns Google-only results.
+
+  **Sprint 024 inherits the verification contract**, which is the reason this entry records
+  reasoning and not only a verdict: a domain provider is trusted to fill fields only when the
+  candidate it returns can be tied to the identifier that was requested, and a provider that cannot
+  prove that is not merged. MusicBrainz's release-versus-release-group distinction is the same
+  problem in the shape DEC-042 already predicted.
