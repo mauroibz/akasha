@@ -27,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
@@ -311,6 +312,9 @@ export function DetailPage() {
                 </p>
               </div>
             )}
+            <div className="mt-5">
+              <Attachments itemId={item.id} />
+            </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button
                 variant="outline"

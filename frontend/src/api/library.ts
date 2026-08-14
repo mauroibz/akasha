@@ -273,3 +273,65 @@ export async function acceptSuggestedStatuses(filter: {
   const data = (await response.json()) as { affected: number };
   return data.affected;
 }
+
+export interface Attachment {
+  id: number;
+  filename: string;
+  byte_size: number;
+  sha256: string;
+  created_at: string;
+}
+
+export async function fetchAttachments(itemId: number): Promise<Attachment[]> {
+  const response = await fetch(`/api/items/${itemId}/attachments`);
+  if (!response.ok) throw new Error("Files could not be loaded");
+  const body = (await response.json()) as { attachments: Attachment[] };
+  return body.attachments;
+}
+
+/**
+ * Upload one opaque file.
+ *
+ * The size cap is the server's to enforce, not ours: a client-side check is a
+ * courtesy that a request built by hand walks straight past. This surfaces the
+ * server's own refusal so the message the owner reads is the real reason.
+ */
+export async function uploadAttachment(
+  itemId: number,
+  file: File,
+): Promise<Attachment> {
+  const body = new FormData();
+  body.set("file", file);
+  const response = await fetch(`/api/items/${itemId}/attachments`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body,
+  });
+  if (!response.ok) {
+    const detail = (await response.json().catch(() => null)) as {
+      error?: { code?: string };
+    } | null;
+    throw new Error(
+      detail?.error?.code === "attachment_too_large"
+        ? "That file is larger than the limit for attachments"
+        : "The file could not be attached",
+    );
+  }
+  return response.json() as Promise<Attachment>;
+}
+
+export async function deleteAttachment(
+  itemId: number,
+  attachmentId: number,
+): Promise<void> {
+  const response = await fetch(
+    `/api/items/${itemId}/attachments/${attachmentId}`,
+    { method: "DELETE" },
+  );
+  if (!response.ok) throw new Error("The file could not be removed");
+}
+
+/** Where a browser fetches the bytes. Served as a forced download, never inline. */
+export function attachmentHref(itemId: number, attachmentId: number): string {
+  return `/api/items/${itemId}/attachments/${attachmentId}`;
+}

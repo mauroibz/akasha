@@ -239,6 +239,33 @@ test("detail has no serious accessibility violations", async ({ page }) => {
   await expectNoSeriousViolations(page, "detail");
 });
 
+test("the detail attachments list has no serious accessibility violations", async ({
+  page,
+}) => {
+  await page.route("**/api/entries/7", (route) =>
+    route.fulfill({ json: detailEntry }),
+  );
+  await page.route("**/api/items/3/attachments", (route) =>
+    route.fulfill({
+      json: {
+        attachments: [
+          {
+            id: 1,
+            filename: "Rayuela.epub",
+            byte_size: 2621440,
+            sha256: "a".repeat(64),
+            created_at: "2026-08-14T00:00:00Z",
+          },
+        ],
+      },
+    }),
+  );
+  await stubShelves(page);
+  await page.goto("/books/7");
+  await expect(page.getByRole("link", { name: "Rayuela.epub" })).toBeVisible();
+  await expectNoSeriousViolations(page, "detail (attachments)");
+});
+
 test("the detail opinion dialog has no serious accessibility violations", async ({
   page,
 }) => {

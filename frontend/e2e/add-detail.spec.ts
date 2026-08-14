@@ -230,3 +230,55 @@ test("search results stagger in and selecting one keeps the keyboard flow", asyn
   // reader needs it on the frame the form mounts.
   await expect(page.getByRole("combobox", { name: /status/i })).toBeFocused();
 });
+
+test("a file can be attached, downloaded and removed from the detail page", async ({
+  page,
+}) => {
+  await common(page);
+  let attachments: Array<Record<string, unknown>> = [];
+  await page.route("**/api/items/3/attachments", async (route) => {
+    if (route.request().method() === "POST") {
+      attachments = [
+        {
+          id: 1,
+          filename: "Rayuela.epub",
+          byte_size: 2621440,
+          sha256: "a".repeat(64),
+          created_at: "2026-08-14T00:00:00Z",
+        },
+      ];
+      await route.fulfill({ status: 201, json: attachments[0] });
+      return;
+    }
+    await route.fulfill({ json: { attachments } });
+  });
+  await page.route("**/api/items/3/attachments/1", async (route) => {
+    attachments = [];
+    await route.fulfill({ status: 204, body: "" });
+  });
+
+  await page.goto("/books/7");
+  await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
+  await expect(page.getByText("No files attached yet.")).toBeVisible();
+
+  await page.getByLabel("Attach a file").setInputFiles({
+    name: "Rayuela.epub",
+    mimeType: "application/epub+zip",
+    buffer: Buffer.from("epub bytes"),
+  });
+
+  const link = page.getByRole("link", { name: "Rayuela.epub" });
+  await expect(link).toBeVisible();
+  await expect(page.getByText("2.5 MB")).toBeVisible();
+
+  // The link points at the item-scoped download and carries `download`, which is
+  // all the client is responsible for. That the response forces a save rather
+  // than rendering is the server's contract and is asserted against the real
+  // headers in `backend/tests/test_attachments_api.py`, where it can be checked
+  // properly instead of inferred from browser behaviour.
+  await expect(link).toHaveAttribute("href", "/api/items/3/attachments/1");
+  await expect(link).toHaveAttribute("download", "");
+
+  await page.getByRole("button", { name: "Remove Rayuela.epub" }).click();
+  await expect(page.getByText("No files attached yet.")).toBeVisible();
+});
