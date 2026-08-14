@@ -202,6 +202,22 @@ blobs rather than copying them; where `/data` and `/backups` are separate volume
 which is the shipped Compose deployment — it links from a sibling backup instead,
 and copies only when neither is possible.
 
+A blob can still be orphaned by a route that does not go through
+`delete_attachment` — an item deleted outside the application, or a crash between
+writing the blob and committing its row. `akasha-attachments reclaim` collects
+those (DEC-050). It reports by default and removes nothing without `--apply`,
+reads the filesystem before the database so a row committed between the two reads
+protects its blob, never touches a blob younger than an hour, and leaves anything
+under `attachments/` that it did not write. A blob a backup has linked survives
+it: the backup holds its own reference to the same inode.
+
+Uploads and downloads stream. `BlobWriter` hashes and writes a chunk at a time
+into a temporary and moves it under its digest at commit, so the per-file cap is
+enforced as bytes arrive rather than after the whole upload is buffered, and
+downloads are a `FileResponse`. The download's validator is an ETag over digest
+**and** filename, not `immutable`: the blob cannot change but the response
+carries the editable name, so a rename has to be able to invalidate it.
+
 ### 5.2 Deletion and orphan policy
 
 Deleting an entry deletes its shelf joins but retains the item, source links, and cover as a cache. No orphan-prune endpoint is part of v1; that product question is deferred. Import undo may remove an orphan item only when its ledger proves the batch created it and no entry references it.

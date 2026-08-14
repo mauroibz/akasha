@@ -62,8 +62,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | completed |
 | [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | completed |
 | [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | completed |
-| [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | **ready** |
-| [023](023-creator-sort-names.md) | Creator sort names | 020 | planned |
+| [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | completed |
+| [023](023-creator-sort-names.md) | Creator sort names | 020 | **ready** |
 | 024 | Export | 020 | planned |
 | 025 | Second domain — albums: pilot, then verdict | 020 | planned |
 | 026 | Third domain — games | 025 | planned |
@@ -153,6 +153,12 @@ upload and download both hold the whole file in memory, up to 25 MiB per request
 **No new feature surface.** An attachment stays an opaque file. Multiple selection, drag-and-drop and
 progress bars are named as non-scope: real improvements, but polish rather than correctness.
 
+**Delivered** (DEC-050). `akasha-attachments reclaim`, dry-run by default. Rename, inline. A
+confirmation on remove. Streaming both ways, measured at +29.9 → +2.6 MiB peak RSS on a 25 MiB
+upload. Replace was put to the owner and deliberately not built: with rename in place it is remove
+plus attach. The orphaned *cover* is still not collected — the reclaim is scoped to the attachment
+store on purpose, since a cover is cache the application can re-fetch.
+
 ### [Sprint 023 — Creator sort names](023-creator-sort-names.md)
 
 `sort_author` is `json_extract(metadata, '$.authors[0]')` verbatim, so "Adolfo Bioy Casares" sorts
@@ -179,6 +185,10 @@ user-facing story rather than only the owner's.
 **Sprint 021 left this one question to answer** (DEC-048): whether an export carries attachment
 bytes, references, or neither. Bytes make an export a multi-gigabyte archive rather than a file;
 references make it portable but incomplete. Decide it explicitly rather than by omission.
+
+Sprint 022 narrows it slightly: the filename is now **owner-edited data**, not something derivable
+from the uploaded file, so whichever of the three an export carries, it has to carry the name. An
+export that reconstructs names from digests loses a correction the owner made by hand (DEC-050).
 
 One design constraint, because it decides whether this survives the domain work: **export the
 entity shape — `type`, identifiers, and an opaque `metadata` object — not a book-specific schema.**

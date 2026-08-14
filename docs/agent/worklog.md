@@ -1098,3 +1098,63 @@ was left as written, since a completed sprint's Outcome is audit history.
 **Next:** Sprint 022 (attachment lifecycle) — `ready`. Reclamation is its dangerous deliverable: it
 deletes data by inference, and must be reasoned about against an upload that has written its blob but
 not yet committed its row.
+
+## 2026-08-14 — Sprint 022 (attachment lifecycle), complete
+
+**Done:** reclaim command, rename, remove confirmation, streaming, and the two UI corrections from
+DEC-049. Commits `561d7d8` reclaim, `58c6956` rename, `bc24adf` confirm + UI, `84fd445` streaming,
+plus this closure commit. Decisions in **DEC-050**.
+
+**Asked before building, as the sprint required.** Both went to the owner at activation rather than
+being settled quietly:
+
+- **Replace: not built.** With rename in place it is remove plus attach, and building it would have
+  added an endpoint, a second confirmation, and a question about what a row's identity means when
+  its bytes change underneath.
+- **Reclaim surface: CLI, dry-run by default**, over a UI button or an automatic sweep.
+
+**The reclaim's two protections, and why the ordering one is real.** The sweep reads the filesystem
+*before* the database. Reversed, a blob whose row was committed between the two reads is reported as
+an orphan and deleted — a file the owner attached seconds earlier. I verified this is not a
+theoretical concern by swapping the two lines and watching
+`test_a_row_committed_during_the_walk_keeps_its_blob` fail, then swapping them back. The second
+protection is a one-hour mtime grace period, which covers the upload still in flight during both
+reads. Both are needed; neither is sufficient.
+
+**The backup question was checked, not assumed.** Acceptance criterion 1 said to check what the
+hardlink chain actually guarantees. It guarantees it: the backup holds its own directory entry
+against the same inode, so unlinking the live path decrements a link count. Confirmed in the
+container — reclaimed blob still byte-identical in the backup (`23b1873a…`), `akasha-backup verify`
+still passed.
+
+**Measured, not asserted** (criterion 5). Peak RSS of a real uvicorn process pushing 25 MiB, taken
+before and after by running the same instrument against a temporary worktree at the pre-streaming
+commit: upload **+29.9 → +2.6 MiB**, download **+24.9 → +0.0 MiB**.
+
+**Seen and left:**
+
+- **`entries.item_id` has no `ON DELETE CASCADE`.** Deleting an item raises `FOREIGN KEY constraint
+  failed` while any entry references it, so producing the orphan for the walkthrough needed the
+  entry deleted first. The sprint baseline described the `CASCADE` leak without this step. Recorded
+  in DEC-050.
+- **`HEAD` on any route is a 405.** Noticed because my first revalidation check used `curl -sI` and
+  silently got an empty ETag, which made a working 304 look like a 200. The code was right and the
+  check was wrong. Application-wide FastAPI behaviour, not attachment-specific, and not touched.
+- **Row layout was ragged** — `justify-between` made the size and buttons track each filename's
+  length, obvious once rows carried two buttons. Fixed in the file I was already changing.
+- **The cover's "Replace cover" control is a raw unstyled `<input type=file>`** on the detail page,
+  showing the browser's default "Choose File / No file chosen". Different component, out of scope,
+  but it looks unfinished next to the Files panel.
+- The quoted publisher string is still visible on the detail page (carried from Sprint 021).
+- The orphaned **cover** file is still not collected. The reclaim is deliberately scoped to the
+  attachment store; a cover is re-fetchable cache and does not deserve a second mechanism.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **328** / frontend **97**;
+`npm run test:e2e` **79 passed / 2 skipped**; `docker build` + `make build` + `make smoke-container`
+passed with no chunk-size warning; `git diff --check` clean. Full container walkthrough: attach,
+rename ×2, download byte-identical with all three headers, 304/200 revalidation around a rename,
+deliberate orphan + backdated `upload-crashed.tmp`, reclaim dry run then `--apply`, browser check of
+inline rename, confirm dialog, cancel-is-a-no-op, one tab stop, confirmed removal, no console errors.
+
+**Next:** Sprint 023 (creator sort names) — status `ready`. No migration was added here, so the head
+is still `0010_attachments` and 023's baseline was updated to say so.

@@ -1255,3 +1255,69 @@ Append-only record of material architecture choices, product-default resolutions
   **Reclamation is the dangerous deliverable** and the sprint file says so: it deletes data by
   inference, the refcount is authoritative where the filesystem is not, and a sweep must be reasoned
   about against an upload that has written its blob but not yet committed its row.
+
+## DEC-050 — Attachment lifecycle: reclamation is a command, replace is not a feature, and `immutable` was wrong
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 022 closed the lifecycle DEC-049 found open. Two of its
+  questions were the owner's rather than the implementer's, and both were put to
+  the owner at activation rather than settled quietly.
+- **Decisions.**
+
+  **Reclamation is an operator command, dry-run by default.** `akasha-attachments
+  reclaim` reports what it would remove and removes nothing until `--apply`. Not
+  a background sweep and not scheduled: this is the only routine in the codebase
+  that deletes data by inference, and `enforce_retention` already sets the
+  precedent that such a routine acts only on what it can prove is ours. Files
+  under `attachments/` that we did not write are reported and left alone.
+
+  **Two independent protections cover the concurrent upload**, which is the
+  failure the sprint named as this deliverable's real risk. The sweep reads the
+  filesystem *before* it reads the database, so a row committed between the two
+  reads makes its blob read as referenced rather than orphaned — the reverse
+  order deletes a file that was attached seconds earlier. And a blob whose mtime
+  is inside a one-hour grace period is never a candidate at all, which covers the
+  same window for an upload still in flight during both reads. The read ordering
+  is pinned by a test that fails when the two are swapped.
+
+  **A blob a backup holds is safe by construction, and this was checked rather
+  than assumed.** The backup hardlinks blobs out of the live store (DEC-048), so
+  the backup directory holds its own entry against the same inode; unlinking the
+  live path decrements a link count and cannot reach the bytes. Verified in the
+  container: the reclaimed blob was byte-identical in the backup afterwards and
+  the backup still verified.
+
+  **Item deletion defers to the sweep rather than reclaiming inline.** The only
+  path that deletes an item is undo, and undo retains an item carrying an
+  attachment (DEC-047), so an inline reclaim there would be unreachable code
+  guarding an unreachable case. The deferral is proved from both ends by test:
+  undo retains, and a blob orphaned by an item deleted any other way is found and
+  reclaimed. Note that `entries.item_id` has no `ON DELETE CASCADE`, so an item
+  cannot be deleted while an entry references it — found during the walkthrough,
+  which had to delete the entry first to produce the orphan at all.
+
+  **Replace is not built.** Once rename exists, replace is remove plus attach:
+  the owner chose to skip it rather than add an endpoint, a second confirmation
+  and a question about what a row's identity and `created_at` mean when its bytes
+  change underneath. Recorded here so it reads as answered rather than forgotten.
+
+  **`Cache-Control: immutable` was wrong and is gone.** The blob genuinely never
+  changes, but the *response* is not the blob — it carries the filename, and the
+  filename is editable. A year of `immutable` with no validator meant an
+  already-downloaded file kept saving under a name the owner had since corrected.
+  Replaced with `max-age=0, must-revalidate` and an ETag over digest **and** name
+  together, so an untouched file still costs a 304 with no body while a renamed
+  one cannot match and is refetched under its new name. Weakening the cache was
+  the cheaper fix than removing the name from the response, because the name is
+  the entire point of `Content-Disposition`.
+
+- **Consequences.** `akasha-attachments` is a second console script alongside
+  `akasha-backup`, documented in the runbook; it is not wired into cron and
+  deliberately does not run itself. Uploads and downloads stream, measured at
+  +29.9 MiB → +2.6 MiB peak RSS on upload and +24.9 MiB → +0.0 MiB on download
+  for a 25 MiB file, which also makes the cap an as-it-arrives check rather than
+  a buffer-then-refuse one. The orphaned cover from product spec open question 2
+  is still not collected: the reclaim is scoped to the attachment store and does
+  not generalize to covers, which are re-fetchable cache. Sprint 023 is unaffected
+  and remains the creator sort names work.

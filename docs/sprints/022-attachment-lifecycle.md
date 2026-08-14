@@ -1,6 +1,6 @@
 # Sprint 022 — Attachment lifecycle: reclaim, rename, and the edges Sprint 021 left
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 021
 **Roadmap revision:** 9
 
@@ -135,5 +135,82 @@ made to hold an orphan. Report the memory figures for the streaming criterion.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Complete.** No new feature surface: an attachment is still an opaque file and nothing here parses,
+renders or reads one.
+
+### Delivered
+
+- **`akasha-attachments reclaim`** (`backend/src/book_tracker/reclaim.py`), a second console script
+  beside `akasha-backup`. Reports by default; removes nothing without `--apply`. Collects orphaned
+  blobs and the `upload-*.tmp` a crashed upload leaves behind, keeps everything a live row
+  references, and reports files under `attachments/` it did not write rather than tidying them.
+- **Rename** — `PATCH /api/items/{item_id}/attachments/{attachment_id}`, plus an inline edit on the
+  detail page. One database write; no file moves and the download URL does not change.
+- **A validator instead of `immutable`** on the download, over digest *and* filename, because
+  renaming made the old header wrong.
+- **Confirmation on remove**, matching *Delete entry* on the same page.
+- **Streaming both ways.** `BlobWriter` hashes and writes a chunk at a time; downloads are a
+  `FileResponse`. The cap is now enforced as bytes arrive rather than after buffering.
+- **The two UI corrections from DEC-049**: per-row pending state, and one tab stop per action.
+- Runbook section, product spec §7 and open question 2, technical spec, and **DEC-050**.
+
+### Acceptance criteria
+
+1. **Met.** A blob with no referencing row is reclaimable and the run reports what it removed and
+   what it left. The backup question was checked rather than assumed: the backup hardlinks blobs out
+   of the live store, so it holds its own entry against the same inode. Verified in the container —
+   the reclaimed blob was byte-identical in the backup afterwards (`23b1873a…` both sides) and
+   `akasha-backup verify` still passed.
+2. **Met, by deferral, stated explicitly.** Item deletion defers to the sweep. The only path that
+   deletes an item is undo, and undo retains an item carrying an attachment, so an inline reclaim
+   there would be unreachable code. Proved from both ends: `test_undo_preserves_an_item_carrying_an_
+   attachment` and `test_a_blob_orphaned_by_an_item_delete_is_found`.
+3. **Met.** Rename changes the listed name and the name a fresh download saves as. The caching
+   wrinkle is reconciled: `max-age=0, must-revalidate` with an ETag over digest and name, so an
+   unchanged file is a 304 with no body and a renamed one cannot match. Container: `304` before the
+   rename, `200` with the new `Content-Disposition` after, bytes identical.
+4. **Met.** Removing asks first; cancelling leaves the file attached and issues no `DELETE`.
+5. **Met, measured.** Peak RSS of a real uvicorn process pushing a 25 MiB file, before → after:
+   upload **+29.9 MiB → +2.6 MiB**, download **+24.9 MiB → +0.0 MiB**. The "before" figure was taken
+   by running the same instrument against a worktree at the pre-streaming commit, not estimated.
+6. **Met.** axe clean on the attachments surface, and exactly one control named "Attach a file".
+
+### Verification
+
+```text
+python scripts/validate_project.py    passed
+make format && make check             passed (openapi surface regenerated and matched)
+make test                             backend 328, frontend 97
+npm run test:e2e                      79 passed, 2 skipped
+docker build && make build && make smoke-container   passed, no chunk-size warning
+git diff --check                      clean
+```
+
+**Walkthrough, against the container.** Compose stack on `akasha:local`, not `make dev`. Uploaded a
+1.5 MB file, renamed it twice, downloaded it byte-identical with all three safety headers, and
+confirmed the 304/200 revalidation pair around a rename. Then deliberately produced an orphan —
+delete the entry, delete the item, `CASCADE` drops the row and leaves the bytes — plus a backdated
+`upload-crashed.tmp`. `reclaim` dry run named both and removed nothing; `--apply` removed both and
+kept the referenced blob. Browser: inline rename, confirm dialog, cancel-is-a-no-op, a second file
+attached, one tab stop, confirmed removal. No console errors.
+
+### Deviations and decisions
+
+- **Replace was not built.** Put to the owner at activation as the sprint required; the answer was
+  to skip it, since with rename in place it is remove plus attach (DEC-050).
+- **The reclaim surface was the owner's call** — CLI, dry-run by default, over a UI button or an
+  automatic sweep.
+- **Row layout corrected.** Not in the sprint, but the walkthrough showed the size and buttons
+  tracking each filename's length, which two action buttons per row made obvious. One-line flex fix
+  in the file already being changed.
+- **`entries.item_id` has no `ON DELETE CASCADE`**, so an item cannot be deleted while an entry
+  references it. Found while trying to produce the orphan; recorded in DEC-050 because the baseline
+  described the `CASCADE` leak without mentioning the entry has to go first.
+
+### Impact on future sprints
+
+- **Sprint 023** is unaffected: no migration was added, so the head is still `0010_attachments`. Its
+  baseline note was updated to say so rather than leaving it to be re-derived.
+- **Sprint 024 (export)** inherits one narrowing: the filename is now owner-edited data, so whatever
+  an export carries, it must carry the name. Reconstructing names from digests loses a correction.
+- **Sprints 025-027** unaffected.

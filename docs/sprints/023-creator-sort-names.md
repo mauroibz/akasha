@@ -1,6 +1,6 @@
 # Sprint 023 — Creator sort names
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 020
 **Roadmap revision:** 9
 
@@ -25,11 +25,11 @@ creator sort name that the owner can correct, and no later domain inherits a bro
 
 ## Current implementation baseline
 
-Re-derive at activation. As of Sprint 021's close (re-derive; Sprint 022 lands first): `sort_author` is
+Re-derive at activation. As of Sprint 022's close: `sort_author` is
 `Computed("json_extract(metadata, '$.authors[0]')")`, and `sort_author_normalized` is a plain column
 maintained by a `before_insert`/`before_update` mapper event, because SQLite generated columns may
-only call built-in functions. The migration head is `0010_attachments`, pinned by literal in
-`test_migrations.py` (twice) and `test_backup.py`.
+only call built-in functions. The migration head is still `0010_attachments` — Sprint 022 added no
+migration — pinned by literal in `test_migrations.py` (twice) and `test_backup.py`.
 
 ## Deliverables
 

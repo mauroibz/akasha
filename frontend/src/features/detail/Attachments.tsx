@@ -143,7 +143,7 @@ export function Attachments({ itemId }: { itemId: number }) {
             return (
               <li
                 key={attachment.id}
-                className="flex items-center justify-between gap-4 text-sm"
+                className="flex items-center gap-2 text-sm"
               >
                 {renamingThis ? (
                   <form
@@ -189,12 +189,14 @@ export function Attachments({ itemId }: { itemId: number }) {
                   <>
                     <a
                       href={attachmentHref(itemId, attachment.id)}
-                      className="truncate underline underline-offset-4"
+                      className="min-w-0 flex-1 truncate underline underline-offset-4"
                       download
                     >
                       {attachment.filename}
                     </a>
-                    <span className="shrink-0 text-xs text-muted-foreground">
+                    {/* Fixed width so size and actions line up down the list
+                        rather than tracking each filename's length. */}
+                    <span className="w-16 shrink-0 text-right text-xs text-muted-foreground">
                       {formatBytes(attachment.byte_size)}
                     </span>
                     <Button

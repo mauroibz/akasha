@@ -588,11 +588,14 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 - Cover, full metadata, description
 - Editable: status, score, notes, dates, shelves, reread count
 - Link to edit underlying item metadata
-- **Files** — attachments on the edition: name, size, download, remove. Loaded
-  as its own request so a slow read never delays the page. An attachment is an
-  **opaque file, or it is a reader**, and this is the opaque-file side of that
-  line: no format parsing, no in-browser reading, no reading progress, no device
-  sync (DEC-048).
+- **Files** — attachments on the edition: name, size, download, rename, remove.
+  Loaded as its own request so a slow read never delays the page. Renaming is
+  inline, since the name is metadata and changing it moves no bytes; removing
+  confirms first, because once the removed row is the last reference the upload
+  is gone. There is no *replace*: with rename in place it is remove plus attach
+  and nothing more (DEC-050). An attachment is an **opaque file, or it is a
+  reader**, and this is the opaque-file side of that line: no format parsing, no
+  in-browser reading, no reading progress, no device sync (DEC-048).
 - Delete entry
 
 **`/triage` — The inbox.** The screen that makes bulk import viable, and the
@@ -755,10 +758,13 @@ acceptance criteria.
    `items` rows and their covers in place, treating them as cache so re-adding
    is instant, with a manual "prune orphans" maintenance action. Only matters
    for disk usage, and covers are ~50KB each. **Attachments changed the stakes
-   of this and it is now half-answered** (DEC-047): an attached file is 2.5 MB
-   rather than 50 KB and is not re-fetchable cache, so removing an attachment
-   deletes its bytes once nothing references them. The orphaned *cover* is still
-   left in place and the prune action is still unbuilt.
+   of this and it is now answered for them** (DEC-047, DEC-049): an attached
+   file is 2.5 MB rather than 50 KB and is not re-fetchable cache, so removing
+   an attachment deletes its bytes once nothing references them, and
+   `akasha-attachments reclaim` collects any blob that was orphaned some other
+   way. The orphaned *cover* is still left in place: the reclaim command is
+   scoped to the attachment store and deliberately does not generalize to
+   covers, which are cache the application can re-fetch.
 3. **Work vs edition.** One row = one edition; a reread of a different edition
    is the same entry with `reread_count++`. Changing this means a different
    uniqueness constraint on `entries`. Recommendation stands: don't.
