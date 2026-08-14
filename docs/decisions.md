@@ -930,3 +930,76 @@ Append-only record of material architecture choices, product-default resolutions
   candidate it returns can be tied to the identifier that was requested, and a provider that cannot
   prove that is not merged. MusicBrainz's release-versus-release-group distinction is the same
   problem in the shape DEC-042 already predicted.
+
+## DEC-045 — Phase B is authorized: cover choice only, Open Library stays first, and quota becomes a provider-agnostic guard
+
+- **Date:** 2026-08-13
+- **Status:** accepted; the go-ahead DEC-035 and DEC-044 both required
+- **Context:** DEC-044 recorded Sprint 020's Phase A verdict and offered the owner one narrow slice
+  against a larger refusal. The owner read it and decided. This entry records that decision, because
+  DEC-035 requires Phase B to rest on an explicit go-ahead rather than an agent's reading of a
+  verdict.
+- **Decision, in four parts.**
+
+  1. **Cross-provider metadata completion is abandoned**, confirming DEC-044's recommendation rather
+     than revisiting it. It is not deferred, not partially built, and not to be revived without new
+     evidence.
+  2. **The cover selector is authorized and built now**, as Sprint 020's Phase B. Its affordability
+     rests entirely on DEC-044's measurement that candidates are already in hand: the Open Library
+     work record enrichment fetches for every book lists 28 editions for Rayuela and 33 for the
+     sampled *Cien años de soledad*, so discovery costs no additional provider request. Candidates
+     are fetched on demand when the chooser opens, never eagerly, which is what keeps the disk cost
+     at ~0 against the ~947 MB an eager five-candidate cache would cost at 5,000 books.
+  3. **Provider order does not change: Open Library first, Google Books as the fallback.** The owner
+     raised the alternative — Google as a high tier until its daily quota is spent, then Open
+     Library — and it was measured rather than argued:
+
+     | per 5,000-book import | Google Books calls | |
+     |---|---|---|
+     | Open Library first (kept) | **1,333** | Google consulted only where Open Library missed |
+     | Google Books first | 5,000 | five times the free tier |
+
+     Correctness and cost point the same way. Open Library reaches an edition through an
+     authoritative `/isbn/` redirect and was verifiable in **100%** of its 44 answers, where Google
+     Books was verifiable in **80.4%**; putting the less verifiable source first would also mean
+     rejecting more of its answers under DEC-044's rule. Google answers faster (1.06 s against
+     1.41 s p50) but enrichment is background work behind a 0.5 s per-job limiter, so latency is not
+     the binding constraint. Google is genuinely needed for the ~25% of books Open Library cannot
+     answer at all, and spending quota there is spending it where it is the only option.
+  4. **A daily quota guard ships with this sprint**, because the owner's instinct that the 1,000/day
+     limit needs designing around is correct even after (3): 1,333 > 1,000, so a single 5,000-book
+     import exhausts the free tier today and silently loses enrichment on the remainder.
+
+- **The guard is provider-agnostic by construction, at the owner's direction.** Google Books is the
+  only metered provider today and it will not be the last — DEC-042 puts MusicBrainz, IGDB and TMDB
+  on the roadmap and singles out IGDB as the one needing real credential machinery. So the mechanism
+  names no provider: a `provider_usage` table keyed by `(provider, day)`, a `ProviderQuota` that
+  answers `record` and `allows` for any name, and limits supplied as configuration
+  (`provider_daily_limits`, default `{"googlebooks": 900}`) rather than written into code. Adding a
+  metered provider later is a config entry. Three consequences worth stating:
+
+  - **Unmetered providers are counted anyway.** Open Library has no cap and is never blocked, but
+    recording its traffic means a future limit can be set against observed history rather than a
+    guess, and the next domain sprint inherits the measurement Phase A had to write a script for.
+  - **Exhaustion defers, it does not fail.** A capped provider's job has its `available_at` moved to
+    the next day boundary **without incrementing `attempts`**, because the existing `fail` path
+    dead-letters at a retry ceiling and a large import would otherwise destroy its own backlog. A
+    genuine provider miss still fails exactly as before; deferral is reserved for quota.
+  - **Interactive search is counted but never blocked.** Spending the last of a day's quota on a
+    search the owner is waiting for is a good use of it; spending it on background enrichment is
+    not. The cap therefore guards enrichment only.
+
+  The default of 900 against a real limit of 1,000 is deliberate headroom: Google resets quota on
+  Pacific time while the counter uses UTC, so the guard is conservative rather than exact.
+
+- **Consequences.** **Sprint 020 is reopened rather than superseded by a new sprint.** Its file
+  already carries a `Phase B — build what Phase A justified` section written to await this
+  go-ahead, so reopening is what the gate structure anticipated: the sprint returns to
+  `in_progress`, `021-attachments.md` returns to `planned` while it waits, and the Outcome is
+  **appended to, never rewritten**. The alternative considered was a new Sprint 021 with attachments
+  shifting to 022 and the domain line to 025–027; it was rejected because this file is append-only
+  history that already refers to Sprints 021, 024 and 026 by number, and renumbering would silently
+  falsify those references while `validate_project.py`'s sequential-numbering rule forced the whole
+  cascade. Nothing about the later roadmap changes.
+  DEC-044's placeholder-cover guard now protects the chooser too: a candidate that is a provider
+  banner is rejected on the same geometry rule, so choosing one cannot install a placeholder.
