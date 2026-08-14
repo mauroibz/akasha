@@ -803,3 +803,79 @@ cross-provider field completion and edition choice are affordable, and concludin
 outcome. Do not start Phase B without an explicit owner go-ahead in `docs/decisions.md`. One item
 does not wait on the gate: `GoogleBooksProvider.fetch_by_isbn` takes the first hit of an `isbn:`
 search and is repaired whatever the verdict.
+
+## 2026-08-13 — Sprint 020 (metadata completeness: viability, then build)
+
+**Done:** Phase A ran and concluded; Phase B did not start, which is the gate working rather than
+work left undone. The owner set that shape when planning: measure, repair the ungated defect, stop.
+
+Two instruments produced the numbers. `scripts/benchmark_library.py` gained provider-request
+counting — an Open Library hit costs **four** metadata requests plus a cover, not one — and needed
+its own repair first: `query_plans` still emitted `normalize_text(...)`, removed as a
+connection-level function by DEC-036, so every run of that script had died with `no such function`
+since Sprint 017. `scripts/assess_provider_completeness.py` is new and asks both live providers
+about a 60-ISBN sample harvested from real search.
+
+The verdict is DEC-044 and it is mostly a decision **not** to build. Cross-provider field completion
+buys a description in 22% of cases, a page count in 12%, and **0% for year, publisher, authors and
+cover**, while a 5,000-book import would need ~15,000 Google requests against a ~1,000/day free
+tier. The owner's headline want — choosing a cover from the editions fetched — gains **nothing**
+from a second provider, because Open Library carried a cover for 100% of the editions it answered
+for. But cover *choice* is still cheap from a source nobody had costed: the Open Library **work
+record enrichment already fetches** lists 28 covers for Rayuela and 33 for *Cien años de soledad*,
+so candidate discovery costs zero extra requests. That is offered as a Phase B and left unstarted.
+
+The ungated defect is repaired. `GoogleBooksProvider.fetch_by_isbn` ran an `isbn:` search and took
+the first hit; verification is now a tri-state and only a **confirmed** volume is merged.
+Unverifiable is rejected exactly like contradicted, and the measurement is why: the observed failure
+was not a wrong printing but a wrong *work* — for ISBN 9789583007828 Open Library returns *Crónica
+de una muerte anunciada* and Google Books returns *Las venas abiertas de América Latina* — so
+merging "only the work-level fields" would have kept the worst error. This discards 19.6% of Google
+Books fallback answers, which is the stated price.
+
+Two further fixes. The placeholder cover is *solved, not just described*: Google's "image not
+available" is **575x92**, a 6.25:1 banner, where real covers measured 0.66 and 0.77, and
+`prepare_cover` rejected only images under 10px, so it installed one as a real cover. And provider
+HTML in descriptions is stripped at the boundary with migration `0008` backfilling what was already
+stored.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **209** / frontend **83**;
+`npm run test:e2e` **75 passed / 2 skipped** across both projects; `make build` clean with no
+chunk-size warning; `make smoke-container` passed with its verified restore reporting revision
+`0008_plain_text_descriptions`; `git diff --check` clean.
+
+Walkthrough ran against a container on a **copy** of the library, never the real one. The copy sat
+at `0006`, so startup wrote a pre-migration backup and applied both `0007` and `0008` unattended —
+DEC-039 exercised for real. A three-row Goodreads import with ISBNs taken from `/api/search`
+committed after resolving one genuine ambiguity (the library already held two *Cien años de
+soledad*). Enrichment then showed both sides of the repair: `9788419233790` missed on Open Library
+and was **confirmed** by the Google fallback, so it merged (RM Verlag, 136pp, 2024), while
+`9788437604572` hit Open Library and got Cátedra and **746** pages — not the 762 the unverifiable
+Google volume would have written. Every stored cover measured portrait, 0.59–0.67. Four detail pages
+opened in a real browser: no literal `<p>` or `<b>` anywhere, no console errors. `docker stop`
+logged `Application shutdown complete` and exited 143.
+
+**Seen and left:**
+
+- **Open Library returns mojibake for some titles** — `Cc3mo Leer a Garcc-A Mc!Rquez` for *Cómo leer
+  a García Márquez*. Upstream data corruption this project cannot fix, but could detect.
+- **Provider search silently degrades to one provider.** The client timeout is a hard 5 s while Open
+  Library's search plus its year-resolution fan-out routinely exceeds it. In the walkthrough,
+  `/api/search` for *Pedro Páramo* returned **Google Books results only**. The handoff's "provider
+  search takes about five seconds" is this, and its real consequence is worse than slowness.
+- **The reprint-over-original ranking is confirmed.** `merge_and_rank` puts a 1969 printing at rank
+  0 and a 2024 edition at rank 1 for *Pedro Páramo*; the 1955 original is not in the top eight.
+  Deliberately deferred in DEC-044 — it is search ranking, and changing it is product behaviour.
+- **The quoted publisher is still there**: the detail page reads `"O'Reilly Media, Inc."`, quotes
+  included, straight from the provider payload. Unowned.
+- `POST /api/enrichment/backfill` exists but there is no `/api/jobs` listing endpoint, so job state
+  during a walkthrough has to be read from the database.
+
+**Deviations:** the repair landed *after* the verdict rather than before, because the owner chose to
+let the measurement pick the policy. One fixture was **added** (the confirmed Google case) and none
+re-recorded — the existing one already contained the defect. `ItemPayload` gained an `edition_match`
+field, which Sprint 024 inherits. A prerequisite defect in the benchmark script was repaired.
+
+**Next:** Sprint 021 (attachments) — status `ready`, file at `docs/sprints/021-attachments.md`,
+expanded from `TEMPLATE.md` at this close. **It is gated** like 020: Phase A measures, and backup
+growth is the measurement that scopes the whole feature. Concluding *no* is a complete outcome.

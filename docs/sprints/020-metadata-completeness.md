@@ -1,6 +1,6 @@
 # Sprint 020 — Metadata completeness: viability, then build
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 019
 **Roadmap revision:** 8
 
@@ -152,5 +152,92 @@ container (not `make dev`) if anything user-visible shipped.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Phase A ran; Phase B did not start.** The owner set that shape at planning time: deliver the
+measured verdict plus the ungated repair, then stop, so the Phase B decision is made with numbers in
+hand. No go-ahead was given and none is recorded, which is the gate working as DEC-035 designed it.
+
+### Delivered
+
+| | |
+|---|---|
+| `4a08747` | provider-request counting in the benchmark, plus its own repair |
+| `45bfabb` | live completeness harness, `classify_edition`, `ItemPayload.edition_match` |
+| `0f579fd` | **DEC-044**, the Phase A verdict |
+| `2e1f388` | edition verification enforced; placeholder-cover guard |
+| `602afb8` | `strip_html` at the provider boundary; migration `0008` |
+
+### Acceptance criteria
+
+1. **Verdict recorded with measurements, including those arguing against building** — DEC-044.
+   The numbers that argue against are the load-bearing ones: cross-provider completion buys a
+   description in 22% of cases, a page count in 12%, and **0% for year, publisher, authors and
+   cover**, while multiplying per-book traffic and breaching the Google free tier threefold on a
+   5,000-book import.
+2. **Edition verification answered concretely** — yes for Open Library (100% confirmed across 44
+   answers, because `/isbn/` resolves authoritatively), and only sometimes for Google Books
+   (80.4% confirmed, 19.6% unverifiable, 0% contradicted). What that rules out is stated: a volume
+   that cannot be tied to the requested ISBN is not merged at all.
+3. **Phase B did not proceed**, so its throughput and rate-limit criteria do not apply. The
+   fill-empty-only invariant is nonetheless proven intact on the path that did change, by
+   `test_a_verified_google_volume_still_only_fills_empty_fields`.
+4. **No chooser shipped**, so its criteria do not apply. DEC-044 costs one out for the owner:
+   candidates are free from the Open Library work record enrichment already fetches — 28 covers for
+   Rayuela, 33 for the sampled *Cien años de soledad* — so discovery needs zero extra requests.
+5. **Both folded observations addressed.** The placeholder cover is *fixed*, not merely described:
+   it is detectable by geometry (Google's is 575x92, a 6.25:1 banner, against real covers at 0.66
+   and 0.77) and `prepare_cover` now rejects it. The reprint-over-original ranking is *reproduced
+   and explicitly deferred with a reason* — it is search ranking governed by product spec 4.3 and
+   DEC-024, so changing it is user-visible product behaviour outside an assessment's remit.
+
+### Verification, actual results
+
+`python scripts/validate_project.py` passed. `make check` passed. `make test` backend **209** /
+frontend **83**. `npm run test:e2e` **75 passed / 2 skipped** across both projects, matching the
+Sprint 019 baseline. `make build` clean with no chunk-size warning. `make smoke-container` passed,
+its verified restore reporting revision `0008_plain_text_descriptions`. `git diff --check` clean.
+
+### Walkthrough
+
+Ran against a container on a **copy** of the library, never the real one. The copy sat at revision
+`0006`, so startup wrote `pre-migration-20260814T002018Z` and then applied both `0007` and `0008`
+unattended — the DEC-039 path exercised for real rather than asserted. A three-row Goodreads import
+whose ISBNs came from `/api/search` committed after resolving one genuine ambiguity (the library
+already held two copies of *Cien años de soledad*), reporting `unsorted_entries: 2`.
+
+Enrichment then exercised both sides of the repair. For `9788419233790` Open Library missed with
+`edition_not_found` and the Google Books fallback **confirmed** the edition, so it was merged:
+RM Verlag, 136 pages, 2024. For `9788437604572` Open Library hit and supplied Cátedra and **746**
+pages — notably *not* the 762 the unverifiable Google volume would have written. Every stored cover
+measured portrait (ratios 0.59–0.67); none was placeholder-shaped. Four detail pages were opened in
+a real browser: no literal `<p>` or `<b>` anywhere, and no console errors in the whole run. The
+*Escaping the Build Trap* description now reads as prose in paragraphs. `docker stop` logged
+`Application shutdown complete` and exited **143**.
+
+### Deviations
+
+- **Commit order differs from the checkpoint list in this file.** The repair lands *after* the
+  verdict rather than before, because the owner chose to let the measurement pick the policy for
+  unverifiable candidates rather than fixing it in advance.
+- **A prerequisite defect was repaired**, as `AGENTS.md` section 2 permits and requires recording:
+  `scripts/benchmark_library.py` still emitted `normalize_text(...)` in `query_plans`, which DEC-036
+  removed as a connection-level function, so every run of the script since had died with
+  `no such function`. Phase A could not measure without it.
+- **One fixture was added, none re-recorded.** `googlebooks_isbn_9780307474728.json` supplies the
+  confirmed case so the repair can be shown to still admit a verified volume. The existing
+  `googlebooks_isbn_9788437604572.json` turned out to *already* contain the defect, and a live check
+  confirmed the same volume still comes back, so nothing was refreshed.
+- **`ItemPayload` gained a field**, `edition_match`. Recorded because Sprint 024 inherits it.
+- **Two existing tests changed meaning deliberately**, both named in DEC-044's reasoning:
+  `test_open_library_miss_falls_back_to_google_books` now runs against the confirmed fixture, and
+  the unverifiable case became its own test asserting the rejection.
+
+### Impact on future sprints
+
+- **021 (attachments), 022 (creator sort), 023 (export)** — unaffected.
+- **024 (albums)** inherits the verification contract, which is why DEC-044 records reasoning rather
+  than only a verdict: a provider fills fields only when its candidate can be tied to the identifier
+  requested. MusicBrainz's release-versus-release-group split is the same problem.
+- **A Phase B remains available and unstarted**: cover choice from Open Library work-record
+  candidates, on demand. It needs an explicit owner go-ahead recorded in `docs/decisions.md`.
+- **Three observations are unowned and recorded**: Open Library title mojibake, the 5-second search
+  timeout that silently yields Google-only results, and the quoted publisher string.

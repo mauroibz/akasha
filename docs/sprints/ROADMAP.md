@@ -2,7 +2,7 @@
 
 **Plan revision:** 8
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 020](020-metadata-completeness.md)
+**Active sprint:** [Sprint 021](021-attachments.md)
 
 ## Shape of the plan
 
@@ -59,8 +59,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [017](017-scale-accessibility-resilience.md) | Production-quality hardening | 016 | completed |
 | [018](018-container-backup-release.md) | Deployable v1 | 017 | completed |
 | [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | completed |
-| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | **ready** |
-| 021 | Attachments: viability, then a narrow slice | 020 | planned |
+| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | completed |
+| [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | **ready** |
 | 022 | Creator sort names | 020 | planned |
 | 023 | Export | 020 | planned |
 | 024 | Second domain — albums: pilot, then verdict | 020 | planned |
@@ -71,7 +71,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 and 020 already have files; the rest do not.
+incorporating actual deviations. Sprints 019, 020 and 021 already have files; the rest do not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -97,7 +97,13 @@ repaired whatever the verdict.
 This sprint sets the provider contract Sprint 024 inherits, so its reasoning matters as much as its
 verdict.
 
-### Sprint 021 — Attachments: viability, then a narrow slice
+[Closed 2026-08-13. **Phase A concluded against building**: cross-provider completion buys a
+description in 22% of cases and 0% for cover, year, publisher and authors, while breaching the
+Google free tier on a large import. The edition defect and the placeholder cover were both repaired.
+A narrow Phase B — cover choice from Open Library work-record candidates, which cost no extra
+requests — remains available and unstarted, pending an owner go-ahead. See DEC-044.]
+
+### [Sprint 021 — Attachments: viability, then a narrow slice](021-attachments.md)
 
 **Gated.** The owner wants to attach arbitrary files to an entry — epubs for books — while keeping
 the metadata-first framing. The scope risk is real and has a precise boundary: **an attachment is
@@ -188,7 +194,10 @@ What is hardcoded, and is the real work:
 Albums first, among the three domains the owner named. MusicBrainz needs no OAuth, unlike IGDB's
 Twitch credentials; release-group versus release maps directly onto the work-versus-edition problem
 this codebase already solved for books; and Cover Art Archive as a separate image provider exercises
-the two-provider composition Sprint 020 will have just settled.
+the two-provider composition Sprint 020 has now settled: DEC-044 fixes the rule that a provider
+fills fields only when its candidate can be tied to the identifier that was requested, and that an
+unverifiable candidate is rejected rather than partially merged. MusicBrainz's release-versus-
+release-group split is that same problem, so albums inherits the answer rather than re-deriving it.
 
 The Goodreads and Calibre import pipelines stay book-only. That is not a gap.
 
