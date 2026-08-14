@@ -80,14 +80,18 @@
       "Body_replace_cover_api_items__item_id__cover_post": {
         "properties": {
           "cover": {
-            "format": "binary",
-            "title": "Cover",
-            "type": "string"
+            "anyOf": [
+              {
+                "format": "binary",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover"
           }
         },
-        "required": [
-          "cover"
-        ],
         "title": "Body_replace_cover_api_items__item_id__cover_post",
         "type": "object"
       },
@@ -443,6 +447,67 @@
           "unsorted_entries"
         ],
         "title": "CommitResponse",
+        "type": "object"
+      },
+      "CoverCandidate": {
+        "properties": {
+          "cover_url": {
+            "title": "Cover Url",
+            "type": "string"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "cover_url",
+          "source_id",
+          "title"
+        ],
+        "title": "CoverCandidate",
+        "type": "object"
+      },
+      "CoverCandidates": {
+        "properties": {
+          "candidates": {
+            "items": {
+              "$ref": "#/components/schemas/CoverCandidate"
+            },
+            "title": "Candidates",
+            "type": "array"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "candidates"
+        ],
+        "title": "CoverCandidates",
         "type": "object"
       },
       "EntryCreateBody": {
@@ -2905,6 +2970,7 @@
         "summary": "Get Cover"
       },
       "post": {
+        "description": "Replace a cover, either with an upload or with a candidate the owner picked.\n\nOne endpoint rather than two because the write is identical past the point the bytes\nare obtained: same validation, same atomic install, same recovery of the previous\ncover if anything fails.",
         "operationId": "replace_cover_api_items__item_id__cover_post",
         "parameters": [
           {
@@ -2924,8 +2990,7 @@
                 "$ref": "#/components/schemas/Body_replace_cover_api_items__item_id__cover_post"
               }
             }
-          },
-          "required": true
+          }
         },
         "responses": {
           "200": {
@@ -2970,6 +3035,66 @@
           }
         },
         "summary": "Replace Cover"
+      }
+    },
+    "/api/items/{item_id}/cover-candidates": {
+      "get": {
+        "description": "Other editions of this work, offered as covers to choose from.\n\nOnly ever reached because a chooser was opened. Nothing here runs while a library\npage renders, which is the invariant that keeps cached pages provider-free.",
+        "operationId": "list_cover_candidates_api_items__item_id__cover_candidates_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CoverCandidates"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Cover Candidates"
       }
     },
     "/api/items/{item_id}/refresh": {

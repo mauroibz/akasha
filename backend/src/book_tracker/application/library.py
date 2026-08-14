@@ -244,6 +244,27 @@ class LibraryService:
                 )
             return source.source, source.source_id
 
+    def cover_lookup(self, item_id: int) -> tuple[str | None, str | None]:
+        """The two handles a cover chooser can reach Open Library's editions by.
+
+        An Open Library edition id when the item has one — primary or not, since a
+        Google-primary item merged with an Open Library match still carries the ref —
+        and otherwise an ISBN, which is the only handle a Google-only item has.
+        """
+        with Session(self.engine) as session:
+            self._item(session, item_id)
+            edition_id = session.scalar(
+                select(ItemSourceRow.source_id).where(
+                    ItemSourceRow.item_id == item_id, ItemSourceRow.source == "openlibrary"
+                )
+            )
+            isbn = session.scalar(
+                select(ItemIdentifierRow.normalized_value).where(
+                    ItemIdentifierRow.item_id == item_id, ItemIdentifierRow.kind == "isbn"
+                )
+            )
+            return edition_id, isbn
+
     def overwrite_provider_fields(self, item_id: int, values: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
             item = self._item(session, item_id)

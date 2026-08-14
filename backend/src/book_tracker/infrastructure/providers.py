@@ -416,6 +416,12 @@ class OpenLibraryProvider:
             )
         return await self._edition_payload(row, key.removeprefix("/books/"), isbn)
 
+    async def work_id(self, edition_id: str) -> str | None:
+        """The work an edition belongs to, which is where its sibling editions live."""
+        row = await self._json(f"https://openlibrary.org/books/{edition_id}.json")
+        work_ids = _keys(row.get("works"), "/works/")
+        return work_ids[0] if work_ids else None
+
     async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._json(
             f"https://openlibrary.org/works/{work_id}/editions.json", limit=min(limit, 20)

@@ -73,3 +73,44 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
         if source_id:
             return [await google.fetch(source_id)]
     raise InvalidResolution("Use an ISBN, Open Library edition/work URL, or Google Books URL")
+
+
+async def cover_candidates(
+    openlibrary: Any,
+    *,
+    edition_id: str | None = None,
+    isbn: str | None = None,
+    limit: int = 20,
+) -> list[SearchCandidate]:
+    """The other editions of this work, as cover options.
+
+    Affordable because of what DEC-044 measured: the work an edition belongs to already
+    lists its siblings, and enrichment has fetched that record for every book anyway, so
+    discovering candidates adds no request to the enrichment path. This function runs
+    only when a chooser is opened, never while a library page renders.
+
+    Reached from an Open Library edition id when the item has one, and otherwise from an
+    ISBN — which matters, because an item added through Google Books has no Open Library
+    source and would otherwise get nothing. That lookup is Open Library's, so it spends
+    no metered quota either way.
+    """
+    work: str | None = None
+    if edition_id:
+        work = await openlibrary.work_id(edition_id)
+    if work is None and isbn:
+        payload = await openlibrary.fetch_by_isbn(isbn)
+        work = await openlibrary.work_id(payload.source_id)
+    if work is None:
+        return []
+
+    rows = await openlibrary.resolve_work(work, limit=limit)
+    seen: set[str] = set()
+    candidates: list[SearchCandidate] = []
+    for row in rows:
+        # Several editions of a work commonly share one scanned cover; showing it three
+        # times reads as a bug rather than as choice.
+        if not row.cover_url or row.cover_url in seen:
+            continue
+        seen.add(row.cover_url)
+        candidates.append(row)
+    return candidates

@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from typing import Annotated, Any, Literal
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from book_tracker.application.add import AddService
 from book_tracker.application.library import LibraryError, LibraryService
+from book_tracker.application.providers import cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
 from book_tracker.infrastructure.covers import (
@@ -15,6 +17,8 @@ from book_tracker.infrastructure.covers import (
     prepare_uploaded_cover,
 )
 from book_tracker.infrastructure.repositories import DomainRepository
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
 
@@ -380,6 +384,61 @@ async def get_cover(item_id: int, request: Request) -> Response:
     )
 
 
+class CoverCandidate(BaseModel):
+    cover_url: str
+    source_id: str
+    title: str
+    year: int | None = None
+
+
+class CoverCandidates(BaseModel):
+    candidates: list[CoverCandidate]
+    reason: str | None = None
+
+
+@router.get(
+    "/items/{item_id}/cover-candidates",
+    response_model=CoverCandidates,
+    responses=ERRORS,
+)
+async def list_cover_candidates(item_id: int, request: Request) -> CoverCandidates:
+    """Other editions of this work, offered as covers to choose from.
+
+    Only ever reached because a chooser was opened. Nothing here runs while a library
+    page renders, which is the invariant that keeps cached pages provider-free.
+    """
+    library = LibraryService(request.app.state.engine)
+    library.get_item(item_id)
+    provider = request.app.state.providers.get("openlibrary")
+    if provider is None:
+        return CoverCandidates(candidates=[], reason="provider_disabled")
+    edition_id, isbn = library.cover_lookup(item_id)
+    if not edition_id and not isbn:
+        return CoverCandidates(candidates=[], reason="no_provider_reference")
+    try:
+        rows = await cover_candidates(provider, edition_id=edition_id, isbn=isbn)
+    except Exception:
+        logger.warning("cover candidates unavailable", extra={"item_id": item_id})
+        return CoverCandidates(candidates=[], reason="provider_unavailable")
+    return CoverCandidates(
+        candidates=[
+            CoverCandidate(
+                cover_url=row.cover_url,
+                source_id=row.source_id,
+                title=row.title,
+                year=row.year,
+            )
+            for row in rows
+            if row.cover_url
+        ],
+        reason=None if rows else "no_candidates",
+    )
+
+
+class ChosenCover(BaseModel):
+    cover_url: str
+
+
 @router.post(
     "/items/{item_id}/cover",
     response_model=ItemResponse,
@@ -387,17 +446,42 @@ async def get_cover(item_id: int, request: Request) -> Response:
     responses=ERRORS,
 )
 async def replace_cover(
-    item_id: int, request: Request, cover: Annotated[UploadFile, File()]
+    item_id: int,
+    request: Request,
+    cover: Annotated[UploadFile | None, File()] = None,
 ) -> ItemResponse:
+    """Replace a cover, either with an upload or with a candidate the owner picked.
+
+    One endpoint rather than two because the write is identical past the point the bytes
+    are obtained: same validation, same atomic install, same recovery of the previous
+    cover if anything fails.
+    """
     library = LibraryService(request.app.state.engine)
     library.get_item(item_id)
-    content = await cover.read(10 * 1024 * 1024 + 1)
+    chosen: str | None = None
+    upload: tuple[bytes, str] | None = None
+    if cover is None:
+        try:
+            chosen = ChosenCover.model_validate(await request.json()).cover_url
+        except Exception as error:
+            raise LibraryError(
+                "invalid_cover", "Provide a cover file or a cover_url", status_code=422
+            ) from error
+    else:
+        upload = (await cover.read(10 * 1024 * 1024 + 1), cover.content_type or "")
     target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
     previous = target.read_bytes() if target.is_file() else None
     try:
-        prepared = prepare_uploaded_cover(
-            content, cover.content_type or "", request.app.state.data_dir
-        )
+        if chosen is not None:
+            # `prepare_cover` carries the host allowlist and the placeholder-banner
+            # guard, so a chosen URL cannot fetch an arbitrary host or install a
+            # provider's "image not available" strip.
+            prepared = await prepare_cover(
+                request.app.state.provider_client, chosen, request.app.state.data_dir
+            )
+        else:
+            assert upload is not None
+            prepared = prepare_uploaded_cover(upload[0], upload[1], request.app.state.data_dir)
         install_cover(prepared, request.app.state.data_dir, item_id)
         DomainRepository(request.app.state.engine).set_cover_path(item_id, f"covers/{item_id}.jpg")
     except CoverError as error:
