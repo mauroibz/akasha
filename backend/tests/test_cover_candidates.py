@@ -7,6 +7,7 @@ candidates costs no extra provider request to discover. DEC-045 authorised build
 
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -16,7 +17,11 @@ import pytest
 from recordings import recording, redirect_location, replay
 from sqlalchemy import Engine, text
 
-from book_tracker.application.providers import CANDIDATE_TIMEOUT_SECONDS, cover_candidates
+from book_tracker.application.providers import (
+    CANDIDATE_BUDGET_SECONDS,
+    CANDIDATE_TIMEOUT_SECONDS,
+    cover_candidates,
+)
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
 from book_tracker.infrastructure.providers import OpenLibraryProvider, create_provider_client
@@ -309,12 +314,14 @@ async def test_an_isbn_open_library_does_not_index_reads_as_no_candidates(
 
 @pytest.mark.anyio
 async def test_candidate_lookup_outlasts_the_default_client_timeout() -> None:
-    """Open Library was measured answering one edition record in 11.3s.
+    """The shared client allows 5s, which the walkthrough proved too tight here.
 
-    The shared client allows 5s, which is right for a search someone is watching and
-    wrong for a chooser they deliberately opened. The candidate path therefore carries
-    its own, longer budget; without it the whole feature fails whenever Open Library is
-    having a slow day, which is what the walkthrough saw.
+    Open Library was measured answering one edition record in 11.3s. The candidate path
+    therefore carries its own, longer per-request budget — but deliberately not one
+    large enough to cover that worst case on a single attempt, because a person is
+    waiting on this dialog. Two attempts at ten seconds under an overall cap is the
+    trade: the common slow response is covered, and a bad minute is reported quickly
+    instead of held behind a spinner.
     """
     seen: list[float | None] = []
 
@@ -327,7 +334,10 @@ async def test_candidate_lookup_outlasts_the_default_client_timeout() -> None:
         await provider.work_id("OL19845805M", timeout=CANDIDATE_TIMEOUT_SECONDS)
 
     assert seen == [CANDIDATE_TIMEOUT_SECONDS]
-    assert CANDIDATE_TIMEOUT_SECONDS > 11
+    # Longer than the shared client's 5s, and short enough that two attempts plus
+    # backoff still fit inside the overall budget a waiting reader is held to.
+    assert CANDIDATE_TIMEOUT_SECONDS > 5
+    assert 2 * CANDIDATE_TIMEOUT_SECONDS <= CANDIDATE_BUDGET_SECONDS + 5
 
 
 @pytest.mark.anyio
@@ -375,3 +385,44 @@ async def test_editions_without_a_real_cover_image_are_not_offered() -> None:
     assert len(rows) == 16
     assert all("/b/id/" in (row.cover_url or "") for row in rows)
     assert not any("/b/olid/" in (row.cover_url or "") for row in rows)
+
+
+@pytest.mark.anyio
+async def test_the_chooser_gives_up_rather_than_making_someone_wait(
+    tmp_path: Path, engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Retries multiply the worst case, and someone is watching this one.
+
+    Each request may now be attempted three times at up to CANDIDATE_TIMEOUT_SECONDS
+    each, across two or three requests — minutes of spinner if Open Library is fully
+    down. The whole operation therefore carries one budget, the same way
+    `search_providers` bounds a search.
+    """
+    item_id = seed_item(engine, source="openlibrary")
+    # The real budget is 25s. The behaviour under test is that there *is* one and that
+    # it is enforced, not its value, so the suite does not sit through it.
+    monkeypatch.setattr("book_tracker.api.library.CANDIDATE_BUDGET_SECONDS", 0.5)
+
+    async def crawl(request: httpx.Request) -> httpx.Response:
+        await asyncio.sleep(30)
+        return httpx.Response(200, json={})
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    app = create_app(configured)
+    client = create_provider_client(transport=httpx.MockTransport(crawl))
+    app.state.engine = engine
+    app.state.data_dir = tmp_path
+    app.state.provider_client = client
+    app.state.providers = {"openlibrary": OpenLibraryProvider(client, "test@example.invalid")}
+
+    started = asyncio.get_running_loop().time()
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as http:
+        response = await http.get(f"/api/items/{item_id}/cover-candidates")
+    elapsed = asyncio.get_running_loop().time() - started
+
+    assert response.json() == {"candidates": [], "reason": "provider_unavailable"}
+    assert elapsed < 5
+    # A dialog someone opened is allowed to wait a little, not a lot.
+    assert CANDIDATE_BUDGET_SECONDS <= 15.0

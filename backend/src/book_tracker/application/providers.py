@@ -7,6 +7,7 @@ from urllib.parse import parse_qs, urlsplit
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.providers import Provider, SearchCandidate, merge_and_rank
+from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,12 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
 # opened deliberately and Open Library was measured answering a single edition record in
 # 11.3s during Sprint 020's walkthrough, so the candidate path gets its own budget: a
 # ten-second wait is tolerable, a failed chooser is not.
-CANDIDATE_TIMEOUT_SECONDS = 20.0
+CANDIDATE_TIMEOUT_SECONDS = 10.0
+# The chooser is opened deliberately and does not block the page behind it, so it can
+# wait a little — but only a little, and only once. Two attempts at ten seconds under a
+# single overall budget: if Open Library is having a bad minute the dialog says so
+# quickly and the reader can reopen it, rather than holding a spinner for a minute.
+CANDIDATE_BUDGET_SECONDS = 15.0
 
 
 async def cover_candidates(
@@ -103,14 +109,20 @@ async def cover_candidates(
     """
     work: str | None = None
     if edition_id:
-        work = await openlibrary.work_id(edition_id, timeout=CANDIDATE_TIMEOUT_SECONDS)
+        work = await openlibrary.work_id(
+            edition_id, timeout=CANDIDATE_TIMEOUT_SECONDS, attempts=INTERACTIVE_ATTEMPTS
+        )
     if work is None and isbn:
         payload = await openlibrary.fetch_by_isbn(isbn)
-        work = await openlibrary.work_id(payload.source_id, timeout=CANDIDATE_TIMEOUT_SECONDS)
+        work = await openlibrary.work_id(
+            payload.source_id, timeout=CANDIDATE_TIMEOUT_SECONDS, attempts=INTERACTIVE_ATTEMPTS
+        )
     if work is None:
         return []
 
-    rows = await openlibrary.resolve_work(work, limit=limit, timeout=CANDIDATE_TIMEOUT_SECONDS)
+    rows = await openlibrary.resolve_work(
+        work, limit=limit, timeout=CANDIDATE_TIMEOUT_SECONDS, attempts=INTERACTIVE_ATTEMPTS
+    )
     seen: set[str] = set()
     candidates: list[SearchCandidate] = []
     for row in rows:

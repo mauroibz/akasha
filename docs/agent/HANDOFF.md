@@ -122,7 +122,10 @@ Backend and tests:
   layer above where a handler-level test is looking. This is exactly how the quota deferral broke.
 - **The shared provider client has a hard 5 s timeout** and Open Library regularly exceeds it — 11.3 s
   for one edition record during Sprint 020's walkthrough. `_bounded_json`, `_json`, `work_id` and
-  `resolve_work` all take an optional `timeout` for paths that can afford to wait.
+  `resolve_work` all take an optional `timeout` for paths that can afford to wait, and an `attempts`
+  count for how patient they may be. **Patience is a UX decision, not a default** (DEC-046): 3
+  attempts for background enrichment, 2 for the cover chooser, **1 for search**. A new provider call
+  on an interactive path should ask for fewer, not inherit `PROVIDER_ATTEMPTS`.
 - **`ProviderPayloadError` carries one type for two very different things.** `edition_not_found`
   means the provider answered and does not have it; `provider_unreachable` / `provider_http_error`
   mean it never answered. Branch on `code`, never on the type, or you will tell the reader their
@@ -154,14 +157,17 @@ Frontend and e2e:
 ## Things noticed and deliberately left
 
 - **Open Library's JSON API returns 503 under load**, repeatedly and for minutes at a time, while
-  their website stays up. Sprint 020's walkthrough hit it throughout. Enrichment and the cover
-  chooser both fail intermittently through no fault of ours, and **nothing retries**. Unowned, and
-  the most consequential provider observation.
+  their website stays up. **Now handled, not unowned** (DEC-046): transient failures are retried
+  with jittered backoff, and — the repair that mattered more — a failed job's retry is scheduled
+  into the future instead of for *now*, so an outage no longer burns three attempts in three seconds
+  and dead-letters the book permanently. What remains unhandled is an outage longer than the backoff
+  window, which still exhausts a job; DEC-046 names the fix and why it was not built yet.
 - **Provider search silently degrades to a single provider.** The client timeout is a hard 5 s while
   Open Library's search plus its year-resolution fan-out routinely exceeds it, so `/api/search`
   returns **Google Books only**. The user sees fewer and worse results with no indication anything
-  failed. Sprint 020 gave the cover chooser its own longer timeout and deliberately did **not** fix
-  search.
+  failed. Still unfixed, and deliberately so: DEC-046 gives search **no retries at all**, because
+  spending its 5 s budget on a second attempt returns nothing sooner and nothing better. If this is
+  ever addressed it wants a visible signal, not more patience.
 - **An Open Library placeholder cover cannot be detected by geometry.** DEC-044's rule catches
   Google Books' 6.25:1 banner; Open Library's "No image available" is portrait and ordinarily sized
   and sails through. `default=false` is the only reliable guard and `prepare_cover` now forces it
@@ -182,7 +188,7 @@ Frontend and e2e:
 ## State
 
 - Planning revision 8; state points to Sprint 021, project status `ready`.
-- Gates at Sprint 020's close: validator passed, `make check` passed, `make test` backend **235** /
+- Gates after DEC-046: validator passed, `make check` passed, `make test` backend **244** /
   frontend **85**, Playwright **77 passed / 2 skipped** across both projects, `make build` with no
   chunk-size warning, `make smoke-container` passed, `git diff --check` clean.
 - The two skipped e2e tests are `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a live

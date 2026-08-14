@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from datetime import date
 from typing import Annotated, Any, Literal
@@ -7,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from book_tracker.application.add import AddService
 from book_tracker.application.library import LibraryError, LibraryService
-from book_tracker.application.providers import cover_candidates
+from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
 from book_tracker.infrastructure.covers import (
@@ -417,7 +418,10 @@ async def list_cover_candidates(item_id: int, request: Request) -> CoverCandidat
     if not edition_id and not isbn:
         return CoverCandidates(candidates=[], reason="no_provider_reference")
     try:
-        rows = await cover_candidates(provider, edition_id=edition_id, isbn=isbn)
+        rows = await asyncio.wait_for(
+            cover_candidates(provider, edition_id=edition_id, isbn=isbn),
+            CANDIDATE_BUDGET_SECONDS,
+        )
     except ProviderPayloadError as error:
         # The distinction is the code, not the exception type, and it matters in both
         # directions. Open Library answering 404 for an ISBN it does not carry is an

@@ -1003,3 +1003,51 @@ Append-only record of material architecture choices, product-default resolutions
   cascade. Nothing about the later roadmap changes.
   DEC-044's placeholder-cover guard now protects the chooser too: a candidate that is a provider
   banner is rejected on the same geometry rule, so choosing one cannot install a placeholder.
+
+## DEC-046 — Surviving a sick provider: patience in the background, fast failure in front of a person
+
+- **Date:** 2026-08-13
+- **Status:** accepted
+- **Context:** Sprint 020's walkthrough ran into Open Library's JSON API answering **503** under
+  load, repeatedly and for minutes at a time, while their website stayed up. The owner asked whether
+  retries were the answer. Reading the code first found something worse than the outage itself:
+  `JobRepository.fail` scheduled its retry for **now**, so an enrichment job spent all three of its
+  attempts within a few seconds of an outage starting and then dead-lettered permanently. A
+  five-minute wobble meant those books were never enriched again, and no amount of in-request
+  retrying would have fixed that, because the damage happened above it.
+- **Decision.** Two layers, split by whether anyone is waiting — the owner's stated principle, that a
+  batch import may take as long as it needs while the moment-to-moment experience must not pay for a
+  provider's bad day.
+
+  **In-request retries**, bounded and deliberately small. Only transport failures and
+  `{429, 500, 502, 503, 504}` are retried; a 404 is an answer, not an outage. Delays are exponential
+  with jitter, `Retry-After` is honoured up to a five-second cap, and the attempt count is a
+  parameter rather than a constant so each caller says how patient it is allowed to be:
+
+  | path | attempts | why |
+  |---|---|---|
+  | enrichment (`fetch_by_isbn`) | 3 | nobody is watching; the whole point is to finish eventually |
+  | cover chooser | 2, 10s each, 15s overall | a dialog someone opened; it may wait a little, not a lot |
+  | search | **1 — no retry** | already on a 5s budget, and the other provider's results still render |
+
+  Search is the sharpest case and the reasoning is worth keeping: a retry there returns nothing
+  sooner and nothing better, it only spends a budget the reader is already waiting through. For
+  Google Books it would also spend metered quota that enrichment will want later (DEC-045).
+
+  **Job-level backoff**, which is the repair that actually matters. A failed job's retry is scheduled
+  into the future — 30s, then 60s, then 120s, jittered, capped at ten minutes — so three attempts
+  span minutes instead of seconds and a large import fails as a herd but does not resume as one. The
+  dead-letter bound is unchanged, so a genuinely broken job still gives up.
+- **Consequences.** Retries cost nothing when a provider is healthy: measured after the change with
+  Open Library recovered, the chooser returned 14 candidates in 1.9s and 12 in 0.9s, and a search
+  answered in 3.6s. Three existing tests are ~1.5s slower because they genuinely exercise the retry
+  path now, which is real behaviour rather than overhead to be optimised away.
+  **What this does not fix** is stated plainly, because the walkthrough's lesson was that unrecorded
+  observations rot: a provider that is down for longer than the backoff window still exhausts a
+  job's attempts and dead-letters it. The next step, if outages prove longer than minutes, is to
+  treat sustained unavailability the way DEC-045 treats an exhausted quota — defer without spending
+  an attempt — which the `JobRepository.defer` primitive already supports. That is deliberately not
+  built now: it needs a deferral bound so a permanently dead provider cannot make a job immortal,
+  and that is a schema change nobody has yet shown to be necessary.
+  This work was done at the owner's direct instruction between sprints, with Sprint 021 left `ready`
+  and untouched. Recorded here rather than in a sprint Outcome so it is not lost.

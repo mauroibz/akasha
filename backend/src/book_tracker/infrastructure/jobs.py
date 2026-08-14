@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import random
 import uuid
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
@@ -26,6 +27,14 @@ logger = logging.getLogger(__name__)
 
 LEASE_DURATION = timedelta(minutes=5)
 DEFAULT_MAX_RETRIES = 3
+# A failed job used to become claimable again immediately, so a provider outage burned
+# every attempt within a few seconds and dead-lettered the job permanently — a five
+# minute Open Library wobble meant those books were never enriched again. The retry is
+# scheduled into the future instead, and the gap grows, so three attempts span minutes
+# rather than seconds. Jittered because a large import fails in a herd and should not
+# resume as one.
+RETRY_BACKOFF_BASE_SECONDS = 30.0
+RETRY_BACKOFF_MAX_SECONDS = 600.0
 
 
 @dataclass(frozen=True)
@@ -169,7 +178,9 @@ class JobRepository:
                 row.finished_at = now_iso
             else:
                 row.state = "queued"
-                row.available_at = now_iso
+                row.available_at = (
+                    (now + _retry_backoff(row.attempts)).isoformat().replace("+00:00", "Z")
+                )
             row.updated_at = now_iso
 
     def defer(self, job_id: str, until: datetime, *, reason: str) -> None:
@@ -293,6 +304,13 @@ class JobRepository:
                 }
                 for row in rows
             ]
+
+
+def _retry_backoff(attempts: int) -> timedelta:
+    """Exponential, jittered, capped. `attempts` has already been incremented."""
+    seconds = RETRY_BACKOFF_BASE_SECONDS * (2 ** max(0, attempts - 1))
+    seconds = min(seconds, RETRY_BACKOFF_MAX_SECONDS)
+    return timedelta(seconds=seconds + random.uniform(0, seconds / 4))
 
 
 class RateLimiter:

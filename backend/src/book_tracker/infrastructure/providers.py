@@ -1,5 +1,6 @@
 import asyncio
 import json
+import random
 import re
 from collections.abc import Iterable, Mapping
 from dataclasses import replace
@@ -26,6 +27,22 @@ class ProviderPayloadError(ValueError):
 
 
 MAX_PROVIDER_BYTES = 2 * 1024 * 1024
+# Open Library's JSON API answers 503 under load, repeatedly and for minutes at a time,
+# while their website stays up. Most individual failures are short, so one retry pair
+# recovers them; longer outages are handled a layer up by the job queue backing off,
+# not by hammering here. Deliberately small: retrying hard against a service that is
+# already struggling is how a slow provider becomes a dead one.
+# Patience belongs in the background. A batch import can take as long as it needs, so
+# enrichment retries; a person waiting on a search must not pay for a provider's bad
+# day, so interactive paths ask for fewer attempts or none.
+PROVIDER_ATTEMPTS = 3
+INTERACTIVE_ATTEMPTS = 2
+NO_RETRY = 1
+RETRY_BASE_SECONDS: float = 0.4
+# A provider that says how long to wait is worth believing, up to a point — an
+# interactive search cannot sit behind a five-minute Retry-After.
+MAX_RETRY_SLEEP_SECONDS: float = 5.0
+RETRYABLE_STATUSES = frozenset({429, 500, 502, 503, 504})
 # Undated search results are resolved against `/works/{id}/editions.json`. Bounded so a
 # 20-result search never opens 20 simultaneous connections to Open Library.
 WORK_RESOLUTION_CONCURRENCY = 5
@@ -47,7 +64,50 @@ def create_provider_client(transport: httpx.AsyncBaseTransport | None = None) ->
     )
 
 
+def _retry_delay(attempt: int, response: httpx.Response | None) -> float:
+    """How long to wait before the next attempt, honouring `Retry-After`."""
+    if response is not None:
+        raw = response.headers.get("retry-after", "").strip()
+        if raw.isdigit():
+            return min(float(raw), MAX_RETRY_SLEEP_SECONDS)
+    # Exponential, with jitter so several queued jobs do not resume in lockstep.
+    delay: float = RETRY_BASE_SECONDS * float(2**attempt)
+    jittered: float = delay + random.uniform(0, delay / 2)
+    return jittered if jittered < MAX_RETRY_SLEEP_SECONDS else MAX_RETRY_SLEEP_SECONDS
+
+
 async def _bounded_json(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: Mapping[str, str | int],
+    headers: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+    attempts: int = PROVIDER_ATTEMPTS,
+) -> Mapping[str, Any]:
+    """Fetch and decode a bounded JSON body, retrying a provider that is unwell.
+
+    Only transport failures and `RETRYABLE_STATUSES` are retried. A 404 is an answer,
+    not an outage, and retrying it wastes everyone's time.
+
+    `attempts` is how the caller says whether anyone is waiting: background enrichment
+    can afford to be patient, an interactive search cannot.
+    """
+    for attempt in range(attempts):
+        try:
+            return await _read_json(client, url, params=params, headers=headers, timeout=timeout)
+        except httpx.HTTPStatusError as error:
+            if error.response.status_code not in RETRYABLE_STATUSES or attempt == attempts - 1:
+                raise
+            await asyncio.sleep(_retry_delay(attempt, error.response))
+        except (httpx.TransportError, httpx.TimeoutException):
+            if attempt == attempts - 1:
+                raise
+            await asyncio.sleep(_retry_delay(attempt, None))
+    raise AssertionError("unreachable")  # pragma: no cover
+
+
+async def _read_json(
     client: httpx.AsyncClient,
     url: str,
     *,
@@ -190,10 +250,20 @@ class OpenLibraryProvider:
         self.headers = {"User-Agent": f"Akasha/0.1 ({contact})"}
 
     async def _json(
-        self, url: str, *, timeout: float | None = None, **params: str | int
+        self,
+        url: str,
+        *,
+        timeout: float | None = None,
+        attempts: int = PROVIDER_ATTEMPTS,
+        **params: str | int,
     ) -> Mapping[str, Any]:
         return await _bounded_json(
-            self.client, url, params=params, headers=self.headers, timeout=timeout
+            self.client,
+            url,
+            params=params,
+            headers=self.headers,
+            timeout=timeout,
+            attempts=attempts,
         )
 
     def _candidate(self, row: Mapping[str, Any]) -> SearchCandidate | None:
@@ -232,6 +302,10 @@ class OpenLibraryProvider:
     async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._json(
             "https://openlibrary.org/search.json",
+            # No retry: search already has a 5s budget and someone is watching it.
+            # Spending that budget on a second attempt returns nothing sooner and
+            # nothing better, and the other provider's results still render.
+            attempts=NO_RETRY,
             q=query,
             limit=min(limit, 20),
             fields=(
@@ -422,19 +496,35 @@ class OpenLibraryProvider:
             )
         return await self._edition_payload(row, key.removeprefix("/books/"), isbn)
 
-    async def work_id(self, edition_id: str, *, timeout: float | None = None) -> str | None:
+    async def work_id(
+        self,
+        edition_id: str,
+        *,
+        timeout: float | None = None,
+        attempts: int = PROVIDER_ATTEMPTS,
+    ) -> str | None:
         """The work an edition belongs to, which is where its sibling editions live."""
-        row = await self._json(f"https://openlibrary.org/books/{edition_id}.json", timeout=timeout)
+        row = await self._json(
+            f"https://openlibrary.org/books/{edition_id}.json",
+            timeout=timeout,
+            attempts=attempts,
+        )
         work_ids = _keys(row.get("works"), "/works/")
         return work_ids[0] if work_ids else None
 
     async def resolve_work(
-        self, work_id: str, limit: int = 20, *, timeout: float | None = None
+        self,
+        work_id: str,
+        limit: int = 20,
+        *,
+        timeout: float | None = None,
+        attempts: int = PROVIDER_ATTEMPTS,
     ) -> list[SearchCandidate]:
         body = await self._json(
             f"https://openlibrary.org/works/{work_id}/editions.json",
             limit=min(limit, 20),
             timeout=timeout,
+            attempts=attempts,
         )
         entries = body.get("entries", [])
         rows: list[SearchCandidate] = []
@@ -540,14 +630,23 @@ class GoogleBooksProvider:
             original_year=None,
         )
 
-    async def _get(self, url: str, **params: str | int) -> Mapping[str, Any]:
+    async def _get(
+        self, url: str, *, attempts: int = PROVIDER_ATTEMPTS, **params: str | int
+    ) -> Mapping[str, Any]:
         if not self.enabled:
             raise RuntimeError("Google Books is disabled")
-        return await _bounded_json(self.client, url, params={**params, "key": self.api_key})
+        return await _bounded_json(
+            self.client, url, params={**params, "key": self.api_key}, attempts=attempts
+        )
 
     async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._get(
-            "https://www.googleapis.com/books/v1/volumes", q=query, maxResults=min(limit, 20)
+            "https://www.googleapis.com/books/v1/volumes",
+            # As with Open Library: someone is watching a search, and a retry also
+            # spends metered quota that enrichment will want later.
+            attempts=NO_RETRY,
+            q=query,
+            maxResults=min(limit, 20),
         )
         items = body.get("items", [])
         if not isinstance(items, list):
