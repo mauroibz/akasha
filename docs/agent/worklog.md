@@ -947,3 +947,58 @@ the new minimum-size guard correctly rejects it.
 
 **Next:** Sprint 021 (attachments) — status `ready`, file at `docs/sprints/021-attachments.md`. It is
 gated like 020, and backup growth is the measurement that scopes the whole feature.
+
+## 2026-08-14 — Sprint 021 (in progress — stopped at the Phase A gate)
+
+**Done:** Phase A of the attachments gate. Built `scripts/assess_attachment_cost.py` plus 14 tests
+in `backend/tests/test_attachment_cost.py`, ran the measurement, recorded the verdict as DEC-047,
+and stopped for the owner's go-ahead. No product code changed; nothing user-visible shipped.
+
+**The deliverable is a comparison table, not a verdict.** The owner directed during planning that
+Phase A measure and report rather than pronounce — no disk budget is recorded anywhere in this repo
+— and that the assessment cost alternatives (shallower retention, separate cadence, dedup,
+exclusion) rather than the two options the sprint file named. Seven strategies were costed.
+
+**Headline numbers**, 500 attachments at 2.5 MB, seven-night window, against today's 130.9 MB:
+in-the-tar nightly **8.68 GB / 67.9x**; separate label keep-2 2.57 GB / 20.1x; weekly cadence
+1.35 GB / 10.6x; loose deduplicated store 1.35 GB / 10.5x; excluded 130.9 MB / 1.0x. **Multipliers
+are independent of corpus size** — identical at 100, 300 and 500 — so they are properties of the
+strategy, not the sample.
+
+**Two findings worth more than the table.** Measured gzip ratio on an epub corpus is **1.0003** —
+the archive is *larger* than the raw bytes, because an epub is already a ZIP — and that useless
+compression costs 20.4 s per backup against 2.0 s for a loose store, a 10x gap on hardware much
+faster than the ZimaBoard. It is also exactly what makes deduplication impossible, since a tar
+shares nothing with last night's tar.
+
+**Method notes for whoever re-runs this.** `/tmp` here is tmpfs, so the run was pointed at
+`/home/ibz/.cache/akasha-assess` via `TMPDIR`; running in RAM would have made every wall-time figure
+fiction. The corpus is incompressible ZIP content on purpose, and disk accounting counts unique
+inodes — both are pinned by tests, because getting either wrong silently flatters the result. The
+real `create_backup`/`restore_backup` are called rather than reimplemented.
+
+**Two defects found and deliberately left**, both Phase B's to fix and both in DEC-047:
+`UndoService` deletes a batch-created item without regard for attachments it might carry, guarded
+only by `modified_items`; and **no cover file is ever unlinked** when an item is deleted, which
+product spec open question 2 accepts on the grounds that covers are ~50 KB — a premise a 2.5 MB
+attachment invalidates.
+
+**Also established:** `calibre_uuid` is already persisted as an item identifier and Calibre's
+`books` table carries `uuid` and `path` in the same row, so the zero-copy Calibre reference needs
+**no schema change**. And today's serving safety comes from the cover pipeline re-encoding
+everything to JPEG, not from headers — the codebase sets no CSP, no `nosniff`, no
+`Content-Disposition` anywhere — so an opaque blob endpoint would be the first user-controlled
+content type to reach a browser, from the SPA's own origin.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **258** / frontend **85**;
+`npm run test:e2e` **77 passed / 2 skipped** across both projects; `make build` clean with no
+chunk-size warning; `make smoke-container` passed; `git diff --check` clean.
+
+**Deviations:** seven strategies rather than two, and the Calibre reference assessed, both at the
+owner's direction. Sprint left `in_progress` rather than closed, which is correct: DEC-035 requires
+an explicit recorded go-ahead before Phase B, and it does not exist yet.
+
+**Next:** the owner decides two things — whether to build attachments at all, and which strategy.
+Recommended rows are E if attachments are stored (full fidelity, 10.5x, fastest backup of any
+option) and F if 10.5x is unwelcome (1.0x, and an epub usually still exists wherever it came from,
+which a score and a note never do). Record the answer in `docs/decisions.md`, then Phase B.

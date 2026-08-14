@@ -1,21 +1,40 @@
 # Handoff — current reality
 
 **Last completed:** Sprint 020 (metadata completeness, both phases), 2026-08-13.
-**Next:** Sprint 021 (attachments) — status `ready`, file at `docs/sprints/021-attachments.md`.
+**Active:** Sprint 021 (attachments) — status `in_progress`, **stopped at the Phase A gate**.
 
 ## Read this first
 
-**Sprint 021 is an assessment, not a build.** Phase A measures whether attaching arbitrary files is
-affordable and Phase B builds only what the verdict *and an explicit owner go-ahead* justify. Phase A
-concluding *no* is a complete, correct outcome. **Sprint 020 is the worked example**: its Phase A
-concluded against the main feature, shipped two defect repairs, and closed as a complete sprint. Do
-not read a gated sprint as permission to build.
+**Sprint 021's Phase A is done and the sprint is waiting on the owner, not on an agent.** Do not
+start Phase B. DEC-035 requires an explicit go-ahead recorded in `docs/decisions.md`, and DEC-047 is
+the verdict, not the go-ahead. The owner is deciding **two** things: whether attachments get built
+at all, and which storage strategy they get — the second changes what a restore promises, so it is
+not an implementer's call.
 
-**For Sprint 021 the measurement that scopes everything is backup growth.**
-`ARCHIVED_DIRECTORIES = ("covers", "imports")` in `backup.py` tars everything into every backup,
-seven nightly deep. A cover is **38.8 KB** measured; an epub is 1–5 MB. Either attachments go in the
-tar under a size cap or they are excluded with a documented separate story, and that decision scopes
-the feature.
+**The numbers are in DEC-047 and do not need re-deriving.** Seven strategies were costed at 100, 300
+and 500 attachments. At 500 files (1.25 GB) over a seven-night window, against today's 130.9 MB:
+in-the-tar nightly **8.68 GB (67.9x)**, separate label keep-2 2.57 GB (20.1x), weekly cadence
+1.35 GB (10.6x), loose deduplicated store 1.35 GB (10.5x), excluded-with-manifest 130.9 MB (1.0x).
+**The multipliers are identical at all three scales**, so they are properties of the strategy.
+Recommended: **E** (loose, deduplicated) if attachments are stored at all, **F** (excluded) if 10.5x
+is unwelcome. Re-run with `scripts/assess_attachment_cost.py` rather than re-arguing.
+
+**gzip on an epub corpus measures 1.0003** — the archive is *larger* than the raw bytes, since an
+epub is already a ZIP — and costs 20.4 s per backup against 2.0 s for a loose store. That useless
+compression is also what makes deduplication impossible. If anything ever revisits `_archive`, this
+is the reason to.
+
+**If Phase B proceeds it inherits three requirements from DEC-047**, not to be rediscovered later:
+an item carrying an attachment must be exempt from `UndoService`'s item deletion; deleting an item
+must either remove its files or feed a prune action (**no cover is unlinked today** — product spec
+open question 2 accepts that because covers are ~50 KB, which a 2.5 MB attachment invalidates); and
+downloads need `Content-Disposition: attachment`, `nosniff` and a fixed `application/octet-stream`,
+because today's safety comes from the cover pipeline re-encoding everything to JPEG and **the
+codebase sets no CSP, no `nosniff` and no `Content-Disposition` anywhere**.
+
+**The Calibre zero-copy reference needs no schema change.** `calibre_uuid` is already persisted as an
+item identifier, and Calibre's `books` table carries `uuid` and `path` in the same row, so a
+Calibre-sourced item can re-derive its file location from the read-only mount at serve time.
 
 **Sprint 020's Phase B is done.** The owner gave the go-ahead in DEC-045 and the sprint reopened
 to build it rather than spawning a new one — worth knowing, because it is the precedent for how a
@@ -62,7 +81,7 @@ brand or of future domains (`AGENTS.md`, DEC-042). Do not rename them.
 
 | Sprint | Scope | Status |
 |---|---|---|
-| 021 | Attachments, **gated** | `ready` |
+| 021 | Attachments, **gated** | `in_progress` — Phase A done, at the gate |
 | 022 | Creator sort names | `planned` |
 | 023 | Export | `planned` |
 | 024–026 | Domains: albums (**gated**), games, series (**gated**) | `planned` |
@@ -187,10 +206,12 @@ Frontend and e2e:
 
 ## State
 
-- Planning revision 8; state points to Sprint 021, project status `ready`.
-- Gates after DEC-046: validator passed, `make check` passed, `make test` backend **244** /
+- Planning revision 8; state points to Sprint 021, project status `in_progress`.
+- Gates after DEC-047: validator passed, `make check` passed, `make test` backend **258** /
   frontend **85**, Playwright **77 passed / 2 skipped** across both projects, `make build` with no
   chunk-size warning, `make smoke-container` passed, `git diff --check` clean.
+- **`/tmp` on this machine is tmpfs.** Any measurement of disk or wall time must set `TMPDIR` to a
+  path on real storage, or the numbers are RAM-speed fiction.
 - The two skipped e2e tests are `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a live
   backend.
 - **`v1.0.0` exists** as an annotated local tag at `4ccf431`. Nothing has been pushed;

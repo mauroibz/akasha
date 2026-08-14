@@ -1051,3 +1051,97 @@ Append-only record of material architecture choices, product-default resolutions
   and that is a schema change nobody has yet shown to be necessary.
   This work was done at the owner's direct instruction between sprints, with Sprint 021 left `ready`
   and untouched. Recorded here rather than in a sprint Outcome so it is not lost.
+
+## DEC-047 — Attachments measured: the naive design costs 68x the current backup, and four cheaper shapes exist
+
+- **Date:** 2026-08-14
+- **Status:** accepted as a Phase A verdict; **Phase B is not authorized by this entry**
+- **Context:** DEC-042 made assess-then-build the default shape for any item whose cost is unknown,
+  and Sprint 021 is one. The owner wants to attach arbitrary files to items — epubs for books —
+  inside the metadata-first framing. DEC-040 makes that a backup question before it is anything
+  else: `ARCHIVED_DIRECTORIES = ("covers", "imports")` tars everything into every backup, seven
+  nightly deep. The owner directed that Phase A **measure and report rather than pronounce**, since
+  no disk budget is recorded anywhere in this repository, and that the Calibre zero-copy alternative
+  be assessed alongside uploaded copies. Everything below was measured by
+  `scripts/assess_attachment_cost.py` on 2026-08-14, on an NVMe workstation considerably faster than
+  the target ZimaBoard, against a corpus of incompressible ZIP files standing in for epubs.
+
+  **Backup growth, seven-night retention window.** "x today" is against the same library's current
+  backup — database plus covers plus imports, no attachments.
+
+  | | 100 files (250 MB) | 300 files (750 MB) | 500 files (1.25 GB) | vs today |
+  |---|---|---|---|---|
+  | today, no attachments | 26.3 MB | 78.6 MB | 130.9 MB | 1x |
+  | **A** in the tar, every night | 1.73 GB | 5.20 GB | **8.68 GB** | **67.9x** |
+  | **B** size cap only | 1.73 GB | 5.20 GB | 8.68 GB | 67.9x |
+  | **C** separate label, keep 2 | 526 MB | 1.54 GB | 2.57 GB | 20.1x |
+  | **D** weekly cadence | 276 MB | 829 MB | 1.35 GB | 10.6x |
+  | **E** loose store, deduplicated | 276 MB | 829 MB | 1.35 GB | 10.5x |
+  | **F** excluded, manifest only | 26.3 MB | 78.6 MB | 130.9 MB | 1.0x |
+  | **G** Calibre reference | 26.3 MB | 78.6 MB | 130.9 MB | 1.0x |
+
+  The multipliers are **independent of corpus size** — 67.9x, 20.1x, 10.5x, 1.0x hold at all three
+  scales — so they are properties of the strategy, not of the sample.
+
+  **Compression buys nothing, and costs.** The measured gzip ratio on the attachment corpus is
+  **1.0003**: the `tar.gz` is fractionally *larger* than the raw bytes, because an epub is already a
+  ZIP and all gzip adds is tar headers. It is not free: at 500 files a gzipping backup takes
+  **20.4 s** against **2.0 s** for the loose store, a **10x** difference on hardware much faster than
+  the ZimaBoard. The compression the current design pays CPU for is also precisely what makes
+  deduplication impossible, since a tar shares no bytes with the tar written the night before.
+
+  **Deduplication is the whole of E's advantage, and it was measured rather than assumed.** Disk
+  accounting counts unique inodes; the second nightly backup's real incremental was measured and
+  found to be the database and covers only, giving 1.00 effective copies of the attachment corpus
+  against A's 7.00. E needs one filesystem, so it degrades to full copies — B's numbers — when
+  `BACKUP_DIR` points at a NAS share, which DEC-040 explicitly allows.
+
+  **Restore round-trips under every strategy**, verified in `backend/tests/test_attachment_cost.py`:
+  scores, notes and shelves come back in all seven, and the five that carry attachment bytes return
+  them byte-identical. F and G restore the database and **name every attachment they could not
+  bring back**, which is the only honest form those two can take.
+
+- **Where an attachment hangs: item, with one consequence that must be handled.** Item matches the
+  metadata-first framing and survives import merges — a re-import that resolves to `reuse_item`
+  finds the attachment already there. The consequence is in undo. `UndoService` deletes an item a
+  batch created when no other entry references it, guarded only by `modified_items` for fill-empty
+  fields. **An item carrying a hand-uploaded attachment must join that guard**, or undoing an import
+  destroys a file the owner deliberately attached — exactly the class of loss the ledger exists to
+  prevent. Separately, **no cover file is ever unlinked today**, so a deleted item leaks its image;
+  product spec open question 2 accepts that explicitly on the grounds that "covers are ~50KB each."
+  Attachments invalidate that premise at 2.5 MB per orphan, so whoever builds this owes either a
+  delete path or a prune action.
+
+- **Threat model, LAN-only and unauthenticated (product spec section 9).** Today every byte the
+  application serves has been through `prepare_cover` / `prepare_uploaded_cover` and re-encoded to
+  JPEG, and `get_cover` answers with a fixed `media_type="image/jpeg"`. Safety comes from that
+  normalization, not from headers — the codebase sets no `Content-Security-Policy`, no
+  `X-Content-Type-Options`, and no `Content-Disposition` anywhere. An opaque attachment is the first
+  user-controlled content type to reach a browser, and it is served from the same origin as the SPA.
+  So: **stored XSS is the real risk** — an uploaded HTML or SVG opened inline can script the
+  application against its own API — and `Content-Disposition: attachment`, `nosniff` and a fixed
+  `application/octet-stream` become load-bearing rather than optional. Filenames must be stored as
+  metadata with server-generated paths, so a name is never a path component. And with no auth,
+  anyone on the LAN can fill the disk: a per-file cap is not a total cap.
+
+- **The Calibre alternative is viable with no schema change.** `calibre_uuid` is already persisted as
+  an item identifier by the import path, and Calibre's `books` table carries `uuid` and `path` in the
+  same row, so a Calibre-sourced item can re-derive its file location at serve time from the
+  read-only mount. That is strategy G: zero disk, zero backup growth, and no new storage to secure.
+  Its limits are real — it covers only books already in Calibre, it breaks if the library moves, and
+  it is a different feature from attaching an arbitrary file to an arbitrary item.
+
+- **Decision.** The measurement is recorded; the choice is the owner's, and it is **two choices**:
+  whether attachments are built at all, and which strategy they get. The strategy question must not
+  be settled quietly by an implementer, because it changes what a restore promises. **A and B are not
+  recommended**: 68x, and B's cap bounds the worst file while leaving the total unbounded.
+  **E is the recommended row if attachments are stored at all** — full fidelity, 10.5x, and the
+  fastest backup of any strategy because it stops gzipping what does not compress. **F is the
+  recommended row if the 10.5x is unwelcome**, and it is more defensible than it looks: an epub
+  usually still exists wherever it came from, which a score and a note never do.
+- **Consequences.** No product change ships in Phase A. Sprint 021 stays `in_progress` pending the
+  owner's go-ahead, which DEC-035 requires to be explicit and recorded here rather than inferred from
+  this verdict. `scripts/assess_attachment_cost.py` and its tests are committed so any future
+  revisit re-measures rather than re-argues. If Phase B proceeds, the undo guard, the orphan-file
+  question and the three response headers are requirements it inherits from this entry, not
+  refinements to be discovered later.

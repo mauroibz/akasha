@@ -129,5 +129,76 @@ container (not `make dev`) if anything user-visible shipped.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Phase A complete; Phase B not started and not authorized.** The sprint remains `in_progress` at
+the gate DEC-035 requires: the verdict is recorded, the owner has not yet decided.
+
+### Delivered
+
+- `scripts/assess_attachment_cost.py` — costs seven storage strategies side by side against real
+  `create_backup` / `restore_backup`, on a grid of 100/300/500 attachments at 2.5 MB. Reports bytes
+  per backup, bytes across the seven-night window, gzip ratio, effective copies, and backup and
+  restore wall time, plus what each strategy loses. Writes JSON.
+- `backend/tests/test_attachment_cost.py` — 14 tests pinning the two numbers that would otherwise be
+  quietly wrong (unique-inode accounting, incompressible corpus), the size-cap boundary, and a
+  restore round-trip per strategy including that F and G name what they did not carry.
+- **DEC-047**, the Phase A verdict.
+
+### Measured (2026-08-14, NVMe workstation, faster than the ZimaBoard)
+
+Seven-night window against the same library's current backup:
+
+| strategy | 500 files (1.25 GB) | vs today | backup time |
+|---|---|---|---|
+| today, no attachments | 130.9 MB | 1x | 1.3 s |
+| A in the tar, nightly | 8.68 GB | **67.9x** | 20.4 s |
+| B size cap only | 8.68 GB | 67.9x | 20.6 s |
+| C separate label, keep 2 | 2.57 GB | 20.1x | 20.6 s |
+| D weekly cadence | 1.35 GB | 10.6x | 20.5 s |
+| E loose, deduplicated | 1.35 GB | 10.5x | **2.0 s** |
+| F excluded, manifest | 130.9 MB | 1.0x | 1.3 s |
+| G Calibre reference | 130.9 MB | 1.0x | 1.3 s |
+
+Multipliers are independent of corpus size at 100, 300 and 500 files. Measured gzip ratio on the
+attachment corpus is **1.0003** — the archive is fractionally larger than the raw bytes, so the
+compression the current design pays for buys nothing and blocks deduplication.
+
+### Acceptance criteria
+
+1. **Met.** DEC-047 records the verdict with the measurements behind it, including the ones that
+   argue against building — 67.9x for the naive design, and the fact that F's near-zero cost buys a
+   weaker recovery promise.
+2. **Met.** The backup question is answered with numbers, and restore was shown to round-trip under
+   every one of the seven strategies.
+3. **N/A** — Phase B not authorized.
+4. **N/A** — no surface shipped.
+
+### Verification
+
+`python scripts/validate_project.py` passed. `make check` passed. `make test` backend **258** /
+frontend **85**. `npm run test:e2e` **77 passed / 2 skipped** across both projects. `make build`
+clean. `make smoke-container` passed. `git diff --check` clean. The instrument was run for real on
+NVMe rather than tmpfs, because `/tmp` here is a RAM disk and would have made every wall-time figure
+fiction.
+
+No walkthrough was required: Phase A ships no user-visible change. The restore drill inside the
+instrument and the container smoke test cover the operational path.
+
+### Deviations
+
+- The instrument costs **seven** strategies rather than the two the sprint file implied ("either
+  attachments go into the tar under a size cap, or they are excluded"). At the owner's direction
+  during planning, the deliverable is a comparison table to choose from rather than a single
+  measured path — the two named options turned out to be the most expensive and the cheapest of a
+  wider set, with four useful shapes between them.
+- The Calibre zero-copy reference was assessed as strategy G, also at the owner's direction. It was
+  not in the sprint file's Phase A list.
+- Phase A found two defects in adjacent code and **left both unfixed** because they belong to Phase
+  B's scope: undo deletes an item without regard for attachments it may carry, and no cover file is
+  ever unlinked when an item is deleted. Both are recorded in DEC-047.
+
+### Impact on future sprints
+
+- **022 (creator sort names), 023 (export), 024-026 (domains):** no impact. Sprint 021 touches no
+  shared contract.
+- If Phase B proceeds, **023 export** inherits a question this entry does not answer: whether an
+  export carries attachment bytes, references, or neither.
