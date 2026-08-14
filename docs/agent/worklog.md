@@ -1255,3 +1255,38 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: Sprint 024 (export) is unchanged and still `ready`; it runs first. Its format bet
   is confirmed by seam 3, so no redesign — read the new deliverable 2 paragraph and
   DEC-052 before starting.
+
+## 2026-08-14 — Sprint 024 (export), complete
+- Done: `GET /api/export` streaming entity-shaped JSON, `?format=csv` streaming the
+  Goodreads-shaped CSV. New `application/export.py` and `api/export.py`, router wired in
+  `main.py`, `frontend/openapi.json` regenerated. DEC-054 records the attachment answer.
+  Product spec §6 route list, §9 and §10 row 6 and technical spec §7.1 updated to match.
+  Commits `01bfce1`, `afb1902`.
+- Verified: `validate_project.py` pass. `make check` pass. `make test` — 358 backend, 99
+  frontend. `npm run test:e2e` — 79 passed, 2 skipped. `make build`, `make smoke-container`
+  pass. `git diff --check` clean.
+  Walkthrough against the real dev library (7 items, 5 entries) at port 8123; note the
+  server auto-migrated it 0006 → 0011 and wrote `backups/pre-migration-20260814T163152Z`
+  first. Downloaded both artifacts: correct `Content-Disposition` and content types.
+  Corrected item 3's creator sort by hand via `PATCH /api/items/3`
+  (`García Márquez, Gabriel José`), re-exported, and read it back — the correction is
+  there and `sort_author` still holds the display name. Attached a 1.5 MB epub, renamed
+  it, and the export carried the **renamed** filename plus digest with no inlined bytes.
+  Resolved the exported sha256 against `data/attachments/85/8565c3d…` and `sha256sum`
+  matched. Opened the CSV in LibreOffice headless → xlsx: 17 headers, `Carlos Ruiz Zafón`
+  intact.
+- Deviations: checkpoints 1 and 3 merged (attachment references are a field of the item
+  payload, not a separate slice). The memory criterion needed a comparison across two
+  library sizes rather than the absolute bound first written — peak is dominated by ~1 MB
+  of fixed statement compilation, so a *small* library failed a bound the large one passed.
+  CSV formula neutralization added beyond plan and confined to the CSV. All recorded in the
+  sprint Outcome.
+- Dead ends worth not repeating: `yield_per` / `stream_results` does **not** bound memory
+  on SQLite — the driver has no server-side cursor and materializes the whole result. And
+  selecting mapped entities defeats any batching, because the `Session` identity map
+  retains every instance for the session's life. Both paths select columns and walk in
+  keyset batches. Functional tests passed throughout both defects; only the measurement
+  saw them.
+- Blocked/open: none.
+- Next: Sprint 025 (albums, six seams) is `ready`. **Its first act is to cut a branch from
+  `main` (DEC-053)** — nothing else in the protocol changes.

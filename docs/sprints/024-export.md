@@ -1,6 +1,6 @@
 # Sprint 024 — Export
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 020
 **Roadmap revision:** 10
 
@@ -118,5 +118,70 @@ still carries your correction.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Completed 2026-08-14.**
+
+### Delivered
+
+`GET /api/export` streams the whole library as one JSON document — `kind`, `version`,
+`generated_at`, then `items` and `entries`. An item is `type`, `title`, `subtitle`, `year`,
+`creator_sort_override`, an opaque `metadata` object, `identifiers`, `sources` and `attachments`.
+`?format=csv` returns the Goodreads-shaped CSV. Two commits: `01bfce1`, `afb1902`.
+
+### Acceptance criteria
+
+1. **Owner data survives, derived columns are absent.** Verified by test and again by reading a real
+   export: a hand-corrected `creator_sort_override` and a renamed attachment both appear, and all
+   five derived columns (`sort_author`, `creator_sort`, `title_normalized`,
+   `sort_author_normalized`, `creator_sort_normalized`) are asserted absent.
+2. **Entity-shaped.** An item whose `type` is `album`, carrying `{"creators": [...], "label": ...}`,
+   exports through the same path with no branch and its metadata untranslated.
+3. **CSV.** All seventeen product-spec 5.1 columns in Goodreads' order. A title with a comma, a note
+   with an embedded quote *and* a newline, and accented names round-trip through `csv.DictReader`.
+   Then opened for real in LibreOffice (`soffice --headless --convert-to xlsx`): 17 headers,
+   `Carlos Ruiz Zafón` intact.
+4. **Attachments decided and recorded** — references plus digest, DEC-054. Verified beyond the test:
+   the exported sha256 resolved to `data/attachments/85/8565c3d…` and `sha256sum` matched, which is
+   the property that makes omitting the bytes safe rather than merely cheap.
+5. **Memory flat, measured.** 200 items vs 2000 items: output x10.0, peak **x1.07 (JSON)** and
+   **x1.66 (CSV)**.
+
+### Verification
+
+`python scripts/validate_project.py` pass · `make format` · `make check` pass (ruff, mypy 39 files,
+eslint, tsc, OpenAPI contract + frontend type check) · `make test` — **358 backend passed**, **99
+frontend passed** · `npm run test:e2e` — **79 passed, 2 skipped** · `make build` · `make
+smoke-container` pass · `git diff --check` clean.
+
+Walkthrough against the real dev library: both artifacts downloaded with correct
+`Content-Disposition` and content types; corrected a creator sort name by hand through
+`PATCH /api/items/3` and confirmed by reading the re-exported JSON that
+`García Márquez, Gabriel José` survived while `sort_author` kept the display name; attached a
+1.5 MB epub, renamed it, and confirmed the export carried the **renamed** filename with its digest
+and no inlined bytes.
+
+### Deviations
+
+- **Commit checkpoints 1 and 3 merged.** Attachment references are a field of the item payload, so
+  "carry attachments in the export" had no separate slice to be. No broken state was committed.
+- **The memory criterion needed a different instrument than planned.** An absolute bound on peak was
+  written first and was wrong: peak is dominated by roughly 1 MB of fixed SQLAlchemy statement
+  compilation that does not grow with the corpus, so a *small* library failed a bound the large one
+  passed. Replaced with a comparison across two library sizes, which is what "flat" actually claims.
+- **Two streaming defects the measurement caught**, both invisible to the functional tests: selecting
+  mapped entities held the whole library in the `Session` identity map however small the batch, and
+  `yield_per` did not fix it because SQLite's driver has no server-side cursor and materializes the
+  result set regardless. Both paths now select columns and walk in keyset batches.
+- **CSV formula neutralization was added and is not in the sprint plan.** A note beginning `=` is a
+  formula to a spreadsheet, and the artifact exists to be opened in one. It alters bytes, so it is
+  confined to the CSV; the JSON stays lossless and a test pins both halves.
+- **`My Rating` halves the stored score** (round-half-up), inverting the import's doubling, so an
+  odd hand-set score loses half a point in the CSV. The exact 1–10 value is in the JSON. `wishlist`,
+  `dropped` and `unsorted` have no Goodreads spelling and are written verbatim rather than flattened
+  into a neighbouring shelf.
+
+### Impact on future sprints
+
+Sprint 025 is unaffected and its seam 3 is confirmed rather than contradicted: `metadata` is passed
+through untransformed, so nothing in the export learns a domain's field names and the album work
+needs no format v2. The `test_export.py` case that exports an `album` item is already in place as
+the regression that will catch it if that changes.

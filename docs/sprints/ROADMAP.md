@@ -2,7 +2,7 @@
 
 **Plan revision:** 10
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 024](024-export.md)
+**Active sprint:** [Sprint 025](025-second-domain-albums.md)
 
 ## Shape of the plan
 
@@ -65,8 +65,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | completed |
 | [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | completed |
 | [023](023-creator-sort-names.md) | Creator sort names | 020 | completed |
-| [024](024-export.md) | Export | 020 | **ready** |
-| [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | planned |
+| [024](024-export.md) | Export | 020 | completed |
+| [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | **ready** |
 | 026 | Status vocabulary (seam 5b) | 025 | planned |
 | 027 | Third domain — games | 026 | planned |
 | 028 | Fourth domain — series | 026 | planned |
@@ -176,7 +176,7 @@ walkthrough library) survivable rather than a defect to tune out.
 `sort_author` deliberately kept its name and its display role; the rename waits for Sprint 025,
 which changes the metadata key from `authors` to `creators` and can do both in one pass.
 
-### Sprint 024 — Export
+### [Sprint 024 — Export](024-export.md) — completed
 
 `GET /api/export` dumping entries and items as JSON, plus a Goodreads-shaped CSV. Product spec
 section 9 deferred this to v2 as agreed-in-principle; the owner has now scheduled it. Backups
@@ -202,6 +202,17 @@ The database is already shaped that way. A book-shaped export format would need 
 Sprint 025 lands.
 
 The Goodreads-shaped CSV is a book-only convenience and is allowed to stay book-only.
+
+[Closed 2026-08-14. Delivered as planned. **Attachments are carried as references plus their sha256,
+not bytes (DEC-054)** — the blob is already held live and in every nightly backup, and a digest
+resolves against a backup because the blob's path *is* its digest, verified by matching the exported
+digest against the file on disk. "Neither" was never available: the sprint's own first criterion
+requires the owner-typed filename to survive. Streaming needed two repairs the memory measurement
+caught and the functional tests could not see — mapped entities held the whole library in the
+`Session` identity map, and `yield_per` did not help because SQLite materializes the result anyway.
+Measured at x1.07 (JSON) and x1.66 (CSV) peak for x10 output. The CSV neutralizes leading `=` so a
+spreadsheet reads a note as text, which makes the JSON the lossless artifact. **There is no export
+button in the UI** — the route is the surface, and no screen in product spec 7 asks for one.]
 
 ### [Sprint 025 — Second domain, albums: the six seams](025-second-domain-albums.md)
 

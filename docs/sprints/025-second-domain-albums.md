@@ -1,6 +1,6 @@
 # Sprint 025 — Second domain, albums: the seams, proved by one domain
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 024
 **Roadmap revision:** 10
 

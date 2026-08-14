@@ -470,6 +470,8 @@ POST   /api/import/calibre/commit      → {batch_id, options}
 GET    /api/import/jobs/{id}           → progress for background enrichment
 DELETE /api/import/batches/{id}        → undo an import batch
 
+GET    /api/export                     → whole library as entity-shaped JSON;
+                                          ?format=csv for a Goodreads-shaped CSV
 POST   /api/enrichment/backfill        → re-queue enrichment for items whose
                                           metadata or cover is still empty
 GET    /api/health/providers           → which providers are configured, and
@@ -672,15 +674,15 @@ enrichment. "Undo last import" for 24 hours.
 
 Listed so they're not re-litigated during build.
 
-**Scheduled — Export.** `GET /api/export` dumping entries + items as JSON, plus
-a Goodreads-shaped CSV. Deferred through v1; **scheduled as Sprint 024** in
-roadmap revision 9, because the repository is public and portability is now a
-user-facing story rather than only the owner's. Until it exists the only exit
-path is the SQLite file itself — genuinely fine, it's a documented open format
-you can query with any tool — but it means **the nightly DB backup (§8) is not
-optional in production.** Export the entity shape (`type`, identifiers, opaque
-`metadata`), not a book-specific schema, or a second domain forces a v2 format;
-the Goodreads-shaped CSV is allowed to stay book-only.
+**Delivered — Export.** `GET /api/export` dumps entries + items as JSON, with
+`?format=csv` for a Goodreads-shaped CSV. **Shipped in Sprint 024.** The JSON is
+entity-shaped (`type`, identifiers, opaque `metadata`) rather than book-specific,
+so a second domain needs no v2 format; the CSV is one domain's export view and is
+allowed to stay book-only. Attachments are carried as references plus their
+sha256, not as bytes (DEC-054): the digest resolves against any backup, because a
+blob's path *is* its digest. The nightly DB backup (§8) remains non-optional in
+production — the export is a portability story, not a restore story. There is no
+export button in the UI; the route is the surface.
 
 **v2 — Auth.** None in v1; LAN-only. Internal Nginx Proxy Manager routing is
 allowed, but there must be no public DNS, internet port-forwarding, tunnel, or
@@ -710,14 +712,16 @@ are simpler while both are on the ZimaBoard.
 
 **Scheduled — second domain (albums).** The `items`/`entries` split and the
 two-method provider shape are the entire preparation. The second domain is
-**albums, scheduled as Sprint 024**, not wine as this section originally
-assumed: MusicBrainz needs no OAuth, release-group versus release maps onto the
-work-versus-edition problem already solved for books, and Cover Art Archive
-exercises the separate-image-provider case. Games (025) and series (026) follow.
-When a domain arrives: add its provider, a per-type display config declaring
-sort fields and facets, a status vocabulary that fits it, and extract the
-provider registry from the concrete cases. Do **not** build the plugin runtime
-before two of them exist.
+**albums, scheduled as Sprint 025** under plan revision 10, not wine as this
+section originally assumed: MusicBrainz needs no OAuth, release-group versus
+release maps onto the work-versus-edition problem already solved for books, and
+Cover Art Archive exercises the separate-image-provider case. Sprint 026 is the
+status vocabulary; games (027) and series (028) follow. DEC-052 replaced the
+"add a provider and see" shape with **six named seams**, validated against the
+live MusicBrainz API rather than assumed — and found that casting an album into
+book fields is lossy, because MusicBrainz only inverts a *person's* sort name and
+a barcode is not a unique edition key. Do **not** build the plugin runtime before
+two domains exist.
 
 Wine stays exploratory and unscheduled — see `docs/domain_metadata_roadmap_report.md`.
 Expect it to be manual-entry-first: there's no free equivalent of ISBN, identity
@@ -738,7 +742,7 @@ Resolved during spec review; recorded so they aren't reopened.
 | 3 | Adding a book you already have | Exact dupe → navigate to existing entry with a toast. Different edition → warn on the picker card, don't block (§4.3) |
 | 4 | Rereads | Stay lossy: latest dates, one score, `reread_count`. No `readings` table |
 | 5 | Scale | TanStack Virtual + keyset pagination; animation budget spent on interactions, not scrolling (§6, §7) |
-| 6 | Export | Deferred through v1; nightly DB backup mandatory in the meantime (§9). Scheduled as Sprint 023 in roadmap revision 8 |
+| 6 | Export | Deferred through v1; nightly DB backup mandatory in the meantime (§9). **Delivered in Sprint 024** — entity-shaped JSON plus a Goodreads CSV, attachments by reference (DEC-054) |
 | 7 | Auth | Deferred to v2. LAN-only; internal NPM is allowed, but no internet-reachable proxy/DNS/forwarding until auth (§9) |
 
 ---

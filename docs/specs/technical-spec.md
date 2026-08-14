@@ -328,6 +328,14 @@ The product-spec route list is authoritative, with these refinements:
   expose normalized Calibre UUID/book identity and whether a local cover was staged, never a source
   filesystem path.
 - Cover files are served from a controlled route or static mount with immutable cache headers; database paths are relative and never accepted from clients.
+- `GET /api/export` streams the whole library rather than buffering it: rows are walked in keyset
+  batches of 200 and each is serialized and yielded on its own, so peak memory tracks the batch and
+  not the corpus (measured at x1.07 JSON / x1.66 CSV peak for x10 output). Select **columns, not
+  mapped entities** — an ORM entity is retained by the `Session` identity map for as long as the
+  session lives, and `yield_per` does not help because SQLite's driver has no server-side cursor and
+  materializes the result anyway. The JSON omits every derived column by design; the CSV neutralizes
+  leading `=`, `+`, `-`, `@` so a spreadsheet reads a note as text, which makes the JSON the lossless
+  artifact and the CSV the convenience view.
 - Add `GET /api/health/live` and `GET /api/health/ready`; readiness verifies DB access and migration head, not public provider availability. `GET /api/health/providers` reports provider configuration separately and never affects readiness.
 
 OpenAPI is the API contract. Generate or validate frontend request/response types from it in CI so backend/frontend drift fails checks.
