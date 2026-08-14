@@ -172,6 +172,27 @@ class JobRepository:
                 row.available_at = now_iso
             row.updated_at = now_iso
 
+    def defer(self, job_id: str, until: datetime, *, reason: str) -> None:
+        """Return a job to the queue for later **without spending an attempt**.
+
+        Deliberately not `fail`. That path increments `attempts` and dead-letters at
+        the retry ceiling, so a large import that exhausted a provider's daily quota
+        would destroy its own backlog instead of finishing it the next day. A quota
+        that has not reset yet is not a failure, and must not be counted as one.
+        """
+        now_iso = _now()
+        with self._write() as session:
+            row = session.get(JobRow, job_id)
+            if row is None:
+                raise LookupError(job_id)
+            row.state = "queued"
+            row.available_at = until.isoformat().replace("+00:00", "Z")
+            row.error = reason
+            row.error_code = "provider_quota_exhausted"
+            row.lease_expires_at = None
+            row.heartbeat_at = None
+            row.updated_at = now_iso
+
     def cancel(self, job_id: str) -> None:
         now_iso = _now()
         with self._write() as session:
@@ -244,6 +265,7 @@ class JobRepository:
                 "error": row.error,
                 "error_code": row.error_code,
                 "attempts": row.attempts,
+                "available_at": row.available_at,
                 "created_at": row.created_at,
                 "updated_at": row.updated_at,
                 "finished_at": row.finished_at,
@@ -353,6 +375,12 @@ class JobRunner:
                 self.repo.complete(claimed.id, result.get("progress", {}), now)
             elif result["state"] == "cancelled":
                 self.repo.cancel(claimed.id)
+            elif result["state"] == "deferred":
+                # The handler already returned the job to the queue for later. Falling
+                # through to `fail` here would spend an attempt and reset available_at
+                # to now, which undoes the deferral and eventually dead-letters a
+                # backlog that was only waiting for a provider budget to reset.
+                pass
             else:
                 self.repo.fail(
                     claimed.id,

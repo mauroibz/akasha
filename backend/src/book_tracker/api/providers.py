@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from typing import Annotated, Any, cast
 
 from fastapi import APIRouter, Query, Request, Response
@@ -78,11 +79,20 @@ async def resolve(
 async def search(
     q: Annotated[str, Query(min_length=1, max_length=300)], request: Request, response: Response
 ) -> list[SearchCandidateResponse]:
+    providers = _providers(request)
+    # Search records what it spends but is never blocked by a daily budget (DEC-045).
+    # The last request of a day belongs to the person waiting for a result, not to
+    # background enrichment, which can defer to tomorrow without anyone noticing.
+    quota = getattr(request.app.state, "provider_quota", None)
+    if quota is not None:
+        moment = datetime.now(UTC)
+        for name in providers:
+            quota.record(name, moment)
     try:
-        rows = await search_providers(q, list(_providers(request).values()))
+        rows = await search_providers(q, list(providers.values()))
     except ProvidersUnavailable as error:
         raise LibraryError("providers_unavailable", str(error), status_code=503) from error
     represented = {ref.source for row in rows for ref in row.source_refs}
-    if rows and len(represented) < len(_providers(request)):
+    if rows and len(represented) < len(providers):
         response.headers["X-Provider-Warning"] = "Some metadata providers are unavailable"
     return [SearchCandidateResponse.from_domain(row) for row in rows]

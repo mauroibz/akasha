@@ -16,6 +16,12 @@ class Settings(BaseSettings):
     timezone: str = Field(default="UTC", validation_alias="TZ")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")
     environment: str = "development"
+    # Daily request budgets per provider. Configuration rather than code (DEC-045), so
+    # a metered provider added later is an entry here and not a patch: override with
+    # BOOK_TRACKER_PROVIDER_DAILY_LIMITS as JSON. A provider absent from this mapping is
+    # unmetered and never blocked. 900 rather than Google's real ~1000 is deliberate
+    # headroom, because their quota resets on Pacific time and the counter uses UTC.
+    provider_daily_limits: dict[str, int] = Field(default_factory=lambda: {"googlebooks": 900})
     sqlite_busy_timeout_ms: int = 5_000
     static_dir: Path | None = None
 

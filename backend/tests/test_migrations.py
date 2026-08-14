@@ -71,7 +71,11 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
 
     pending = pending_revisions(configured.database_url)
 
-    assert pending == ["0007_normalized_sort_projection", "0008_plain_text_descriptions"]
+    assert pending == [
+        "0007_normalized_sort_projection",
+        "0008_plain_text_descriptions",
+        "0009_provider_usage",
+    ]
 
     upgrade(configured.database_url)
     assert pending_revisions(configured.database_url) == []
@@ -136,6 +140,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
     assert pending_revisions(configured.database_url) == [
         "0007_normalized_sort_projection",
         "0008_plain_text_descriptions",
+        "0009_provider_usage",
     ]
 
 

@@ -28,6 +28,7 @@ from book_tracker.infrastructure.providers import (
     OpenLibraryProvider,
     create_provider_client,
 )
+from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import pending_revisions, schema_is_current, upgrade
 
@@ -154,10 +155,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.providers = {provider.name: provider for provider in providers}
         # Durable job runner for background enrichment (Sprint 011)
         rate_limiter = RateLimiter(min_interval_seconds=0.5)
+        # Daily budgets, provider-agnostic (DEC-045). Enrichment is gated by them;
+        # interactive search deliberately is not, so the last of a day's quota goes to
+        # a search someone is waiting for rather than to background work.
+        app.state.provider_quota = ProviderQuota(
+            app.state.engine, limits=configured.provider_daily_limits
+        )
         enrichment_handler = EnrichmentHandler(
             app.state.engine,
             app.state.providers,
             rate_limiter=rate_limiter,
+            quota=app.state.provider_quota,
             cover_client=provider_client,
             data_dir=configured.data_dir,
         )

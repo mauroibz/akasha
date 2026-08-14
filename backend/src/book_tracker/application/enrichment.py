@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Collection, Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +23,7 @@ from book_tracker.infrastructure.models import (
     ItemRow,
 )
 from book_tracker.infrastructure.providers import ProviderPayloadError
+from book_tracker.infrastructure.quota import ProviderQuota
 
 logger = logging.getLogger(__name__)
 
@@ -59,31 +60,48 @@ class EnrichmentHandler:
         providers: Mapping[str, Any],
         *,
         rate_limiter: RateLimiter | None = None,
+        quota: ProviderQuota | None = None,
         cover_client: httpx.AsyncClient | None = None,
         data_dir: Path | None = None,
     ) -> None:
         self.engine = engine
         self.providers = providers
         self.rate_limiter = rate_limiter
+        self.quota = quota
         self.cover_client = cover_client
         self.data_dir = data_dir
         self.repo = JobRepository(engine)
 
     async def _fetch(
-        self, isbn: str
+        self, isbn: str, now: datetime | None = None
     ) -> tuple[ItemPayload | None, str | None, dict[str, Any] | None]:
         """Try each provider in order, returning the first usable payload.
 
         Failures are never swallowed: every attempt contributes a sentence to the
         reason recorded on the job row (DEC-025, technical spec 6.2).
+
+        A provider over its daily budget is skipped rather than called, and if that
+        leaves nothing to try the caller defers the job instead of failing it — a
+        quota that has not reset yet is not a failure (DEC-045).
         """
         reasons: list[str] = []
         unreachable = False
+        capped = False
+        available = False
+        moment = now or datetime.now(UTC)
         for name in PROVIDER_ORDER:
             provider = self.providers.get(name)
             if provider is None:
                 reasons.append(f"{_label(name)} is not configured.")
                 continue
+            if self.quota is not None and not self.quota.allows(name, moment):
+                capped = True
+                reasons.append(f"{_label(name)} is out of requests for today.")
+                logger.info("provider quota exhausted", extra={"provider": name})
+                continue
+            available = True
+            if self.quota is not None:
+                self.quota.record(name, moment)
             try:
                 payload = await provider.fetch_by_isbn(isbn)
             except ProviderPayloadError as error:
@@ -110,6 +128,9 @@ class EnrichmentHandler:
                 continue
             return payload, name, None
 
+        if capped and not available:
+            # Nothing was even tried: every configured provider is out of budget.
+            return None, None, {"state": "deferred", "error": " ".join(reasons)[:500]}
         failure = {
             "state": "failed",
             "error": " ".join(reasons)[:500],
@@ -160,9 +181,14 @@ class EnrichmentHandler:
                 "error_code": "rate_limited",
             }
 
-        payload_data, source_name, failure = await self._fetch(isbn)
+        payload_data, source_name, failure = await self._fetch(isbn, now)
         if payload_data is None:
             assert failure is not None
+            if failure["state"] == "deferred":
+                # Tomorrow's budget, without spending one of this job's attempts.
+                until = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
+                self.repo.defer(job_id, until, reason=str(failure["error"]))
+                return {"state": "deferred", "available_at": until.isoformat()}
             return failure
 
         # Fill only empty fields
