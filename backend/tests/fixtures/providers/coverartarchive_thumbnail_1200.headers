@@ -1,0 +1,9 @@
+HTTP/1.1 307 TEMPORARY REDIRECT
+Date: Fri, 14 Aug 2026 21:42:58 GMT
+Content-Type: text/plain; charset=utf-8
+Content-Length: 143
+Connection: keep-alive
+Keep-Alive: timeout=15
+Location: http://archive.org/download/mbid-e7ba3cb7-a074-45ee-870f-3baeb6d3e8bf/mbid-e7ba3cb7-a074-45ee-870f-3baeb6d3e8bf-12708426541_thumb1200.jpg
+Access-Control-Allow-Origin: *
+
