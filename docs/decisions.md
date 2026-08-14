@@ -1451,3 +1451,36 @@ Append-only record of material architecture choices, product-default resolutions
   `.us.archive.org` suffix, and checked on every hop at `covers.py:117` — and full-size art is
   811 KiB against 244 KiB at 1200px, which matters because `MAX_COVER_EDGE` is 600 and the
   difference is downscaled away.
+
+## DEC-053 — Domain-line sprints run on a branch; the rest stay on `main`
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 025's risk section flagged an apparent conflict: the roadmap says the second
+  domain is implemented "on a branch", while `AGENTS.md` says a sprint ends with a clean worktree and
+  all commits local on the current branch. The owner settled it at planning time rather than leaving
+  it to be re-litigated mid-sprint.
+- **Decision:** **The conflict was overstated and there is nothing to reconcile.** The invariant
+  reads "local on *the current branch*", not "on `main`" — it forbids pushing, not branching. A
+  sprint may therefore run on a branch and still satisfy every invariant, provided it ends clean and
+  unpushed.
+
+  What needed deciding is which sprints use one, and the rule is the risk, not the sprint number:
+  **a sprint whose architecture could fail spectacularly runs on a branch; a sprint whose design is
+  already confirmed stays on `main`.**
+
+  - **Sprint 024 (export) stays on `main`.** It carries no architectural risk — DEC-052's seam 3
+    confirmed its entity-shaped, opaque-`metadata` format bet rather than threatening it — and it
+    depends on 020, not on the domain line. Isolating it would quarantine work nobody doubts.
+  - **Sprint 025 (albums) and the domain line after it run on a branch**, cut from `main` when 025
+    is activated. Its least-proven seam is identity (DEC-052 seam 2), derived from measurement
+    rather than from a walk through the code, and the sprint already names two conditions under
+    which it should stop and re-plan rather than push through.
+
+  A branched sprint follows the ordinary protocol in every other respect: state and handoff advance
+  as usual, the worktree ends clean, and nothing is pushed. Merging the branch back is an owner
+  decision at the sprint's close, not an automatic step — that is the entire point of cutting it.
+- **Consequences:** Sprint 025's "Risks and decisions to surface" no longer carries this as an open
+  question. A later agent finding domain work on a branch should read that as intended state and not
+  as an inconsistency to repair under `AGENTS.md` §1. `main` continues to hold every completed sprint
+  and remains the branch a failed domain experiment is abandoned *back* to.

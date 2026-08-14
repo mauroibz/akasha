@@ -172,6 +172,11 @@ and report what you saw — including anything wrong and out of scope.
 
 ## Risks and decisions to surface
 
+- **Settled (DEC-053): this sprint runs on a branch cut from `main` at activation.** The invariant
+  forbids pushing, not branching, so nothing is bent by it. Follow the ordinary protocol otherwise —
+  state and handoff advance, the worktree ends clean, nothing is pushed — and treat merging back as
+  the owner's decision at close, which is the reason the branch exists.
+
 - **The renames in deliverable 3 are the largest blast radius in the sprint** — 55 `sort_author`
   occurrences across 27 files, 7 e2e specs, `frontend/e2e/seed.ts`, a migration, and the benchmark.
   DEC-051 deferred them here on purpose. If the sprint runs long, this is the slice to land alone
