@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 10,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "025",
   "active_sprint_file": "docs/sprints/025-second-domain-albums.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "024",
   "completed_sprints": [
     "001",
@@ -32,6 +32,6 @@
     "023",
     "024"
   ],
-  "started_at": "",
-  "updated_at": "2026-08-14T16:40:00-03:00"
+  "started_at": "2026-08-14T18:10:00-03:00",
+  "updated_at": "2026-08-14T18:10:00-03:00"
 }

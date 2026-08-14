@@ -30,7 +30,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { chooseableStatuses } from "@/features/library/labels";
+import {
+  chooseableStatuses,
+  statusHotkeys,
+  statusLabels,
+} from "@/features/library/labels";
 import { useMotionPresets } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
@@ -38,24 +42,6 @@ import {
   isEditableTarget,
   mergeUniqueEntries,
 } from "@/features/library/library";
-
-const statusLabels: Record<EntryStatus, string> = {
-  unsorted: "Inbox",
-  read: "Read",
-  reading: "Reading",
-  to_read: "To read",
-  wishlist: "Wishlist",
-  dropped: "Dropped",
-};
-
-const statusHotkeys: Record<string, EntryStatus> = {
-  r: "read",
-  t: "to_read",
-  w: "wishlist",
-  d: "dropped",
-  g: "reading",
-  u: "unsorted",
-};
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];

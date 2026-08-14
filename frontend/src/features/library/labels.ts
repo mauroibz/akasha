@@ -23,6 +23,20 @@ export const chooseableStatuses: readonly EntryStatus[] = [
   "dropped",
 ];
 
+/**
+ * The triage keyboard map, beside the labels it names rather than re-typed on the
+ * screen that uses it: a status, what it is called and the key that sets it are one
+ * table, and `labels.test.ts` asserts they cannot drift apart.
+ */
+export const statusHotkeys: Record<string, EntryStatus> = {
+  r: "read",
+  t: "to_read",
+  w: "wishlist",
+  d: "dropped",
+  g: "reading",
+  u: "unsorted",
+};
+
 export const sortLabels: Record<SortKey, string> = {
   date_added: "Recently added",
   score: "Score",
