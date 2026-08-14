@@ -27,6 +27,7 @@ const entry = {
     subtitle: null,
     year: 1963,
     sort_author: "Julio Cortázar",
+    creator_sort: "Cortázar, Julio",
     cover_path: null,
     cover_url: null,
     metadata: {
@@ -211,6 +212,63 @@ describe("DetailPage", () => {
     expect(screen.getByText("openlibrary (primary)")).toBeVisible();
     expect(screen.getByText("Argentine fiction")).toBeVisible();
     expect(screen.getByText("Favorites")).toBeVisible();
+  });
+
+  it("corrects the creator sort name and clears it back to the automatic value", async () => {
+    const bodies: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (init?.method === "PATCH") {
+        bodies.push(String(init.body));
+        return new Response(JSON.stringify(entry.item));
+      }
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: /edit book metadata/i }),
+    );
+    // The automatic value is offered as the placeholder rather than prefilled, so
+    // an untouched field stays empty and the row keeps following its authors.
+    const field = screen.getByLabelText(/sorts as/i);
+    expect(field).toHaveValue("");
+    expect(field).toHaveAttribute("placeholder", "Cortázar, Julio");
+    await user.type(field, "Cortázar Ascasubi, Julio");
+    await user.click(screen.getByRole("button", { name: /save metadata/i }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(JSON.parse(bodies[0]).creator_sort_override).toBe(
+      "Cortázar Ascasubi, Julio",
+    );
+  });
+
+  it("sends null when the sort name field is emptied", async () => {
+    const bodies: string[] = [];
+    const corrected = {
+      ...entry,
+      item: { ...entry.item, creator_sort_override: "Anything At All" },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (init?.method === "PATCH") {
+        bodies.push(String(init.body));
+        return new Response(JSON.stringify(corrected.item));
+      }
+      return new Response(JSON.stringify(corrected));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+    await user.click(
+      screen.getByRole("button", { name: /edit book metadata/i }),
+    );
+    await user.clear(screen.getByLabelText(/sorts as/i));
+    await user.click(screen.getByRole("button", { name: /save metadata/i }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(JSON.parse(bodies[0]).creator_sort_override).toBeNull();
   });
 
   it("confirmed deletion calls DELETE and returns to library", async () => {

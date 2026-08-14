@@ -44,6 +44,10 @@ export function MetadataDialog({
       authors: Array.isArray(item.metadata.authors)
         ? item.metadata.authors.join(", ")
         : "",
+      // Left empty rather than prefilled with `creator_sort`: an untouched field
+      // must keep following the authors above, and the automatic value is shown
+      // as the placeholder instead.
+      creator_sort_override: item.creator_sort_override ?? "",
       publisher: asText(item.metadata.publisher),
       language: asText(item.metadata.language),
       page_count: asText(item.metadata.page_count),
@@ -130,6 +134,32 @@ export function MetadataDialog({
                 className="h-11"
                 {...form.register("authors")}
               />
+            )}
+          </Field>
+          <Field
+            id="metadata-creator-sort"
+            label="Sorts as"
+            error={errors.creator_sort_override?.message}
+          >
+            {(props) => (
+              <>
+                <Input
+                  {...props}
+                  aria-describedby={
+                    props["aria-describedby"] ?? "metadata-creator-sort-hint"
+                  }
+                  className="h-11"
+                  placeholder={item.creator_sort ?? ""}
+                  {...form.register("creator_sort_override")}
+                />
+                <p
+                  id="metadata-creator-sort-hint"
+                  className="mt-1 text-xs text-muted-foreground"
+                >
+                  Where this sits in an author-sorted list. Leave it empty to
+                  follow the authors above.
+                </p>
+              </>
             )}
           </Field>
           <Field

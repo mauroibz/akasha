@@ -107,7 +107,12 @@ class ItemResponse(BaseModel):
     title: str
     subtitle: str | None
     year: int | None
+    # The creator's name as written, then the name the library sorts it under.
+    # They are different strings: García Márquez displays first-name-first and
+    # sorts surname-first.
     sort_author: str | None
+    creator_sort: str | None
+    creator_sort_override: str | None
     cover_url: str | None
     metadata: BookMetadataResponse
     identifiers: dict[str, str]
@@ -215,6 +220,8 @@ class ItemPatch(BaseModel):
     title: str | None = Field(default=None, min_length=1)
     subtitle: str | None = None
     year: int | None = None
+    # Sent as "" or null to drop the correction and go back to the heuristic.
+    creator_sort_override: str | None = Field(default=None, max_length=300)
     metadata: BookMetadataPatch | None = None
 
     @model_validator(mode="after")

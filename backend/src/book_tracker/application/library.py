@@ -168,6 +168,8 @@ class LibraryService:
             "subtitle": item.subtitle,
             "year": item.year,
             "sort_author": item.sort_author,
+            "creator_sort": item.creator_sort,
+            "creator_sort_override": item.creator_sort_override,
             "cover_url": f"/api/items/{item.id}/cover?v={cover_version}"
             if item.cover_path
             else None,
@@ -237,6 +239,12 @@ class LibraryService:
             for field in ("title", "subtitle", "year"):
                 if field in changes:
                     setattr(item, field, changes[field])
+            if "creator_sort_override" in changes:
+                # Blank means "go back to the automatic value", which is why this
+                # stores NULL rather than an empty string: the mapper event reads
+                # the override to decide whether the heuristic still applies.
+                override = (changes["creator_sort_override"] or "").strip()
+                item.creator_sort_override = override or None
             if "metadata" in changes:
                 metadata = json.loads(item.metadata_json)
                 legacy_publishers = metadata.pop("publishers", None)

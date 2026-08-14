@@ -26,6 +26,10 @@ export interface LibraryItem {
   subtitle: string | null;
   year: number | null;
   sort_author: string | null;
+  /** The name this edition sorts under: "García Márquez, Gabriel". */
+  creator_sort?: string | null;
+  /** Set only when the owner corrected it; absent means the automatic value. */
+  creator_sort_override?: string | null;
   cover_url?: string | null;
   cover_path?: string | null;
   metadata: {
@@ -142,6 +146,8 @@ export async function patchItem(
     title?: string;
     subtitle?: string | null;
     year?: number | null;
+    /** Null drops the correction and goes back to the automatic sort name. */
+    creator_sort_override?: string | null;
     metadata?: Partial<LibraryEntry["item"]["metadata"]>;
   },
 ): Promise<LibraryEntry["item"]> {

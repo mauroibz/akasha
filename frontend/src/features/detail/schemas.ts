@@ -64,6 +64,7 @@ export const metadataSchema = z.object({
   subtitle: z.string(),
   year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
   authors: z.string(),
+  creator_sort_override: z.string().max(300, "That is too long to be a name"),
   publisher: z.string(),
   language: z.string(),
   page_count: optionalNumber("Page count must be 1 or more", 1, 100_000),

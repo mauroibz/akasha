@@ -380,6 +380,8 @@ export function DetailPage() {
                 title: values.title.trim(),
                 subtitle: values.subtitle || null,
                 year: optionalInt(values.year),
+                creator_sort_override:
+                  values.creator_sort_override.trim() || null,
                 metadata: {
                   ...item.metadata,
                   authors: splitList(values.authors),

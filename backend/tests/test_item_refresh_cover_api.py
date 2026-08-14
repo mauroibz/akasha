@@ -156,3 +156,46 @@ async def test_confirmed_refresh_merges_present_metadata_and_failure_is_atomic(
     assert failed.status_code == 502
     assert after.json() == refreshed.json()
     assert entry.json()["status"] == "reading"
+
+
+@pytest.mark.anyio
+async def test_a_corrected_creator_sort_name_is_owner_data_and_outlives_a_refresh(
+    tmp_path: Path,
+) -> None:
+    """Acceptance criterion 2: the correction is not cache.
+
+    A refresh is the one path that overwrites provider-managed fields on purpose,
+    so it is the sharpest test of whether the override is treated as owner data.
+    It rewrites `metadata.authors` out from under the row; the sort name must not
+    follow it.
+    """
+    provider = RefreshProvider()
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {provider.name: provider}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries", json={"source": "openlibrary", "source_id": "OL2M"}
+            )
+            item_id = created.json()["entry"]["item_id"]
+            seeded = await client.get(f"/api/items/{item_id}")
+            corrected = await client.patch(
+                f"/api/items/{item_id}", json={"creator_sort_override": "Tolkien, J. R. R."}
+            )
+            refreshed = await client.post(f"/api/items/{item_id}/refresh", json={"overwrite": True})
+            cleared = await client.patch(
+                f"/api/items/{item_id}", json={"creator_sort_override": ""}
+            )
+    # Seeded by the heuristic, with nothing for the owner to keep yet.
+    assert seeded.json()["creator_sort"] == "Author, Provider"
+    assert "creator_sort_override" not in seeded.json()
+    assert corrected.json()["creator_sort"] == "Tolkien, J. R. R."
+    assert corrected.json()["creator_sort_override"] == "Tolkien, J. R. R."
+    # The refresh replaced the authors and left the correction alone.
+    assert refreshed.json()["metadata"]["authors"] == ["Provider Author"]
+    assert refreshed.json()["creator_sort"] == "Tolkien, J. R. R."
+    # Clearing it is how the owner goes back to the automatic value.
+    assert cleared.json()["creator_sort"] == "Author, Provider"
+    assert "creator_sort_override" not in cleared.json()

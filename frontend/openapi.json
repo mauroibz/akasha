@@ -1325,6 +1325,18 @@
       },
       "ItemPatch": {
         "properties": {
+          "creator_sort_override": {
+            "anyOf": [
+              {
+                "maxLength": 300,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Sort Override"
+          },
           "metadata": {
             "anyOf": [
               {
@@ -1385,6 +1397,28 @@
               }
             ],
             "title": "Cover Url"
+          },
+          "creator_sort": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Sort"
+          },
+          "creator_sort_override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator Sort Override"
           },
           "id": {
             "title": "Id",
@@ -1456,6 +1490,8 @@
           "subtitle",
           "year",
           "sort_author",
+          "creator_sort",
+          "creator_sort_override",
           "cover_url",
           "metadata",
           "identifiers",
