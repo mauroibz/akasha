@@ -17,7 +17,7 @@ re-recorded: the Sprint 020 verification work found that
 `googlebooks_isbn_9788437604572.json` already demonstrated the defect it needed to prove,
 and a live check that day returned the same volume.
 
-Eight files were **added** on 2026-08-14 for Sprint 025 (the `musicbrainz_*`,
+Twelve files were **added** on 2026-08-14 for Sprint 025 (the `musicbrainz_*`,
 `coverartarchive_*` and `archive_org_*` rows below), captured with
 `User-Agent: Akasha/1.1 (+https://github.com/mauroibz/akasha)` and paced at ~1.2 s
 between requests. MusicBrainz answered one **`503`** during the run, which is how it
@@ -45,6 +45,8 @@ signals throttling — it does not use `429`. Nothing else was re-recorded.
 | `musicbrainz_artist_group_daft_punk.json` | `GET https://musicbrainz.org/ws/2/artist/056e4f3e-d505-4dad-8ec1-d04f521cbb56?fmt=json` — captured **2026-08-14**. Type `Group`, `sort-name` `Daft Punk`: **not** inverted. This is the fixture the whole seam-1 rule turns on; the DEC-051 heuristic would produce `Punk, Daft`. |
 | `musicbrainz_artist_other_various_artists.json` | `GET https://musicbrainz.org/ws/2/artist/89ad4ac3-39f7-470e-963a-56509c546377?fmt=json` — captured **2026-08-14**. Type `Other`, `sort-name` `Various Artists`, also not inverted. |
 | `musicbrainz_search_dean_blunt.json` | `GET https://musicbrainz.org/ws/2/release-group?query=arid:e8bd5b47-e8b4-4671-a9f6-590a92e88898&fmt=json&limit=25` — captured **2026-08-14**. Two of these credit more than one artist, with `joinphrase` `" & "`: a credit is a **rendered string**, not the `", "` join of a list. |
+| `musicbrainz_search_discovery.json` | `GET https://musicbrainz.org/ws/2/release-group?query=Discovery AND artist:Daft Punk&fmt=json&limit=10` — captured **2026-08-14**. The `Group` case reaching the adapter through the search path it really uses: `artist-credit[0].artist.sort-name` is `Daft Punk`, uninverted, in the search response itself. No artist lookup is needed to get it. |
+| `musicbrainz_search_now_thats_what_i_call_music.json` | `GET https://musicbrainz.org/ws/2/release-group?query=artist:"Various Artists" AND release:"Now That's What I Call Music!"&fmt=json&limit=10` — captured **2026-08-14**. The `Other` case: `Various Artists`, also uninverted. |
 | `coverartarchive_release_group_kind_of_blue.json` | `GET https://coverartarchive.org/release-group/8e8a594f-2175-38c7-a871-abb68ec363e7` — captured **2026-08-14**. The `image` URL is **`http://`**, and each image carries `1200`/`500`/`250` thumbnails. `MAX_COVER_EDGE` is 600, so the 1200 is the one to fetch: the full image is downscaled to 600 anyway and the 500 would upscale. |
 | `coverartarchive_thumbnail_1200.headers` | `GET http://coverartarchive.org/release/e7ba3cb7-a074-45ee-870f-3baeb6d3e8bf/12708426541-1200.jpg` — response headers only, captured **2026-08-14**. Status **307**, `Location:` an `http://archive.org/download/...` URL. |
 | `archive_org_download_redirect.headers` | `GET http://archive.org/download/mbid-e7ba3cb7-…-12708426541_thumb1200.jpg` — response headers only, captured **2026-08-14**. Status **302** to `http://dn710907.ca.archive.org/…`, a host matched by neither `archive.org` exactly nor the `.us.archive.org` suffix rule. Note that **both** hops answer `http://`, so an https upgrade applied only to the first URL does not survive the chain. |
