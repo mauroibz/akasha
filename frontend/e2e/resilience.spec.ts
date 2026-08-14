@@ -126,7 +126,7 @@ test("library to detail and back is possible without a pointer", async ({
           title: "Seeded book 0003",
           subtitle: null,
           year: 1903,
-          sort_author: "Author 3",
+          creator: "Author 3",
           cover_path: null,
           cover_url: null,
           metadata: {},

@@ -46,7 +46,7 @@ describe("AddPage", () => {
                 source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
                 title: "Rayuela",
                 subtitle: null,
-                authors: ["Julio Cortázar"],
+                creators: ["Julio Cortázar"],
                 year: 1963,
                 cover_url: null,
                 identifiers: {},
@@ -112,7 +112,7 @@ describe("AddPage", () => {
                   source_refs: [{ source: "openlibrary", source_id: "OL2M" }],
                   title: "Second search result",
                   subtitle: null,
-                  authors: ["Someone"],
+                  creators: ["Someone"],
                   year: 1970,
                   cover_url: null,
                   identifiers: {},
@@ -241,7 +241,7 @@ describe("AddPage", () => {
       screen.getByRole("button", { name: /enter manually/i }),
     );
     await userEvent.type(
-      screen.getByLabelText(/^authors, comma separated$/i),
+      screen.getByLabelText(/^creators, comma separated$/i),
       "Julio Cortázar",
     );
     await userEvent.type(screen.getByLabelText(/^year$/i), "1963");
@@ -263,7 +263,7 @@ describe("AddPage", () => {
     expect(
       request.mock.calls.filter(([, init]) => init?.method === "POST"),
     ).toHaveLength(0);
-    expect(screen.getByLabelText(/^authors, comma separated$/i)).toHaveValue(
+    expect(screen.getByLabelText(/^creators, comma separated$/i)).toHaveValue(
       "Julio Cortázar",
     );
     expect(screen.getByLabelText(/^year$/i)).toHaveValue(1963);

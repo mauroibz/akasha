@@ -20,7 +20,7 @@ class SearchCandidate:
     source_refs: tuple[SourceRef, ...]
     title: str
     subtitle: str | None
-    authors: tuple[str, ...]
+    creators: tuple[str, ...]
     year: int | None
     cover_url: str | None
     identifiers: Mapping[str, str]
@@ -28,6 +28,9 @@ class SearchCandidate:
     metadata: Mapping[str, Any]
     original_year: int | None = None
     cover_fallback_urls: tuple[str, ...] = ()
+    # The credit as the source renders it, when it renders one: `["Dean Blunt",
+    # "James Ferraro"]` joined by ", " is not "Dean Blunt Meets James Ferraro".
+    credit: str | None = None
 
 
 @dataclass(frozen=True)

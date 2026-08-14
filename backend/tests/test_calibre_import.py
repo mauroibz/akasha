@@ -86,7 +86,7 @@ async def test_calibre_preview_is_read_only_stages_cover_and_commit_never_reread
         assert preview.status_code == 201
         record = preview.json()["records"][0]
         assert record["calibre_uuid"] == "uuid-1"
-        assert record["authors"] == ["Jorge Luis Borges"]
+        assert record["creators"] == ["Jorge Luis Borges"]
         assert record["shelves"] == ["cuentos"]
         assert record["score"] == 9 and record["score_provisional"] is False
         assert record["description"] == "Relatos completos"
@@ -171,7 +171,7 @@ async def test_calibre_minimal_schema_and_resync_fill_only(tmp_path: Path) -> No
             item_id = connection.execute(
                 text(
                     "INSERT INTO items(title,year,metadata,created_at,updated_at) "
-                    'VALUES(\'Manual title\',NULL,\'{"authors":[],"publisher":"Manual"}\','
+                    'VALUES(\'Manual title\',NULL,\'{"creators":[],"publisher":"Manual"}\','
                     "'n','n') RETURNING id"
                 )
             ).scalar_one()

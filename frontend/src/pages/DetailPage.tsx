@@ -176,7 +176,7 @@ export function DetailPage() {
             <p className="text-lg text-muted-foreground">{item.subtitle}</p>
           )}
           <p className="mt-2 text-foreground">
-            {item.sort_author ?? "Unknown author"}
+            {item.creator ?? "Unknown creator"}
           </p>
           <p className="text-sm text-muted-foreground">
             Edition year: {item.year ?? "unknown"}
@@ -384,7 +384,7 @@ export function DetailPage() {
                   values.creator_sort_override.trim() || null,
                 metadata: {
                   ...item.metadata,
-                  authors: splitList(values.authors),
+                  creators: splitList(values.creators),
                   publisher: values.publisher,
                   language: values.language,
                   page_count: optionalInt(values.page_count),

@@ -125,7 +125,7 @@ class DomainRepository:
             suggestions: set[int] = set()
             if title and first_author:
                 for item_id, candidate_title, candidate_author in session.execute(
-                    select(ItemRow.id, ItemRow.title, ItemRow.sort_author)
+                    select(ItemRow.id, ItemRow.title, ItemRow.creator_primary)
                 ):
                     if (
                         candidate_author
@@ -140,7 +140,7 @@ class DomainRepository:
         *,
         title: str,
         subtitle: str | None = None,
-        authors: Sequence[str] = (),
+        creators: Sequence[str] = (),
         identifiers: Sequence[Identifier] = (),
         sources: Sequence[SourceIdentity] = (),
         user_id: int = 1,
@@ -159,7 +159,7 @@ class DomainRepository:
                     year=None,
                     cover_path=None,
                     identifiers="{}",
-                    metadata_json=json.dumps({"authors": list(authors)}),
+                    metadata_json=json.dumps({"creators": list(creators)}),
                     created_at=now,
                     updated_at=now,
                 )
@@ -564,7 +564,7 @@ class ImportRepository:
                     item_id = exact or item_id
                 if item_id is None:
                     metadata = {
-                        "authors": payload["authors"],
+                        "creators": payload["creators"],
                         **({"publisher": payload["publisher"]} if payload.get("publisher") else {}),
                         **(
                             {"page_count": payload["page_count"]}
@@ -639,7 +639,7 @@ class ImportRepository:
                         after["year"] = existing_item.year
                     metadata = json.loads(existing_item.metadata_json)
                     incoming = {
-                        "authors": payload.get("authors"),
+                        "creators": payload.get("creators"),
                         "publisher": payload.get("publisher"),
                         "page_count": payload.get("page_count"),
                         "original_year": payload.get("original_year"),

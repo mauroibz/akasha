@@ -42,7 +42,7 @@ def candidate(
         source_refs=(SourceRef(source, source_id),),
         title=title,
         subtitle=None,
-        authors=("Julio Cortázar",),
+        creators=("Julio Cortázar",),
         year=None,
         cover_url=cover,
         identifiers={"isbn13": isbn} if isbn else {},
@@ -205,9 +205,9 @@ async def test_openlibrary_selects_nested_edition_and_resolves_full_metadata() -
         search = await provider.search("Rayuela")
         payload = await provider.fetch(search[0].source_id)
     assert (search[0].source_id, search[0].year, search[0].original_year) == ("OL1M", 2019, 1963)
-    assert payload.authors == ("Julio Cortázar",)
+    assert payload.creators == ("Julio Cortázar",)
     assert payload.metadata == {
-        "authors": ["Julio Cortázar"],
+        "creators": ["Julio Cortázar"],
         "publisher": "Cátedra",
         "language": "es",
         "page_count": 736,

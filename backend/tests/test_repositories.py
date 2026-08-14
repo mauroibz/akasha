@@ -63,7 +63,7 @@ def test_split_exact_identities_conflict_without_mutation(engine: Engine) -> Non
 
 def test_title_author_is_only_an_ambiguity_suggestion(engine: Engine) -> None:
     repository = DomainRepository(engine)
-    repository.create_or_get_entry(title="Cien años de soledad", authors=("García Márquez",))
+    repository.create_or_get_entry(title="Cien años de soledad", creators=("García Márquez",))
     decision = repository.match(title="Cien anos de soledad!", first_author="Garcia Marquez")
     assert decision.kind is MatchKind.AMBIGUOUS
     assert decision.item_id is None
@@ -74,7 +74,7 @@ def test_fill_empty_and_identifier_union_require_exact_agreement(engine: Engine)
     isbn = normalize_identifier("isbn", "9780306406157")
     calibre = normalize_identifier("calibre_uuid", "abc")
     created = repository.create_or_get_entry(
-        title="Existing", subtitle=None, authors=("Author",), identifiers=(isbn,)
+        title="Existing", subtitle=None, creators=("Author",), identifiers=(isbn,)
     )
     repository.fill_empty_item(
         created.item_id, {"title": "Incoming", "subtitle": "Sub"}, (isbn, calibre)

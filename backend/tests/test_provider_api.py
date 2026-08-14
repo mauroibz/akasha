@@ -25,7 +25,7 @@ class Provider:
                 source_refs=(SourceRef(self.name, "OL1M"),),
                 title=query,
                 subtitle=None,
-                authors=("Author",),
+                creators=("Author",),
                 year=2001,
                 cover_url=None,
                 identifiers={},

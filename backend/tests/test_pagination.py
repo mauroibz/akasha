@@ -40,9 +40,9 @@ async def test_list_filters_facets_and_default_excludes_unsorted(tmp_path: Path)
     app = create_app(configured)
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        first = repository.create_or_get_entry(title="Álgebra", authors=("Ada",))
-        second = repository.create_or_get_entry(title="Biology", authors=("Bob",))
-        third = repository.create_or_get_entry(title="Chemistry", authors=("Cara",))
+        first = repository.create_or_get_entry(title="Álgebra", creators=("Ada",))
+        second = repository.create_or_get_entry(title="Biology", creators=("Bob",))
+        third = repository.create_or_get_entry(title="Chemistry", creators=("Cara",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE entries SET status='read', score=8 WHERE id=:id"),
@@ -142,7 +142,7 @@ def test_common_status_date_query_uses_composite_index(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "sort", ["date_added", "score", "title", "sort_author", "year", "date_finished"]
+    "sort", ["date_added", "score", "title", "creator", "year", "date_finished"]
 )
 @pytest.mark.parametrize("order", ["asc", "desc"])
 async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
@@ -152,8 +152,8 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
         entries = [
-            repository.create_or_get_entry(title="Same", authors=("Zed",)),
-            repository.create_or_get_entry(title="same", authors=("Zed",)),
+            repository.create_or_get_entry(title="Same", creators=("Zed",)),
+            repository.create_or_get_entry(title="same", creators=("Zed",)),
             repository.create_or_get_entry(title="Other"),
         ]
         with app.state.engine.begin() as connection:
@@ -183,8 +183,8 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
                 if cursor is None:
                     break
             assert len({row["id"] for row in rows}) == len(rows) == 3
-            if sort in {"score", "sort_author", "year", "date_finished"}:
-                value = "item" if sort in {"sort_author", "year"} else None
+            if sort in {"score", "creator", "year", "date_finished"}:
+                value = "item" if sort in {"creator", "year"} else None
                 values = [row[value][sort] if value else row[sort] for row in rows]
                 assert values[-1] is None
 
@@ -192,7 +192,7 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
 def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
     """A pre-0011 cursor carries a value from the old projection.
 
-    `sort_author` used to order by the first author verbatim, so a stale cursor
+    The creator sort used to order by the first author verbatim, so a stale cursor
     holds "gabriel" where the column now holds "garcia marquez gabriel". Comparing
     the two would silently skip or repeat a page, which is worse than an error the
     library page already knows how to render.
@@ -201,7 +201,7 @@ def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
         base64.urlsafe_b64encode(
             json.dumps(
                 {
-                    "sort": "sort_author",
+                    "sort": "creator",
                     "order": "asc",
                     "filter_key": "abc",
                     "value": "gabriel",
@@ -215,7 +215,7 @@ def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
         .rstrip("=")
     )
     with pytest.raises(CursorError):
-        decode_cursor(stale, sort="sort_author", order="asc", filter_key="abc")
+        decode_cursor(stale, sort="creator", order="asc", filter_key="abc")
 
 
 @pytest.mark.anyio
@@ -236,14 +236,14 @@ async def test_author_sort_orders_by_the_creator_sort_name(tmp_path: Path) -> No
             ("Pedro Páramo", "Juan Rulfo"),
             ("Sangre azul", "Zoé Aguirre"),
         ]:
-            repository.create_or_get_entry(title=title, authors=(author,))
+            repository.create_or_get_entry(title=title, creators=(author,))
         with app.state.engine.begin() as connection:
             connection.execute(text("UPDATE entries SET status='read'"))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as client:
             page = (
-                await client.get("/api/entries", params={"sort": "sort_author", "order": "asc"})
+                await client.get("/api/entries", params={"sort": "creator", "order": "asc"})
             ).json()
     assert [row["item"]["title"] for row in page["items"]] == [
         "Sangre azul",

@@ -286,7 +286,7 @@ class OpenLibraryProvider:
             source_refs=(SourceRef(self.name, source_id),),
             title=str(row["title"]),
             subtitle=str(row["subtitle"]) if row.get("subtitle") else None,
-            authors=tuple(
+            creators=tuple(
                 str(value) for value in edition.get("author_name", row.get("author_name", []))
             ),
             year=_year(edition.get("publish_date")),
@@ -357,7 +357,7 @@ class OpenLibraryProvider:
                 edition,
                 title=candidate.title,
                 subtitle=candidate.subtitle or edition.subtitle,
-                authors=candidate.authors,
+                creators=candidate.creators,
                 cover_url=edition.cover_url or candidate.cover_url,
                 original_year=candidate.original_year,
                 metadata=candidate.metadata,
@@ -416,7 +416,7 @@ class OpenLibraryProvider:
         created_value = created.get("value") if isinstance(created, dict) else created
         original_year = _year(work.get("first_publish_date") or created_value)
         metadata = {
-            "authors": list(authors),
+            "creators": list(authors),
             "publisher": publisher,
             "language": _language(row.get("languages")),
             "page_count": row.get("number_of_pages"),
@@ -446,7 +446,7 @@ class OpenLibraryProvider:
             source_refs=(SourceRef(self.name, source_id),),
             title=str(title),
             subtitle=str(row["subtitle"]) if row.get("subtitle") else None,
-            authors=authors,
+            creators=authors,
             year=_year(row.get("publish_date")),
             cover_url=cover_urls[0] if cover_urls else None,
             identifiers=identifiers,
@@ -549,7 +549,7 @@ class OpenLibraryProvider:
                     source_refs=(SourceRef(self.name, edition_id),),
                     title=str(entry["title"]),
                     subtitle=str(entry["subtitle"]) if entry.get("subtitle") else None,
-                    authors=(),
+                    creators=(),
                     year=_year(entry.get("publish_date")),
                     cover_url=cover_url,
                     identifiers=identifiers,
@@ -605,7 +605,7 @@ class GoogleBooksProvider:
         authors = tuple(str(value) for value in info.get("authors", []))
         description = info.get("description")
         metadata = {
-            "authors": list(authors),
+            "creators": list(authors),
             "publisher": info.get("publisher"),
             "page_count": info.get("pageCount"),
             "description": strip_html(str(description)) if description else None,
@@ -621,7 +621,7 @@ class GoogleBooksProvider:
             source_refs=(SourceRef(self.name, source_id),),
             title=str(info["title"]),
             subtitle=str(info["subtitle"]) if info.get("subtitle") else None,
-            authors=authors,
+            creators=authors,
             year=_year(info.get("publishedDate")),
             cover_url=_google_cover(images.get("thumbnail") if isinstance(images, dict) else None),
             identifiers=identifiers,

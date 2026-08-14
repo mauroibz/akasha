@@ -41,11 +41,11 @@ export function MetadataDialog({
       title: item.title,
       subtitle: item.subtitle ?? "",
       year: asText(item.year),
-      authors: Array.isArray(item.metadata.authors)
-        ? item.metadata.authors.join(", ")
+      creators: Array.isArray(item.metadata.creators)
+        ? item.metadata.creators.join(", ")
         : "",
       // Left empty rather than prefilled with `creator_sort`: an untouched field
-      // must keep following the authors above, and the automatic value is shown
+      // must keep following the creators above, and the automatic value is shown
       // as the placeholder instead.
       creator_sort_override: item.creator_sort_override ?? "",
       publisher: asText(item.metadata.publisher),
@@ -124,15 +124,15 @@ export function MetadataDialog({
             )}
           </Field>
           <Field
-            id="metadata-authors"
-            label="Authors"
-            error={errors.authors?.message}
+            id="metadata-creators"
+            label="Creators"
+            error={errors.creators?.message}
           >
             {(props) => (
               <Input
                 {...props}
                 className="h-11"
-                {...form.register("authors")}
+                {...form.register("creators")}
               />
             )}
           </Field>
@@ -157,7 +157,7 @@ export function MetadataDialog({
                   className="mt-1 text-xs text-muted-foreground"
                 >
                   Where this sits in an author-sorted list. Leave it empty to
-                  follow the authors above.
+                  follow the creators above.
                 </p>
               </>
             )}

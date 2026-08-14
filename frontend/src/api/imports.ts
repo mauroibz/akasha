@@ -5,7 +5,7 @@ export interface ImportRecord {
   calibre_book_id?: string | null;
   calibre_uuid?: string | null;
   title: string;
-  authors: string[];
+  creators: string[];
   isbn: string | null;
   suggested_status: string | null;
   score: number | null;

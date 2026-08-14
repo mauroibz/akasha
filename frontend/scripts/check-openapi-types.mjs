@@ -15,9 +15,9 @@ const expected = {
     "shelves",
     "score_provisional",
   ],
-  ItemResponse: ["id", "type", "title", "sort_author", "cover_url", "metadata"],
-  BookMetadataResponse: ["authors", "subjects"],
-  BookMetadataPatch: ["authors", "publisher", "original_year"],
+  ItemResponse: ["id", "type", "title", "creator", "cover_url", "metadata"],
+  BookMetadataResponse: ["creators", "subjects"],
+  BookMetadataPatch: ["creators", "publisher", "original_year"],
   FacetsResponse: ["status_counts"],
   ShelfResponse: ["id", "name", "slug", "entry_count"],
 };

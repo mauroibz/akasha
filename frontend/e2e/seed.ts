@@ -33,7 +33,7 @@ export function entry(id: number) {
       id,
       type: "book",
       // The first two entries carry deliberately hostile metadata so layout
-      // assertions cover long titles/authors, and every other entry carries a
+      // assertions cover long titles/creators, and every other entry carries a
       // real cover so both populated and empty covers are exercised.
       title:
         id <= 2
@@ -41,7 +41,7 @@ export function entry(id: number) {
           : `Seeded book ${String(id).padStart(4, "0")}`,
       subtitle: null,
       year: 1900 + (id % 126),
-      sort_author: id <= 2 ? longAuthor : `Author ${id % 200}`,
+      creator: id <= 2 ? longAuthor : `Author ${id % 200}`,
       cover_url: id % 2 === 0 ? pixelCover : null,
       cover_path: null,
       metadata: {},

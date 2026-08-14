@@ -53,7 +53,7 @@ async def test_fetch_by_isbn_replays_the_real_isbn_redirect_into_a_populated_pay
     assert "/books/9788437604572.json" not in requested
     assert payload.source_id == "OL19845805M"
     assert payload.title == "Rayuela"
-    assert payload.authors == ("Julio Cortázar",)
+    assert payload.creators == ("Julio Cortázar",)
     assert payload.year == 1984
     assert payload.identifiers == {"isbn13": "9788437604572"}
     assert payload.language == "es"

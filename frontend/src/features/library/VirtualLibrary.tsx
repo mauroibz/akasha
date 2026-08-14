@@ -84,7 +84,7 @@ function EntryMetadata({
       <p
         className={`text-sm text-muted-foreground ${grid ? "mt-1 line-clamp-2" : "truncate"}`}
       >
-        {entry.item.sort_author ?? "Unknown author"}
+        {entry.item.creator ?? "Unknown creator"}
       </p>
       {/* A grid card is 260px wide and gives its metadata column 88px once the
           fixed cover and the padding are subtracted, so "Edition year: 2015 ·

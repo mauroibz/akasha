@@ -47,7 +47,7 @@ def stub(
         source_refs=(SourceRef(source, source_id),),
         title=title,
         subtitle=None,
-        authors=("Someone",),
+        creators=("Someone",),
         year=2000,
         cover_url="https://cover",
         identifiers=identifiers if identifiers is not None else ({"isbn13": isbn} if isbn else {}),

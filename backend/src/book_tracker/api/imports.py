@@ -24,7 +24,7 @@ class ImportRecordResponse(BaseModel):
     calibre_book_id: str | None = None
     calibre_uuid: str | None = None
     title: str
-    authors: list[str]
+    creators: list[str]
     isbn: str | None
     suggested_status: str | None
     score: int | None

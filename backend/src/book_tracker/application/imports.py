@@ -58,7 +58,7 @@ class GoodreadsImportService:
         planned: list[dict[str, Any]] = []
         for payload in parsed:
             identifiers = [normalize_identifier("isbn", payload["isbn"])] if payload["isbn"] else []
-            author = payload["authors"][0] if payload["authors"] else ""
+            author = payload["creators"][0] if payload["creators"] else ""
             match = self.domain.match(
                 identifiers=identifiers, title=payload["title"], first_author=author
             )
@@ -181,7 +181,7 @@ class CalibreImportService:
             match = self.domain.match(
                 identifiers=identifiers,
                 title=payload["title"],
-                first_author=payload["authors"][0] if payload["authors"] else "",
+                first_author=payload["creators"][0] if payload["creators"] else "",
             )
             if payload["errors"]:
                 action = "error"

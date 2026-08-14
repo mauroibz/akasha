@@ -10,7 +10,9 @@ export interface SearchCandidate {
   source_refs: SourceRef[];
   title: string;
   subtitle: string | null;
-  authors: string[];
+  creators: string[];
+  /** The credit as the source renders it, when it renders one. */
+  credit: string | null;
   year: number | null;
   original_year?: number | null;
   cover_url: string | null;
@@ -21,7 +23,7 @@ export interface SearchCandidate {
 export interface ManualItem {
   title: string;
   subtitle?: string;
-  authors: string[];
+  creators: string[];
   year?: number;
   publisher?: string;
   language?: string;

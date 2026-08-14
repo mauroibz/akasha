@@ -59,7 +59,7 @@ def make_item(data_dir: Path, title: str = "Rayuela") -> int:
             year=1963,
             cover_path=None,
             identifiers="{}",
-            metadata_json=json.dumps({"authors": ["Julio Cortázar"]}),
+            metadata_json=json.dumps({"creators": ["Julio Cortázar"]}),
             created_at=NOW,
             updated_at=NOW,
         )

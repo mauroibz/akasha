@@ -597,7 +597,7 @@ export function TriagePage() {
                         {entry.item.title}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {entry.item.sort_author ?? "Unknown"}
+                        {entry.item.creator ?? "Unknown"}
                       </p>
                     </div>
                     {hasConflict && (

@@ -41,7 +41,7 @@ export const sortLabels: Record<SortKey, string> = {
   date_added: "Recently added",
   score: "Score",
   title: "Title",
-  sort_author: "Author",
+  creator: "Creator",
   year: "Year",
   date_finished: "Finished",
 };

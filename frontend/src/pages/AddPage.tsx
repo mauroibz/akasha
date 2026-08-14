@@ -114,7 +114,7 @@ export function AddPage() {
       ? {
           title: values.title.trim(),
           subtitle: values.subtitle || undefined,
-          authors: splitList(values.authors),
+          creators: splitList(values.creators),
           year: optionalInt(values.year) ?? undefined,
           isbn: values.isbn || undefined,
         }
@@ -164,7 +164,7 @@ export function AddPage() {
     resolver: zodResolver(manualBookSchema),
     defaultValues: {
       title: "",
-      authors: "",
+      creators: "",
       subtitle: "",
       year: "",
       isbn: "",
@@ -229,7 +229,8 @@ export function AddPage() {
                   <span>
                     <strong>{row.title}</strong>
                     <span className="mt-1 block text-muted-foreground">
-                      {row.authors.join(", ") || "Unknown author"}
+                      {row.credit ??
+                        (row.creators.join(", ") || "Unknown creator")}
                     </span>
                     <span className="block text-sm">
                       Edition year: {row.year ?? "unknown"}
@@ -296,15 +297,15 @@ export function AddPage() {
                 )}
               </Field>
               <Field
-                id="manual-authors"
-                label="Authors, comma separated"
-                error={errors.authors?.message}
+                id="manual-creators"
+                label="Creators, comma separated"
+                error={errors.creators?.message}
               >
                 {(props) => (
                   <Input
                     {...props}
                     className="h-11"
-                    {...form.register("authors")}
+                    {...form.register("creators")}
                   />
                 )}
               </Field>
@@ -355,7 +356,7 @@ export function AddPage() {
               )}
               <div>
                 <h2 className="text-2xl font-semibold">{selected?.title}</h2>
-                <p>{selected?.authors.join(", ")}</p>
+                <p>{selected?.credit ?? selected?.creators.join(", ")}</p>
               </div>
             </div>
           )}

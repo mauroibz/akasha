@@ -35,12 +35,12 @@ class Provider:
             source_refs=(SourceRef(self.name, source_id),),
             title="Rayuela",
             subtitle="Edición crítica",
-            authors=("Julio Cortázar",),
+            creators=("Julio Cortázar",),
             year=2001,
             cover_url=None,
             identifiers={"isbn13": "9788437604572"},
             language="es",
-            metadata={"publisher": "Cátedra", "authors": ["Julio Cortázar"]},
+            metadata={"publisher": "Cátedra", "creators": ["Julio Cortázar"]},
         )
 
 
@@ -56,7 +56,7 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
         body = {
             "manual": {
                 "title": "Rayuela",
-                "authors": ["Julio Cortázar"],
+                "creators": ["Julio Cortázar"],
                 "year": 1999,
                 "isbn": "978-84-376-0457-2",
             },
@@ -71,7 +71,7 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
             json={
                 "manual": {
                     "title": "Rayuela",
-                    "authors": ["Julio Cortázar"],
+                    "creators": ["Julio Cortázar"],
                     "year": 2005,
                     "isbn": "9780307474728",
                 },
@@ -84,7 +84,7 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
             json={
                 "manual": {
                     "title": "Rayuela",
-                    "authors": ["Julio Cortázar"],
+                    "creators": ["Julio Cortázar"],
                     "year": 2005,
                     "isbn": "9780307474728",
                 },
@@ -142,7 +142,7 @@ async def test_concurrent_double_submit_is_idempotent(tmp_path: Path) -> None:
                 response = await client.post(
                     "/api/entries",
                     json={
-                        "manual": {"title": "Concurrent", "authors": ["Ada"]},
+                        "manual": {"title": "Concurrent", "creators": ["Ada"]},
                         "status": "read",
                         "idempotency_key": "same-request",
                     },
@@ -188,7 +188,7 @@ async def test_provider_wait_does_not_hold_sqlite_write_lock(tmp_path: Path) -> 
                 manual = await client.post(
                     "/api/entries",
                     json={
-                        "manual": {"title": "No lock", "authors": ["Ada"]},
+                        "manual": {"title": "No lock", "creators": ["Ada"]},
                         "status": "read",
                         "idempotency_key": "no-lock",
                     },

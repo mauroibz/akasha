@@ -97,7 +97,7 @@ make concurrent dedupe safe.
 
 ```json
 {
-  "authors": ["Julio Cortázar"],
+  "creators": ["Julio Cortázar"],
   "publisher": "Alfaguara",
   "language": "es",
   "page_count": 736,
@@ -108,13 +108,17 @@ make concurrent dedupe safe.
 }
 ```
 
-`authors` is an array of plain strings. **No author table in v1.** Author
-identity is its own resolution problem and buys nothing until you want an author
-page. Sorting by author uses `authors[0]`, exposed as a generated column:
+`creators` is an array of plain strings — an album's artists and a book's authors
+are the same neutral concept, and the key was renamed from `authors` in Sprint 025
+(DEC-052). **No creator table in v1.** Creator identity is its own resolution
+problem and buys nothing until you want a creator page. `credit` beside it is the
+credit as the source renders it, because `["Dean Blunt", "James Ferraro"]` joined
+by `", "` is not `Dean Blunt Meets James Ferraro`. Sorting and searching use
+`creators[0]`, exposed as a generated column:
 
 ```sql
-ALTER TABLE items ADD COLUMN sort_author TEXT
-    GENERATED ALWAYS AS (json_extract(metadata, '$.authors[0]')) VIRTUAL;
+ALTER TABLE items ADD COLUMN creator_primary TEXT
+    GENERATED ALWAYS AS (json_extract(metadata, '$.creators[0]')) VIRTUAL;
 ```
 
 ### 3.2 `entries` — the personal layer
@@ -483,7 +487,7 @@ fetches and dedupes, commits the item/entry relationally, then installs a prepar
 cover or queues retryable cover work. Cover failure never rolls back the valid
 entry. The 20-second add flow depends on this not being three client round trips.
 
-**Sort keys:** `date_added` (default, desc), `score`, `title`, `sort_author`,
+**Sort keys:** `date_added` (default, desc), `score`, `title`, `creator`,
 `year`, `date_finished`. NULL scores sort last regardless of direction.
 
 **Pagination.** `GET /api/entries` is keyset-paginated, not offset-paginated:

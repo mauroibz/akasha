@@ -63,7 +63,7 @@ export const metadataSchema = z.object({
   title: z.string().trim().min(1, "A book needs a title"),
   subtitle: z.string(),
   year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
-  authors: z.string(),
+  creators: z.string(),
   creator_sort_override: z.string().max(300, "That is too long to be a name"),
   publisher: z.string(),
   language: z.string(),
@@ -91,7 +91,7 @@ export function optionalInt(value: string): number | null {
 /** The manual-entry form on /add: the same rules as the metadata dialog. */
 export const manualBookSchema = z.object({
   title: z.string().trim().min(1, "A book needs a title"),
-  authors: z.string(),
+  creators: z.string(),
   subtitle: z.string(),
   year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
   isbn: z

@@ -77,6 +77,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0009_provider_usage",
         "0010_attachments",
         "0011_creator_sort_names",
+        "0012_creators",
     ]
 
     upgrade(configured.database_url)
@@ -145,6 +146,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0009_provider_usage",
         "0010_attachments",
         "0011_creator_sort_names",
+        "0012_creators",
     ]
 
 
@@ -218,14 +220,14 @@ async def test_accented_sorting_and_search_survive_the_projection_backfill(
         by_title = service.list_entries(sort="title", order="asc")
         unaccented_query = service.list_entries(q="avila")
         author_query = service.list_entries(q="sabato")
-        by_author = service.list_entries(sort="sort_author", order="asc")
+        by_author = service.list_entries(sort="creator", order="asc")
 
     # "Ávila" before "Ébano" before "Zurita": accent-folded, not code-point order,
     # which would put every accented capital after "Z".
     assert [row["item"]["title"] for row in by_title["items"]] == ["Ávila", "Ébano", "Zurita"]
     assert [row["item"]["title"] for row in unaccented_query["items"]] == ["Ávila"]
     assert [row["item"]["title"] for row in author_query["items"]] == ["Ébano"]
-    assert [row["item"]["sort_author"] for row in by_author["items"]] == [
+    assert [row["item"]["creator"] for row in by_author["items"]] == [
         "Ángela Ruiz",
         "Ernesto Sábato",
         "Zoé Valdés",
@@ -241,7 +243,7 @@ def test_the_backfill_reaches_rows_written_before_the_projection_existed(tmp_pat
 
     connection = sqlite3.connect(configured.data_dir / "books.db")
     projected = connection.execute(
-        "SELECT title, title_normalized, sort_author_normalized FROM items ORDER BY id"
+        "SELECT title, title_normalized, creator_primary_normalized FROM items ORDER BY id"
     ).fetchall()
     connection.close()
 
@@ -250,6 +252,98 @@ def test_the_backfill_reaches_rows_written_before_the_projection_existed(tmp_pat
         ("Zurita", "zurita", "zoe valdes"),
         ("Ébano", "ebano", "ernesto sabato"),
     ]
+
+
+def seed_library_at_creator_sort_names(database_path: Path) -> None:
+    """Rows as 0011 left them: `metadata.authors`, one of them hand-corrected."""
+    connection = sqlite3.connect(database_path)
+    # `creator_sort` is written the way 0011's backfill left it: the override when the
+    # owner supplied one, the heuristic's answer otherwise.
+    rows = [
+        (
+            "Cien años de soledad",
+            "Gabriel García Márquez",
+            "García Márquez, Gabriel José",
+            "García Márquez, Gabriel José",
+        ),
+        ("Ficciones", "Jorge Luis Borges", None, "Luis Borges, Jorge"),
+    ]
+    for index, (title, author, override, sort_name) in enumerate(rows, start=1):
+        connection.execute(
+            "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at,"
+            " creator_sort_override, creator_sort) VALUES (?, 'book', ?, '{}', ?, ?, ?, ?, ?)",
+            (
+                index,
+                title,
+                json.dumps({"authors": [author], "publisher": "Sudamericana"}),
+                NOW,
+                NOW,
+                override,
+                sort_name,
+            ),
+        )
+    connection.commit()
+    connection.close()
+
+
+def test_the_creators_rename_carries_the_owner_correction_rather_than_recomputing_it(
+    tmp_path: Path,
+) -> None:
+    """AC9: no row loses its creator sort name across `authors` -> `creators`.
+
+    The override is the only value here that is not derived, and the heuristic that
+    would replace it is known to be wrong on exactly the names it exists to fix —
+    "Jorge Luis Borges" becomes "Luis Borges, Jorge" (DEC-051). Recomputing it during
+    the rename would silently undo a hand correction.
+    """
+    configured = database_at(tmp_path / "data", "0011_creator_sort_names")
+    seed_library_at_creator_sort_names(configured.data_dir / "books.db")
+    assert configured.database_url is not None
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    migrated = connection.execute(
+        "SELECT metadata, creator_primary, creator_primary_normalized, creator_sort_override,"
+        " creator_sort FROM items ORDER BY id"
+    ).fetchall()
+    connection.close()
+
+    corrected, heuristic = migrated
+    assert json.loads(corrected[0]) == {
+        "creators": ["Gabriel García Márquez"],
+        "publisher": "Sudamericana",
+    }
+    assert corrected[1] == "Gabriel García Márquez"
+    assert corrected[2] == "gabriel garcia marquez"
+    # Carried verbatim, and still the value the library sorts under.
+    assert corrected[3] == "García Márquez, Gabriel José"
+    assert corrected[4] == "García Márquez, Gabriel José"
+    # A row nobody corrected keeps the heuristic's answer, wrong as it is.
+    assert json.loads(heuristic[0])["creators"] == ["Jorge Luis Borges"]
+    assert heuristic[3] is None
+    assert heuristic[4] == "Luis Borges, Jorge"
+
+
+def test_an_item_with_no_creators_survives_the_rename(tmp_path: Path) -> None:
+    """An album can credit nobody, and so can a hand-entered book."""
+    configured = database_at(tmp_path / "data", "0011_creator_sort_names")
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'book', 'Anonymous', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    connection.close()
+    assert configured.database_url is not None
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    row = connection.execute("SELECT metadata, creator_primary, creator_sort FROM items").fetchone()
+    connection.close()
+    assert row == ("{}", None, None)
 
 
 @pytest.mark.anyio

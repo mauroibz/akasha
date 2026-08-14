@@ -27,7 +27,8 @@ class SearchCandidateResponse(BaseModel):
     source_refs: list[SourceRefResponse]
     title: str
     subtitle: str | None
-    authors: list[str]
+    creators: list[str]
+    credit: str | None
     year: int | None
     original_year: int | None
     cover_url: str | None
@@ -46,7 +47,8 @@ class SearchCandidateResponse(BaseModel):
             ],
             title=candidate.title,
             subtitle=candidate.subtitle,
-            authors=list(candidate.authors),
+            creators=list(candidate.creators),
+            credit=candidate.credit,
             year=candidate.year,
             original_year=candidate.original_year,
             cover_url=candidate.cover_url,

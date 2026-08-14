@@ -293,7 +293,7 @@ async def test_backfill_selects_only_items_that_an_isbn_lookup_could_still_help(
             "9780141187761",
             year=1949,
             cover_path="covers/9.jpg",
-            metadata={"authors": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
+            metadata={"creators": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
         )
 
         assert enqueue_enrichment_backfill(engine) == 1

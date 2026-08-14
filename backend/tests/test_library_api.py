@@ -23,7 +23,7 @@ async def test_entry_item_and_shelf_lifecycle(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE entries SET score=6, score_provisional=1 WHERE id=:id"),
@@ -91,7 +91,7 @@ async def test_shelf_entry_counts_and_deletion_retains_entries(tmp_path: Path) -
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as client:

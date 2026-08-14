@@ -5,14 +5,14 @@ Three rules shape this module.
 **Owner data in, derived data out.** `creator_sort_override` (DEC-051) and an
 attachment's `filename` (DEC-050) are values a person typed and no algorithm can
 reconstruct, so an export that drops either loses something real. The projections
-beside them -- `sort_author`, `creator_sort`, and the three `*_normalized` columns
+beside them -- `creator_primary`, `creator_sort`, and the `*_normalized` columns
 -- rebuild themselves on every write through the DEC-036 mapper event. Exporting
 them would present a cache as authority to whoever reads the dump later, so they
 are omitted deliberately and a test asserts their absence.
 
 **The entity shape, not a book shape.** An item is `type`, identifiers, sources
 and an opaque `metadata` object, exactly as the row stores it. `metadata` is
-passed through untransformed: the moment this module knows that `authors` is a
+passed through untransformed: the moment this module knows that `creators` is a
 field, the format needs a v2 for the second domain (DEC-052 seam 3). The
 Goodreads CSV beside it is allowed to be book-shaped because it is one domain's
 export view rather than the export.
@@ -322,7 +322,7 @@ def _goodreads_date(value: str | None) -> str:
 
 def _row(entry: Any, item: Any, identifiers: dict[str, str], shelves: list[str]) -> dict[str, Any]:
     metadata = json.loads(item.metadata_json or "{}")
-    authors = metadata.get("authors")
+    authors = metadata.get("creators")
     authors = [str(name) for name in authors] if isinstance(authors, list) else []
     # Goodreads rates 1-5 and the importer doubled it (product spec 5.1). Halving
     # rounds a hand-set odd score up rather than down; the exact 1-10 value is in

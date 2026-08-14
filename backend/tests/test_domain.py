@@ -32,9 +32,9 @@ def test_title_author_match_is_ambiguity_only() -> None:
 
 def test_fill_empty_preserves_non_empty_values() -> None:
     assert fill_empty(
-        {"title": "Existing", "subtitle": "", "metadata": {"authors": ["A"]}},
-        {"title": "Incoming", "subtitle": "Filled", "metadata": {"authors": ["B"]}},
-    ) == {"title": "Existing", "subtitle": "Filled", "metadata": {"authors": ["A"]}}
+        {"title": "Existing", "subtitle": "", "metadata": {"creators": ["A"]}},
+        {"title": "Incoming", "subtitle": "Filled", "metadata": {"creators": ["B"]}},
+    ) == {"title": "Existing", "subtitle": "Filled", "metadata": {"creators": ["A"]}}
 
 
 # --------------------------------------------------------------------------------------

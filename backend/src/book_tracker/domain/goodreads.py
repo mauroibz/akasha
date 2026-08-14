@@ -120,7 +120,7 @@ def parse_goodreads(data: bytes) -> list[dict[str, Any]]:
                 "row_number": row_number,
                 "goodreads_book_id": (row.get("Book Id") or "").strip(),
                 "title": title,
-                "authors": [
+                "creators": [
                     value
                     for value in [author, *((row.get("Additional Authors") or "").split(","))]
                     if value.strip()

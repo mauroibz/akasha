@@ -109,11 +109,11 @@ class AddService:
             cover_url = None
             cover_fallback_urls: Sequence[str] = ()
             title = str(manual["title"]).strip()
-            authors = tuple(
-                str(value).strip() for value in manual.get("authors", []) if str(value).strip()
+            creators = tuple(
+                str(value).strip() for value in manual.get("creators", []) if str(value).strip()
             )
             metadata = {
-                "authors": list(authors),
+                "creators": list(creators),
                 **{key: manual[key] for key in ("publisher", "language") if manual.get(key)},
             }
             identifiers = self._identifiers(
@@ -129,9 +129,9 @@ class AddService:
             cover_fallback_urls = payload.cover_fallback_urls
             title = payload.title
             subtitle = payload.subtitle
-            authors = payload.authors
+            creators = payload.creators
             year = payload.year
-            metadata = {**payload.metadata, "authors": list(authors)}
+            metadata = {**payload.metadata, "creators": list(creators)}
             if payload.language:
                 metadata["language"] = payload.language
             identifiers = self._identifiers(payload.identifiers)
@@ -150,7 +150,7 @@ class AddService:
                     break
                 except CoverError:
                     prepared_cover = None
-        near_matches = self.repository.near_entry_ids(title, authors[0] if authors else "")
+        near_matches = self.repository.near_entry_ids(title, creators[0] if creators else "")
         exact = self.repository.match(identifiers=identifiers, sources=sources)
         if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
             raise LibraryError(

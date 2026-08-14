@@ -182,7 +182,7 @@ async def test_commit_requires_ambiguity_choice_and_preserves_existing_entry(
             title="Ficciones",
             subtitle=None,
             year=1944,
-            metadata={"authors": ["Jorge Luis Borges"], "publisher": "Manual"},
+            metadata={"creators": ["Jorge Luis Borges"], "publisher": "Manual"},
             identifiers=[],
             sources=[],
             status="read",
@@ -227,7 +227,7 @@ async def test_commit_fills_only_empty_shared_metadata(tmp_path: Path) -> None:
                     "INSERT INTO items(title,year,metadata,created_at,updated_at) "
                     "VALUES('Ficciones',NULL,:metadata,'n','n') RETURNING id"
                 ),
-                {"metadata": '{"authors":["Jorge Luis Borges"],"publisher":"Manual"}'},
+                {"metadata": '{"creators":["Jorge Luis Borges"],"publisher":"Manual"}'},
             ).scalar_one()
             connection.execute(
                 text(

@@ -20,8 +20,8 @@ class ItemRow(Base):
     cover_path: Mapped[str | None]
     identifiers: Mapped[str]
     metadata_json: Mapped[str] = mapped_column("metadata")
-    sort_author: Mapped[str | None] = mapped_column(
-        Computed("json_extract(metadata, '$.authors[0]')")
+    creator_primary: Mapped[str | None] = mapped_column(
+        Computed("json_extract(metadata, '$.creators[0]')")
     )
     # Sorting and filtering by text used to call the connection-level
     # `normalize_text` UDF once per candidate row, which Sprint 017 measured at
@@ -30,9 +30,9 @@ class ItemRow(Base):
     # event below rather than by a generated column: SQLite generated columns
     # may only call built-in functions.
     title_normalized: Mapped[str | None]
-    sort_author_normalized: Mapped[str | None]
-    # `sort_author` is the creator's name as written, which is what the detail
-    # page shows and what the `q` filter matches. These three are what the library
+    creator_primary_normalized: Mapped[str | None]
+    # `creator_primary` is the first creator's name as written, which is what the
+    # `q` filter matches and what the detail page falls back to. These three are what the library
     # *sorts* by, which is not the same string: "Gabriel García Márquez" displays
     # as written and sorts under García Márquez. The override is the owner's
     # correction and the only one of the three that is not derived.
@@ -43,11 +43,11 @@ class ItemRow(Base):
     updated_at: Mapped[str]
 
 
-def _first_author(metadata_json: str | None) -> str | None:
-    """Mirror `json_extract(metadata, '$.authors[0]')`, which defines `sort_author`."""
+def _first_creator(metadata_json: str | None) -> str | None:
+    """Mirror `json_extract(metadata, '$.creators[0]')`, which defines `creator_primary`."""
     decoded = json.loads(metadata_json or "{}")
-    authors = decoded.get("authors") if isinstance(decoded, dict) else None
-    first = authors[0] if isinstance(authors, list) and authors else None
+    creators = decoded.get("creators") if isinstance(decoded, dict) else None
+    first = creators[0] if isinstance(creators, list) and creators else None
     return first if isinstance(first, str) else None
 
 
@@ -55,8 +55,8 @@ def _project_normalized_text(_mapper: object, _connection: object, item: "ItemRo
     """Keep the normalized projection in step with every write to an item.
 
     Attached to the mapper rather than to each call site so a future write path
-    cannot forget it and leave a row unsortable. `sort_author` is a generated
-    column with no value on the Python object before flush, so the author is read
+    cannot forget it and leave a row unsortable. `creator_primary` is a generated
+    column with no value on the Python object before flush, so the creator is read
     from the same JSON path the generated column uses.
 
     The creator sort name is derived here for the same reason, and only the
@@ -65,10 +65,10 @@ def _project_normalized_text(_mapper: object, _connection: object, item: "ItemRo
     ORM object, so none of them can leave the sort key stale.
     """
     item.title_normalized = normalize_text(item.title or "")
-    author = _first_author(item.metadata_json)
-    item.sort_author_normalized = normalize_text(author) if author else None
+    creator = _first_creator(item.metadata_json)
+    item.creator_primary_normalized = normalize_text(creator) if creator else None
     override = (item.creator_sort_override or "").strip()
-    sort_name = override or (creator_sort_name(author) if author else "")
+    sort_name = override or (creator_sort_name(creator) if creator else "")
     item.creator_sort = sort_name or None
     item.creator_sort_normalized = normalize_text(sort_name) if sort_name else None
 

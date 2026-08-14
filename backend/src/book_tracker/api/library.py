@@ -78,7 +78,8 @@ class SourceResponse(BaseModel):
 
 
 class BookMetadataResponse(BaseModel):
-    authors: list[str] = Field(default_factory=list)
+    creators: list[str] = Field(default_factory=list)
+    credit: str | None = None
     publisher: str | None = None
     language: str | None = None
     page_count: int | None = None
@@ -91,7 +92,8 @@ class BookMetadataResponse(BaseModel):
 class BookMetadataPatch(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    authors: list[str] | None = None
+    creators: list[str] | None = None
+    credit: str | None = None
     publisher: str | None = None
     language: str | None = None
     page_count: int | None = Field(default=None, ge=1)
@@ -107,10 +109,10 @@ class ItemResponse(BaseModel):
     title: str
     subtitle: str | None
     year: int | None
-    # The creator's name as written, then the name the library sorts it under.
-    # They are different strings: García Márquez displays first-name-first and
-    # sorts surname-first.
-    sort_author: str | None
+    # The creator as the record credits them, then the name the library sorts it
+    # under. They are different strings: García Márquez displays first-name-first
+    # and sorts surname-first.
+    creator: str | None
     creator_sort: str | None
     creator_sort_override: str | None
     cover_url: str | None
@@ -158,7 +160,7 @@ class SourceRefBody(BaseModel):
 class ManualItemBody(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     subtitle: str | None = Field(default=None, max_length=500)
-    authors: list[str] = Field(default_factory=list, max_length=50)
+    creators: list[str] = Field(default_factory=list, max_length=50)
     year: int | None = Field(default=None, ge=0, le=9999)
     publisher: str | None = Field(default=None, max_length=300)
     language: str | None = Field(default=None, max_length=20)
@@ -287,7 +289,7 @@ async def list_entries(
     shelf: Annotated[list[str] | None, Query()] = None,
     q: str | None = None,
     sort: Literal[
-        "date_added", "score", "title", "sort_author", "year", "date_finished"
+        "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
     order: Literal["asc", "desc"] = "desc",
     after: str | None = None,
@@ -744,7 +746,7 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
             "provider_failure", "Metadata could not be fetched", status_code=502
         ) from error
     metadata = dict(payload.metadata)
-    metadata["authors"] = list(payload.authors)
+    metadata["creators"] = list(payload.creators)
     if payload.language is not None:
         metadata["language"] = payload.language
     prepared = None

@@ -167,7 +167,10 @@ class LibraryService:
             "title": item.title,
             "subtitle": item.subtitle,
             "year": item.year,
-            "sort_author": item.sort_author,
+            # The credit as the source rendered it, and the first creator's name when
+            # nobody rendered one: "Dean Blunt Meets James Ferraro" is not the join of
+            # the ordered list, and a book's single author is both.
+            "creator": metadata.get("credit") or item.creator_primary,
             "creator_sort": item.creator_sort,
             "creator_sort_override": item.creator_sort_override,
             "cover_url": f"/api/items/{item.id}/cover?v={cover_version}"
@@ -528,7 +531,7 @@ class LibraryService:
             query = query.where(
                 or_(
                     ItemRow.title_normalized.like(pattern),
-                    ItemRow.sort_author_normalized.like(pattern),
+                    ItemRow.creator_primary_normalized.like(pattern),
                 )
             )
         return query
@@ -549,9 +552,9 @@ class LibraryService:
             "score": EntryRow.score,
             "title": ItemRow.title_normalized,
             # Ordering reads the creator sort name; the `q` filter above stays on
-            # `sort_author_normalized`, because search matches the name as it is
+            # `creator_primary_normalized`, because search matches the name as it is
             # written and "gabriel garcia" must keep finding García Márquez.
-            "sort_author": ItemRow.creator_sort_normalized,
+            "creator": ItemRow.creator_sort_normalized,
             "year": ItemRow.year,
             "date_finished": EntryRow.date_finished,
         }
@@ -613,7 +616,7 @@ class LibraryService:
                     # divergence between the two would silently skip or repeat a
                     # page.
                     "title": item.title_normalized,
-                    "sort_author": item.creator_sort_normalized,
+                    "creator": item.creator_sort_normalized,
                     "year": item.year,
                     "date_finished": last.date_finished,
                 }

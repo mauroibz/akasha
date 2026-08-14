@@ -52,7 +52,7 @@ const populated = {
         title: "Rayuela",
         subtitle: null,
         year: 1963,
-        sort_author: "Cortázar, Julio",
+        creator: "Cortázar, Julio",
         cover_path: null,
         cover_url: null,
         metadata: {},

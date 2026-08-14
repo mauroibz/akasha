@@ -174,7 +174,7 @@
       "BookMetadataPatch": {
         "additionalProperties": false,
         "properties": {
-          "authors": {
+          "creators": {
             "anyOf": [
               {
                 "items": {
@@ -186,7 +186,18 @@
                 "type": "null"
               }
             ],
-            "title": "Authors"
+            "title": "Creators"
+          },
+          "credit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit"
           },
           "description": {
             "anyOf": [
@@ -277,12 +288,23 @@
       },
       "BookMetadataResponse": {
         "properties": {
-          "authors": {
+          "creators": {
             "items": {
               "type": "string"
             },
-            "title": "Authors",
+            "title": "Creators",
             "type": "array"
+          },
+          "credit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit"
           },
           "description": {
             "anyOf": [
@@ -1054,13 +1076,6 @@
       },
       "ImportRecordResponse": {
         "properties": {
-          "authors": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Authors",
-            "type": "array"
-          },
           "calibre_book_id": {
             "anyOf": [
               {
@@ -1105,6 +1120,13 @@
             "default": false,
             "title": "Cover Staged",
             "type": "boolean"
+          },
+          "creators": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Creators",
+            "type": "array"
           },
           "date_added": {
             "anyOf": [
@@ -1309,7 +1331,7 @@
           "record_id",
           "row_number",
           "title",
-          "authors",
+          "creators",
           "isbn",
           "suggested_status",
           "score",
@@ -1398,6 +1420,17 @@
             ],
             "title": "Cover Url"
           },
+          "creator": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Creator"
+          },
           "creator_sort": {
             "anyOf": [
               {
@@ -1433,17 +1466,6 @@
           },
           "metadata": {
             "$ref": "#/components/schemas/BookMetadataResponse"
-          },
-          "sort_author": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Sort Author"
           },
           "sources": {
             "items": {
@@ -1489,7 +1511,7 @@
           "title",
           "subtitle",
           "year",
-          "sort_author",
+          "creator",
           "creator_sort",
           "creator_sort_override",
           "cover_url",
@@ -1584,12 +1606,12 @@
       },
       "ManualItemBody": {
         "properties": {
-          "authors": {
+          "creators": {
             "items": {
               "type": "string"
             },
             "maxItems": 50,
-            "title": "Authors",
+            "title": "Creators",
             "type": "array"
           },
           "isbn": {
@@ -1794,13 +1816,6 @@
       },
       "SearchCandidateResponse": {
         "properties": {
-          "authors": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Authors",
-            "type": "array"
-          },
           "cover_url": {
             "anyOf": [
               {
@@ -1811,6 +1826,24 @@
               }
             ],
             "title": "Cover Url"
+          },
+          "creators": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Creators",
+            "type": "array"
+          },
+          "credit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Credit"
           },
           "identifiers": {
             "additionalProperties": {
@@ -1894,7 +1927,8 @@
           "source_refs",
           "title",
           "subtitle",
-          "authors",
+          "creators",
+          "credit",
           "year",
           "original_year",
           "cover_url",
@@ -2190,7 +2224,7 @@
                 "date_added",
                 "score",
                 "title",
-                "sort_author",
+                "creator",
                 "year",
                 "date_finished"
               ],

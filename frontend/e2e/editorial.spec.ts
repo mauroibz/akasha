@@ -19,11 +19,11 @@ const entry = {
     title: "Rayuela",
     subtitle: null,
     year: 1963,
-    sort_author: "Julio Cortázar",
+    creator: "Julio Cortázar",
     cover_path: null,
     cover_url: null,
     metadata: {
-      authors: ["Julio Cortázar"],
+      creators: ["Julio Cortázar"],
       publisher: "Sudamericana",
       language: "es",
       page_count: 736,

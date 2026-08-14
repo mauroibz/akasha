@@ -26,7 +26,7 @@ const entry = {
     title: "Rayuela",
     subtitle: null,
     year: 1963,
-    sort_author: "Julio Cortázar",
+    creator: "Julio Cortázar",
     creator_sort: "Cortázar, Julio",
     cover_path: null,
     cover_url: null,

@@ -179,7 +179,7 @@ export function ImportPage() {
                   {record.title || `Row ${record.row_number}`}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  {record.authors.join(", ") || "Author missing"}
+                  {record.creators.join(", ") || "Creator missing"}
                   {record.score
                     ? record.score_provisional
                       ? ` · provisional score ${record.score}`

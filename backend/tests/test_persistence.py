@@ -151,7 +151,7 @@ def test_normalized_projection_matches_the_domain_function_on_insert(tmp_path: P
                 year=1967,
                 cover_path=None,
                 identifiers="{}",
-                metadata_json=f'{{"authors": ["{author}"]}}',
+                metadata_json=f'{{"creators": ["{author}"]}}',
                 created_at="now",
                 updated_at="now",
             )
@@ -159,7 +159,7 @@ def test_normalized_projection_matches_the_domain_function_on_insert(tmp_path: P
         session.commit()
     with engine.connect() as connection:
         stored = connection.execute(
-            text("SELECT title_normalized, sort_author_normalized, sort_author FROM items")
+            text("SELECT title_normalized, creator_primary_normalized, creator_primary FROM items")
         ).one()
     assert stored[0] == normalize_text(title)
     assert stored[1] == normalize_text(author)
@@ -182,24 +182,24 @@ def test_normalized_projection_follows_a_later_title_and_author_change(tmp_path:
             year=None,
             cover_path=None,
             identifiers="{}",
-            metadata_json='{"authors": ["Original Author"]}',
+            metadata_json='{"creators": ["Original Author"]}',
             created_at="now",
             updated_at="now",
         )
         session.add(item)
         session.commit()
         item.title = "Rayuela"
-        item.metadata_json = '{"authors": ["Cortázar, Julio"]}'
+        item.metadata_json = '{"creators": ["Cortázar, Julio"]}'
         session.commit()
     with engine.connect() as connection:
         stored = connection.execute(
-            text("SELECT title_normalized, sort_author_normalized FROM items")
+            text("SELECT title_normalized, creator_primary_normalized FROM items")
         ).one()
     assert stored[0] == normalize_text("Rayuela")
     assert stored[1] == normalize_text("Cortázar, Julio")
 
 
-def test_item_without_authors_projects_a_null_sort_author(tmp_path: Path) -> None:
+def test_item_without_creators_projects_a_null_creator_primary(tmp_path: Path) -> None:
     from sqlalchemy.orm import Session
 
     from book_tracker.infrastructure.models import ItemRow
@@ -222,7 +222,7 @@ def test_item_without_authors_projects_a_null_sort_author(tmp_path: Path) -> Non
         session.commit()
     with engine.connect() as connection:
         stored = connection.execute(
-            text("SELECT sort_author, sort_author_normalized FROM items")
+            text("SELECT creator_primary, creator_primary_normalized FROM items")
         ).one()
     assert stored == (None, None)
 
@@ -236,6 +236,7 @@ def test_projection_migration_backfills_rows_written_before_it(tmp_path: Path) -
     config = alembic_config(configured.database_url)
     command.upgrade(config, "0006_job_error_code")
     engine = create_engine(configured)
+    # Written the way 0006 knew how: the key was `authors` until 0012 renamed it.
     rows = [
         ("Pedro Páramo", '{"authors": ["Rulfo, Juan"]}'),
         ("Ædificium", '{"authors": []}'),
@@ -255,12 +256,12 @@ def test_projection_migration_backfills_rows_written_before_it(tmp_path: Path) -
     engine = create_engine(configured)
     with engine.connect() as connection:
         stored = connection.execute(
-            text("SELECT title_normalized, sort_author_normalized FROM items ORDER BY id")
+            text("SELECT title_normalized, creator_primary_normalized FROM items ORDER BY id")
         ).all()
     assert stored[0] == (normalize_text("Pedro Páramo"), normalize_text("Rulfo, Juan"))
     assert stored[1] == (normalize_text("Ædificium"), None)
     # `metadata` is only guaranteed to be JSON, not to be an object carrying
-    # authors. Such a row still gets a usable title projection instead of
+    # creators. Such a row still gets a usable title projection instead of
     # failing the migration for the whole library.
     assert stored[2] == (normalize_text("Metadata that is not an object"), None)
     command.downgrade(config, "0006_job_error_code")
@@ -285,7 +286,7 @@ def test_creator_sort_projection_seeds_from_the_first_author(tmp_path: Path) -> 
                 year=1967,
                 cover_path=None,
                 identifiers="{}",
-                metadata_json='{"authors": ["Gabriel García Márquez"]}',
+                metadata_json='{"creators": ["Gabriel García Márquez"]}',
                 created_at="now",
                 updated_at="now",
             )
@@ -319,7 +320,7 @@ def test_a_creator_sort_override_wins_over_the_heuristic_and_survives_a_metadata
             year=1937,
             cover_path=None,
             identifiers="{}",
-            metadata_json='{"authors": ["John Ronald Reuel Tolkien"]}',
+            metadata_json='{"creators": ["John Ronald Reuel Tolkien"]}',
             created_at="now",
             updated_at="now",
             creator_sort_override="Tolkien, J. R. R.",
@@ -350,7 +351,7 @@ def test_clearing_the_override_restores_the_heuristic(tmp_path: Path) -> None:
             year=1955,
             cover_path=None,
             identifiers="{}",
-            metadata_json='{"authors": ["Juan Rulfo"]}',
+            metadata_json='{"creators": ["Juan Rulfo"]}',
             created_at="now",
             updated_at="now",
             creator_sort_override="Anything At All",
@@ -401,6 +402,7 @@ def test_creator_sort_migration_backfills_rows_written_before_it(tmp_path: Path)
     config = alembic_config(configured.database_url)
     command.upgrade(config, "0010_attachments")
     engine = create_engine(configured)
+    # Written the way 0010 knew how: the key was `authors` until 0012 renamed it.
     rows = [
         ("Cien años de soledad", '{"authors": ["Gabriel García Márquez"]}'),
         ("La invención de Morel", '{"authors": ["Adolfo Bioy Casares"]}'),

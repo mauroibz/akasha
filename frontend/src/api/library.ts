@@ -9,7 +9,7 @@ export const entryStatuses = [
 
 export type EntryStatus = (typeof entryStatuses)[number];
 export type SortKey =
-  "date_added" | "score" | "title" | "sort_author" | "year" | "date_finished";
+  "date_added" | "score" | "title" | "creator" | "year" | "date_finished";
 export type SortOrder = "asc" | "desc";
 
 export interface Shelf {
@@ -25,7 +25,7 @@ export interface LibraryItem {
   title: string;
   subtitle: string | null;
   year: number | null;
-  sort_author: string | null;
+  creator: string | null;
   /** The name this edition sorts under: "García Márquez, Gabriel". */
   creator_sort?: string | null;
   /** Set only when the owner corrected it; absent means the automatic value. */
@@ -33,7 +33,9 @@ export interface LibraryItem {
   cover_url?: string | null;
   cover_path?: string | null;
   metadata: {
-    authors?: string[];
+    creators?: string[];
+    /** The credit as the source renders it, when it renders one. */
+    credit?: string | null;
     publisher?: string | null;
     language?: string | null;
     page_count?: number | null;

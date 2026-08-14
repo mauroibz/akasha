@@ -23,10 +23,10 @@ from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 
 DERIVED_COLUMNS = (
-    "sort_author",
+    "creator",
     "creator_sort",
     "title_normalized",
-    "sort_author_normalized",
+    "creator_primary_normalized",
     "creator_sort_normalized",
 )
 
@@ -45,7 +45,7 @@ async def test_export_carries_owner_data_and_omits_derived_columns(tmp_path: Pat
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE items SET creator_sort_override=:sort WHERE id=:id"),
@@ -72,7 +72,7 @@ async def test_export_carries_owner_data_and_omits_derived_columns(tmp_path: Pat
     # The override is the one creator field no algorithm can reconstruct (DEC-051).
     assert item["creator_sort_override"] == "Cortázar, Julio"
     assert item["type"] == "book"
-    assert item["metadata"]["authors"] == ["Julio Cortázar"]
+    assert item["metadata"]["creators"] == ["Julio Cortázar"]
     for column in DERIVED_COLUMNS:
         assert column not in item, f"{column} is derived and must not be exported"
 
@@ -109,7 +109,7 @@ async def test_export_does_not_special_case_the_item_type(tmp_path: Path) -> Non
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Kind of Blue", authors=("Miles Davis",))
+        created = repository.create_or_get_entry(title="Kind of Blue", creators=("Miles Davis",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE items SET type='album', metadata=:meta WHERE id=:id"),
@@ -140,7 +140,7 @@ async def test_export_carries_attachment_references_with_their_digest(tmp_path: 
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as client:
@@ -200,7 +200,7 @@ async def test_csv_export_has_the_goodreads_columns_and_survives_hostile_text(
         repository = DomainRepository(app.state.engine)
         created = repository.create_or_get_entry(
             title="Rayuela, o el libro de los libros",
-            authors=("Julio Cortázar", "Jorge Luis Borges"),
+            creators=("Julio Cortázar", "Jorge Luis Borges"),
         )
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -248,7 +248,7 @@ async def test_csv_export_neutralizes_spreadsheet_formulas(tmp_path: Path) -> No
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Ledger", authors=("A. Nobody",))
+        created = repository.create_or_get_entry(title="Ledger", creators=("A. Nobody",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE entries SET notes=:notes WHERE id=:id"),
@@ -281,7 +281,7 @@ def _seed(engine, count: int) -> int:
                 {
                     "title": f"Title {index}",
                     "metadata": json.dumps(
-                        {"authors": [f"Author {index}"], "description": padding}
+                        {"creators": [f"Author {index}"], "description": padding}
                     ),
                 },
             )
