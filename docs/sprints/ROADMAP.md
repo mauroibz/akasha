@@ -2,7 +2,7 @@
 
 **Plan revision:** 8
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 022](022-creator-sort-names.md)
+**Active sprint:** [Sprint 022](022-attachment-lifecycle.md)
 
 ## Shape of the plan
 
@@ -17,11 +17,12 @@ Post-v1 work branches:
  └─ 019 Post-v1 polish
      └─ 020 Metadata completeness  [GATED]
          ├─ 021 Attachments        [GATED]
-         ├─ 022 Creator sort names
-         ├─ 023 Export
-         └─ 024 Second domain: albums  [GATED]
-             ├─ 025 Third domain: games
-             └─ 026 Fourth domain: series  [GATED]
+         │   └─ 022 Attachment lifecycle
+         ├─ 023 Creator sort names
+         ├─ 024 Export
+         └─ 025 Second domain: albums  [GATED]
+             ├─ 026 Third domain: games
+             └─ 027 Fourth domain: series  [GATED]
 ```
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
@@ -61,11 +62,12 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | completed |
 | [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | completed |
 | [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | completed |
-| [022](022-creator-sort-names.md) | Creator sort names | 020 | **ready** |
-| 023 | Export | 020 | planned |
-| 024 | Second domain — albums: pilot, then verdict | 020 | planned |
-| 025 | Third domain — games | 024 | planned |
-| 026 | Fourth domain — series | 024 | planned |
+| [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | **ready** |
+| [023](023-creator-sort-names.md) | Creator sort names | 020 | planned |
+| 024 | Export | 020 | planned |
+| 025 | Second domain — albums: pilot, then verdict | 020 | planned |
+| 026 | Third domain — games | 025 | planned |
+| 027 | Fourth domain — series | 025 | planned |
 
 ## Contracts for planned sprints
 
@@ -94,7 +96,7 @@ One item does not wait on the gate: `GoogleBooksProvider.fetch_by_isbn` takes th
 `isbn:` search, which is not guaranteed to carry the requested ISBN13. That is a live defect and is
 repaired whatever the verdict.
 
-This sprint sets the provider contract Sprint 024 inherits, so its reasoning matters as much as its
+This sprint sets the provider contract Sprint 025 inherits, so its reasoning matters as much as its
 verdict.
 
 [Closed 2026-08-13. **Phase A concluded against building**: cross-provider completion buys a
@@ -134,7 +136,24 @@ Reading an uploaded epub's OPF as another metadata provider filling empty fields
 genuinely cheap and on-brand, and is named here so it is recognized as the natural next step rather
 than smuggled into the first slice. It is explicit non-scope for Phase B.
 
-### [Sprint 022 — Creator sort names](022-creator-sort-names.md)
+### [Sprint 022 — Attachment lifecycle](022-attachment-lifecycle.md)
+
+Sprint 021 shipped the storage design and the happy path. A review of what it left found the flows
+around a file are thinner than the storage under it, and one genuine hole.
+
+**The hole is reclamation.** `delete_blob_if_unreferenced` has exactly one caller, so a blob can end
+up with nothing pointing at it and no way to find it — via the `CASCADE` on item delete, via a crash
+between writing a blob and inserting its row, or via an item orphaned by entry deletion. At 2.5 MB a
+file this is a different problem from the 39 KB orphaned cover the product spec waved through.
+
+The rest is smaller: no rename, though the filename is already only metadata; no confirmation on
+remove, though the product spec says deletes confirm and *Delete entry* on the same page does; and
+upload and download both hold the whole file in memory, up to 25 MiB per request.
+
+**No new feature surface.** An attachment stays an opaque file. Multiple selection, drag-and-drop and
+progress bars are named as non-scope: real improvements, but polish rather than correctness.
+
+### [Sprint 023 — Creator sort names](023-creator-sort-names.md)
 
 `sort_author` is `json_extract(metadata, '$.authors[0]')` verbatim, so "Adolfo Bioy Casares" sorts
 under A and "Gabriel García Márquez" under G.
@@ -146,11 +165,11 @@ stored sort name seeded by a heuristic and correctable by the owner — a migrat
 surface, not a one-line fix.
 
 Name it **creator**, not author. An album has an artist and a game has a studio, and this projection
-should not need rewriting when Sprint 024 lands. Note that `title_normalized` and
+should not need rewriting when Sprint 025 lands. Note that `title_normalized` and
 `sort_author_normalized` are maintained by a mapper event (DEC-036) precisely so a new write path
 cannot forget them; whatever replaces `sort_author` inherits that requirement.
 
-### Sprint 023 — Export
+### Sprint 024 — Export
 
 `GET /api/export` dumping entries and items as JSON, plus a Goodreads-shaped CSV. Product spec
 section 9 deferred this to v2 as agreed-in-principle; the owner has now scheduled it. Backups
@@ -164,11 +183,11 @@ references make it portable but incomplete. Decide it explicitly rather than by 
 One design constraint, because it decides whether this survives the domain work: **export the
 entity shape — `type`, identifiers, and an opaque `metadata` object — not a book-specific schema.**
 The database is already shaped that way. A book-shaped export format would need a v2 the moment
-Sprint 024 lands.
+Sprint 025 lands.
 
 The Goodreads-shaped CSV is a book-only convenience and is allowed to stay book-only.
 
-### Sprint 024 — Second domain, albums: pilot, then verdict
+### Sprint 025 — Second domain, albums: pilot, then verdict
 
 **Gated, and its Phase A is a build rather than a document.** `docs/domain_metadata_roadmap_report.md`
 already did the provider research; repeating it as prose would produce a confident answer about
@@ -208,7 +227,7 @@ release-group split is that same problem, so albums inherits the answer rather t
 
 The Goodreads and Calibre import pipelines stay book-only. That is not a gap.
 
-### Sprint 025 — Third domain, games
+### Sprint 026 — Third domain, games
 
 IGDB. Not gated: by this point the architecture verdict exists and this sprint either fits it or
 proves it wrong cheaply.
@@ -218,7 +237,7 @@ refresh, where every provider so far has needed at most a static API key. Locali
 enrichment, not a guarantee: keep the original title plus whatever alternate names the provider
 exposes rather than assuming a single translated-title field.
 
-### Sprint 026 — Fourth domain, series
+### Sprint 027 — Fourth domain, series
 
 **Gated on a product decision, not on a provider integration.** TMDB is the strongest provider in
 the research and the integration is the easy half.

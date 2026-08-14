@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "plan_revision": 8,
+  "plan_revision": 9,
   "project_status": "ready",
   "active_sprint": "022",
-  "active_sprint_file": "docs/sprints/022-creator-sort-names.md",
+  "active_sprint_file": "docs/sprints/022-attachment-lifecycle.md",
   "active_sprint_status": "ready",
   "last_completed_sprint": "021",
   "completed_sprints": [
@@ -30,5 +30,5 @@
     "021"
   ],
   "started_at": "",
-  "updated_at": "2026-08-14T00:45:00-03:00"
+  "updated_at": "2026-08-14T01:15:00-03:00"
 }

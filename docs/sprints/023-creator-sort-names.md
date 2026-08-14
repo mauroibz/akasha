@@ -1,8 +1,8 @@
-# Sprint 022 — Creator sort names
+# Sprint 023 — Creator sort names
 
-**Status:** ready
+**Status:** planned
 **Depends on:** 020
-**Roadmap revision:** 8
+**Roadmap revision:** 9
 
 ## Objective
 
@@ -12,7 +12,7 @@ creator sort name that the owner can correct, and no later domain inherits a bro
 ## Required context
 
 1. `AGENTS.md`
-2. `docs/sprints/ROADMAP.md`, the Sprint 022 section — it names the trap this sprint exists to avoid
+2. `docs/sprints/ROADMAP.md`, the Sprint 023 section — it names the trap this sprint exists to avoid
 3. `docs/decisions.md`: DEC-036 (the normalized projection and *why it is maintained by a mapper
    event*), DEC-015 (what DEC-036 superseded), DEC-042 (why creator precedes the domain line)
 4. `backend/src/book_tracker/infrastructure/models.py` — `ItemRow.sort_author` is a generated column
@@ -25,7 +25,7 @@ creator sort name that the owner can correct, and no later domain inherits a bro
 
 ## Current implementation baseline
 
-Re-derive at activation. As of Sprint 021's close: `sort_author` is
+Re-derive at activation. As of Sprint 021's close (re-derive; Sprint 022 lands first): `sort_author` is
 `Computed("json_extract(metadata, '$.authors[0]')")`, and `sort_author_normalized` is a plain column
 maintained by a `before_insert`/`before_update` mapper event, because SQLite generated columns may
 only call built-in functions. The migration head is `0010_attachments`, pinned by literal in
@@ -34,7 +34,7 @@ only call built-in functions. The migration head is `0010_attachments`, pinned b
 ## Deliverables
 
 1. A stored creator sort name, seeded by a heuristic and correctable by the owner. **Name it
-   creator, not author** — an album has an artist and a game has a studio, and Sprint 024 should not
+   creator, not author** — an album has an artist and a game has a studio, and Sprint 025 should not
    have to rewrite this.
 2. A migration that backfills it for every existing row, following `0007`'s shape.
 3. An edit surface, because the heuristic is *known* to be wrong for this library and a value nobody
@@ -84,7 +84,7 @@ library list is actually what the acceptance criteria claim.
 1. `feat: store a creator sort name and backfill it`
 2. `feat: sort the library by the stored creator name`
 3. `feat: correct a creator sort name by hand`
-4. final `docs(sprint-022): close sprint and hand off`
+4. final `docs(sprint-023): close sprint and hand off`
 
 ## Risks and decisions to surface
 

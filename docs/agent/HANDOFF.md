@@ -1,8 +1,8 @@
 # Handoff — current reality
 
 **Last completed:** Sprint 021 (attachments, both phases), 2026-08-14.
-**Next:** Sprint 022 (creator sort names) — status `ready`, file at
-`docs/sprints/022-creator-sort-names.md`.
+**Next:** Sprint 022 (attachment lifecycle) — status `ready`, file at
+`docs/sprints/022-attachment-lifecycle.md`.
 
 ## Read this first
 
@@ -33,7 +33,18 @@ epub's OPF as a metadata provider is named in DEC-047/048 as the natural next st
 is recognised rather than smuggled in.
 
 **Undo retains an item that carries an attachment**, the way it already retains one whose fields
-were hand-edited. Without that guard, undoing an import destroys an uploaded file.
+were hand-edited. Without that guard, undoing an import destroys an uploaded file. **That is a guard,
+not a fix** — see below.
+
+**Sprint 022 exists because nothing reclaims an orphaned blob** (DEC-049).
+`delete_blob_if_unreferenced` has exactly one caller, so three routes leak bytes with nothing able to
+find them: the `CASCADE` on item delete, a crash between `store_blob` and the row insert, and an item
+orphaned by entry deletion. At 2.5 MB a file this is not the 39 KB orphaned cover the product spec
+waved through. The sprint also carries rename, a confirmation on remove (the product spec says
+deletes confirm, and *Delete entry* on the same page does), and streaming — upload and download both
+hold the whole file in memory, 25 MiB per request. **Multiple selection, drag-and-drop and progress
+bars are explicit non-scope**: real improvements, but polish rather than correctness, and the owner
+asked for no creep.
 
 **Provider order is settled and measured, not a preference.** Open Library first, Google Books only
 where Open Library misses: 1,333 Google calls per 5,000 books against 5,000 the other way, and 100%
@@ -72,11 +83,14 @@ brand or of future domains (`AGENTS.md`, DEC-042). Do not rename them.
 
 | Sprint | Scope | Status |
 |---|---|---|
-| 022 | Creator sort names | `ready` |
-| 023 | Export | `planned` |
-| 024–026 | Domains: albums (**gated**), games, series (**gated**) | `planned` |
+| 022 | Attachment lifecycle | `ready` |
+| 023 | Creator sort names | `planned` |
+| 024 | Export | `planned` |
+| 025–027 | Domains: albums (**gated**), games, series (**gated**) | `planned` |
 
-Only 022 has a sprint file. The rest are contracts in `ROADMAP.md` and get expanded from
+Only 022 has a sprint file. **The tail renumbered at plan revision 9** (DEC-049) to fit Sprint 022 in
+ahead of the existing plan — the same forced renumber DEC-042 hit, because the validator requires
+`active_sprint == len(completed_sprints) + 1`. The rest are contracts in `ROADMAP.md` and get expanded from
 `TEMPLATE.md` when activated — the closing agent of the prior sprint does that, and
 `validate_project.py` fails if it is skipped.
 
@@ -205,11 +219,19 @@ Frontend and e2e:
 - **No cover file is ever unlinked when an item is deleted.** Unchanged. Product spec open question 2
   justified that with "covers are ~50KB each"; it now says so explicitly rather than implying the
   same is true of a 2.5 MB attachment. Attachment blobs *are* reclaimed, by refcount.
+- **No `createObjectURL` anywhere in the frontend**, so the classic blob-URL leak does not exist
+  here. Checked during the DEC-049 review; keep it that way if a preview is ever added.
+- `disabled={remove.isPending}` is on every Remove button, so removing one file disables all of
+  them, and the `sr-only` file input is focusable with the same accessible name as its button — two
+  tab stops for one action. Both are Sprint 022's.
+- **The attachment download is `Cache-Control: immutable` for a year with no validator, while the
+  filename is mutable.** A re-upload of identical bytes under a new name renames the row, so an
+  already-downloaded file keeps its old name. Rename and caching are one question, not two.
 - Entries added through the UI carry no score until you set one.
 
 ## State
 
-- Planning revision 8; state points to Sprint 022, project status `ready`.
+- Planning revision 9; state points to Sprint 022, project status `ready`.
 - Gates at Sprint 021's close: validator passed, `make check` passed, `make test` backend **293** /
   frontend **95**, Playwright **79 passed / 2 skipped** across both projects, `make build` with no
   chunk-size warning, `docker build` + `make smoke-container` passed, `git diff --check` clean.

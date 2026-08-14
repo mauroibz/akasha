@@ -1065,3 +1065,36 @@ orphaned-cover defect was left; the undo defect was fixed.
 `docs/sprints/022-creator-sort-names.md`. It replaces the `sort_author` generated column with a
 stored, owner-correctable creator sort name, and the roadmap's warning stands: a last-space split
 gets García Márquez and Vargas Llosa wrong while getting Rulfo right.
+
+## 2026-08-14 — Post-021 review (no code changed)
+
+**Done:** pushed Sprint 021 to `origin/main` (`743a509..7744302`), then reviewed the attachment
+feature at the owner's request — does it cover delete/replace/rename, are the flows clean, is
+anything leaking — explicitly without feature creep. **Assessment only; no product code was
+touched.** Findings are DEC-049 and the work is scheduled as Sprint 022.
+
+**Read out of the shipped code, not inferred:**
+
+- `delete_blob_if_unreferenced` has **exactly one caller**. Three routes orphan a blob with nothing
+  able to find it: `CASCADE` on item delete, a crash between `store_blob` and the row insert, and an
+  item orphaned by entry deletion. The undo guard makes the first unreachable today — a guard, not a
+  fix. **This is the only real hole.**
+- No rename (the filename is already metadata, so it is one write) and no replace.
+- Remove has no confirmation, while the product spec says deletes confirm and *Delete entry* on the
+  same page does.
+- `await file.read(cap + 1)` and `target.read_bytes()`: 25 MiB in memory per concurrent request.
+  Not a leak, nothing accumulates, but sharp on a ZimaBoard where a cover is 39 KB.
+- **No frontend leak.** No `createObjectURL` anywhere; query cache keyed per item; the file input is
+  reset after each pick. Two warts: one pending flag disables every Remove button, and the `sr-only`
+  input is a second tab stop with the same accessible name as its button.
+- `Cache-Control: immutable` for a year with no validator against a **mutable** filename, so a
+  re-upload under a new name leaves an already-downloaded file with its old one.
+
+**Deviations:** scheduling Sprint 022 ahead of the plan forced the tail to renumber — creator sort
+022→023, export 023→024, domains 024-026→025-027, `FINAL_SPRINT` 26→27 in the validator and
+`WORKFLOW.md`. Same forced renumber as DEC-042 and for the same validator rule. Sprint 021's Outcome
+was left as written, since a completed sprint's Outcome is audit history.
+
+**Next:** Sprint 022 (attachment lifecycle) — `ready`. Reclamation is its dangerous deliverable: it
+deletes data by inference, and must be reasoned about against an upload that has written its blob but
+not yet committed its row.

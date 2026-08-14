@@ -1195,3 +1195,63 @@ Append-only record of material architecture choices, product-default resolutions
   is the first user-controlled content type the application serves. Sprint 023 (export) inherits an
   open question this entry does not answer: whether an export carries attachment bytes, references,
   or neither.
+
+## DEC-049 — Attachment lifecycle reviewed: one real hole, several thin edges, scheduled as Sprint 022
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** With Sprint 021 closed and pushed, the owner asked for an assessment of whether the
+  attachment feature covers its bases — delete, replace, rename, and whether the flows are clean and
+  leak-free — explicitly without feature creep, and with any resulting work scheduled ahead of the
+  existing plan. Everything below was read out of the shipped code, not inferred.
+- **Findings.**
+
+  **The one genuine hole is reclamation.** `delete_blob_if_unreferenced` has exactly one caller,
+  `LibraryService.delete_attachment`. Three routes therefore produce a blob nothing points at and
+  nothing can find: `attachments.item_id` is `ON DELETE CASCADE`, so deleting an item drops the rows
+  and leaks the bytes; `store_blob` deliberately writes before the row is inserted, so a crash
+  between them leaves an orphan; and deleting an entry leaves its item, and so its attachments, in
+  place by design. The undo guard from DEC-047 makes the first route unreachable *today*, which is a
+  guard rather than a fix. At 2.5 MB per file this is a materially different problem from the 39 KB
+  orphaned cover that product spec open question 2 waved through.
+
+  **Missing operations.** No rename, although the filename is already only metadata and renaming is a
+  single database write. No replace. Whether replace is a real operation once rename exists is a
+  product question and is left open rather than answered by building it.
+
+  **Convention violated.** Removing an attachment has no confirmation, while the product spec's
+  interaction notes state that confirmation dialogs are limited to delete and provider refresh, and
+  *Delete entry* on the same page has one. Removing a file is irreversible once it is the last
+  reference.
+
+  **Memory.** Upload does `await file.read(cap + 1)` and download does `target.read_bytes()`, so a
+  25 MiB file is a 25 MiB allocation per concurrent request. The cover endpoints do the same, but a
+  cover is 39 KB. Not a leak — nothing accumulates — but a sharp edge on a ZimaBoard.
+
+  **No frontend leak was found.** There is no `createObjectURL` anywhere in the codebase, so the
+  classic blob-URL leak does not exist here; the React Query cache is keyed per item and bounded; the
+  file input is reset after each pick. Two minor warts: `disabled={remove.isPending}` is on every
+  Remove button, so removing one file disables all of them, and the `sr-only` file input is focusable
+  and shares its accessible name with the visible button, giving two tab stops for one action.
+
+  **One caching wrinkle.** The download carries `Cache-Control: immutable` for a year with no
+  validator, while the row's `filename` is mutable — a re-upload of identical bytes under a new name
+  renames the row. A file already downloaded therefore keeps its old name. Small, but real, and it
+  makes rename and caching a single question rather than two.
+
+- **Decision.** Scheduled as **Sprint 022, ahead of the existing plan** at the owner's direction,
+  covering reclamation, rename, the remove confirmation, streaming, and the two UI corrections.
+  Multiple-file selection, drag-and-drop and upload progress bars are named as **explicit non-scope**:
+  they are real improvements but they are additive polish, not lifecycle correctness, and the owner
+  asked for no feature creep. The scope line from DEC-047 is restated in the sprint file: an
+  attachment is an opaque file, or it is a reader.
+- **Consequences.** Plan revision goes to **9** and the tail of the roadmap renumbers: creator sort
+  names 022 → 023, export 023 → 024, and the domain line 024-026 → 025-027. This is the same forced
+  renumber DEC-042 hit, and for the same reason — `scripts/validate_project.py` requires
+  `active_sprint == len(completed_sprints) + 1` and permits exactly one non-completed sprint file. The
+  final-sprint bound moves from 026 to 027 in `WORKFLOW.md` and `validate_project.py`. Sprint 021's
+  Outcome keeps its "Impact on future sprints" text as written, because a completed sprint's Outcome
+  is audit history; its numbering is superseded by this entry rather than edited.
+  **Reclamation is the dangerous deliverable** and the sprint file says so: it deletes data by
+  inference, the refcount is authoritative where the filesystem is not, and a sweep must be reasoned
+  about against an upload that has written its blob but not yet committed its row.
