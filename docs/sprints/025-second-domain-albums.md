@@ -1,6 +1,6 @@
 # Sprint 025 — Second domain, albums: the seams, proved by one domain
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 024
 **Roadmap revision:** 10
 
@@ -195,5 +195,116 @@ and report what you saw — including anything wrong and out of scope.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Completed 2026-08-14** on branch `sprint-025-albums`, cut from `main` per DEC-053. Twelve commits,
+all local, nothing pushed. Merging back is the owner's call.
+
+### Delivered
+
+All six seams, in the deliverable order the plan set. `docs/decisions.md` gains **DEC-055** (where
+each seam actually landed, including the clean-run report AC11 requires) and **DEC-056** (metadata
+responses stopped inventing empty defaults).
+
+| # | Deliverable | Commit |
+|---|---|---|
+| 1 | Status label duplicate collapsed; `statusHotkeys` joins `labels.ts` with a cannot-drift test | `510b2bc` |
+| 2 | Seam 2 — `IdentityStrategy`: a per-domain grouping key plus the source preference that picks a merge's primary | `ef1bbb5` |
+| 3 | Seam 1 — `metadata.authors` → `creators` + `credit`, `sort_author` → `creator_primary`, migration `0012_creators`; a source that knows the sort name seeds the override | `82cb57d`, `c95a694` |
+| 4 | Seam 3 — `FieldSpec` per domain, served at `GET /api/item-types`, driving the dialog and the detail page's facts | `3c0b335` |
+| 5 | Seam 4 — CAA as the album cover source, https upgrade at every hop, `.archive.org` subdomain rule, 1200px thumbnail | `788dea6` |
+| 6 | Seam 6 — albums declare no enrichment; `resolve_input` is a per-domain URL recognizer | `493b4b8` |
+| 7 | The MusicBrainz adapter; `type` from the registry at all three `repositories.py` sites; `GET /api/search?type=`; a domain chooser on `/add` | `1c3f06d` |
+| 8 | Seam 5a — per-domain status labels: `read` renders as "Listened" | `493b4b8` |
+| — | Recordings, in their own commits per the fixtures README | `506171a`, `ad20765`, `8355633` |
+| — | Walkthrough finding: the Goodreads CSV was emitting albums as books | `07cfaea` |
+
+### Acceptance criteria
+
+1. **Met, in a browser.** Chromium against the built app on the real dev library at `data/`:
+   searched *Kind of Blue*, added it, opened it, edited it; cover art fetched from the Cover Art
+   Archive through the full redirect chain and installed at `covers/8.jpg`.
+2. **Met, and this is the one that mattered.** `Daft Punk` stored `creator_sort` **`Daft Punk`** and
+   `Miles Davis` stored **`Davis, Miles`**, both seeded from MusicBrainz's `sort-name` with the
+   DEC-051 heuristic never running. `Various Artists` covered by a recorded search. In the
+   creator-sorted mixed library the order reads Daft Punk · Davis · García Márquez · Perri · Ruiz
+   Zafón, then the two rows with no creator.
+3. **Met from both sides.** Two candidates sharing barcode `888837168625` stay two items; two book
+   editions sharing an ISBN still merge into one card with both refs.
+4. **Met.** Mixed-type keyset pagination walked one row at a time, past page 1, on four sorts: no
+   skipped row, no repeat, no dropped cursor. Pagination needed no change (DEC-055).
+5. **Met, structurally.** `GET /api/search?type=` selects providers by `item_type`, so a book search
+   cannot reach MusicBrainz and an album search cannot reach Open Library or Google Books. Verified
+   in the request log during the walkthrough and pinned by a test.
+6. **Met.** ~1.1 s pacing and a descriptive User-Agent live in the adapter, because albums never
+   touch the job runner's shared 0.5 s `RateLimiter`. MusicBrainz answered one **503** during the
+   fixture capture, which `RETRYABLE_STATUSES` already covered — verified rather than assumed.
+7. **Met.** The dialog rendered `Artists · Artist credit · Label · Catalogue number · Country ·
+   Language · Format · Tracks` for the album and the book fields for a book, with no `type === "book"`
+   branch in the component.
+8. **Met, with a correction.** The entity-shaped JSON carries albums untranslated. The CSV was
+   *not* honest and now is: see the walkthrough finding below.
+9. **Met on real data.** Compared against the pre-migration backup row by row: every creator name and
+   sort name survived, and item 3's hand-typed `García Márquez, Gabriel José` was carried verbatim.
+10. **Met.** 387 backend and 106 frontend tests, 79 e2e, all green; imports, enrichment, triage, undo
+    and backup unchanged.
+11. **Met.** DEC-055 is the write-up, and it reports the clean parts too.
+
+### Verification
+
+```text
+python scripts/validate_project.py   pass
+make check                           pass (lint, mypy, openapi-check, validator)
+make test                            387 backend, 106 frontend
+npm run test:e2e                     79 passed, 2 skipped
+make build                           pass
+make smoke-container                 pass
+git diff --check                     clean
+```
+
+**Walkthrough gate.** Ran the built application against the real dev library (7 items) at
+`127.0.0.1:8123`. It auto-migrated `0011 → 0012` and wrote `backups/pre-migration-20260814T220529Z`
+first. Added *Kind of Blue* (item 8) and *Discovery* (item 9) as real albums; both carry installed
+cover art and correct sort names. What was seen, including what was wrong and out of scope:
+
+- **The Goodreads CSV emitted both albums as books** — title and artist in the Author column, no
+  ISBN, no page count. Fixed in `07cfaea`: the CSV is one domain's view, the JSON is the whole
+  library. No test could have caught this before a second domain existed.
+- **`Rereads: 0` and `Started`/`Finished` on an album**, under a panel headed "Your reading data".
+  That is exactly the product question Sprint 026 owns and is left for it deliberately.
+- **"Choose a cover" is offered on an album and can only say no** — the chooser is Open Library's
+  work-editions path, so it answers `no_provider_reference` and the dialog explains itself. Graceful,
+  but it is a control that cannot work for this domain.
+- **A single `500` appeared in the browser console during the first add** and matched no request in
+  the server log, so it came from an external image host, not from the application. Not reproduced.
+- **The container could not be used for the walkthrough**: `docker compose` runs as uid 10001 and the
+  dev `data/` directory is owned by the host user, so startup failed with `attempt to write a
+  readonly database`. Container behaviour is covered by `make smoke-container` separately. This is a
+  property of the dev checkout, not of the image.
+- Pre-existing and untouched: item 1 still carries `OL14454691A` as its creator, and item 7's
+  publisher is still stored with its quotes.
+
+### Deviations
+
+- **Commit checkpoints 5 and 6 merged.** The CAA work is inseparable from the cover pipeline fixes it
+  needs, and seams 6 and 5a landed together in `493b4b8` because both are one-line consequences of
+  the registry the adapter had already introduced.
+- **Two extra recording commits** beyond the plan's one: the Group/Other sort-name cases were
+  captured through the search endpoint the adapter really calls, and the mono pressing was captured
+  once release selection needed a stable tiebreak between two same-day originals.
+- **`/api/health/providers` now lists MusicBrainz.** It needs no key, so it is always available;
+  leaving it out would have meant the health list silently meant "book providers".
+- **User-facing copy on shared surfaces stopped saying "book"** — "Edit metadata", "Add to library",
+  "Search title or creator", "Unknown creator", and the sort control now reads "Creator". Internal
+  names are unchanged, which is the standing invariant.
+- **Release selection is arbitrary between same-day originals.** *Kind of Blue* resolved to the mono
+  US pressing (`CL 1355`) and *Discovery* to an Australian CD (`8100172`). Both are official releases
+  carrying the group's own `first-release-date`; which of those wins is stable but not meaningful.
+
+### Impact on future sprints
+
+- **026** gains a concrete starting point: the label half of seam 5 is done and `Domain.status_labels`
+  is where the vocabulary half attaches. The product question is now answerable with two domains in
+  hand, and the walkthrough named the two places it bites — "Rereads" and "Your reading data" on an
+  album detail page.
+- **027 (games)** inherits the registry, the field spec, the identity strategy and the paced-adapter
+  pattern; its prediction is unchanged and now testable.
+- **028 (series)** is untouched.

@@ -1290,3 +1290,33 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Blocked/open: none.
 - Next: Sprint 025 (albums, six seams) is `ready`. **Its first act is to cut a branch from
   `main` (DEC-053)** — nothing else in the protocol changes.
+
+## 2026-08-14 — Sprint 025 (second domain, albums), complete
+- Done: all six seams on branch `sprint-025-albums` (DEC-053), twelve commits `510b2bc`..`07cfaea`,
+  nothing pushed. Seam 2 `IdentityStrategy` (grouping key + source preference), seam 1
+  `authors`→`creators`/`credit` with migration `0012_creators` and source-seeded sort names, seam 3
+  `FieldSpec` served at `GET /api/item-types`, seam 4 CAA covers with the https-per-hop and
+  `.archive.org` fixes, seam 6 no-enrichment plus per-domain URL recognizers, seam 5a status labels,
+  and `MusicBrainzProvider` with its own 1.1 s pacing. DEC-055 and DEC-056 appended.
+- Verified: `validate_project.py`, `make check`, `make test` (387 backend, 106 frontend),
+  `npm run test:e2e` (79 passed, 2 skipped), `make build`, `make smoke-container`, `git diff --check`
+  — all green. Walkthrough in Chromium against the **real dev library** at `127.0.0.1:8123`: it
+  auto-migrated 0011→0012 and wrote `backups/pre-migration-20260814T220529Z` first; added *Kind of
+  Blue* (item 8) and *Discovery* (item 9) as real albums with cover art fetched through the whole CAA
+  redirect chain. `Daft Punk` stored `Daft Punk` and `Miles Davis` stored `Davis, Miles`. Compared
+  every row against the pre-migration backup: no creator or sort name lost, item 3's hand correction
+  carried verbatim.
+- Deviations: checkpoints 5+6 and seams 6+5a merged into single commits; two extra fixture commits;
+  `/api/health/providers` now lists MusicBrainz; shared-surface copy stopped saying "book".
+- Dead ends worth not repeating: **the container cannot run the walkthrough against the dev checkout**
+  — compose runs as uid 10001 and `data/` is owned by the host user, so it dies with "attempt to
+  write a readonly database"; use `make smoke-container` for the container gate and run the app
+  directly for the library walkthrough. **Two MusicBrainz releases can share the group's own
+  `first-release-date`** (mono and stereo *Kind of Blue*), so release selection needs a stable
+  tiebreak or it flips between pressings. `text("... IN :param")` does not expand in SQLAlchemy —
+  build the placeholders. And a blanket `authors`→`creators` rename over the tests will break the
+  migration tests that deliberately seed *old* rows: those must keep the old key.
+- Blocked/open: none. The Goodreads CSV fix (`07cfaea`) came from the walkthrough, not the suite.
+- Next: Sprint 026 (status vocabulary, seam 5b) is `ready` at `docs/sprints/026-status-vocabulary.md`.
+  **Its first deliverable is a question for the owner, not code**: whether `reread_count` and
+  `date_finished` mean anything for an album.

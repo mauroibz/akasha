@@ -1514,3 +1514,59 @@ Append-only record of material architecture choices, product-default resolutions
   what backups are for (DEC-039, DEC-040). Should a future sprint want a self-contained archive, it
   is an additive `?include=attachments` variant rather than a format change, because the reference
   block already names every blob it would need to carry.
+
+## DEC-055 — Every seam was cut where section 4 said, and the two that moved are named
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 025's eleventh acceptance criterion requires that a seam cut somewhere other
+  than `docs/domain-architecture-proposal.md` section 4 describes is written up — **and that a clean
+  run reports that too, because silence is not evidence.** This is that entry.
+- **Decision:** **The six seams landed where section 4 put them.** Albums are searched, added,
+  covered, listed, opened and edited beside books with no book vocabulary anywhere in the path, and
+  none of the three tripwires fired:
+
+  - `identity_key` lifted out of `merge_and_rank` without dragging the ranking signals with it. What
+    it needed beside it was the **source preference**: `_merge_group` picked the `openlibrary` row as
+    a group's primary by name, which is the same question — who wins a merge — and belongs to the
+    same strategy. That is a refinement of seam 2, not a relocation.
+  - **Keyset pagination, `CursorState`, the job runner, the import ledger, undo, backup, attachments
+    and shelves needed no change at all**, exactly as section 4 predicted. A mixed library was walked
+    one row at a time past page 1 on four sorts to prove it. The one adjacent question — a stale
+    `sort=sort_author` cursor after the rename — needed no version bump either, because
+    `decode_cursor` already rejects a cursor whose sort key does not match the query.
+  - No seventh seam was needed.
+
+  **Two things sat slightly wide of where section 4 drew them, and both are recorded here rather
+  than smoothed over:**
+
+  1. **Seam 4 reaches one hop further than "upgrade the scheme before validating".** The Cover Art
+     Archive answers `http://` in its JSON *and* in every redirect hop — measured live on
+     2026-08-14: `coverartarchive.org` 307s to an `http://archive.org` URL, which 302s to an
+     `http://dn710907.ca.archive.org` URL. Upgrading only the URL the JSON supplies fails on the
+     second hop, so the upgrade is applied at every hop, and the allowlist gained a `.archive.org`
+     subdomain rule rather than another literal host.
+  2. **Seam 3 reaches the detail page and the export, not only the dialog.** Section 4 said the field
+     spec drives "the metadata dialog, the detail page's display order, and the export's
+     human-readable half", and the walkthrough proved the last part is load-bearing: with two domains
+     present the Goodreads CSV was emitting albums as books. The CSV is one domain's export view and
+     is now restricted to it; the entity-shaped JSON beside it still carries every type.
+- **Consequences.** Sprint 027's falsifiable prediction stands: games should need no seam albums did
+  not. The seam model is now proved by two domains rather than argued from one, and the parts of it
+  that turned out to be under-specified were both *narrower* than expected rather than wider — which
+  is the failure direction DEC-052 chose deliberately when it rejected Strategy B.
+
+## DEC-056 — Metadata responses stopped inventing empty defaults
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** `ItemResponse.metadata` was a Pydantic model with `default_factory=list` on its list
+  fields, so an item with no subjects was served `"subjects": []` whether or not the row held one.
+  Seam 3 replaced that model with the opaque object the row actually stores.
+- **Decision:** **The API serves the metadata that exists and nothing else.** An absent field is
+  absent, not an empty list. Clients treat a missing key and an empty value the same way, which the
+  frontend already did.
+- **Consequences.** This matches the rule Sprint 024 set for the export — `metadata` passes through
+  untransformed — so the two surfaces no longer disagree about what an item holds. A client that
+  relied on the defaults would see a shape change; the only client is this repository's frontend, and
+  a test pins the behaviour.

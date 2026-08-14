@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 10,
-  "project_status": "in_progress",
-  "active_sprint": "025",
-  "active_sprint_file": "docs/sprints/025-second-domain-albums.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "024",
+  "project_status": "ready",
+  "active_sprint": "026",
+  "active_sprint_file": "docs/sprints/026-status-vocabulary.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "025",
   "completed_sprints": [
     "001",
     "002",
@@ -30,8 +30,9 @@
     "021",
     "022",
     "023",
-    "024"
+    "024",
+    "025"
   ],
-  "started_at": "2026-08-14T18:10:00-03:00",
-  "updated_at": "2026-08-14T18:10:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-08-14T22:30:00-03:00"
 }

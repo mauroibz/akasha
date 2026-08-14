@@ -2,7 +2,7 @@
 
 **Plan revision:** 10
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 025](025-second-domain-albums.md)
+**Active sprint:** [Sprint 026](026-status-vocabulary.md)
 
 ## Shape of the plan
 
@@ -66,8 +66,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | completed |
 | [023](023-creator-sort-names.md) | Creator sort names | 020 | completed |
 | [024](024-export.md) | Export | 020 | completed |
-| [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | **ready** |
-| 026 | Status vocabulary (seam 5b) | 025 | planned |
+| [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
+| [026](026-status-vocabulary.md) | Status vocabulary (seam 5b) | 025 | **ready** |
 | 027 | Third domain — games | 026 | planned |
 | 028 | Fourth domain — series | 026 | planned |
 
@@ -75,7 +75,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 025 have files; 026, 027 and 028 do not.
+incorporating actual deviations. Sprints 019 through 026 have files; 027 and 028 do not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -246,7 +246,16 @@ mode the whole approach exists to avoid.
 The largest blast radius is the `metadata.authors` → `creators` and `sort_author` renames DEC-051
 deferred to here: 55 occurrences across 27 files, seven e2e specs, a migration and the benchmark.
 
-### Sprint 026 — Status vocabulary (seam 5b)
+[Closed 2026-08-14 on a branch (DEC-053). All six seams landed where section 4 put them and **none of
+the three tripwires fired** — keyset pagination, the job runner and the ledger needed no change, and
+no seventh seam appeared (DEC-055). `Daft Punk` sorts under D because MusicBrainz's curated
+`sort-name` seeds the override and the DEC-051 heuristic never runs. Two seams reached slightly
+further than written: the https upgrade has to apply to **every** redirect hop, because the Cover Art
+Archive answers `http://` on all of them, and the field spec reaches the export — the walkthrough
+caught the Goodreads CSV emitting albums as books. The API also stopped inventing empty metadata
+defaults (DEC-056).]
+
+### [Sprint 026 — Status vocabulary (seam 5b)](026-status-vocabulary.md)
 
 The one seam Sprint 025 deliberately leaves half-done, pulled out because it is the largest single
 piece and the only one carrying a genuine product decision (DEC-052).
