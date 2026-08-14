@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 9,
-  "project_status": "in_progress",
-  "active_sprint": "023",
-  "active_sprint_file": "docs/sprints/023-creator-sort-names.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "022",
+  "project_status": "ready",
+  "active_sprint": "024",
+  "active_sprint_file": "docs/sprints/024-export.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "023",
   "completed_sprints": [
     "001",
     "002",
@@ -28,8 +28,9 @@
     "019",
     "020",
     "021",
-    "022"
+    "022",
+    "023"
   ],
-  "started_at": "2026-08-14T14:05:00-03:00",
-  "updated_at": "2026-08-14T14:05:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-08-14T15:10:00-03:00"
 }

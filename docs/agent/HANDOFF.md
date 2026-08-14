@@ -1,81 +1,71 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 022 (attachment lifecycle), 2026-08-14.
-**Next:** Sprint 023 (creator sort names) — status `ready`, file at
-`docs/sprints/023-creator-sort-names.md`.
+**Last completed:** Sprint 023 (creator sort names), 2026-08-14.
+**Next:** Sprint 024 (export) — status `ready`, file at `docs/sprints/024-export.md`.
 
 ## Read this first
 
-**Attachments are content-addressed and the lifecycle around them is now closed** (DEC-048,
-DEC-050). A blob lives at `data/attachments/{sha256[:2]}/{sha256}` and the uploaded filename is held
-in the database, never on disk. Four things follow and all four are load-bearing: identical bytes
-cost one blob; the path is the digest, so integrity is free; the backup's hardlink sharing is correct
-by definition; and **traversal is structural, not filtered** — no caller-supplied string reaches the
-filesystem, which is why the `%2e%2e` tests pass without a filter to maintain. Do not "simplify" this
-to `{item_id}/{filename}`.
+**`items` now carries two different names for a creator and they are not interchangeable.**
+`sort_author` is still the generated `json_extract(metadata, '$.authors[0]')` — the name **as
+written** — and it is what the detail page and the grid display and what the `q` search filter
+matches. `creator_sort_normalized` is what the library **orders** by. Sorting moved; search
+deliberately did not, because a reader types "gabriel garcia" and must still find a row that sorts
+as "garcia marquez gabriel" (DEC-051). If you find yourself pointing both at one column, that is
+the regression this split exists to prevent.
 
-**`akasha-attachments reclaim` is the only routine here that deletes data by inference**, and it is
-built defensively on purpose. Three rules, none of them decoration:
+**Of the three new columns only `creator_sort_override` is real data.** `creator_sort` and
+`creator_sort_normalized` are derived as `override or creator_sort_name(first_author)` by the same
+`before_insert`/`before_update` mapper event DEC-036 introduced, so they cannot be forgotten by a
+new write path — and they must never be written directly. Migration head is
+`0011_creator_sort_names`, pinned by literal in `test_backup.py` and listed twice in
+`test_migrations.py`.
 
-1. **It reads the filesystem before it reads the database.** An upload writes its blob and then
-   commits its row, so walking first and asking about references second can only be too generous.
-   Reversed, a blob whose row landed between the two reads reads as an orphan and is deleted — a file
-   the owner attached seconds earlier. A test fails if the two are swapped; that was verified by
-   swapping them, not assumed.
-2. **A blob younger than an hour is never a candidate**, which covers the same window for an upload
-   still in flight during both reads.
-3. **It reports and removes nothing without `--apply`**, and files under `attachments/` that it did
-   not write are named and left alone — the same rule that keeps `enforce_retention` to directories
-   carrying our own manifest.
+**The heuristic is wrong on purpose and correcting a row is the supported answer.** It treats the
+first token as the given name and everything after as the surname, so it gets the Spanish double
+surnames right — García Márquez, Bioy Casares, Vargas Llosa — and gets two-given-name English names
+wrong: "Jorge Luis Borges" becomes "Luis Borges, Jorge". Measured at **14 of 16** on the
+walkthrough library. Do not tune it. The edit surface ("Sorts as" in the metadata dialog) and the
+Calibre seed are the design's answer, and a tuned heuristic would silently rewrite names the owner
+has already fixed.
 
-**A blob a backup holds survives the reclaim**, because the backup has its own directory entry
-against the same inode. Verified in the container rather than reasoned about.
+**Calibre's `authors.sort` is read where it exists and stored as the override**, which is to say as
+owner data, not cache. That is what stops a refresh or a re-import recomputing over it. The column
+is optional — `REQUIRED_TABLES` guarantees the `authors` table, not its columns — so the reader
+checks with `PRAGMA table_info` and falls back. Undo knows this field: an import that seeded it can
+be undone, while a name corrected after the import is retained.
 
-**Item deletion defers to that sweep rather than reclaiming inline**, and this is deliberate. The
-only path that deletes an item is undo, and undo retains an item carrying an attachment (DEC-047), so
-an inline reclaim there would be unreachable code. Note also that **`entries.item_id` has no
-`ON DELETE CASCADE`**: an item cannot be deleted at all while an entry references it.
+**`CursorState.v` is 2.** Bump it whenever a stored projection a cursor compares against changes
+meaning; a stale cursor then fails as `400 invalid_cursor`, which `HomePage.tsx` already renders,
+instead of comparing an old value against a new column and skipping or repeating a page.
 
-**The download is no longer `immutable`, and must not go back.** The blob cannot change, but the
-response is not the blob — it carries the filename, which is now editable. `max-age=0,
-must-revalidate` with an ETag over digest **and** name: an untouched file is a 304 with no body, a
-renamed one cannot match and is refetched under its new name.
+## Sprint 024 — what it walks into
 
-**Uploads and downloads stream.** `BlobWriter` hashes and writes a chunk at a time; the per-file cap
-is enforced as bytes arrive rather than after buffering. Measured on a 25 MiB file: peak RSS delta
-went from +29.9 MiB to +2.6 MiB on upload and +24.9 MiB to +0.0 MiB on download.
+**There are now two owner-edited fields that no algorithm can reconstruct**: an attachment's
+`filename` (DEC-050) and `creator_sort_override` (DEC-051). An export that omits either loses
+something the owner typed. The derived columns are the opposite case and should be left out
+entirely; they rebuild themselves.
 
-**An attachment is an opaque file, or it is a reader.** That line held through two sprints: no format
-parsing, no in-browser reading, no reading progress, no device sync. Reading an uploaded epub's OPF as
-a metadata provider is named in DEC-047/048/050 as the natural next step precisely so it is recognised
-rather than smuggled in. **Replace was considered and deliberately not built** (DEC-050): with rename
-in place it is remove plus attach.
+The sprint's one real decision is **whether an export carries attachment bytes, references, or
+neither** — a fork, not a detail, since bytes make the export an archive rather than a file. Put it
+to the owner at activation, the way Sprints 021 and 022 put theirs.
 
-## Sprint 023 — what it walks into
-
-`sort_author` is `Computed("json_extract(metadata, '$.authors[0]')")`, so "Gabriel García Márquez"
-sorts under G. The trap the roadmap names is real: splitting on the last space gets *Márquez* and
-*Llosa* wrong while getting *Rulfo* right, so the shape is a stored sort name seeded by a heuristic
-and **correctable by the owner**, not a cleverer split.
-
-**Sprint 022 added no migration**, so the head is still `0010_attachments`, pinned by literal in
-`test_migrations.py` (twice) and `test_backup.py`. `sort_author_normalized` is maintained by a
-`before_insert`/`before_update` mapper event (DEC-036) precisely so a new write path cannot forget it;
-whatever replaces `sort_author` inherits that requirement. Name the column for **creators**, not
-authors — an album has an artist and a game has a studio.
+The binding format constraint: **export the entity shape** — `type`, identifiers, opaque
+`metadata` — not a book-specific schema. `backup.py` is the closest prior art for producing a
+whole-library artifact, and the attachment download is the prior art for streaming one.
 
 ## Known and left, in the order they are likely to bite
 
-- **`HEAD` on any route returns 405.** Application-wide, not attachment-specific. It cost me a
-  confusing debugging detour: `curl -sI` returned no ETag, which made a working 304 look like a 200.
-- **The orphaned cover file is still not collected.** The reclaim is scoped to the attachment store
-  on purpose: a cover is re-fetchable cache and does not deserve a second delete-by-inference
-  mechanism. Product spec open question 2 records this.
-- **"Replace cover" on the detail page is a raw unstyled `<input type=file>`**, showing the browser's
-  default "Choose File / No file chosen". It looks unfinished beside the Files panel.
+- **One dev-library item has `OL14454691A` as its author** — an Open Library author key that reached
+  `metadata.authors` as if it were a name, so it sorts under O. Pre-existing, unrelated to Sprint
+  023, and it will show up in any author-sorted list.
+- **The list API takes repeated `status=`, not `statuses=`.** An unknown parameter is ignored
+  silently, so a wrong guess looks like missing rows — the default excludes `unsorted`, which is
+  where imports land.
+- **`HEAD` on any route returns 405.** Application-wide, not route-specific.
+- **"Replace cover" on the detail page is a raw unstyled `<input type=file>`**, showing the
+  browser's default "Choose File / No file chosen" beside the styled Files panel.
 - **The quoted publisher string** (`"O'Reilly Media, Inc."`) is still visible on the detail page.
-- Multiple-file selection, drag-and-drop and upload progress bars are unbuilt and were named
-  explicit non-scope in Sprint 022 — additive polish, not lifecycle correctness.
+- The orphaned cover file is still not collected; the reclaim is scoped to attachments on purpose.
 
 ## State
 

@@ -1,6 +1,6 @@
 # Sprint 023 — Creator sort names
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 020
 **Roadmap revision:** 9
 
@@ -132,5 +132,61 @@ Plus a walkthrough against the container with the real library:
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Delivered.** The library sorts by a stored creator sort name that the owner can correct, seeded
+from Calibre where that database has a curated one and from a heuristic otherwise. Decisions in
+**DEC-051**.
+
+Commits: `2bc81f0` columns, heuristic and migration `0011_creator_sort_names`; `e5f15b4` ordering,
+cursor and the version bump; `aeec7c9` the edit surface; `5780155` the Calibre seed and the
+matching undo path; plus this closure commit.
+
+**Acceptance criteria, and how each was verified**
+
+1. **The three roadmap names sort correctly** — verified in the browser against the container, not
+   only in tests. Author-ascending reads Allende, Bioy Casares, Bolaño, Borges, Cortázar, Esquivel,
+   García Márquez ×2, Le Guin, Paz, Perri, Ruiz Zafón, Rulfo, Sabato, Vargas Llosa. The regression
+   test deliberately includes a fourth name, Zoé Aguirre: García Márquez, Bioy Casares and Rulfo
+   sort the same way by given name as by surname (a, g, j against b, g, r), so a test built only
+   from the three the roadmap named passes against the very defect it exists to catch.
+2. **A correction is owner data** — asserted against the real refresh path, which rewrites
+   `metadata.authors` out from under the row and leaves the sort name alone, and re-checked in the
+   container by hand.
+3. **Cursors stayed stable** — six pages of three walked the container library with no skip or
+   repeat and nulls last, and a hand-built `v: 1` cursor returned `400 invalid_cursor` rather than
+   mis-paginating.
+4. **The projection cannot be forgotten** — it is maintained by the DEC-036 mapper event, and every
+   metadata write in the codebase goes through an ORM object; there is no raw `UPDATE items`.
+5. **The Calibre seed works both ways** — a database with `authors.sort` seeded
+   `Borges, Jorge Luis` and `Vargas Llosa, Mario` as overrides through a real preview-and-commit in
+   the container; one without the column still imports.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **350** / frontend **99**;
+`npm run test:e2e` **79 passed / 2 skipped**; `make build` and `make smoke-container` passed;
+`git diff --check` clean. Container walkthrough against a copy of the real data directory, which
+was at revision `0006` and so migrated through `0011` for real, taking a pre-migration backup on
+the way.
+
+**Measured, as the sprint required.** The heuristic on the walkthrough library: **14 of 16 authored
+items right**. Both failures are the same shape — two given names and no initial, "Jorge Luis
+Borges" becoming "Luis Borges, Jorge". Reported rather than tuned around, because the edit surface
+is the answer. Benchmark re-run: `sort_author` at page 26 contended **78.7 ms p95** against the
+78 ms DEC-036 recorded, text filter **10.4 ms** against 10 ms — no regression from the new column.
+
+**Deviations from plan**
+
+- **Undo was pulled in.** Not in the sprint file. The import now fills `creator_sort_override`, and
+  `_set_item_field` silently ignored fields it did not know, so an undone import would have left
+  the seeded name behind while reporting it as "retained". Fixed with a test in `5780155`.
+- **The `q` filter was left on `sort_author_normalized`** rather than moved with the ordering. The
+  plan called this; it is recorded here because it is the one place the sprint's title is
+  misleading — only *ordering* moved.
+
+**Seen and left, in the order they are likely to matter**
+
+- **Item 1 of the dev library has `OL14454691A` as its author**, an Open Library author key that
+  reached `metadata.authors` as if it were a name. It now sorts under O. Pre-existing, unrelated to
+  this sprint, and visible in any author-sorted list.
+- The **"Replace cover" raw `<input type=file>`** is still on the detail page, still showing
+  "Choose File / No file chosen" beside the styled Files panel. Carried from Sprint 022.
+- The quoted publisher string is still on the detail page. Carried from Sprint 021.
+- `HEAD` on any route is still a 405, application-wide.

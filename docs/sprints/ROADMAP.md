@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 8
+**Plan revision:** 9
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [Sprint 022](022-attachment-lifecycle.md)
 
@@ -63,8 +63,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | completed |
 | [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | completed |
 | [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | completed |
-| [023](023-creator-sort-names.md) | Creator sort names | 020 | **ready** |
-| 024 | Export | 020 | planned |
+| [023](023-creator-sort-names.md) | Creator sort names | 020 | completed |
+| [024](024-export.md) | Export | 020 | **ready** |
 | 025 | Second domain — albums: pilot, then verdict | 020 | planned |
 | 026 | Third domain — games | 025 | planned |
 | 027 | Fourth domain — series | 025 | planned |
@@ -159,21 +159,20 @@ upload. Replace was put to the owner and deliberately not built: with rename in 
 plus attach. The orphaned *cover* is still not collected — the reclaim is scoped to the attachment
 store on purpose, since a cover is cache the application can re-fetch.
 
-### [Sprint 023 — Creator sort names](023-creator-sort-names.md)
+### [Sprint 023 — Creator sort names](023-creator-sort-names.md) — completed
 
-`sort_author` is `json_extract(metadata, '$.authors[0]')` verbatim, so "Adolfo Bioy Casares" sorts
-under A and "Gabriel García Márquez" under G.
+Delivered as planned (DEC-051): `creator_sort_override` is the owner's value, `creator_sort` and
+`creator_sort_normalized` are derived from it or from a heuristic by the DEC-036 mapper event, and
+migration `0011_creator_sort_names` backfilled every row.
 
-The obvious repair is wrong for this library specifically. Splitting on the last space gives
-*Márquez* for García Márquez and *Llosa* for Vargas Llosa, both of which are wrong, while giving
-the right answer for Rulfo. Spanish double surnames have no reliable heuristic, so the shape is a
-stored sort name seeded by a heuristic and correctable by the owner — a migration plus an edit
-surface, not a one-line fix.
+Two things later sprints inherit. **Ordering moved to the creator column but search did not** —
+the `q` filter still reads `sort_author_normalized`, because a reader types the name as written.
+And **Calibre's `authors.sort` seeds the override as owner data**, which is what makes the
+heuristic's known failure ("Jorge Luis Borges" → "Luis Borges, Jorge", 2 of 16 items on the
+walkthrough library) survivable rather than a defect to tune out.
 
-Name it **creator**, not author. An album has an artist and a game has a studio, and this projection
-should not need rewriting when Sprint 025 lands. Note that `title_normalized` and
-`sort_author_normalized` are maintained by a mapper event (DEC-036) precisely so a new write path
-cannot forget them; whatever replaces `sort_author` inherits that requirement.
+`sort_author` deliberately kept its name and its display role; the rename waits for Sprint 025,
+which changes the metadata key from `authors` to `creators` and can do both in one pass.
 
 ### Sprint 024 — Export
 
@@ -189,6 +188,11 @@ references make it portable but incomplete. Decide it explicitly rather than by 
 Sprint 022 narrows it slightly: the filename is now **owner-edited data**, not something derivable
 from the uploaded file, so whichever of the three an export carries, it has to carry the name. An
 export that reconstructs names from digests loses a correction the owner made by hand (DEC-050).
+
+Sprint 023 adds a second field of that kind: `creator_sort_override` (DEC-051). It is not derivable
+from `metadata.authors` — that is the entire reason it exists — so an export that omits it loses a
+correction in exactly the same way. `creator_sort` and `creator_sort_normalized` are derived and
+should **not** be exported; they rebuild themselves on import.
 
 One design constraint, because it decides whether this survives the domain work: **export the
 entity shape — `type`, identifiers, and an opaque `metadata` object — not a book-specific schema.**
@@ -221,7 +225,11 @@ What is hardcoded, and is the real work:
 - `type="book"` at three `infrastructure/repositories.py` call sites, and `SOURCE_PREFERENCE` as a
   module constant in `domain/providers.py`.
 - Book fields in `features/detail/MetadataDialog.tsx` and `features/detail/schemas.ts`, which a
-  per-type display config replaces.
+  per-type display config replaces. The "Sorts as" field added in Sprint 023 is the one field there
+  that is **not** book-specific and should survive the config as-is — an album has an artist and a
+  game has a studio, which is why the column is named for creators (DEC-051). The `sort_author`
+  column and API field still carry the book-era name, and this is the sprint that renames them,
+  alongside the `metadata.authors` → `creators` key change.
 - **Status vocabulary.** "To read / Reading / Read" does not fit an album. This reaches the filter
   chips, the triage keyboard map, the Goodreads status suggestions, and `entryStatuses`. Expect it
   to be the largest single piece.

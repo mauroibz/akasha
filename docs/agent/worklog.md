@@ -1158,3 +1158,64 @@ inline rename, confirm dialog, cancel-is-a-no-op, one tab stop, confirmed remova
 
 **Next:** Sprint 023 (creator sort names) — status `ready`. No migration was added here, so the head
 is still `0010_attachments` and 023's baseline was updated to say so.
+
+## 2026-08-14 — Sprint 023 (creator sort names), complete
+
+**Done:** stored creator sort name with a heuristic seed and an owner override, migration
+`0011_creator_sort_names`, ordering and cursors moved onto it, the "Sorts as" edit field, and the
+Calibre `authors.sort` seed. Commits `2bc81f0`, `e5f15b4`, `aeec7c9`, `5780155`, plus this closure
+commit. Decisions in **DEC-051**.
+
+**Two owner decisions were taken at planning, before any code.** Calibre's curated `authors.sort`
+seeds the value as owner data rather than as a guess; and `sort_author` keeps its name and its
+display role, with the rename deferred to Sprint 025 where the `authors` → `creators` key change
+happens in one pass. Both are recorded in the sprint file's own "Owner decisions" section.
+
+**The three-name test would have passed against the defect.** García Márquez, Bioy Casares and
+Rulfo sort the same way by given name as by surname — a, g, j against b, g, r — so a regression
+test built only from the three names the roadmap listed proves nothing. Zoé Aguirre is in the test
+for that reason: last by given name, first by surname. I noticed this only when the first version
+of the test passed before the implementation existed.
+
+**Measured rather than tuned.** On the walkthrough library the heuristic got **14 of 16** authored
+items right. Both failures are one shape: two given names and no initial, so "Jorge Luis Borges"
+becomes "Luis Borges, Jorge". That is exactly the class Calibre's curated column fixes, which is
+why the seed matters more than a cleverer split would.
+
+**Undo was pulled in, and it was not in the sprint file.** The import now fills
+`creator_sort_override`, and `_set_item_field` silently ignores fields it does not recognise — an
+undone import would have left the seeded name behind while *reporting* it as "retained", which is
+the worst of both. Fixed with a test that also pins the retain half: a name corrected after the
+import survives undo.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **350** / frontend **99**;
+`npm run test:e2e` **79 passed / 2 skipped**; `make build` and `make smoke-container` passed;
+`git diff --check` clean.
+
+Container walkthrough against a copy of the real `data/`, which was still at revision `0006`, so it
+migrated through `0011` for real and wrote a pre-migration backup on the way. Seeded 13 Spanish
+titles to make the ordering legible, then: read the author-sorted grid in the browser (Allende,
+Bioy Casares, Bolaño, Borges, Cortázar, Esquivel, García Márquez ×2, …); walked six cursor pages of
+three with no skip, no repeat, nulls last; hand-built a `v: 1` cursor and got `400 invalid_cursor`;
+ran a real Calibre preview-and-commit and saw `Borges, Jorge Luis` and `Vargas Llosa, Mario` land
+as overrides; corrected a name in the dialog and watched the row move from eighth to fourth, then
+cleared it and watched the order return exactly. Tab order goes Authors → Sorts as → Publisher, one
+stop, no console errors. Benchmark re-run: `sort_author` page 26 contended **78.7 ms p95** against
+DEC-036's 78 ms.
+
+**Seen and left:**
+
+- **Item 1 of the dev library has `OL14454691A` as its author** — an Open Library author key that
+  reached `metadata.authors` as if it were a name, so it now sorts under O. Pre-existing and
+  unrelated to this sprint, but visible in any author-sorted list and worth a look.
+- The `statuses=` query parameter I reached for while walking through does not exist; the API takes
+  repeated `status=`. My own error, but it cost a confusing few minutes where imported rows looked
+  missing from the list when they were simply in the Inbox, which the default excludes.
+- **`ROADMAP.md` claimed plan revision 8** while `state.json`, `WORKFLOW.md` and sprints 022–023 all
+  said 9. Repaired as a documentation-only inconsistency; no re-plan happened here. The product
+  spec also still said export was "Sprint 023 in roadmap revision 8"; corrected to 024/9.
+- The unstyled "Replace cover" `<input type=file>`, the quoted publisher string, and the
+  application-wide `HEAD` 405 are all still there, all carried from earlier sprints.
+
+**Next:** Sprint 024 (export) — status `ready`, file written. Its one real decision is whether an
+export carries attachment bytes, references, or neither; put it to the owner at activation.

@@ -673,8 +673,8 @@ enrichment. "Undo last import" for 24 hours.
 Listed so they're not re-litigated during build.
 
 **Scheduled — Export.** `GET /api/export` dumping entries + items as JSON, plus
-a Goodreads-shaped CSV. Deferred through v1; **scheduled as Sprint 023** in
-roadmap revision 8, because the repository is public and portability is now a
+a Goodreads-shaped CSV. Deferred through v1; **scheduled as Sprint 024** in
+roadmap revision 9, because the repository is public and portability is now a
 user-facing story rather than only the owner's. Until it exists the only exit
 path is the SQLite file itself — genuinely fine, it's a documented open format
 you can query with any tool — but it means **the nightly DB backup (§8) is not

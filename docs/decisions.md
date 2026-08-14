@@ -1321,3 +1321,60 @@ Append-only record of material architecture choices, product-default resolutions
   is still not collected: the reclaim is scoped to the attachment store and does
   not generalize to covers, which are re-fetchable cache. Sprint 023 is unaffected
   and remains the creator sort names work.
+
+## DEC-051 — The creator sort name is stored, seeded from Calibre where it exists, and correctable
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** `items.sort_author` is `json_extract(metadata, '$.authors[0]')` verbatim, and the
+  library's "Author" sort ordered by its normalized form. That filed "Gabriel García Márquez" under
+  G and "Adolfo Bioy Casares" under A, which for a Spanish-language library makes the sort
+  unusable. The roadmap named the trap the obvious repair falls into: splitting on the last space
+  yields *Márquez* and *Llosa*, both wrong, and *Rulfo*, right. Spanish double surnames carry no
+  reliable signal, so no heuristic closes this.
+- **Decision:** Store the sort name rather than compute it on read. Migration
+  `0011_creator_sort_names` adds three columns to `items`: `creator_sort_override`, the only one
+  that is not derived, and `creator_sort` / `creator_sort_normalized`, both computed as
+  `override or creator_sort_name(first_author)` by the same `before_insert`/`before_update` mapper
+  event DEC-036 introduced, so no write path can leave the sort key stale. Backfilled in Python
+  with the domain function, following `0007`, so Alembic depends on nothing the application
+  registers. Ordering and the keyset cursor move to `creator_sort_normalized`; **the `q` filter
+  deliberately does not**, and stays on `sort_author_normalized`, because search matches the name
+  as written and "gabriel garcia" must keep finding a row that sorts as "garcia marquez gabriel".
+  Three consequences of that split are load-bearing: the API returns the display name and the sort
+  name as separate fields, the detail page and grid keep showing the name as written, and
+  duplicate-matching in `DomainRepository.match` still compares display names.
+
+  **The heuristic is biased towards the Spanish double surname on purpose.** The first token is the
+  given name, an initial stays with it, everything after is the surname, and a name already
+  carrying a comma is left alone. It gets all three roadmap cases right and gets
+  "John Ronald Reuel Tolkien" wrong. Measured on a walkthrough library of 16 authored items: **14
+  right, 2 wrong**, both failures of the same kind — two given names and no initials
+  ("Jorge Luis Borges" → "Luis Borges, Jorge"). Tuning it further was rejected: the edit surface is
+  the answer to a wrong name, which is why the sprint treated it as the feature rather than the
+  polish.
+
+  **Calibre's `authors.sort` seeds the override, as owner data rather than cache.** A real Calibre
+  database carries a hand-curated sort name per author, and this library came from Calibre, so the
+  seed is curated truth on exactly the names the heuristic has no signal for. The column is
+  optional — `REQUIRED_TABLES` guarantees the `authors` table, not its columns — so the reader
+  checks and falls back. Storing it as the override rather than as the derived value is what stops
+  a later refresh or re-import recomputing over it. Undo learned the field in the same change: the
+  import fills it, so undo must be able to unfill it, while retaining a value the owner corrected
+  afterwards.
+
+  **`CursorState.v` goes to 2.** A cursor issued before the migration holds "gabriel" where the
+  column now holds "garcia marquez gabriel"; comparing them would silently skip or repeat a page.
+  The version bump makes it a `400 invalid_cursor` the library page already renders. This
+  establishes the rule recorded in the technical spec: bump the version whenever a stored
+  projection a cursor compares against changes meaning.
+- **Consequences:** The migration head is `0011_creator_sort_names`. `sort_author` keeps its name
+  and its display role; renaming it to a creator-shaped name was considered and deferred to Sprint
+  025, which changes the metadata key from `authors` to `creators` and can do both in one pass —
+  doing it here would have touched three components, seven e2e seeds, the benchmark and several
+  backend tests inside the sprint whose own risk note is that pagination breaks in ways unit tests
+  miss. No index accompanies the new columns, for the reason DEC-036 measured and re-verified here:
+  `sort_author` at page 26 contended is **78.7 ms p95**, against the 78 ms DEC-036 recorded, and
+  the text filter 10.4 ms against 10 ms. Sprint 024 (export) inherits a third owner-edited field
+  after the attachment filename (DEC-050): an export that reconstructs sort names from authors
+  loses a correction, exactly as one that reconstructs filenames from digests does.
