@@ -1,5 +1,5 @@
 from collections import Counter
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
@@ -52,7 +52,8 @@ class Provider(Protocol):
     async def fetch(self, source_id: str) -> ItemPayload: ...
 
 
-def _isbn(candidate: SearchCandidate) -> str | None:
+def isbn_identity(candidate: SearchCandidate) -> str | None:
+    """Books' cross-provider identity: an ISBN is globally unique, so it can group."""
     value = candidate.identifiers.get("isbn13") or candidate.identifiers.get("isbn")
     if not value:
         return None
@@ -62,18 +63,44 @@ def _isbn(candidate: SearchCandidate) -> str | None:
         return None
 
 
+def no_shared_identity(_candidate: SearchCandidate) -> None:
+    """Albums have no cross-provider identity, and that is a complete answer.
+
+    DEC-052 observed barcode `888837168625` on three distinct releases. A barcode is
+    therefore not an edition key, and there is no other global identifier a second
+    provider would carry — so the correct behaviour is to merge nothing rather than
+    to merge on a weaker key.
+    """
+    return None
+
+
+@dataclass(frozen=True)
+class IdentityStrategy:
+    """How a domain decides two candidates are the same record, and who wins a merge.
+
+    `identity_key` returning `None` means *never merge this candidate*. Both halves are
+    per-domain: the grouping key, and the source order that picks the primary row of a
+    group and breaks ranking ties.
+    """
+
+    identity_key: Callable[[SearchCandidate], str | None]
+    source_preference: tuple[str, ...]
+
+
 SOURCE_PREFERENCE = ("openlibrary", "googlebooks")
+BOOK_IDENTITY = IdentityStrategy(isbn_identity, SOURCE_PREFERENCE)
+ALBUM_IDENTITY = IdentityStrategy(no_shared_identity, ("musicbrainz",))
 
 
-def _source_rank(source: str) -> tuple[int, str]:
+def _source_rank(source: str, preference: Sequence[str]) -> tuple[int, str]:
     """Product spec 4.3 prefers Open Library's record; alphabetical order does not."""
-    if source in SOURCE_PREFERENCE:
-        return (SOURCE_PREFERENCE.index(source), "")
-    return (len(SOURCE_PREFERENCE), source)
+    if source in preference:
+        return (preference.index(source), "")
+    return (len(preference), source)
 
 
-def _merge_group(group: Sequence[SearchCandidate]) -> SearchCandidate:
-    primary = next((row for row in group if row.source == "openlibrary"), group[0])
+def _merge_group(group: Sequence[SearchCandidate], preference: Sequence[str]) -> SearchCandidate:
+    primary = min(group, key=lambda row: _source_rank(row.source, preference))
     cover = primary.cover_url or next((row.cover_url for row in group if row.cover_url), None)
     refs = tuple(sorted({ref for row in group for ref in row.source_refs}))
     identifiers = dict(primary.identifiers)
@@ -108,8 +135,16 @@ def _merge_group(group: Sequence[SearchCandidate]) -> SearchCandidate:
     )
 
 
-def merge_and_rank(query: str, candidates: Sequence[SearchCandidate]) -> list[SearchCandidate]:
-    """Merge duplicate editions and rank without discarding provider relevance.
+def merge_and_rank(
+    query: str,
+    candidates: Sequence[SearchCandidate],
+    *,
+    identity: IdentityStrategy,
+) -> list[SearchCandidate]:
+    """Merge duplicate records and rank without discarding provider relevance.
+
+    What counts as a duplicate is the domain's to say (`identity`), not this function's:
+    books group on ISBN, albums group on nothing at all.
 
     Providers already rank their own results; re-sorting them by title threw that away
     and buried the obvious answer under alphabetically earlier noise. Each candidate
@@ -127,16 +162,19 @@ def merge_and_rank(query: str, candidates: Sequence[SearchCandidate]) -> list[Se
     groups: list[list[tuple[int, SearchCandidate]]] = []
     keyed: dict[str, list[tuple[int, SearchCandidate]]] = {}
     for position, candidate in zip(positions, candidates, strict=True):
-        isbn = _isbn(candidate)
-        if isbn:
-            keyed.setdefault(isbn, []).append((position, candidate))
+        key = identity.identity_key(candidate)
+        if key is not None:
+            keyed.setdefault(key, []).append((position, candidate))
         else:
             groups.append([(position, candidate)])
     groups.extend(keyed.values())
 
     # A result merged from both providers takes the best rank either one gave it.
     ranked = [
-        (min(position for position, _row in group), _merge_group([row for _position, row in group]))
+        (
+            min(position for position, _row in group),
+            _merge_group([row for _position, row in group], identity.source_preference),
+        )
         for group in groups
     ]
     normalized_query = normalize_text(query)
@@ -146,7 +184,7 @@ def merge_and_rank(query: str, candidates: Sequence[SearchCandidate]) -> list[Se
             normalize_text(entry[1].title) != normalized_query,
             entry[1].language not in {"es", "en"},
             entry[1].cover_url is None,
-            _source_rank(entry[1].source),
+            _source_rank(entry[1].source, identity.source_preference),
             entry[1].source_id,
         )
     )

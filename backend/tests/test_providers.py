@@ -9,7 +9,12 @@ from book_tracker.application.providers import (
     resolve_input,
     search_providers,
 )
-from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
+from book_tracker.domain.providers import (
+    BOOK_IDENTITY,
+    SearchCandidate,
+    SourceRef,
+    merge_and_rank,
+)
 from book_tracker.infrastructure.providers import (
     MAX_PROVIDER_BYTES,
     GoogleBooksProvider,
@@ -78,6 +83,7 @@ def test_merge_retains_sources_and_prefers_google_cover_without_losing_ol_primar
             candidate("googlebooks", "g1", isbn="9788437604572", cover="https://cover"),
             candidate("openlibrary", "OL1M", isbn="9788437604572"),
         ],
+        identity=BOOK_IDENTITY,
     )
     assert len(merged) == 1
     assert merged[0].source == "openlibrary"

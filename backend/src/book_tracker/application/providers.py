@@ -5,6 +5,7 @@ from collections.abc import Sequence
 from typing import Any
 from urllib.parse import parse_qs, urlsplit
 
+from book_tracker.domain.domains import DEFAULT_DOMAIN, Domain
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.providers import Provider, SearchCandidate, merge_and_rank
 from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS
@@ -38,6 +39,7 @@ async def search_providers(
     query: str,
     providers: Sequence[Provider],
     *,
+    domain: Domain = DEFAULT_DOMAIN,
     limit: int = 20,
     timeout_seconds: float = 5,
 ) -> list[SearchCandidate]:
@@ -46,7 +48,8 @@ async def search_providers(
     )
     if results and not any(success for success, _rows in results):
         raise ProvidersUnavailable("Every enabled metadata provider failed")
-    return merge_and_rank(query, [row for _success, rows in results for row in rows])[:limit]
+    candidates = [row for _success, rows in results for row in rows]
+    return merge_and_rank(query, candidates, identity=domain.identity)[:limit]
 
 
 async def resolve_input(value: str, providers: dict[str, Provider]) -> list[SearchCandidate]:
