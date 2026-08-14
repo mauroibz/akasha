@@ -149,3 +149,83 @@ async def test_cover_accepts_a_wide_but_plausible_cover(tmp_path: Path) -> None:
         prepared = await prepare_cover(client, "https://covers.openlibrary.org/one", tmp_path)
     assert prepared.exists()
     prepared.unlink()
+
+
+@pytest.mark.anyio
+async def test_cover_rejects_an_image_too_small_to_be_a_cover(tmp_path: Path) -> None:
+    """Sprint 020's walkthrough chose a candidate and got a 60x40 image.
+
+    Open Library serves whatever scan it holds behind a `-L.jpg` URL, and for some
+    cover ids that is a thumbnail. It is a real image with a plausible 1.5 ratio, so
+    neither the byte guard nor the placeholder-banner guard catches it; it just looks
+    broken at the 240px the detail page paints it.
+
+    Only the download path is tightened. `prepare_uploaded_cover` is left alone: what a
+    person deliberately uploads is their business.
+    """
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg((60, 40)))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(CoverError, match="too small"):
+            await prepare_cover(client, "https://covers.openlibrary.org/one", tmp_path)
+
+
+@pytest.mark.anyio
+async def test_a_small_but_usable_cover_is_still_accepted(tmp_path: Path) -> None:
+    """The bound has to clear real scans, not just the pathological one."""
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg((220, 330)))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        prepared = await prepare_cover(client, "https://covers.openlibrary.org/one", tmp_path)
+    assert prepared.exists()
+    prepared.unlink()
+
+
+@pytest.mark.anyio
+async def test_open_library_downloads_always_ask_for_no_default_placeholder(
+    tmp_path: Path,
+) -> None:
+    """`?default=false` is the only reliable guard against Open Library's placeholder.
+
+    DEC-044's geometry rule catches Google Books' banner because it is 6.25:1. Open
+    Library's "No image available" is a portrait image of ordinary size, so no shape or
+    byte heuristic separates it from a real cover — Sprint 020's walkthrough installed
+    one at 325x500 and it sailed through both guards. Asking the host not to substitute
+    a default turns it into a 404 instead, so the parameter is forced here rather than
+    trusted to whatever URL arrived.
+    """
+    seen: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg((400, 600)))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        prepared = await prepare_cover(
+            client, "https://covers.openlibrary.org/b/id/8231851-L.jpg", tmp_path
+        )
+    prepared.unlink()
+
+    assert seen == ["https://covers.openlibrary.org/b/id/8231851-L.jpg?default=false"]
+
+
+@pytest.mark.anyio
+async def test_a_non_open_library_host_is_not_given_the_parameter(tmp_path: Path) -> None:
+    """The parameter means something to one host; adding it everywhere is noise."""
+    seen: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(str(request.url))
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg((400, 600)))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        prepared = await prepare_cover(
+            client, "https://books.google.com/books/content?id=abc", tmp_path
+        )
+    prepared.unlink()
+
+    assert seen == ["https://books.google.com/books/content?id=abc"]

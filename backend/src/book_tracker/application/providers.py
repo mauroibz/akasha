@@ -75,6 +75,13 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
     raise InvalidResolution("Use an ISBN, Open Library edition/work URL, or Google Books URL")
 
 
+# The shared client allows 5s, which suits a search someone is watching. A chooser is
+# opened deliberately and Open Library was measured answering a single edition record in
+# 11.3s during Sprint 020's walkthrough, so the candidate path gets its own budget: a
+# ten-second wait is tolerable, a failed chooser is not.
+CANDIDATE_TIMEOUT_SECONDS = 20.0
+
+
 async def cover_candidates(
     openlibrary: Any,
     *,
@@ -96,20 +103,26 @@ async def cover_candidates(
     """
     work: str | None = None
     if edition_id:
-        work = await openlibrary.work_id(edition_id)
+        work = await openlibrary.work_id(edition_id, timeout=CANDIDATE_TIMEOUT_SECONDS)
     if work is None and isbn:
         payload = await openlibrary.fetch_by_isbn(isbn)
-        work = await openlibrary.work_id(payload.source_id)
+        work = await openlibrary.work_id(payload.source_id, timeout=CANDIDATE_TIMEOUT_SECONDS)
     if work is None:
         return []
 
-    rows = await openlibrary.resolve_work(work, limit=limit)
+    rows = await openlibrary.resolve_work(work, limit=limit, timeout=CANDIDATE_TIMEOUT_SECONDS)
     seen: set[str] = set()
     candidates: list[SearchCandidate] = []
     for row in rows:
+        # `resolve_work` falls back to an `/b/olid/` URL for an edition with no cover
+        # id, which is a plausible string and a 404. Offering those puts blank,
+        # clickable tiles in the grid — the walkthrough chose one and got a 422 — so
+        # only an edition whose record carries a real cover id is a candidate.
+        if not row.cover_url or "/b/id/" not in row.cover_url:
+            continue
         # Several editions of a work commonly share one scanned cover; showing it three
         # times reads as a bug rather than as choice.
-        if not row.cover_url or row.cover_url in seen:
+        if row.cover_url in seen:
             continue
         seen.add(row.cover_url)
         candidates.append(row)

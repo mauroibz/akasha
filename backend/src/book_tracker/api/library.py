@@ -16,6 +16,7 @@ from book_tracker.infrastructure.covers import (
     prepare_cover,
     prepare_uploaded_cover,
 )
+from book_tracker.infrastructure.providers import ProviderPayloadError
 from book_tracker.infrastructure.repositories import DomainRepository
 
 logger = logging.getLogger(__name__)
@@ -417,6 +418,19 @@ async def list_cover_candidates(item_id: int, request: Request) -> CoverCandidat
         return CoverCandidates(candidates=[], reason="no_provider_reference")
     try:
         rows = await cover_candidates(provider, edition_id=edition_id, isbn=isbn)
+    except ProviderPayloadError as error:
+        # The distinction is the code, not the exception type, and it matters in both
+        # directions. Open Library answering 404 for an ISBN it does not carry is an
+        # answer, and calling that unreachable sends the reader after a network problem
+        # that is not there. But the same exception also carries genuine transport
+        # failures, and calling those "no candidates" quietly blames the data for an
+        # outage. Sprint 020's walkthrough produced both mistakes in turn.
+        unreachable = error.code in {"provider_unreachable", "provider_http_error"}
+        logger.info("no cover candidates", extra={"item_id": item_id, "code": error.code})
+        return CoverCandidates(
+            candidates=[],
+            reason="provider_unavailable" if unreachable else "no_candidates",
+        )
     except Exception:
         logger.warning("cover candidates unavailable", extra={"item_id": item_id})
         return CoverCandidates(candidates=[], reason="provider_unavailable")

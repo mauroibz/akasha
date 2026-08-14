@@ -53,8 +53,10 @@ async def _bounded_json(
     *,
     params: Mapping[str, str | int],
     headers: Mapping[str, str] | None = None,
+    timeout: float | None = None,
 ) -> Mapping[str, Any]:
-    async with client.stream("GET", url, params=params, headers=headers) as response:
+    extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
+    async with client.stream("GET", url, params=params, headers=headers, **extra) as response:
         response.raise_for_status()
         declared = int(response.headers.get("content-length", "0"))
         if declared > MAX_PROVIDER_BYTES:
@@ -187,8 +189,12 @@ class OpenLibraryProvider:
         self.client = client
         self.headers = {"User-Agent": f"Akasha/0.1 ({contact})"}
 
-    async def _json(self, url: str, **params: str | int) -> Mapping[str, Any]:
-        return await _bounded_json(self.client, url, params=params, headers=self.headers)
+    async def _json(
+        self, url: str, *, timeout: float | None = None, **params: str | int
+    ) -> Mapping[str, Any]:
+        return await _bounded_json(
+            self.client, url, params=params, headers=self.headers, timeout=timeout
+        )
 
     def _candidate(self, row: Mapping[str, Any]) -> SearchCandidate | None:
         nested = row.get("editions")
@@ -416,15 +422,19 @@ class OpenLibraryProvider:
             )
         return await self._edition_payload(row, key.removeprefix("/books/"), isbn)
 
-    async def work_id(self, edition_id: str) -> str | None:
+    async def work_id(self, edition_id: str, *, timeout: float | None = None) -> str | None:
         """The work an edition belongs to, which is where its sibling editions live."""
-        row = await self._json(f"https://openlibrary.org/books/{edition_id}.json")
+        row = await self._json(f"https://openlibrary.org/books/{edition_id}.json", timeout=timeout)
         work_ids = _keys(row.get("works"), "/works/")
         return work_ids[0] if work_ids else None
 
-    async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
+    async def resolve_work(
+        self, work_id: str, limit: int = 20, *, timeout: float | None = None
+    ) -> list[SearchCandidate]:
         body = await self._json(
-            f"https://openlibrary.org/works/{work_id}/editions.json", limit=min(limit, 20)
+            f"https://openlibrary.org/works/{work_id}/editions.json",
+            limit=min(limit, 20),
+            timeout=timeout,
         )
         entries = body.get("entries", [])
         rows: list[SearchCandidate] = []

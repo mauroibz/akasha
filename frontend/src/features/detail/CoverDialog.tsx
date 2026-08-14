@@ -37,6 +37,10 @@ export function CoverDialog({
 }: CoverDialogProps) {
   const [chooseError, setChooseError] = useState("");
   const [pending, setPending] = useState<string | null>(null);
+  // A candidate image can still 404. Hiding only the <img> left a blank tile that
+  // was still clickable, and choosing it answered 422 — the walkthrough did exactly
+  // that. Drop the whole tile instead.
+  const [broken, setBroken] = useState<Set<string>>(new Set());
   // Only ever fetched while the dialog is open, which is what keeps a library page
   // free of provider traffic.
   const candidates = useQuery({
@@ -61,7 +65,9 @@ export function CoverDialog({
     }
   }
 
-  const rows = candidates.data?.candidates ?? [];
+  const rows = (candidates.data?.candidates ?? []).filter(
+    (candidate) => !broken.has(candidate.cover_url),
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -110,10 +116,25 @@ export function CoverDialog({
                     src={candidate.cover_url}
                     alt=""
                     loading="lazy"
-                    // A candidate cover can 404; a torn-image icon reads as breakage,
-                    // so the tile simply goes quiet instead.
-                    onError={(event) => {
-                      event.currentTarget.style.visibility = "hidden";
+                    onError={() =>
+                      setBroken((previous) =>
+                        new Set(previous).add(candidate.cover_url),
+                      )
+                    }
+                    // Open Library serves whatever scan it holds behind a `-L.jpg`
+                    // URL, and for some cover ids that is a 60x40 thumbnail. The
+                    // server refuses those; dropping the tile too means nobody is
+                    // offered a choice that cannot be taken.
+                    onLoad={(event) => {
+                      const image = event.currentTarget;
+                      if (
+                        image.naturalWidth < 200 ||
+                        image.naturalHeight < 200
+                      ) {
+                        setBroken((previous) =>
+                          new Set(previous).add(candidate.cover_url),
+                        );
+                      }
                     }}
                   />
                   <span className="mt-1 block text-xs text-muted-foreground">

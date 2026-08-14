@@ -1,7 +1,7 @@
 import os
 import tempfile
 from pathlib import Path
-from urllib.parse import urljoin, urlsplit
+from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 
 import httpx
 from PIL import Image, UnidentifiedImageError
@@ -16,6 +16,12 @@ MAX_COVER_REDIRECTS = 3
 # it is tall, and Open Library needs no guard at all because its URLs carry
 # `?default=false` and answer 404 instead.
 MAX_COVER_ASPECT_RATIO = 3.0
+# The detail page paints a cover about 240px wide, so anything much under this is
+# visibly broken rather than merely small. Open Library serves whatever scan it holds
+# behind a `-L.jpg` URL and for some cover ids that is a 60x40 thumbnail, which Sprint
+# 020's walkthrough duly installed. Applies to provider downloads only; what someone
+# deliberately uploads is their business.
+MIN_PROVIDER_COVER_EDGE = 200
 ALLOWED_COVER_HOSTS = {
     "covers.openlibrary.org",
     "books.google.com",
@@ -62,6 +68,24 @@ def prepare_uploaded_cover(content: bytes, content_type: str, data_dir: Path) ->
         raise CoverError("cover could not be prepared") from error
 
 
+def _no_placeholder(url: str) -> str:
+    """Ask Open Library for a 404 rather than its "No image available" substitute.
+
+    The geometry guard above catches Google Books' placeholder because it is a 6.25:1
+    banner. Open Library's is a portrait image of ordinary size, so no shape or byte
+    heuristic tells it apart from a real cover — Sprint 020's walkthrough installed one
+    at 325x500 and it passed every check. `default=false` is the only reliable answer,
+    and it is applied here rather than trusted to whatever URL arrived, because the
+    cover chooser accepts a URL from the client.
+    """
+    parts = urlsplit(url)
+    if (parts.hostname or "") != "covers.openlibrary.org":
+        return url
+    query = [(key, value) for key, value in parse_qsl(parts.query) if key != "default"]
+    query.append(("default", "false"))
+    return urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(query), parts.fragment))
+
+
 async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> Path:
     def validate_url(value: str) -> None:
         parsed = urlsplit(value)
@@ -71,6 +95,7 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
             raise CoverError("cover URL must use an allowlisted HTTPS host")
 
     validate_url(url)
+    url = _no_placeholder(url)
     covers_dir = data_dir / "covers"
     covers_dir.mkdir(parents=True, exist_ok=True)
     temporary: Path | None = None
@@ -118,6 +143,8 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
                 raise CoverError("cover exceeds pixel limit")
             if width > height * MAX_COVER_ASPECT_RATIO:
                 raise CoverError("cover looks like a provider placeholder banner")
+            if width < MIN_PROVIDER_COVER_EDGE or height < MIN_PROVIDER_COVER_EDGE:
+                raise CoverError("cover image is too small to use")
             image.load()
             converted = image.convert("RGB")
             converted.thumbnail((MAX_COVER_EDGE, MAX_COVER_EDGE), Image.Resampling.LANCZOS)

@@ -193,7 +193,9 @@ async def test_the_lifespan_drains_queued_jobs_without_anyone_calling_tick(
 
 def jpeg_bytes() -> bytes:
     buffer = io.BytesIO()
-    Image.new("RGB", (40, 60), (120, 30, 30)).save(buffer, "JPEG")
+    # A realistic cover shape: `prepare_cover` now rejects provider images too small
+    # to use, and the 40x60 stand-in this used to be would be one of them.
+    Image.new("RGB", (400, 600), (120, 30, 30)).save(buffer, "JPEG")
     return buffer.getvalue()
 
 

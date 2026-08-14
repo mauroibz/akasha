@@ -16,7 +16,7 @@ import pytest
 from recordings import recording, redirect_location, replay
 from sqlalchemy import Engine, text
 
-from book_tracker.application.providers import cover_candidates
+from book_tracker.application.providers import CANDIDATE_TIMEOUT_SECONDS, cover_candidates
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
 from book_tracker.infrastructure.providers import OpenLibraryProvider, create_provider_client
@@ -139,8 +139,8 @@ def seed_item(engine: Engine, *, source: str | None = None, isbn: str | None = N
         if isbn is not None:
             connection.execute(
                 text(
-                    "INSERT INTO item_identifiers (item_id, kind, value, normalized_value)"
-                    " VALUES (:i, 'isbn', :v, :v)"
+                    "INSERT INTO item_identifiers (item_id, kind, value, normalized_value,"
+                    " created_at, updated_at) VALUES (:i, 'isbn', :v, :v, 'n', 'n')"
                 ),
                 {"i": item_id, "v": isbn},
             )
@@ -284,3 +284,94 @@ def _jpeg() -> bytes:
 
 
 assert json  # the seed helpers keep metadata as JSON text
+
+
+@pytest.mark.anyio
+async def test_an_isbn_open_library_does_not_index_reads_as_no_candidates(
+    tmp_path: Path, engine: Engine
+) -> None:
+    """Not indexed is not unreachable.
+
+    The walkthrough hit this: Open Library answers 404 for a perfectly good ISBN it
+    simply does not carry, and reporting that as "could not be reached" sends the
+    reader chasing a network problem that does not exist.
+    """
+    item_id = seed_item(engine, isbn="9788439731764")
+    app = app_with(tmp_path, engine, {"/isbn/9788439731764.json": (404, {"error": "notfound"})})
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(f"/api/items/{item_id}/cover-candidates")
+
+    assert response.json() == {"candidates": [], "reason": "no_candidates"}
+
+
+@pytest.mark.anyio
+async def test_candidate_lookup_outlasts_the_default_client_timeout() -> None:
+    """Open Library was measured answering one edition record in 11.3s.
+
+    The shared client allows 5s, which is right for a search someone is watching and
+    wrong for a chooser they deliberately opened. The candidate path therefore carries
+    its own, longer budget; without it the whole feature fails whenever Open Library is
+    having a slow day, which is what the walkthrough saw.
+    """
+    seen: list[float | None] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request.extensions.get("timeout", {}).get("read"))
+        return httpx.Response(200, json=recording("edition_OL19845805M.json"))
+
+    async with create_provider_client(transport=httpx.MockTransport(handler)) as client:
+        provider = OpenLibraryProvider(client, "test@example.invalid")
+        await provider.work_id("OL19845805M", timeout=CANDIDATE_TIMEOUT_SECONDS)
+
+    assert seen == [CANDIDATE_TIMEOUT_SECONDS]
+    assert CANDIDATE_TIMEOUT_SECONDS > 11
+
+
+@pytest.mark.anyio
+async def test_an_unreachable_provider_is_not_blamed_on_the_data(
+    tmp_path: Path, engine: Engine
+) -> None:
+    """The other half of the same mistake.
+
+    `fetch_by_isbn` raises the same exception type for "not indexed" and for "could not
+    be reached"; only the code separates them. Mapping both to `no_candidates` tells the
+    reader this book has no other editions when Open Library is simply down — which it
+    genuinely was during the walkthrough, answering 503.
+    """
+    item_id = seed_item(engine, isbn="9788439731764")
+    app = app_with(tmp_path, engine, {"/isbn/9788439731764.json": (503, {"error": "unavailable"})})
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(f"/api/items/{item_id}/cover-candidates")
+
+    assert response.json() == {"candidates": [], "reason": "provider_unavailable"}
+
+
+@pytest.mark.anyio
+async def test_editions_without_a_real_cover_image_are_not_offered() -> None:
+    """`resolve_work` invents an `/b/olid/` URL for an edition that has no cover.
+
+    That URL is a plausible string and a 404. The walkthrough clicked one: six tiles in
+    a twenty-tile grid were blank, and choosing one answered 422. Only editions whose
+    record actually carries a cover id are offered.
+    """
+    entries = recording("editions_OL14860424W.json")
+    for entry in entries["entries"][:4]:
+        entry.pop("covers", None)
+    routes = {
+        "/books/OL19845805M.json": (200, recording("edition_OL19845805M.json")),
+        "/works/OL14860424W/editions.json": (200, entries),
+    }
+    async with create_provider_client(transport=replay(routes)) as client:
+        rows = await cover_candidates(
+            OpenLibraryProvider(client, "test@example.invalid"), edition_id="OL19845805M"
+        )
+
+    assert len(rows) == 16
+    assert all("/b/id/" in (row.cover_url or "") for row in rows)
+    assert not any("/b/olid/" in (row.cover_url or "") for row in rows)
