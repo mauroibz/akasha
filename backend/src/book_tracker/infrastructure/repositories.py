@@ -9,6 +9,7 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from book_tracker.domain.domains import DEFAULT_DOMAIN
 from book_tracker.domain.identity import Identifier
 from book_tracker.domain.matching import MatchDecision, MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
@@ -141,6 +142,7 @@ class DomainRepository:
         title: str,
         subtitle: str | None = None,
         creators: Sequence[str] = (),
+        item_type: str = DEFAULT_DOMAIN.item_type,
         identifiers: Sequence[Identifier] = (),
         sources: Sequence[SourceIdentity] = (),
         user_id: int = 1,
@@ -153,7 +155,7 @@ class DomainRepository:
             now = _now()
             if decision.item_id is None:
                 item = ItemRow(
-                    type="book",
+                    type=item_type,
                     title=title,
                     subtitle=subtitle,
                     year=None,
@@ -243,6 +245,7 @@ class DomainRepository:
         score: int | None,
         shelf_ids: Sequence[int] = (),
         creator_sort: str | None = None,
+        item_type: str = DEFAULT_DOMAIN.item_type,
         user_id: int = 1,
     ) -> EntryResult:
         with self._write() as session:
@@ -253,7 +256,7 @@ class DomainRepository:
             now = _now()
             if decision.item_id is None:
                 item = ItemRow(
-                    type="book",
+                    type=item_type,
                     title=title,
                     subtitle=subtitle,
                     year=year,
@@ -589,7 +592,9 @@ class ImportRepository:
                         **({"series": payload["series"]} if payload.get("series") else {}),
                     }
                     item = ItemRow(
-                        type="book",
+                        # Goodreads and Calibre are book pipelines and stay that way;
+                        # the type still comes from the registry rather than a literal.
+                        type=DEFAULT_DOMAIN.item_type,
                         title=payload["title"],
                         subtitle=None,
                         year=payload.get("year"),

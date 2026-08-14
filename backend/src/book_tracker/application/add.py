@@ -6,6 +6,7 @@ import httpx
 from sqlalchemy import Engine
 
 from book_tracker.application.library import LibraryError, LibraryService
+from book_tracker.domain.domains import DEFAULT_DOMAIN
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
@@ -106,6 +107,10 @@ class AddService:
         confirm_near_match: bool = False,
     ) -> dict[str, Any]:
         creator_sort: str | None = None
+        # Manual entry is a book form; a provider add is whatever domain that provider
+        # serves. Either way the type comes from the registry or the adapter, never
+        # from a literal at the call site.
+        item_type = DEFAULT_DOMAIN.item_type
         if manual is not None:
             cover_url = None
             cover_fallback_urls: Sequence[str] = ()
@@ -126,6 +131,8 @@ class AddService:
         else:
             assert source is not None and source_id is not None
             payload = await self._provider_payload(source, source_id, supplied_refs)
+            provider = self.providers.get(source)
+            item_type = getattr(provider, "item_type", item_type)
             cover_url = payload.cover_url
             cover_fallback_urls = payload.cover_fallback_urls
             title = payload.title
@@ -172,6 +179,7 @@ class AddService:
                 score=score,
                 shelf_ids=shelf_ids,
                 creator_sort=creator_sort,
+                item_type=item_type,
             )
         except IdentityConflict as error:
             raise LibraryError(

@@ -90,3 +90,65 @@ async def test_search_api_announces_partial_provider_results(tmp_path: Path) -> 
             response = await client.get("/api/search", params={"q": "Rayuela"})
     assert response.status_code == 200
     assert response.headers["X-Provider-Warning"] == "Some metadata providers are unavailable"
+
+
+class RecordingProvider:
+    """A provider that only says whether it was asked."""
+
+    def __init__(self, name: str, item_type: str) -> None:
+        self.name = name
+        self.item_type = item_type
+        self.searches: list[str] = []
+
+    async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+        self.searches.append(query)
+        return [
+            SearchCandidate(
+                source=self.name,
+                source_id=f"{self.name}-1",
+                source_refs=(SourceRef(self.name, f"{self.name}-1"),),
+                title=query,
+                subtitle=None,
+                creators=("Someone",),
+                year=2001,
+                cover_url=None,
+                identifiers={},
+                language="en",
+                metadata={},
+            )
+        ]
+
+    async def fetch(self, source_id: str):  # type: ignore[no-untyped-def]
+        raise NotImplementedError
+
+
+@pytest.mark.anyio
+async def test_a_search_reaches_only_the_providers_of_the_domain_it_names(
+    tmp_path: Path,
+) -> None:
+    """AC5, and it is structural rather than careful.
+
+    A provider serves one domain, and the search endpoint selects by `item_type`, so
+    adding an album cannot spend a book-provider request even by accident — which
+    matters because Google Books is metered (DEC-045).
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    books = RecordingProvider("openlibrary", "book")
+    albums = RecordingProvider("musicbrainz", "album")
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.providers = {"openlibrary": books, "musicbrainz": albums}
+        book_search = await client.get("/api/search", params={"q": "Rayuela"})
+        album_search = await client.get(
+            "/api/search", params={"q": "Kind of Blue", "type": "album"}
+        )
+        unknown = await client.get("/api/search", params={"q": "x", "type": "sculpture"})
+
+    assert books.searches == ["Rayuela"]
+    assert albums.searches == ["Kind of Blue"]
+    # The default is books, so every client that predates the second domain is unchanged.
+    assert book_search.json()[0]["source"] == "openlibrary"
+    assert album_search.json()[0]["source"] == "musicbrainz"
+    assert unknown.status_code == 422

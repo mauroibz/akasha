@@ -28,6 +28,12 @@ function renderPage() {
 
 afterEach(() => vi.restoreAllMocks());
 
+/** The two domains `GET /api/item-types` publishes (DEC-052 seam 3). */
+const itemTypes = [
+  { id: "book", label: "Book", fields: [] },
+  { id: "album", label: "Album", fields: [] },
+];
+
 describe("AddPage", () => {
   it("debounces provider search and offers keyboard-accessible manual fallback", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
@@ -93,6 +99,8 @@ describe("AddPage", () => {
       async (input, init) =>
         new Promise<Response>((resolve) => {
           const url = String(input);
+          if (url === "/api/item-types")
+            return resolve(new Response(JSON.stringify(itemTypes)));
           if (url === "/api/shelves") return resolve(new Response("[]"));
           if (url === "/api/health/providers")
             return resolve(
@@ -147,6 +155,8 @@ describe("AddPage", () => {
   it("keeps the manual escape hatch when providers fail outright", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/health/providers")
         return new Response(JSON.stringify({ providers: [], degraded: false }));
@@ -289,10 +299,39 @@ describe("AddPage", () => {
     expect(screen.getByLabelText(/^isbn$/i)).toHaveValue("not-an-isbn");
   });
 
+  it("asks the providers of the domain the reader chose", async () => {
+    // AC5 from the reader's side: choosing Albums sends `type=album`, and the
+    // backend answers it with MusicBrainz alone. Nothing filters a mixed result
+    // set on the client, because a mixed result set is never fetched.
+    const searched: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
+      searched.push(url);
+      return new Response(JSON.stringify([]));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    const albums = await screen.findByRole("radio", { name: "Album" });
+    await user.click(albums);
+    await user.type(screen.getByRole("searchbox"), "Kind of Blue");
+    await waitFor(() => expect(searched.length).toBeGreaterThan(0));
+
+    expect(albums).toHaveAttribute("aria-checked", "true");
+    expect(searched.at(-1)).toContain("type=album");
+    expect(searched.some((url) => url.includes("type=book"))).toBe(false);
+  });
+
   it("requires explicit confirmation before adding a near-match edition", async () => {
     let posts = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (String(input) === "/api/health/providers")
         return new Response(JSON.stringify({ providers: [], degraded: false }));
       posts += 1;

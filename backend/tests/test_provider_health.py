@@ -44,6 +44,8 @@ async def test_missing_google_key_warns_at_startup_and_reports_a_degraded_provid
     assert body["degraded"] is True
     assert body["providers"] == [
         {"name": "openlibrary", "available": True, "reason": None},
+        # The album provider needs no key, so it is available wherever it is wired.
+        {"name": "musicbrainz", "available": True, "reason": None},
         {
             "name": "googlebooks",
             "available": False,
@@ -53,7 +55,7 @@ async def test_missing_google_key_warns_at_startup_and_reports_a_degraded_provid
 
 
 @pytest.mark.anyio
-async def test_a_configured_key_reports_both_providers_available(tmp_path: Path) -> None:
+async def test_a_configured_key_reports_every_provider_available(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path, key="test-key"))
     async with (
         app.router.lifespan_context(app),
@@ -63,7 +65,11 @@ async def test_a_configured_key_reports_both_providers_available(tmp_path: Path)
 
     body = response.json()
     assert body["degraded"] is False
-    assert [row["name"] for row in body["providers"]] == ["openlibrary", "googlebooks"]
+    assert [row["name"] for row in body["providers"]] == [
+        "openlibrary",
+        "musicbrainz",
+        "googlebooks",
+    ]
     assert all(row["available"] for row in body["providers"])
 
 

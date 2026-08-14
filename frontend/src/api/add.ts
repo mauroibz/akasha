@@ -44,11 +44,20 @@ async function json<T>(response: Response, message: string): Promise<T> {
   if (!response.ok) throw new Error(message);
   return response.json() as Promise<T>;
 }
-export function searchBooks(value: string, signal?: AbortSignal) {
+/**
+ * `itemType` decides which providers are asked. It is not cosmetic: a search never
+ * reaches a provider that serves another domain, so looking for an album spends no
+ * Google Books quota and looking for a book spends no MusicBrainz request.
+ */
+export function searchCandidates(
+  value: string,
+  itemType: string,
+  signal?: AbortSignal,
+) {
   const resolved = /^(https?:\/\/|[\dXx -]{10,17}$)/.test(value.trim());
   const route = resolved
     ? `/api/search/resolve?url=${encodeURIComponent(value.trim())}`
-    : `/api/search?q=${encodeURIComponent(value.trim())}`;
+    : `/api/search?q=${encodeURIComponent(value.trim())}&type=${encodeURIComponent(itemType)}`;
   return fetch(route, { headers: { Accept: "application/json" }, signal }).then(
     async (response) => ({
       items: await json<SearchCandidate[]>(

@@ -24,9 +24,7 @@ KIND_OF_BLUE = "8e8a594f-2175-38c7-a871-abb68ec363e7"
 ORIGINAL_RELEASE = "79ed3ff2-1b33-3245-8755-947554bc8b3d"
 CONTACT = "test@example.invalid"
 
-SEARCH_ROUTES = {
-    "/ws/2/release-group": (200, recording("musicbrainz_search_kind_of_blue.json"))
-}
+SEARCH_ROUTES = {"/ws/2/release-group": (200, recording("musicbrainz_search_kind_of_blue.json"))}
 FETCH_ROUTES = {
     f"/ws/2/release-group/{KIND_OF_BLUE}": (
         200,

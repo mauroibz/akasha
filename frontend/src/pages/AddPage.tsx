@@ -8,7 +8,7 @@ import {
   createEntry,
   getShelves,
   NearMatchError,
-  searchBooks,
+  searchCandidates,
   type ManualItem,
   type SearchCandidate,
 } from "@/api/add";
@@ -28,10 +28,16 @@ import {
   splitList,
   type ManualBookValues,
 } from "@/features/detail/schemas";
-import type { EntryStatus } from "@/api/library";
+import type { EntryStatus, ItemType } from "@/api/library";
+import { getItemTypes } from "@/api/library";
+import { cn } from "@/lib/utils";
 
 export function AddPage() {
   const [query, setQuery] = useState("");
+  // Which domain is being searched. Not a filter over one result set: it decides
+  // which providers are asked at all (DEC-052 seam 6).
+  const [itemType, setItemType] = useState("book");
+  const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
   const [results, setResults] = useState<SearchCandidate[]>([]);
   const presets = useMotionPresets();
   // Identity of the committed result set, so a new search re-staggers and a
@@ -67,7 +73,7 @@ export function AddPage() {
     const timer = window.setTimeout(() => {
       setPending(true);
       setError("");
-      void searchBooks(query, controller.signal)
+      void searchCandidates(query, itemType, controller.signal)
         .then((value) => {
           if (searchRequestId.current !== requestId) return;
           setResults(value.items);
@@ -79,7 +85,11 @@ export function AddPage() {
           if (e.name === "AbortError") return;
           if (searchRequestId.current !== requestId) return;
           setError(e.message);
-          setWarning("You can still enter this book manually.");
+          setWarning(
+            itemType === "book"
+              ? "You can still enter this book manually."
+              : "Try again in a moment.",
+          );
         })
         .finally(() => {
           if (searchRequestId.current !== requestId) return;
@@ -90,10 +100,16 @@ export function AddPage() {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [query]);
+  }, [query, itemType]);
   useEffect(() => {
     void getShelves()
       .then(setShelves)
+      .catch(() => undefined);
+  }, []);
+  // The domains come from the server, so this screen never enumerates them itself.
+  useEffect(() => {
+    void getItemTypes()
+      .then(setItemTypes)
       .catch(() => undefined);
   }, []);
   useEffect(() => {
@@ -178,24 +194,58 @@ export function AddPage() {
     ? form.handleSubmit((values) => submit(values))
     : () => submit(form.getValues());
   const editing = manual || selected;
+  const searchLabel = itemType === "book" ? "Search books" : "Search albums";
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
       <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
         ← Library
       </Button>
-      <h1 className="mt-6 text-4xl font-semibold">Add a book</h1>
+      <h1 className="mt-6 text-4xl font-semibold">Add to your library</h1>
       {!editing && (
         <>
-          <label className="mt-8 block">
-            <span className="sr-only">Search books</span>
+          {itemTypes.length > 1 && (
+            <div
+              role="radiogroup"
+              aria-label="What are you adding?"
+              className="mt-6 inline-flex rounded-full bg-surface p-1"
+            >
+              {itemTypes.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={itemType === choice.id}
+                  className={cn(
+                    "rounded-full px-5 py-2 text-sm font-medium transition-colors",
+                    itemType === choice.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => {
+                    setItemType(choice.id);
+                    setResults([]);
+                    setManual(false);
+                  }}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          )}
+          <label className="mt-4 block">
+            <span className="sr-only">{searchLabel}</span>
             <Input
               autoFocus
               role="searchbox"
-              aria-label="Search books"
+              aria-label={searchLabel}
               className="h-12 rounded-full bg-surface px-5"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Title, author, ISBN, or URL"
+              placeholder={
+                itemType === "book"
+                  ? "Title, author, ISBN, or URL"
+                  : "Album or artist"
+              }
             />
           </label>
           <ProviderHealthNotice />

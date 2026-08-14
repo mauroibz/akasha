@@ -11,6 +11,7 @@ from book_tracker.application.providers import (
     resolve_input,
     search_providers,
 )
+from book_tracker.domain.domains import DEFAULT_DOMAIN, DOMAINS
 from book_tracker.domain.providers import Provider, SearchCandidate
 
 router = APIRouter(prefix="/api")
@@ -62,6 +63,20 @@ def _providers(request: Request) -> dict[str, Provider]:
     return cast(dict[str, Provider], request.app.state.providers)
 
 
+def _providers_for(request: Request, item_type: str) -> dict[str, Provider]:
+    """Only the providers that serve this domain.
+
+    This is what makes "adding an album spends no book-provider request" structural
+    rather than a matter of care: a search never reaches a provider whose `item_type`
+    is not the one being searched for.
+    """
+    return {
+        name: provider
+        for name, provider in _providers(request).items()
+        if getattr(provider, "item_type", DEFAULT_DOMAIN.item_type) == item_type
+    }
+
+
 @router.get("/search/resolve", response_model=list[SearchCandidateResponse])
 async def resolve(
     url: Annotated[str, Query(min_length=1)], request: Request
@@ -79,9 +94,21 @@ async def resolve(
 
 @router.get("/search", response_model=list[SearchCandidateResponse])
 async def search(
-    q: Annotated[str, Query(min_length=1, max_length=300)], request: Request, response: Response
+    q: Annotated[str, Query(min_length=1, max_length=300)],
+    request: Request,
+    response: Response,
+    type: Annotated[str, Query(max_length=50)] = DEFAULT_DOMAIN.item_type,
 ) -> list[SearchCandidateResponse]:
-    providers = _providers(request)
+    domain = DOMAINS.get(type)
+    if domain is None:
+        raise LibraryError("unknown_item_type", f"No domain named {type!r}", status_code=422)
+    providers = _providers_for(request, domain.item_type)
+    if not providers:
+        raise LibraryError(
+            "providers_unavailable",
+            f"No metadata provider is configured for {domain.label.lower()}s",
+            status_code=503,
+        )
     # Search records what it spends but is never blocked by a daily budget (DEC-045).
     # The last request of a day belongs to the person waiting for a result, not to
     # background enrichment, which can defer to tomorrow without anyone noticing.
@@ -91,7 +118,7 @@ async def search(
         for name in providers:
             quota.record(name, moment)
     try:
-        rows = await search_providers(q, list(providers.values()))
+        rows = await search_providers(q, list(providers.values()), domain=domain)
     except ProvidersUnavailable as error:
         raise LibraryError("providers_unavailable", str(error), status_code=503) from error
     represented = {ref.source for row in rows for ref in row.source_refs}

@@ -56,7 +56,8 @@ def _credit(artist_credit: Sequence[Any]) -> tuple[tuple[str, ...], str, str | N
     for index, entry in enumerate(artist_credit):
         if not isinstance(entry, Mapping):
             continue
-        artist = entry.get("artist") if isinstance(entry.get("artist"), Mapping) else {}
+        candidate = entry.get("artist")
+        artist: Mapping[str, Any] = candidate if isinstance(candidate, Mapping) else {}
         name = str(entry.get("name") or artist.get("name") or "").strip()
         if not name:
             continue
@@ -64,7 +65,9 @@ def _credit(artist_credit: Sequence[Any]) -> tuple[tuple[str, ...], str, str | N
         rendered.append(name + str(entry.get("joinphrase") or ""))
         if index == 0:
             curated = artist.get("sort-name")
-            sort_name = str(curated).strip() if isinstance(curated, str) and curated.strip() else None
+            sort_name = (
+                str(curated).strip() if isinstance(curated, str) and curated.strip() else None
+            )
     return tuple(names), "".join(rendered).strip(), sort_name
 
 
@@ -185,11 +188,14 @@ class MusicBrainzProvider:
             )
 
         creators, credit, sort_name = _credit(group.get("artist-credit") or [])
-        label_info = next(
+        label_info: Mapping[str, Any] = next(
             (row for row in release.get("label-info") or [] if isinstance(row, Mapping)), {}
         )
-        label = label_info.get("label") if isinstance(label_info.get("label"), Mapping) else {}
-        medium = next((row for row in release.get("media") or [] if isinstance(row, Mapping)), {})
+        named = label_info.get("label")
+        label: Mapping[str, Any] = named if isinstance(named, Mapping) else {}
+        medium: Mapping[str, Any] = next(
+            (row for row in release.get("media") or [] if isinstance(row, Mapping)), {}
+        )
         representation = release.get("text-representation")
         language = (
             _text(representation.get("language")) if isinstance(representation, Mapping) else None

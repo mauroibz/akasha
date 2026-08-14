@@ -339,7 +339,7 @@ test("add has no serious accessibility violations", async ({ page }) => {
   await stubProviderHealth(page);
   await page.goto("/add");
   await expect(
-    page.getByRole("heading", { name: /add a book/i }),
+    page.getByRole("heading", { name: /add to your library/i }),
   ).toBeVisible();
   await expectNoSeriousViolations(page, "add");
 });

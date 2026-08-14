@@ -189,6 +189,66 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
                 assert values[-1] is None
 
 
+@pytest.mark.anyio
+@pytest.mark.parametrize("sort", ["creator", "title", "date_added", "year"])
+async def test_a_mixed_library_pages_across_the_type_boundary(tmp_path: Path, sort: str) -> None:
+    """AC4, and the tripwire DEC-052 set.
+
+    Keyset pagination was predicted to need no change for a second domain. If a page
+    skipped a row, repeated one or dropped the cursor once albums sat beside books,
+    that prediction was wrong and the seam model with it — so this walks a mixed
+    library one row at a time, past page 1, with a cursor issued before the last page.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        seeded = [
+            ("book", "Rayuela", "Julio Cortázar", 1963),
+            ("album", "Kind of Blue", "Miles Davis", 1959),
+            ("book", "Ficciones", "Jorge Luis Borges", 1944),
+            ("album", "Discovery", "Daft Punk", 2001),
+            ("album", "Ávila", None, None),
+            ("book", "Pedro Páramo", "Juan Rulfo", 1955),
+        ]
+        for item_type, title, creator, year in seeded:
+            created = repository.create_or_get_entry(
+                title=title,
+                creators=(creator,) if creator else (),
+                item_type=item_type,
+            )
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    text("UPDATE entries SET status='read' WHERE id=:id"),
+                    {"id": created.entry_id},
+                )
+                if year is not None:
+                    connection.execute(
+                        text("UPDATE items SET year=:year WHERE id=:id"),
+                        {"year": year, "id": created.item_id},
+                    )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            cursor = None
+            rows: list[dict[str, object]] = []
+            pages = 0
+            while True:
+                params: dict[str, object] = {"sort": sort, "order": "asc", "limit": 2}
+                if cursor:
+                    params["after"] = cursor
+                page = (await client.get("/api/entries", params=params)).json()
+                rows.extend(page["items"])
+                pages += 1
+                cursor = page["next_cursor"]
+                if cursor is None:
+                    break
+
+    assert pages > 1
+    identifiers = [row["id"] for row in rows]
+    assert len(set(identifiers)) == len(identifiers) == len(seeded)
+    assert {row["item"]["type"] for row in rows} == {"book", "album"}
+
+
 def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
     """A pre-0011 cursor carries a value from the old projection.
 

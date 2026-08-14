@@ -3590,6 +3590,17 @@
               "title": "Q",
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "default": "book",
+              "maxLength": 50,
+              "title": "Type",
+              "type": "string"
+            }
           }
         ],
         "responses": {

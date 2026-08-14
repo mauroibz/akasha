@@ -24,6 +24,7 @@ from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
+from book_tracker.infrastructure.musicbrainz import MusicBrainzProvider
 from book_tracker.infrastructure.providers import (
     GoogleBooksProvider,
     OpenLibraryProvider,
@@ -154,6 +155,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 "GOOGLE_BOOKS_API_KEY is not set; search and enrichment run on Open "
                 "Library alone and Spanish-language coverage will be poor"
             )
+        # The album domain. MusicBrainz needs no key, only a descriptive User-Agent and
+        # ~1 request/second, both of which the adapter owns (DEC-052 seam 4/6).
+        providers.append(
+            MusicBrainzProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
         app.state.providers = {provider.name: provider for provider in providers}
         # Durable job runner for background enrichment (Sprint 011)
         rate_limiter = RateLimiter(min_interval_seconds=0.5)
@@ -249,6 +257,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         configured_providers = getattr(app.state, "providers", {})
         rows = [
             ProviderStatus(name="openlibrary", available="openlibrary" in configured_providers),
+            ProviderStatus(
+                name="musicbrainz",
+                available="musicbrainz" in configured_providers,
+                reason=None if "musicbrainz" in configured_providers else "not configured",
+            ),
             ProviderStatus(
                 name="googlebooks",
                 available="googlebooks" in configured_providers,
