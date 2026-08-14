@@ -60,6 +60,10 @@ good and why. No social media features, fully offline.
   and seven nights of backups cost about one copy rather than seven. Files are served
   as downloads and never rendered, and nothing here parses them — this is a shelf, not
   a reader.
+- **Your library, exportable.** One request dumps everything as JSON, or as a
+  Goodreads-shaped CSV that opens in a spreadsheet. The dump keeps what you typed and
+  leaves out what the application derived, so nothing you corrected by hand is lost and
+  nothing rebuilt from a cache pretends to be authoritative.
 - **Accessible by default.** Twelve automated axe checks gate every change; both list
   surfaces are proper ARIA feeds.
 
