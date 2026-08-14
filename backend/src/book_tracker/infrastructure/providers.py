@@ -567,4 +567,14 @@ class GoogleBooksProvider:
             for value in info.get("industryIdentifiers", [])
             if isinstance(value, dict)
         ]
-        return ItemPayload(**candidate.__dict__, edition_match=classify_edition(carried, isbn))
+        match = classify_edition(carried, isbn)
+        if match is not EDITION_CONFIRMED:
+            # DEC-044: unverifiable is rejected exactly like contradicted. The measured
+            # failure was not a right-book/wrong-printing mismatch but an entirely
+            # different work, so merging only the work-level fields would have kept the
+            # worst error. Absent metadata beats confidently wrong metadata.
+            raise ProviderPayloadError(
+                f"Google Books returned a volume that cannot be confirmed as ISBN {isbn}",
+                code="edition_unverified",
+            )
+        return ItemPayload(**candidate.__dict__, edition_match=match)

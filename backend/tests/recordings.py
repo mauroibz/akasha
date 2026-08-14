@@ -89,6 +89,16 @@ GOOGLE_HIT: Mapping[str, Route] = {
 GOOGLE_MISS: Mapping[str, Route] = {
     "/books/v1/volumes": (200, recording("googlebooks_isbn_9789994444441_empty.json"))
 }
+# `GOOGLE_HIT` answers with a volume carrying no ISBN, which is the defect DEC-044
+# repaired and is now rejected. `GOOGLE_CONFIRMED` is the verified counterpart, for
+# proving the fallback still works rather than having been switched off.
+CONFIRMED_ISBN = "9780307474728"
+GOOGLE_CONFIRMED: Mapping[str, Route] = {
+    "/books/v1/volumes": (200, recording("googlebooks_isbn_9780307474728.json"))
+}
+OPENLIBRARY_MISS_CONFIRMED: Mapping[str, Route] = {
+    f"/isbn/{CONFIRMED_ISBN}.json": (404, {"error": "notfound"})
+}
 
 
 def unreachable_transport() -> httpx.MockTransport:

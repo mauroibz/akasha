@@ -14,10 +14,13 @@ from typing import Any
 import httpx
 import pytest
 from recordings import (
+    CONFIRMED_ISBN,
+    GOOGLE_CONFIRMED,
     GOOGLE_HIT,
     GOOGLE_MISS,
     OPENLIBRARY_HIT,
     OPENLIBRARY_MISS,
+    OPENLIBRARY_MISS_CONFIRMED,
     RECORDED_ISBN,
     enrichment_providers,
 )
@@ -99,15 +102,37 @@ async def test_open_library_hit_fills_empty_fields_from_the_recorded_edition(
 
 @pytest.mark.anyio
 async def test_open_library_miss_falls_back_to_google_books(engine: Engine) -> None:
-    item_id = create_item(engine, "Rayuela")
-    async with enrichment_providers(openlibrary=OPENLIBRARY_MISS, google=GOOGLE_HIT) as providers:
-        _job_id, result = await run_job(engine, providers, item_id)
+    """The fallback still works, when the volume can be tied to the requested ISBN."""
+    item_id = create_item(engine, "Cien años de soledad")
+    async with enrichment_providers(
+        openlibrary=OPENLIBRARY_MISS_CONFIRMED, google=GOOGLE_CONFIRMED
+    ) as providers:
+        _job_id, result = await run_job(engine, providers, item_id, isbn=CONFIRMED_ISBN)
 
     assert result["state"] == "succeeded"
     assert result["progress"]["provider"] == "googlebooks"
     row = read_item(engine, item_id)
-    assert row.year == 1984
-    assert json.loads(row.metadata)["publisher"] == "Ediciones Catedra S.A."
+    assert row.year == 2009
+    assert json.loads(row.metadata)["publisher"] == "Vintage Espanol"
+
+
+@pytest.mark.anyio
+async def test_an_unverifiable_google_volume_is_not_merged_at_all(engine: Engine) -> None:
+    """DEC-044: the fallback answers, but not about the edition that was asked for.
+
+    Before the repair this wrote `Ediciones Catedra S.A.` and 762 pages onto the item
+    from a volume whose only identifier is a library barcode.
+    """
+    item_id = create_item(engine, "Rayuela")
+    async with enrichment_providers(openlibrary=OPENLIBRARY_MISS, google=GOOGLE_HIT) as providers:
+        _job_id, result = await run_job(engine, providers, item_id)
+
+    assert result["state"] == "failed"
+    assert result["error_code"] == "enrichment_no_data"
+    assert "cannot be confirmed" in result["error"]
+    row = read_item(engine, item_id)
+    assert row.year is None
+    assert json.loads(row.metadata) == {}
 
 
 @pytest.mark.anyio
@@ -187,6 +212,29 @@ async def test_enrichment_never_overwrites_a_populated_field(engine: Engine) -> 
     assert metadata["authors"] == ["Someone Else"]
     # Fields that were empty are still filled.
     assert metadata["page_count"] == 746
+
+
+@pytest.mark.anyio
+async def test_a_verified_google_volume_still_only_fills_empty_fields(engine: Engine) -> None:
+    """DEC-008 across the path Sprint 020 changed, not only the Open Library one."""
+    item_id = create_item(
+        engine,
+        "Cien años de soledad",
+        year=1967,
+        metadata={"publisher": "Editorial Sudamericana"},
+    )
+    async with enrichment_providers(
+        openlibrary=OPENLIBRARY_MISS_CONFIRMED, google=GOOGLE_CONFIRMED
+    ) as providers:
+        _job_id, result = await run_job(engine, providers, item_id, isbn=CONFIRMED_ISBN)
+
+    assert result["state"] == "succeeded"
+    row = read_item(engine, item_id)
+    # The user's first edition survives the 2009 reprint the provider answered with.
+    assert row.year == 1967
+    metadata = json.loads(row.metadata)
+    assert metadata["publisher"] == "Editorial Sudamericana"
+    assert metadata["page_count"] == 498
 
 
 @pytest.mark.anyio

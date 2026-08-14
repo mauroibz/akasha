@@ -1,0 +1,81 @@
+{
+  "kind": "books#volumes",
+  "totalItems": 300,
+  "items": [
+    {
+      "kind": "books#volume",
+      "id": "7lj5EHcChqYC",
+      "etag": "UDkTwuKUx7M",
+      "selfLink": "https://www.googleapis.com/books/v1/volumes/7lj5EHcChqYC",
+      "volumeInfo": {
+        "title": "Cien años de soledad / One Hundred Years of Solitude",
+        "authors": [
+          "Gabriel García Márquez"
+        ],
+        "publisher": "Vintage Espanol",
+        "publishedDate": "2009-09-22",
+        "description": "\"La aventura fabulosa de la familia Buendía-Iguarán, con sus milagros, fantasías, obsesiones, tragedias, incestos, adulterios, rebeldías, descubrimientos y condenas, representaba al mismo tiempo el mito y la historia, la tragedia y el amor del mundo entero. El personaje principal es Macondo, el pueblo mismo, que sobrevive al olvido por cien años de fracasos personales y acontecimientos fantásticos, para finalmente desaparecer sin rastro alguno, al igual que toda su historia\" --from Amazon.com.",
+        "industryIdentifiers": [
+          {
+            "type": "ISBN_13",
+            "identifier": "9780307474728"
+          },
+          {
+            "type": "ISBN_10",
+            "identifier": "0307474720"
+          }
+        ],
+        "readingModes": {
+          "text": false,
+          "image": false
+        },
+        "pageCount": 498,
+        "printType": "BOOK",
+        "categories": [
+          "Fiction"
+        ],
+        "averageRating": 5,
+        "ratingsCount": 4,
+        "maturityRating": "NOT_MATURE",
+        "allowAnonLogging": false,
+        "contentVersion": "2.5.1.0.preview.0",
+        "panelizationSummary": {
+          "containsEpubBubbles": false,
+          "containsImageBubbles": false
+        },
+        "imageLinks": {
+          "smallThumbnail": "http://books.google.com/books/content?id=7lj5EHcChqYC&printsec=frontcover&img=1&zoom=5&source=gbs_api",
+          "thumbnail": "http://books.google.com/books/content?id=7lj5EHcChqYC&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+        },
+        "language": "es",
+        "previewLink": "http://books.google.com.ar/books?id=7lj5EHcChqYC&dq=isbn:9780307474728&hl=&cd=1&source=gbs_api",
+        "infoLink": "http://books.google.com.ar/books?id=7lj5EHcChqYC&dq=isbn:9780307474728&hl=&source=gbs_api",
+        "canonicalVolumeLink": "https://books.google.com/books/about/Cien_a%C3%B1os_de_soledad_One_Hundred_Years.html?hl=&id=7lj5EHcChqYC"
+      },
+      "saleInfo": {
+        "country": "AR",
+        "saleability": "NOT_FOR_SALE",
+        "isEbook": false
+      },
+      "accessInfo": {
+        "country": "AR",
+        "viewability": "NO_PAGES",
+        "embeddable": false,
+        "publicDomain": false,
+        "textToSpeechPermission": "ALLOWED",
+        "epub": {
+          "isAvailable": false
+        },
+        "pdf": {
+          "isAvailable": true
+        },
+        "webReaderLink": "http://play.google.com/books/reader?id=7lj5EHcChqYC&hl=&source=gbs_api",
+        "accessViewStatus": "NONE",
+        "quoteSharingAllowed": false
+      },
+      "searchInfo": {
+        "textSnippet": "&quot;La aventura fabulosa de la familia Buendía-Iguarán, con sus milagros, fantasías, obsesiones, tragedias, incestos, adulterios, rebeldías, descubrimientos y condenas, representaba al mismo tiempo el mito y la historia, la tragedia y el ..."
+      }
+    }
+  ]
+}

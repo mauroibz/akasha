@@ -122,21 +122,23 @@ def test_classify_edition_separates_confirmation_from_absence_of_evidence() -> N
     assert classify_edition(["9780307474728", "8437604575"], "9788437604572") == EDITION_CONFIRMED
 
 
-@pytest.mark.anyio
-async def test_google_books_marks_the_recorded_volume_unverifiable() -> None:
-    """The committed recording carries a barcode and no ISBN, so nothing confirms it."""
-    transport = replay({"/books/v1/volumes": (200, recording(GOOGLE_RECORDING))})
+def test_the_committed_google_recording_is_itself_the_defect() -> None:
+    """Read straight from the fixture, so what is at stake stays visible in the suite.
 
-    async with create_provider_client(transport=transport) as client:
-        payload = await GoogleBooksProvider(client, "test-key").fetch_by_isbn("9788437604572")
+    The only hit for `isbn:9788437604572` is a scanned volume whose identifiers are a
+    University of Michigan barcode. Before the repair its publisher and page count were
+    merged into whatever item asked for that ISBN, with nothing tying the two together —
+    and its page count disagrees with the Open Library edition's 746.
+    """
+    volume = recording(GOOGLE_RECORDING)["items"][0]
+    info = volume["volumeInfo"]
+    carried = [value.get("identifier") for value in info["industryIdentifiers"]]
 
-    assert payload.source_id == "B-JeAAAAMAAJ"
-    assert payload.identifiers == {}
-    assert payload.edition_match == EDITION_UNVERIFIABLE
-    # The fields that would be merged onto another edition, named so a future change to
-    # the policy has to look at what is actually at stake.
-    assert payload.metadata["publisher"] == "Ediciones Catedra S.A."
-    assert payload.metadata["page_count"] == 762
+    assert volume["id"] == "B-JeAAAAMAAJ"
+    assert carried == ["UOM:39015008575477"]
+    assert classify_edition(carried, "9788437604572") == EDITION_UNVERIFIABLE
+    assert info["publisher"] == "Ediciones Catedra S.A."
+    assert info["pageCount"] == 762
 
 
 @pytest.mark.anyio
@@ -157,3 +159,37 @@ async def test_a_payload_reached_without_a_requested_isbn_has_no_verdict() -> No
         payload = await OpenLibraryProvider(client, "test@example.invalid").fetch("OL19845805M")
 
     assert payload.edition_match is None
+
+
+@pytest.mark.anyio
+async def test_google_books_refuses_a_volume_it_cannot_tie_to_the_requested_isbn() -> None:
+    """The repair: an unverifiable volume is not returned for merging at all.
+
+    Measured in DEC-044: 19.6% of Google Books answers carry no ISBN, and the observed
+    failure was not a wrong printing but a wholly different book — Open Library returned
+    *Crónica de una muerte anunciada* for an ISBN where Google Books returned *Las venas
+    abiertas de América Latina*.
+    """
+    transport = replay({"/books/v1/volumes": (200, recording(GOOGLE_RECORDING))})
+
+    async with create_provider_client(transport=transport) as client:
+        with pytest.raises(ProviderPayloadError) as caught:
+            await GoogleBooksProvider(client, "test-key").fetch_by_isbn("9788437604572")
+
+    assert caught.value.code == "edition_unverified"
+
+
+@pytest.mark.anyio
+async def test_google_books_still_returns_a_volume_that_carries_the_requested_isbn() -> None:
+    """The repair must not degenerate into switching the fallback off."""
+    transport = replay(
+        {"/books/v1/volumes": (200, recording("googlebooks_isbn_9780307474728.json"))}
+    )
+
+    async with create_provider_client(transport=transport) as client:
+        payload = await GoogleBooksProvider(client, "test-key").fetch_by_isbn("9780307474728")
+
+    assert payload.edition_match == EDITION_CONFIRMED
+    assert payload.identifiers == {"isbn13": "9780307474728"}
+    assert payload.metadata["publisher"] == "Vintage Espanol"
+    assert payload.metadata["page_count"] == 498

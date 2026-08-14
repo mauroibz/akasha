@@ -10,6 +10,12 @@ MAX_COVER_BYTES = 10 * 1024 * 1024
 MAX_COVER_PIXELS = 40_000_000
 MAX_COVER_EDGE = 600
 MAX_COVER_REDIRECTS = 3
+# Providers answer "image not available" with a wide, short banner rather than a 404.
+# Google Books' is 575x92 — 6.25:1 — where real covers measured 0.66:1 and 0.77:1
+# (DEC-044). The threshold sits far from both: no book cover is three times as wide as
+# it is tall, and Open Library needs no guard at all because its URLs carry
+# `?default=false` and answer 404 instead.
+MAX_COVER_ASPECT_RATIO = 3.0
 ALLOWED_COVER_HOSTS = {
     "covers.openlibrary.org",
     "books.google.com",
@@ -110,6 +116,8 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
             width, height = image.size
             if width < 10 or height < 10 or width * height > MAX_COVER_PIXELS:
                 raise CoverError("cover exceeds pixel limit")
+            if width > height * MAX_COVER_ASPECT_RATIO:
+                raise CoverError("cover looks like a provider placeholder banner")
             image.load()
             converted = image.convert("RGB")
             converted.thumbnail((MAX_COVER_EDGE, MAX_COVER_EDGE), Image.Resampling.LANCZOS)

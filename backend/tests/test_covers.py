@@ -19,6 +19,12 @@ def jpeg(size: tuple[int, int] = (1200, 800)) -> bytes:
     return output.getvalue()
 
 
+def png(size: tuple[int, int]) -> bytes:
+    output = io.BytesIO()
+    Image.new("P", size, 0).save(output, "PNG")
+    return output.getvalue()
+
+
 @pytest.mark.anyio
 async def test_cover_is_bounded_resized_and_atomically_installed(tmp_path: Path) -> None:
     async def handler(_request: httpx.Request) -> httpx.Response:
@@ -110,3 +116,36 @@ def test_cover_install_failure_removes_prepared_file(
         install_cover(prepared, tmp_path, 7)
     assert not prepared.exists()
     assert not (tmp_path / "covers" / "7.jpg").exists()
+
+
+@pytest.mark.anyio
+async def test_cover_rejects_a_provider_placeholder_banner(tmp_path: Path) -> None:
+    """DEC-044 measured the shape of Google Books' "image not available" image.
+
+    It is 575x92 — a 6.25:1 banner at a few hundred bytes — where the real covers
+    measured alongside it were 575x750 and 575x887. Before this guard `prepare_cover`
+    rejected only images under 10px per side, so the placeholder was installed as a
+    real cover and nothing downstream could tell.
+    """
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "image/png"}, content=png((575, 92)))
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        with pytest.raises(CoverError, match="placeholder"):
+            await prepare_cover(client, "https://covers.openlibrary.org/one", tmp_path)
+
+
+@pytest.mark.anyio
+async def test_cover_accepts_a_wide_but_plausible_cover(tmp_path: Path) -> None:
+    """The guard is a banner detector, not a portrait rule: wraparound art is real."""
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200, headers={"content-type": "image/jpeg"}, content=jpeg((1200, 800))
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        prepared = await prepare_cover(client, "https://covers.openlibrary.org/one", tmp_path)
+    assert prepared.exists()
+    prepared.unlink()

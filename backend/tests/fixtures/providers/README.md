@@ -10,7 +10,12 @@ If a provider changes shape, re-record deliberately, in its own commit, and say 
 sprint outcome — otherwise a regression test quietly starts asserting the new bug.
 
 Captured 2026-08-09 with `User-Agent: Akasha/0.1 (<contact address>)`, the value
-`USER_AGENT_CONTACT` supplies at runtime.
+`USER_AGENT_CONTACT` supplies at runtime, except where a row states a different date.
+
+One file was **added** on 2026-08-13 (`googlebooks_isbn_9780307474728.json`). Nothing was
+re-recorded: the Sprint 020 verification work found that
+`googlebooks_isbn_9788437604572.json` already demonstrated the defect it needed to prove,
+and a live check that day returned the same volume.
 
 | File | Source |
 |---|---|
@@ -24,6 +29,7 @@ Captured 2026-08-09 with `User-Agent: Akasha/0.1 (<contact address>)`, the value
 | `editions_OL34762840W.json` | `GET https://openlibrary.org/works/OL34762840W/editions.json?limit=20` — the work behind result 14. Its publish dates are `"Mar 09, 2005"`-style, which the original four-character year parser could not read. |
 | `googlebooks_isbn_9788437604572.json` | `GET https://www.googleapis.com/books/v1/volumes?q=isbn:9788437604572&maxResults=1&key=…` — the Google Books fallback answer for the same book. The API key is a query parameter and appears nowhere in the response. |
 | `googlebooks_isbn_9789994444441_empty.json` | The same endpoint for an ISBN Google Books does not index: `totalItems: 0`, no `items` key. |
+| `googlebooks_isbn_9780307474728.json` | `GET https://www.googleapis.com/books/v1/volumes?q=isbn:9780307474728&maxResults=1&key=…` — captured **2026-08-13**, for Sprint 020. The counterpart to the row above: this volume *does* carry the requested ISBN13 in `industryIdentifiers`, so it is the confirmed case. It exists so the edition-verification repair can be shown to still admit a verified candidate rather than merely disabling the Google Books fallback. |
 
 The `fields` parameter used for both search recordings is the one
 `OpenLibraryProvider.search` sends; it is reproduced in the test that replays them.
