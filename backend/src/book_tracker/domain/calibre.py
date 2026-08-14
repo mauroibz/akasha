@@ -75,18 +75,28 @@ class CalibreAdapter:
         self, connection: sqlite3.Connection, tables: set[str], library: Path, query_only: bool
     ) -> list[dict[str, Any]]:
         records: list[dict[str, Any]] = []
+        # Calibre keeps a hand-curated sort name beside each author's display
+        # name, which is better than anything a heuristic can infer from
+        # "Gabriel García Márquez". It is read where it exists and treated as
+        # owner data on commit. `REQUIRED_TABLES` only guarantees the table, not
+        # its columns, so an older or hand-built database simply has no sort here.
+        author_columns = {str(row[1]) for row in connection.execute("PRAGMA table_info(authors)")}
+        sort_column = "a.sort" if "sort" in author_columns else "NULL"
         for row_number, book in enumerate(connection.execute("SELECT * FROM books ORDER BY id"), 2):
             book_id = int(book["id"])
             columns = set(book.keys())
-            authors = [
-                row[0]
+            author_rows = [
+                row
                 for row in connection.execute(
-                    "SELECT a.name FROM authors a JOIN books_authors_link l ON l.author=a.id "
+                    f"SELECT a.name, {sort_column} FROM authors a "
+                    "JOIN books_authors_link l ON l.author=a.id "
                     "WHERE l.book=? ORDER BY l.rowid",
                     (book_id,),
                 )
                 if row[0]
             ]
+            authors = [row[0] for row in author_rows]
+            author_sorts = [str(row[1] or "").strip() for row in author_rows]
             identifiers = {
                 str(row[0]).lower(): str(row[1]).strip()
                 for row in connection.execute(
@@ -149,6 +159,7 @@ class CalibreAdapter:
                     "calibre_uuid": str(book["uuid"] or "") if "uuid" in columns else "",
                     "title": str(book["title"] or "").strip(),
                     "authors": authors,
+                    "author_sorts": author_sorts,
                     "isbn": isbn,
                     "publisher": None,
                     "page_count": None,

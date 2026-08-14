@@ -287,6 +287,10 @@ class UndoService:
 def _get_item_field(item: ItemRow, field: str) -> Any:
     if field == "year":
         return item.year
+    if field == "creator_sort_override":
+        # A Calibre import seeds this from that database's curated `authors.sort`,
+        # so undo has to be able to unseed it.
+        return item.creator_sort_override
     if field.startswith("metadata."):
         metadata = json.loads(item.metadata_json)
         return metadata.get(field.removeprefix("metadata."))
@@ -296,6 +300,8 @@ def _get_item_field(item: ItemRow, field: str) -> Any:
 def _set_item_field(item: ItemRow, field: str, value: Any) -> None:
     if field == "year":
         item.year = value
+    elif field == "creator_sort_override":
+        item.creator_sort_override = value
     elif field.startswith("metadata."):
         key = field.removeprefix("metadata.")
         metadata = json.loads(item.metadata_json)

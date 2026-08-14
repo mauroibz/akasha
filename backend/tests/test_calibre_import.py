@@ -210,3 +210,96 @@ async def test_calibre_minimal_schema_and_resync_fill_only(tmp_path: Path) -> No
                 )
                 == 1
             )
+
+
+def calibre_library_with_author_sort(root: Path) -> Path:
+    """A real Calibre schema: `authors` carries the curated `sort` beside `name`."""
+    library = root / "library"
+    library.mkdir(parents=True)
+    connection = sqlite3.connect(library / "metadata.db")
+    connection.executescript(
+        """
+        CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, pubdate TEXT, path TEXT, uuid TEXT);
+        CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT, sort TEXT);
+        CREATE TABLE books_authors_link (book INTEGER, author INTEGER);
+        CREATE TABLE identifiers (book INTEGER, type TEXT, val TEXT);
+        INSERT INTO books VALUES (1, 'El Aleph', '1949-01-01', '', 'uuid-1');
+        INSERT INTO books VALUES (2, 'El hacedor', '1960-01-01', '', 'uuid-2');
+        INSERT INTO authors VALUES (1, 'Jorge Luis Borges', 'Borges, Jorge Luis');
+        -- An author row whose `sort` is empty falls back to the heuristic.
+        INSERT INTO authors VALUES (2, 'Gabriel García Márquez', '');
+        INSERT INTO books_authors_link VALUES (1, 1);
+        INSERT INTO books_authors_link VALUES (2, 2);
+        """
+    )
+    connection.commit()
+    connection.close()
+    return library / "metadata.db"
+
+
+@pytest.mark.anyio
+async def test_calibre_author_sort_seeds_the_creator_sort_name(tmp_path: Path) -> None:
+    """Calibre's `authors.sort` is curated by hand, so it lands as the override.
+
+    "Borges, Jorge Luis" is what the heuristic would have produced here anyway;
+    the point is that it is stored as owner data rather than as a guess, so a
+    later refresh or re-import cannot recompute over it.
+    """
+    mount = tmp_path / "calibre"
+    database = calibre_library_with_author_sort(mount)
+    before = digest(database)
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=mount,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", json={"library_path": "library"})
+        committed = await client.post(
+            "/api/import/calibre/commit", json={"batch_id": preview.json()["batch_id"]}
+        )
+        assert committed.status_code == 200
+        with app.state.engine.connect() as connection:
+            rows = connection.execute(
+                text("SELECT title, creator_sort, creator_sort_override FROM items ORDER BY id")
+            ).all()
+    assert digest(database) == before
+    assert rows[0] == ("El Aleph", "Borges, Jorge Luis", "Borges, Jorge Luis")
+    # No curated value, so the heuristic seeds it and nothing is claimed as owner data.
+    assert rows[1] == ("El hacedor", "García Márquez, Gabriel", None)
+
+
+@pytest.mark.anyio
+async def test_calibre_without_an_author_sort_column_still_imports(tmp_path: Path) -> None:
+    """The column is optional: an older or hand-built database has only `name`."""
+    mount = tmp_path / "calibre"
+    calibre_library(mount, minimal=True)
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=mount,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", json={"library_path": "library"})
+        assert preview.status_code == 201
+        committed = await client.post(
+            "/api/import/calibre/commit", json={"batch_id": preview.json()["batch_id"]}
+        )
+        assert committed.status_code == 200
+        with app.state.engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT creator_sort, creator_sort_override FROM items")
+            ).one()
+    # The heuristic, unaided: two given names is the case it gets wrong, and this
+    # is what the curated column above exists to avoid.
+    assert row == ("Luis Borges, Jorge", None)

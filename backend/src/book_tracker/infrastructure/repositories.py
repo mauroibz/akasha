@@ -30,6 +30,22 @@ def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
+def _curated_sort_name(payload: Mapping[str, Any]) -> str | None:
+    """The first author's sort name as a human curated it, if the source had one.
+
+    Only Calibre carries this — `authors.sort` — and it beats the heuristic on
+    exactly the names the heuristic has no signal for, which is why it is stored
+    as the owner's value rather than recomputed on every write. A Goodreads
+    payload has no such field and falls through to the heuristic.
+    """
+    sorts = payload.get("author_sorts")
+    if not isinstance(sorts, list):
+        return None
+    return next(
+        (value.strip() for value in sorts if isinstance(value, str) and value.strip()), None
+    )
+
+
 @dataclass(frozen=True)
 class SourceIdentity:
     source: str
@@ -577,6 +593,7 @@ class ImportRepository:
                         metadata_json=json.dumps(metadata, ensure_ascii=False),
                         created_at=now,
                         updated_at=now,
+                        creator_sort_override=_curated_sort_name(payload),
                     )
                     session.add(item)
                     session.flush()
@@ -609,6 +626,13 @@ class ImportRepository:
                     assert existing_item is not None
                     before: dict[str, Any] = {}
                     after: dict[str, Any] = {}
+                    curated = _curated_sort_name(payload)
+                    if curated and existing_item.creator_sort_override is None:
+                        # Filling an empty field, the same rule the metadata merge
+                        # below follows: a correction already on the row wins.
+                        before["creator_sort_override"] = None
+                        existing_item.creator_sort_override = curated
+                        after["creator_sort_override"] = curated
                     if existing_item.year is None and payload.get("year") is not None:
                         before["year"] = None
                         existing_item.year = payload["year"]

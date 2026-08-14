@@ -527,6 +527,48 @@ class TestUndoReporting:
         assert "skipped" in result
         assert result["retained"] >= 1
 
+    def test_undo_reverts_a_seeded_sort_name_but_keeps_a_hand_correction(
+        self, engine: Engine
+    ) -> None:
+        """A Calibre import fills `creator_sort_override`, so undo has to unfill it.
+
+        The same rule the other item fields follow: revert what the import wrote,
+        retain what the owner changed afterwards.
+        """
+        batch_id = _create_committed_batch(engine)
+        seeded = _create_item(engine, "El Aleph")
+        corrected = _create_item(engine, "El hacedor")
+        for item_id in (seeded, corrected):
+            _create_entry(engine, item_id, "unsorted")
+            _add_fill_empty_effect(
+                engine,
+                batch_id,
+                1,
+                "item",
+                str(item_id),
+                "creator_sort_override",
+                None,
+                "Borges, Jorge Luis",
+            )
+        with engine.begin() as conn:
+            conn.execute(
+                text("UPDATE items SET creator_sort_override=:v WHERE id=:id"),
+                {"v": "Borges, Jorge Luis", "id": seeded},
+            )
+            conn.execute(
+                text("UPDATE items SET creator_sort_override=:v WHERE id=:id"),
+                {"v": "Borges Acevedo, Jorge Luis", "id": corrected},
+            )
+        UndoService(engine).undo(batch_id)
+        with engine.connect() as conn:
+            values = conn.execute(
+                text("SELECT id, creator_sort_override FROM items ORDER BY id")
+            ).all()
+        assert dict(values) == {
+            seeded: None,
+            corrected: "Borges Acevedo, Jorge Luis",
+        }
+
     def test_repeated_undo_is_harmless(self, engine: Engine) -> None:
         """AC4: Repeated undo is harmless — second call is a no-op."""
         batch_id = _create_committed_batch(engine)
