@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 9
+**Plan revision:** 10
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 022](022-attachment-lifecycle.md)
+**Active sprint:** [Sprint 024](024-export.md)
 
 ## Shape of the plan
 
@@ -20,9 +20,10 @@ Post-v1 work branches:
          │   └─ 022 Attachment lifecycle
          ├─ 023 Creator sort names
          ├─ 024 Export
-         └─ 025 Second domain: albums  [GATED]
-             ├─ 026 Third domain: games
-             └─ 027 Fourth domain: series  [GATED]
+         └─ 025 Second domain: albums — the six seams
+             └─ 026 Status vocabulary (seam 5b)
+                 ├─ 027 Third domain: games
+                 └─ 028 Fourth domain: series  [GATED]
 ```
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
@@ -65,15 +66,16 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [022](022-attachment-lifecycle.md) | Attachment lifecycle: reclaim, rename, edges | 021 | completed |
 | [023](023-creator-sort-names.md) | Creator sort names | 020 | completed |
 | [024](024-export.md) | Export | 020 | **ready** |
-| 025 | Second domain — albums: pilot, then verdict | 020 | planned |
-| 026 | Third domain — games | 025 | planned |
-| 027 | Fourth domain — series | 025 | planned |
+| [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | planned |
+| 026 | Status vocabulary (seam 5b) | 025 | planned |
+| 027 | Third domain — games | 026 | planned |
+| 028 | Fourth domain — series | 026 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019, 020 and 021 already have files; the rest do not.
+incorporating actual deviations. Sprints 019 through 025 have files; 026, 027 and 028 do not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -201,61 +203,70 @@ Sprint 025 lands.
 
 The Goodreads-shaped CSV is a book-only convenience and is allowed to stay book-only.
 
-### Sprint 025 — Second domain, albums: pilot, then verdict
+### [Sprint 025 — Second domain, albums: the six seams](025-second-domain-albums.md)
 
-**Gated, and its Phase A is a build rather than a document.** `docs/domain_metadata_roadmap_report.md`
-already did the provider research; repeating it as prose would produce a confident answer about
-this codebase that the research cannot support.
+**No longer gated, and no longer a blind pilot.** DEC-052 accepted
+`docs/domain-architecture-proposal.md`, which answered by measurement what this sprint's Phase A was
+going to answer by walking: the album mapping was validated against live MusicBrainz and Cover Art
+Archive responses on 2026-08-14. The gate's purpose — do not build an abstraction whose cost is
+unknown — is served better by six named seams that can each be proved wrong than by an unstructured
+verdict at the end.
 
-Phase A: implement one domain end to end on a branch — search, add, cover, library card, detail,
-edit. The deliverable is **the list of everything that had to be touched that was not the provider
-adapter.** If that list is a type column, a provider registry, a per-type field config and a status
-vocabulary, the abstraction is justified and Phase B builds it properly. If it reaches into keyset
-pagination, the job runner, or the import ledger, that is the finding and it changes the plan.
+**The core is already neutral.** `items` has been `type`/`title`/`subtitle`/`year`/`cover_path`/
+`identifiers`/opaque `metadata` since Sprint 002. What is book-shaped is every layer above it, so
+the work is lifting book logic out of the shared layers into a per-domain plugin. Albums are never
+translated into book vocabulary.
 
-What is already generic, and should be confirmed rather than rebuilt:
+Two measured facts rejected the tempting shortcut of casting albums into book fields:
 
-- `items.type` exists and product spec 3.1 always described `items` as a domain-agnostic shell.
-- `Provider` in `domain/providers.py` is already a two-method protocol carrying `item_type`.
-- `normalize_identifier` in `domain/identity.py` already has a generic non-ISBN path.
-- `items`/`entries` are already split, which product spec section 9 called the entire preparation.
+- **MusicBrainz ships a curated sort name and only inverts people.** `Miles Davis` is a `Person` and
+  sorts `Davis, Miles`; `Daft Punk` is a `Group` and does not invert. DEC-051's heuristic assumes a
+  person's name and would produce `Punk, Daft`. Seam 1 generalizes the Calibre seed instead: a
+  source that knows the sort name seeds the override, and the heuristic runs only when nothing knew.
+- **Barcode is not a unique edition key** — one barcode was observed on three distinct releases —
+  so cross-provider identity does not exist for albums. Seam 2 is therefore a strategy
+  (`identity_key() -> str | None`, `None` meaning never merge), not a configurable identifier field.
 
-What is hardcoded, and is the real work:
+Seams 1–4, 5a and 6 land here; **seam 5b is Sprint 026**. The split answers the owner's objection
+that six seams is too much for one sprint, and it cuts in the only place that survives cutting:
+extracting seams *before* albums would design the abstraction from one domain, which is the failure
+mode the whole approach exists to avoid.
 
-- `type="book"` at three `infrastructure/repositories.py` call sites, and `SOURCE_PREFERENCE` as a
-  module constant in `domain/providers.py`.
-- Book fields in `features/detail/MetadataDialog.tsx` and `features/detail/schemas.ts`, which a
-  per-type display config replaces. The "Sorts as" field added in Sprint 023 is the one field there
-  that is **not** book-specific and should survive the config as-is — an album has an artist and a
-  game has a studio, which is why the column is named for creators (DEC-051). The `sort_author`
-  column and API field still carry the book-era name, and this is the sprint that renames them,
-  alongside the `metadata.authors` → `creators` key change.
-- **Status vocabulary.** "To read / Reading / Read" does not fit an album. This reaches the filter
-  chips, the triage keyboard map, the Goodreads status suggestions, and `entryStatuses`. Expect it
-  to be the largest single piece.
-- Literal "book"/"books" copy in `ShelvesPage.tsx` and `ImportPage.tsx`.
+The largest blast radius is the `metadata.authors` → `creators` and `sort_author` renames DEC-051
+deferred to here: 55 occurrences across 27 files, seven e2e specs, a migration and the benchmark.
 
-Albums first, among the three domains the owner named. MusicBrainz needs no OAuth, unlike IGDB's
-Twitch credentials; release-group versus release maps directly onto the work-versus-edition problem
-this codebase already solved for books; and Cover Art Archive as a separate image provider exercises
-the two-provider composition Sprint 020 has now settled: DEC-044 fixes the rule that a provider
-fills fields only when its candidate can be tied to the identifier that was requested, and that an
-unverifiable candidate is rejected rather than partially merged. MusicBrainz's release-versus-
-release-group split is that same problem, so albums inherits the answer rather than re-deriving it.
+### Sprint 026 — Status vocabulary (seam 5b)
 
-The Goodreads and Calibre import pipelines stay book-only. That is not a gap.
+The one seam Sprint 025 deliberately leaves half-done, pulled out because it is the largest single
+piece and the only one carrying a genuine product decision (DEC-052).
 
-### Sprint 026 — Third domain, games
+Sprint 025 ships albums carrying books' status *values* under album *labels* — `read` renders as
+"Listened". That is honest and visible, and it costs nothing structurally, because the standing
+invariant already says internal names are permanent while user-facing copy is free to move. What it
+does not do is let a domain have *different statuses*.
 
-IGDB. Not gated: by this point the architecture verdict exists and this sprint either fits it or
-proves it wrong cheaply.
+This sprint does: per-domain status vocabularies, validation moving off the global `EntryStatus`
+StrEnum, filter chips, the triage keyboard map, and the Goodreads status suggestions staying
+book-only. Sprint 025 collapses the duplicated `statusLabels` in `pages/TriagePage.tsx:42` first, so
+this sprint is not fighting two copies.
+
+**The product question it must answer, which is the owner's and not the implementer's:** an album is
+re-listened continuously in a way a book is not re-read, so `reread_count` and `date_finished` may
+be meaningless for the domain. Deliberately scheduled after albums exist, because the answer is much
+better with two domains in hand than with one.
+
+### Sprint 027 — Third domain, games
+
+IGDB. Not gated: by this point the seam model exists and this sprint either fits it or proves it wrong
+cheaply. **It carries a falsifiable prediction from DEC-052** — games should need no seam that
+albums did not. If it needs a seventh, the abstraction was wrong.
 
 The new infrastructure is authentication — IGDB requires Twitch OAuth client credentials and token
 refresh, where every provider so far has needed at most a static API key. Localization is
 enrichment, not a guarantee: keep the original title plus whatever alternate names the provider
 exposes rather than assuming a single translated-title field.
 
-### Sprint 027 — Fourth domain, series
+### Sprint 028 — Fourth domain, series
 
 **Gated on a product decision, not on a provider integration.** TMDB is the strongest provider in
 the research and the integration is the easy half.
@@ -266,7 +277,7 @@ and "watched through season 3" is not expressible, or entries gain hierarchy, wh
 pagination, triage selection semantics, bulk operations, and every count in the UI.
 
 Phase A decides that and nothing else. It is last on the roadmap because the decision is much
-better made with two working domains in hand than with none.
+better made with three working domains in hand than with none.
 
 Note the vocabulary collision before it causes confusion: book-series already exists as a free-text
 `metadata` field, and product spec section 11 item 4 records the deliberate choice not to model it.

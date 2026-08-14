@@ -2,7 +2,7 @@
 
 **Status:** ready
 **Depends on:** 020
-**Roadmap revision:** 9
+**Roadmap revision:** 10
 
 ## Objective
 
@@ -18,16 +18,19 @@ plus a Goodreads-shaped CSV. Nothing the owner typed by hand is missing from the
    column list the CSV has to mirror
 4. `docs/decisions.md`: DEC-048 (attachments, which left the export question open), DEC-050 (the
    attachment filename is owner data), DEC-051 (so is the creator sort name), DEC-039/DEC-040
-   (backup and its manifest, the closest prior art for a generated artifact)
-5. `backend/src/book_tracker/backup.py` — how a whole-library artifact is currently produced,
+   (backup and its manifest, the closest prior art for a generated artifact), **DEC-052** (the
+   domain seams, and why an opaque `metadata` object is the right bet)
+5. `docs/domain-architecture-proposal.md` section 4, seam 3 — the field spec this export's
+   human-readable half should be described in terms of
+6. `backend/src/book_tracker/backup.py` — how a whole-library artifact is currently produced,
    verified and streamed; reuse its shape rather than inventing a second one
-6. `backend/src/book_tracker/application/library.py`, `_item_dict` and `_entry_dict` — the existing
+7. `backend/src/book_tracker/application/library.py`, `_item_dict` and `_entry_dict` — the existing
    serialization of exactly the two entities being exported
-7. `backend/src/book_tracker/api/library.py` — `ItemResponse`/`EntryResponse` and the streaming
+8. `backend/src/book_tracker/api/library.py` — `ItemResponse`/`EntryResponse` and the streaming
    response pattern already used by attachment downloads
-8. `backend/src/book_tracker/infrastructure/models.py` — which columns are owner data and which are
+9. `backend/src/book_tracker/infrastructure/models.py` — which columns are owner data and which are
    derived
-9. Sprint 023 Outcome and `docs/agent/HANDOFF.md`
+10. Sprint 023 Outcome and `docs/agent/HANDOFF.md`
 
 ## Current implementation baseline
 
@@ -45,6 +48,10 @@ with the uploaded filename held in the database. `items` carries two owner-edite
    `metadata` object. **Not a book-specific schema** — the database is already domain-agnostic, and
    a book-shaped format needs a v2 the moment Sprint 025 lands.
 2. A Goodreads-shaped CSV, allowed to stay book-only, mirroring the columns product spec 5.1 lists.
+   Frame it in code and docs as **one domain's export view**, not as the export's only shape: DEC-052
+   accepted a per-domain field spec (seam 3), and the CSV is the book domain's instance of it. The
+   JSON stays opaque and entity-shaped — seam 3 confirms that bet rather than threatening it, which
+   is why this sprint runs before the domain work rather than after.
 3. An answer to the attachment question, implemented rather than implied.
 4. Streaming, not buffering. The JSON dump of a full library is the same class of object the
    attachment download already streams (Sprint 022), and the deployment target is a ZimaBoard.

@@ -1219,3 +1219,39 @@ DEC-036's 78 ms.
 
 **Next:** Sprint 024 (export) — status `ready`, file written. Its one real decision is whether an
 export carries attachment bytes, references, or neither; put it to the owner at activation.
+
+## 2026-08-14 — Domain architecture planning (no code changed)
+- Done: wrote `docs/domain-architecture-proposal.md` and recorded **DEC-052**, which the
+  owner accepted in full. Probed MusicBrainz `ws/2` and the Cover Art Archive live to
+  validate the album mapping instead of reasoning about it. Rewrote
+  `docs/sprints/025-second-domain-albums.md` around six named seams, added Sprint 026
+  (status vocabulary, seam 5b), renumbered games 026→027 and series 027→028, moved the
+  roadmap to plan revision 10, moved `FINAL_SPRINT` 27→28 in `scripts/validate_project.py`,
+  and added the field-spec paragraph to Sprint 024. No source code touched.
+- Verified: `python scripts/validate_project.py` passes. Live API observations, all
+  reproducible with a descriptive User-Agent:
+  - `artist/561d854a…` (Miles Davis) type=`Person` sort-name=`Davis, Miles`;
+    `056e4f3e…` (Daft Punk) type=`Group` sort-name=`Daft Punk`; Various Artists
+    type=`Other`, not inverted. **MusicBrainz only inverts people.**
+  - barcode `888837168625` observed on three distinct *Random Access Memories* releases,
+    twice more with a leading zero; 8 of 10 sampled releases carry a barcode, a 1959
+    release carries none. **Barcode is not a unique edition key.**
+  - `release-group/8e8a594f…` holds 25 releases → release-group≈work, release≈edition.
+  - CAA `image` fields are `http://`; final redirect host is `dn710907.ca.archive.org`,
+    matched by neither the `archive.org` literal in `ALLOWED_COVER_HOSTS` nor the
+    `.us.archive.org` suffix rule, and `validate_url` runs on every hop (`covers.py:117`).
+  - CAA sizes: full 811 KiB · 1200px 244 KiB · 500px 49 KiB · 250px 16 KiB, against
+    `MAX_COVER_EDGE = 600`.
+  - MusicBrainz throttles with **503**, not 429; `x-ratelimit-limit: 1200` observed.
+- Deviations: Sprint 025 was previously an unstructured gated pilot. DEC-052 replaces the
+  gate with six falsifiable seams and un-gates the sprint — the gate's purpose is served
+  better by seams that can each be proved wrong. Seam 5 split into 5a (labels, Sprint 025)
+  and 5b (vocabularies, Sprint 026) because the owner judged six seams over-specified for
+  one sprint; splitting *before* albums was rejected as it would design the abstraction
+  from one domain.
+- Blocked/open: the Sprint 026 product question — whether `reread_count` and
+  `date_finished` mean anything for an album — is the owner's and is deliberately deferred
+  until two domains exist.
+- Next: Sprint 024 (export) is unchanged and still `ready`; it runs first. Its format bet
+  is confirmed by seam 3, so no redesign — read the new deliverable 2 paragraph and
+  DEC-052 before starting.

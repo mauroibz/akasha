@@ -1378,3 +1378,76 @@ Append-only record of material architecture choices, product-default resolutions
   the text filter 10.4 ms against 10 ms. Sprint 024 (export) inherits a third owner-edited field
   after the attachment filename (DEC-050): an export that reconstructs sort names from authors
   loses a correction, exactly as one that reconstructs filenames from digests does.
+
+## DEC-052 — Domains attach at six seams; the core is already neutral
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 025 was planned as an unstructured pilot whose deliverable was a list of
+  everything the second domain had to touch. Before activating it the owner asked the framing
+  question directly — are domains cast into the book shape, or is the book shape generalized first
+  — and asked that the album mapping be validated against the live API rather than reasoned about.
+  Both were done; `docs/domain-architecture-proposal.md` is the result and is accepted in full.
+- **Decision.**
+
+  **The framing was wrong in a useful way.** `items` has been a neutral shell since Sprint 002 —
+  `type`, `title`, `subtitle`, `year`, `cover_path`, `identifiers`, opaque `metadata`. The core does
+  not need generalizing. What is book-shaped is every layer above it, so the work is lifting
+  book-specific logic out of the shared layers into a per-domain plugin. **Strategy D** of the
+  proposal: neutral core, seam-by-seam extraction, six seams, everything else untouched until a
+  domain proves it must move. Strategy A (cast albums into book fields) was rejected on evidence,
+  not taste; Strategy B (generalize everything first) was rejected because it designs the
+  abstraction from one real domain.
+
+  **Two measured facts decided it, both from live MusicBrainz probes on 2026-08-14.**
+
+  *MusicBrainz ships a curated sort name and only inverts people.* `Miles Davis` is type `Person`
+  and sorts `Davis, Miles`; `Daft Punk` is type `Group` and sorts `Daft Punk`; `Various Artists` is
+  type `Other` and is left alone. DEC-051's `creator_sort_name` assumes a person's name, which is
+  safe for books and false for a large share of album creators — it would produce `Punk, Daft` and
+  `Floyd, Pink`. Casting an album into `metadata.authors` discards knowledge the provider already
+  had and then manufactures the hand-correction work DEC-051 defines as owner data. This
+  generalizes the Calibre seed into a rule: **a source that knows the sort name seeds the override;
+  the heuristic runs only when nothing knew.**
+
+  *Barcode is not a unique edition key.* `888837168625` appears on three distinct *Random Access
+  Memories* releases and twice more with a leading zero, while a 1959 release carries none. ISBN's
+  global uniqueness is the only reason `merge_and_rank` can group candidates across providers by it.
+  Albums are therefore not "books with a different identifier field" — cross-provider identity does
+  not exist for them, and the seam must be a strategy (`identity_key(candidate) -> str | None`,
+  where `None` means never merge) rather than a configurable field name. This lives in
+  `domain/providers.py`, which the earlier plan's touched-list did not anticipate.
+
+  **The owner's four open questions are answered:** Strategy D accepted; albums perform no
+  background enrichment (one release fetch returns everything, to be confirmed in the pilot, not
+  bolted on later); Sprint 024 runs first and is confirmed rather than threatened by seam 3; and the
+  status vocabulary splits, below.
+
+  **Seam 5 splits, because six seams in one sprint is over-specified.** The owner raised this and it
+  is correct. Splitting *before* albums would revert to Strategy B — a seam cannot be validated with
+  only one domain present — so albums stay whole in Sprint 025 and the split runs through seam 5
+  instead:
+
+  - **5a, in Sprint 025:** per-domain status *labels* over the existing status values. `read`
+    renders as "Listened" for an album. No schema change, no validation change, no hotkey change,
+    and squarely inside the standing invariant that internal names are permanent while user-facing
+    copy is free to move. The duplicate `statusLabels` in `pages/TriagePage.tsx:42` is collapsed
+    into `features/library/labels.ts` first, since a per-domain label map against a duplicated
+    table is how the book vocabulary silently survives on one screen.
+  - **5b, in Sprint 026:** per-domain status *vocabularies* — different sets, validation moving off
+    the global `EntryStatus` StrEnum, filter chips, triage hotkeys — plus the product question of
+    whether `reread_count` and `date_finished` mean anything for an album. Deliberately decided with
+    two domains in hand rather than one.
+
+- **Consequences.** Roadmap moves to plan revision 10 and gains a sprint: 025 albums (seams 1–4, 5a,
+  6), **026 status vocabulary (seam 5b)**, 027 games, 028 series. `FINAL_SPRINT` in
+  `scripts/validate_project.py` moves from 27 to 28. Sprint 024 gains one paragraph framing the
+  Goodreads CSV as one domain's export view rather than the export's only shape; its format bet —
+  entity-shaped, opaque `metadata` — is confirmed by seam 3 and needs no redesign. Sprints 027 and
+  028 gain a falsifiable prediction: games should need no seam that albums did not, and if it needs
+  a seventh the abstraction was wrong. Three concrete cover-pipeline facts are recorded for seam 4:
+  Cover Art Archive serves `http://` URLs while `validate_url` requires https, its final redirect
+  host is `dn710907.ca.archive.org` — matched by neither the `archive.org` literal nor the
+  `.us.archive.org` suffix, and checked on every hop at `covers.py:117` — and full-size art is
+  811 KiB against 244 KiB at 1200px, which matters because `MAX_COVER_EDGE` is 600 and the
+  difference is downscaled away.
