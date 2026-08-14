@@ -25,6 +25,7 @@ from book_tracker.backup import (
 )
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
+from book_tracker.infrastructure.attachments import blob_path, store_blob
 from book_tracker.infrastructure.models import (
     EntryRow,
     EntryShelfRow,
@@ -110,7 +111,13 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
     # cannot be, and the copy carries no sidecar files at all.
     assert not list(result.path.glob("*.db-wal"))
     assert not list(result.path.glob("*.db-shm"))
-    assert result.manifest["counts"] == {"items": 1, "entries": 1, "shelves": 1, "covers": 1}
+    assert result.manifest["counts"] == {
+        "items": 1,
+        "entries": 1,
+        "shelves": 1,
+        "covers": 1,
+        "attachments": 0,
+    }
     assert result.manifest["alembic_revision"] == "0010_attachments"
     verify_backup(result.path)
 
@@ -316,3 +323,123 @@ def test_the_backup_cli_does_not_need_the_application_configured(tmp_path: Path)
     # runpy re-executes a module that the package already imported, which used to
     # print a RuntimeWarning into every nightly log.
     assert "RuntimeWarning" not in completed.stderr
+
+
+def attached(data_dir: Path, content: bytes) -> str:
+    """Put a blob in the live store the way the application would (DEC-048)."""
+    stored = store_blob(content, data_dir)
+    return stored.sha256
+
+
+def test_a_backup_carries_the_attachment_blobs(tmp_path: Path) -> None:
+    data_dir = populated_data_dir(tmp_path)
+    digest = attached(data_dir, b"an epub, or near enough")
+
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        now=datetime.fromisoformat(NOW),
+    )
+
+    assert digest in [entry["sha256"] for entry in result.manifest["attachments"]]
+    restore_backup(result.path, into=tmp_path / "restored")
+    assert (tmp_path / "restored" / "attachments" / digest[:2] / digest).read_bytes() == (
+        b"an epub, or near enough"
+    )
+
+
+def test_a_second_backup_shares_blobs_rather_than_copying_them(tmp_path: Path) -> None:
+    """Strategy E, the reason DEC-047 recommended it: the seventh copy is free."""
+    data_dir = populated_data_dir(tmp_path)
+    digest = attached(data_dir, b"x" * 200_000)
+    dest = tmp_path / "backups"
+
+    first = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    second = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    one = (first.path / "attachments" / digest[:2] / digest).stat()
+    two = (second.path / "attachments" / digest[:2] / digest).stat()
+    assert (one.st_dev, one.st_ino) == (two.st_dev, two.st_ino), "blobs should be hardlinked"
+
+
+def test_deleting_an_attachment_leaves_the_backup_able_to_restore_it(tmp_path: Path) -> None:
+    """The point of a backup: what the owner deleted is still recoverable."""
+    data_dir = populated_data_dir(tmp_path)
+    digest = attached(data_dir, b"deleted later, restored anyway")
+
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        now=datetime.fromisoformat(NOW),
+    )
+    blob_path(data_dir, digest).unlink()
+
+    restore_backup(result.path, into=tmp_path / "restored")
+    assert (tmp_path / "restored" / "attachments" / digest[:2] / digest).is_file()
+
+
+def test_retention_deleting_one_backup_does_not_take_a_shared_blob(tmp_path: Path) -> None:
+    """Hardlinks make this work, but only if nothing walks and deletes by content."""
+    data_dir = populated_data_dir(tmp_path)
+    digest = attached(data_dir, b"shared across two nights")
+    dest = tmp_path / "backups"
+    create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    keeper = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    enforce_retention(dest, keep=1, label="nightly")
+
+    assert (keeper.path / "attachments" / digest[:2] / digest).is_file()
+    verify_backup(keeper.path)
+
+
+def test_verify_notices_an_attachment_that_went_missing(tmp_path: Path) -> None:
+    data_dir = populated_data_dir(tmp_path)
+    digest = attached(data_dir, b"here now, gone shortly")
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        now=datetime.fromisoformat(NOW),
+    )
+
+    (result.path / "attachments" / digest[:2] / digest).unlink()
+
+    with pytest.raises(BackupError):
+        verify_backup(result.path)
+
+
+def test_a_library_with_no_attachments_still_backs_up_and_restores(tmp_path: Path) -> None:
+    data_dir = populated_data_dir(tmp_path)
+
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        now=datetime.fromisoformat(NOW),
+    )
+    restore_backup(result.path, into=tmp_path / "restored")
+
+    assert result.manifest["attachments"] == []
+    assert (tmp_path / "restored" / "books.db").is_file()

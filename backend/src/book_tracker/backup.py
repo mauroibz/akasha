@@ -14,11 +14,21 @@ every checksum and re-runs `PRAGMA integrity_check` on the copy, and
 Retention is scoped to a label. Nightly backups expire; the backup taken
 immediately before a migration is the rollback point for that upgrade, and
 nightly housekeeping must never be what deletes it.
+
+Attachments are shared, not copied. DEC-047 measured the naive alternative --
+tarring them into every nightly backup -- at 67.9x the current backup, against
+10.5x for hardlinking them out of the content-addressed store. A blob named for
+its own digest can never change, so a link is always safe; where BACKUP_DIR is
+on another filesystem the link falls back to a copy and the cost degrades to
+what the tar would have been. gzip is not used on them at all: DEC-047 measured
+its ratio on an epub corpus at 1.0003, so it produced a larger file than the
+input while costing 20.4s per backup against 2.0s without it.
 """
 
 import argparse
 import hashlib
 import json
+import os
 import sqlite3
 import sys
 import tarfile
@@ -34,6 +44,7 @@ DATABASE_NAME = "books.db"
 MANIFEST_KIND = "akasha-backup"
 MANIFEST_VERSION = 1
 ARCHIVED_DIRECTORIES = ("covers", "imports")
+ATTACHMENTS_DIR = "attachments"
 _CHUNK = 1024 * 1024
 
 
@@ -68,6 +79,8 @@ def create_backup(
         for directory in ARCHIVED_DIRECTORIES:
             _archive(data_dir / directory, path / f"{directory}.tar.gz")
         counts["covers"] = sum(1 for entry in (data_dir / "covers").glob("*") if entry.is_file())
+        attachments = _share_attachments(data_dir, path)
+        counts["attachments"] = len(attachments)
         archived = [DATABASE_NAME, *(f"{name}.tar.gz" for name in ARCHIVED_DIRECTORIES)]
         manifest: dict[str, Any] = {
             "kind": MANIFEST_KIND,
@@ -77,6 +90,7 @@ def create_backup(
             "alembic_revision": _revision(path / DATABASE_NAME),
             "counts": counts,
             "files": archived,
+            "attachments": attachments,
         }
         (path / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         _write_checksums(path, [*archived, MANIFEST_NAME])
@@ -102,6 +116,13 @@ def verify_backup(path: Path) -> dict[str, Any]:
         actual = _digest(candidate)
         if actual != expected:
             raise BackupError(f"{path}: {name} failed its checksum")
+    for entry in manifest.get("attachments", []):
+        digest = str(entry.get("sha256", ""))
+        blob = path / ATTACHMENTS_DIR / digest[:2] / digest
+        if not blob.is_file():
+            raise BackupError(f"{path}: attachment {digest} is missing")
+        if blob.stat().st_size != int(entry.get("bytes", -1)):
+            raise BackupError(f"{path}: attachment {digest} is the wrong size")
     _check_integrity(path / DATABASE_NAME)
     return manifest
 
@@ -120,6 +141,13 @@ def restore_backup(path: Path, *, into: Path) -> dict[str, Any]:
             # `data` refuses absolute paths, `..` and special files, so a tampered
             # archive cannot write outside the directory being restored.
             archive.extractall(target, filter="data")
+    source = path / ATTACHMENTS_DIR
+    if source.is_dir():
+        for blob in sorted(source.rglob("*")):
+            if blob.is_file():
+                destination = into / ATTACHMENTS_DIR / blob.relative_to(source)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_bytes(blob.read_bytes())
     return manifest
 
 
@@ -185,6 +213,38 @@ def _archive(source: Path, target: Path) -> None:
         if source.is_dir():
             for entry in sorted(source.rglob("*")):
                 archive.add(entry, arcname=str(entry.relative_to(source)), recursive=False)
+
+
+def _share_attachments(data_dir: Path, backup_path: Path) -> list[dict[str, Any]]:
+    """Hardlink every blob in the live store into this backup.
+
+    Linked from the live store rather than from the previous backup: it is O(1),
+    it always finds the blob, and it means a backup keeps an attachment alive
+    after the owner deletes it, which is the entire point of having one. The
+    inode is shared, so `rmtree` on an expired backup only decrements a link
+    count and cannot take a blob another backup still needs.
+
+    Not compressed and not tarred, because a tar shares nothing with the tar
+    written the night before -- which is exactly what makes the naive design cost
+    seven copies (DEC-047).
+    """
+    source = data_dir / ATTACHMENTS_DIR
+    recorded: list[dict[str, Any]] = []
+    if not source.is_dir():
+        return recorded
+    for blob in sorted(source.rglob("*")):
+        if not blob.is_file():
+            continue
+        target = backup_path / ATTACHMENTS_DIR / blob.relative_to(source)
+        target.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            os.link(blob, target)
+        except OSError:
+            # Another filesystem -- DEC-040 allows BACKUP_DIR on a NAS share --
+            # so pay for a copy rather than failing the backup.
+            target.write_bytes(blob.read_bytes())
+        recorded.append({"sha256": blob.name, "bytes": target.stat().st_size})
+    return recorded
 
 
 def _revision(database_path: Path) -> str | None:

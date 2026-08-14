@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.models import (
+    AttachmentRow,
     EntryRow,
     ImportBatchRow,
     ImportEffectRow,
@@ -136,6 +137,20 @@ class UndoService:
                             item = session.get(ItemRow, item_id)
                             if item is None:
                                 skipped += 1
+                                continue
+                            # An attached file is a deliberate act by the owner, not
+                            # something the import put there, so it keeps its item
+                            # alive exactly the way a hand-edited field does
+                            # (DEC-047). Without this, undoing an import silently
+                            # destroys an uploaded epub.
+                            attachments = session.scalar(
+                                select(func.count())
+                                .select_from(AttachmentRow)
+                                .where(AttachmentRow.item_id == item_id)
+                            )
+                            if attachments:
+                                retained += 1
+                                retained_items += 1
                                 continue
                             # Check if item is referenced by other entries
                             other_entries = session.scalar(

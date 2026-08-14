@@ -63,9 +63,15 @@ if str(BACKEND_SRC) not in sys.path:
 
 from book_tracker.backup import create_backup, restore_backup  # noqa: E402
 
-ATTACHMENTS_DIR = "attachments"
-ATTACHMENT_MANIFEST = "attachments.json"
-ATTACHMENT_ARCHIVE = "attachments.tar.gz"
+# Deliberately *not* "attachments". Strategy E shipped (DEC-048), so the real
+# `create_backup` now shares blobs out of `data/attachments` by itself. This script
+# has to keep modelling all seven strategies against each other to stay useful on a
+# revisit, so it keeps its corpus and its payload under names the shipped backup
+# ignores. What it measures is therefore still a clean comparison of hypotheticals.
+CORPUS_DIR = "assess-corpus"
+PAYLOAD_DIR = "assess-payload"
+ATTACHMENT_MANIFEST = "assess-attachments.json"
+ATTACHMENT_ARCHIVE = "assess-attachments.tar.gz"
 # 25 MB admits an epub, a PDF scan and a comic issue while refusing an audiobook or a
 # video rip, which are the things that turn this feature into a media server. Used by
 # strategy B; the real value is Phase B's to set once the owner has chosen a strategy.
@@ -283,7 +289,7 @@ def _write_attachment_payload(
                 if entry.is_file() and name in admitted:
                     archive.add(entry, arcname=name, recursive=False)
         return
-    target = backup_path / ATTACHMENTS_DIR
+    target = backup_path / PAYLOAD_DIR
     target.mkdir(parents=True, exist_ok=True)
     for entry in sorted(source.rglob("*")):
         name = str(entry.relative_to(source))
@@ -291,7 +297,7 @@ def _write_attachment_payload(
             continue
         destination = target / name
         destination.parent.mkdir(parents=True, exist_ok=True)
-        earlier = previous / ATTACHMENTS_DIR / name if previous is not None else None
+        earlier = previous / PAYLOAD_DIR / name if previous is not None else None
         if (
             strategy.payload == "link"
             and earlier is not None
@@ -314,7 +320,7 @@ def _payload_bytes(strategy: Strategy, backup_path: Path) -> int:
     if strategy.payload == "tar":
         archive = backup_path / ATTACHMENT_ARCHIVE
         return archive.stat().st_size if archive.is_file() else 0
-    loose = backup_path / ATTACHMENTS_DIR
+    loose = backup_path / PAYLOAD_DIR
     return disk_usage(loose) if loose.is_dir() else 0
 
 
@@ -330,7 +336,7 @@ def measure_strategy(
     `retained_copies` came off the disk.
     """
     dest.mkdir(parents=True, exist_ok=True)
-    source = data_dir / ATTACHMENTS_DIR
+    source = data_dir / CORPUS_DIR
     raw_attachment_bytes = disk_usage(source) if source.is_dir() else 0
 
     started = time.perf_counter()
@@ -396,7 +402,7 @@ def measure_strategy(
 def restore_strategy(strategy: Strategy, backup_path: Path, *, into: Path) -> RestoreOutcome:
     """Restore a backup and report which attachments did not come back with it."""
     restore_backup(backup_path, into=into)
-    attachments = into / ATTACHMENTS_DIR
+    attachments = into / PAYLOAD_DIR
     attachments.mkdir(parents=True, exist_ok=True)
     try:
         manifest = json.loads((backup_path / ATTACHMENT_MANIFEST).read_text(encoding="utf-8"))
@@ -410,7 +416,7 @@ def restore_strategy(strategy: Strategy, backup_path: Path, *, into: Path) -> Re
             with tarfile.open(archive_path, "r:gz") as archive:
                 archive.extractall(attachments, filter="data")
     elif strategy.payload in {"loose", "link"}:
-        stored = backup_path / ATTACHMENTS_DIR
+        stored = backup_path / PAYLOAD_DIR
         if stored.is_dir():
             for entry in sorted(stored.rglob("*")):
                 if entry.is_file():
@@ -448,7 +454,7 @@ def _throwaway_library(root: Path, *, count: int, size_bytes: int) -> Path:
     # attachment numbers are compared against is the real one.
     for index in range(count or 1):
         (data_dir / "covers" / f"{index}.jpg").write_bytes(random.Random(index).randbytes(38_800))
-    make_corpus(data_dir / ATTACHMENTS_DIR, count=count, size_bytes=size_bytes, seed=99)
+    make_corpus(data_dir / CORPUS_DIR, count=count, size_bytes=size_bytes, seed=99)
     return data_dir
 
 

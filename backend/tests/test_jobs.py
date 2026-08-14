@@ -405,6 +405,48 @@ class TestUndo:
             assert conn.scalar(text("SELECT count(*) FROM entries")) == 0
             assert conn.scalar(text("SELECT count(*) FROM items")) == 0
 
+    def test_undo_preserves_an_item_carrying_an_attachment(self, engine: Engine) -> None:
+        """DEC-047: an attached file is a deliberate act, not import residue.
+
+        Undoing a batch deletes the items it created, and without this guard that
+        sweeps away a file the owner uploaded by hand — exactly the loss the undo
+        ledger exists to prevent.
+        """
+        batch_id = _create_committed_batch(engine)
+        item_id = _create_item(engine, "Has an epub", year=2000)
+        entry_id = _create_entry(engine, item_id, "read", 8)
+        _add_create_effect(engine, batch_id, 1, "item", item_id)
+        _add_create_effect(engine, batch_id, 1, "entry", entry_id)
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO attachments "
+                    "(item_id, filename, byte_size, sha256, created_at, updated_at) "
+                    "VALUES (:iid, 'book.epub', 12, :sha, '2026-01-01', '2026-01-01')"
+                ),
+                {"iid": item_id, "sha": "a" * 64},
+            )
+
+        result = UndoService(engine).undo(batch_id)
+
+        assert result["retained_items"] >= 1
+        with engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM items")) == 1
+            assert conn.scalar(text("SELECT count(*) FROM attachments")) == 1
+
+    def test_undo_still_deletes_an_item_with_no_attachment(self, engine: Engine) -> None:
+        """The guard must be narrow, or undo stops undoing anything."""
+        batch_id = _create_committed_batch(engine)
+        item_id = _create_item(engine, "Plain", year=2000)
+        entry_id = _create_entry(engine, item_id, "read", 8)
+        _add_create_effect(engine, batch_id, 1, "item", item_id)
+        _add_create_effect(engine, batch_id, 1, "entry", entry_id)
+
+        UndoService(engine).undo(batch_id)
+
+        with engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM items")) == 0
+
     def test_undo_preserves_later_user_edits(self, engine: Engine) -> None:
         """AC3: Undo cannot remove later user edits; skips fields that changed."""
         batch_id = _create_committed_batch(engine)

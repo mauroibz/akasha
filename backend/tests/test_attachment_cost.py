@@ -90,7 +90,7 @@ def test_disk_usage_counts_a_copy_twice(tmp_path: Path) -> None:
 
 def test_a_full_copy_strategy_grows_by_a_whole_corpus_every_night(tmp_path: Path) -> None:
     data_dir = populated_data_dir(tmp_path)
-    make_corpus(data_dir / "attachments", count=4, size_bytes=48 * 1024, seed=4)
+    make_corpus(data_dir / "assess-corpus", count=4, size_bytes=48 * 1024, seed=4)
 
     measured = measure_strategy(strategy("A"), data_dir=data_dir, dest=tmp_path / "backups", keep=7)
 
@@ -107,7 +107,7 @@ def test_a_deduplicating_strategy_costs_about_one_copy_across_the_whole_window(
 ) -> None:
     """Attachments do not change once uploaded, so the seventh copy should be free."""
     data_dir = populated_data_dir(tmp_path)
-    make_corpus(data_dir / "attachments", count=4, size_bytes=48 * 1024, seed=5)
+    make_corpus(data_dir / "assess-corpus", count=4, size_bytes=48 * 1024, seed=5)
 
     measured = measure_strategy(strategy("E"), data_dir=data_dir, dest=tmp_path / "backups", keep=7)
 
@@ -129,9 +129,9 @@ def test_a_strategy_that_archives_attachments_restores_their_bytes(
     tmp_path: Path, key: str
 ) -> None:
     data_dir = populated_data_dir(tmp_path)
-    make_corpus(data_dir / "attachments", count=3, size_bytes=32 * 1024, seed=6)
+    make_corpus(data_dir / "assess-corpus", count=3, size_bytes=32 * 1024, seed=6)
     expected = {
-        path.name: path.read_bytes() for path in sorted((data_dir / "attachments").iterdir())
+        path.name: path.read_bytes() for path in sorted((data_dir / "assess-corpus").iterdir())
     }
 
     measured = measure_strategy(strategy(key), data_dir=data_dir, dest=tmp_path / "backups", keep=7)
@@ -150,8 +150,8 @@ def test_a_strategy_that_drops_attachments_names_what_it_did_not_carry(
 ) -> None:
     """Silently restoring less than the operator expected is the failure mode."""
     data_dir = populated_data_dir(tmp_path)
-    make_corpus(data_dir / "attachments", count=3, size_bytes=32 * 1024, seed=7)
-    names = sorted(path.name for path in (data_dir / "attachments").iterdir())
+    make_corpus(data_dir / "assess-corpus", count=3, size_bytes=32 * 1024, seed=7)
+    names = sorted(path.name for path in (data_dir / "assess-corpus").iterdir())
 
     measured = measure_strategy(strategy(key), data_dir=data_dir, dest=tmp_path / "backups", keep=7)
     outcome = restore_strategy(
@@ -169,7 +169,7 @@ def test_every_strategy_still_restores_the_database_the_owner_would_actually_los
     import sqlite3
 
     data_dir = populated_data_dir(tmp_path)
-    make_corpus(data_dir / "attachments", count=2, size_bytes=16 * 1024, seed=8)
+    make_corpus(data_dir / "assess-corpus", count=2, size_bytes=16 * 1024, seed=8)
 
     for index, candidate in enumerate(STRATEGIES):
         measured = measure_strategy(
