@@ -7,18 +7,29 @@ flat against library size, which the sprint requires be measured rather than
 asserted.
 """
 
-from fastapi import APIRouter, Request
+from typing import Literal
+
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
-from book_tracker.application.export import export_json
+from book_tracker.application.export import export_csv, export_json
 
 router = APIRouter(prefix="/api")
 
 
 @router.get("/export")
-async def export(request: Request) -> StreamingResponse:
+async def export(
+    request: Request, format: Literal["json", "csv"] = Query(default="json")
+) -> StreamingResponse:
+    engine = request.app.state.engine
+    if format == "csv":
+        return StreamingResponse(
+            export_csv(engine),
+            media_type="text/csv; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="akasha-export.csv"'},
+        )
     return StreamingResponse(
-        export_json(request.app.state.engine),
+        export_json(engine),
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="akasha-export.json"'},
     )

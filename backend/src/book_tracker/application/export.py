@@ -24,6 +24,8 @@ fetched one query per batch rather than one per item, which keeps that promise
 without an N+1.
 """
 
+import csv
+import io
 import json
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
@@ -57,10 +59,10 @@ def _grouped(rows: Sequence[Any], key: str) -> dict[int, list[Any]]:
 
 
 def _item_payload(
-    item: ItemRow,
-    identifiers: list[ItemIdentifierRow],
-    sources: list[ItemSourceRow],
-    attachments: list[AttachmentRow],
+    item: Any,
+    identifiers: list[Any],
+    sources: list[Any],
+    attachments: list[Any],
 ) -> dict[str, Any]:
     return {
         "id": item.id,
@@ -81,11 +83,12 @@ def _item_payload(
             }
             for row in sources
         ],
-        # References, not bytes: the blob is already held twice -- once live and
-        # once hardlinked into every nightly backup (DEC-048) -- and a third copy
-        # would turn a file you can read into a multi-gigabyte archive. The digest
-        # is what makes the reference resolvable, because the blob's path *is* its
-        # digest, so a backup can be searched by it without a running instance.
+        # References, not bytes (DEC-054): the blob is already held twice -- once
+        # live and once hardlinked into every nightly backup (DEC-048) -- and a
+        # third copy would turn a file you can read into a multi-gigabyte archive.
+        # The digest is what makes the reference resolvable, because the blob's
+        # path *is* its digest, so a backup can be searched by it with no running
+        # instance.
         "attachments": [
             {
                 "filename": row.filename,
@@ -101,29 +104,87 @@ def _item_payload(
     }
 
 
+#: Columns are selected individually rather than as mapped entities throughout
+#: this module. An ORM entity is retained by the `Session` identity map for as
+#: long as the session lives, so streaming entities would hold the whole library
+#: in memory however small the batch was -- which is precisely the regression the
+#: memory test catches.
+_ITEM_COLUMNS = (
+    ItemRow.id,
+    ItemRow.type,
+    ItemRow.title,
+    ItemRow.subtitle,
+    ItemRow.year,
+    ItemRow.creator_sort_override,
+    ItemRow.metadata_json,
+    ItemRow.created_at,
+    ItemRow.updated_at,
+)
+
+
+def _batches(session: Session, columns: tuple[Any, ...]) -> Iterator[list[Any]]:
+    """Walk a table in keyset batches, holding one batch at a time.
+
+    `yield_per` is not enough here. SQLite's driver has no server-side cursor, so
+    a streamed result is still materialized in full by the DBAPI and peak memory
+    tracks the library rather than the batch -- which the memory test caught. A
+    keyset walk issues one bounded query per batch instead, the same technique the
+    library list already uses (technical spec 7.2). The key must be the first
+    column and must be unique and ordered.
+    """
+    key = columns[0]
+    last: Any = None
+    while True:
+        statement = select(*columns).order_by(key).limit(BATCH)
+        if last is not None:
+            statement = statement.where(key > last)
+        rows = session.execute(statement).all()
+        if not rows:
+            return
+        yield list(rows)
+        if len(rows) < BATCH:
+            return
+        last = rows[-1][0]
+
+
 def iter_items(session: Session) -> Iterator[dict[str, Any]]:
-    stream = session.scalars(select(ItemRow).order_by(ItemRow.id)).yield_per(BATCH)
-    for batch in stream.partitions(BATCH):
+    for batch in _batches(session, _ITEM_COLUMNS):
         ids = [item.id for item in batch]
         identifiers = _grouped(
-            session.scalars(
-                select(ItemIdentifierRow)
+            session.execute(
+                select(
+                    ItemIdentifierRow.item_id,
+                    ItemIdentifierRow.kind,
+                    ItemIdentifierRow.normalized_value,
+                )
                 .where(ItemIdentifierRow.item_id.in_(ids))
                 .order_by(ItemIdentifierRow.item_id, ItemIdentifierRow.kind)
             ).all(),
             "item_id",
         )
         sources = _grouped(
-            session.scalars(
-                select(ItemSourceRow)
+            session.execute(
+                select(
+                    ItemSourceRow.item_id,
+                    ItemSourceRow.source,
+                    ItemSourceRow.source_id,
+                    ItemSourceRow.is_primary,
+                )
                 .where(ItemSourceRow.item_id.in_(ids))
                 .order_by(ItemSourceRow.item_id, ItemSourceRow.source, ItemSourceRow.source_id)
             ).all(),
             "item_id",
         )
         attachments = _grouped(
-            session.scalars(
-                select(AttachmentRow)
+            session.execute(
+                select(
+                    AttachmentRow.item_id,
+                    AttachmentRow.id,
+                    AttachmentRow.filename,
+                    AttachmentRow.byte_size,
+                    AttachmentRow.sha256,
+                    AttachmentRow.created_at,
+                )
                 .where(AttachmentRow.item_id.in_(ids))
                 .order_by(AttachmentRow.item_id, AttachmentRow.id)
             ).all(),
@@ -138,19 +199,36 @@ def iter_items(session: Session) -> Iterator[dict[str, Any]]:
             )
 
 
+_ENTRY_COLUMNS = (
+    EntryRow.id,
+    EntryRow.item_id,
+    EntryRow.status,
+    EntryRow.score,
+    EntryRow.score_provisional,
+    EntryRow.suggested_status,
+    EntryRow.notes,
+    EntryRow.date_added,
+    EntryRow.date_started,
+    EntryRow.date_finished,
+    EntryRow.reread_count,
+)
+
+
+def _shelves_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]:
+    shelves: dict[int, list[str]] = {}
+    for entry_id, name in session.execute(
+        select(EntryShelfRow.entry_id, ShelfRow.name)
+        .join(ShelfRow, ShelfRow.id == EntryShelfRow.shelf_id)
+        .where(EntryShelfRow.entry_id.in_(entry_ids))
+        .order_by(EntryShelfRow.entry_id, ShelfRow.name.collate("NOCASE"))
+    ).all():
+        shelves.setdefault(entry_id, []).append(name)
+    return shelves
+
+
 def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
-    stream = session.scalars(select(EntryRow).order_by(EntryRow.id)).yield_per(BATCH)
-    for batch in stream.partitions(BATCH):
-        ids = [entry.id for entry in batch]
-        rows = session.execute(
-            select(EntryShelfRow.entry_id, ShelfRow.name)
-            .join(ShelfRow, ShelfRow.id == EntryShelfRow.shelf_id)
-            .where(EntryShelfRow.entry_id.in_(ids))
-            .order_by(EntryShelfRow.entry_id, ShelfRow.name.collate("NOCASE"))
-        ).all()
-        shelves: dict[int, list[str]] = {}
-        for entry_id, name in rows:
-            shelves.setdefault(entry_id, []).append(name)
+    for batch in _batches(session, _ENTRY_COLUMNS):
+        shelves = _shelves_for(session, [entry.id for entry in batch])
         for entry in batch:
             yield {
                 "id": entry.id,
@@ -186,3 +264,132 @@ def export_json(engine: Engine, *, now: datetime | None = None) -> Iterator[str]
                 yield ("," if index else "") + json.dumps(row, ensure_ascii=False)
             yield "]"
         yield "}"
+
+
+#: Product spec 5.1, in Goodreads' own order. This view is allowed to be
+#: book-shaped: it is one domain's export view, not the export (DEC-052 seam 3).
+GOODREADS_COLUMNS = (
+    "Book Id",
+    "Title",
+    "Author",
+    "Additional Authors",
+    "ISBN",
+    "ISBN13",
+    "My Rating",
+    "Publisher",
+    "Number of Pages",
+    "Year Published",
+    "Original Publication Year",
+    "Date Read",
+    "Date Added",
+    "Bookshelves",
+    "Exclusive Shelf",
+    "My Review",
+    "Read Count",
+)
+
+#: The inverse of the import's suggestion map (product spec 5.1). Goodreads has no
+#: wishlist or dropped concept, so those statuses -- and `unsorted` -- have no
+#: Goodreads spelling and are written verbatim rather than flattened into a
+#: neighbouring shelf, which would silently move a row.
+_EXCLUSIVE_SHELF = {"read": "read", "reading": "currently-reading", "to_read": "to-read"}
+
+#: Leading characters a spreadsheet treats as the start of a formula rather than
+#: as text. Excel's DDE behaviour makes this a real hazard in a file whose whole
+#: purpose is to be opened in a spreadsheet, and notes are free text.
+_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _safe_cell(value: object) -> str:
+    """Render a cell that a spreadsheet will read as text.
+
+    Neutralizing changes the bytes, which is why it happens *here* and not in the
+    JSON: the JSON export is the lossless artifact and carries the value exactly
+    as typed, while the CSV is the convenience view and is made safe to open.
+    """
+    text_value = "" if value is None else str(value)
+    if text_value.startswith(_FORMULA_PREFIXES):
+        return "'" + text_value
+    return text_value
+
+
+def _goodreads_date(value: str | None) -> str:
+    """ISO `2026-01-05` to Goodreads' `2026/01/05`; timestamps lose their time."""
+    if not value:
+        return ""
+    return value[:10].replace("-", "/")
+
+
+def _row(entry: Any, item: Any, identifiers: dict[str, str], shelves: list[str]) -> dict[str, Any]:
+    metadata = json.loads(item.metadata_json or "{}")
+    authors = metadata.get("authors")
+    authors = [str(name) for name in authors] if isinstance(authors, list) else []
+    # Goodreads rates 1-5 and the importer doubled it (product spec 5.1). Halving
+    # rounds a hand-set odd score up rather than down; the exact 1-10 value is in
+    # the JSON export, which is the lossless one. `0` is Goodreads for unrated.
+    rating = (entry.score + 1) // 2 if entry.score else 0
+    return {
+        "Book Id": item.id,
+        "Title": item.title,
+        "Author": authors[0] if authors else "",
+        "Additional Authors": ", ".join(authors[1:]),
+        "ISBN": identifiers.get("isbn10", ""),
+        "ISBN13": identifiers.get("isbn", identifiers.get("isbn13", "")),
+        "My Rating": rating,
+        "Publisher": metadata.get("publisher") or "",
+        "Number of Pages": metadata.get("page_count") or "",
+        "Year Published": item.year if item.year is not None else "",
+        "Original Publication Year": metadata.get("original_year") or "",
+        "Date Read": _goodreads_date(entry.date_finished),
+        "Date Added": _goodreads_date(entry.date_added),
+        "Bookshelves": ", ".join(shelves),
+        "Exclusive Shelf": _EXCLUSIVE_SHELF.get(entry.status, entry.status),
+        "My Review": entry.notes or "",
+        # We store rereads; Goodreads counts total reads, and the importer took
+        # `Read Count - 1`. This is that inverse.
+        "Read Count": (entry.reread_count or 0) + 1,
+    }
+
+
+def export_csv(engine: Engine) -> Iterator[str]:
+    """Yield the Goodreads-shaped CSV a row at a time."""
+    buffer = io.StringIO()
+    writer = csv.DictWriter(buffer, fieldnames=list(GOODREADS_COLUMNS), lineterminator="\r\n")
+
+    def flush() -> str:
+        value = buffer.getvalue()
+        buffer.seek(0)
+        buffer.truncate(0)
+        return value
+
+    writer.writeheader()
+    yield flush()
+
+    with Session(engine) as session:
+        for batch in _batches(session, _ENTRY_COLUMNS):
+            item_ids = [entry.item_id for entry in batch]
+            items = {
+                item.id: item
+                for item in session.execute(
+                    select(*_ITEM_COLUMNS).where(ItemRow.id.in_(item_ids))
+                ).all()
+            }
+            identifiers: dict[int, dict[str, str]] = {}
+            for row in session.execute(
+                select(
+                    ItemIdentifierRow.item_id,
+                    ItemIdentifierRow.kind,
+                    ItemIdentifierRow.normalized_value,
+                ).where(ItemIdentifierRow.item_id.in_(item_ids))
+            ).all():
+                identifiers.setdefault(row.item_id, {})[row.kind] = row.normalized_value
+            shelves = _shelves_for(session, [entry.id for entry in batch])
+            for entry in batch:
+                item = items.get(entry.item_id)
+                if item is None:  # pragma: no cover - the foreign key guarantees this
+                    continue
+                row_values = _row(
+                    entry, item, identifiers.get(item.id, {}), shelves.get(entry.id, [])
+                )
+                writer.writerow({key: _safe_cell(value) for key, value in row_values.items()})
+                yield flush()
