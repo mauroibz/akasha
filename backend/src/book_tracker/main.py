@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
+from book_tracker.api.export import router as export_router
 from book_tracker.api.imports import enrichment_router
 from book_tracker.api.imports import router as imports_router
 from book_tracker.api.library import router as library_router
@@ -264,6 +265,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(providers_router)
     app.include_router(imports_router)
     app.include_router(enrichment_router)
+    app.include_router(export_router)
 
     @app.api_route(
         "/api/{path:path}",

@@ -1484,3 +1484,33 @@ Append-only record of material architecture choices, product-default resolutions
   question. A later agent finding domain work on a branch should read that as intended state and not
   as an inconsistency to repair under `AGENTS.md` §1. `main` continues to hold every completed sprint
   and remains the branch a failed domain experiment is abandoned *back* to.
+
+## DEC-054 — The export carries attachment references and their digest, not their bytes
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** DEC-048 built attachments and explicitly left one question for the export sprint:
+  whether an export carries attachment bytes, references, or neither. Sprint 024 put it to the owner
+  at activation, as Sprints 021 and 022 did with theirs.
+- **Decision:** **References, with the digest.** Each item's export payload carries every attachment's
+  `filename`, `byte_size`, `sha256`, `created_at` and API `path`. No bytes.
+
+  "Neither" was never actually available, and noticing that narrowed the fork before it reached the
+  owner: the sprint's first acceptance criterion requires every field the owner typed to survive, and
+  DEC-050 made the attachment filename exactly that. An export omitting attachments would fail its
+  own criterion.
+
+  Bytes were rejected because the blob is **already held twice** — once live and once hardlinked into
+  every nightly backup (DEC-048), where DEC-050 verified a backup's copy survives a live reclaim
+  byte-identically. A third copy would convert an artifact you can open, read and mail into a
+  multi-gigabyte archive, which is the fork the roadmap warned changes what the feature *is*.
+
+  **The digest is what makes a reference more than a note.** The blob's path under
+  `data/attachments/{sha256[:2]}/{sha256}` *is* its digest, so a reference resolves against any
+  backup by name alone, with no running instance and no index. That is the property that makes
+  omitting the bytes safe rather than merely cheap.
+- **Consequences.** The export is a file rather than an archive, so it streams as JSON with no
+  container format and no second code path. A restore story that needs bytes uses a backup, which is
+  what backups are for (DEC-039, DEC-040). Should a future sprint want a self-contained archive, it
+  is an additive `?include=attachments` variant rather than a format change, because the reference
+  block already names every blob it would need to carry.
