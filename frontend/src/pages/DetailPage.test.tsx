@@ -66,6 +66,99 @@ function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("DetailPage", () => {
+  it("offers the editions of the work as covers and installs the chosen one", async () => {
+    const candidates = {
+      candidates: [
+        {
+          cover_url: "https://covers.openlibrary.org/b/id/15104001-L.jpg",
+          source_id: "OL59588323M",
+          title: "Il gioco del mondo",
+          year: 1969,
+        },
+        {
+          cover_url: "https://covers.openlibrary.org/b/id/15103989-L.jpg",
+          source_id: "OL59587941M",
+          title: "Marelle",
+          year: 1966,
+        },
+      ],
+      reason: null,
+    };
+    const request = vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url.includes("/cover-candidates"))
+          return new Response(JSON.stringify(candidates));
+        if (init?.method === "POST")
+          return new Response(
+            JSON.stringify({
+              ...entry.item,
+              cover_url: "/api/items/3/cover",
+            }),
+          );
+        return new Response(JSON.stringify(entry));
+      });
+    renderPage();
+    expect(
+      await screen.findByRole("heading", { name: "Rayuela" }),
+    ).toBeVisible();
+    const user = userEvent.setup();
+
+    // Candidates must not be fetched until the chooser is opened: a library page
+    // that reaches a provider on render is the invariant this feature must not break.
+    expect(
+      request.mock.calls.filter(([url]) =>
+        String(url).includes("/cover-candidates"),
+      ),
+    ).toHaveLength(0);
+
+    await user.click(screen.getByRole("button", { name: /choose a cover/i }));
+    const chooser = await screen.findByRole("dialog");
+    expect(
+      await within(chooser).findByRole("button", { name: /1969 edition/i }),
+    ).toBeVisible();
+
+    await user.click(
+      within(chooser).getByRole("button", { name: /1966 edition/i }),
+    );
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/items/3/cover",
+        expect.objectContaining({
+          method: "POST",
+          body: JSON.stringify({
+            cover_url: "https://covers.openlibrary.org/b/id/15103989-L.jpg",
+          }),
+        }),
+      ),
+    );
+    await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  });
+
+  it("explains an empty chooser instead of showing an empty grid", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url.includes("/cover-candidates"))
+        return new Response(
+          JSON.stringify({ candidates: [], reason: "no_provider_reference" }),
+        );
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    expect(
+      await screen.findByRole("heading", { name: "Rayuela" }),
+    ).toBeVisible();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /choose a cover/i }));
+    const chooser = await screen.findByRole("dialog");
+    expect(
+      await within(chooser).findByText(/nothing to look editions up by/i),
+    ).toBeVisible();
+  });
+
   it("renders cached detail and persists opinion and metadata edits", async () => {
     const request = vi
       .spyOn(globalThis, "fetch")

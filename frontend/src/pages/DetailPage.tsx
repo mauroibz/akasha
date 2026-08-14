@@ -9,6 +9,7 @@ import {
   patchEntry,
   patchItem,
   refreshItem,
+  chooseCover,
   replaceCover,
 } from "@/api/library";
 import { createShelf, getShelves } from "@/api/shelves";
@@ -26,6 +27,7 @@ import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
 import { optionalInt, splitList } from "@/features/detail/schemas";
@@ -56,7 +58,7 @@ export function DetailPage() {
   const cache = useQueryClient();
   const navigate = useNavigate();
   const [dialog, setDialog] = useState<
-    "opinion" | "metadata" | "refresh" | "delete" | null
+    "opinion" | "metadata" | "refresh" | "delete" | "cover" | null
   >(null);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -140,6 +142,13 @@ export function DetailPage() {
               aria-label="No cover"
             />
           )}
+          <Button
+            variant="secondary"
+            className="mt-3 w-full"
+            onClick={() => setDialog("cover")}
+          >
+            Choose a cover
+          </Button>
           <div className="mt-3 block text-sm">
             <Label htmlFor="replace-cover">Replace cover</Label>
             <Input
@@ -343,6 +352,17 @@ export function DetailPage() {
             .then(() => undefined)
         }
         onCreateShelf={handleCreateShelf}
+      />
+
+      <CoverDialog
+        open={dialog === "cover"}
+        onOpenChange={(open) => setDialog(open ? "cover" : null)}
+        item={item}
+        onChoose={(coverUrl) =>
+          update
+            .mutateAsync(() => chooseCover(item.id, coverUrl))
+            .then(() => undefined)
+        }
       />
 
       <MetadataDialog

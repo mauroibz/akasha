@@ -150,6 +150,51 @@ test("mobile detail confirms refresh and reports cover failure without motion", 
   await expect(page.locator("main")).toBeVisible();
 });
 
+test("choosing a cover from another edition installs it and closes the chooser", async ({
+  page,
+}) => {
+  await common(page);
+  let chosen: string | null = null;
+  await page.route("**/api/items/3/cover-candidates", (route) =>
+    route.fulfill({
+      json: {
+        candidates: [
+          {
+            cover_url: "https://covers.openlibrary.org/b/id/15104001-L.jpg",
+            source_id: "OL59588323M",
+            title: "Il gioco del mondo",
+            year: 1969,
+          },
+          {
+            cover_url: "https://covers.openlibrary.org/b/id/15103989-L.jpg",
+            source_id: "OL59587941M",
+            title: "Marelle",
+            year: 1966,
+          },
+        ],
+        reason: null,
+      },
+    }),
+  );
+  await page.route("**/api/items/3/cover", async (route) => {
+    chosen = JSON.parse(route.request().postData() ?? "{}").cover_url;
+    await route.fulfill({
+      json: { ...entry.item, cover_url: "/api/items/3/cover" },
+    });
+  });
+
+  await page.goto("/books/7");
+  await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
+  await page.getByRole("button", { name: /choose a cover/i }).click();
+
+  const chooser = page.getByRole("dialog");
+  await expect(chooser).toBeVisible();
+  await chooser.getByRole("button", { name: /1966 edition/i }).click();
+
+  await expect(page.getByRole("dialog")).toBeHidden();
+  expect(chosen).toBe("https://covers.openlibrary.org/b/id/15103989-L.jpg");
+});
+
 test("search results stagger in and selecting one keeps the keyboard flow", async ({
   page,
 }) => {

@@ -252,6 +252,43 @@ test("the detail opinion dialog has no serious accessibility violations", async 
   await expectNoSeriousViolations(page, "detail (opinion dialog)");
 });
 
+test("the cover chooser has no serious accessibility violations", async ({
+  page,
+}) => {
+  await page.route("**/api/entries/7", (route) =>
+    route.fulfill({ json: detailEntry }),
+  );
+  await page.route("**/api/items/3/cover-candidates", (route) =>
+    route.fulfill({
+      json: {
+        candidates: [
+          {
+            cover_url: "https://covers.openlibrary.org/b/id/15104001-L.jpg",
+            source_id: "OL59588323M",
+            title: "Il gioco del mondo",
+            year: 1969,
+          },
+          {
+            cover_url: "https://covers.openlibrary.org/b/id/15103989-L.jpg",
+            source_id: "OL59587941M",
+            title: "Marelle",
+            year: 1966,
+          },
+        ],
+        reason: null,
+      },
+    }),
+  );
+  await stubShelves(page);
+  await page.goto("/books/7");
+  await page.getByRole("button", { name: /choose a cover/i }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /1969 edition/i }),
+  ).toBeVisible();
+  await expectNoSeriousViolations(page, "detail (cover chooser)");
+});
+
 test("add has no serious accessibility violations", async ({ page }) => {
   await stubShelves(page);
   await stubProviderHealth(page);

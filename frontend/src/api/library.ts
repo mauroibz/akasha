@@ -185,6 +185,43 @@ export async function replaceCover(
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
+export interface CoverCandidate {
+  cover_url: string;
+  source_id: string;
+  title: string;
+  year: number | null;
+}
+
+export interface CoverCandidates {
+  candidates: CoverCandidate[];
+  reason: string | null;
+}
+
+/** Other editions of this work, offered as covers. Fetched only when a chooser opens. */
+export async function fetchCoverCandidates(
+  itemId: number,
+): Promise<CoverCandidates> {
+  const response = await fetch(`/api/items/${itemId}/cover-candidates`);
+  if (!response.ok) throw new Error("Cover options could not be loaded");
+  return response.json() as Promise<CoverCandidates>;
+}
+
+export async function chooseCover(
+  itemId: number,
+  coverUrl: string,
+): Promise<LibraryEntry["item"]> {
+  const response = await fetch(`/api/items/${itemId}/cover`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({ cover_url: coverUrl }),
+  });
+  if (!response.ok)
+    throw new Error(
+      "Cover could not be changed; the previous cover is unchanged",
+    );
+  return response.json() as Promise<LibraryEntry["item"]>;
+}
+
 export async function deleteEntry(entryId: number): Promise<void> {
   const response = await fetch(`/api/entries/${entryId}`, {
     method: "DELETE",
