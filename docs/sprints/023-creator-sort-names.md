@@ -1,6 +1,6 @@
 # Sprint 023 — Creator sort names
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 020
 **Roadmap revision:** 9
 
@@ -19,9 +19,25 @@ creator sort name that the owner can correct, and no later domain inherits a bro
    and `_project_normalized_text` is the mapper event that keeps the normalized columns in step
 5. `backend/src/book_tracker/domain/normalization.py`
 6. `backend/src/book_tracker/application/library.py`, the sort and cursor paths
-7. `backend/alembic/versions/0007_normalized_sort_projection.py` — the closest prior art for a
+7. `backend/src/book_tracker/domain/pagination.py` — `CursorState.v` is the version this sprint bumps
+8. `backend/src/book_tracker/domain/calibre.py` — the reader that will learn to read `authors.sort`
+9. `backend/alembic/versions/0007_normalized_sort_projection.py` — the closest prior art for a
    migration that rewrites every row in `items`
-8. Sprint 021 Outcome and `docs/agent/HANDOFF.md`
+10. Sprint 021 Outcome and `docs/agent/HANDOFF.md`
+
+## Owner decisions taken at planning (2026-08-14)
+
+Both were put to the owner before this sprint was scoped, and both narrow the work rather than
+widen it.
+
+- **Calibre's `authors.sort` seeds the sort name, stored as owner data.** A real Calibre database
+  carries a human-curated sort name per author and this library came from Calibre, so the seed is
+  curated truth rather than a guess. The heuristic becomes the fallback, not the primary path.
+- **`sort_author` keeps its name and its display role.** It holds the verbatim first author for the
+  detail page, the grid, and the `q` search filter; the new column owns *ordering* only. Renaming
+  the display field would touch three components, seven e2e seeds, the benchmark and several
+  backend tests, in the sprint whose own risk note says pagination breaks in ways unit tests miss.
+  The rename happens once in Sprint 025, alongside the metadata key `authors` → `creators`.
 
 ## Current implementation baseline
 
@@ -33,13 +49,18 @@ migration — pinned by literal in `test_migrations.py` (twice) and `test_backup
 
 ## Deliverables
 
-1. A stored creator sort name, seeded by a heuristic and correctable by the owner. **Name it
-   creator, not author** — an album has an artist and a game has a studio, and Sprint 025 should not
-   have to rewrite this.
-2. A migration that backfills it for every existing row, following `0007`'s shape.
+1. A stored creator sort name, seeded and correctable by the owner. **Name it creator, not
+   author** — an album has an artist and a game has a studio, and Sprint 025 should not have to
+   rewrite this. The shape is three columns: `creator_sort_override` (owner input, and where the
+   Calibre seed lands), plus `creator_sort` and `creator_sort_normalized` derived from
+   `override or heuristic(first_author)` by the existing mapper event.
+2. A migration that backfills them for every existing row, following `0007`'s shape.
 3. An edit surface, because the heuristic is *known* to be wrong for this library and a value nobody
    can fix is worse than no value.
-4. Sorting, filtering and keyset cursors moved onto it.
+4. The Calibre import reads `authors.sort` where the column exists and stores it as the override.
+5. Sorting and keyset cursors moved onto the normalized creator column. The `q` filter stays on
+   `sort_author_normalized`: search matches the name as written, so `gabriel garcia` must keep
+   matching a row that now sorts as `garcia marquez gabriel`.
 
 ## Acceptance criteria
 
@@ -48,16 +69,22 @@ migration — pinned by literal in `test_migrations.py` (twice) and `test_backup
    last-space split gets the first two wrong and the third right.
 2. A corrected sort name survives a provider refresh and a re-import; it is owner data, not cache.
 3. Keyset pagination stays stable across the change — a cursor issued before the migration must not
-   silently skip or repeat rows after it.
+   silently skip or repeat rows after it. The mechanism is a `CursorState.v` bump: a stale cursor
+   fails loudly with `400 invalid_cursor`, which the library page already renders.
 4. The projection is maintained by whatever mechanism replaces the mapper event, and a new write
    path cannot forget it (DEC-036's requirement, inherited).
+5. A Calibre import of a database carrying `authors.sort` seeds the override from it; a database
+   without that column still imports.
 
 ## Required tests (TDD)
 
-- The three Spanish surname cases above, plus a mononym and an empty author list.
+- The three Spanish surname cases above, plus a mononym, an empty author list, an already-inverted
+  `"García Márquez, Gabriel"`, and `"Ursula K. Le Guin"`.
 - A round trip proving a hand-corrected sort name is not overwritten by refresh or import.
 - Migration test: rows written before the migration carry the backfilled value after it.
-- Cursor stability across the projection change.
+- Cursor stability across the projection change, including that a `v: 1` cursor is rejected rather
+  than silently mis-paginating.
+- Calibre import with and without the `authors.sort` column.
 
 ## Verification
 
@@ -69,8 +96,17 @@ cd .. && make build && make smoke-container
 git diff --check
 ```
 
-Plus a walkthrough against the container with the real library, checking that the sort order in the
-library list is actually what the acceptance criteria claim.
+Plus a walkthrough against the container with the real library:
+
+1. Sort by Author, page past the first screen, and read the order — the acceptance criteria are a
+   claim about what is on screen, not about a test.
+2. Correct one name by hand, confirm the list re-sorts, then refresh that item from the provider and
+   confirm the correction survived.
+3. **Measure the seed.** Count how many items took their sort name from Calibre versus the
+   heuristic, and read a sample of the heuristic's output. If it is wrong more often than right,
+   report the number plainly rather than tuning it silently.
+4. Re-run `scripts/benchmark_library.py` for `sort_author` and compare against the 78 ms p95 at
+   page 26 that DEC-036 recorded.
 
 ## Explicit non-scope
 
@@ -84,7 +120,8 @@ library list is actually what the acceptance criteria claim.
 1. `feat: store a creator sort name and backfill it`
 2. `feat: sort the library by the stored creator name`
 3. `feat: correct a creator sort name by hand`
-4. final `docs(sprint-023): close sprint and hand off`
+4. `feat: seed creator sort names from Calibre`
+5. final `docs(sprint-023): close sprint and hand off`
 
 ## Risks and decisions to surface
 

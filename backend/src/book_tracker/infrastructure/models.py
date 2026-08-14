@@ -3,7 +3,7 @@ import json
 from sqlalchemy import Computed, ForeignKey, event
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-from book_tracker.domain.normalization import normalize_text
+from book_tracker.domain.normalization import creator_sort_name, normalize_text
 
 
 class Base(DeclarativeBase):
@@ -31,6 +31,14 @@ class ItemRow(Base):
     # may only call built-in functions.
     title_normalized: Mapped[str | None]
     sort_author_normalized: Mapped[str | None]
+    # `sort_author` is the creator's name as written, which is what the detail
+    # page shows and what the `q` filter matches. These three are what the library
+    # *sorts* by, which is not the same string: "Gabriel García Márquez" displays
+    # as written and sorts under García Márquez. The override is the owner's
+    # correction and the only one of the three that is not derived.
+    creator_sort_override: Mapped[str | None] = mapped_column(default=None)
+    creator_sort: Mapped[str | None] = mapped_column(default=None)
+    creator_sort_normalized: Mapped[str | None] = mapped_column(default=None)
     created_at: Mapped[str]
     updated_at: Mapped[str]
 
@@ -50,10 +58,19 @@ def _project_normalized_text(_mapper: object, _connection: object, item: "ItemRo
     cannot forget it and leave a row unsortable. `sort_author` is a generated
     column with no value on the Python object before flush, so the author is read
     from the same JSON path the generated column uses.
+
+    The creator sort name is derived here for the same reason, and only the
+    override is owner data: clearing it restores the heuristic, and every path
+    that edits an item — refresh, import fill, undo, manual edit — goes through an
+    ORM object, so none of them can leave the sort key stale.
     """
     item.title_normalized = normalize_text(item.title or "")
     author = _first_author(item.metadata_json)
     item.sort_author_normalized = normalize_text(author) if author else None
+    override = (item.creator_sort_override or "").strip()
+    sort_name = override or (creator_sort_name(author) if author else "")
+    item.creator_sort = sort_name or None
+    item.creator_sort_normalized = normalize_text(sort_name) if sort_name else None
 
 
 event.listen(ItemRow, "before_insert", _project_normalized_text)

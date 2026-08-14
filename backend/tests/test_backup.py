@@ -118,7 +118,7 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
         "covers": 1,
         "attachments": 0,
     }
-    assert result.manifest["alembic_revision"] == "0010_attachments"
+    assert result.manifest["alembic_revision"] == "0011_creator_sort_names"
     verify_backup(result.path)
 
 

@@ -267,3 +267,164 @@ def test_projection_migration_backfills_rows_written_before_it(tmp_path: Path) -
     assert "title_normalized" not in {
         column["name"] for column in inspect(create_engine(configured)).get_columns("items")
     }
+
+
+def test_creator_sort_projection_seeds_from_the_first_author(tmp_path: Path) -> None:
+    from sqlalchemy.orm import Session
+
+    from book_tracker.domain.normalization import normalize_text
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    with Session(engine) as session:
+        session.add(
+            ItemRow(
+                type="book",
+                title="Cien años de soledad",
+                subtitle=None,
+                year=1967,
+                cover_path=None,
+                identifiers="{}",
+                metadata_json='{"authors": ["Gabriel García Márquez"]}',
+                created_at="now",
+                updated_at="now",
+            )
+        )
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT creator_sort, creator_sort_normalized, creator_sort_override FROM items")
+        ).one()
+    assert stored[0] == "García Márquez, Gabriel"
+    assert stored[1] == normalize_text("García Márquez, Gabriel")
+    # Nothing was corrected, so there is no owner value to keep.
+    assert stored[2] is None
+
+
+def test_a_creator_sort_override_wins_over_the_heuristic_and_survives_a_metadata_write(
+    tmp_path: Path,
+) -> None:
+    """The override is owner data. A later write to the item must not recompute over it."""
+    from sqlalchemy.orm import Session
+
+    from book_tracker.domain.normalization import normalize_text
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    with Session(engine) as session:
+        item = ItemRow(
+            type="book",
+            title="The Hobbit",
+            subtitle=None,
+            year=1937,
+            cover_path=None,
+            identifiers="{}",
+            metadata_json='{"authors": ["John Ronald Reuel Tolkien"]}',
+            created_at="now",
+            updated_at="now",
+            creator_sort_override="Tolkien, J. R. R.",
+        )
+        session.add(item)
+        session.commit()
+        item.title = "The Hobbit, or There and Back Again"
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT creator_sort, creator_sort_normalized FROM items")
+        ).one()
+    assert stored[0] == "Tolkien, J. R. R."
+    assert stored[1] == normalize_text("Tolkien, J. R. R.")
+
+
+def test_clearing_the_override_restores_the_heuristic(tmp_path: Path) -> None:
+    from sqlalchemy.orm import Session
+
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    with Session(engine) as session:
+        item = ItemRow(
+            type="book",
+            title="Pedro Páramo",
+            subtitle=None,
+            year=1955,
+            cover_path=None,
+            identifiers="{}",
+            metadata_json='{"authors": ["Juan Rulfo"]}',
+            created_at="now",
+            updated_at="now",
+            creator_sort_override="Anything At All",
+        )
+        session.add(item)
+        session.commit()
+        item.creator_sort_override = None
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(text("SELECT creator_sort FROM items")).one()
+    assert stored[0] == "Rulfo, Juan"
+
+
+def test_item_without_authors_has_no_creator_sort(tmp_path: Path) -> None:
+    from sqlalchemy.orm import Session
+
+    from book_tracker.infrastructure.models import ItemRow
+
+    engine = migrated_engine(tmp_path)
+    with Session(engine) as session:
+        session.add(
+            ItemRow(
+                type="book",
+                title="Anonymous",
+                subtitle=None,
+                year=None,
+                cover_path=None,
+                identifiers="{}",
+                metadata_json="{}",
+                created_at="now",
+                updated_at="now",
+            )
+        )
+        session.commit()
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT creator_sort, creator_sort_normalized FROM items")
+        ).one()
+    assert stored == (None, None)
+
+
+def test_creator_sort_migration_backfills_rows_written_before_it(tmp_path: Path) -> None:
+    from alembic import command
+    from book_tracker.domain.normalization import normalize_text
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    config = alembic_config(configured.database_url)
+    command.upgrade(config, "0010_attachments")
+    engine = create_engine(configured)
+    rows = [
+        ("Cien años de soledad", '{"authors": ["Gabriel García Márquez"]}'),
+        ("La invención de Morel", '{"authors": ["Adolfo Bioy Casares"]}'),
+        ("Ædificium", '{"authors": []}'),
+        ("Metadata that is not an object", "[]"),
+    ]
+    with engine.begin() as connection:
+        for index, (title, metadata) in enumerate(rows, start=1):
+            connection.execute(
+                text(
+                    "INSERT INTO items (id, type, title, identifiers, metadata,"
+                    " created_at, updated_at)"
+                    " VALUES (:id, 'book', :title, '{}', :metadata, 'now', 'now')"
+                ),
+                {"id": index, "title": title, "metadata": metadata},
+            )
+    command.upgrade(config, "head")
+    engine = create_engine(configured)
+    with engine.connect() as connection:
+        stored = connection.execute(
+            text("SELECT creator_sort, creator_sort_normalized FROM items ORDER BY id")
+        ).all()
+    assert stored[0] == ("García Márquez, Gabriel", normalize_text("García Márquez, Gabriel"))
+    assert stored[1] == ("Bioy Casares, Adolfo", normalize_text("Bioy Casares, Adolfo"))
+    assert stored[2] == (None, None)
+    # Same tolerance `0007` needed: `metadata` is JSON, not necessarily an object.
+    assert stored[3] == (None, None)
