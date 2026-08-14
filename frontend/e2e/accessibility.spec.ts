@@ -264,6 +264,20 @@ test("the detail attachments list has no serious accessibility violations", asyn
   await page.goto("/books/7");
   await expect(page.getByRole("link", { name: "Rayuela.epub" })).toBeVisible();
   await expectNoSeriousViolations(page, "detail (attachments)");
+
+  // One tab stop per action. The file input is visually hidden but was still
+  // focusable, and it shares its accessible name with the button that opens it,
+  // so tabbing hit the same action twice with nothing to distinguish the two.
+  expect(
+    await page.getByRole("button", { name: "Attach a file" }).count(),
+  ).toBe(1);
+  await page.getByRole("button", { name: "Attach a file" }).focus();
+  await page.keyboard.press("Tab");
+  const focused = await page.evaluate(() => {
+    const active = document.activeElement;
+    return { tag: active?.tagName, type: active?.getAttribute("type") };
+  });
+  expect(focused).not.toEqual({ tag: "INPUT", type: "file" });
 });
 
 test("the detail opinion dialog has no serious accessibility violations", async ({

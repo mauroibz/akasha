@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
 
+import type { Attachment } from "@/api/library";
 import {
   attachmentHref,
   deleteAttachment,
@@ -9,9 +10,21 @@ import {
   renameAttachment,
   uploadAttachment,
 } from "@/api/library";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { formatBytes } from "@/lib/bytes";
+import { cn } from "@/lib/utils";
 
 /**
  * Files attached to this edition.
@@ -30,6 +43,7 @@ export function Attachments({ itemId }: { itemId: number }) {
   const picker = useRef<HTMLInputElement>(null);
   const [renaming, setRenaming] = useState<number | null>(null);
   const [draft, setDraft] = useState("");
+  const [confirming, setConfirming] = useState<Attachment | null>(null);
   const key = ["attachments", itemId];
 
   const { data, isPending, isError } = useQuery({
@@ -88,10 +102,13 @@ export function Attachments({ itemId }: { itemId: number }) {
           ref={picker}
           type="file"
           className="sr-only"
-          aria-label="Attach a file"
-          // Out of the tab order: the visible button above opens this picker and
-          // carries the same accessible name, so leaving this focusable gave two
-          // tab stops for one action.
+          data-testid="attachment-picker"
+          // Out of the accessibility tree entirely, not merely out of view. The
+          // button above is the control: it opens this picker and carries the
+          // name. Leaving this exposed published a second "Attach a file" with
+          // its own tab stop, so the same action appeared twice with nothing to
+          // tell them apart. Not focusable, so hiding it strands no one.
+          aria-hidden="true"
           tabIndex={-1}
           onChange={(event) => {
             const file = event.target.files?.[0];
@@ -197,7 +214,7 @@ export function Attachments({ itemId }: { itemId: number }) {
                       variant="ghost"
                       size="sm"
                       aria-label={`Remove ${attachment.filename}`}
-                      onClick={() => remove.mutate(attachment.id)}
+                      onClick={() => setConfirming(attachment)}
                       disabled={removePending}
                     >
                       Remove
@@ -209,6 +226,39 @@ export function Attachments({ itemId }: { itemId: number }) {
           })}
         </ul>
       )}
+
+      <AlertDialog
+        open={confirming !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirming(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove this file?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirming?.filename} will be detached from this edition. If no
+              other edition has the same file, the upload is deleted and cannot
+              be recovered except from a backup.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className={cn(
+                buttonVariants({ variant: "destructive" }),
+                "rounded-full px-5",
+              )}
+              onClick={() => {
+                if (confirming) remove.mutate(confirming.id);
+                setConfirming(null);
+              }}
+            >
+              Remove file
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </section>
   );
 }

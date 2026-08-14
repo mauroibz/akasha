@@ -74,7 +74,7 @@ describe("Attachments", () => {
     await screen.findByText("No files attached yet.");
 
     await userEvent.setup().upload(
-      screen.getByLabelText("Attach a file"),
+      screen.getByTestId("attachment-picker"),
       new File(["x".repeat(64)], "huge.epub", {
         type: "application/epub+zip",
       }),
@@ -104,7 +104,7 @@ describe("Attachments", () => {
     await userEvent
       .setup()
       .upload(
-        screen.getByLabelText("Attach a file"),
+        screen.getByTestId("attachment-picker"),
         new File(["epub"], "Rayuela.epub", { type: "application/epub+zip" }),
       );
 
@@ -113,7 +113,7 @@ describe("Attachments", () => {
     );
   });
 
-  it("removes a file when asked", async () => {
+  it("removes a file only after the removal is confirmed", async () => {
     let removed = false;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
       if (init?.method === "DELETE") {
@@ -126,12 +126,75 @@ describe("Attachments", () => {
     });
     renderPanel();
     await screen.findByRole("link", { name: "Rayuela.epub" });
+    const user = userEvent.setup();
 
-    await userEvent
-      .setup()
-      .click(screen.getByRole("button", { name: "Remove Rayuela.epub" }));
+    await user.click(
+      screen.getByRole("button", { name: "Remove Rayuela.epub" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Remove file" }));
 
     expect(await screen.findByText("No files attached yet.")).toBeVisible();
+  });
+
+  it("leaves the file attached when the removal is cancelled", async () => {
+    // Once it is the last reference the bytes are gone, so cancelling has to be
+    // a true no-op rather than a delayed yes.
+    const fetcher = vi
+      .spyOn(globalThis, "fetch")
+      .mockResolvedValue(new Response(JSON.stringify(listed)));
+    renderPanel();
+    await screen.findByRole("link", { name: "Rayuela.epub" });
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove Rayuela.epub" }),
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+
+    expect(screen.getByRole("link", { name: "Rayuela.epub" })).toBeVisible();
+    expect(
+      fetcher.mock.calls.some(([, init]) => init?.method === "DELETE"),
+    ).toBe(false);
+  });
+
+  it("renames a file in place without moving its download", async () => {
+    let renamed = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (_input, init) => {
+      if (init?.method === "PATCH") {
+        renamed = true;
+        return new Response(
+          JSON.stringify({
+            ...listed.attachments[0],
+            filename: "Bestiario.epub",
+          }),
+        );
+      }
+      return new Response(
+        JSON.stringify(
+          renamed
+            ? {
+                attachments: [
+                  { ...listed.attachments[0], filename: "Bestiario.epub" },
+                ],
+              }
+            : listed,
+        ),
+      );
+    });
+    renderPanel();
+    await screen.findByRole("link", { name: "Rayuela.epub" });
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Rename Rayuela.epub" }),
+    );
+    const field = screen.getByLabelText("New name for Rayuela.epub");
+    await user.clear(field);
+    await user.type(field, "Bestiario.epub");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+
+    const link = await screen.findByRole("link", { name: "Bestiario.epub" });
+    expect(link).toHaveAttribute("href", "/api/items/3/attachments/1");
   });
 
   it("does not take the page down when the list cannot be read", async () => {

@@ -267,7 +267,7 @@ test("a file can be attached, downloaded and removed from the detail page", asyn
   await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
   await expect(page.getByText("No files attached yet.")).toBeVisible();
 
-  await page.getByLabel("Attach a file").setInputFiles({
+  await page.getByTestId("attachment-picker").setInputFiles({
     name: "Rayuela.epub",
     mimeType: "application/epub+zip",
     buffer: Buffer.from("epub bytes"),
@@ -298,8 +298,22 @@ test("a file can be attached, downloaded and removed from the detail page", asyn
   await expect(renamed).toBeVisible();
   await expect(renamed).toHaveAttribute("href", "/api/items/3/attachments/1");
 
+  // Removing asks first, the way *Delete entry* on this page already does:
+  // once it is the last reference the bytes are gone, and the product spec
+  // reserves confirmation for exactly that (§7 interaction notes).
   await page
     .getByRole("button", { name: "Remove Rayuela — Julio Cortázar.epub" })
     .click();
+  await expect(
+    page.getByRole("alertdialog", { name: /Remove this file/ }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Cancel" }).click();
+  await expect(renamed).toBeVisible();
+
+  await page
+    .getByRole("button", { name: "Remove Rayuela — Julio Cortázar.epub" })
+    .click();
+  await page.getByRole("button", { name: "Remove file" }).click();
   await expect(page.getByText("No files attached yet.")).toBeVisible();
 });
