@@ -24,6 +24,7 @@ dependencies = [
 # which imports this module, so runpy would execute it a second time under
 # __main__ and warn about it in every nightly cron log.
 akasha-backup = "book_tracker.backup:main"
+akasha-attachments = "book_tracker.reclaim:main"
 
 [dependency-groups]
 dev = [

@@ -108,6 +108,34 @@ Check one by hand at any time:
 docker compose exec akasha akasha-backup verify /backups/nightly-<stamp>
 ```
 
+## Reclaiming attachment space
+
+A blob whose last row goes away is removed with it. A few routes leave one behind
+anyway — an item deleted outside the application, a crash between writing the file
+and recording the row — and nothing else collects those. This finds them:
+
+```bash
+docker compose exec akasha akasha-attachments reclaim
+```
+
+It **reports and removes nothing** by default: what it would delete, what it kept
+because a row still points at it, and anything under `attachments/` it did not
+put there and will not touch. Read that list, then run it again to act on it:
+
+```bash
+docker compose exec akasha akasha-attachments reclaim --apply
+```
+
+Safe to run at any time, including while the stack is serving. A blob written in
+the last hour is never touched, which is what keeps it away from an upload whose
+file has landed but whose database row has not been committed yet; pass
+`--grace-seconds` if you ever need to narrow that window. A blob a backup has
+linked survives this — the backup holds its own reference to the same inode, so
+reclaiming the live copy cannot reach the bytes.
+
+There is no schedule for it and it deliberately does not run itself. It deletes
+by inference, and inference belongs behind a person.
+
 ## Restoring
 
 ```bash

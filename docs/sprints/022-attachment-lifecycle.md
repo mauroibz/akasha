@@ -1,6 +1,6 @@
 # Sprint 022 — Attachment lifecycle: reclaim, rename, and the edges Sprint 021 left
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 021
 **Roadmap revision:** 9
 
