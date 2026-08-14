@@ -1,8 +1,8 @@
 # Handoff — current reality
 
 **Last completed:** Sprint 025 (second domain, albums — the six seams), 2026-08-14.
-**Next:** Sprint 026 (status vocabulary, seam 5b) — status `ready`, file at
-`docs/sprints/026-status-vocabulary.md`. Plan revision **10**.
+**Next:** Sprint 026 (statuses, formats and tracklists) — status `ready`, file at
+`docs/sprints/026-statuses-formats-tracklists.md`. Plan revision **11**.
 
 ## Do this first
 
@@ -11,18 +11,19 @@ closed there; twelve commits are local and nothing was pushed. **Merging back is
 decision** — that is the entire reason the branch exists. Ask before merging, and cut Sprint 026's
 branch from whatever the owner settles on.
 
-**Read DEC-057 before Sprint 026.** The owner answered its central question while trying albums in
-the running application: an album's status records **possession** (`wishlist` / `pending` / `owned`),
-not consumption, and `reread_count`, `date_started` and `date_finished` are meaningless for it. One
-sub-question is still open and gates the build — whether format tags (CD/Digital/Vinyl,
-physical/borrowed/digital) carry ownership and so overlap `owned`. DEC-057 states it and recommends
-an answer; put it to the owner rather than guessing.
+**The plan changed on 2026-08-14 — read DEC-058 first.** This line no longer adds a third and fourth
+domain. It finishes music (026), polishes the library shell (027), then builds a **domain contract**
+(028) and **per-domain imports** (029) so that games, series and `spotify → music` become epics on
+top of a contract, developed in parallel without touching the core. Games and series are named under
+"Future epics" in the roadmap and carry no sprint number. `FINAL_SPRINT` is now **29**, and the
+project reaches `complete` when 029 closes.
 
-**The owner's other usability feedback is in `docs/sprints/ROADMAP.md` under "Owner feedback".**
-Five items, unscheduled, each written at the size and location it would land: a domain tab selector
-on the library, tracklists as album metadata (measured: one `inc=recordings` parameter, no extra
-request), format/ownership tags, the library grid being a fixed-height window instead of the page,
-and shelves being edited from a dialog named after something else.
+**Sprint 026's product decisions are made — DEC-057 and DEC-059.** An album's status records
+possession (`wishlist` / `pending` / `owned`) with no relisten counter and no started/finished dates;
+format is an **independent, multi-valued, per-domain tag on the entry**, legal on any status, so
+"wishlist → vinyl" works and "sort by owned, see how" is a filter plus a card. Formats reuse shelves'
+machinery and none of its meaning — shelves stay the higher tier ("work", "fiction"). Neither needs
+re-litigating; both need building.
 
 ## Read this first
 

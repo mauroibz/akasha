@@ -1,15 +1,17 @@
-# Sprint 026 — Status vocabulary (seam 5b)
+# Sprint 026 — Statuses, formats and tracklists
 
 **Status:** ready
 **Depends on:** 025
-**Roadmap revision:** 10
+**Roadmap revision:** 11
 
 ## Objective
 
-A domain has **its own statuses**, not just its own names for everyone else's. The sprint succeeds
-when an album's entry offers the statuses an album can actually be in, the library filters and the
-triage keyboard follow, and the product question underneath — whether `reread_count` and
-`date_finished` mean anything for an album — has an owner's answer recorded rather than a default.
+**Music is finished as a domain.** An album's entry offers the statuses an album can actually be in,
+records how you own it — or how you intend to — and shows what is on it. The sprint succeeds when
+the owner can filter to what they own and see the format, mark a wishlist record as the pressing they
+mean to buy, and read a tracklist without leaving the page.
+
+Seam 5b is the structural half of that; DEC-057 and DEC-059 are the product half, already decided.
 
 ## Required context
 
@@ -45,12 +47,11 @@ Observed 2026-08-14 at Sprint 025's close. **Re-derive at activation.**
 
 ## Deliverables
 
-1. **The product decision, mostly settled — finish it.** **DEC-057 has the owner's answer**: an
-   album's status records *possession* (`wishlist` / `pending` / `owned`), not consumption, and
-   `reread_count`, `date_started` and `date_finished` are meaningless for it. Read DEC-057 first.
-   What is still open is the one question it names: whether format tags (CD/Digital/Vinyl,
-   physical/borrowed/digital) carry ownership too, and therefore overlap `owned`. Settle that with
-   the owner, with the recommendation DEC-057 gives, before building either.
+1. **Read the product decisions; they are made.** **DEC-057**: an album's status records
+   *possession* (`wishlist` / `pending` / `owned`), not consumption, and `reread_count`,
+   `date_started` and `date_finished` are meaningless for it. **DEC-059**: status and format are
+   independent axes, format hangs on the **entry** rather than the item, it is multi-valued, and its
+   vocabulary is the domain's. Neither needs re-litigating; both need building.
 2. **Per-domain status vocabularies.** `Domain` gains the ordered statuses it has and which of them
    are directly choosable; `unsorted` stays universal, because imports land there and the default
    library view hides it. Validation moves from the global `EntryStatus` to a per-type lookup keyed
@@ -59,7 +60,19 @@ Observed 2026-08-14 at Sprint 025's close. **Re-derive at activation.**
    library filter chips. Decide explicitly what a chip means in a mixed library — a count for a
    status only one domain has is either hidden, or shown with its own domain's name.
 4. **The Goodreads status suggestion stays book-only by declaration**, not by accident.
-5. **The entry panel's copy** stops calling itself "Your reading data" for every domain.
+5. **The entry panel's copy** stops calling itself "Your reading data" for every domain, and an
+   album stops showing `reread_count`, `date_started` and `date_finished` (DEC-057).
+6. **Formats (DEC-059).** An `entry_formats` join table with a closed per-domain vocabulary on
+   `Domain` — `Vinyl`/`CD`/`Digital` for albums, `Physical`/`Borrowed`/`Digital` for books. Copy the
+   shelf machinery for the join, the facet count and the bulk path; do **not** render it as a shelf
+   or let it become free text. A format is legal on any status, which is what makes
+   "wishlist → vinyl" expressible.
+7. **Tracklists.** Measured on 2026-08-14: adding `recordings` to the release fetch's existing `inc`
+   returns every track's position, title and length in the same request — 6.4 KB for *Kind of Blue*,
+   no extra call and no extra rate-limit budget. It needs a **new field-spec type**: an ordered list
+   of structured rows, which is the first field the spec cannot currently describe. Tracks are
+   metadata on the album, **not child entities** — that distinction is Sprint 028's to revisit if a
+   later epic needs it, and this sprint must not blur it.
 
 ## Acceptance criteria
 
@@ -71,6 +84,10 @@ Observed 2026-08-14 at Sprint 025's close. **Re-derive at activation.**
 4. The triage keyboard sets the right status for the row it is on, whatever domain it belongs to.
 5. Filter chips and `status_counts` are correct and legible in a mixed library, per the choice made
    in deliverable 3.
+8. **The owner can filter to `owned` and see how they own it from the list**, and can mark a
+   `wishlist` album `Vinyl` without either value implying the other. Demonstrated in a browser.
+9. An album's detail page lists its tracks in order with their lengths, and a book's detail page
+   gains no empty tracklist.
 6. An album shows no reread count and no started/finished dates, per DEC-057, and a book still
    shows all three. The remaining ownership/format question is answered in `docs/decisions.md`
    before any code depends on it.
@@ -79,6 +96,10 @@ Observed 2026-08-14 at Sprint 025's close. **Re-derive at activation.**
 ## Required tests (TDD)
 
 - A status outside a domain's vocabulary is refused on create, patch and bulk-set.
+- A format outside a domain's vocabulary is refused; a format on a `wishlist` entry is accepted, and
+  an entry carrying two formats keeps both.
+- The tracklist survives a metadata refresh without being rebuilt into a different order, and an
+  album with no recordings renders no empty list.
 - Every entry's status survives the change, proven against a database seeded before it.
 - The triage hotkey map is derived from the domain, and the drift assertion in `labels.test.ts`
   still holds for every domain rather than for one.
@@ -101,23 +122,29 @@ from the library grid, the detail page and triage; filter by each chip; and repo
 
 ## Explicit non-scope
 
-- Games (027) and series (028).
+- Games and series, which DEC-058 moved out of this plan entirely and into future epics.
+- **Tracks as entities.** A tracklist is metadata here. Entry hierarchy is not this sprint's
+  question and possibly not this plan's.
+- The library shell — domain tabs, full-page scroll, shelf ergonomics. That is Sprint 027, and
+  keeping it out is what stops this sprint from becoming two.
 - Per-domain **entry** models beyond whatever deliverable 1 decides — hierarchy is Sprint 028's
   question, and it is a much larger one.
 - Re-opening seam 5a. Labels are done; this sprint is about which statuses exist.
 
 ## Commit checkpoints
 
-1. `docs: settle what an album's statuses are` (the decision, before the code)
-2. `feat: give each domain its own statuses`
-3. `feat: follow the domain vocabulary in triage and the filters`
-4. final `docs(sprint-026): close sprint and hand off`
+1. `feat: give each domain its own statuses`
+2. `feat: follow the domain vocabulary in triage and the filters`
+3. `feat: record how a copy is owned`
+4. `feat: read an album's tracklist`
+5. final `docs(sprint-026): close sprint and hand off`
 
 ## Risks and decisions to surface
 
-- **The product question is the sprint, and DEC-057 answered most of it.** What remains — whether
-  format tags carry ownership — still gates deliverable 2, because it decides whether `owned` is a
-  status at all. Do not guess it: it is not a reversible implementation detail.
+- **This sprint has three deliverables that could each fill it.** Statuses are the structural one and
+  land first; formats are the product one and are why the sprint exists; tracklists are the small
+  one and land last **because they are the slice to defer to 027 if the sprint runs long** — not the
+  one to rush at the end. Deferring them is a note in the outcome, not a failure.
 - **Entry fields become per-domain, not only statuses.** DEC-057 means an album hides
   `reread_count`, `date_started` and `date_finished`. That reaches the opinion dialog, the detail
   panel, the export and the Goodreads CSV mapping. Check whether hiding is enough or whether the

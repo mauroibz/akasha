@@ -1612,3 +1612,81 @@ Append-only record of material architecture choices, product-default resolutions
 - **Consequences.** Sprint 026's deliverable 1 changes from *ask the question* to *settle the
   ownership/format overlap*, which is a smaller and better-posed question. Books are untouched: their
   statuses, rereads and dates keep their present meaning, and no existing entry is remapped.
+
+## DEC-058 — This plan line ends at the domain contract; further domains are epics
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Supersedes:** the sprint 027/028 assignments in DEC-052, which put games and series inside this
+  plan. It does not disturb DEC-052's architecture, which was validated exactly as intended.
+- **Context:** Sprint 025 existed to find out whether a second domain was affordable. It was: all six
+  seams landed where they were drawn and no tripwire fired (DEC-055). The owner's conclusion from
+  running it is that **the experiment answered its question, and the plan should now finish music,
+  polish what exists, and stop** — rather than spending its remaining sprints proving the same point
+  twice more with games and series.
+- **Decision.** **Plan revision 11.** The line ends with four sprints:
+
+  | Sprint | What it closes |
+  |---|---|
+  | 026 | Statuses, formats and tracklists — music finished as a domain |
+  | 027 | Library shell and shelves — the polish pass on the screen the owner actually uses |
+  | 028 | The domain contract: what a domain must supply, and a conformance suite that proves it |
+  | 029 | Per-domain imports: the pipeline stops being book-only |
+
+  **Sprints 028 and 029 are the gate.** Their purpose is that a third domain becomes an *epic on top
+  of a contract* rather than a sprint inside this plan: each domain encapsulated enough that
+  `calibre → books`, `spotify → music` and `steam → games` can be built in parallel by different
+  hands without touching each other or the core. `FINAL_SPRINT` moves 28 → 29 in
+  `scripts/validate_project.py`.
+
+  **Games and series leave the numbered plan** and become future epics. DEC-052's falsifiable
+  prediction — that games need no seam albums did not — is not abandoned; it becomes the first thing
+  the conformance suite in 028 is written to check, which is a better test of it than another
+  bespoke sprint would have been.
+- **Consequences.** The project reaches `complete` at the end of 029 rather than 028. Auth is
+  unaffected and remains unscheduled (product spec section 9): it gates *exposure*, not domains, and
+  nothing here changes that. A domain epic started after 029 inherits a written contract and a test
+  suite it must pass, instead of six seams it must infer from how albums happened to be built.
+
+## DEC-059 — Ownership is an entry-level format tag, not a status and not a shelf
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Answers:** the question DEC-057 left open.
+- **Context:** DEC-057 settled that an album's status records possession, and named one unresolved
+  overlap: if a record is tagged `Vinyl`, the tag has already asserted ownership. The owner wants
+  **both** readings supported: *"I can sort by owned and see where/how I own it"*, and *"mark
+  something as wishlist → vinyl, so I can schedule my next purchase."* They also drew a boundary
+  around shelves: those are **a higher tier of organization — "work", "fiction"** — and formats are
+  not that.
+- **Decision.** **Status and format are independent axes, and a format is a property of your copy.**
+
+  A wishlist entry can carry `Vinyl` — the format you *intend* to buy — and an owned entry carries
+  the format you actually have. Neither implies the other, so nothing is double-encoded and
+  "wishlist → vinyl" is expressible, which option (b) in DEC-057 could not do.
+
+  **It hangs on the entry, not the item.** An album's `format` from MusicBrainz describes *a release*
+  — that Kind of Blue was pressed on 12" vinyl in 1959. Your copy might be a reissue, a CD or a
+  stream. Those are different facts and the existing model already separates them: items hold shared
+  edition facts, entries hold what is true for you.
+
+  **Multi-valued**, because owning a record on vinyl *and* digital is ordinary — vinyl frequently
+  ships with a download code — and because turning one value into many later is a migration.
+
+  Costed against the alternatives:
+
+  | | Shape | For | Against | Verdict |
+  |---|---|---|---|---|
+  | **A** | A `format` column on `entries` | One migration, trivial to sort and filter | Single-valued; vinyl-plus-digital needs a migration later | Rejected — the limitation is the common case |
+  | **B** | Reuse shelves with a naming convention | No new machinery at all | Collapses the owner's explicit distinction: shelves are "work"/"fiction", not "vinyl" | Rejected on the owner's boundary |
+  | **C** | JSON array on the entry | No new table | Filtering and counting need a projection; the same problem `metadata` already has | Rejected |
+  | **D** | An `entry_formats` join table, vocabulary per domain from the registry | Multi-valued; filter and facet reuse the shelf query patterns exactly; the vocabulary is a domain's to declare, like its statuses | One migration and one new table | **Accepted** |
+
+  **Shelves' mechanism is reused; shelves' meaning is not.** The join, the slug, the facet count and
+  the bulk-assign path are proven and get copied. The control is its own, the vocabulary is closed
+  and per-domain (`Vinyl`/`CD`/`Digital` for albums, `Physical`/`Borrowed`/`Digital` for books)
+  rather than free text, and nothing renders a format as a shelf.
+- **Consequences.** Sprint 026 carries this. "Sort by owned and see how" is a status filter plus the
+  format on the card; "schedule my next purchase" is filtering `wishlist` by format. The closed
+  vocabulary lives on `Domain` beside `fields` and the statuses, so a future domain declares its own
+  — and the conformance suite in Sprint 028 gains one more thing to check.

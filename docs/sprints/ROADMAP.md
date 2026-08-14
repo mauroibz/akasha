@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 10
+**Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 026](026-status-vocabulary.md)
+**Active sprint:** [Sprint 026](026-statuses-formats-tracklists.md)
 
 ## Shape of the plan
 
@@ -21,10 +21,19 @@ Post-v1 work branches:
          ├─ 023 Creator sort names
          ├─ 024 Export
          └─ 025 Second domain: albums — the six seams
-             └─ 026 Status vocabulary (seam 5b)
-                 ├─ 027 Third domain: games
-                 └─ 028 Fourth domain: series  [GATED]
+             └─ 026 Statuses, formats and tracklists
+                 └─ 027 Library shell and shelves
+                     └─ 028 The domain contract  [GATED]
+                         └─ 029 Per-domain imports   ← the plan ends here
 ```
+
+**The plan stops at 029, and that is the point (DEC-058).** Sprint 025 asked whether a second domain
+was affordable and answered yes. Proving the same thing twice more with games and series would spend
+the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
+music, polishes the screen the owner actually uses, and then builds the contract that makes a third
+domain an **epic on top of it** — one that can be developed in parallel with others and without
+touching the core. Games and series are named under [Future epics](#future-epics-after-this-plan)
+and carry no sprint number.
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -67,15 +76,16 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [023](023-creator-sort-names.md) | Creator sort names | 020 | completed |
 | [024](024-export.md) | Export | 020 | completed |
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
-| [026](026-status-vocabulary.md) | Status vocabulary (seam 5b) | 025 | **ready** |
-| 027 | Third domain — games | 026 | planned |
-| 028 | Fourth domain — series | 026 | planned |
+| [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | **ready** |
+| 027 | Library shell and shelves | 026 | planned |
+| 028 | The domain contract | 027 | planned |
+| 029 | Per-domain imports | 028 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 026 have files; 027 and 028 do not.
+incorporating actual deviations. Sprints 019 through 026 have files; 027, 028 and 029 do not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -255,59 +265,108 @@ Archive answers `http://` on all of them, and the field spec reaches the export 
 caught the Goodreads CSV emitting albums as books. The API also stopped inventing empty metadata
 defaults (DEC-056).]
 
-### [Sprint 026 — Status vocabulary (seam 5b)](026-status-vocabulary.md)
+### [Sprint 026 — Statuses, formats and tracklists](026-statuses-formats-tracklists.md)
 
-The one seam Sprint 025 deliberately leaves half-done, pulled out because it is the largest single
-piece and the only one carrying a genuine product decision (DEC-052).
+**Music, finished as a domain.** Sprint 025 shipped albums carrying books' status *values* under
+album *labels* — honest, visible, and a one-sprint debt. This clears it and adds the two things the
+owner found missing once albums were real.
 
-Sprint 025 ships albums carrying books' status *values* under album *labels* — `read` renders as
-"Listened". That is honest and visible, and it costs nothing structurally, because the standing
-invariant already says internal names are permanent while user-facing copy is free to move. What it
-does not do is let a domain have *different statuses*.
+Three decisions arrive with it, all already made, none needing re-litigation:
 
-This sprint does: per-domain status vocabularies, validation moving off the global `EntryStatus`
-StrEnum, filter chips, the triage keyboard map, and the Goodreads status suggestions staying
-book-only. Sprint 025 collapses the duplicated `statusLabels` in `pages/TriagePage.tsx:42` first, so
-this sprint is not fighting two copies.
+- **DEC-057** — an album's status records **possession**, not consumption: `wishlist` / `pending` /
+  `owned`, with no relisten counter and no started/finished dates. That makes status a per-domain
+  *concept* rather than a per-domain vocabulary, which is what seam 5b was always for.
+- **DEC-059** — **format is an independent axis on the entry**: multi-valued, per-domain vocabulary,
+  and legal on any status, so "wishlist → vinyl" is expressible and "sort by owned, see how" is one
+  filter plus a card. It reuses shelves' machinery and none of shelves' meaning — shelves stay the
+  higher tier ("work", "fiction").
+- **Tracklists**, measured at one `inc=recordings` parameter and no extra request. They need the
+  first field type the spec cannot yet describe: an ordered list of structured rows. Tracks are
+  metadata, **not** child entities.
 
-**The product question it must answer, which is the owner's and not the implementer's:** an album is
-re-listened continuously in a way a book is not re-read, so `reread_count` and `date_finished` may
-be meaningless for the domain. Deliberately scheduled after albums exist, because the answer is much
-better with two domains in hand than with one.
+The sprint's own risk note names the tracklist slice as the one to defer to 027 if it runs long,
+rather than the one to rush.
 
-### Sprint 027 — Third domain, games
+### Sprint 027 — Library shell and shelves
 
-IGDB. Not gated: by this point the seam model exists and this sprint either fits it or proves it wrong
-cheaply. **It carries a falsifiable prediction from DEC-052** — games should need no seam that
-albums did not. If it needs a seventh, the abstraction was wrong.
+The polish pass on the screen the owner spends their time in, scheduled by DEC-058 as the last
+feature work before the contract sprints. Three findings from the Sprint 025 walkthrough, all in the
+"Owner feedback" section below with their causes already traced:
 
-The new infrastructure is authentication — IGDB requires Twitch OAuth client credentials and token
-refresh, where every provider so far has needed at most a static API key. Localization is
-enrichment, not a guarantee: keep the original title plus whatever alternate names the provider
-exposes rather than assuming a single translated-title field.
+- **A domain tab selector.** Sprint 025 deliberately left the list endpoint with no `type` filter,
+  because AC4 only required that a mixed library paginate correctly — which it must either way. This
+  is the other half: books and albums together read as a mixed bag rather than as one library. The
+  tab strip is fed by `GET /api/item-types`, which already serves the domains and their labels; the
+  open question is only what the default is.
+- **The library grid is a fixed-height window inside the page** (`h-[min(70vh,760px)]` on the
+  virtualizer's scroll container), so the primary surface scrolls inside a box. Letting the page
+  scroll and having the virtualizer measure the window is the fix, and it is the one thing Sprint 013
+  was called in to repair — so it re-runs the scale and feed-semantics checks rather than assuming
+  them.
+- **Shelves are edited from a dialog named after something else.** Shelf membership lives inside
+  `OpinionDialog`, and creating a shelf is a whole route. The API already does what is needed, so
+  this is UI-shaped: inline shelf editing with create-on-type. DEC-059 fixed the boundary this must
+  respect — shelves are the higher tier ("work", "fiction"); formats are not shelves and must not be
+  rendered as one.
 
-### Sprint 028 — Fourth domain, series
+If Sprint 026 has to defer its tracklist slice, it lands here.
 
-**Gated on a product decision, not on a provider integration.** TMDB is the strongest provider in
-the research and the integration is the easy half.
+### Sprint 028 — The domain contract
 
-The entry model is one score, one status, one `reread_count` per item — settled deliberately in
-product spec section 10, item 4. A television series does not fit it. Either a series is one entry
-and "watched through season 3" is not expressible, or entries gain hierarchy, which reaches keyset
-pagination, triage selection semantics, bulk operations, and every count in the UI.
+**Gated**, and the first of the two sprints DEC-058 makes the gate to further domains.
 
-Phase A decides that and nothing else. It is last on the roadmap because the decision is much
-better made with three working domains in hand than with none.
+Albums proved the seams exist. What does not exist yet is a **written contract**: a new domain is
+currently built by reading how albums were built and inferring the rules. Phase A produces that
+contract — what a domain must supply (`Domain` and its registry entry, an adapter, a field spec, a
+status vocabulary, a format vocabulary, a URL recognizer), what it may never touch, and where its
+code lives — plus **a conformance suite a domain must pass**, run against books and albums first to
+prove it describes reality rather than intentions.
 
-Note the vocabulary collision before it causes confusion: book-series already exists as a free-text
-`metadata` field, and product spec section 11 item 4 records the deliberate choice not to model it.
+Phase A also measures what is still misplaced: book-shaped logic sitting in shared layers that two
+domains happened not to collide over. Phase B moves only what the suite proves is misplaced.
+
+**This is where DEC-052's falsifiable prediction gets tested properly.** "Games need no seam albums
+did not" is checked by writing the conformance suite against the seams and seeing whether a paper
+walk through IGDB passes it — which is cheaper and more honest than another bespoke sprint.
+
+### Sprint 029 — Per-domain imports
+
+The last sprint in the plan. Import is book-only today — `domain/goodreads.py`, `domain/calibre.py`
+and `application/imports.py` assume books throughout, while the ledger, the preview and undo are
+genuinely shared and must stay that way.
+
+The outcome is a pipeline where `calibre → books` is one importer among several rather than the
+shape of importing itself, so that `spotify → music` and `steam → games` are **epics somebody else
+can build in parallel** without touching the core (DEC-058). Calibre and Goodreads are re-expressed
+against that boundary; no second importer is built here, because building one would be the epic this
+sprint exists to make possible.
+
+When this closes, the project state goes `complete` per `WORKFLOW.md`'s final-sprint rule.
+
+## Future epics, after this plan
+
+Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
+contract and Sprint 029's import boundary, developed in parallel without interfering with the others.
+
+- **Games — IGDB.** Carries DEC-052's prediction that games need no seam albums did not; Sprint 028's
+  conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
+  Twitch OAuth client credentials and token refresh, where every provider so far has needed at most a
+  static API key. `steam → games` is the import.
+- **Series — TMDB.** Gated on a product decision rather than an integration. The entry model is one
+  score, one status, one `reread_count` per item (product spec section 10, item 4), and a television
+  series does not fit it: either a series is one entry and "watched through season 3" is not
+  expressible, or entries gain hierarchy, which reaches keyset pagination, triage selection, bulk
+  operations and every count in the UI. Note the vocabulary collision before it causes confusion —
+  book-series already exists as a free-text `metadata` field, and product spec section 11 item 4
+  records the deliberate choice not to model it.
+- **Music imports — `spotify → music`.** The natural first exercise of Sprint 029's boundary.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 
-Raised while trying Sprint 025's albums in the running application. **Nothing here has a sprint
-number yet**; they are written down at the size and location they would land, so scheduling them is
-a decision rather than a rediscovery. The status half of this feedback was large enough to become a
-decision on its own and is **DEC-057**, already folded into Sprint 026.
+Raised while trying Sprint 025's albums in the running application. **All of it is now scheduled**
+(DEC-058): items 1, 4 and 5 are Sprint 027, items 2 and 3 are Sprint 026. The causes below were
+traced when the feedback was recorded, so the sprints that pick them up start from evidence rather
+than from a rediscovery. The status half became **DEC-057** and the ownership half **DEC-059**.
 
 ### 1. The library should select a domain, not mix them
 
