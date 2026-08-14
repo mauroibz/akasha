@@ -345,6 +345,37 @@ describe("DetailPage", () => {
     expect(within(dialog).queryByLabelText(/page count/i)).toBeNull();
   });
 
+  it("names an album's statuses the way its domain does", async () => {
+    // Seam 5a: `read` is still the stored value; only the copy follows the domain.
+    // Sprint 026 decides whether an album may have different statuses at all.
+    const albumTypes = [
+      {
+        id: "album",
+        label: "Album",
+        fields: [],
+        status_labels: { read: "Listened", reading: "Listening" },
+      },
+    ];
+    const album = {
+      ...entry,
+      status: "read",
+      item: { ...entry.item, type: "album", title: "Discovery", metadata: {} },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(albumTypes));
+      return new Response(JSON.stringify(album));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Discovery" });
+
+    expect(document.querySelector("[data-fact='status'] dd")).toHaveTextContent(
+      "Listened",
+    );
+  });
+
   it("corrects the creator sort name and clears it back to the automatic value", async () => {
     const bodies: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {

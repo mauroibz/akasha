@@ -6,6 +6,8 @@ import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
 import type { LibraryEntry } from "@/api/library";
+import { statusLabelsFor } from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import {
   gridColumnCount,
   gridLayout,
@@ -40,6 +42,8 @@ function EntryControls({
   entry: LibraryEntry;
   stretch?: boolean;
 }) {
+  // One cached request for the whole session, shared with every other row.
+  const itemTypes = useItemTypes();
   return (
     <div
       className="flex h-11 shrink-0 items-center gap-2"
@@ -50,6 +54,7 @@ function EntryControls({
         value={entry.status}
         onValueChange={(status) => onStatus(entry, status)}
         label={`Status for ${entry.item.title}`}
+        labels={statusLabelsFor(entry.item.type, itemTypes.data)}
         // In a card the select absorbs the free width so it can never push the
         // score control past the card edge.
         className={stretch ? "h-9 min-w-0 flex-1" : "h-9 w-auto"}

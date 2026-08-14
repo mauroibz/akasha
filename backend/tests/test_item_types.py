@@ -120,3 +120,27 @@ async def test_metadata_stays_opaque_in_the_response(tmp_path: Path) -> None:
     body = response.json()
     assert body["metadata"]["catalog_number"] == "7243 8 49606 1 4"
     assert body["metadata"]["creators"] == ["Daft Punk"]
+
+
+@pytest.mark.anyio
+async def test_a_domain_renames_the_statuses_it_shares(tmp_path: Path) -> None:
+    """Seam 5a: the labels are the domain's, the values are everyone's.
+
+    An album is listened to, not read. What it is *called* moves; `read` stays the
+    stored value, so no data migrates and no filter breaks. Sprint 026 takes the other
+    half — whether a domain may have different statuses at all.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
+
+    assert published["album"]["status_labels"] == {
+        "read": "Listened",
+        "reading": "Listening",
+        "to_read": "To listen",
+    }
+    # A book keeps the shared vocabulary, so it overrides nothing.
+    assert published["book"]["status_labels"] == {}

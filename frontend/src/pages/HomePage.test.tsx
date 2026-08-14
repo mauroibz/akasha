@@ -73,6 +73,12 @@ test("announces loading and then renders the populated library and inbox facet",
     "fetch",
     vi.fn((request: string | URL | Request) => {
       // The page also loads the shelf list; only the library request is held open.
+      if (String(request).startsWith("/api/item-types")) {
+        return new Response("[]");
+      }
+      if (String(request).startsWith("/api/item-types")) {
+        return new Response("[]");
+      }
       if (String(request).startsWith("/api/shelves")) {
         return Promise.resolve(new Response("[]", { status: 200 }));
       }
@@ -343,6 +349,9 @@ test("Inbox count applies the unsorted filter", async () => {
 test("the shelf filter lists every shelf, not only those on loaded pages", async () => {
   // No loaded entry carries a shelf, so a filter derived from `entries` is empty.
   const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    if (String(request).startsWith("/api/item-types")) {
+      return new Response("[]");
+    }
     if (String(request).startsWith("/api/shelves")) {
       return new Response(
         JSON.stringify([

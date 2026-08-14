@@ -30,6 +30,7 @@ import {
 } from "@/features/detail/schemas";
 import type { EntryStatus, ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
+import { statusLabelsFor } from "@/features/library/labels";
 import { cn } from "@/lib/utils";
 
 export function AddPage() {
@@ -414,6 +415,7 @@ export function AddPage() {
             <div>
               <span className="mb-1 block text-sm">Status</span>
               <StatusSelect
+                labels={statusLabelsFor(itemType, itemTypes)}
                 triggerRef={statusRef}
                 value={status}
                 onValueChange={setStatus}

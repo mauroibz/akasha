@@ -1,4 +1,4 @@
-import type { EntryStatus, SortKey } from "@/api/library";
+import type { EntryStatus, ItemType, SortKey } from "@/api/library";
 
 /**
  * User-facing copy for the entry statuses. Internal names are permanent
@@ -36,6 +36,23 @@ export const statusHotkeys: Record<string, EntryStatus> = {
   g: "reading",
   u: "unsorted",
 };
+
+/**
+ * The statuses as *this* item's domain names them. The values never move — `read` is
+ * a permanent internal name — but an album is listened to rather than read, so the
+ * copy does (DEC-052 seam 5a). A domain that overrides nothing gets the shared table.
+ */
+export function statusLabelsFor(
+  itemType: string,
+  types: ItemType[] | undefined,
+): Record<EntryStatus, string> {
+  // Defensive on purpose: the registry must never be the reason a row fails to
+  // render, so anything unexpected falls back to the shared vocabulary.
+  const overrides = Array.isArray(types)
+    ? types.find((type) => type.id === itemType)?.status_labels
+    : undefined;
+  return overrides ? { ...statusLabels, ...overrides } : statusLabels;
+}
 
 export const sortLabels: Record<SortKey, string> = {
   date_added: "Recently added",

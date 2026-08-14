@@ -1365,7 +1365,7 @@
         "type": "object"
       },
       "ItemTypeResponse": {
-        "description": "What a domain says its metadata fields are, so a form can render itself.",
+        "description": "What a domain says about itself, so a screen can render it without branching.",
         "properties": {
           "fields": {
             "items": {
@@ -1381,12 +1381,20 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "status_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Status Labels",
+            "type": "object"
           }
         },
         "required": [
           "id",
           "label",
-          "fields"
+          "fields",
+          "status_labels"
         ],
         "title": "ItemTypeResponse",
         "type": "object"

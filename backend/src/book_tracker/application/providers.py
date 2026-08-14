@@ -1,12 +1,9 @@
 import asyncio
 import logging
-import re
 from collections.abc import Sequence
 from typing import Any
-from urllib.parse import parse_qs, urlsplit
 
-from book_tracker.domain.domains import DEFAULT_DOMAIN, Domain
-from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
+from book_tracker.domain.domains import DEFAULT_DOMAIN, DOMAINS, Domain
 from book_tracker.domain.providers import Provider, SearchCandidate, merge_and_rank
 from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS
 
@@ -53,30 +50,35 @@ async def search_providers(
 
 
 async def resolve_input(value: str, providers: dict[str, Provider]) -> list[SearchCandidate]:
-    cleaned = value.strip()
-    try:
-        isbn = normalize_identifier("isbn", cleaned).normalized_value
-    except InvalidIdentifier:
-        isbn = None
-    if isbn:
-        return await search_providers(f"isbn:{isbn}", list(providers.values()), timeout_seconds=5)
+    """Turn something pasted into the add box into candidates.
 
-    parsed = urlsplit(cleaned)
-    host = (parsed.hostname or "").casefold()
-    openlibrary = providers.get("openlibrary")
-    google = providers.get("googlebooks")
-    book = re.fullmatch(r"/books/(OL\d+M)/?", parsed.path)
-    work = re.fullmatch(r"/works/(OL\d+W)/?", parsed.path)
-    if host in {"openlibrary.org", "www.openlibrary.org"} and book and openlibrary:
-        return [await openlibrary.fetch(book.group(1))]
-    if host in {"openlibrary.org", "www.openlibrary.org"} and work and openlibrary:
-        resolver: Any = openlibrary
-        return list(await resolver.resolve_work(work.group(1)))
-    if (host == "books.google.com" or host.endswith(".books.google.com")) and google:
-        source_id = parse_qs(parsed.query).get("id", [""])[0]
-        if source_id:
-            return [await google.fetch(source_id)]
-    raise InvalidResolution("Use an ISBN, Open Library edition/work URL, or Google Books URL")
+    What a string *means* is the domain's to say (DEC-052 seam 6): an ISBN and an
+    Open Library URL belong to books, a MusicBrainz release-group URL to albums, and
+    this function only spends what the recognizing domain asks for.
+    """
+    cleaned = value.strip()
+    for domain in DOMAINS.values():
+        match = domain.recognize(cleaned)
+        if match is None:
+            continue
+        if match.action == "search":
+            candidates = [
+                provider
+                for provider in providers.values()
+                if getattr(provider, "item_type", DEFAULT_DOMAIN.item_type) == domain.item_type
+            ]
+            return await search_providers(match.value, candidates, domain=domain, timeout_seconds=5)
+        provider = providers.get(match.provider)
+        if provider is None:
+            continue
+        if match.action == "work":
+            resolver: Any = provider
+            return list(await resolver.resolve_work(match.value))
+        return [await provider.fetch(match.value)]
+    raise InvalidResolution(
+        "Use an ISBN, an Open Library edition/work URL, a Google Books URL, "
+        "or a MusicBrainz release group URL"
+    )
 
 
 # The shared client allows 5s, which suits a search someone is watching. A chooser is

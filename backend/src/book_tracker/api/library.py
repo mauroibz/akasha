@@ -88,11 +88,14 @@ class FieldSpecResponse(BaseModel):
 
 
 class ItemTypeResponse(BaseModel):
-    """What a domain says its metadata fields are, so a form can render itself."""
+    """What a domain says about itself, so a screen can render it without branching."""
 
     id: str
     label: str
     fields: list[FieldSpecResponse]
+    #: Overrides for the shared status vocabulary — `read` reads as "Listened" on an
+    #: album. The values are permanent internal names; only the copy moves (seam 5a).
+    status_labels: dict[str, str]
 
 
 class ItemResponse(BaseModel):
@@ -407,6 +410,7 @@ async def list_item_types() -> list[ItemTypeResponse]:
             id=domain.item_type,
             label=domain.label,
             fields=[FieldSpecResponse(**vars(field)) for field in domain.fields],
+            status_labels=dict(domain.status_labels),
         )
         for domain in DOMAINS.values()
     ]

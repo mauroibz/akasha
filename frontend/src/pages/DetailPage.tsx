@@ -34,7 +34,7 @@ import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
-import { statusLabels } from "@/features/library/labels";
+import { statusLabelsFor } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -224,7 +224,7 @@ export function DetailPage() {
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
               <Fact name="status" label="Status">
-                {statusLabels[entry.status]}
+                {statusLabelsFor(item.type, itemTypes.data)[entry.status]}
               </Fact>
               <Fact name="score" label="Score">
                 <span

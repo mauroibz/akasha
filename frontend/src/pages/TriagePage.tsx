@@ -34,7 +34,9 @@ import {
   chooseableStatuses,
   statusHotkeys,
   statusLabels,
+  statusLabelsFor,
 } from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import { useMotionPresets } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
@@ -60,6 +62,10 @@ export function TriagePage() {
     () => filtersFromParams(searchParams),
     [searchParams],
   );
+  // The bulk chooser below stays on the shared vocabulary on purpose: a selection can
+  // hold books and albums at once, and one of the two names would be wrong for half of
+  // it. Per-row copy follows the row's own domain.
+  const itemTypes = useItemTypes();
   const [search, setSearch] = useState(filters.query);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
@@ -603,9 +609,17 @@ export function TriagePage() {
                     {hasConflict && (
                       <span
                         className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
-                        title={`Suggested: ${statusLabels[entry.suggested_status!]}`}
+                        title={`Suggested: ${
+                          statusLabelsFor(entry.item.type, itemTypes.data)[
+                            entry.suggested_status!
+                          ]
+                        }`}
                       >
-                        {statusLabels[entry.suggested_status!]}
+                        {
+                          statusLabelsFor(entry.item.type, itemTypes.data)[
+                            entry.suggested_status!
+                          ]
+                        }
                       </span>
                     )}
                     <span

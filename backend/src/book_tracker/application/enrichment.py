@@ -13,6 +13,7 @@ import httpx
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
+from book_tracker.domain.domains import DOMAINS
 from book_tracker.domain.providers import ItemPayload
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
@@ -333,13 +334,19 @@ def enqueue_enrichment_backfill(
 def _backfillable_items(
     engine: Engine, item_ids: Collection[int] | None = None
 ) -> list[tuple[int, str]]:
+    # A domain declares whether background enrichment applies at all. One MusicBrainz
+    # release fetch already returns everything an album has, so there is nothing for a
+    # job to fill and no ISBN to key it on — "this domain does not enrich" is a
+    # simplification rather than a gap (DEC-052 seam 6).
+    enriching = tuple(domain.item_type for domain in DOMAINS.values() if domain.enriches)
+    types = ", ".join(f":type_{index}" for index, _ in enumerate(enriching))
+    parameters: dict[str, Any] = {f"type_{index}": value for index, value in enumerate(enriching)}
     scope = ""
-    parameters: dict[str, Any] = {}
     if item_ids is not None:
         # Bound and parameterised rather than interpolated.
         placeholders = ", ".join(f":item_{index}" for index, _ in enumerate(item_ids))
         scope = f"AND items.id IN ({placeholders})"
-        parameters = {f"item_{index}": value for index, value in enumerate(item_ids)}
+        parameters.update({f"item_{index}": value for index, value in enumerate(item_ids)})
     with engine.connect() as connection:
         result = connection.execute(
             text(
@@ -348,7 +355,8 @@ def _backfillable_items(
                 FROM items
                 JOIN item_identifiers AS ident
                   ON ident.item_id = items.id AND ident.kind = 'isbn'
-                WHERE (
+                WHERE items.type IN ({types})
+                  AND (
                         items.cover_path IS NULL
                      OR items.cover_path = ''
                      OR items.year IS NULL

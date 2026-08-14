@@ -6,6 +6,8 @@ import type { LibraryEntry } from "@/api/library";
 import type { ShelfWithCount } from "@/api/shelves";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
+import { statusLabelsFor } from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -39,6 +41,7 @@ export function OpinionDialog({
   onSave,
   onCreateShelf,
 }: OpinionDialogProps) {
+  const itemTypes = useItemTypes();
   const [newShelfName, setNewShelfName] = useState("");
   const [saveError, setSaveError] = useState("");
   const form = useForm<OpinionValues>({
@@ -89,6 +92,7 @@ export function OpinionDialog({
               name="status"
               render={({ field }) => (
                 <StatusSelect
+                  labels={statusLabelsFor(entry.item.type, itemTypes.data)}
                   value={field.value}
                   onValueChange={field.onChange}
                   label="Status"

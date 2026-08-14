@@ -22,6 +22,8 @@ const orderedStatuses: readonly EntryStatus[] = [
 
 interface StatusSelectProps {
   value: EntryStatus;
+  /** The labels of the item's domain; defaults to the shared vocabulary. */
+  labels?: Record<EntryStatus, string>;
   onValueChange: (status: EntryStatus) => void;
   /** Accessible name. Radix has no implicit label, so this is required. */
   label: string;
@@ -40,6 +42,7 @@ export function StatusSelect({
   value,
   onValueChange,
   label,
+  labels = statusLabels,
   className,
   triggerRef,
 }: StatusSelectProps) {
@@ -58,7 +61,7 @@ export function StatusSelect({
       <SelectContent>
         {orderedStatuses.map((status) => (
           <SelectItem key={status} value={status}>
-            {statusLabels[status]}
+            {labels[status]}
           </SelectItem>
         ))}
       </SelectContent>

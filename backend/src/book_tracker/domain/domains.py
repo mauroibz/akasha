@@ -10,10 +10,13 @@ This record grows one seam at a time. It starts with identity because that is th
 the earlier plan did not anticipate and the one most likely to be wrong.
 """
 
-from collections.abc import Mapping, Sequence
-from dataclasses import dataclass
+import re
+from collections.abc import Callable, Mapping, Sequence
+from dataclasses import dataclass, field
 from typing import Any, Literal
+from urllib.parse import parse_qs, urlsplit
 
+from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.providers import ALBUM_IDENTITY, BOOK_IDENTITY, IdentityStrategy
 
 FieldType = Literal["text", "long_text", "number"]
@@ -67,6 +70,17 @@ ALBUM_FIELDS = (
 )
 
 
+# Seam 5a: the *labels* are the domain's, the values are not. `read` is a permanent
+# internal name and an album renders it as "Listened". Sprint 026 takes the other half —
+# per-domain status *vocabularies*, validation off the global `EntryStatus`, the filter
+# chips and the triage keys — which is the piece carrying a product decision (DEC-052).
+ALBUM_STATUS_LABELS = {
+    "read": "Listened",
+    "reading": "Listening",
+    "to_read": "To listen",
+}
+
+
 @dataclass(frozen=True)
 class Domain:
     """`item_type` is the value stored in `items.type` and is permanent."""
@@ -75,16 +89,97 @@ class Domain:
     label: str
     identity: IdentityStrategy
     fields: tuple[FieldSpec, ...]
+    #: Whether background enrichment applies. One MusicBrainz release fetch already
+    #: returns everything an album has, where a Goodreads row starts as little more
+    #: than an ISBN — so "this domain does not enrich" is a simplification, not a gap.
+    enriches: bool = True
+    #: Overrides for the shared status vocabulary; absent statuses keep their names.
+    status_labels: Mapping[str, str] = field(default_factory=dict)
+    #: Recognizes a URL or identifier this domain can resolve, for add-by-URL.
+    recognize: Callable[[str], "UrlMatch | None"] = lambda _value: None
 
 
-BOOK = Domain(item_type="book", label="Book", identity=BOOK_IDENTITY, fields=BOOK_FIELDS)
-ALBUM = Domain(item_type="album", label="Album", identity=ALBUM_IDENTITY, fields=ALBUM_FIELDS)
+BOOK = Domain(
+    item_type="book",
+    label="Book",
+    identity=BOOK_IDENTITY,
+    fields=BOOK_FIELDS,
+    recognize=lambda value: recognize_book_input(value),
+)
+ALBUM = Domain(
+    item_type="album",
+    label="Album",
+    identity=ALBUM_IDENTITY,
+    fields=ALBUM_FIELDS,
+    enriches=False,
+    status_labels=ALBUM_STATUS_LABELS,
+    recognize=lambda value: recognize_album_url(value),
+)
 
 DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM)}
 
 # Every route, importer and repository that predates the second domain works on books;
 # naming that here keeps `"book"` out of those call sites as a literal.
 DEFAULT_DOMAIN = BOOK
+
+
+@dataclass(frozen=True)
+class UrlMatch:
+    """What a domain recognized in something typed into the add box.
+
+    `action` is how to spend it: `fetch` a record by its id, expand a `work` into its
+    editions, or run a `search` the domain's providers already understand.
+    """
+
+    provider: str
+    action: Literal["fetch", "work", "search"]
+    value: str
+
+
+_OPENLIBRARY_HOSTS = {"openlibrary.org", "www.openlibrary.org"}
+_MUSICBRAINZ_HOSTS = {"musicbrainz.org", "www.musicbrainz.org", "beta.musicbrainz.org"}
+_OPENLIBRARY_EDITION = re.compile(r"/books/(OL\d+M)/?")
+_OPENLIBRARY_WORK = re.compile(r"/works/(OL\d+W)/?")
+_MUSICBRAINZ_RELEASE_GROUP = re.compile(
+    r"/release-group/([0-9a-fA-F-]{36})/?",
+)
+
+
+def recognize_book_input(value: str) -> UrlMatch | None:
+    """An ISBN, an Open Library edition or work, or a Google Books volume."""
+    try:
+        isbn = normalize_identifier("isbn", value).normalized_value
+    except InvalidIdentifier:
+        isbn = None
+    if isbn:
+        return UrlMatch("", "search", f"isbn:{isbn}")
+    parsed = urlsplit(value)
+    host = (parsed.hostname or "").casefold()
+    if host in _OPENLIBRARY_HOSTS:
+        edition = _OPENLIBRARY_EDITION.fullmatch(parsed.path)
+        if edition:
+            return UrlMatch("openlibrary", "fetch", edition.group(1))
+        work = _OPENLIBRARY_WORK.fullmatch(parsed.path)
+        if work:
+            return UrlMatch("openlibrary", "work", work.group(1))
+    if host == "books.google.com" or host.endswith(".books.google.com"):
+        volume = parse_qs(parsed.query).get("id", [""])[0]
+        if volume:
+            return UrlMatch("googlebooks", "fetch", volume)
+    return None
+
+
+def recognize_album_url(value: str) -> UrlMatch | None:
+    """A MusicBrainz release-group URL. A release URL is deliberately not one.
+
+    The item is the release group; pointing at one pressing would silently add a
+    different record from the one the link names.
+    """
+    parsed = urlsplit(value)
+    if (parsed.hostname or "").casefold() not in _MUSICBRAINZ_HOSTS:
+        return None
+    group = _MUSICBRAINZ_RELEASE_GROUP.fullmatch(parsed.path)
+    return UrlMatch("musicbrainz", "fetch", group.group(1)) if group else None
 
 
 class InvalidMetadata(ValueError):

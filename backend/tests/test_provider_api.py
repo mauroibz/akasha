@@ -152,3 +152,48 @@ async def test_a_search_reaches_only_the_providers_of_the_domain_it_names(
     assert book_search.json()[0]["source"] == "openlibrary"
     assert album_search.json()[0]["source"] == "musicbrainz"
     assert unknown.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_a_url_is_resolved_by_the_domain_that_recognizes_it(tmp_path: Path) -> None:
+    """Seam 6: `resolve_input` stopped knowing three book URL shapes by heart.
+
+    Each domain recognizes its own, and only the recognizing domain's provider is
+    asked — so pasting a MusicBrainz link spends nothing at Open Library.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    books = RecordingProvider("openlibrary", "book")
+    albums = RecordingProvider("musicbrainz", "album")
+    fetched: list[tuple[str, str]] = []
+
+    async def remember(provider: RecordingProvider, source_id: str) -> SearchCandidate:
+        fetched.append((provider.name, source_id))
+        return (await provider.search(source_id))[0]
+
+    books.fetch = lambda source_id: remember(books, source_id)  # type: ignore[method-assign]
+    albums.fetch = lambda source_id: remember(albums, source_id)  # type: ignore[method-assign]
+
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.providers = {"openlibrary": books, "musicbrainz": albums}
+        album = await client.get(
+            "/api/search/resolve",
+            params={
+                "url": "https://musicbrainz.org/release-group/8e8a594f-2175-38c7-a871-abb68ec363e7"
+            },
+        )
+        book = await client.get(
+            "/api/search/resolve",
+            params={"url": "https://openlibrary.org/books/OL19845805M"},
+        )
+        nonsense = await client.get("/api/search/resolve", params={"url": "https://example.com/x"})
+
+    assert album.status_code == 200
+    assert book.status_code == 200
+    assert fetched == [
+        ("musicbrainz", "8e8a594f-2175-38c7-a871-abb68ec363e7"),
+        ("openlibrary", "OL19845805M"),
+    ]
+    assert nonsense.status_code == 422

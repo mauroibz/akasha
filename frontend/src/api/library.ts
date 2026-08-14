@@ -32,6 +32,8 @@ export interface ItemType {
   id: string;
   label: string;
   fields: FieldSpec[];
+  /** Overrides for the shared status vocabulary: an album is "Listened", not "Read". */
+  status_labels: Partial<Record<EntryStatus, string>>;
 }
 
 /**
