@@ -105,6 +105,7 @@ class AddService:
         idempotency_key: str | None,
         confirm_near_match: bool = False,
     ) -> dict[str, Any]:
+        creator_sort: str | None = None
         if manual is not None:
             cover_url = None
             cover_fallback_urls: Sequence[str] = ()
@@ -130,6 +131,7 @@ class AddService:
             title = payload.title
             subtitle = payload.subtitle
             creators = payload.creators
+            creator_sort = payload.creator_sort
             year = payload.year
             metadata = {**payload.metadata, "creators": list(creators)}
             if payload.language:
@@ -169,6 +171,7 @@ class AddService:
                 status=status,
                 score=score,
                 shelf_ids=shelf_ids,
+                creator_sort=creator_sort,
             )
         except IdentityConflict as error:
             raise LibraryError(

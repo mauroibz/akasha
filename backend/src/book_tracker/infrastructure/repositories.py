@@ -242,6 +242,7 @@ class DomainRepository:
         status: str,
         score: int | None,
         shelf_ids: Sequence[int] = (),
+        creator_sort: str | None = None,
         user_id: int = 1,
     ) -> EntryResult:
         with self._write() as session:
@@ -261,6 +262,10 @@ class DomainRepository:
                         {value.kind: value.normalized_value for value in identifiers}
                     ),
                     metadata_json=json.dumps(dict(metadata), ensure_ascii=False),
+                    # A source that knows the sort name seeds the owner's value, so the
+                    # heuristic never runs on a name somebody already answered — the
+                    # same rule Calibre's `authors.sort` follows (DEC-051, DEC-052).
+                    creator_sort_override=(creator_sort or None),
                     created_at=now,
                     updated_at=now,
                 )

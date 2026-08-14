@@ -44,6 +44,74 @@ class Provider:
         )
 
 
+class SortNameProvider:
+    """A provider that knows how its own creator sorts, the way MusicBrainz does."""
+
+    name = "openlibrary"
+    item_type = "book"
+
+    def __init__(self, creator: str, creator_sort: str | None) -> None:
+        self.creator = creator
+        self.creator_sort = creator_sort
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Discovery",
+            subtitle=None,
+            creators=(self.creator,),
+            year=2001,
+            cover_url=None,
+            identifiers={},
+            language="en",
+            metadata={"creators": [self.creator]},
+            creator_sort=self.creator_sort,
+        )
+
+
+@pytest.mark.anyio
+async def test_a_source_that_knows_the_sort_name_seeds_it_and_the_heuristic_stays_out(
+    tmp_path: Path,
+) -> None:
+    """The rule seam 1 generalizes from Calibre: a source that knows, seeds (DEC-051).
+
+    The heuristic assumes a person's name and would file `Daft Punk` under P, which is
+    the observation the whole architecture turns on (DEC-052). It must not run on a
+    name a source already answered — and it must still run when nothing knew.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": SortNameProvider("Daft Punk", "Daft Punk")}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            known = await client.post(
+                "/api/entries",
+                json={"source": "openlibrary", "source_id": "known", "status": "read"},
+            )
+        app.state.providers = {"openlibrary": SortNameProvider("Miles Davis", None)}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            unknown = await client.post(
+                "/api/entries",
+                json={"source": "openlibrary", "source_id": "unknown", "status": "read"},
+            )
+
+    seeded = known.json()["entry"]["item"]
+    assert seeded["creator_sort_override"] == "Daft Punk"
+    assert seeded["creator_sort"] == "Daft Punk"
+    # Nothing knew, so the heuristic answers and stays correctable.
+    guessed = unknown.json()["entry"]["item"]
+    assert guessed["creator_sort_override"] is None
+    assert guessed["creator_sort"] == "Davis, Miles"
+
+
 @pytest.mark.anyio
 async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
     tmp_path: Path,

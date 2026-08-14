@@ -31,6 +31,10 @@ class SearchCandidate:
     # The credit as the source renders it, when it renders one: `["Dean Blunt",
     # "James Ferraro"]` joined by ", " is not "Dean Blunt Meets James Ferraro".
     credit: str | None = None
+    # A sort name the source is sure of. MusicBrainz knows Person from Group and only
+    # inverts a person's name; Calibre curates `authors.sort`. A source that knows this
+    # seeds the owner's override and the heuristic never runs (DEC-051, DEC-052).
+    creator_sort: str | None = None
 
 
 @dataclass(frozen=True)
