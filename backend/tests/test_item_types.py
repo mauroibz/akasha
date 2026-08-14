@@ -1,0 +1,122 @@
+"""The metadata field spec: what a domain says its fields are, served as data.
+
+`ItemResponse.metadata` used to be `BookMetadataResponse`, so the twelve book fields
+were a contract in three places — the response model, the patch model, and a form
+that listed them by hand. A second domain cannot join that arrangement without the
+shared layer learning both vocabularies (DEC-052 seam 3).
+
+Storage stays opaque. What moves is the *description* of the fields, which the API
+publishes and the dialog renders.
+"""
+
+from pathlib import Path
+
+import httpx
+import pytest
+from sqlalchemy import text
+
+from book_tracker.config import Settings
+from book_tracker.infrastructure.repositories import DomainRepository
+from book_tracker.main import create_app
+
+
+def settings(tmp_path: Path) -> Settings:
+    return Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_every_domain_publishes_its_fields(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get("/api/item-types")
+
+    assert response.status_code == 200
+    published = {row["id"]: row for row in response.json()}
+    assert set(published) == {"book", "album"}
+
+    book_fields = {field["name"]: field for field in published["book"]["fields"]}
+    assert book_fields["creators"]["multiplicity"] == "many"
+    assert book_fields["page_count"]["type"] == "number"
+    assert book_fields["description"]["type"] == "long_text"
+    # A book has no label and an album has no page count. Neither domain carries the
+    # other's fields as optional nulls, which is the thing a shared model cannot avoid.
+    assert "label" not in book_fields
+    album_fields = {field["name"]: field for field in published["album"]["fields"]}
+    assert "page_count" not in album_fields
+    assert album_fields["label"]["label"] == "Label"
+    assert album_fields["creators"]["label"] == "Artists"
+
+
+@pytest.mark.anyio
+async def test_a_patch_is_validated_against_the_fields_of_its_own_type(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET type='album' WHERE id=:id"), {"id": album.item_id}
+            )
+
+        on_its_own_type = await client.patch(
+            f"/api/items/{album.item_id}", json={"metadata": {"label": "Virgin"}}
+        )
+        borrowed = await client.patch(
+            f"/api/items/{book.item_id}", json={"metadata": {"label": "Virgin"}}
+        )
+        invented = await client.patch(
+            f"/api/items/{book.item_id}", json={"metadata": {"nonsense": "x"}}
+        )
+        out_of_range = await client.patch(
+            f"/api/items/{book.item_id}", json={"metadata": {"page_count": 0}}
+        )
+        wrong_shape = await client.patch(
+            f"/api/items/{book.item_id}", json={"metadata": {"creators": "Cortázar"}}
+        )
+
+    assert on_its_own_type.status_code == 200
+    assert on_its_own_type.json()["metadata"]["label"] == "Virgin"
+    # A field the domain does not declare is refused exactly as an invented one is:
+    # `extra="forbid"` used to do this for the one vocabulary that existed.
+    assert borrowed.status_code == 422
+    assert invented.status_code == 422
+    assert out_of_range.status_code == 422
+    assert wrong_shape.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_metadata_stays_opaque_in_the_response(tmp_path: Path) -> None:
+    """The spec describes the fields; it does not become the storage schema."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE items SET type='album',"
+                    " metadata=json_set(metadata, '$.catalog_number', '7243 8 49606 1 4')"
+                    " WHERE id=:id"
+                ),
+                {"id": album.item_id},
+            )
+        response = await client.get(f"/api/items/{album.item_id}")
+
+    body = response.json()
+    assert body["metadata"]["catalog_number"] == "7243 8 49606 1 4"
+    assert body["metadata"]["creators"] == ["Daft Punk"]

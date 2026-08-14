@@ -1,5 +1,6 @@
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
+import { stubItemTypes } from "./seed";
 
 const entry = {
   id: 7,
@@ -48,6 +49,7 @@ async function stubEntry(page: Page) {
       },
     }),
   );
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
@@ -135,13 +137,13 @@ test("confirmed deletion removes the entry and returns to library", async ({
     .first()
     .click();
   await expect(
-    page.getByRole("alertdialog", { name: /remove this book/i }),
+    page.getByRole("alertdialog", { name: /remove this/i }),
   ).toBeVisible();
   // The dialog states books remain
   await expect(page.getByText(/remain/i)).toBeVisible();
   // Confirm deletion
   await page
-    .getByRole("alertdialog", { name: /remove this book/i })
+    .getByRole("alertdialog", { name: /remove this/i })
     .getByRole("button", { name: /delete entry/i })
     .click();
   await expect(page).toHaveURL("/");
@@ -156,12 +158,12 @@ test("delete cancel preserves the entry", async ({ page }) => {
     .first()
     .click();
   await expect(
-    page.getByRole("alertdialog", { name: /remove this book/i }),
+    page.getByRole("alertdialog", { name: /remove this/i }),
   ).toBeVisible();
   // Press Escape to cancel
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("alertdialog", { name: /remove this book/i }),
+    page.getByRole("alertdialog", { name: /remove this/i }),
   ).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
 });

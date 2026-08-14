@@ -79,7 +79,10 @@ async def test_typed_partial_metadata_patch_migrates_legacy_publisher_and_clears
     assert migrated.json()["metadata"]["language"] == "es"
     assert "publisher" not in cleared.json()["metadata"]
     assert invalid.status_code == 422
-    assert "BookMetadataPatch" in openapi["components"]["schemas"]
+    # The patch is no longer typed by a model that names book fields; the fields are
+    # published as data instead and the patch is checked against them (DEC-052 seam 3).
+    assert "/api/item-types" in openapi["paths"]
+    assert "ItemTypeResponse" in openapi["components"]["schemas"]
 
 
 @pytest.mark.anyio
@@ -151,7 +154,6 @@ async def test_confirmed_refresh_merges_present_metadata_and_failure_is_atomic(
         "series": "Keep",
         "creators": ["Provider Author"],
         "language": "es",
-        "subjects": [],
     }
     assert failed.status_code == 502
     assert after.json() == refreshed.json()

@@ -2,6 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
+import { stubItemTypes } from "./seed";
 
 const candidate = (id: string, year: number) => ({
   source: "openlibrary",
@@ -45,6 +46,7 @@ const entry = {
 
 async function common(page: Page) {
   await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
@@ -76,7 +78,7 @@ test("manual add is keyboard-complete and cached detail edits persist", async ({
   // Navigate to detail to verify the entry was created
   await page.goto("/books/7");
   await expect(page.getByText("Cached while providers are down")).toBeVisible();
-  await page.getByRole("button", { name: /edit book metadata/i }).click();
+  await page.getByRole("button", { name: /edit metadata/i }).click();
   await page.getByLabel(/^title$/i).fill("Rayuela corregida");
   await page.getByRole("button", { name: /save metadata/i }).click();
 });

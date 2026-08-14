@@ -2,6 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { stillDurations } from "./motion";
+import { stubItemTypes } from "./seed";
 
 /**
  * Product spec section 4.3 and technical spec section 8 require that every user
@@ -79,6 +80,7 @@ async function stubLibrary(page: Page) {
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({ json: emptyLibrary }),
   );
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
@@ -156,11 +158,11 @@ for (const size of widths) {
         .first()
         .click();
       await page
-        .getByRole("alertdialog", { name: /remove this book/i })
+        .getByRole("alertdialog", { name: /remove this/i })
         .getByRole("button", { name: /delete entry/i })
         .click();
       await expect(page).toHaveURL("/");
-      await expectVisibleToast(page, "Book removed from your library");
+      await expectVisibleToast(page, "Removed from your library");
     });
 
     test("renaming a shelf confirms on the toast surface", async ({ page }) => {

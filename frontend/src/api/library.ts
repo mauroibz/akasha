@@ -18,6 +18,35 @@ export interface Shelf {
   slug: string;
 }
 
+/** One metadata field, as the domain that owns it describes it. */
+export interface FieldSpec {
+  name: string;
+  label: string;
+  type: "text" | "long_text" | "number";
+  multiplicity: "one" | "many";
+  minimum?: number | null;
+  maximum?: number | null;
+}
+
+export interface ItemType {
+  id: string;
+  label: string;
+  fields: FieldSpec[];
+}
+
+/**
+ * What each domain says its metadata fields are. Fetched once and cached: it changes
+ * with a deployment, never with a library edit, so a screen renders whatever the
+ * server declares instead of hardcoding one domain's vocabulary (DEC-052 seam 3).
+ */
+export async function getItemTypes(): Promise<ItemType[]> {
+  const response = await fetch("/api/item-types", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("Item types could not be loaded");
+  return response.json() as Promise<ItemType[]>;
+}
+
 /** The edition. Shared by everyone who owns it; never carries opinion data. */
 export interface LibraryItem {
   id: number;
@@ -32,18 +61,8 @@ export interface LibraryItem {
   creator_sort_override?: string | null;
   cover_url?: string | null;
   cover_path?: string | null;
-  metadata: {
-    creators?: string[];
-    /** The credit as the source renders it, when it renders one. */
-    credit?: string | null;
-    publisher?: string | null;
-    language?: string | null;
-    page_count?: number | null;
-    description?: string | null;
-    subjects?: string[];
-    series?: string | null;
-    original_year?: number | null;
-  };
+  /** Opaque: what is in here is the domain's business, not this type's. */
+  metadata: Record<string, unknown>;
   identifiers: Record<string, string>;
   sources: Array<{ source: string; source_id: string; is_primary: boolean }>;
 }
@@ -138,7 +157,7 @@ export async function getEntry(entryId: number): Promise<LibraryEntry> {
   const response = await fetch(`/api/entries/${entryId}`, {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Book detail could not be loaded");
+  if (!response.ok) throw new Error("Detail could not be loaded");
   return response.json() as Promise<LibraryEntry>;
 }
 
@@ -150,7 +169,7 @@ export async function patchItem(
     year?: number | null;
     /** Null drops the correction and goes back to the automatic sort name. */
     creator_sort_override?: string | null;
-    metadata?: Partial<LibraryEntry["item"]["metadata"]>;
+    metadata?: Record<string, unknown>;
   },
 ): Promise<LibraryEntry["item"]> {
   const response = await fetch(`/api/items/${itemId}`, {
@@ -158,7 +177,7 @@ export async function patchItem(
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(changes),
   });
-  if (!response.ok) throw new Error("Book metadata could not be saved");
+  if (!response.ok) throw new Error("Metadata could not be saved");
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 

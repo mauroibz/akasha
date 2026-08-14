@@ -8,6 +8,63 @@ import { Toaster } from "@/components/ui/sonner";
 import { findToast } from "@/test/toast";
 import { DetailPage } from "./DetailPage";
 
+/** What `GET /api/item-types` publishes for a book (DEC-052 seam 3). */
+const itemTypes = [
+  {
+    id: "book",
+    label: "Book",
+    fields: [
+      {
+        name: "creators",
+        label: "Creators",
+        type: "text",
+        multiplicity: "many",
+      },
+      {
+        name: "publisher",
+        label: "Publisher",
+        type: "text",
+        multiplicity: "one",
+      },
+      {
+        name: "language",
+        label: "Language",
+        type: "text",
+        multiplicity: "one",
+      },
+      {
+        name: "page_count",
+        label: "Page count",
+        type: "number",
+        multiplicity: "one",
+        minimum: 1,
+        maximum: 100000,
+      },
+      {
+        name: "description",
+        label: "Description",
+        type: "long_text",
+        multiplicity: "one",
+      },
+      {
+        name: "subjects",
+        label: "Subjects",
+        type: "text",
+        multiplicity: "many",
+      },
+      { name: "series", label: "Series", type: "text", multiplicity: "one" },
+      {
+        name: "original_year",
+        label: "Original publication year",
+        type: "number",
+        multiplicity: "one",
+        minimum: 0,
+        maximum: 9999,
+      },
+    ],
+  },
+];
+
 const entry = {
   id: 7,
   item_id: 3,
@@ -31,7 +88,7 @@ const entry = {
     cover_path: null,
     cover_url: null,
     metadata: {
-      authors: ["Julio Cortázar"],
+      creators: ["Julio Cortázar"],
       publisher: "Sudamericana",
       language: "es",
       page_count: 736,
@@ -90,6 +147,8 @@ describe("DetailPage", () => {
       .mockImplementation(async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
         if (url.includes("/cover-candidates"))
           return new Response(JSON.stringify(candidates));
         if (init?.method === "POST")
@@ -142,6 +201,8 @@ describe("DetailPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (url.includes("/cover-candidates"))
         return new Response(
           JSON.stringify({ candidates: [], reason: "no_provider_reference" }),
@@ -166,6 +227,8 @@ describe("DetailPage", () => {
       .mockImplementation(async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
         if (!init) return new Response(JSON.stringify(entry));
         if (url.includes("/entries/"))
           return new Response(JSON.stringify({ ...entry, notes: "Loved it" }));
@@ -182,9 +245,7 @@ describe("DetailPage", () => {
     await user.clear(screen.getByLabelText(/notes/i));
     await user.type(screen.getByLabelText(/notes/i), "Loved it");
     await user.click(screen.getByRole("button", { name: /save opinion/i }));
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/^title$/i));
     await user.type(screen.getByLabelText(/^title$/i), "Rayuela corregida");
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
@@ -201,6 +262,8 @@ describe("DetailPage", () => {
   it("renders all standard metadata fields", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -214,11 +277,81 @@ describe("DetailPage", () => {
     expect(screen.getByText("Favorites")).toBeVisible();
   });
 
+  it("renders the fields the server declares, not a hardcoded book form", async () => {
+    // The component is never edited for a new domain: the same code renders an
+    // album's fields because the spec says so (DEC-052 seam 3, AC7).
+    const albumTypes = [
+      {
+        id: "album",
+        label: "Album",
+        fields: [
+          {
+            name: "creators",
+            label: "Artists",
+            type: "text",
+            multiplicity: "many",
+          },
+          { name: "label", label: "Label", type: "text", multiplicity: "one" },
+          {
+            name: "track_count",
+            label: "Tracks",
+            type: "number",
+            multiplicity: "one",
+            minimum: 1,
+            maximum: 10000,
+          },
+        ],
+      },
+    ];
+    const album = {
+      ...entry,
+      item: {
+        ...entry.item,
+        type: "album",
+        title: "Discovery",
+        creator: "Daft Punk",
+        creator_sort: "Daft Punk",
+        metadata: {
+          creators: ["Daft Punk"],
+          label: "Virgin",
+          track_count: 14,
+        },
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(albumTypes));
+      return new Response(JSON.stringify(album));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Discovery" });
+
+    // The facts panel speaks the album's vocabulary and none of the book's.
+    expect(document.querySelector("[data-fact='label'] dd")).toHaveTextContent(
+      "Virgin",
+    );
+    expect(document.querySelector("[data-fact='page_count']")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText(/^label$/i)).toHaveValue("Virgin");
+    expect(within(dialog).getByLabelText(/^tracks$/i)).toHaveValue(14);
+    expect(
+      within(dialog).getByLabelText(/^artists, comma separated$/i),
+    ).toHaveValue("Daft Punk");
+    expect(within(dialog).queryByLabelText(/page count/i)).toBeNull();
+  });
+
   it("corrects the creator sort name and clears it back to the automatic value", async () => {
     const bodies: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") {
         bodies.push(String(init.body));
         return new Response(JSON.stringify(entry.item));
@@ -228,9 +361,7 @@ describe("DetailPage", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     // The automatic value is offered as the placeholder rather than prefilled, so
     // an untouched field stays empty and the row keeps following its authors.
     const field = screen.getByLabelText(/sorts as/i);
@@ -253,6 +384,8 @@ describe("DetailPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") {
         bodies.push(String(init.body));
         return new Response(JSON.stringify(corrected.item));
@@ -262,9 +395,7 @@ describe("DetailPage", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/sorts as/i));
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -277,6 +408,8 @@ describe("DetailPage", () => {
       const url = String(input);
       requests.push([url, init]);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "DELETE" && url === "/api/entries/7")
         return new Response(null, { status: 204 });
       return new Response(JSON.stringify(entry));
@@ -290,12 +423,12 @@ describe("DetailPage", () => {
     );
     // Confirmation dialog appears
     expect(
-      screen.getByRole("alertdialog", { name: /remove this book/i }),
+      screen.getByRole("alertdialog", { name: /remove this/i }),
     ).toBeVisible();
     // Click the confirm button inside the dialog
     await user.click(
       within(
-        screen.getByRole("alertdialog", { name: /remove this book/i }),
+        screen.getByRole("alertdialog", { name: /remove this/i }),
       ).getByRole("button", { name: /delete entry/i }),
     );
     // DELETE was called
@@ -307,9 +440,7 @@ describe("DetailPage", () => {
     await waitFor(() => expect(screen.getByText("Library page")).toBeVisible());
     // The confirmation is shown on the visible toast surface, not stashed in
     // storage for the next route to render into a hidden paragraph.
-    expect(
-      await findToast("Book removed from your library"),
-    ).toBeInTheDocument();
+    expect(await findToast("Removed from your library")).toBeInTheDocument();
   });
 
   it("cancel preserves the entry and does not call DELETE", async () => {
@@ -318,6 +449,8 @@ describe("DetailPage", () => {
       const url = String(input);
       requests.push([url, init]);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -337,6 +470,8 @@ describe("DetailPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "DELETE" && url === "/api/entries/7")
         return new Response(
           JSON.stringify({ error: { code: "entry_not_found" } }),
@@ -352,13 +487,13 @@ describe("DetailPage", () => {
     );
     await user.click(
       within(
-        screen.getByRole("alertdialog", { name: /remove this book/i }),
+        screen.getByRole("alertdialog", { name: /remove this/i }),
       ).getByRole("button", { name: /delete entry/i }),
     );
     // The failure is reported inside the dialog, which is still open. An alert
     // rendered behind a modal is an alert nobody sees.
     const dialog = screen.getByRole("alertdialog", {
-      name: /remove this book/i,
+      name: /remove this/i,
     });
     expect(await within(dialog).findByRole("alert")).toBeVisible();
     // Nothing was deleted: dismissing the dialog reveals the entry again.
@@ -371,6 +506,8 @@ describe("DetailPage", () => {
   it("refuses an impossible date range and keeps the typed values", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") throw new Error("must not be reached");
       return new Response(JSON.stringify(entry));
     });
@@ -402,6 +539,8 @@ describe("DetailPage", () => {
   it("refuses an out-of-range reread count", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -420,6 +559,8 @@ describe("DetailPage", () => {
   it("keeps typed metadata when the write fails", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH")
         return new Response(JSON.stringify({ error: { code: "conflict" } }), {
           status: 409,
@@ -429,9 +570,7 @@ describe("DetailPage", () => {
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/^title$/i));
     await user.type(screen.getByLabelText(/^title$/i), "Rayuela corregida");
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
@@ -440,7 +579,7 @@ describe("DetailPage", () => {
     // silently loses input.
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(
-      screen.getByRole("dialog", { name: /edit shared book metadata/i }),
+      screen.getByRole("dialog", { name: /edit shared metadata/i }),
     ).toBeVisible();
     expect(screen.getByLabelText(/^title$/i)).toHaveValue("Rayuela corregida");
   });
@@ -448,24 +587,26 @@ describe("DetailPage", () => {
   it("rejects an empty title on the metadata form", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/^title$/i));
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      /a book needs a title/i,
+      /a title is required/i,
     );
   });
 
   it("Escape closes dialogs", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -473,21 +614,22 @@ describe("DetailPage", () => {
     await screen.findByRole("heading", { name: "Rayuela" });
     await user.click(screen.getByRole("button", { name: /delete entry/i }));
     expect(
-      screen.getByRole("alertdialog", { name: /remove this book/i }),
+      screen.getByRole("alertdialog", { name: /remove this/i }),
     ).toBeVisible();
     await user.keyboard("{Escape}");
     expect(
-      screen.queryByRole("alertdialog", { name: /remove this book/i }),
+      screen.queryByRole("alertdialog", { name: /remove this/i }),
     ).not.toBeInTheDocument();
   });
   it("shows the score as a filled chip, the same treatment as the library", () => {
     // DEC-026: the ramp means the same thing wherever the eye lands, so the
     // detail page carries the chip rather than the coloured text it used to.
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input) === "/api/shelves"
-        ? new Response("[]")
-        : new Response(JSON.stringify(entry)),
-    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
+      return new Response(JSON.stringify(entry));
+    });
     renderPage();
     return waitFor(() => {
       const score = document.querySelector("[data-fact='score'] span");

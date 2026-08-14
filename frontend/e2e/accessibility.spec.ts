@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
-import { seedLibrary } from "./seed";
+import { seedLibrary, stubItemTypes } from "./seed";
 
 /**
  * Automated WCAG 2.1 A/AA checks on every screen a user can reach.
@@ -230,6 +230,7 @@ test("triage with a selection and its action bar has no serious violations", asy
 });
 
 test("detail has no serious accessibility violations", async ({ page }) => {
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: detailEntry }),
   );
@@ -242,6 +243,7 @@ test("detail has no serious accessibility violations", async ({ page }) => {
 test("the detail attachments list has no serious accessibility violations", async ({
   page,
 }) => {
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: detailEntry }),
   );
@@ -283,6 +285,7 @@ test("the detail attachments list has no serious accessibility violations", asyn
 test("the detail opinion dialog has no serious accessibility violations", async ({
   page,
 }) => {
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: detailEntry }),
   );
@@ -296,6 +299,7 @@ test("the detail opinion dialog has no serious accessibility violations", async 
 test("the cover chooser has no serious accessibility violations", async ({
   page,
 }) => {
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: detailEntry }),
   );

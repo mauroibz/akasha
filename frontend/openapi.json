@@ -171,218 +171,6 @@
         "title": "Body_replace_cover_api_items__item_id__cover_post",
         "type": "object"
       },
-      "BookMetadataPatch": {
-        "additionalProperties": false,
-        "properties": {
-          "creators": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Creators"
-          },
-          "credit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credit"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
-          "original_year": {
-            "anyOf": [
-              {
-                "maximum": 9999.0,
-                "minimum": 0.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Year"
-          },
-          "page_count": {
-            "anyOf": [
-              {
-                "minimum": 1.0,
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Count"
-          },
-          "publisher": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Publisher"
-          },
-          "series": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series"
-          },
-          "subjects": {
-            "anyOf": [
-              {
-                "items": {
-                  "type": "string"
-                },
-                "type": "array"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Subjects"
-          }
-        },
-        "title": "BookMetadataPatch",
-        "type": "object"
-      },
-      "BookMetadataResponse": {
-        "properties": {
-          "creators": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Creators",
-            "type": "array"
-          },
-          "credit": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Credit"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
-          },
-          "language": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
-          "original_year": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Year"
-          },
-          "page_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Count"
-          },
-          "publisher": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Publisher"
-          },
-          "series": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series"
-          },
-          "subjects": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Subjects",
-            "type": "array"
-          }
-        },
-        "title": "BookMetadataResponse",
-        "type": "object"
-      },
       "BulkBody": {
         "properties": {
           "entry_ids": {
@@ -1061,6 +849,56 @@
         "title": "FacetsResponse",
         "type": "object"
       },
+      "FieldSpecResponse": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "maximum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Maximum"
+          },
+          "minimum": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimum"
+          },
+          "multiplicity": {
+            "title": "Multiplicity",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "type",
+          "multiplicity"
+        ],
+        "title": "FieldSpecResponse",
+        "type": "object"
+      },
       "HTTPValidationError": {
         "properties": {
           "detail": {
@@ -1362,12 +1200,14 @@
           "metadata": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/BookMetadataPatch"
+                "additionalProperties": true,
+                "type": "object"
               },
               {
                 "type": "null"
               }
-            ]
+            ],
+            "title": "Metadata"
           },
           "subtitle": {
             "anyOf": [
@@ -1465,7 +1305,9 @@
             "type": "object"
           },
           "metadata": {
-            "$ref": "#/components/schemas/BookMetadataResponse"
+            "additionalProperties": true,
+            "title": "Metadata",
+            "type": "object"
           },
           "sources": {
             "items": {
@@ -1520,6 +1362,33 @@
           "sources"
         ],
         "title": "ItemResponse",
+        "type": "object"
+      },
+      "ItemTypeResponse": {
+        "description": "What a domain says its metadata fields are, so a form can render itself.",
+        "properties": {
+          "fields": {
+            "items": {
+              "$ref": "#/components/schemas/FieldSpecResponse"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "fields"
+        ],
+        "title": "ItemTypeResponse",
         "type": "object"
       },
       "JobProgressResponse": {
@@ -2973,6 +2842,29 @@
         "tags": [
           "imports"
         ]
+      }
+    },
+    "/api/item-types": {
+      "get": {
+        "description": "The domains this build knows, and the metadata fields each one declares.",
+        "operationId": "list_item_types_api_item_types_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTypeResponse"
+                  },
+                  "title": "Response List Item Types Api Item Types Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Item Types"
       }
     },
     "/api/items/{item_id}": {

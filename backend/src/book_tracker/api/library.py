@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from book_tracker.application.add import AddService
 from book_tracker.application.library import (
@@ -16,6 +16,7 @@ from book_tracker.application.library import (
     clean_attachment_filename,
 )
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
+from book_tracker.domain.domains import DOMAINS, InvalidMetadata, validate_metadata_patch
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
 from book_tracker.infrastructure.attachments import (
@@ -77,30 +78,21 @@ class SourceResponse(BaseModel):
     is_primary: bool
 
 
-class BookMetadataResponse(BaseModel):
-    creators: list[str] = Field(default_factory=list)
-    credit: str | None = None
-    publisher: str | None = None
-    language: str | None = None
-    page_count: int | None = None
-    description: str | None = None
-    subjects: list[str] = Field(default_factory=list)
-    series: str | None = None
-    original_year: int | None = None
+class FieldSpecResponse(BaseModel):
+    name: str
+    label: str
+    type: str
+    multiplicity: str
+    minimum: int | None = None
+    maximum: int | None = None
 
 
-class BookMetadataPatch(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class ItemTypeResponse(BaseModel):
+    """What a domain says its metadata fields are, so a form can render itself."""
 
-    creators: list[str] | None = None
-    credit: str | None = None
-    publisher: str | None = None
-    language: str | None = None
-    page_count: int | None = Field(default=None, ge=1)
-    description: str | None = None
-    subjects: list[str] | None = None
-    series: str | None = None
-    original_year: int | None = Field(default=None, ge=0, le=9999)
+    id: str
+    label: str
+    fields: list[FieldSpecResponse]
 
 
 class ItemResponse(BaseModel):
@@ -116,7 +108,7 @@ class ItemResponse(BaseModel):
     creator_sort: str | None
     creator_sort_override: str | None
     cover_url: str | None
-    metadata: BookMetadataResponse
+    metadata: dict[str, Any]
     identifiers: dict[str, str]
     sources: list[SourceResponse]
 
@@ -224,7 +216,9 @@ class ItemPatch(BaseModel):
     year: int | None = None
     # Sent as "" or null to drop the correction and go back to the heuristic.
     creator_sort_override: str | None = Field(default=None, max_length=300)
-    metadata: BookMetadataPatch | None = None
+    # Validated against the field spec of the item's own type, not against a
+    # model that would have to know every domain's vocabulary (DEC-052 seam 3).
+    metadata: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def required_title_when_present(self) -> "ItemPatch":
@@ -394,8 +388,28 @@ async def get_item(item_id: int, library: Library) -> ItemResponse:
 async def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
     changes = body.model_dump(exclude_unset=True)
     if body.metadata is not None:
-        changes["metadata"] = body.metadata.model_dump(exclude_unset=True)
+        item_type = str(library.get_item(item_id)["type"])
+        domain = DOMAINS.get(item_type)
+        if domain is None:
+            raise LibraryError("unknown_item_type", f"No domain describes {item_type!r}")
+        try:
+            changes["metadata"] = validate_metadata_patch(domain, body.metadata)
+        except InvalidMetadata as error:
+            raise LibraryError("invalid_metadata", str(error), status_code=422) from error
     return ItemResponse.model_validate(library.update_item(item_id, changes))
+
+
+@router.get("/item-types", response_model=list[ItemTypeResponse])
+async def list_item_types() -> list[ItemTypeResponse]:
+    """The domains this build knows, and the metadata fields each one declares."""
+    return [
+        ItemTypeResponse(
+            id=domain.item_type,
+            label=domain.label,
+            fields=[FieldSpecResponse(**vars(field)) for field in domain.fields],
+        )
+        for domain in DOMAINS.values()
+    ]
 
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)

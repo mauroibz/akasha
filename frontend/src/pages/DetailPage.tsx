@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import type { FieldSpec } from "@/api/library";
 import {
   deleteEntry,
   getEntry,
+  getItemTypes,
   patchEntry,
   patchItem,
   refreshItem,
@@ -31,12 +33,24 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
-import { optionalInt, splitList } from "@/features/detail/schemas";
+import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import { statusLabels } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 /** One term/definition pair, addressable by name instead of by CSS adjacency. */
+/**
+ * A metadata value rendered from what its domain says it is, rather than from a
+ * branch on the item's type: an album has no page count and a book has no label,
+ * and neither screen should know the other's vocabulary (DEC-052 seam 3).
+ */
+function formatFact(value: unknown, field: FieldSpec): string {
+  if (field.multiplicity === "many")
+    return Array.isArray(value) && value.length ? value.join(", ") : "—";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
 function Fact({
   name,
   label,
@@ -74,6 +88,14 @@ export function DetailPage() {
     queryFn: getShelves,
     retry: false,
   });
+  // The fields belong to the item's domain and change with a deployment, not with
+  // an edit, so they are fetched once and shared by the facts panel and the dialog.
+  const itemTypes = useQuery({
+    queryKey: ["item-types"],
+    queryFn: getItemTypes,
+    retry: false,
+    staleTime: Infinity,
+  });
   const update = useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => {
@@ -92,17 +114,23 @@ export function DetailPage() {
   // here. Radix Dialog owns them now, so the hand-rolled versions are gone
   // rather than left to fight it.
 
-  if (detail.isPending) return <p role="status">Loading book detail…</p>;
-  if (!detail.data) return <p role="alert">Book detail could not be loaded</p>;
+  if (detail.isPending) return <p role="status">Loading detail…</p>;
+  if (!detail.data) return <p role="alert">Detail could not be loaded</p>;
   const entry = detail.data;
   const item = entry.item;
+  const fields =
+    itemTypes.data?.find((type) => type.id === item.type)?.fields ?? [];
+  const inlineFields = fields.filter(
+    (field) => field.type !== "long_text" && field.name !== "creators",
+  );
+  const blockFields = fields.filter((field) => field.type === "long_text");
 
   async function handleDelete() {
     setDeleteError("");
     try {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: ["library"] });
-      toast.success("Book removed from your library");
+      toast.success("Removed from your library");
       navigate("/");
     } catch (e) {
       // Reported inside the dialog, which is still open and still covering the
@@ -180,7 +208,7 @@ export function DetailPage() {
           </p>
           <p className="text-sm text-muted-foreground">
             Edition year: {item.year ?? "unknown"}
-            {item.metadata.original_year &&
+            {typeof item.metadata.original_year === "number" &&
             item.metadata.original_year !== item.year
               ? ` · Originally published: ${item.metadata.original_year}`
               : ""}
@@ -263,18 +291,11 @@ export function DetailPage() {
               Edition facts
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
-              <Fact name="publisher" label="Publisher">
-                {item.metadata.publisher || "—"}
-              </Fact>
-              <Fact name="language" label="Language">
-                {item.metadata.language || "—"}
-              </Fact>
-              <Fact name="pages" label="Pages">
-                {item.metadata.page_count ?? "—"}
-              </Fact>
-              <Fact name="series" label="Series">
-                {item.metadata.series || "—"}
-              </Fact>
+              {inlineFields.map((field) => (
+                <Fact key={field.name} name={field.name} label={field.label}>
+                  {formatFact(item.metadata[field.name], field)}
+                </Fact>
+              ))}
               <Fact name="identifiers" label="Identifiers">
                 {Object.entries(item.identifiers).map(([k, v]) => (
                   <span key={k} className="block text-sm">
@@ -296,22 +317,17 @@ export function DetailPage() {
                 {!item.sources.length && "—"}
               </Fact>
             </dl>
-            {item.metadata.subjects && item.metadata.subjects.length > 0 && (
-              <div className="mt-4">
-                <p className="text-xs text-muted-foreground">Subjects</p>
-                <p className="mt-1 text-foreground">
-                  {item.metadata.subjects.join(", ")}
-                </p>
-              </div>
-            )}
-            {item.metadata.description && (
-              <div className="mt-4">
-                <p className="text-xs text-muted-foreground">Description</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">
-                  {item.metadata.description}
-                </p>
-              </div>
-            )}
+            {blockFields.map((field) => {
+              const value = formatFact(item.metadata[field.name], field);
+              return value === "—" ? null : (
+                <div key={field.name} className="mt-4">
+                  <p className="text-xs text-muted-foreground">{field.label}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-foreground">
+                    {value}
+                  </p>
+                </div>
+              );
+            })}
             <div className="mt-5">
               <Attachments itemId={item.id} />
             </div>
@@ -321,7 +337,7 @@ export function DetailPage() {
                 className="rounded-full px-5"
                 onClick={() => setDialog("metadata")}
               >
-                Edit book metadata
+                Edit metadata
               </Button>
               <Button
                 variant="outline"
@@ -373,6 +389,7 @@ export function DetailPage() {
         open={dialog === "metadata"}
         onOpenChange={(open) => setDialog(open ? "metadata" : null)}
         item={item}
+        fields={fields}
         onSave={(values) =>
           update
             .mutateAsync(() =>
@@ -382,17 +399,7 @@ export function DetailPage() {
                 year: optionalInt(values.year),
                 creator_sort_override:
                   values.creator_sort_override.trim() || null,
-                metadata: {
-                  ...item.metadata,
-                  creators: splitList(values.creators),
-                  publisher: values.publisher,
-                  language: values.language,
-                  page_count: optionalInt(values.page_count),
-                  description: values.description || null,
-                  subjects: splitList(values.subjects),
-                  series: values.series || null,
-                  original_year: optionalInt(values.original_year),
-                },
+                metadata: toMetadataPatch(values, fields),
               }),
             )
             .then(() => undefined)
@@ -434,12 +441,10 @@ export function DetailPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Remove this book from your library?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Remove this from your library?</AlertDialogTitle>
             <AlertDialogDescription>
               Your score, status, notes, and shelf assignments will be deleted.
-              The book metadata and cover remain cached so re-adding is instant.
+              The metadata and cover remain cached so re-adding is instant.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (

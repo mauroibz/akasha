@@ -66,3 +66,50 @@ export async function seedLibrary(page: Page, count = 5000) {
     });
   });
 }
+
+/** The book field spec, as `GET /api/item-types` serves it (DEC-052 seam 3). */
+export const bookItemType = {
+  id: "book",
+  label: "Book",
+  fields: [
+    { name: "creators", label: "Creators", type: "text", multiplicity: "many" },
+    {
+      name: "publisher",
+      label: "Publisher",
+      type: "text",
+      multiplicity: "one",
+    },
+    { name: "language", label: "Language", type: "text", multiplicity: "one" },
+    {
+      name: "page_count",
+      label: "Page count",
+      type: "number",
+      multiplicity: "one",
+      minimum: 1,
+      maximum: 100000,
+    },
+    {
+      name: "description",
+      label: "Description",
+      type: "long_text",
+      multiplicity: "one",
+    },
+    { name: "subjects", label: "Subjects", type: "text", multiplicity: "many" },
+    { name: "series", label: "Series", type: "text", multiplicity: "one" },
+    {
+      name: "original_year",
+      label: "Original publication year",
+      type: "number",
+      multiplicity: "one",
+      minimum: 0,
+      maximum: 9999,
+    },
+  ],
+};
+
+/** Every screen that renders metadata needs the spec that describes it. */
+export async function stubItemTypes(page: Page) {
+  await page.route("**/api/item-types", (route) =>
+    route.fulfill({ json: [bookItemType] }),
+  );
+}
