@@ -1,44 +1,39 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 020 (metadata completeness, both phases), 2026-08-13.
-**Active:** Sprint 021 (attachments) — status `in_progress`, **stopped at the Phase A gate**.
+**Last completed:** Sprint 021 (attachments, both phases), 2026-08-14.
+**Next:** Sprint 022 (creator sort names) — status `ready`, file at
+`docs/sprints/022-creator-sort-names.md`.
 
 ## Read this first
 
-**Sprint 021's Phase A is done and the sprint is waiting on the owner, not on an agent.** Do not
-start Phase B. DEC-035 requires an explicit go-ahead recorded in `docs/decisions.md`, and DEC-047 is
-the verdict, not the go-ahead. The owner is deciding **two** things: whether attachments get built
-at all, and which storage strategy they get — the second changes what a restore promises, so it is
-not an implementer's call.
+**Attachments shipped and they are content-addressed** (DEC-048). A blob lives at
+`data/attachments/{sha256[:2]}/{sha256}` and the uploaded filename is held in the database, never on
+disk. Four things follow, and all four are load-bearing: identical bytes cost one blob; the path is
+the digest, so integrity is free; the backup's hardlink sharing is correct by definition; and
+**traversal is structural, not filtered** — no caller-supplied string reaches the filesystem, which
+is why the `%2e%2e` tests pass without a filter to maintain. Do not "simplify" this to
+`{item_id}/{filename}`.
 
-**The numbers are in DEC-047 and do not need re-deriving.** Seven strategies were costed at 100, 300
-and 500 attachments. At 500 files (1.25 GB) over a seven-night window, against today's 130.9 MB:
-in-the-tar nightly **8.68 GB (67.9x)**, separate label keep-2 2.57 GB (20.1x), weekly cadence
-1.35 GB (10.6x), loose deduplicated store 1.35 GB (10.5x), excluded-with-manifest 130.9 MB (1.0x).
-**The multipliers are identical at all three scales**, so they are properties of the strategy.
-Recommended: **E** (loose, deduplicated) if attachments are stored at all, **F** (excluded) if 10.5x
-is unwelcome. Re-run with `scripts/assess_attachment_cost.py` rather than re-arguing.
+**The backup shares attachment blobs and the fallback chain matters.** Link from the live store;
+failing that, link from a sibling backup; copy only if neither works. The middle step is not an
+optimisation — **Compose mounts `/data` and `/backups` as separate volumes, so the live-store link
+fails `EXDEV` on every single run in the real deployment.** The first version had only the first and
+third steps and silently wrote a full copy nightly, 67.9x instead of 10.5x, with every gate green,
+because every test runs inside one filesystem. Sprint 021's walkthrough caught it; the regression
+test monkeypatches `os.link` to fail the way a volume boundary does.
 
-**gzip on an epub corpus measures 1.0003** — the archive is *larger* than the raw bytes, since an
-epub is already a ZIP — and costs 20.4 s per backup against 2.0 s for a loose store. That useless
-compression is also what makes deduplication impossible. If anything ever revisits `_archive`, this
-is the reason to.
+**Attachments are not compressed and not tarred, deliberately.** DEC-047 measured gzip's ratio on an
+epub corpus at **1.0003** — the archive comes out larger than the input — while costing 20.4s per
+backup against 2.0s. A tar also shares nothing with the tar written the night before, which is
+exactly what makes the naive design cost seven copies.
 
-**If Phase B proceeds it inherits three requirements from DEC-047**, not to be rediscovered later:
-an item carrying an attachment must be exempt from `UndoService`'s item deletion; deleting an item
-must either remove its files or feed a prune action (**no cover is unlinked today** — product spec
-open question 2 accepts that because covers are ~50 KB, which a 2.5 MB attachment invalidates); and
-downloads need `Content-Disposition: attachment`, `nosniff` and a fixed `application/octet-stream`,
-because today's safety comes from the cover pipeline re-encoding everything to JPEG and **the
-codebase sets no CSP, no `nosniff` and no `Content-Disposition` anywhere**.
+**An attachment is an opaque file, or it is a reader.** That line is the scope boundary and it held:
+no format parsing, no in-browser reading, no reading progress, no device sync. Reading an uploaded
+epub's OPF as a metadata provider is named in DEC-047/048 as the natural next step precisely so it
+is recognised rather than smuggled in.
 
-**The Calibre zero-copy reference needs no schema change.** `calibre_uuid` is already persisted as an
-item identifier, and Calibre's `books` table carries `uuid` and `path` in the same row, so a
-Calibre-sourced item can re-derive its file location from the read-only mount at serve time.
-
-**Sprint 020's Phase B is done.** The owner gave the go-ahead in DEC-045 and the sprint reopened
-to build it rather than spawning a new one — worth knowing, because it is the precedent for how a
-gated sprint's Phase B is handled here. Cross-provider metadata completion stays **abandoned**.
+**Undo retains an item that carries an attachment**, the way it already retains one whose fields
+were hand-edited. Without that guard, undoing an import destroys an uploaded file.
 
 **Provider order is settled and measured, not a preference.** Open Library first, Google Books only
 where Open Library misses: 1,333 Google calls per 5,000 books against 5,000 the other way, and 100%
@@ -47,32 +42,28 @@ measurements.
 
 **Daily provider budgets exist and name nobody** (DEC-045). `ProviderQuota`, migration `0009` and
 the enrichment loop are all provider-agnostic; limits live in `Settings.provider_daily_limits`
-(default `{"googlebooks": 900}`), so a metered provider added in a domain sprint is a config entry.
-Two rules to keep: exhaustion **defers** (`JobRepository.defer`, which does not touch `attempts`)
-because `fail` dead-letters at the retry ceiling and would destroy a large import's backlog; and
-interactive search is **counted but never blocked**, since the last request of a day belongs to
-someone waiting for a result.
+(default `{"googlebooks": 900}`). Two rules to keep: exhaustion **defers** (`JobRepository.defer`,
+which does not touch `attempts`) because `fail` dead-letters at the retry ceiling and would destroy
+a large import's backlog; and interactive search is **counted but never blocked**.
 
 **A provider record is merged only when it can be tied to the identifier that was requested**
-(DEC-044). Verification is a tri-state — confirmed, contradicted, unverifiable — and **unverifiable
-is rejected exactly like contradicted**. That is not squeamishness: the observed failure was a wrong
-*work*, not a wrong printing, so merging "only the safe fields" would have preserved the worst error.
-`ItemPayload.edition_match` carries the verdict, and it is `None` for payloads reached without a
-requested ISBN. **Sprint 024 inherits this contract.**
+(DEC-044). Verification is a tri-state and **unverifiable is rejected exactly like contradicted**,
+because the observed failure was a wrong *work*, not a wrong printing. `ItemPayload.edition_match`
+carries the verdict. **Sprint 024 inherits this contract.**
 
-**A green test suite is not evidence about the shipped artifact.** Sprint 018's walkthrough found the
-production bundle had been a blank page since Sprint 017 with every gate green, because Playwright
-ran only against the Vite dev server. There is a second Playwright project, `production-bundle`. Run
-`npm run test:e2e` (both projects), not just `--project=chromium`.
+**A green test suite is not evidence about the shipped artifact.** Sprint 018's walkthrough found
+the production bundle had been a blank page since Sprint 017 with every gate green; Sprint 021's
+found the backup copying what it claimed to share. Run `npm run test:e2e` (both projects), and
+remember `docker build -t akasha:local .` — `make build` builds the wheel and the frontend, **not
+the image**, so a walkthrough against a stale image tests the previous commit.
 
-**Migrations run at startup and take an online backup first** (DEC-039), and this was exercised for
-real in Sprint 020's walkthrough: a copy at `0006` was backed up and taken to `0008` unattended.
-Backups live outside the data volume (DEC-040); retention is label-scoped, so nightly backups expire
-at seven and pre-migration backups are never pruned.
+**Migrations run at startup and take an online backup first** (DEC-039), exercised for real again in
+Sprint 021's walkthrough: a copy at `0006` was backed up and taken to `0010` unattended. Backups live
+outside the data volume (DEC-040); retention is label-scoped.
 
 **`book_tracker/__init__.py` is deliberately empty.** It used to re-export `create_app`, which made
 `akasha-backup restore` fail on a missing `USER_AGENT_CONTACT`. Import `create_app` from
-`book_tracker.main`. Do not put imports back in the package init.
+`book_tracker.main`.
 
 **The package stays `book_tracker` and the entities stay `items`/`entries`** regardless of the Akasha
 brand or of future domains (`AGENTS.md`, DEC-042). Do not rename them.
@@ -81,12 +72,11 @@ brand or of future domains (`AGENTS.md`, DEC-042). Do not rename them.
 
 | Sprint | Scope | Status |
 |---|---|---|
-| 021 | Attachments, **gated** | `in_progress` — Phase A done, at the gate |
-| 022 | Creator sort names | `planned` |
+| 022 | Creator sort names | `ready` |
 | 023 | Export | `planned` |
 | 024–026 | Domains: albums (**gated**), games, series (**gated**) | `planned` |
 
-Only 021 has a sprint file. The rest are contracts in `ROADMAP.md` and get expanded from
+Only 022 has a sprint file. The rest are contracts in `ROADMAP.md` and get expanded from
 `TEMPLATE.md` when activated — the closing agent of the prior sprint does that, and
 `validate_project.py` fails if it is skipped.
 
@@ -96,7 +86,7 @@ Only 021 has a sprint file. The rest are contracts in `ROADMAP.md` and get expan
 Books, with a README naming the exact URL behind each file. **Never re-record them silently** — a
 fixture is a pinned observation of an external contract.
 
-Sprint 020 **added** two files (`googlebooks_isbn_9780307474728.json`, the confirmed-edition case,
+Sprint 021 added and re-recorded none. Sprint 020 **added** two files (`googlebooks_isbn_9780307474728.json`, the confirmed-edition case,
 and `editions_OL14860424W.json`, the work behind the Rayuela edition) and re-recorded none. Worth knowing why: `googlebooks_isbn_9788437604572.json` turned out to *already*
 contain the defect being investigated — its only hit carries a University of Michigan barcode and no
 ISBN — and a live check confirmed the same volume still comes back. The fixture was evidence, not an
@@ -135,7 +125,14 @@ Backend and tests:
   to both.
 - **The migration head is pinned by literal in three tests** — `test_migrations.py` (twice) and
   `test_backup.py`'s manifest assertion. A new migration fails all three until they are updated.
-  The head is now `0009_provider_usage`.
+  The head is now `0010_attachments`.
+- **`make build` does not build the container image.** It builds the wheel and the frontend bundle.
+  A walkthrough needs `docker build -t akasha:local .` first, or it exercises the previous commit —
+  this cost half an hour in Sprint 021, twice, and looked like the fix not working.
+- **`/tmp` on this machine is tmpfs.** Any measurement of disk or wall time must set `TMPDIR` to a
+  path on real storage, or the numbers are RAM-speed fiction.
+- `scripts/assess_attachment_cost.py` keeps its corpus under `assess-corpus` / `assess-payload`
+  precisely so the shipped backup ignores it and all seven hypothetical strategies stay comparable.
 - **`JobRunner.tick` routes every unrecognised handler state to `fail`.** A handler that returns a
   new state must be given a branch there, or the runner undoes whatever the handler just did one
   layer above where a handler-level test is looking. This is exactly how the quota deferral broke.
@@ -202,23 +199,27 @@ Frontend and e2e:
   Sprint 022, where the Spanish double-surname problem needs a stored sort name.
 - **The *Add shelves* bulk action in product spec section 7 is unbuilt and unowned** (DEC-043). If
   scheduled, it and the retired `s` shortcut are one feature and should be built together.
+- **Re-uploading identical bytes under a different name renames the existing attachment** instead of
+  adding a second row. Deliberate — `(item_id, sha256)` is unique, last name wins — but it silently
+  changes a name the owner chose, and it surprised the walkthrough.
+- **No cover file is ever unlinked when an item is deleted.** Unchanged. Product spec open question 2
+  justified that with "covers are ~50KB each"; it now says so explicitly rather than implying the
+  same is true of a 2.5 MB attachment. Attachment blobs *are* reclaimed, by refcount.
 - Entries added through the UI carry no score until you set one.
 
 ## State
 
-- Planning revision 8; state points to Sprint 021, project status `in_progress`.
-- Gates after DEC-047: validator passed, `make check` passed, `make test` backend **258** /
-  frontend **85**, Playwright **77 passed / 2 skipped** across both projects, `make build` with no
-  chunk-size warning, `make smoke-container` passed, `git diff --check` clean.
-- **`/tmp` on this machine is tmpfs.** Any measurement of disk or wall time must set `TMPDIR` to a
-  path on real storage, or the numbers are RAM-speed fiction.
+- Planning revision 8; state points to Sprint 022, project status `ready`.
+- Gates at Sprint 021's close: validator passed, `make check` passed, `make test` backend **293** /
+  frontend **95**, Playwright **79 passed / 2 skipped** across both projects, `make build` with no
+  chunk-size warning, `docker build` + `make smoke-container` passed, `git diff --check` clean.
 - The two skipped e2e tests are `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a live
   backend.
 - **`v1.0.0` exists** as an annotated local tag at `4ccf431`. Nothing has been pushed;
   `git push origin v1.0.0` publishes it.
 - Image `akasha:local`, user 10001:10001, no Node, `STOPSIGNAL SIGTERM`.
-- **Migration head is `0009_provider_usage`.** The repo's own `data/books.db` is still at `0006`,
-  so the next container start against it will back up and migrate three revisions. That path was
-  exercised for real in Sprint 020's walkthrough against a copy.
+- **Migration head is `0010_attachments`.** The repo's own `data/books.db` is still at `0006`, so the
+  next container start against it backs up and migrates four revisions. Exercised for real against a
+  copy in Sprint 021's walkthrough.
 - `.env` exists locally with the owner's `GOOGLE_BOOKS_API_KEY` and is gitignored.
 - Commit messages in this repository carry no `Co-Authored-By` trailer.

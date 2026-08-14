@@ -2,7 +2,7 @@
 
 **Plan revision:** 8
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 021](021-attachments.md)
+**Active sprint:** [Sprint 022](022-creator-sort-names.md)
 
 ## Shape of the plan
 
@@ -60,8 +60,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [018](018-container-backup-release.md) | Deployable v1 | 017 | completed |
 | [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | completed |
 | [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | completed |
-| [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | **ready** |
-| 022 | Creator sort names | 020 | planned |
+| [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | completed |
+| [022](022-creator-sort-names.md) | Creator sort names | 020 | **ready** |
 | 023 | Export | 020 | planned |
 | 024 | Second domain — albums: pilot, then verdict | 020 | planned |
 | 025 | Third domain — games | 024 | planned |
@@ -134,7 +134,7 @@ Reading an uploaded epub's OPF as another metadata provider filling empty fields
 genuinely cheap and on-brand, and is named here so it is recognized as the natural next step rather
 than smuggled into the first slice. It is explicit non-scope for Phase B.
 
-### Sprint 022 — Creator sort names
+### [Sprint 022 — Creator sort names](022-creator-sort-names.md)
 
 `sort_author` is `json_extract(metadata, '$.authors[0]')` verbatim, so "Adolfo Bioy Casares" sorts
 under A and "Gabriel García Márquez" under G.
@@ -156,6 +156,10 @@ cannot forget them; whatever replaces `sort_author` inherits that requirement.
 section 9 deferred this to v2 as agreed-in-principle; the owner has now scheduled it. Backups
 (DEC-039, DEC-040) removed the urgency, but the repository is public and portability is now a
 user-facing story rather than only the owner's.
+
+**Sprint 021 left this one question to answer** (DEC-048): whether an export carries attachment
+bytes, references, or neither. Bytes make an export a multi-gigabyte archive rather than a file;
+references make it portable but incomplete. Decide it explicitly rather than by omission.
 
 One design constraint, because it decides whether this survives the domain work: **export the
 entity shape — `type`, identifiers, and an opaque `metadata` object — not a book-specific schema.**

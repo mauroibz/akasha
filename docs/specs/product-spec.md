@@ -455,6 +455,10 @@ GET    /api/items/{id}
 PATCH  /api/items/{id}                 → manual metadata correction
 POST   /api/items/{id}/refresh         → re-pull from source, OVERWRITES edits
 POST   /api/items/{id}/cover           → upload replacement cover
+GET    /api/items/{id}/attachments     → files attached to this edition
+POST   /api/items/{id}/attachments     → upload one opaque file, size-capped
+GET    /api/items/{id}/attachments/{aid} → download; always Content-Disposition: attachment
+DELETE /api/items/{id}/attachments/{aid} → detach; the bytes go when nothing references them
 GET    /api/shelves
 PATCH  /api/shelves/{id}               → rename
 DELETE /api/shelves/{id}               → detaches, does not delete entries
@@ -584,6 +588,11 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 - Cover, full metadata, description
 - Editable: status, score, notes, dates, shelves, reread count
 - Link to edit underlying item metadata
+- **Files** — attachments on the edition: name, size, download, remove. Loaded
+  as its own request so a slow read never delays the page. An attachment is an
+  **opaque file, or it is a reader**, and this is the opaque-file side of that
+  line: no format parsing, no in-browser reading, no reading progress, no device
+  sync (DEC-048).
 - Delete entry
 
 **`/triage` — The inbox.** The screen that makes bulk import viable, and the
@@ -745,7 +754,11 @@ acceptance criteria.
 2. **Deleting an entry — what happens to the item?** Spec leaves orphaned
    `items` rows and their covers in place, treating them as cache so re-adding
    is instant, with a manual "prune orphans" maintenance action. Only matters
-   for disk usage, and covers are ~50KB each.
+   for disk usage, and covers are ~50KB each. **Attachments changed the stakes
+   of this and it is now half-answered** (DEC-047): an attached file is 2.5 MB
+   rather than 50 KB and is not re-fetchable cache, so removing an attachment
+   deletes its bytes once nothing references them. The orphaned *cover* is still
+   left in place and the prune action is still unbuilt.
 3. **Work vs edition.** One row = one edition; a reread of a different edition
    is the same entry with `reread_count++`. Changing this means a different
    uniqueness constraint on `entries`. Recommendation stands: don't.

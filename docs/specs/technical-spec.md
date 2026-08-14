@@ -97,6 +97,7 @@ Environment variables:
 | `USER_AGENT_CONTACT` | yes in production | none | contact included in provider User-Agent |
 | `TZ` | no | `UTC` | display/default local timezone; stored dates remain ISO |
 | `LOG_LEVEL` | no | `INFO` | structured application log threshold |
+| `BOOK_TRACKER_ATTACHMENT_MAX_BYTES` | no | `26214400` | per-file cap on attachments; bounds the worst file, not the total |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -184,6 +185,22 @@ This ledger makes undo safe: reverse only effects recorded for the batch; delete
 - `created_at`, `updated_at`, `finished_at`
 
 Jobs survive restart. Handlers are idempotent. The lifespan runner claims one queued job in a short transaction, processes network/file work outside that transaction, and persists progress. On startup, expired `running` jobs return to `queued` with incremented attempts. Cap retries and expose terminal failure.
+
+`attachments`
+
+- `id` integer primary key
+- `item_id` foreign key to items, cascade delete
+- `filename` required text — the name the owner uploaded, held here and **never** used as a path
+- `byte_size` and `sha256` required
+- unique on `(item_id, sha256)`, so re-uploading the same bytes to the same item updates the name rather than duplicating the row
+- indexed on `item_id` and on `sha256`, the second because deletion is refcounted
+
+Blobs live at `{data_dir}/attachments/{sha256[:2]}/{sha256}`, content-addressed
+(DEC-048). Identical bytes occupy one blob however many items reference them, and a
+blob is removed only when no row still points at its digest. The backup hardlinks
+blobs rather than copying them; where `/data` and `/backups` are separate volumes —
+which is the shipped Compose deployment — it links from a sibling backup instead,
+and copies only when neither is possible.
 
 ### 5.2 Deletion and orphan policy
 
@@ -343,7 +360,8 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
 - Parameterized SQL only; whitelist sort expressions.
 - Escape rendered text; do not render provider descriptions as raw HTML without sanitization.
 - Limit uploads, decompression/image dimensions, provider response sizes, and request timeouts.
-- Prevent path traversal and symlink escape for Calibre and staged files.
+- Prevent path traversal and symlink escape for Calibre and staged files. For attachments this is structural rather than filtered: the stored path is the content digest and an uploaded filename is only ever metadata, so no caller-supplied string reaches the filesystem.
+- **Serve attachments as downloads, never inline.** `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and a fixed `application/octet-stream`. Attachments are the only user-controlled content type the application serves — everything else is re-encoded to JPEG by the cover pipeline — and the SPA shares their origin, so an uploaded HTML or SVG rendered inline would run against the application's own API.
 - Enforce read-only Calibre mount in Compose and read-only SQLite URI/query mode in code.
 - Do not log notes, import row contents, API keys, or full provider payloads.
 - No CORS by default in the single-origin deployment.

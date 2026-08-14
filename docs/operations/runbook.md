@@ -83,6 +83,21 @@ from under a writer. Each run writes a directory containing `books.db`,
 verifies its own output with `PRAGMA integrity_check`, and then deletes the
 oldest `nightly-` backups beyond `BACKUP_RETENTION` (default 7).
 
+Attached files are carried as **hardlinks**, in an `attachments/` directory
+alongside the tarballs, and the manifest lists each blob's digest and size.
+They are not tarred and not compressed: an epub is already a ZIP, so gzip
+measured a ratio of 1.0003 on them while costing ten times the runtime, and a
+tar shares no bytes with the one written the night before (DEC-047). Sharing is
+why seven nights of attachments cost about one copy instead of seven. Deleting
+an expired backup only decrements a link count, so it can never take a blob
+another backup still needs — and a backup keeps an attachment recoverable after
+you delete it from the library, which is the point of having one.
+
+If `BACKUP_DIR` is on a different filesystem from the data volume — which is the
+normal Compose setup — blobs are linked from the previous backup instead, so
+sharing still holds. A copy is only paid on the very first backup to a fresh
+disk.
+
 Backups live on their own mount, outside the data volume (DEC-040). Point
 `BACKUP_DIR` at a NAS share if you have one; a backup on the same disk as the
 database does not survive losing that disk.

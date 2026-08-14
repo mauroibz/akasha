@@ -1002,3 +1002,66 @@ an explicit recorded go-ahead before Phase B, and it does not exist yet.
 Recommended rows are E if attachments are stored (full fidelity, 10.5x, fastest backup of any
 option) and F if 10.5x is unwelcome (1.0x, and an epub usually still exists wherever it came from,
 which a score and a note never do). Record the answer in `docs/decisions.md`, then Phase B.
+
+## 2026-08-14 — Sprint 021 (complete)
+
+**Done:** Phase B. The owner read DEC-047 at the gate and asked whether strategy E meant "full
+database backups, less intense file backups" — and, more usefully, pointed out that Phase A had
+costed *backup* layouts while leaving the live store undesigned, asking for both to be designed
+together and to be scalable. That is DEC-048 and it changed the shape of the build: the store is
+**content-addressed**, not `{item_id}/{filename}`.
+
+**Content addressing was the highest-leverage decision in the sprint.** `attachments/{sha256[:2]}/
+{sha256}`, filename in the database. Identical bytes cost one blob; integrity is free; the backup's
+hardlinking is correct by definition rather than by assumption; and **traversal stops being a filter
+to get right** — no caller-supplied string reaches the filesystem at all. Marginal cost is 2x a
+file's size, against 8x for the naive design.
+
+**Shipped:** migration `0010_attachments` (head moves off `0009_provider_usage`; three literal pins
+updated); `infrastructure/attachments.py`; four endpoints under `/api/items/{id}/attachments` with
+`Content-Disposition: attachment`, `nosniff` and fixed `application/octet-stream`; refcounted
+deletion; hardlinked backup blobs with digest+size in the manifest; the undo guard DEC-047 required;
+a detail-page Files panel with its own query so it never blocks the page.
+
+**The walkthrough found a defect no test could have, which is the whole reason the gate exists.**
+The first implementation hardlinked out of the live store. Compose mounts `/data` and `/backups` as
+**separate volumes**, so `os.link` fails `EXDEV` on every single run and it silently wrote a full
+copy each night — 67.9x rather than the authorized 10.5x, with the entire suite green, because every
+test runs inside one filesystem. Backups always share a filesystem with each other, so the fix links
+from a sibling backup when the live store is unreachable, and copies only when neither works.
+Measured in the container: two nightly backups of one 1.5 MB attachment went 4.0 MB → 2.6 MB. The
+regression test monkeypatches `os.link` to fail exactly the way a volume boundary does, and was
+confirmed to fail without the fix before it was kept.
+
+**Walkthrough detail** (container, not `make dev`): real library at `0006` migrated to `0010`
+unattended behind a pre-migration backup; upload → list → download byte-identical with all three
+headers → delete; blob at `attachments/a1/a17e…`, gone with the last reference while both backups
+kept it; two backups verified and restored; browser check showed the Files panel with names, sizes
+and non-ASCII filenames intact and no console errors.
+
+**Seen and left:**
+
+- **Re-uploading identical bytes under a new name renames the existing row** rather than adding one.
+  Deliberate — `(item_id, sha256)` is unique and last-write-wins on the name — but it is a silent
+  mutation of a name the owner chose, and it surprised me during the walkthrough. Worth revisiting
+  if it ever bites.
+- **No cover file is unlinked when an item is deleted.** Unchanged and out of scope, but product
+  spec open question 2 justified it with "covers are ~50KB each", so that question was updated
+  rather than left implying attachments are cheap cache.
+- The quoted publisher string (`"O'Reilly Media, Inc."`) is still visible on the detail page.
+- The e2e download assertion checks the anchor's `href` and `download` attribute rather than driving
+  a browser download; the forced-save contract is asserted against real headers in
+  `test_attachments_api.py`, where it can be checked properly instead of inferred.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **293** / frontend **95**;
+`npm run test:e2e` **79 passed / 2 skipped** across both projects; `make build` clean with no
+chunk-size warning; `docker build` + `make smoke-container` passed; `git diff --check` clean.
+
+**Deviations:** the live store design was not in the sprint file — it came from the owner's question
+at the gate (DEC-048). Strategy G (Calibre reference) was assessed and deliberately not built. The
+orphaned-cover defect was left; the undo defect was fixed.
+
+**Next:** Sprint 022 (creator sort names) — status `ready`, file expanded at
+`docs/sprints/022-creator-sort-names.md`. It replaces the `sort_author` generated column with a
+stored, owner-correctable creator sort name, and the roadmap's warning stands: a last-space split
+gets García Márquez and Vargas Llosa wrong while getting Rulfo right.

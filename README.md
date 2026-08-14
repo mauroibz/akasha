@@ -55,6 +55,11 @@ good and why. No social media features, fully offline.
   after.
 - **Background enrichment.** A durable job queue fills in metadata and covers, retries
   failures, and survives a restart.
+- **Files on a book.** Attach an epub or a PDF to an edition and download it again
+  later. Stored by content, so the same file attached twice takes the space of one,
+  and seven nights of backups cost about one copy rather than seven. Files are served
+  as downloads and never rendered, and nothing here parses them — this is a shelf, not
+  a reader.
 - **Accessible by default.** Twelve automated axe checks gate every change; both list
   surfaces are proper ARIA feeds.
 
@@ -100,7 +105,7 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 |---|---|---|
 | `USER_AGENT_CONTACT` | *required* | Contact address sent to metadata providers |
 | `GOOGLE_BOOKS_API_KEY` | *empty* | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
-| `DATA_DIR` | `./data` | Database and covers |
+| `DATA_DIR` | `./data` | Database, covers and attached files |
 | `BACKUP_DIR` | `./backups` | Backups, deliberately outside the data volume |
 | `CALIBRE_DIR` | `./calibre` | Your Calibre library, mounted read-only |
 | `AKASHA_PORT` | `8000` | Published port |
@@ -127,8 +132,9 @@ There is a real backup, and the restore has been tested rather than described.
 ```
 
 Each run copies the database through SQLite's online backup API (never a file copy of
-a live WAL database), archives covers and import metadata, writes checksums, verifies
-itself with `PRAGMA integrity_check`, and keeps the last `BACKUP_RETENTION` nights.
+a live WAL database), archives covers and import metadata, hardlinks attached files so
+each night does not pay for a fresh copy of them, writes checksums, verifies itself
+with `PRAGMA integrity_check`, and keeps the last `BACKUP_RETENTION` nights.
 
 Upgrades take their own backup first: if a migration has pending work against an
 existing database, startup copies it before touching anything and refuses to migrate

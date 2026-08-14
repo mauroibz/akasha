@@ -274,9 +274,9 @@ def _existing_backups(dest: Path, *, exclude: Path) -> list[Path]:
     Only directories carrying an Akasha manifest, for the same reason retention
     only deletes those: `dest` is an operator-supplied path and may hold anything.
     """
-    found = []
     if not dest.is_dir():
-        return found
+        return []
+    found: list[tuple[str, Path]] = []
     for candidate in dest.iterdir():
         if candidate == exclude or not candidate.is_dir():
             continue
