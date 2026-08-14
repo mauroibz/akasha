@@ -32,7 +32,15 @@ class SearchCandidate:
 
 @dataclass(frozen=True)
 class ItemPayload(SearchCandidate):
-    pass
+    """A fetched record, plus whether it is provably the edition that was asked for.
+
+    `edition_match` is set by `fetch_by_isbn`, which is the only caller that has both
+    a requested ISBN and the raw provider row carrying every identifier the record
+    holds. It is `None` for payloads reached any other way — a search selection or an
+    explicit refresh — where there is no requested edition to verify against.
+    """
+
+    edition_match: str | None = None
 
 
 class Provider(Protocol):

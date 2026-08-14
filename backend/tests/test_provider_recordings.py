@@ -9,10 +9,17 @@ import pytest
 from recordings import recording, redirect_location, replay
 
 from book_tracker.infrastructure.providers import (
+    EDITION_CONFIRMED,
+    EDITION_CONTRADICTED,
+    EDITION_UNVERIFIABLE,
+    GoogleBooksProvider,
     OpenLibraryProvider,
     ProviderPayloadError,
+    classify_edition,
     create_provider_client,
 )
+
+GOOGLE_RECORDING = "googlebooks_isbn_9788437604572.json"
 
 
 @pytest.fixture
@@ -90,3 +97,63 @@ async def test_shared_provider_client_follows_redirects() -> None:
     """`/isbn/` answers 302; a client that does not follow it parses HTML as JSON."""
     async with create_provider_client() as client:
         assert client.follow_redirects is True
+
+
+# --------------------------------------------------------------------------------------
+# Edition verification (Sprint 020)
+#
+# `GoogleBooksProvider.fetch_by_isbn` runs an `isbn:` *search* and takes the first hit,
+# which is not guaranteed to carry the ISBN that was asked for. The committed Google
+# recording is itself an instance: the only hit for `isbn:9788437604572` is volume
+# `B-JeAAAAMAAJ`, whose `industryIdentifiers` hold a University of Michigan barcode and
+# no ISBN at all. Nothing had to be re-recorded to prove this.
+# --------------------------------------------------------------------------------------
+
+
+def test_classify_edition_separates_confirmation_from_absence_of_evidence() -> None:
+    """Three outcomes, not two: a volume with no ISBN denies nothing."""
+    assert classify_edition(["9788437604572"], "9788437604572") == EDITION_CONFIRMED
+    # The same edition expressed as ISBN10 is the same edition.
+    assert classify_edition(["8437604575"], "9788437604572") == EDITION_CONFIRMED
+    assert classify_edition(["9780307474728"], "9788437604572") == EDITION_CONTRADICTED
+    assert classify_edition([], "9788437604572") == EDITION_UNVERIFIABLE
+    assert classify_edition(["UOM:39015008575477"], "9788437604572") == EDITION_UNVERIFIABLE
+    # A volume listing several formats is confirmed if any of them is the one asked for.
+    assert classify_edition(["9780307474728", "8437604575"], "9788437604572") == EDITION_CONFIRMED
+
+
+@pytest.mark.anyio
+async def test_google_books_marks_the_recorded_volume_unverifiable() -> None:
+    """The committed recording carries a barcode and no ISBN, so nothing confirms it."""
+    transport = replay({"/books/v1/volumes": (200, recording(GOOGLE_RECORDING))})
+
+    async with create_provider_client(transport=transport) as client:
+        payload = await GoogleBooksProvider(client, "test-key").fetch_by_isbn("9788437604572")
+
+    assert payload.source_id == "B-JeAAAAMAAJ"
+    assert payload.identifiers == {}
+    assert payload.edition_match == EDITION_UNVERIFIABLE
+    # The fields that would be merged onto another edition, named so a future change to
+    # the policy has to look at what is actually at stake.
+    assert payload.metadata["publisher"] == "Ediciones Catedra S.A."
+    assert payload.metadata["page_count"] == 762
+
+
+@pytest.mark.anyio
+async def test_open_library_confirms_the_edition_its_isbn_redirect_resolves_to() -> None:
+    """Open Library reaches the edition through `/isbn/`, so it can always be checked."""
+    async with create_provider_client(transport=replay(EDITION_ROUTES)) as client:
+        payload = await OpenLibraryProvider(client, "test@example.invalid").fetch_by_isbn(
+            "9788437604572"
+        )
+
+    assert payload.edition_match == EDITION_CONFIRMED
+
+
+@pytest.mark.anyio
+async def test_a_payload_reached_without_a_requested_isbn_has_no_verdict() -> None:
+    """`fetch` has no edition to verify against, and must not claim one."""
+    async with create_provider_client(transport=replay(EDITION_ROUTES)) as client:
+        payload = await OpenLibraryProvider(client, "test@example.invalid").fetch("OL19845805M")
+
+    assert payload.edition_match is None

@@ -1,7 +1,7 @@
 import asyncio
 import json
 import re
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import replace
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -100,6 +100,46 @@ def _isbn(values: list[object]) -> dict[str, str]:
         except InvalidIdentifier:
             continue
     return {}
+
+
+def isbn13_set(values: Iterable[object]) -> frozenset[str]:
+    """Every value that normalizes to an ISBN13, not only the first.
+
+    `_isbn` keeps the first parseable value because that is what a payload's single
+    `identifiers["isbn13"]` slot can hold. Verifying that a candidate really is the
+    edition that was asked for needs all of them: a volume commonly lists its ISBN10
+    and its ISBN13, and either may come first.
+    """
+    found: set[str] = set()
+    for value in values:
+        try:
+            found.add(normalize_identifier("isbn", str(value)).normalized_value)
+        except InvalidIdentifier:
+            continue
+    return frozenset(found)
+
+
+EDITION_CONFIRMED = "confirmed"
+EDITION_CONTRADICTED = "contradicted"
+EDITION_UNVERIFIABLE = "unverifiable"
+
+
+def classify_edition(candidate_isbns: Iterable[object], requested_isbn: str) -> str:
+    """Decide whether a fetched candidate is provably the edition that was requested.
+
+    Three outcomes, not two, and the third is the common one for Google Books: a
+    scanned library volume frequently exposes only a barcode
+    (`OTHER: UOM:39015008575477`) and no ISBN at all, so nothing in its own payload
+    either confirms or denies that it is the edition the ISBN asked for.
+    """
+    found = isbn13_set(candidate_isbns)
+    if not found:
+        return EDITION_UNVERIFIABLE
+    try:
+        wanted = normalize_identifier("isbn", requested_isbn).normalized_value
+    except InvalidIdentifier:
+        return EDITION_UNVERIFIABLE
+    return EDITION_CONFIRMED if wanted in found else EDITION_CONTRADICTED
 
 
 def _language(value: object) -> str | None:
@@ -251,7 +291,9 @@ class OpenLibraryProvider:
         row = await self._json(f"https://openlibrary.org/books/{source_id}.json")
         return await self._edition_payload(row, source_id)
 
-    async def _edition_payload(self, row: Mapping[str, Any], source_id: str) -> ItemPayload:
+    async def _edition_payload(
+        self, row: Mapping[str, Any], source_id: str, requested_isbn: str | None = None
+    ) -> ItemPayload:
         title = row.get("title")
         if not title:
             raise ProviderPayloadError(
@@ -327,6 +369,15 @@ class OpenLibraryProvider:
             metadata=metadata,
             original_year=original_year,
             cover_fallback_urls=tuple(cover_urls[1:]),
+            # Every ISBN the edition record carries, not just the one that fits the
+            # payload's single identifier slot.
+            edition_match=(
+                None
+                if requested_isbn is None
+                else classify_edition(
+                    list(row.get("isbn_13", [])) + list(row.get("isbn_10", [])), requested_isbn
+                )
+            ),
         )
 
     async def fetch_by_isbn(self, isbn: str) -> ItemPayload:
@@ -358,7 +409,7 @@ class OpenLibraryProvider:
                 f"Open Library resolved ISBN {isbn} to {key or 'no record'}, not an edition",
                 code="edition_not_found",
             )
-        return await self._edition_payload(row, key.removeprefix("/books/"))
+        return await self._edition_payload(row, key.removeprefix("/books/"), isbn)
 
     async def resolve_work(self, work_id: str, limit: int = 20) -> list[SearchCandidate]:
         body = await self._json(
@@ -494,14 +545,26 @@ class GoogleBooksProvider:
         return ItemPayload(**candidate.__dict__)
 
     async def fetch_by_isbn(self, isbn: str) -> ItemPayload:
-        """Fetch edition data by ISBN. Used by background enrichment."""
+        """Fetch edition data by ISBN. Used by background enrichment.
+
+        This is an `isbn:` *search*, not a lookup by identifier, so the volume that
+        comes back is whatever ranked first and is not guaranteed to carry the ISBN
+        that was asked for. `edition_match` records whether it does.
+        """
         body = await self._get(
             "https://www.googleapis.com/books/v1/volumes", q=f"isbn:{isbn}", maxResults=1
         )
         items = body.get("items", [])
         if not isinstance(items, list) or not items:
             raise ProviderPayloadError("Google Books found no volume for ISBN")
-        candidate = self._candidate(items[0])
+        row = items[0]
+        candidate = self._candidate(row)
         if candidate is None:
             raise ProviderPayloadError("Google Books volume is incomplete")
-        return ItemPayload(**candidate.__dict__)
+        info = row.get("volumeInfo", {})
+        carried = [
+            value.get("identifier")
+            for value in info.get("industryIdentifiers", [])
+            if isinstance(value, dict)
+        ]
+        return ItemPayload(**candidate.__dict__, edition_match=classify_edition(carried, isbn))
