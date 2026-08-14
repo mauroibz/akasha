@@ -187,3 +187,67 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
                 value = "item" if sort in {"sort_author", "year"} else None
                 values = [row[value][sort] if value else row[sort] for row in rows]
                 assert values[-1] is None
+
+
+def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
+    """A pre-0011 cursor carries a value from the old projection.
+
+    `sort_author` used to order by the first author verbatim, so a stale cursor
+    holds "gabriel" where the column now holds "garcia marquez gabriel". Comparing
+    the two would silently skip or repeat a page, which is worse than an error the
+    library page already knows how to render.
+    """
+    stale = (
+        base64.urlsafe_b64encode(
+            json.dumps(
+                {
+                    "sort": "sort_author",
+                    "order": "asc",
+                    "filter_key": "abc",
+                    "value": "gabriel",
+                    "entry_id": 4,
+                    "null_bucket": 0,
+                    "v": 1,
+                }
+            ).encode()
+        )
+        .decode()
+        .rstrip("=")
+    )
+    with pytest.raises(CursorError):
+        decode_cursor(stale, sort="sort_author", order="asc", filter_key="abc")
+
+
+@pytest.mark.anyio
+async def test_author_sort_orders_by_the_creator_sort_name(tmp_path: Path) -> None:
+    """The three names the roadmap named, plus one whose two orderings disagree.
+
+    Sorting by given name and sorting by surname happen to agree for García
+    Márquez, Bioy Casares and Rulfo — a, g, j against b, g, r — so a test built
+    only from those three passes against the defect it is meant to catch. Zoé
+    Aguirre is the one that separates them: last by given name, first by surname.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        for title, author in [
+            ("Cien años de soledad", "Gabriel García Márquez"),
+            ("La invención de Morel", "Adolfo Bioy Casares"),
+            ("Pedro Páramo", "Juan Rulfo"),
+            ("Sangre azul", "Zoé Aguirre"),
+        ]:
+            repository.create_or_get_entry(title=title, authors=(author,))
+        with app.state.engine.begin() as connection:
+            connection.execute(text("UPDATE entries SET status='read'"))
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            page = (
+                await client.get("/api/entries", params={"sort": "sort_author", "order": "asc"})
+            ).json()
+    assert [row["item"]["title"] for row in page["items"]] == [
+        "Sangre azul",
+        "La invención de Morel",
+        "Cien años de soledad",
+        "Pedro Páramo",
+    ]

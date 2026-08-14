@@ -16,7 +16,11 @@ class CursorState:
     value: Any
     entry_id: int
     null_bucket: int
-    v: int = 1
+    # Bumped to 2 in Sprint 023. `sort_author` stopped ordering by the first author
+    # verbatim and started ordering by the stored creator sort name, so a cursor
+    # issued before that migration compares "gabriel" against "garcia marquez
+    # gabriel" and silently skips or repeats a page. Rejecting it is the point.
+    v: int = 2
 
 
 def encode_cursor(state: CursorState) -> str:
@@ -33,7 +37,7 @@ def decode_cursor(
         state = CursorState(**payload)
     except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
         raise CursorError("cursor is malformed") from error
-    if state.v != 1 or state.sort != sort or state.order != order or state.filter_key != filter_key:
+    if state.v != 2 or state.sort != sort or state.order != order or state.filter_key != filter_key:
         raise CursorError("cursor does not match this query")
     if state.null_bucket not in (0, 1) or state.entry_id < 1:
         raise CursorError("cursor values are invalid")

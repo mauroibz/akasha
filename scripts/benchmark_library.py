@@ -321,7 +321,7 @@ def query_plans(engine: Engine, service: LibraryService) -> list[tuple[str, list
             "date_added": "entries.date_added",
             "score": "entries.score",
             "title": "items.title_normalized",
-            "sort_author": "items.sort_author_normalized",
+            "sort_author": "items.creator_sort_normalized",
             "year": "items.year",
             "date_finished": "entries.date_finished",
         }[sort]

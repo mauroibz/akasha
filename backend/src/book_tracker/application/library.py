@@ -540,7 +540,10 @@ class LibraryService:
             "date_added": EntryRow.date_added,
             "score": EntryRow.score,
             "title": ItemRow.title_normalized,
-            "sort_author": ItemRow.sort_author_normalized,
+            # Ordering reads the creator sort name; the `q` filter above stays on
+            # `sort_author_normalized`, because search matches the name as it is
+            # written and "gabriel garcia" must keep finding García Márquez.
+            "sort_author": ItemRow.creator_sort_normalized,
             "year": ItemRow.year,
             "date_finished": EntryRow.date_finished,
         }
@@ -602,7 +605,7 @@ class LibraryService:
                     # divergence between the two would silently skip or repeat a
                     # page.
                     "title": item.title_normalized,
-                    "sort_author": item.sort_author_normalized,
+                    "sort_author": item.creator_sort_normalized,
                     "year": item.year,
                     "date_finished": last.date_finished,
                 }
