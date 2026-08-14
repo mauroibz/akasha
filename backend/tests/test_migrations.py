@@ -71,7 +71,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
 
     pending = pending_revisions(configured.database_url)
 
-    assert pending == ["0007_normalized_sort_projection"]
+    assert pending == ["0007_normalized_sort_projection", "0008_plain_text_descriptions"]
 
     upgrade(configured.database_url)
     assert pending_revisions(configured.database_url) == []
@@ -133,7 +133,10 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
 
     # Refusing to migrate is the whole point: the pre-0007 rows must still be there.
     assert configured.database_url is not None
-    assert pending_revisions(configured.database_url) == ["0007_normalized_sort_projection"]
+    assert pending_revisions(configured.database_url) == [
+        "0007_normalized_sort_projection",
+        "0008_plain_text_descriptions",
+    ]
 
 
 @pytest.mark.anyio
@@ -261,3 +264,54 @@ async def test_a_failing_migration_does_not_write_a_backup_per_restart(tmp_path:
     # Still the copy taken before the first attempt, which is the useful one.
     assert verify_backup(backups[0])["alembic_revision"] == PRE_PROJECTION
     assert app is not None
+
+
+PRE_PLAIN_TEXT = "0007_normalized_sort_projection"
+
+
+def seed_markup_descriptions(database_path: Path) -> None:
+    """Descriptions as they are already stored in a library imported before 0008."""
+    connection = sqlite3.connect(database_path)
+    rows = [
+        # The exact shape the Sprint 019 walkthrough saw on the detail page.
+        ("Escaping the Build Trap", "<p>To stay competitive, companies <b>must</b> innovate.</p>"),
+        ("Cien años de soledad", "<p> <b>Macondo</b> y los Buendía.</p>"),
+        # Already prose: must come through byte-identical, not round-tripped.
+        ("The Shadow of the Wind", "A boy discovers a book."),
+        # Nothing but markup: the key is dropped rather than left as an empty string.
+        ("Empty", "<p></p>"),
+    ]
+    for index, (title, description) in enumerate(rows, start=1):
+        connection.execute(
+            "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+            " VALUES (?, 'book', ?, '{}', ?, ?, ?)",
+            (index, title, json.dumps({"description": description}), NOW, NOW),
+        )
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (99, 'book', 'No description', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    connection.close()
+
+
+def test_stored_descriptions_are_reduced_to_plain_text(tmp_path: Path) -> None:
+    """Stripping at the provider boundary does nothing for a library imported earlier."""
+    configured = database_at(tmp_path / "data", PRE_PLAIN_TEXT)
+    seed_markup_descriptions(configured.data_dir / "books.db")
+    assert configured.database_url is not None
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    stored = connection.execute("SELECT id, metadata FROM items ORDER BY id").fetchall()
+    connection.close()
+    descriptions = {row[0]: json.loads(row[1]).get("description") for row in stored}
+
+    assert descriptions[1] == "To stay competitive, companies must innovate."
+    assert descriptions[2] == "Macondo y los Buendía."
+    assert descriptions[3] == "A boy discovers a book."
+    # An all-markup description would otherwise read as "present, and blank".
+    assert descriptions[4] is None
+    assert descriptions[99] is None

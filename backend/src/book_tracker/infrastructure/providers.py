@@ -9,6 +9,7 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import httpx
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
+from book_tracker.domain.normalization import strip_html
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
 
 
@@ -160,7 +161,11 @@ def _language(value: object) -> str | None:
 def _description(value: object) -> str | None:
     if isinstance(value, dict):
         value = value.get("value")
-    return str(value).strip() if value else None
+    if not value:
+        return None
+    # Providers put markup in prose fields and the detail page escapes what it
+    # renders, so an unstripped description shows its own `<p>` tags to the reader.
+    return strip_html(str(value)) or None
 
 
 def _keys(values: object, prefix: str) -> list[str]:
@@ -492,11 +497,12 @@ class GoogleBooksProvider:
         )
         source_id = str(row["id"])
         authors = tuple(str(value) for value in info.get("authors", []))
+        description = info.get("description")
         metadata = {
             "authors": list(authors),
             "publisher": info.get("publisher"),
             "page_count": info.get("pageCount"),
-            "description": info.get("description"),
+            "description": strip_html(str(description)) if description else None,
             "subjects": info.get("categories"),
         }
         metadata = {

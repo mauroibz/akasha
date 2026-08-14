@@ -3,7 +3,7 @@ import pytest
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
-from book_tracker.domain.normalization import normalize_text
+from book_tracker.domain.normalization import normalize_text, strip_html
 
 
 @pytest.mark.parametrize(
@@ -35,3 +35,41 @@ def test_fill_empty_preserves_non_empty_values() -> None:
         {"title": "Existing", "subtitle": "", "metadata": {"authors": ["A"]}},
         {"title": "Incoming", "subtitle": "Filled", "metadata": {"authors": ["B"]}},
     ) == {"title": "Existing", "subtitle": "Filled", "metadata": {"authors": ["A"]}}
+
+
+# --------------------------------------------------------------------------------------
+# Provider descriptions arrive as markup (Sprint 020)
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        # The exact shapes the Sprint 019 walkthrough saw on the detail page.
+        (
+            "<p>To stay competitive, companies <b>must</b> innovate.</p>",
+            "To stay competitive, companies must innovate.",
+        ),
+        ("<p> <b>Cien años</b> de soledad</p>", "Cien años de soledad"),
+        # Paragraphs stay separated rather than running together into one wall.
+        ("<p>First.</p><p>Second.</p>", "First.\n\nSecond."),
+        # Entities are decoded whether or not any tag is present.
+        ("Tom &amp; Jerry", "Tom & Jerry"),
+        ("<p>Tom &amp; Jerry</p>", "Tom & Jerry"),
+        # Prose that never had markup is returned untouched.
+        ("A plain description.", "A plain description."),
+        # Malformed markup degrades to text rather than losing the description.
+        ("Unclosed <p>tag", "Unclosed\n\ntag"),
+        # Nothing renders this as HTML, but script content is not prose either.
+        ("<script>alert(1)</script>Real text", "Real text"),
+        ("", ""),
+        ("<p></p>", ""),
+    ],
+)
+def test_strip_html_reduces_provider_markup_to_prose(raw: str, expected: str) -> None:
+    assert strip_html(raw) == expected
+
+
+def test_strip_html_collapses_whitespace_without_joining_words() -> None:
+    """`<b>` inside a sentence is a word boundary, not a paragraph break."""
+    assert strip_html("<p>one <b>two</b> three</p>") == "one two three"
