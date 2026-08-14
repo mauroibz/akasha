@@ -879,3 +879,71 @@ field, which Sprint 024 inherits. A prerequisite defect in the benchmark script 
 **Next:** Sprint 021 (attachments) — status `ready`, file at `docs/sprints/021-attachments.md`,
 expanded from `TEMPLATE.md` at this close. **It is gated** like 020: Phase A measures, and backup
 growth is the measurement that scopes the whole feature. Concluding *no* is a complete outcome.
+
+## 2026-08-13 — Sprint 020 Phase B (cover selector and provider quota)
+
+**Done:** The owner read DEC-044 and gave the go-ahead DEC-035 required, so the sprint reopened for
+its Phase B rather than being superseded by a new one — the decisions log is append-only and already
+refers to Sprints 021, 024 and 026 by number, so renumbering would have falsified those references.
+DEC-045 records that along with three decisions: the metadata merge is abandoned, the cover selector
+is built, and provider order stays Open Library first.
+
+The order question was the owner's and was measured rather than argued. Open Library first costs
+**1,333** Google calls per 5,000 books; Google first costs **5,000**. Open Library is also verifiable
+in 100% of its answers against Google Books' 80.4%, so correctness and quota agree. But 1,333 still
+exceeds the ~1,000/day tier, which is why the guard shipped in the same sprint.
+
+The guard is **provider-agnostic at the owner's explicit direction** — the roadmap adds MusicBrainz,
+IGDB and TMDB, and a guard written around one provider becomes a patch at each new one. Nothing in
+`ProviderQuota`, migration `0009` or the enrichment loop names a provider; limits are configuration,
+and the tests are written against a fictional `pretendbooks` so they prove the mechanism rather than
+re-asserting today's default. Exhaustion **defers** rather than fails, because `fail` increments
+attempts and dead-letters at the ceiling, so a large import would otherwise destroy its own backlog.
+
+The chooser rests on DEC-044's measurement: the work record enrichment already fetches lists the
+sibling editions, so candidates cost no extra request to discover.
+
+**Verified:** validator passed; `make check` passed; `make test` backend **235** / frontend **85**;
+`npm run test:e2e` **77 passed / 2 skipped** across both projects; `make build` clean;
+`make smoke-container` passed; `git diff --check` clean.
+
+**Walkthrough — this is the part that mattered.** Container on a copy of the library, migrating
+`0006` to `0009` unattended behind a pre-migration backup, graceful stop at 143. The feature worked
+in the end — 14 candidates for *Shadow of the Wind*, a chosen cover installed and still there after
+reload, no console errors — but only after **five repairs, every one of which passed the full test
+suite first**:
+
+1. The chooser failed outright: the shared client allows 5 s and Open Library answered one edition
+   record in **11.3 s**.
+2. "Not indexed" was reported as "could not be reached" — and my first fix then reported a real
+   outage as "no candidates". One exception type carries both; only its code separates them. Open
+   Library was genuinely 503-ing during the run, which is how the second direction surfaced.
+3. Six of twenty tiles were blank and still clickable, because `resolve_work` invents an `/b/olid/`
+   URL for an edition with no cover id. Choosing one answered 422.
+4. A **60x40** image was installed as a cover. Provider downloads now require 200 px per side.
+5. The screenshot gave away a fifth, which no assertion would have: the cover behind the dialog read
+   *No image available*. **Open Library's placeholder is portrait and ordinarily sized**, so
+   DEC-044's geometry rule — which catches Google's 6.25:1 banner — cannot see it. `default=false`
+   is the only reliable guard and is now forced at the download boundary rather than trusted to the
+   URL the client sent. This corrects DEC-044's answer on placeholder detection.
+
+A sixth defect was found by testing one layer up rather than by the walkthrough: `JobRunner.tick`
+routed every state that was not `succeeded` or `cancelled` to `fail`, so the new deferral was undone
+above where its unit test was looking.
+
+**Seen and left:**
+
+- **Open Library's JSON API returns 503 under load**, repeatedly, for minutes at a time. Its website
+  stays up. This makes the chooser and enrichment fail intermittently through no fault of ours, and
+  nothing retries. Unowned, and now the most consequential provider observation.
+- `search_providers` still degrades silently to a single provider on its 5 s timeout. This sprint
+  worked around it for the chooser and did **not** fix it for search.
+- Open Library title mojibake and the quoted publisher string are both unchanged.
+- The reprint-over-original ranking is unchanged and still deferred by DEC-044.
+
+**Deviations:** the sprint was reopened rather than superseded (DEC-045); one fixture was added and
+none re-recorded; an existing test's arbitrary 40x60 stand-in image was resized to 400x600 because
+the new minimum-size guard correctly rejects it.
+
+**Next:** Sprint 021 (attachments) — status `ready`, file at `docs/sprints/021-attachments.md`. It is
+gated like 020, and backup growth is the measurement that scopes the whole feature.

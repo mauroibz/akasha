@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 8,
-  "project_status": "in_progress",
-  "active_sprint": "020",
-  "active_sprint_file": "docs/sprints/020-metadata-completeness.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "019",
+  "project_status": "ready",
+  "active_sprint": "021",
+  "active_sprint_file": "docs/sprints/021-attachments.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "020",
   "completed_sprints": [
     "001",
     "002",
@@ -25,8 +25,9 @@
     "016",
     "017",
     "018",
-    "019"
+    "019",
+    "020"
   ],
-  "started_at": "2026-08-13T21:50:00-03:00",
-  "updated_at": "2026-08-13T21:50:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-08-13T22:40:00-03:00"
 }

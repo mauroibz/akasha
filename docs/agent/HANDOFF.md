@@ -1,6 +1,6 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 020 (metadata completeness), 2026-08-13.
+**Last completed:** Sprint 020 (metadata completeness, both phases), 2026-08-13.
 **Next:** Sprint 021 (attachments) — status `ready`, file at `docs/sprints/021-attachments.md`.
 
 ## Read this first
@@ -17,12 +17,22 @@ seven nightly deep. A cover is **38.8 KB** measured; an epub is 1–5 MB. Either
 tar under a size cap or they are excluded with a documented separate story, and that decision scopes
 the feature.
 
-**A Phase B from Sprint 020 is available and unstarted.** DEC-044 declined cross-provider field
-completion but identified a cheap slice the owner has not yet ruled on: **cover choice from Open
-Library work-record candidates**. The work record is *already fetched* during every enrichment and
-lists 28 covers for Rayuela, 33 for *Cien años de soledad*, so candidate discovery costs zero extra
-provider requests; only the thumbnails cost anything, and only on demand. It needs an explicit
-go-ahead recorded in `docs/decisions.md` before anyone builds it.
+**Sprint 020's Phase B is done.** The owner gave the go-ahead in DEC-045 and the sprint reopened
+to build it rather than spawning a new one — worth knowing, because it is the precedent for how a
+gated sprint's Phase B is handled here. Cross-provider metadata completion stays **abandoned**.
+
+**Provider order is settled and measured, not a preference.** Open Library first, Google Books only
+where Open Library misses: 1,333 Google calls per 5,000 books against 5,000 the other way, and 100%
+of Open Library's answers verifiable against Google Books' 80.4%. Do not reorder them without new
+measurements.
+
+**Daily provider budgets exist and name nobody** (DEC-045). `ProviderQuota`, migration `0009` and
+the enrichment loop are all provider-agnostic; limits live in `Settings.provider_daily_limits`
+(default `{"googlebooks": 900}`), so a metered provider added in a domain sprint is a config entry.
+Two rules to keep: exhaustion **defers** (`JobRepository.defer`, which does not touch `attempts`)
+because `fail` dead-letters at the retry ceiling and would destroy a large import's backlog; and
+interactive search is **counted but never blocked**, since the last request of a day belongs to
+someone waiting for a result.
 
 **A provider record is merged only when it can be tied to the identifier that was requested**
 (DEC-044). Verification is a tri-state — confirmed, contradicted, unverifiable — and **unverifiable
@@ -67,8 +77,8 @@ Only 021 has a sprint file. The rest are contracts in `ROADMAP.md` and get expan
 Books, with a README naming the exact URL behind each file. **Never re-record them silently** — a
 fixture is a pinned observation of an external contract.
 
-Sprint 020 **added** one file (`googlebooks_isbn_9780307474728.json`, the confirmed-edition case) and
-re-recorded none. Worth knowing why: `googlebooks_isbn_9788437604572.json` turned out to *already*
+Sprint 020 **added** two files (`googlebooks_isbn_9780307474728.json`, the confirmed-edition case,
+and `editions_OL14860424W.json`, the work behind the Rayuela edition) and re-recorded none. Worth knowing why: `googlebooks_isbn_9788437604572.json` turned out to *already*
 contain the defect being investigated — its only hit carries a University of Michigan barcode and no
 ISBN — and a live check confirmed the same volume still comes back. The fixture was evidence, not an
 obstacle.
@@ -106,6 +116,17 @@ Backend and tests:
   to both.
 - **The migration head is pinned by literal in three tests** — `test_migrations.py` (twice) and
   `test_backup.py`'s manifest assertion. A new migration fails all three until they are updated.
+  The head is now `0009_provider_usage`.
+- **`JobRunner.tick` routes every unrecognised handler state to `fail`.** A handler that returns a
+  new state must be given a branch there, or the runner undoes whatever the handler just did one
+  layer above where a handler-level test is looking. This is exactly how the quota deferral broke.
+- **The shared provider client has a hard 5 s timeout** and Open Library regularly exceeds it — 11.3 s
+  for one edition record during Sprint 020's walkthrough. `_bounded_json`, `_json`, `work_id` and
+  `resolve_work` all take an optional `timeout` for paths that can afford to wait.
+- **`ProviderPayloadError` carries one type for two very different things.** `edition_not_found`
+  means the provider answered and does not have it; `provider_unreachable` / `provider_http_error`
+  mean it never answered. Branch on `code`, never on the type, or you will tell the reader their
+  book has no editions when the provider is simply down.
 - Adding a migration that imports a domain function couples the two: stashing the function while the
   migration file is present breaks every test that runs migrations.
 - **There is no `/api/jobs` listing endpoint.** `POST /api/enrichment/backfill` exists, and
@@ -132,11 +153,20 @@ Frontend and e2e:
 
 ## Things noticed and deliberately left
 
+- **Open Library's JSON API returns 503 under load**, repeatedly and for minutes at a time, while
+  their website stays up. Sprint 020's walkthrough hit it throughout. Enrichment and the cover
+  chooser both fail intermittently through no fault of ours, and **nothing retries**. Unowned, and
+  the most consequential provider observation.
 - **Provider search silently degrades to a single provider.** The client timeout is a hard 5 s while
   Open Library's search plus its year-resolution fan-out routinely exceeds it, so `/api/search`
-  returns **Google Books only** — observed in Sprint 020's walkthrough searching *Pedro Páramo*. The
-  user sees fewer and worse results with no indication anything failed. Unowned, and the most
-  consequential of these.
+  returns **Google Books only**. The user sees fewer and worse results with no indication anything
+  failed. Sprint 020 gave the cover chooser its own longer timeout and deliberately did **not** fix
+  search.
+- **An Open Library placeholder cover cannot be detected by geometry.** DEC-044's rule catches
+  Google Books' 6.25:1 banner; Open Library's "No image available" is portrait and ordinarily sized
+  and sails through. `default=false` is the only reliable guard and `prepare_cover` now forces it
+  for that host. If a third image provider is ever added, assume its placeholder needs its own
+  answer rather than inheriting either of these.
 - **Search offers a reprint above the original.** `merge_and_rank` puts a 1969 printing at rank 0 and
   a 2024 edition at rank 1 for *Pedro Páramo*; the 1955 original is not in the top eight. Deferred
   with a reason in DEC-044: it is search ranking, and changing it is user-visible product behaviour.
@@ -152,15 +182,16 @@ Frontend and e2e:
 ## State
 
 - Planning revision 8; state points to Sprint 021, project status `ready`.
-- Gates at Sprint 020's close: validator passed, `make check` passed, `make test` backend **209** /
-  frontend **83**, Playwright **75 passed / 2 skipped** across both projects, `make build` with no
+- Gates at Sprint 020's close: validator passed, `make check` passed, `make test` backend **235** /
+  frontend **85**, Playwright **77 passed / 2 skipped** across both projects, `make build` with no
   chunk-size warning, `make smoke-container` passed, `git diff --check` clean.
 - The two skipped e2e tests are `live-metadata.spec.ts`, which needs `LIVE_METADATA_MODE` and a live
   backend.
 - **`v1.0.0` exists** as an annotated local tag at `4ccf431`. Nothing has been pushed;
   `git push origin v1.0.0` publishes it.
 - Image `akasha:local`, user 10001:10001, no Node, `STOPSIGNAL SIGTERM`.
-- **Migration head is `0008_plain_text_descriptions`.** The repo's own `data/books.db` is still at
-  `0006`, so the next container start against it will back up and migrate two revisions.
+- **Migration head is `0009_provider_usage`.** The repo's own `data/books.db` is still at `0006`,
+  so the next container start against it will back up and migrate three revisions. That path was
+  exercised for real in Sprint 020's walkthrough against a copy.
 - `.env` exists locally with the owner's `GOOGLE_BOOKS_API_KEY` and is gitignored.
 - Commit messages in this repository carry no `Co-Authored-By` trailer.

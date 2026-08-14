@@ -2,7 +2,7 @@
 
 **Plan revision:** 8
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 020](020-metadata-completeness.md)
+**Active sprint:** [Sprint 021](021-attachments.md)
 
 ## Shape of the plan
 
@@ -59,8 +59,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [017](017-scale-accessibility-resilience.md) | Production-quality hardening | 016 | completed |
 | [018](018-container-backup-release.md) | Deployable v1 | 017 | completed |
 | [019](019-post-v1-polish.md) | Post-v1 polish and ledger clearing | 018 | completed |
-| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | **in progress** |
-| [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | planned |
+| [020](020-metadata-completeness.md) | Metadata completeness: viability, then build | 019 | completed |
+| [021](021-attachments.md) | Attachments: viability, then a narrow slice | 020 | **ready** |
 | 022 | Creator sort names | 020 | planned |
 | 023 | Export | 020 | planned |
 | 024 | Second domain — albums: pilot, then verdict | 020 | planned |
@@ -103,7 +103,8 @@ Google free tier on a large import. The edition defect and the placeholder cover
 **Phase B was then authorized by the owner (DEC-045)** and the sprint reopened to build it:
 cover choice from Open Library work-record candidates, which cost no extra requests, plus a
 provider-agnostic daily quota guard. Provider order stays Open Library first, measured rather than
-assumed. See DEC-044 and DEC-045.]
+assumed. Both shipped; the walkthrough found five defects the suite could not, including a
+correction to DEC-044's placeholder rule. See DEC-044 and DEC-045.]
 
 ### [Sprint 021 — Attachments: viability, then a narrow slice](021-attachments.md)
 

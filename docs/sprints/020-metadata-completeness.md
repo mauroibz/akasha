@@ -1,6 +1,6 @@
 # Sprint 020 — Metadata completeness: viability, then build
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 019
 **Roadmap revision:** 8
 
@@ -241,3 +241,95 @@ a real browser: no literal `<p>` or `<b>` anywhere, and no console errors in the
   candidates, on demand. It needs an explicit owner go-ahead recorded in `docs/decisions.md`.
 - **Three observations are unowned and recorded**: Open Library title mojibake, the 5-second search
   timeout that silently yields Google-only results, and the quoted publisher string.
+
+## Outcome — Phase B
+
+Appended, not rewritten: the Phase A record above is audit history and stands as written. The
+sprint reopened after DEC-045 recorded the owner's go-ahead, which is what the gate structure
+anticipated rather than an exception to it.
+
+### Delivered
+
+| | |
+|---|---|
+| `ee5a842` | **DEC-045**: go-ahead, merge abandoned, provider order decided, sprint reopened |
+| `65ba56d` | cover candidates from the editions of a work |
+| `40f4cbf` | the chooser, and choosing through the existing cover endpoint |
+| `297635e` | provider-agnostic daily quota guard, deferral instead of failure |
+| `6ea1f44` | four defects the walkthrough found, plus a fifth the screenshot gave away |
+
+### What the owner decided
+
+The metadata merge is **abandoned**, confirming DEC-044 rather than revisiting it. The cover
+selector is **built**. Provider order stays **Open Library first**, measured rather than argued:
+1,333 Google calls per 5,000 books against 5,000 the other way, and 100% of Open Library's answers
+verifiable against Google Books' 80.4%. The quota guard is **provider-agnostic at the owner's
+direction**, because the roadmap adds MusicBrainz, IGDB and TMDB.
+
+### Acceptance criteria
+
+Phase A's criteria 1, 2 and 5 were met at the first close and are unchanged. Phase B settles the
+rest:
+
+3. **No regression, and the invariant proven.** Enrichment is untouched except for the quota check;
+   `test_a_verified_google_volume_still_only_fills_empty_fields` continues to pin DEC-008. Candidate
+   discovery costs **no** additional provider request, which is the measurement the whole feature
+   rests on.
+4. **The chooser meets every clause.** Reachable from the detail page; defaults to the current cover
+   in the strict sense that nothing changes until a candidate is chosen; never blocks the page,
+   since candidates are fetched only when the dialog opens and a unit test asserts they are not
+   fetched on render; and passes the axe gate as `detail (cover chooser)`.
+
+### Verification, actual results
+
+`python scripts/validate_project.py` passed. `make check` passed. `make test` backend **235** /
+frontend **85**. `npm run test:e2e` **77 passed / 2 skipped** across both projects, up from 75.
+`make build` clean with no chunk-size warning. `make smoke-container` passed. `git diff --check`
+clean.
+
+### Walkthrough — five defects, none of which the suite could see
+
+Ran against a container on a **copy** of the library. The copy sat at `0006`, so startup wrote a
+pre-migration backup and applied `0007`, `0008` and `0009` unattended. `docker stop` logged
+`Application shutdown complete` and exited **143**.
+
+The feature worked — 14 real candidates for *Shadow of the Wind*, a chosen cover installed and still
+there after a reload, no console errors — but only after five repairs, every one of which passed the
+test suite first:
+
+1. **The chooser failed outright.** The shared client allows 5 s; Open Library answered a single
+   edition record in **11.3 s**. The candidate path now has its own budget.
+2. **"Not indexed" was reported as "could not be reached"** — and the first fix then reported a real
+   outage as "no candidates". One exception type carries both; only its code separates them.
+   Open Library was genuinely answering **503** during the run, which is how the second direction
+   surfaced.
+3. **Six of twenty tiles were blank and still clickable**, because `resolve_work` invents an
+   `/b/olid/` URL for an edition with no cover id. Choosing one answered 422.
+4. **A 60x40 image was installed as a cover.** Provider downloads now require 200 px per side.
+5. **The screenshot gave away a fifth**: the cover behind the dialog read *No image available*.
+   Open Library's placeholder is **portrait and ordinarily sized**, so DEC-044's geometry rule —
+   which catches Google's 6.25:1 banner — cannot see it. `default=false` is the only reliable guard
+   and is now forced at the download boundary rather than trusted to the URL the client sent.
+   **This is a correction to DEC-044's answer on placeholder detection**, found by looking at a
+   picture rather than at a test result.
+
+### Deviations
+
+- **The sprint was reopened rather than superseded.** DEC-045 records the reasoning: this repository's
+  decisions log is append-only history that already refers to Sprints 021, 024 and 026 by number, and
+  a new sprint would have forced a renumbering cascade that falsified those references.
+- **A defect was found in code this sprint did not otherwise touch.** `JobRunner.tick` routed every
+  state that was not `succeeded` or `cancelled` to `fail`, so the new deferral was undone one layer
+  above where its unit test was looking. Caught by testing the runner rather than the handler.
+- **One fixture was added** (`editions_OL14860424W.json`) and none re-recorded.
+- **An existing test's stand-in image was resized** from 40x60 to 400x600. It was an arbitrary
+  placeholder, not an assertion about size, and the new guard correctly rejects the old one.
+
+### Impact on future sprints
+
+- **021 (attachments)** returns to `ready` unchanged.
+- **024 (albums)** inherits both the verification contract from DEC-044 and the quota mechanism from
+  DEC-045, which is why the latter names no provider: a metered provider is a configuration entry.
+- **Unowned observations carried forward**: Open Library's API returns 503 under load and its titles
+  can be mojibake; `search_providers` still degrades silently to one provider on its 5 s timeout,
+  which this sprint worked around for the chooser but did not fix for search.

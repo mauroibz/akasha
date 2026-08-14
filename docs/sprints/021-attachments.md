@@ -1,6 +1,6 @@
 # Sprint 021 — Attachments: viability, then a narrow slice
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 020
 **Roadmap revision:** 8
 
