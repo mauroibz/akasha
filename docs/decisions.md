@@ -1570,3 +1570,45 @@ Append-only record of material architecture choices, product-default resolutions
   untransformed — so the two surfaces no longer disagree about what an item holds. A client that
   relied on the defaults would see a shape change; the only client is this repository's frontend, and
   a test pins the behaviour.
+
+## DEC-057 — An album's status records possession, not consumption
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 026's first deliverable is the product question DEC-052 deferred until two
+  domains existed: whether `reread_count` and `date_finished` mean anything for an album. The owner
+  answered it while trying Sprint 025's albums in the running application, before the sprint was
+  activated.
+- **Decision, in the owner's words:** album statuses should be **wishlist / pending / owned** rather
+  than read/reading/read, and **a relisten counter makes no sense**.
+
+  This is a larger answer than the question asked, and worth naming as such: it says an album's
+  status is not a *consumption* state at all. A book moves to-read → reading → read, and that
+  progression is the thing being tracked. An album is played hundreds of times or twice, and the
+  interesting fact is whether you have it. So **status is a per-domain concept, not merely a
+  per-domain vocabulary** — which is what seam 5b was always for, and confirms the split DEC-052
+  made rather than complicating it.
+
+  Consequences that follow directly:
+
+  - `reread_count` is not shown or stored for albums, and `date_started` / `date_finished` go with
+    it: they date a passage through a book that an album does not have.
+  - The **score and the note carry the opinion** for an album, which they already do for books. The
+    entry model does not need a new field to express "I have listened to this and I think it is
+    an 8".
+  - `unsorted` stays universal, because imports land there whatever the domain.
+- **Open, and for Sprint 026 to settle with the owner rather than to assume:** the owner also wants
+  **format tags — CD / Digital / Vinyl for albums, physical / borrowed / digital for books.** Those
+  overlap with `owned`: a record of "I have this on vinyl" already asserts possession. Either
+  - **(a)** status is possession (`wishlist` / `pending` / `owned`) and format is a property of the
+    copy, which double-encodes ownership in two places that can disagree; or
+  - **(b)** format tags *are* the possession record — having one means you own it — and status keeps
+    a lighter consumption shape (`pending` / `listened`), which is fewer concepts but makes
+    "wishlist" mean "no format tag yet", an absence rather than a state.
+
+  **(a) is the recommendation**, because a status that can only be inferred from the absence of a tag
+  is not legible on a card, and the walkthrough showed the status control is the thing the eye lands
+  on. But this is a product judgement and the sprint must put it to the owner before building either.
+- **Consequences.** Sprint 026's deliverable 1 changes from *ask the question* to *settle the
+  ownership/format overlap*, which is a smaller and better-posed question. Books are untouched: their
+  statuses, rereads and dates keep their present meaning, and no existing entry is remapped.

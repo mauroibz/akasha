@@ -11,10 +11,18 @@ closed there; twelve commits are local and nothing was pushed. **Merging back is
 decision** — that is the entire reason the branch exists. Ask before merging, and cut Sprint 026's
 branch from whatever the owner settles on.
 
-**Sprint 026's first deliverable is a question, not code.** Whether `reread_count` and
-`date_finished` mean anything for an album is a product decision DEC-052 deliberately deferred until
-two domains existed. Put it to the owner with a recommendation and record the answer before building
-the vocabulary that depends on it.
+**Read DEC-057 before Sprint 026.** The owner answered its central question while trying albums in
+the running application: an album's status records **possession** (`wishlist` / `pending` / `owned`),
+not consumption, and `reread_count`, `date_started` and `date_finished` are meaningless for it. One
+sub-question is still open and gates the build — whether format tags (CD/Digital/Vinyl,
+physical/borrowed/digital) carry ownership and so overlap `owned`. DEC-057 states it and recommends
+an answer; put it to the owner rather than guessing.
+
+**The owner's other usability feedback is in `docs/sprints/ROADMAP.md` under "Owner feedback".**
+Five items, unscheduled, each written at the size and location it would land: a domain tab selector
+on the library, tracklists as album metadata (measured: one `inc=recordings` parameter, no extra
+request), format/ownership tags, the library grid being a fixed-height window instead of the page,
+and shelves being edited from a dialog named after something else.
 
 ## Read this first
 

@@ -16,9 +16,10 @@ triage keyboard follow, and the product question underneath — whether `reread_
 1. `AGENTS.md`, `docs/agent/WORKFLOW.md`
 2. **`docs/domain-architecture-proposal.md` section 4 seam 5 and section 7**, which split this seam
    in two and explain why 5b waited for two domains
-3. `docs/decisions.md`: **DEC-052** (the split, and the owner's three answers), **DEC-055** (where
-   the seams actually landed — read this before assuming anything about the registry), DEC-051
-   (owner data versus derived), DEC-019 if the status suggestion logic moves
+3. `docs/decisions.md`: **DEC-057 first** (the owner's answer: an album's status is possession),
+   then **DEC-052** (the split, and the owner's three answers), **DEC-055** (where the seams
+   actually landed — read this before assuming anything about the registry), DEC-051 (owner data
+   versus derived), DEC-019 if the status suggestion logic moves
 4. Sprint 025's Outcome, especially its walkthrough findings: "Rereads: 0" and "Your reading data" on
    an album detail page are this sprint's two visible symptoms
 5. `docs/specs/product-spec.md` sections 3.2, 5, 7; `docs/specs/technical-spec.md` sections 5.1, 7.1
@@ -44,10 +45,12 @@ Observed 2026-08-14 at Sprint 025's close. **Re-derive at activation.**
 
 ## Deliverables
 
-1. **The product decision, first and in writing.** Put the `reread_count` / `date_finished` question
-   to the owner with a recommendation, and record the answer in `docs/decisions.md` before building
-   anything that depends on it. It decides whether an entry's fields are per-domain too, or only its
-   statuses.
+1. **The product decision, mostly settled — finish it.** **DEC-057 has the owner's answer**: an
+   album's status records *possession* (`wishlist` / `pending` / `owned`), not consumption, and
+   `reread_count`, `date_started` and `date_finished` are meaningless for it. Read DEC-057 first.
+   What is still open is the one question it names: whether format tags (CD/Digital/Vinyl,
+   physical/borrowed/digital) carry ownership too, and therefore overlap `owned`. Settle that with
+   the owner, with the recommendation DEC-057 gives, before building either.
 2. **Per-domain status vocabularies.** `Domain` gains the ordered statuses it has and which of them
    are directly choosable; `unsorted` stays universal, because imports land there and the default
    library view hides it. Validation moves from the global `EntryStatus` to a per-type lookup keyed
@@ -68,8 +71,9 @@ Observed 2026-08-14 at Sprint 025's close. **Re-derive at activation.**
 4. The triage keyboard sets the right status for the row it is on, whatever domain it belongs to.
 5. Filter chips and `status_counts` are correct and legible in a mixed library, per the choice made
    in deliverable 3.
-6. The owner's answer to the `reread_count` / `date_finished` question is implemented as decided and
-   recorded in `docs/decisions.md`.
+6. An album shows no reread count and no started/finished dates, per DEC-057, and a book still
+   shows all three. The remaining ownership/format question is answered in `docs/decisions.md`
+   before any code depends on it.
 7. Every book behaviour the suite covers is unchanged: imports, triage, undo, bulk edit, backup.
 
 ## Required tests (TDD)
@@ -111,10 +115,13 @@ from the library grid, the detail page and triage; filter by each chip; and repo
 
 ## Risks and decisions to surface
 
-- **The product question is the sprint.** DEC-052 deliberately deferred it here rather than letting
-  Sprint 025 guess. Do not start deliverable 2 before it is answered: whether an album has
-  `reread_count` at all changes what the entry model looks like, and that is not a reversible
-  implementation detail.
+- **The product question is the sprint, and DEC-057 answered most of it.** What remains — whether
+  format tags carry ownership — still gates deliverable 2, because it decides whether `owned` is a
+  status at all. Do not guess it: it is not a reversible implementation detail.
+- **Entry fields become per-domain, not only statuses.** DEC-057 means an album hides
+  `reread_count`, `date_started` and `date_finished`. That reaches the opinion dialog, the detail
+  panel, the export and the Goodreads CSV mapping. Check whether hiding is enough or whether the
+  fields should be refused on write for a domain that does not have them.
 - **A mixed filter chip has no obviously right answer.** "Listened 3" and "Read 6" as separate chips
   is honest but doubles the row; one "Finished 9" chip is compact and lies slightly. This is a
   product judgement worth surfacing with a recommendation rather than settling silently.

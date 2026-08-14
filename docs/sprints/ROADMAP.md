@@ -302,12 +302,88 @@ better made with three working domains in hand than with none.
 Note the vocabulary collision before it causes confusion: book-series already exists as a free-text
 `metadata` field, and product spec section 11 item 4 records the deliberate choice not to model it.
 
+## Owner feedback — recorded 2026-08-14, unscheduled
+
+Raised while trying Sprint 025's albums in the running application. **Nothing here has a sprint
+number yet**; they are written down at the size and location they would land, so scheduling them is
+a decision rather than a rediscovery. The status half of this feedback was large enough to become a
+decision on its own and is **DEC-057**, already folded into Sprint 026.
+
+### 1. The library should select a domain, not mix them
+
+> "The main library should really have a tab selector to choose between domains, there is no point
+> in showing books and albums combined."
+
+Sprint 025 deliberately left the list endpoint with **no `type` filter** — AC4 asked only that a
+mixed library paginate correctly, and it does. This is the other half of that decision, and the
+walkthrough supports it: books and albums beside each other read as a mixed bag rather than as one
+library.
+
+Small, and it lands naturally beside Sprint 026's filter-chip work: a `type` parameter on
+`GET /api/entries`, a tab strip fed by `GET /api/item-types` (which already serves the domain list
+and labels), and a remembered choice in the URL the way every other filter already is. The one real
+question is what the default is — all, or the last domain used.
+
+### 2. Albums should carry their tracklist
+
+> "Albums should really come with songlists as metadata."
+
+**Measured 2026-08-14: this is one query parameter.** The release fetch already asks MusicBrainz for
+`inc=artist-credits+labels+media+release-groups`; adding `recordings` returns every track's position,
+title and length in the same request — 6.4 KB for *Kind of Blue*, no extra call, no extra rate-limit
+budget.
+
+Sprint 025's non-scope said "tracks as entities" belongs to Sprint 028's entry-hierarchy question,
+and that still holds: a tracklist stored as **metadata** on the album is not that. It needs a field
+type the spec does not have yet — an ordered list of structured rows rather than a line of text —
+which is the only reason this is not already done.
+
+### 3. Format and ownership tags
+
+> "Maybe categories like CD/Digital/Vinyl as tags? It can transfer to books as well
+> (physical/borrowed/digital)."
+
+Cuts across domains, which is what makes it interesting and what makes it need a decision first: it
+overlaps `owned` as a status. **DEC-057 states the overlap and recommends an answer**; Sprint 026
+has to settle it before either is built. Note that an album's `format` already arrives from
+MusicBrainz as metadata (`CD`, `12" Vinyl`) — as a *property of the release*, not as a fact about
+your copy, which is a different thing wearing the same word.
+
+### 4. The library grid is a window inside the page
+
+> "The main coverart/library scroll does not use the entire page, it's a window, even though it's
+> the primary thing we are looking at."
+
+Concrete cause: `frontend/src/features/library/VirtualLibrary.tsx` gives the scroll container
+`h-[min(70vh,760px)]`, so the grid is a fixed box with its own scrollbar inside a `max-w-7xl` page
+(`pages/HomePage.tsx`). The virtualizer measures that element, which is why it was written that way
+— it is not decorative.
+
+The fix is to let the **page** scroll and have the virtualizer measure the window instead, which
+`@tanstack/react-virtual` supports directly. Not a large change, but it touches the one thing Sprint
+013 was called in to repair, so it wants its own slice with the scale tests (10,000 entries, the
+accessibility feed semantics) run against it rather than being folded into a feature sprint.
+
+### 5. Shelves are too far from the thing being shelved
+
+> "Shelves kinda suck, having to create them by going on a new screen + having to click 'edit
+> opinion' to be able to change them is not ideal."
+
+Two separate frictions, and the second is the sharper one: shelf membership lives inside
+`OpinionDialog`, so putting a book on a shelf means opening a dialog named after something else.
+Creating a shelf is a whole route (`/shelves`).
+
+Both are UI-shaped rather than model-shaped — `POST /api/shelves` and the entry's `shelf_ids` already
+do what is needed, and bulk shelf assignment already exists in triage. Likely shape: shelf editing
+inline on the detail page and on a card, with create-on-type in the same control.
+
 ## Not scheduled
 
 - **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
   owner during the revision-8 re-plan. It remains the gate on any exposure beyond LAN: no public
   DNS, port-forwarding, tunnel, or internet-reachable proxy until it exists.
 - **Sharing, multiuser, Calibre write-back, OPDS.** Product spec section 9, unchanged.
+- **The owner feedback above**, until it is scheduled.
 - **Wine and the remaining exploratory domains.** `docs/domain_metadata_roadmap_report.md` assesses
   them; none is scheduled. Wine's weakness is access economics rather than catalogue geography.
 
