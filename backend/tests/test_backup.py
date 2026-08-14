@@ -111,7 +111,7 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
     assert not list(result.path.glob("*.db-wal"))
     assert not list(result.path.glob("*.db-shm"))
     assert result.manifest["counts"] == {"items": 1, "entries": 1, "shelves": 1, "covers": 1}
-    assert result.manifest["alembic_revision"] == "0009_provider_usage"
+    assert result.manifest["alembic_revision"] == "0010_attachments"
     verify_backup(result.path)
 
 

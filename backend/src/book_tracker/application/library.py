@@ -3,6 +3,7 @@ import json
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any, Literal
 
 from sqlalchemy import Engine, and_, case, delete, func, or_, select
@@ -11,7 +12,13 @@ from sqlalchemy.orm import Session
 
 from book_tracker.domain.normalization import normalize_text, shelf_slug
 from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
+from book_tracker.infrastructure.attachments import (
+    AttachmentError,
+    delete_blob_if_unreferenced,
+    store_blob,
+)
 from book_tracker.infrastructure.models import (
+    AttachmentRow,
     EntryRow,
     EntryShelfRow,
     ItemIdentifierRow,
@@ -229,6 +236,109 @@ class LibraryService:
             item.updated_at = _now()
             session.flush()
             return self._item_dict(session, item)
+
+    def list_attachments(self, item_id: int) -> list[dict[str, Any]]:
+        with Session(self.engine) as session:
+            self._item(session, item_id)
+            rows = session.execute(
+                select(AttachmentRow)
+                .where(AttachmentRow.item_id == item_id)
+                .order_by(AttachmentRow.created_at, AttachmentRow.id)
+            ).scalars()
+            return [self._attachment_dict(row) for row in rows]
+
+    def add_attachment(
+        self, item_id: int, *, filename: str, content: bytes, data_dir: Path, max_bytes: int
+    ) -> dict[str, Any]:
+        """Store the bytes, then record the name against the item.
+
+        The blob is written before the row so a crash between the two leaves an
+        unreferenced file rather than a row pointing at nothing: one is reclaimable
+        by a prune, the other is a broken download the owner discovers later.
+        """
+        if len(content) > max_bytes:
+            raise LibraryError(
+                "attachment_too_large",
+                f"Attachments are limited to {max_bytes} bytes",
+                status_code=413,
+            )
+        with Session(self.engine) as session:
+            self._item(session, item_id)
+        try:
+            stored = store_blob(content, data_dir)
+        except AttachmentError as error:
+            raise LibraryError("invalid_attachment", str(error), status_code=422) from error
+        now = _now()
+        with self._write() as session:
+            existing = session.execute(
+                select(AttachmentRow).where(
+                    AttachmentRow.item_id == item_id, AttachmentRow.sha256 == stored.sha256
+                )
+            ).scalar_one_or_none()
+            if existing is not None:
+                # Same bytes on the same item. Refresh the name the owner chose and
+                # return the row that already exists rather than duplicating it.
+                existing.filename = filename
+                existing.updated_at = now
+                session.flush()
+                return self._attachment_dict(existing)
+            row = AttachmentRow(
+                item_id=item_id,
+                filename=filename,
+                byte_size=stored.byte_size,
+                sha256=stored.sha256,
+                created_at=now,
+                updated_at=now,
+            )
+            session.add(row)
+            session.flush()
+            return self._attachment_dict(row)
+
+    def get_attachment(self, item_id: int, attachment_id: int) -> dict[str, Any]:
+        """Scoped by item on purpose: an id alone must not reach another item's file."""
+        with Session(self.engine) as session:
+            row = session.execute(
+                select(AttachmentRow).where(
+                    AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                raise LibraryError(
+                    "attachment_not_found", "Attachment was not found", status_code=404
+                )
+            return self._attachment_dict(row)
+
+    def delete_attachment(self, item_id: int, attachment_id: int, *, data_dir: Path) -> None:
+        """Drop the row, then the blob only if no other row still points at it."""
+        with self._write() as session:
+            row = session.execute(
+                select(AttachmentRow).where(
+                    AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                raise LibraryError(
+                    "attachment_not_found", "Attachment was not found", status_code=404
+                )
+            digest = row.sha256
+            session.delete(row)
+            session.flush()
+            remaining = session.scalar(
+                select(func.count())
+                .select_from(AttachmentRow)
+                .where(AttachmentRow.sha256 == digest)
+            )
+        delete_blob_if_unreferenced(data_dir, digest, references=int(remaining or 0))
+
+    @staticmethod
+    def _attachment_dict(row: AttachmentRow) -> dict[str, Any]:
+        return {
+            "id": row.id,
+            "filename": row.filename,
+            "byte_size": row.byte_size,
+            "sha256": row.sha256,
+            "created_at": row.created_at,
+        }
 
     def primary_source(self, item_id: int) -> tuple[str, str]:
         with Session(self.engine) as session:

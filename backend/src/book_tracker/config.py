@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     # unmetered and never blocked. 900 rather than Google's real ~1000 is deliberate
     # headroom, because their quota resets on Pacific time and the counter uses UTC.
     provider_daily_limits: dict[str, int] = Field(default_factory=lambda: {"googlebooks": 900})
+    # Per-file cap on attachments (DEC-048). Configuration rather than code, like the
+    # provider budgets above: 25 MB admits an epub, a PDF scan or a comic issue while
+    # refusing the audiobook and video rips that would turn this into a media server.
+    # It bounds the worst single file, not the total — with no auth, anyone on the LAN
+    # can still fill the disk, which is a property of v1 being LAN-only.
+    attachment_max_bytes: int = 25 * 1024 * 1024
     sqlite_busy_timeout_ms: int = 5_000
     static_dir: Path | None = None
 

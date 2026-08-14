@@ -126,7 +126,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         configure_logging(configured.log_level, scrub=(configured.google_books_api_key,))
-        for directory in ("", "covers", "imports"):
+        for directory in ("", "covers", "imports", "attachments"):
             (configured.data_dir / directory).mkdir(parents=True, exist_ok=True)
         if not getattr(app.state, "skip_migrations", False):
             assert configured.database_url is not None
@@ -136,6 +136,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         provider_client = create_provider_client()
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
+        app.state.attachment_max_bytes = configured.attachment_max_bytes
         app.state.calibre_dir = configured.calibre_dir
         providers: list[Provider] = [
             OpenLibraryProvider(

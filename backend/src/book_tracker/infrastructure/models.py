@@ -176,3 +176,14 @@ class JobRow(Base):
     finished_at: Mapped[str | None]
     created_at: Mapped[str]
     updated_at: Mapped[str]
+
+
+class AttachmentRow(Base):
+    __tablename__ = "attachments"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    item_id: Mapped[int] = mapped_column(ForeignKey("items.id"))
+    filename: Mapped[str]
+    byte_size: Mapped[int]
+    sha256: Mapped[str]
+    created_at: Mapped[str]
+    updated_at: Mapped[str]

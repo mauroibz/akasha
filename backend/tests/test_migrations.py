@@ -75,6 +75,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0007_normalized_sort_projection",
         "0008_plain_text_descriptions",
         "0009_provider_usage",
+        "0010_attachments",
     ]
 
     upgrade(configured.database_url)
@@ -141,6 +142,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0007_normalized_sort_projection",
         "0008_plain_text_descriptions",
         "0009_provider_usage",
+        "0010_attachments",
     ]
 
 

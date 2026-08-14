@@ -1,7 +1,9 @@
 import asyncio
 import logging
 from datetime import date
+from pathlib import PurePosixPath
 from typing import Annotated, Any, Literal
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -11,6 +13,7 @@ from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
+from book_tracker.infrastructure.attachments import AttachmentError, blob_path
 from book_tracker.infrastructure.covers import (
     CoverError,
     install_cover,
@@ -513,6 +516,111 @@ async def replace_cover(
             recovery.replace(target)
         raise
     return ItemResponse.model_validate(library.get_item(item_id))
+
+
+class AttachmentResponse(BaseModel):
+    id: int
+    filename: str
+    byte_size: int
+    sha256: str
+    created_at: str
+
+
+class AttachmentList(BaseModel):
+    attachments: list[AttachmentResponse]
+
+
+@router.get(
+    "/items/{item_id}/attachments",
+    response_model=AttachmentList,
+    responses=ERRORS,
+)
+async def list_attachments(item_id: int, library: Library) -> AttachmentList:
+    return AttachmentList(
+        attachments=[
+            AttachmentResponse.model_validate(row) for row in library.list_attachments(item_id)
+        ]
+    )
+
+
+@router.post(
+    "/items/{item_id}/attachments",
+    response_model=AttachmentResponse,
+    status_code=201,
+    responses=ERRORS,
+)
+async def add_attachment(
+    item_id: int,
+    request: Request,
+    file: Annotated[UploadFile, File()],
+) -> AttachmentResponse:
+    """Take an opaque file and store it by the digest of its contents.
+
+    The uploaded name is never trusted as a path. `os.path.basename` strips any
+    directory a client put in front of it, and even that is belt-and-braces: the
+    name is stored in the database and the blob is addressed by its own hash, so
+    there is no code path where this string reaches the filesystem (DEC-048).
+    """
+    cap = request.app.state.attachment_max_bytes
+    content = await file.read(cap + 1)
+    filename = PurePosixPath(file.filename or "attachment").name or "attachment"
+    return AttachmentResponse.model_validate(
+        LibraryService(request.app.state.engine).add_attachment(
+            item_id,
+            filename=filename,
+            content=content,
+            data_dir=request.app.state.data_dir,
+            max_bytes=cap,
+        )
+    )
+
+
+@router.get(
+    "/items/{item_id}/attachments/{attachment_id}",
+    responses=ERRORS,
+    response_model=None,
+)
+async def download_attachment(item_id: int, attachment_id: int, request: Request) -> Response:
+    """Serve an opaque blob in the only way that is safe from this origin.
+
+    Everything the application served before this endpoint had been re-encoded to
+    a JPEG by the cover pipeline, so content type was never attacker-controlled.
+    It is here, and the SPA shares this origin, so an uploaded HTML or SVG opened
+    inline could script the application against its own API. The three headers
+    below are what stop that, and none of them is optional (DEC-048).
+    """
+    row = LibraryService(request.app.state.engine).get_attachment(item_id, attachment_id)
+    try:
+        target = blob_path(request.app.state.data_dir, row["sha256"])
+    except AttachmentError as error:
+        raise LibraryError(
+            "attachment_not_found", "Attachment was not found", status_code=404
+        ) from error
+    if not target.is_file():
+        raise LibraryError("attachment_not_found", "Attachment was not found", status_code=404)
+    quoted = quote(row["filename"])
+    return Response(
+        content=target.read_bytes(),
+        media_type="application/octet-stream",
+        headers={
+            "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}",
+            "X-Content-Type-Options": "nosniff",
+            "Cache-Control": "private, max-age=31536000, immutable",
+        },
+    )
+
+
+@router.delete(
+    "/items/{item_id}/attachments/{attachment_id}",
+    status_code=204,
+    responses=ERRORS,
+    response_model=None,
+)
+async def delete_attachment(item_id: int, attachment_id: int, request: Request) -> Response:
+    LibraryService(request.app.state.engine).delete_attachment(
+        item_id, attachment_id, data_dir=request.app.state.data_dir
+    )
+    return Response(status_code=204)
 
 
 @router.post(

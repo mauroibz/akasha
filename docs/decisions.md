@@ -1145,3 +1145,53 @@ Append-only record of material architecture choices, product-default resolutions
   revisit re-measures rather than re-argues. If Phase B proceeds, the undo guard, the orphan-file
   question and the three response headers are requirements it inherits from this entry, not
   refinements to be discovered later.
+
+## DEC-048 — Phase B authorized: attachments are content-addressed, and the backup shares blobs rather than copying them
+
+- **Date:** 2026-08-14
+- **Status:** accepted; the go-ahead DEC-035 and DEC-047 both required
+- **Context:** DEC-047 measured seven strategies and handed the owner two choices — whether to build
+  attachments at all, and which storage strategy. The owner read it and asked a question that
+  exposed a gap: DEC-047 costed *backup* layouts and left the live store as "files in a directory".
+  Since nothing was built yet, the owner directed that both be designed together and that the result
+  be scalable. This entry records the decision, because DEC-035 requires Phase B to rest on an
+  explicit go-ahead rather than an agent's reading of a verdict.
+- **Decision.** Attachments are built, as the narrow slice Sprint 021 scopes: one or more opaque
+  files per item, uploaded manually, size-capped, listed with filename and size, downloadable from
+  the detail page. No format parsing, no reader, no reading progress, no device sync.
+
+  **The live store is content-addressed**: `data/attachments/{sha256[:2]}/{sha256}`, with the
+  original filename held in the database as metadata rather than on disk. One choice pays four ways.
+  The same file attached to several items is stored once. **Path traversal becomes impossible by
+  construction** rather than by validation, because a user-supplied name is never a path component —
+  the traversal test Sprint 021 requires is satisfied by the design instead of by a filter.
+  Integrity is free, since the path is the digest. And a blob that can never change makes the backup
+  correct by definition rather than by an assumption about immutability.
+
+  **The backup shares blobs instead of copying them** — strategy E in DEC-047. Database, covers and
+  imports keep exactly today's behaviour: seven full nightly copies, unchanged, because they change
+  constantly and are small. The attachment payload is hardlinked **from the live store**, which is
+  O(1), always finds the blob, and keeps a deleted attachment alive for as long as a backup that
+  carries it still exists. Where `BACKUP_DIR` is on another filesystem — DEC-040 explicitly allows a
+  NAS — the link falls back to a copy and the cost degrades to DEC-047's strategy B.
+
+  **Deletion is refcounted**: a blob goes when no attachment row references it. That mechanism also
+  answers the orphaned-cover leak DEC-047 found, rather than repeating it at 2.5 MB per orphan.
+
+  **Marginal cost per attached file is 2x its size** — one copy live, one shared across every backup
+  — against 8x for the naive design. It is linear in the corpus with no multiplier, and a store keyed
+  by digest does not care whether the bytes are an epub or, under sprints 024-026, a FLAC.
+
+- **Verification stays cheap on purpose.** The backup manifest records each blob's name and size, and
+  `verify_backup` checks those rather than rehashing. The name *is* the digest, so a deep check is
+  always available, but rehashing 1.25 GB nightly would dominate a backup that DEC-047 measured at
+  about two seconds. Recorded as a trade-off rather than left implicit.
+- **Consequences.** A new migration adds the `attachments` table, so the head moves off
+  `0009_provider_usage` and the three tests that pin it by literal must be updated. `UndoService`
+  gains an attachment guard, per DEC-047: an item carrying a hand-uploaded file is retained rather
+  than deleted when a batch is undone. Downloads carry `Content-Disposition: attachment`,
+  `X-Content-Type-Options: nosniff` and a fixed `application/octet-stream`, which are load-bearing
+  here because today's safety comes from the cover pipeline re-encoding everything to JPEG and this
+  is the first user-controlled content type the application serves. Sprint 023 (export) inherits an
+  open question this entry does not answer: whether an export carries attachment bytes, references,
+  or neither.
