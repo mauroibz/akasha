@@ -9,11 +9,14 @@ HTML or SVG opened inline could script the application against its own API, so
 `application/octet-stream` are load-bearing rather than decorative.
 """
 
+import hashlib
+import os
 from pathlib import Path
 
 import httpx
 import pytest
 
+from book_tracker.api.library import UPLOAD_CHUNK_BYTES
 from book_tracker.config import Settings
 from book_tracker.main import create_app
 
@@ -441,3 +444,60 @@ async def test_a_rename_through_another_item_is_a_404(tmp_path: Path) -> None:
         )
 
         assert renamed.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_a_file_larger_than_the_buffer_round_trips_byte_identical(
+    tmp_path: Path,
+) -> None:
+    """Several chunks in and several out, with nothing lost at the seams.
+
+    Incompressible and not a repeating pattern on purpose: a payload of one
+    repeated byte hides an off-by-one at a chunk boundary, because the wrong
+    bytes still compare equal.
+    """
+    payload = os.urandom(int(UPLOAD_CHUNK_BYTES * 2.5))
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        item_id = await make_item(client)
+
+        uploaded = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("big.epub", payload, "application/epub+zip")},
+        )
+        assert uploaded.status_code == 201, uploaded.text
+        assert uploaded.json()["byte_size"] == len(payload)
+        assert uploaded.json()["sha256"] == hashlib.sha256(payload).hexdigest()
+
+        got = await client.get(f"/api/items/{item_id}/attachments/{uploaded.json()['id']}")
+
+        assert got.status_code == 200
+        assert got.content == payload
+        assert int(got.headers["content-length"]) == len(payload)
+        # The headers that make an opaque download safe survived the move to a
+        # streamed response; FileResponse fills in only what it was not given.
+        assert got.headers["content-type"] == "application/octet-stream"
+        assert got.headers["x-content-type-options"] == "nosniff"
+        assert "big.epub" in got.headers["content-disposition"]
+
+
+@pytest.mark.anyio
+async def test_an_upload_to_a_missing_item_is_refused_before_it_is_read(
+    tmp_path: Path,
+) -> None:
+    """The 404 costs nothing: no blob is written and no temporary is left."""
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        uploaded = await client.post(
+            "/api/items/98765/attachments",
+            files={"file": ("orphan.epub", b"bytes", "application/epub+zip")},
+        )
+
+        assert uploaded.status_code == 404
+        assert not [path for path in (tmp_path / "attachments").rglob("*") if path.is_file()]

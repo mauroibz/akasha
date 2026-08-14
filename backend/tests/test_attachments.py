@@ -7,12 +7,16 @@ time. These tests hold that property in place, along with the refcount that
 stops one item's delete from destroying another item's file.
 """
 
+import os
+import tracemalloc
 from pathlib import Path
 
 import pytest
 
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
+    AttachmentTooLarge,
+    BlobWriter,
     blob_path,
     delete_blob_if_unreferenced,
     store_blob,
@@ -91,3 +95,81 @@ def test_storing_leaves_no_temporary_file_behind_when_it_fails(tmp_path: Path) -
 
     leftovers = [path for path in tmp_path.rglob("*") if path.is_file()]
     assert leftovers == []
+
+
+def test_a_blob_written_in_chunks_matches_one_written_whole(tmp_path: Path) -> None:
+    """The streaming path must land on the same digest, or dedup silently stops working."""
+    payload = CONTENT * 500
+    whole = store_blob(payload, tmp_path / "whole")
+
+    with BlobWriter(tmp_path / "chunked", max_bytes=len(payload)) as writer:
+        for start in range(0, len(payload), 64):
+            writer.write(payload[start : start + 64])
+        chunked = writer.commit()
+
+    assert chunked.sha256 == whole.sha256
+    assert chunked.byte_size == len(payload)
+    assert blob_path(tmp_path / "chunked", chunked.sha256).read_bytes() == payload
+
+
+def test_a_writer_holds_one_chunk_not_the_whole_upload(tmp_path: Path) -> None:
+    """The property the streaming change exists for, measured rather than asserted.
+
+    Peak allocation across a 4 MiB upload written 64 KiB at a time, against the
+    4 MiB the previous `await file.read(cap + 1)` held in a single string. The
+    bound is deliberately loose — this is here to catch a return to buffering the
+    whole file, not to pin an allocator.
+    """
+    chunk = os.urandom(64 * 1024)
+    chunks = 64
+    chunk_total = len(chunk) * chunks
+
+    tracemalloc.start()
+    try:
+        before = tracemalloc.get_traced_memory()[0]
+        with BlobWriter(tmp_path, max_bytes=chunk_total) as writer:
+            for _ in range(chunks):
+                writer.write(chunk)
+            stored = writer.commit()
+        peak = tracemalloc.get_traced_memory()[1]
+    finally:
+        tracemalloc.stop()
+
+    assert stored.byte_size == chunk_total
+    assert peak - before < chunk_total // 4
+
+
+def test_an_upload_past_the_cap_stops_writing_and_leaves_nothing(tmp_path: Path) -> None:
+    """Refused as the bytes arrive, not after they have all been held."""
+    writer = BlobWriter(tmp_path, max_bytes=100)
+    writer.write(b"x" * 90)
+
+    with pytest.raises(AttachmentTooLarge):
+        writer.write(b"x" * 20)
+
+    assert not [path for path in (tmp_path / "attachments").rglob("*") if path.is_file()]
+
+
+def test_an_abandoned_upload_leaves_nothing_behind(tmp_path: Path) -> None:
+    """A client that disconnects mid-upload must not cost disk."""
+    with BlobWriter(tmp_path, max_bytes=1000) as writer:
+        writer.write(b"half an epub")
+
+    assert not [path for path in (tmp_path / "attachments").rglob("*") if path.is_file()]
+
+
+def test_a_streamed_upload_of_bytes_already_stored_keeps_one_copy(tmp_path: Path) -> None:
+    first = store_blob(CONTENT, tmp_path)
+
+    with BlobWriter(tmp_path, max_bytes=len(CONTENT)) as writer:
+        writer.write(CONTENT)
+        second = writer.commit()
+
+    assert second.sha256 == first.sha256
+    blobs = [path for path in (tmp_path / "attachments").rglob("*") if path.is_file()]
+    assert len(blobs) == 1
+
+
+def test_a_streamed_upload_of_nothing_is_refused(tmp_path: Path) -> None:
+    with pytest.raises(AttachmentError), BlobWriter(tmp_path, max_bytes=100) as writer:
+        writer.commit()

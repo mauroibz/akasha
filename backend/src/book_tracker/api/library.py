@@ -6,6 +6,7 @@ from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
+from fastapi.responses import FileResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from book_tracker.application.add import AddService
@@ -17,7 +18,12 @@ from book_tracker.application.library import (
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
-from book_tracker.infrastructure.attachments import AttachmentError, blob_path
+from book_tracker.infrastructure.attachments import (
+    AttachmentError,
+    AttachmentTooLarge,
+    BlobWriter,
+    blob_path,
+)
 from book_tracker.infrastructure.covers import (
     CoverError,
     install_cover,
@@ -30,6 +36,11 @@ from book_tracker.infrastructure.repositories import DomainRepository
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api")
+
+# One chunk in flight at a time on the way in; FileResponse does the same on the
+# way out. Large enough that a 25 MiB upload is 25 reads, small enough that a
+# handful of concurrent uploads is megabytes rather than hundreds of them.
+UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
 async def service(request: Request) -> LibraryService:
@@ -565,16 +576,41 @@ async def add_attachment(
     name is stored in the database and the blob is addressed by its own hash, so
     there is no code path where this string reaches the filesystem (DEC-048).
     """
+    library = LibraryService(request.app.state.engine)
+    # Before a single chunk is read: an upload to an item that is not here should
+    # cost nothing, not 25 MiB of transfer followed by a 404.
+    library.ensure_item(item_id)
+
     cap = request.app.state.attachment_max_bytes
-    content = await file.read(cap + 1)
     filename = clean_attachment_filename(file.filename or "") or "attachment"
+    writer = BlobWriter(request.app.state.data_dir, max_bytes=cap)
+    try:
+        while chunk := await file.read(UPLOAD_CHUNK_BYTES):
+            # Written straight through to disk. The previous version read the
+            # whole upload into one string, so a 25 MiB file was a 25 MiB
+            # allocation per concurrent request on a machine where a cover is
+            # 39 KB (DEC-049).
+            writer.write(chunk)
+        stored = writer.commit()
+    except AttachmentTooLarge as error:
+        raise LibraryError(
+            "attachment_too_large",
+            f"Attachments are limited to {cap} bytes",
+            status_code=413,
+        ) from error
+    except AttachmentError as error:
+        raise LibraryError("invalid_attachment", str(error), status_code=422) from error
+    except BaseException:
+        # A disconnected client must not leave its partial upload behind.
+        writer.abort()
+        raise
+
     return AttachmentResponse.model_validate(
-        LibraryService(request.app.state.engine).add_attachment(
+        library.record_attachment(
             item_id,
             filename=filename,
-            content=content,
-            data_dir=request.app.state.data_dir,
-            max_bytes=cap,
+            sha256=stored.sha256,
+            byte_size=stored.byte_size,
         )
     )
 
@@ -618,8 +654,12 @@ async def download_attachment(item_id: int, attachment_id: int, request: Request
     }
     if _matches(request.headers.get("if-none-match"), tag):
         return Response(status_code=304, headers=headers)
-    return Response(
-        content=target.read_bytes(),
+    # Streamed off disk rather than `read_bytes()`, for the same reason the
+    # upload is: the file is up to 25 MiB and the box it serves from is a
+    # ZimaBoard. FileResponse only fills in headers it was not given, so the
+    # validator above is the one that ships.
+    return FileResponse(
+        target,
         media_type="application/octet-stream",
         headers=headers,
     )

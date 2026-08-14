@@ -22,6 +22,7 @@ import re
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
+from typing import IO
 
 ATTACHMENTS_DIR = "attachments"
 _DIGEST = re.compile(r"^[0-9a-f]{64}$")
@@ -29,6 +30,10 @@ _DIGEST = re.compile(r"^[0-9a-f]{64}$")
 
 class AttachmentError(ValueError):
     """A blob could not be stored, or a digest was not a digest."""
+
+
+class AttachmentTooLarge(AttachmentError):
+    """More bytes arrived than the cap allows, and the rest were not read."""
 
 
 @dataclass(frozen=True)
@@ -49,36 +54,108 @@ def blob_path(data_dir: Path, sha256: str) -> Path:
     return data_dir / ATTACHMENTS_DIR / sha256[:2] / sha256
 
 
-def store_blob(content: bytes, data_dir: Path) -> StoredBlob:
-    """Write bytes into the store and return their digest and size.
+class BlobWriter:
+    """Hash and write an upload a chunk at a time, then move it under its digest.
 
-    Written to a temporary file in the destination directory and moved into place
-    with `os.replace`, so a reader never sees a half-written file under a name
-    that claims to be its own checksum. Storing the same bytes twice is a no-op
-    beyond the move, which is what makes deduplication fall out for free.
+    Content addressing means the destination is not known until the last byte has
+    been hashed, so the bytes land in a temporary beside the store and are moved
+    into place at commit. Nothing here ever holds more than one chunk, which is
+    the whole point: the alternative read a 25 MiB upload into a 25 MiB string on
+    a machine where a cover is 39 KB.
+
+    `os.replace` does the move, so a reader never sees a half-written file under
+    a name that claims to be its own checksum. Storing bytes that are already
+    there costs nothing beyond dropping the temporary, which is what makes
+    deduplication fall out for free.
+
+    The cap is enforced as the bytes arrive rather than after, so an oversized
+    upload stops at the first chunk past the limit instead of being buffered in
+    full and then refused.
     """
+
+    def __init__(self, data_dir: Path, *, max_bytes: int) -> None:
+        self._data_dir = data_dir
+        self._max_bytes = max_bytes
+        self._hash = hashlib.sha256()
+        self._written = 0
+        root = data_dir / ATTACHMENTS_DIR
+        try:
+            root.mkdir(parents=True, exist_ok=True)
+            # noqa SIM115: the handle deliberately outlives this call — chunks
+            # arrive one await at a time. `BlobWriter` is itself the context
+            # manager, and `abort` closes and unlinks on every exit path.
+            handle = tempfile.NamedTemporaryFile(  # noqa: SIM115
+                dir=root, prefix="upload-", suffix=".tmp", delete=False
+            )
+        except OSError as error:
+            raise AttachmentError("attachment could not be stored") from error
+        self._handle: IO[bytes] | None = handle
+        # In the store root rather than the digest's own directory, because which
+        # directory that is cannot be known yet. `reclaim` recognises the name at
+        # any depth, so one left behind by a crash is still collectable.
+        self._temporary: Path | None = Path(handle.name)
+
+    def write(self, chunk: bytes) -> None:
+        if self._handle is None:
+            raise AttachmentError("attachment is no longer being written")
+        self._written += len(chunk)
+        if self._written > self._max_bytes:
+            self.abort()
+            raise AttachmentTooLarge(f"attachments are limited to {self._max_bytes} bytes")
+        self._hash.update(chunk)
+        try:
+            self._handle.write(chunk)
+        except OSError as error:
+            self.abort()
+            raise AttachmentError("attachment could not be stored") from error
+
+    def commit(self) -> StoredBlob:
+        if self._handle is None or self._temporary is None:
+            raise AttachmentError("attachment could not be stored")
+        self._handle.close()
+        self._handle = None
+        if self._written == 0:
+            self.abort()
+            raise AttachmentError("attachment is empty")
+        digest = self._hash.hexdigest()
+        target = blob_path(self._data_dir, digest)
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            if target.is_file():
+                # These bytes are already stored. Keep the copy that is there and
+                # let the temporary go: identical content is one blob (DEC-048).
+                self.abort()
+                return StoredBlob(sha256=digest, byte_size=target.stat().st_size)
+            os.replace(self._temporary, target)
+        except OSError as error:
+            self.abort()
+            raise AttachmentError("attachment could not be stored") from error
+        self._temporary = None
+        return StoredBlob(sha256=digest, byte_size=self._written)
+
+    def abort(self) -> None:
+        """Drop a partial upload. Safe to call twice, and after a commit."""
+        if self._handle is not None:
+            self._handle.close()
+            self._handle = None
+        if self._temporary is not None:
+            self._temporary.unlink(missing_ok=True)
+            self._temporary = None
+
+    def __enter__(self) -> "BlobWriter":
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        self.abort()
+
+
+def store_blob(content: bytes, data_dir: Path) -> StoredBlob:
+    """Store bytes already in hand. The streaming path is `BlobWriter`."""
     if not content:
         raise AttachmentError("attachment is empty")
-    digest = hashlib.sha256(content).hexdigest()
-    target = blob_path(data_dir, digest)
-    target.parent.mkdir(parents=True, exist_ok=True)
-    if target.is_file():
-        return StoredBlob(sha256=digest, byte_size=target.stat().st_size)
-    temporary: Path | None = None
-    try:
-        with tempfile.NamedTemporaryFile(
-            dir=target.parent, prefix="upload-", suffix=".tmp", delete=False
-        ) as handle:
-            temporary = Path(handle.name)
-            handle.write(content)
-        os.replace(temporary, target)
-        temporary = None
-    except OSError as error:
-        raise AttachmentError("attachment could not be stored") from error
-    finally:
-        if temporary is not None:
-            temporary.unlink(missing_ok=True)
-    return StoredBlob(sha256=digest, byte_size=len(content))
+    with BlobWriter(data_dir, max_bytes=len(content)) as writer:
+        writer.write(content)
+        return writer.commit()
 
 
 def delete_blob_if_unreferenced(data_dir: Path, sha256: str, *, references: int) -> bool:

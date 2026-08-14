@@ -13,9 +13,8 @@ from sqlalchemy.orm import Session
 from book_tracker.domain.normalization import normalize_text, shelf_slug
 from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
 from book_tracker.infrastructure.attachments import (
-    AttachmentError,
+    StoredBlob,
     delete_blob_if_unreferenced,
-    store_blob,
 )
 from book_tracker.infrastructure.models import (
     AttachmentRow,
@@ -268,28 +267,24 @@ class LibraryService:
             ).scalars()
             return [self._attachment_dict(row) for row in rows]
 
-    def add_attachment(
-        self, item_id: int, *, filename: str, content: bytes, data_dir: Path, max_bytes: int
-    ) -> dict[str, Any]:
-        """Store the bytes, then record the name against the item.
-
-        The blob is written before the row so a crash between the two leaves an
-        unreferenced file rather than a row pointing at nothing: one is reclaimable
-        by a prune, the other is a broken download the owner discovers later.
-        """
-        if len(content) > max_bytes:
-            raise LibraryError(
-                "attachment_too_large",
-                f"Attachments are limited to {max_bytes} bytes",
-                status_code=413,
-            )
+    def ensure_item(self, item_id: int) -> None:
+        """Cheap existence check. Called before an upload is read, so a request
+        for an item that is not here costs nothing rather than 25 MiB."""
         with Session(self.engine) as session:
             self._item(session, item_id)
-        try:
-            stored = store_blob(content, data_dir)
-        except AttachmentError as error:
-            raise LibraryError("invalid_attachment", str(error), status_code=422) from error
+
+    def record_attachment(
+        self, item_id: int, *, filename: str, sha256: str, byte_size: int
+    ) -> dict[str, Any]:
+        """Record an already-stored blob against the item.
+
+        The blob is written before this row on purpose, so a crash between the
+        two leaves an unreferenced file rather than a row pointing at nothing:
+        one is collectable by `reclaim`, the other is a broken download the owner
+        discovers much later.
+        """
         now = _now()
+        stored = StoredBlob(sha256=sha256, byte_size=byte_size)
         with self._write() as session:
             existing = session.execute(
                 select(AttachmentRow).where(
