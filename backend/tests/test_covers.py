@@ -97,8 +97,84 @@ async def test_cover_follows_only_bounded_allowlisted_https_redirects(tmp_path: 
     async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
         with pytest.raises(CoverError, match="allowlisted"):
             await prepare_cover(client, "https://covers.openlibrary.org/start", tmp_path)
+        # An allowlisted host on `http://` is upgraded, not refused: see
+        # `test_an_http_cover_url_is_upgraded_rather_than_refused` below. What stays
+        # refused is the host, whatever scheme it arrives on.
         with pytest.raises(CoverError, match="allowlisted"):
-            await prepare_cover(client, "http://covers.openlibrary.org/cover.jpg", tmp_path)
+            await prepare_cover(client, "http://evil.example/cover.jpg", tmp_path)
+
+
+@pytest.mark.anyio
+async def test_an_http_cover_url_is_upgraded_rather_than_refused(tmp_path: Path) -> None:
+    """The Cover Art Archive hands out `http://` URLs (DEC-052 seam 4, obs. 5).
+
+    Loosening the scheme check would have been the easy fix and the wrong one: the
+    URL is rewritten to https *before* it is validated, so nothing is ever fetched
+    over http and an allowlisted host is not lost to a provider's own habit.
+    """
+    schemes: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        schemes.append(request.url.scheme)
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg())
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        prepared = await prepare_cover(
+            client, "http://coverartarchive.org/release/x/1-1200.jpg", tmp_path
+        )
+    assert prepared.exists()
+    assert schemes == ["https"]
+
+
+@pytest.mark.anyio
+async def test_the_archive_org_redirect_chain_survives_the_hop_check(tmp_path: Path) -> None:
+    """CAA redirects through archive.org to a numbered node, on `http://` each time.
+
+    `validate_url` runs on every hop, and the final host — `dn710907.ca.archive.org` —
+    is matched by neither `archive.org` exactly nor the old `.us.archive.org` suffix.
+    Both hops answer `http://`, which is why the upgrade cannot apply only to the
+    first URL.
+    """
+    hosts: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        hosts.append(f"{request.url.scheme}://{request.url.host}")
+        if request.url.host == "coverartarchive.org":
+            return httpx.Response(
+                307, headers={"location": "http://archive.org/download/mbid-x/thumb1200.jpg"}
+            )
+        if request.url.host == "archive.org":
+            return httpx.Response(
+                302,
+                headers={"location": "http://dn710907.ca.archive.org/0/items/x/thumb1200.jpg"},
+            )
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg())
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        prepared = await prepare_cover(
+            client, "http://coverartarchive.org/release/x/1-1200.jpg", tmp_path
+        )
+    assert prepared.exists()
+    assert hosts == [
+        "https://coverartarchive.org",
+        "https://archive.org",
+        "https://dn710907.ca.archive.org",
+    ]
+
+
+@pytest.mark.anyio
+async def test_a_host_that_merely_ends_in_the_allowlisted_name_is_still_refused(
+    tmp_path: Path,
+) -> None:
+    """A subdomain rule is `.archive.org`, not `archive.org` anywhere in the name."""
+
+    async def handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "image/jpeg"}, content=jpeg())
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        for host in ("notarchive.org", "archive.org.evil.example", "evil-archive.org"):
+            with pytest.raises(CoverError, match="allowlisted"):
+                await prepare_cover(client, f"https://{host}/cover.jpg", tmp_path)
 
 
 def test_cover_install_failure_removes_prepared_file(

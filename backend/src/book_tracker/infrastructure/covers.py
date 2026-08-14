@@ -27,7 +27,13 @@ ALLOWED_COVER_HOSTS = {
     "books.google.com",
     "books.googleusercontent.com",
     "archive.org",
+    "coverartarchive.org",
 }
+# The Cover Art Archive redirects through `archive.org` to a numbered storage node —
+# `dn710907.ca.archive.org` was the one observed — which no fixed list can enumerate.
+# The rule is a subdomain of archive.org, so `notarchive.org` and
+# `archive.org.evil.example` are still refused; it subsumes the older `.us.archive.org`.
+ALLOWED_COVER_HOST_SUFFIX = ".archive.org"
 
 
 class CoverError(ValueError):
@@ -87,13 +93,27 @@ def _no_placeholder(url: str) -> str:
 
 
 async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> Path:
+    def as_https(value: str) -> str:
+        """Rewrite `http://` to https before anything looks at it.
+
+        The Cover Art Archive answers `http://` in its JSON *and* in both redirect
+        hops (DEC-052 seam 4). Loosening the scheme check would have accepted a
+        plaintext fetch; upgrading first means nothing is ever fetched over http and
+        an allowlisted host is not lost to a provider's habit.
+        """
+        parsed = urlsplit(value)
+        if parsed.scheme != "http":
+            return value
+        return urlunsplit(("https", *parsed[1:]))
+
     def validate_url(value: str) -> None:
         parsed = urlsplit(value)
         host = parsed.hostname or ""
-        allowed = host in ALLOWED_COVER_HOSTS or host.endswith(".us.archive.org")
+        allowed = host in ALLOWED_COVER_HOSTS or host.endswith(ALLOWED_COVER_HOST_SUFFIX)
         if parsed.scheme != "https" or not allowed:
             raise CoverError("cover URL must use an allowlisted HTTPS host")
 
+    url = as_https(url)
     validate_url(url)
     url = _no_placeholder(url)
     covers_dir = data_dir / "covers"
@@ -113,7 +133,7 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
                 await response.aclose()
                 raise CoverError("cover redirect has no location")
             await response.aclose()
-            current = urljoin(current, location)
+            current = as_https(urljoin(current, location))
             validate_url(current)
         assert response is not None
         try:
