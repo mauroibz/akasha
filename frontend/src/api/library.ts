@@ -320,6 +320,30 @@ export async function uploadAttachment(
   return response.json() as Promise<Attachment>;
 }
 
+/**
+ * Rename an attached file.
+ *
+ * The name is metadata, so this moves no bytes and the download URL does not
+ * change. What does change is the name the server sends the file under, which
+ * is why the response carries a fresh validator.
+ */
+export async function renameAttachment(
+  itemId: number,
+  attachmentId: number,
+  filename: string,
+): Promise<Attachment> {
+  const response = await fetch(
+    `/api/items/${itemId}/attachments/${attachmentId}`,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ filename }),
+    },
+  );
+  if (!response.ok) throw new Error("The file could not be renamed");
+  return response.json() as Promise<Attachment>;
+}
+
 export async function deleteAttachment(
   itemId: number,
   attachmentId: number,

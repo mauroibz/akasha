@@ -253,6 +253,12 @@ test("a file can be attached, downloaded and removed from the detail page", asyn
     await route.fulfill({ json: { attachments } });
   });
   await page.route("**/api/items/3/attachments/1", async (route) => {
+    if (route.request().method() === "PATCH") {
+      const body = route.request().postDataJSON() as { filename: string };
+      attachments = [{ ...attachments[0], filename: body.filename }];
+      await route.fulfill({ json: attachments[0] });
+      return;
+    }
     attachments = [];
     await route.fulfill({ status: 204, body: "" });
   });
@@ -279,6 +285,21 @@ test("a file can be attached, downloaded and removed from the detail page", asyn
   await expect(link).toHaveAttribute("href", "/api/items/3/attachments/1");
   await expect(link).toHaveAttribute("download", "");
 
-  await page.getByRole("button", { name: "Remove Rayuela.epub" }).click();
+  // Renaming is inline and the download URL does not move: the name is metadata,
+  // so the row keeps its identity and only what it is called changes.
+  await page.getByRole("button", { name: "Rename Rayuela.epub" }).click();
+  const field = page.getByLabel("New name for Rayuela.epub");
+  await field.fill("Rayuela — Julio Cortázar.epub");
+  await page.getByRole("button", { name: "Save" }).click();
+
+  const renamed = page.getByRole("link", {
+    name: "Rayuela — Julio Cortázar.epub",
+  });
+  await expect(renamed).toBeVisible();
+  await expect(renamed).toHaveAttribute("href", "/api/items/3/attachments/1");
+
+  await page
+    .getByRole("button", { name: "Remove Rayuela — Julio Cortázar.epub" })
+    .click();
   await expect(page.getByText("No files attached yet.")).toBeVisible();
 });

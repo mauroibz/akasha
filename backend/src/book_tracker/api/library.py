@@ -1,7 +1,7 @@
 import asyncio
+import hashlib
 import logging
 from datetime import date
-from pathlib import PurePosixPath
 from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
@@ -9,7 +9,11 @@ from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFi
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from book_tracker.application.add import AddService
-from book_tracker.application.library import LibraryError, LibraryService
+from book_tracker.application.library import (
+    LibraryError,
+    LibraryService,
+    clean_attachment_filename,
+)
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.types import EntryStatus
@@ -563,7 +567,7 @@ async def add_attachment(
     """
     cap = request.app.state.attachment_max_bytes
     content = await file.read(cap + 1)
-    filename = PurePosixPath(file.filename or "attachment").name or "attachment"
+    filename = clean_attachment_filename(file.filename or "") or "attachment"
     return AttachmentResponse.model_validate(
         LibraryService(request.app.state.engine).add_attachment(
             item_id,
@@ -599,14 +603,65 @@ async def download_attachment(item_id: int, attachment_id: int, request: Request
     if not target.is_file():
         raise LibraryError("attachment_not_found", "Attachment was not found", status_code=404)
     quoted = quote(row["filename"])
+    tag = _attachment_etag(row)
+    headers = {
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}",
+        "X-Content-Type-Options": "nosniff",
+        # Not `immutable` any more. The blob genuinely never changes, but this
+        # response is not the blob: it carries the filename, and the filename is
+        # editable, so a year of `immutable` left an already-downloaded file
+        # saving under a name the owner had since corrected (DEC-049). The
+        # validator covers digest and name together, so an untouched file still
+        # costs a 304 with no body while a renamed one can no longer match.
+        "Cache-Control": "private, max-age=0, must-revalidate",
+        "ETag": tag,
+    }
+    if _matches(request.headers.get("if-none-match"), tag):
+        return Response(status_code=304, headers=headers)
     return Response(
         content=target.read_bytes(),
         media_type="application/octet-stream",
-        headers={
-            "Content-Disposition": f"attachment; filename*=UTF-8''{quoted}",
-            "X-Content-Type-Options": "nosniff",
-            "Cache-Control": "private, max-age=31536000, immutable",
-        },
+        headers=headers,
+    )
+
+
+def _attachment_etag(row: dict[str, object]) -> str:
+    """Identifies the response, not the file: bytes and name both move it."""
+    seed = f"{row['sha256']}:{row['filename']}".encode()
+    return f'"{hashlib.sha256(seed).hexdigest()[:32]}"'
+
+
+def _matches(header: str | None, tag: str) -> bool:
+    """`If-None-Match` is a list, and any member may be marked weak."""
+    if not header:
+        return False
+    for candidate in header.split(","):
+        cleaned = candidate.strip()
+        if cleaned.startswith("W/"):
+            cleaned = cleaned[2:]
+        if cleaned in {tag, "*"}:
+            return True
+    return False
+
+
+class AttachmentRename(BaseModel):
+    filename: str
+
+
+@router.patch(
+    "/items/{item_id}/attachments/{attachment_id}",
+    response_model=AttachmentResponse,
+    responses=ERRORS,
+)
+async def rename_attachment(
+    item_id: int,
+    attachment_id: int,
+    payload: AttachmentRename,
+    library: Library,
+) -> AttachmentResponse:
+    """Rename an attached file. One database write; the bytes are not involved."""
+    return AttachmentResponse.model_validate(
+        library.rename_attachment(item_id, attachment_id, filename=payload.filename)
     )
 
 

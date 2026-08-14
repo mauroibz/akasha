@@ -1,14 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { toast } from "sonner";
 
 import {
   attachmentHref,
   deleteAttachment,
   fetchAttachments,
+  renameAttachment,
   uploadAttachment,
 } from "@/api/library";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { formatBytes } from "@/lib/bytes";
 
 /**
@@ -19,10 +21,15 @@ import { formatBytes } from "@/lib/bytes";
  * the surface must not block what it lives on. The download is a plain anchor
  * because the server answers with `Content-Disposition: attachment`, so the
  * browser saves it and no script has to touch the bytes.
+ *
+ * Renaming is inline rather than a modal, matching how the rest of the app edits
+ * (product spec §7: dialogs are for deletes, not for edits).
  */
 export function Attachments({ itemId }: { itemId: number }) {
   const cache = useQueryClient();
   const picker = useRef<HTMLInputElement>(null);
+  const [renaming, setRenaming] = useState<number | null>(null);
+  const [draft, setDraft] = useState("");
   const key = ["attachments", itemId];
 
   const { data, isPending, isError } = useQuery({
@@ -35,6 +42,17 @@ export function Attachments({ itemId }: { itemId: number }) {
     onSuccess: (added) => {
       void cache.invalidateQueries({ queryKey: key });
       toast.success(`Attached ${added.filename}`);
+    },
+    onError: (error: Error) => toast.error(error.message),
+  });
+
+  const rename = useMutation({
+    mutationFn: ({ id, filename }: { id: number; filename: string }) =>
+      renameAttachment(itemId, id, filename),
+    onSuccess: (renamed) => {
+      void cache.invalidateQueries({ queryKey: key });
+      setRenaming(null);
+      toast.success(`Renamed to ${renamed.filename}`);
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -71,6 +89,10 @@ export function Attachments({ itemId }: { itemId: number }) {
           type="file"
           className="sr-only"
           aria-label="Attach a file"
+          // Out of the tab order: the visible button above opens this picker and
+          // carries the same accessible name, so leaving this focusable gave two
+          // tab stops for one action.
+          tabIndex={-1}
           onChange={(event) => {
             const file = event.target.files?.[0];
             // Cleared so choosing the same file twice still fires a change.
@@ -92,33 +114,99 @@ export function Attachments({ itemId }: { itemId: number }) {
         </p>
       ) : (
         <ul className="mt-2 space-y-1">
-          {attachments.map((attachment) => (
-            <li
-              key={attachment.id}
-              className="flex items-center justify-between gap-4 text-sm"
-            >
-              <a
-                href={attachmentHref(itemId, attachment.id)}
-                className="truncate underline underline-offset-4"
-                download
+          {attachments.map((attachment) => {
+            const renamingThis = renaming === attachment.id;
+            // Per row: one file being worked on must not disable the controls
+            // on every other row.
+            const renamePending =
+              rename.isPending && rename.variables?.id === attachment.id;
+            const removePending =
+              remove.isPending && remove.variables === attachment.id;
+
+            return (
+              <li
+                key={attachment.id}
+                className="flex items-center justify-between gap-4 text-sm"
               >
-                {attachment.filename}
-              </a>
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {formatBytes(attachment.byte_size)}
-              </span>
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                aria-label={`Remove ${attachment.filename}`}
-                onClick={() => remove.mutate(attachment.id)}
-                disabled={remove.isPending}
-              >
-                Remove
-              </Button>
-            </li>
-          ))}
+                {renamingThis ? (
+                  <form
+                    className="flex flex-1 items-center gap-2"
+                    onSubmit={(event) => {
+                      event.preventDefault();
+                      const filename = draft.trim();
+                      if (!filename || filename === attachment.filename) {
+                        setRenaming(null);
+                        return;
+                      }
+                      rename.mutate({ id: attachment.id, filename });
+                    }}
+                  >
+                    <Input
+                      autoFocus
+                      value={draft}
+                      aria-label={`New name for ${attachment.filename}`}
+                      className="h-8 flex-1"
+                      onChange={(event) => setDraft(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") setRenaming(null);
+                      }}
+                    />
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      disabled={renamePending}
+                    >
+                      {renamePending ? "Saving…" : "Save"}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setRenaming(null)}
+                    >
+                      Cancel
+                    </Button>
+                  </form>
+                ) : (
+                  <>
+                    <a
+                      href={attachmentHref(itemId, attachment.id)}
+                      className="truncate underline underline-offset-4"
+                      download
+                    >
+                      {attachment.filename}
+                    </a>
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {formatBytes(attachment.byte_size)}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Rename ${attachment.filename}`}
+                      onClick={() => {
+                        setDraft(attachment.filename);
+                        setRenaming(attachment.id);
+                      }}
+                    >
+                      Rename
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-label={`Remove ${attachment.filename}`}
+                      onClick={() => remove.mutate(attachment.id)}
+                      disabled={removePending}
+                    >
+                      Remove
+                    </Button>
+                  </>
+                )}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>

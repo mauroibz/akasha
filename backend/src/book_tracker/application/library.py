@@ -3,7 +3,7 @@ import json
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 from sqlalchemy import Engine, and_, case, delete, func, or_, select
@@ -30,6 +30,27 @@ from book_tracker.infrastructure.models import (
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
+
+
+MAX_FILENAME_LENGTH = 255
+
+
+def clean_attachment_filename(raw: str) -> str | None:
+    """The one rule for an attachment's name, wherever it arrives from.
+
+    A name never becomes a path component (DEC-048), so this is not what stops
+    traversal — the digest being the path is. It runs anyway because the name is
+    echoed straight back out in a `Content-Disposition`, and a name carrying
+    directories is a name that reads as a path to whatever receives it next.
+
+    Returns `None` for anything that is not a name, so upload can fall back to a
+    default and rename can refuse: a file with no name at all is worse than the
+    name it already had.
+    """
+    name = PurePosixPath(raw.strip()).name.strip()
+    if not name or name in {".", ".."}:
+        return None
+    return name[:MAX_FILENAME_LENGTH]
 
 
 class LibraryError(Exception):
@@ -291,6 +312,35 @@ class LibraryService:
                 updated_at=now,
             )
             session.add(row)
+            session.flush()
+            return self._attachment_dict(row)
+
+    def rename_attachment(
+        self, item_id: int, attachment_id: int, *, filename: str
+    ) -> dict[str, Any]:
+        """Change what the file is called, and nothing else.
+
+        The name has only ever been metadata (DEC-048), so this touches no file,
+        keeps the digest and the row identity, and leaves every backup that has
+        already linked the blob correct. What it does change is the download
+        response, which is why the validator on that response covers the name as
+        well as the bytes.
+        """
+        cleaned = clean_attachment_filename(filename)
+        if cleaned is None:
+            raise LibraryError("invalid_attachment_name", "A file needs a name", status_code=422)
+        with self._write() as session:
+            row = session.execute(
+                select(AttachmentRow).where(
+                    AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
+                )
+            ).scalar_one_or_none()
+            if row is None:
+                raise LibraryError(
+                    "attachment_not_found", "Attachment was not found", status_code=404
+                )
+            row.filename = cleaned
+            row.updated_at = _now()
             session.flush()
             return self._attachment_dict(row)
 

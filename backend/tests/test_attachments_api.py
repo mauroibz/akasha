@@ -269,3 +269,175 @@ async def test_attachments_for_a_missing_item_are_a_404_not_an_empty_list(
         listed = await client.get("/api/items/98765/attachments")
 
         assert listed.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_renaming_changes_the_name_without_touching_the_bytes(tmp_path: Path) -> None:
+    """The filename is metadata, so a rename is one database write and no file IO."""
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        item_id = await make_item(client)
+        uploaded = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("untitled.epub", b"epub bytes here", "application/epub+zip")},
+        )
+        attachment_id = uploaded.json()["id"]
+        digest = uploaded.json()["sha256"]
+        blob = next(path for path in (tmp_path / "attachments").rglob("*") if path.is_file())
+        before = blob.stat().st_ino
+
+        renamed = await client.patch(
+            f"/api/items/{item_id}/attachments/{attachment_id}",
+            json={"filename": "Rayuela — Julio Cortázar.epub"},
+        )
+
+        assert renamed.status_code == 200, renamed.text
+        assert renamed.json()["filename"] == "Rayuela — Julio Cortázar.epub"
+        # Row identity and digest are untouched, which is what keeps every backup
+        # that already links this blob correct.
+        assert renamed.json()["id"] == attachment_id
+        assert renamed.json()["sha256"] == digest
+        assert blob.stat().st_ino == before
+        assert blob.read_bytes() == b"epub bytes here"
+
+        listed = await client.get(f"/api/items/{item_id}/attachments")
+        assert listed.json()["attachments"][0]["filename"] == "Rayuela — Julio Cortázar.epub"
+
+
+@pytest.mark.anyio
+async def test_a_renamed_file_downloads_under_its_new_name(tmp_path: Path) -> None:
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        item_id = await make_item(client)
+        uploaded = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("untitled.epub", b"epub bytes here", "application/epub+zip")},
+        )
+        attachment_id = uploaded.json()["id"]
+
+        await client.patch(
+            f"/api/items/{item_id}/attachments/{attachment_id}",
+            json={"filename": "Bestiario.epub"},
+        )
+        got = await client.get(f"/api/items/{item_id}/attachments/{attachment_id}")
+
+        assert "Bestiario.epub" in got.headers["content-disposition"]
+        assert "untitled.epub" not in got.headers["content-disposition"]
+
+
+@pytest.mark.anyio
+async def test_a_rename_invalidates_what_a_browser_already_cached(tmp_path: Path) -> None:
+    """The wrinkle DEC-049 found: `immutable` for a year against a mutable name.
+
+    The blob never changes but the response does, so the validator covers both.
+    An unchanged file still costs nothing to re-check — 304, no body — and a
+    renamed one can no longer match, so the browser refetches and saves under the
+    name the owner just chose instead of the one from a year ago.
+    """
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        item_id = await make_item(client)
+        uploaded = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("untitled.epub", b"epub bytes here", "application/epub+zip")},
+        )
+        attachment_id = uploaded.json()["id"]
+        url = f"/api/items/{item_id}/attachments/{attachment_id}"
+
+        first = await client.get(url)
+        etag = first.headers["etag"]
+        assert "immutable" not in first.headers["cache-control"]
+
+        unchanged = await client.get(url, headers={"If-None-Match": etag})
+        assert unchanged.status_code == 304
+        assert unchanged.content == b""
+
+        await client.patch(url, json={"filename": "Bestiario.epub"})
+        after = await client.get(url, headers={"If-None-Match": etag})
+
+        assert after.status_code == 200
+        assert after.content == b"epub bytes here"
+        assert "Bestiario.epub" in after.headers["content-disposition"]
+        assert after.headers["etag"] != etag
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("hostile", ["../../books.db", "/etc/passwd", "a/b.epub"])
+async def test_a_rename_to_a_path_keeps_only_the_name(tmp_path: Path, hostile: str) -> None:
+    """Same rule as upload. Nothing here reaches the filesystem, but the name is
+    echoed into a `Content-Disposition`, so it is normalized at the door."""
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        item_id = await make_item(client)
+        uploaded = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("book.epub", b"epub bytes here", "application/epub+zip")},
+        )
+
+        renamed = await client.patch(
+            f"/api/items/{item_id}/attachments/{uploaded.json()['id']}",
+            json={"filename": hostile},
+        )
+
+        assert renamed.status_code == 200, renamed.text
+        assert "/" not in renamed.json()["filename"]
+        assert renamed.json()["filename"] in {"books.db", "passwd", "b.epub"}
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("empty", ["", "   ", "/", "..", "."])
+async def test_a_rename_to_nothing_is_refused(tmp_path: Path, empty: str) -> None:
+    """A file with no name is worse than the name it had."""
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        item_id = await make_item(client)
+        uploaded = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("book.epub", b"epub bytes here", "application/epub+zip")},
+        )
+        attachment_id = uploaded.json()["id"]
+
+        renamed = await client.patch(
+            f"/api/items/{item_id}/attachments/{attachment_id}", json={"filename": empty}
+        )
+
+        assert renamed.status_code == 422
+        listed = await client.get(f"/api/items/{item_id}/attachments")
+        assert listed.json()["attachments"][0]["filename"] == "book.epub"
+
+
+@pytest.mark.anyio
+async def test_a_rename_through_another_item_is_a_404(tmp_path: Path) -> None:
+    app = app_for(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        mine = await make_item(client, "Mine")
+        yours = await make_item(client, "Yours")
+        uploaded = await client.post(
+            f"/api/items/{mine}/attachments",
+            files={"file": ("secret.epub", b"secret bytes", "application/epub+zip")},
+        )
+
+        renamed = await client.patch(
+            f"/api/items/{yours}/attachments/{uploaded.json()['id']}",
+            json={"filename": "mine-now.epub"},
+        )
+
+        assert renamed.status_code == 404
