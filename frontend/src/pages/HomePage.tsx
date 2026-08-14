@@ -317,7 +317,7 @@ export function HomePage() {
             className="rounded-full px-5"
             onClick={() => void navigate("/add")}
           >
-            Add book
+            Add to library
           </Button>
         </div>
       </header>
@@ -332,7 +332,7 @@ export function HomePage() {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title or author  /"
+            placeholder="Search title or creator  /"
             className="h-11 rounded-full bg-surface"
           />
         </label>

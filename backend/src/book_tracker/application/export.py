@@ -34,6 +34,7 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from book_tracker.domain.domains import DEFAULT_DOMAIN
 from book_tracker.infrastructure.models import (
     AttachmentRow,
     EntryRow,
@@ -352,7 +353,7 @@ def _row(entry: Any, item: Any, identifiers: dict[str, str], shelves: list[str])
 
 
 def export_csv(engine: Engine) -> Iterator[str]:
-    """Yield the Goodreads-shaped CSV a row at a time."""
+    """Yield the Goodreads-shaped CSV a row at a time, for books alone."""
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=list(GOODREADS_COLUMNS), lineterminator="\r\n")
 
@@ -387,6 +388,12 @@ def export_csv(engine: Engine) -> Iterator[str]:
             for entry in batch:
                 item = items.get(entry.item_id)
                 if item is None:  # pragma: no cover - the foreign key guarantees this
+                    continue
+                # One domain's export view, not the export. A Goodreads CSV describes
+                # books: an album emitted into it would arrive somewhere else as a book
+                # with no author, no ISBN and a page count. The JSON beside it is the
+                # lossless artifact and carries every type (DEC-052 seam 3).
+                if item.type != DEFAULT_DOMAIN.item_type:
                     continue
                 row_values = _row(
                     entry, item, identifiers.get(item.id, {}), shelves.get(entry.id, [])

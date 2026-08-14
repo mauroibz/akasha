@@ -109,13 +109,23 @@ async def test_export_does_not_special_case_the_item_type(tmp_path: Path) -> Non
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Kind of Blue", creators=("Miles Davis",))
+        book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        album = repository.create_or_get_entry(
+            title="Kind of Blue", creators=("Miles Davis",), item_type="album"
+        )
         with app.state.engine.begin() as connection:
             connection.execute(
-                text("UPDATE items SET type='album', metadata=:meta WHERE id=:id"),
+                text("UPDATE items SET metadata=:meta WHERE id=:id"),
                 {
                     "meta": '{"creators": ["Miles Davis"], "label": "Columbia"}',
-                    "id": created.item_id,
+                    "id": album.item_id,
+                },
+            )
+            connection.execute(
+                text("UPDATE items SET metadata=:meta WHERE id=:id"),
+                {
+                    "meta": '{"creators": ["Julio Cortázar"], "page_count": 736}',
+                    "id": book.item_id,
                 },
             )
         async with httpx.AsyncClient(
@@ -123,10 +133,18 @@ async def test_export_does_not_special_case_the_item_type(tmp_path: Path) -> Non
         ) as client:
             response = await client.get("/api/export")
 
-    item = response.json()["items"][0]
-    assert item["type"] == "album"
-    # Opaque: the album's own vocabulary survives untranslated.
-    assert item["metadata"] == {"creators": ["Miles Davis"], "label": "Columbia"}
+    exported = {row["title"]: row for row in response.json()["items"]}
+    assert {row["type"] for row in exported.values()} == {"book", "album"}
+    # Opaque both ways: each domain's own vocabulary survives untranslated, and the
+    # album needs no branch of its own to get there.
+    assert exported["Kind of Blue"]["metadata"] == {
+        "creators": ["Miles Davis"],
+        "label": "Columbia",
+    }
+    assert exported["Rayuela"]["metadata"] == {
+        "creators": ["Julio Cortázar"],
+        "page_count": 736,
+    }
 
 
 @pytest.mark.anyio
@@ -345,3 +363,31 @@ def test_export_memory_is_flat_against_library_size(tmp_path: Path, exporter: st
         f"peak grew with library size: {small_peak} -> {large_peak} bytes "
         f"while output grew {small_total} -> {large_total}"
     )
+
+
+@pytest.mark.anyio
+async def test_the_goodreads_csv_carries_books_and_leaves_the_other_domains_to_the_json(
+    tmp_path: Path,
+) -> None:
+    """Found on the Sprint 025 walkthrough: the CSV was emitting albums as books.
+
+    The CSV is one domain's export view — a Goodreads import would read an album as a
+    book with no author and no ISBN. The JSON beside it is the lossless artifact and
+    carries every type, so nothing is lost by leaving the CSV book-shaped.
+    """
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        repository.create_or_get_entry(
+            title="Kind of Blue", creators=("Miles Davis",), item_type="album"
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            csv_body = (await client.get("/api/export", params={"format": "csv"})).text
+            everything = (await client.get("/api/export")).json()
+
+    titles = [row.split(",")[1] for row in csv_body.strip().splitlines()[1:]]
+    assert titles == ["Rayuela"]
+    assert {row["title"] for row in everything["items"]} == {"Rayuela", "Kind of Blue"}
