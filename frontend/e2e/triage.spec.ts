@@ -29,6 +29,7 @@ function makeEntries(count: number) {
       sources: [],
     },
     shelves: [],
+    formats: [],
   }));
   return entries;
 }
@@ -49,7 +50,10 @@ test("a provisional score is marked and the marker is explained", async ({
         items: entries,
         next_cursor: null,
         total: entries.length,
-        facets: { status_counts: { unsorted: entries.length } },
+        facets: {
+          status_counts: { unsorted: entries.length },
+          format_counts: {},
+        },
       },
     }),
   );
@@ -89,7 +93,7 @@ test("triage page renders and bulk-accepts suggested statuses", async ({
         items: entries.slice(0, 100),
         next_cursor: null,
         total: entries.length,
-        facets: { status_counts: { unsorted: 30 } },
+        facets: { status_counts: { unsorted: 30 }, format_counts: {} },
       },
     }),
   );
@@ -120,7 +124,7 @@ test("triage keyboard shortcuts set status on focused row", async ({
         items: entries,
         next_cursor: null,
         total: 5,
-        facets: { status_counts: { unsorted: 5 } },
+        facets: { status_counts: { unsorted: 5 }, format_counts: {} },
       },
     }),
   );
@@ -153,7 +157,7 @@ test("triage bulk status update with selection", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 10,
-        facets: { status_counts: { unsorted: 10 } },
+        facets: { status_counts: { unsorted: 10 }, format_counts: {} },
       },
     }),
   );
@@ -200,7 +204,7 @@ test("triage Ctrl+A selects all matching with server-side exclusions", async ({
         items: entries.slice(0, 100),
         next_cursor: null,
         total: 200,
-        facets: { status_counts: { unsorted: 200 } },
+        facets: { status_counts: { unsorted: 200 }, format_counts: {} },
       },
     }),
   );
@@ -249,7 +253,7 @@ test("triage j/k navigation moves focus between rows", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 5,
-        facets: { status_counts: { unsorted: 5 } },
+        facets: { status_counts: { unsorted: 5 }, format_counts: {} },
       },
     }),
   );
@@ -283,7 +287,7 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 200,
-        facets: { status_counts: { unsorted: 200 } },
+        facets: { status_counts: { unsorted: 200 }, format_counts: {} },
       },
     }),
   );
@@ -316,7 +320,7 @@ test("the bulk action bar enters without animating a single row", async ({
         items: entries,
         next_cursor: null,
         total: 12,
-        facets: { status_counts: { unsorted: 12 } },
+        facets: { status_counts: { unsorted: 12 }, format_counts: {} },
       },
     }),
   );
@@ -349,7 +353,7 @@ test("digits score the focused row and Enter opens it", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 5,
-        facets: { status_counts: { unsorted: 5 } },
+        facets: { status_counts: { unsorted: 5 }, format_counts: {} },
       },
     }),
   );
@@ -394,7 +398,7 @@ test("triage animates its action bar but not under reduced motion", async ({
         items: entries,
         next_cursor: null,
         total: 8,
-        facets: { status_counts: { unsorted: 8 } },
+        facets: { status_counts: { unsorted: 8 }, format_counts: {} },
       },
     }),
   );

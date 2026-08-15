@@ -1,3 +1,8 @@
+/**
+ * The union of every domain's statuses, which is what a *filter* spans and what the
+ * API can return for any row. Which of them a given entry may hold is its domain's
+ * business, published per item type at `/api/item-types` (seam 5b, DEC-057).
+ */
 export const entryStatuses = [
   "unsorted",
   "read",
@@ -5,9 +10,21 @@ export const entryStatuses = [
   "to_read",
   "wishlist",
   "dropped",
+  "pending",
+  "owned",
+] as const;
+
+/** The union of every domain's formats, for the same reason (DEC-059). */
+export const entryFormats = [
+  "physical",
+  "borrowed",
+  "digital",
+  "vinyl",
+  "cd",
 ] as const;
 
 export type EntryStatus = (typeof entryStatuses)[number];
+export type EntryFormat = (typeof entryFormats)[number];
 export type SortKey =
   "date_added" | "score" | "title" | "creator" | "year" | "date_finished";
 export type SortOrder = "asc" | "desc";
@@ -18,22 +35,53 @@ export interface Shelf {
   slug: string;
 }
 
+/** One cell of a `rows` field — a tracklist's position, title or length. */
+export interface ColumnSpec {
+  name: string;
+  label: string;
+  type: "text" | "number" | "duration";
+}
+
 /** One metadata field, as the domain that owns it describes it. */
 export interface FieldSpec {
   name: string;
   label: string;
-  type: "text" | "long_text" | "number";
+  type: "text" | "long_text" | "number" | "rows";
   multiplicity: "one" | "many";
   minimum?: number | null;
   maximum?: number | null;
+  /** Present only on a `rows` field: what one row of it holds. */
+  columns?: ColumnSpec[] | null;
+}
+
+/** One status a domain's entries can be in, with the key that sets it in triage. */
+export interface StatusSpec {
+  value: EntryStatus;
+  label: string;
+  choosable: boolean;
+  hotkey: string | null;
+}
+
+export interface FormatSpec {
+  value: EntryFormat;
+  label: string;
 }
 
 export interface ItemType {
   id: string;
   label: string;
   fields: FieldSpec[];
-  /** Overrides for the shared status vocabulary: an album is "Listened", not "Read". */
-  status_labels: Partial<Record<EntryStatus, string>>;
+  /**
+   * The statuses this domain's entries can hold, in the order a control offers them.
+   * An album is not a book with different words: `read` is not a state it can be in.
+   */
+  statuses: StatusSpec[];
+  default_status: EntryStatus;
+  /** Which of `date_started`, `date_finished`, `reread_count` this domain has. */
+  entry_fields: string[];
+  formats: FormatSpec[];
+  /** The heading over the personal region of the detail page. */
+  entry_panel_label: string;
 }
 
 /**
@@ -83,18 +131,24 @@ export interface LibraryEntry {
   suggested_status: EntryStatus | null;
   item: LibraryItem;
   shelves: Shelf[];
+  /** How you hold this copy, in the domain's declared order (DEC-059). */
+  formats: EntryFormat[];
 }
 
 export interface LibraryPage {
   items: LibraryEntry[];
   next_cursor: string | null;
   total: number;
-  facets: { status_counts: Partial<Record<EntryStatus, number>> };
+  facets: {
+    status_counts: Partial<Record<EntryStatus, number>>;
+    format_counts: Partial<Record<EntryFormat, number>>;
+  };
 }
 
 export interface LibraryFilters {
   statuses: EntryStatus[];
   shelves: string[];
+  formats: EntryFormat[];
   query: string;
   sort: SortKey;
   order: SortOrder;
@@ -108,6 +162,7 @@ export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
   });
   filters.statuses.forEach((status) => params.append("status", status));
   filters.shelves.forEach((shelf) => params.append("shelf", shelf));
+  filters.formats.forEach((format) => params.append("format", format));
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (cursor) params.set("after", cursor);
   return params.toString();
@@ -144,7 +199,7 @@ export async function patchEntry(
       | "date_finished"
       | "reread_count"
     >
-  > & { shelf_ids?: number[] },
+  > & { shelf_ids?: number[]; formats?: EntryFormat[] },
 ): Promise<LibraryEntry> {
   const response = await fetch(`/api/entries/${entryId}`, {
     method: "PATCH",
@@ -263,6 +318,8 @@ export interface BulkSet {
   score?: number;
   add_shelves?: number[];
   remove_shelves?: number[];
+  add_formats?: EntryFormat[];
+  remove_formats?: EntryFormat[];
   clear_provisional?: boolean;
 }
 

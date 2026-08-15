@@ -1,6 +1,6 @@
 import type { Ref } from "react";
 
-import type { EntryStatus } from "@/api/library";
+import type { EntryStatus, StatusSpec } from "@/api/library";
 import {
   Select,
   SelectContent,
@@ -8,22 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { statusLabels } from "@/features/library/labels";
+import { fallbackStatuses } from "@/features/library/labels";
 import { cn } from "@/lib/utils";
-
-const orderedStatuses: readonly EntryStatus[] = [
-  "read",
-  "reading",
-  "to_read",
-  "wishlist",
-  "dropped",
-  "unsorted",
-];
 
 interface StatusSelectProps {
   value: EntryStatus;
-  /** The labels of the item's domain; defaults to the shared vocabulary. */
-  labels?: Record<EntryStatus, string>;
+  /** The statuses of the item's domain; defaults to the shared vocabulary. */
+  statuses?: readonly StatusSpec[];
   onValueChange: (status: EntryStatus) => void;
   /** Accessible name. Radix has no implicit label, so this is required. */
   label: string;
@@ -37,15 +28,25 @@ interface StatusSelectProps {
  * add form. Radix renders it as `button[role="combobox"]` with a listbox
  * portalled to `document.body` — which is why `isEditableTarget` guards on the
  * role rather than on tag names.
+ *
+ * It has no list of its own: the statuses arrive from the item's domain, so an
+ * album offers `Owned` and a book offers `Read` with no branch here (seam 5b).
  */
 export function StatusSelect({
   value,
   onValueChange,
   label,
-  labels = statusLabels,
+  statuses = fallbackStatuses,
   className,
   triggerRef,
 }: StatusSelectProps) {
+  // Declared order, except that the inbox sinks to the bottom in every domain:
+  // it is where imports land rather than something a reader picks, so it should
+  // not be the first thing an open list offers.
+  const ordered = [
+    ...statuses.filter((status) => status.choosable),
+    ...statuses.filter((status) => !status.choosable),
+  ];
   return (
     <Select
       value={value}
@@ -59,9 +60,9 @@ export function StatusSelect({
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
-        {orderedStatuses.map((status) => (
-          <SelectItem key={status} value={status}>
-            {labels[status]}
+        {ordered.map((status) => (
+          <SelectItem key={status.value} value={status.value}>
+            {status.label}
           </SelectItem>
         ))}
       </SelectContent>

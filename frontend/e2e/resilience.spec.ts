@@ -56,7 +56,7 @@ test("a failed library load says so and can be retried", async ({ page }) => {
         items: [],
         next_cursor: null,
         total: 0,
-        facets: { status_counts: {} },
+        facets: { status_counts: {}, format_counts: {} },
       },
     });
   });
@@ -134,6 +134,7 @@ test("library to detail and back is possible without a pointer", async ({
           sources: [],
         },
         shelves: [],
+        formats: [],
       },
     }),
   );

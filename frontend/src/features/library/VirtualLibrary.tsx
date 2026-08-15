@@ -6,7 +6,7 @@ import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
 import type { LibraryEntry } from "@/api/library";
-import { statusLabelsFor } from "@/features/library/labels";
+import { formatLabels, statusesFor } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import {
   gridColumnCount,
@@ -54,7 +54,7 @@ function EntryControls({
         value={entry.status}
         onValueChange={(status) => onStatus(entry, status)}
         label={`Status for ${entry.item.title}`}
-        labels={statusLabelsFor(entry.item.type, itemTypes.data)}
+        statuses={statusesFor(entry.item.type, itemTypes.data)}
         // In a card the select absorbs the free width so it can never push the
         // score control past the card edge.
         className={stretch ? "h-9 min-w-0 flex-1" : "h-9 w-auto"}
@@ -116,7 +116,34 @@ function EntryMetadata({
           </>
         ) : null}
       </p>
+      <FormatBadges entry={entry} />
     </div>
+  );
+}
+
+/**
+ * How you hold this copy, read straight off the row.
+ *
+ * "Filter to owned and see how" is one filter plus this: without it the answer is
+ * on the detail page, one click per record, which is not an answer to "sort by
+ * owned and see where I own it" (DEC-059).
+ */
+function FormatBadges({ entry }: { entry: LibraryEntry }) {
+  const itemTypes = useItemTypes();
+  if (!entry.formats?.length) return null;
+  const labels = formatLabels(itemTypes.data);
+  return (
+    <p className="mt-1 flex flex-wrap gap-1" data-card-formats="">
+      <span className="sr-only">Formats: </span>
+      {entry.formats.map((format) => (
+        <span
+          key={format}
+          className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px] leading-4 text-muted-foreground"
+        >
+          {labels[format] ?? format}
+        </span>
+      ))}
+    </p>
   );
 }
 

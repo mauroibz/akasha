@@ -45,7 +45,10 @@ async function stubEntry(page: Page) {
         items: [entry],
         next_cursor: null,
         total: 1,
-        facets: { status_counts: { reading: 1, unsorted: 5 } },
+        facets: {
+          status_counts: { reading: 1, unsorted: 5 },
+          format_counts: {},
+        },
       },
     }),
   );

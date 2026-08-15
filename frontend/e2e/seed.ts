@@ -49,6 +49,7 @@ export function entry(id: number) {
       sources: [],
     },
     shelves: [],
+    formats: [],
   };
 }
 
@@ -61,7 +62,10 @@ export async function seedLibrary(page: Page, count = 5000) {
         items,
         next_cursor: null,
         total: count,
-        facets: { status_counts: { read: count, unsorted: 27 } },
+        facets: {
+          status_counts: { read: count, unsorted: 27 },
+          format_counts: {},
+        },
       }),
     });
   });

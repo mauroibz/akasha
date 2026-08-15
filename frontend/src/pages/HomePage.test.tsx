@@ -60,11 +60,12 @@ const populated = {
         sources: [],
       },
       shelves: [],
+      formats: [],
     },
   ],
   next_cursor: null,
   total: 1,
-  facets: { status_counts: { read: 1, unsorted: 12 } },
+  facets: { status_counts: { read: 1, unsorted: 12 }, format_counts: {} },
 };
 
 test("announces loading and then renders the populated library and inbox facet", async () => {
@@ -108,7 +109,7 @@ test("renders a useful empty state", async () => {
             items: [],
             next_cursor: null,
             total: 0,
-            facets: { status_counts: { unsorted: 3 } },
+            facets: { status_counts: { unsorted: 3 }, format_counts: {} },
           }),
           { status: 200 },
         ),

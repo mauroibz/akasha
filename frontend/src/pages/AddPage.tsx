@@ -30,7 +30,7 @@ import {
 } from "@/features/detail/schemas";
 import type { EntryStatus, ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
-import { statusLabelsFor } from "@/features/library/labels";
+import { statusesFor } from "@/features/library/labels";
 import { cn } from "@/lib/utils";
 
 export function AddPage() {
@@ -46,6 +46,8 @@ export function AddPage() {
   const resultsKey = results.map((row) => row.source_id).join("|");
   const [selected, setSelected] = useState<SearchCandidate | null>(null);
   const [manual, setManual] = useState(false);
+  // Seeded from the domain rather than fixed: a book is added `read` and a record
+  // is added `owned`, and the API refuses the other domain's default outright.
   const [status, setStatus] = useState<EntryStatus>("read");
   const [score, setScore] = useState("");
   const [error, setError] = useState("");
@@ -110,8 +112,16 @@ export function AddPage() {
   // The domains come from the server, so this screen never enumerates them itself.
   useEffect(() => {
     void getItemTypes()
-      .then(setItemTypes)
+      .then((types) => {
+        setItemTypes(types);
+        // The registry arrives after the first render, so the initial default
+        // comes from it rather than staying on the book-era literal below.
+        const current = types.find((type) => type.id === itemType);
+        if (current) setStatus(current.default_status);
+      })
       .catch(() => undefined);
+    // Runs once: the domain chooser sets the status itself when it changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     if (manual) titleRef.current?.focus();
@@ -224,6 +234,7 @@ export function AddPage() {
                   )}
                   onClick={() => {
                     setItemType(choice.id);
+                    setStatus(choice.default_status);
                     setResults([]);
                     setManual(false);
                   }}
@@ -415,7 +426,7 @@ export function AddPage() {
             <div>
               <span className="mb-1 block text-sm">Status</span>
               <StatusSelect
-                labels={statusLabelsFor(itemType, itemTypes)}
+                statuses={statusesFor(itemType, itemTypes)}
                 triggerRef={statusRef}
                 value={status}
                 onValueChange={setStatus}

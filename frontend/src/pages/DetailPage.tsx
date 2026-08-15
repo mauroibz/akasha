@@ -34,7 +34,12 @@ import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
-import { statusLabelsFor } from "@/features/library/labels";
+import {
+  entryPanelLabel,
+  formatLabels,
+  hasEntryField,
+  statusLabelFor,
+} from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +54,72 @@ function formatFact(value: unknown, field: FieldSpec): string {
     return Array.isArray(value) && value.length ? value.join(", ") : "—";
   if (value === null || value === undefined || value === "") return "—";
   return String(value);
+}
+
+/** A duration in milliseconds as a listener reads it: 9:22, or 1:02:11. */
+function duration(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    return "";
+  const total = Math.round(value / 1000);
+  const parts = [Math.floor(total / 60) % 60, total % 60];
+  if (total >= 3600) parts.unshift(Math.floor(total / 3600));
+  return parts
+    .map((part, index) =>
+      index ? String(part).padStart(2, "0") : String(part),
+    )
+    .join(":");
+}
+
+/**
+ * An ordered list of structured rows — a tracklist — rendered from the columns its
+ * domain declares rather than from anything this screen knows about music.
+ *
+ * A tracklist is metadata on the album, not a set of child entities: it is read,
+ * never opened, and nothing hangs off a track (Sprint 025 non-scope, still true).
+ */
+function RowsField({ field, value }: { field: FieldSpec; value: unknown }) {
+  const rows = Array.isArray(value) ? value : [];
+  // Absent and empty are the same thing, so a book gains no empty tracklist and
+  // neither does a release with no recordings.
+  if (!rows.length || !field.columns?.length) return null;
+  const columns = field.columns;
+  return (
+    <section
+      className="mt-6 rounded-xl border border-border p-5"
+      aria-label={field.label}
+    >
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
+        {field.label}
+      </h2>
+      <ol className="mt-4 grid gap-1" data-rows={field.name}>
+        {rows.map((row, index) => {
+          const cells = (row ?? {}) as Record<string, unknown>;
+          return (
+            <li
+              key={index}
+              className="flex items-baseline gap-3 border-b border-border/40 py-1 last:border-0"
+            >
+              {columns.map((column) => (
+                <span
+                  key={column.name}
+                  data-column={column.name}
+                  className={
+                    column.name === "title"
+                      ? "min-w-0 flex-1 truncate text-foreground"
+                      : "shrink-0 tabular-nums text-sm text-muted-foreground"
+                  }
+                >
+                  {column.type === "duration"
+                    ? duration(cells[column.name])
+                    : String(cells[column.name] ?? "")}
+                </span>
+              ))}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
 }
 
 function Fact({
@@ -121,9 +192,17 @@ export function DetailPage() {
   const fields =
     itemTypes.data?.find((type) => type.id === item.type)?.fields ?? [];
   const inlineFields = fields.filter(
-    (field) => field.type !== "long_text" && field.name !== "creators",
+    (field) =>
+      field.type !== "long_text" &&
+      field.type !== "rows" &&
+      field.name !== "creators",
   );
   const blockFields = fields.filter((field) => field.type === "long_text");
+  // An ordered list of structured rows is neither a fact nor a paragraph, so it
+  // gets its own region rather than being joined into one line (a tracklist).
+  const rowFields = fields.filter((field) => field.type === "rows");
+  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+    hasEntryField(item.type, itemTypes.data, field);
 
   async function handleDelete() {
     setDeleteError("");
@@ -214,17 +293,19 @@ export function DetailPage() {
               : ""}
           </p>
 
-          {/* Personal reading region */}
+          {/* The personal region. Its heading is the domain's: an album's entry
+              records possession rather than reading, so "Your reading data" over a
+              record was seam 5a showing through (DEC-057). */}
           <section
             className="mt-6 rounded-xl border border-border p-5"
-            aria-label="Your reading data"
+            aria-label={entryPanelLabel(item.type, itemTypes.data)}
           >
             <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
-              Your reading data
+              {entryPanelLabel(item.type, itemTypes.data)}
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
               <Fact name="status" label="Status">
-                {statusLabelsFor(item.type, itemTypes.data)[entry.status]}
+                {statusLabelFor(item.type, itemTypes.data, entry.status)}
               </Fact>
               <Fact name="score" label="Score">
                 <span
@@ -244,15 +325,28 @@ export function DetailPage() {
                   </span>
                 )}
               </Fact>
-              <Fact name="started" label="Started">
-                {entry.date_started ?? "—"}
+              <Fact name="formats" label="Format">
+                {(entry.formats ?? [])
+                  .map(
+                    (format) => formatLabels(itemTypes.data)[format] ?? format,
+                  )
+                  .join(", ") || "—"}
               </Fact>
-              <Fact name="finished" label="Finished">
-                {entry.date_finished ?? "—"}
-              </Fact>
-              <Fact name="rereads" label="Rereads">
-                {entry.reread_count}
-              </Fact>
+              {has("date_started") && (
+                <Fact name="started" label="Started">
+                  {entry.date_started ?? "—"}
+                </Fact>
+              )}
+              {has("date_finished") && (
+                <Fact name="finished" label="Finished">
+                  {entry.date_finished ?? "—"}
+                </Fact>
+              )}
+              {has("reread_count") && (
+                <Fact name="rereads" label="Rereads">
+                  {entry.reread_count}
+                </Fact>
+              )}
               <Fact name="shelves" label="Shelves">
                 {entry.shelves.map((s) => s.name).join(", ") || "—"}
               </Fact>
@@ -348,6 +442,14 @@ export function DetailPage() {
               </Button>
             </div>
           </section>
+
+          {rowFields.map((field) => (
+            <RowsField
+              key={field.name}
+              field={field}
+              value={item.metadata[field.name]}
+            />
+          ))}
         </section>
       </div>
 
@@ -363,10 +465,19 @@ export function DetailPage() {
                 status: values.status,
                 score: values.score,
                 notes: values.notes,
-                date_started: values.date_started || null,
-                date_finished: values.date_finished || null,
-                reread_count: Number(values.reread_count || 0),
                 shelf_ids: values.shelf_ids,
+                formats: values.formats,
+                // Sent only by a domain that has them. The server refuses a reread
+                // count on a record with a 422, and it is right to (DEC-057).
+                ...(has("date_started")
+                  ? { date_started: values.date_started || null }
+                  : {}),
+                ...(has("date_finished")
+                  ? { date_finished: values.date_finished || null }
+                  : {}),
+                ...(has("reread_count")
+                  ? { reread_count: Number(values.reread_count || 0) }
+                  : {}),
               }),
             )
             .then(() => undefined)

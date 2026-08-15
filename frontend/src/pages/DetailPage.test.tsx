@@ -101,6 +101,7 @@ const entry = {
     sources: [{ source: "openlibrary", source_id: "OL1M", is_primary: true }],
   },
   shelves: [{ id: 1, name: "Favorites", slug: "favorites" }],
+  formats: ["physical"],
 };
 
 function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
@@ -345,20 +346,43 @@ describe("DetailPage", () => {
     expect(within(dialog).queryByLabelText(/page count/i)).toBeNull();
   });
 
-  it("names an album's statuses the way its domain does", async () => {
-    // Seam 5a: `read` is still the stored value; only the copy follows the domain.
-    // Sprint 026 decides whether an album may have different statuses at all.
+  it("gives an album its own statuses, formats and heading", async () => {
+    // Seam 5b (DEC-057): not the book vocabulary renamed. An album is `owned`, has
+    // no reread count and no dates, and its personal region is not "reading data".
     const albumTypes = [
       {
         id: "album",
         label: "Album",
         fields: [],
-        status_labels: { read: "Listened", reading: "Listening" },
+        statuses: [
+          { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+          {
+            value: "wishlist",
+            label: "Wishlist",
+            choosable: true,
+            hotkey: "w",
+          },
+          {
+            value: "pending",
+            label: "On the way",
+            choosable: true,
+            hotkey: "p",
+          },
+          { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+        ],
+        default_status: "owned",
+        entry_fields: [],
+        formats: [
+          { value: "vinyl", label: "Vinyl" },
+          { value: "cd", label: "CD" },
+        ],
+        entry_panel_label: "Your copy",
       },
     ];
     const album = {
       ...entry,
-      status: "read",
+      status: "owned",
+      formats: ["vinyl"],
       item: { ...entry.item, type: "album", title: "Discovery", metadata: {} },
     };
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
@@ -372,8 +396,33 @@ describe("DetailPage", () => {
     await screen.findByRole("heading", { name: "Discovery" });
 
     expect(document.querySelector("[data-fact='status'] dd")).toHaveTextContent(
-      "Listened",
+      "Owned",
     );
+    expect(
+      document.querySelector("[data-fact='formats'] dd"),
+    ).toHaveTextContent("Vinyl");
+    expect(screen.getByRole("heading", { name: "Your copy" })).toBeVisible();
+    // The three fields a record has no meaning for are gone, not blank.
+    expect(document.querySelector("[data-fact='rereads']")).toBeNull();
+    expect(document.querySelector("[data-fact='started']")).toBeNull();
+    expect(document.querySelector("[data-fact='finished']")).toBeNull();
+  });
+
+  it("keeps a book's reading data, the half DEC-057 did not touch", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types") return new Response("[]");
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    expect(document.querySelector("[data-fact='rereads']")).not.toBeNull();
+    expect(document.querySelector("[data-fact='started']")).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Your reading data" }),
+    ).toBeVisible();
   });
 
   it("corrects the creator sort name and clears it back to the automatic value", async () => {

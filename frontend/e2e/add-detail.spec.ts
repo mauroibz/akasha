@@ -42,6 +42,7 @@ const entry = {
     sources: [{ source: "openlibrary", source_id: "OL1M", is_primary: true }],
   },
   shelves: [],
+  formats: [],
 };
 
 async function common(page: Page) {

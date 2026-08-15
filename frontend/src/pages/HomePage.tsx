@@ -10,9 +10,9 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
-  entryStatuses,
   getLibraryPage,
   patchEntry,
+  type EntryFormat,
   type EntryStatus,
   type LibraryEntry,
   type LibraryFilters,
@@ -27,12 +27,15 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
-import { sortLabels, statusLabels } from "@/features/library/labels";
+import { domainsFrom, sortLabels } from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import {
   isEditableTarget,
   libraryMotionKey,
@@ -44,12 +47,14 @@ import {
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
+const allFormats = "__all_formats__";
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
   return {
     statuses,
     shelves: params.getAll("shelf"),
+    formats: params.getAll("format") as EntryFormat[],
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
@@ -60,6 +65,7 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   const params = new URLSearchParams();
   filters.statuses.forEach((s) => params.append("status", s));
   filters.shelves.forEach((s) => params.append("shelf", s));
+  filters.formats.forEach((s) => params.append("format", s));
   if (filters.query.trim()) params.set("q", filters.query.trim());
   params.set("sort", filters.sort);
   params.set("order", filters.order);
@@ -143,6 +149,8 @@ export function HomePage() {
   );
   // Every shelf, not only the ones on the pages loaded so far: a shelf whose books
   // are all further down the list was previously unfilterable.
+  // One cached request for the whole session, shared with every card on the page.
+  const itemTypes = useItemTypes();
   const shelfQuery = useQuery({
     queryKey: ["shelves"],
     queryFn: getShelves,
@@ -381,6 +389,38 @@ export function HomePage() {
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={filters.formats[0] ?? allFormats}
+          onValueChange={(value) =>
+            updateFilters({
+              formats: value === allFormats ? [] : [value as EntryFormat],
+            })
+          }
+        >
+          <SelectTrigger
+            aria-label="Filter by format"
+            className="h-11 w-auto gap-2 rounded-full bg-surface"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={allFormats}>All formats</SelectItem>
+            {domainsFrom(itemTypes.data).map((type) => (
+              <SelectGroup key={type.id}>
+                <SelectLabel>{type.label}</SelectLabel>
+                {type.formats.map((format) => (
+                  <SelectItem
+                    key={`${type.id}-${format.value}`}
+                    value={format.value}
+                  >
+                    {format.label}{" "}
+                    {firstPage?.facets.format_counts[format.value] ?? 0}
+                  </SelectItem>
+                ))}
+              </SelectGroup>
+            ))}
+          </SelectContent>
+        </Select>
         <div
           className="flex rounded-full bg-surface p-1"
           aria-label="Library view"
@@ -407,28 +447,46 @@ export function HomePage() {
           </Button>
         </div>
       </section>
-      <div className="mt-4 flex flex-wrap gap-2" aria-label="Filter by status">
-        {entryStatuses.map((status) => {
-          const active = filters.statuses.includes(status);
-          return (
-            <button
-              key={status}
-              aria-pressed={active}
-              className="min-h-11 rounded-full border border-border px-4 text-sm aria-pressed:border-primary aria-pressed:text-primary focus-ring"
-              onClick={() =>
-                updateFilters({
-                  statuses: active
-                    ? filters.statuses.filter((value) => value !== status)
-                    : [...filters.statuses, status],
-                })
-              }
-            >
-              {statusLabels[status]}{" "}
-              {firstPage?.facets.status_counts[status] ?? 0}
-            </button>
-          );
-        })}
-      </div>
+      {/* One row per domain, each under its own name.
+          A library holding books and records has no single status vocabulary to
+          put in one row: "Read" and "Owned" beside each other with no indication
+          of what they belong to reads as one confused list. Grouping is the
+          owner's call, and it survives Sprint 027's domain tabs, which will scope
+          this to one row at a time. */}
+      {domainsFrom(itemTypes.data).map((type) => (
+        <div
+          key={type.id}
+          className="mt-4 flex flex-wrap items-center gap-2"
+          aria-label={`Filter ${type.label.toLowerCase()}s by status`}
+          role="group"
+        >
+          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            {type.label}
+          </span>
+          {type.statuses.map((status) => {
+            const active = filters.statuses.includes(status.value);
+            return (
+              <button
+                key={status.value}
+                aria-pressed={active}
+                className="min-h-11 rounded-full border border-border px-4 text-sm aria-pressed:border-primary aria-pressed:text-primary focus-ring"
+                onClick={() =>
+                  updateFilters({
+                    statuses: active
+                      ? filters.statuses.filter(
+                          (value) => value !== status.value,
+                        )
+                      : [...filters.statuses, status.value],
+                  })
+                }
+              >
+                {status.label}{" "}
+                {firstPage?.facets.status_counts[status.value] ?? 0}
+              </button>
+            );
+          })}
+        </div>
+      ))}
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole

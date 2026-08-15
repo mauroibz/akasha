@@ -6,6 +6,7 @@ export const viewPreferenceKey = "akasha.library.view";
 export const defaultLibraryFilters: LibraryFilters = {
   statuses: [],
   shelves: [],
+  formats: [],
   query: "",
   sort: "date_added",
   order: "desc",

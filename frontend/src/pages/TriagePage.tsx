@@ -31,10 +31,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  chooseableStatuses,
-  statusHotkeys,
-  statusLabels,
-  statusLabelsFor,
+  hotkeysFor,
+  statusLabelFor,
+  statusesFor,
 } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { useMotionPresets } from "@/lib/motion";
@@ -50,6 +49,7 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
   return {
     statuses: statuses.length ? statuses : ["unsorted"],
     shelves: params.getAll("shelf"),
+    formats: [],
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
@@ -147,6 +147,35 @@ export function TriagePage() {
   const selectionCount = allMatching
     ? (firstPage?.total ?? 0) - excludedIds.size
     : selectedIds.size;
+
+  /**
+   * The statuses every selected row can actually take.
+   *
+   * A selection legitimately spans domains, and the server refuses a mixed write
+   * whole rather than half-applying it. Offering a status only one domain has would
+   * therefore be offering a button that fails, so the chooser narrows to the
+   * intersection — which for a mixed selection is `wishlist` and the inbox.
+   */
+  const selectionStatuses = useMemo(() => {
+    const types = allMatching
+      ? new Set(entries.map((entry) => entry.item.type))
+      : new Set(
+          entries
+            .filter((entry) => selectedIds.has(entry.id))
+            .map((entry) => entry.item.type),
+        );
+    const lists = Array.from(types).map((type) =>
+      statusesFor(type, itemTypes.data),
+    );
+    if (!lists.length) return [];
+    return lists[0].filter(
+      (status) =>
+        status.choosable &&
+        lists.every((list) =>
+          list.some((other) => other.value === status.value),
+        ),
+    );
+  }, [allMatching, entries, selectedIds, itemTypes.data]);
 
   // Build bulk body from selection state
   const buildBulkBody = (
@@ -256,25 +285,39 @@ export function TriagePage() {
         setFocusedId(entries[next].id);
         return;
       }
-      // Status hotkeys (apply to focused row or selection)
-      const statusKey = statusHotkeys[event.key.toLowerCase()];
+      // Status hotkeys (apply to focused row or selection). The map is the
+      // *focused row's domain's*: `o` is Owned on a record and nothing on a book,
+      // and one shared table would have to pick a winner (seam 5b).
+      const focused = entries.find((row) => row.id === focusedId);
+      const key = event.key.toLowerCase();
+      const statusKey = focused
+        ? hotkeysFor(focused.item.type, itemTypes.data)[key]
+        : undefined;
       if (statusKey) {
         event.preventDefault();
-        const entry = entries.find((row) => row.id === focusedId);
-        if (entry && selectionCount === 0) {
+        if (selectionCount === 0) {
           // Single-row update via bulk API
           bulkMutation.mutate({
-            entry_ids: [entry.id],
+            entry_ids: [focused!.id],
             set: { status: statusKey },
           });
-        } else if (selectionCount > 0) {
+        } else if (selectionStatuses.some((row) => row.value === statusKey)) {
           bulkMutation.mutate(buildBulkBody({ status: statusKey }));
+        } else {
+          // Saying why beats a key that silently does nothing on a mixed selection.
+          toast.error(
+            `Not every selected row can be set to ${statusLabelFor(
+              focused!.item.type,
+              itemTypes.data,
+              statusKey,
+            )}`,
+          );
         }
         return;
       }
       // Score shortcuts (1-9, 0=10) on focused row
       const score = event.key === "0" ? 10 : Number(event.key);
-      const entry = entries.find((row) => row.id === focusedId);
+      const entry = focused;
       if (entry && score >= 1 && score <= 10) {
         event.preventDefault();
         if (selectionCount > 0) {
@@ -486,9 +529,9 @@ export function TriagePage() {
                   <SelectValue placeholder="Set status…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {chooseableStatuses.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {statusLabels[status]}
+                  {selectionStatuses.map((status) => (
+                    <SelectItem key={status.value} value={status.value}>
+                      {status.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -609,17 +652,17 @@ export function TriagePage() {
                     {hasConflict && (
                       <span
                         className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
-                        title={`Suggested: ${
-                          statusLabelsFor(entry.item.type, itemTypes.data)[
-                            entry.suggested_status!
-                          ]
-                        }`}
+                        title={`Suggested: ${statusLabelFor(
+                          entry.item.type,
+                          itemTypes.data,
+                          entry.suggested_status!,
+                        )}`}
                       >
-                        {
-                          statusLabelsFor(entry.item.type, itemTypes.data)[
-                            entry.suggested_status!
-                          ]
-                        }
+                        {statusLabelFor(
+                          entry.item.type,
+                          itemTypes.data,
+                          entry.suggested_status!,
+                        )}
                       </span>
                     )}
                     <span

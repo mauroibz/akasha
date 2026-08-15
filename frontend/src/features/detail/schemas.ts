@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { entryStatuses, type FieldSpec } from "@/api/library";
+import { entryFormats, entryStatuses, type FieldSpec } from "@/api/library";
 
 /**
  * Validation for the two detail forms. Technical spec section 8 requires schema
@@ -48,6 +48,9 @@ export const opinionSchema = z
     date_finished: optionalIsoDate,
     reread_count: optionalNumber("Rereads must be between 0 and 9999", 0, 9999),
     shelf_ids: z.array(z.number()),
+    // The union; which of them this entry may hold is its domain's business and is
+    // enforced on the server against the item's own type (DEC-059).
+    formats: z.array(z.enum(entryFormats)),
   })
   .refine(
     (value) =>

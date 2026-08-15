@@ -110,6 +110,7 @@ async function stubTriage(page: Page) {
       sources: [],
     },
     shelves: [],
+    formats: [],
   }));
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({
@@ -117,7 +118,10 @@ async function stubTriage(page: Page) {
         items: entries,
         next_cursor: null,
         total: entries.length,
-        facets: { status_counts: { unsorted: entries.length } },
+        facets: {
+          status_counts: { unsorted: entries.length },
+          format_counts: {},
+        },
       },
     }),
   );
