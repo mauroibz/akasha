@@ -125,7 +125,11 @@ test("a wishlist record can be marked vinyl without either implying the other", 
   // A record's opinion form offers no reread count and no dates (DEC-057).
   await expect(page.getByLabel("Reread count")).toHaveCount(0);
   await expect(page.getByLabel("Started")).toHaveCount(0);
-  await page.getByLabel("Vinyl").check();
+  // One control, shared with the add screen: a closed vocabulary you pick from,
+  // and deliberately never the shelf control, which is the one you type into.
+  await page.getByRole("combobox", { name: "Format" }).click();
+  await page.getByRole("option", { name: "Vinyl" }).click();
+  await page.keyboard.press("Escape");
   await page.getByRole("button", { name: "Save opinion" }).click();
 
   await expect(page.getByRole("dialog")).toHaveCount(0);

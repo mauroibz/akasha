@@ -39,6 +39,10 @@ interface ShelfPickerProps {
  * It is deliberately not a format control. Formats are a closed per-domain
  * vocabulary you pick from; shelves are yours and you invent them (DEC-059), and
  * the two must not converge into one widget that does both badly.
+ *
+ * Shared by the detail page and the add screen. It owns no fetching of its own —
+ * both the assignment and the creation are the caller's, so the add screen can hold
+ * the choice in local state until the entry it belongs to exists.
  */
 export function ShelfPicker({
   current,

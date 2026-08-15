@@ -15,6 +15,7 @@ from book_tracker.domain.matching import MatchDecision, MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
 from book_tracker.domain.normalization import normalize_text, shelf_slug
 from book_tracker.infrastructure.models import (
+    EntryFormatRow,
     EntryRow,
     EntryShelfRow,
     ImportBatchRow,
@@ -247,6 +248,10 @@ class DomainRepository:
         creator_sort: str | None = None,
         item_type: str = DEFAULT_DOMAIN.item_type,
         user_id: int = 1,
+        #: The rest of the opinion, already validated against the item's own domain
+        #: by the caller. Absent keys leave the column at its default.
+        entry_values: Mapping[str, Any] | None = None,
+        formats: Sequence[str] = (),
     ) -> EntryResult:
         with self._write() as session:
             exact = self._exact_ids(session, identifiers, sources)
@@ -315,16 +320,17 @@ class DomainRepository:
                 )
                 if found != shelves:
                     raise LookupError("shelf_not_found")
+            values = dict(entry_values or {})
             entry = EntryRow(
                 user_id=user_id,
                 item_id=item_id,
                 status=status,
                 score=score,
-                notes=None,
+                notes=values.get("notes"),
                 date_added=now,
-                date_started=None,
-                date_finished=None,
-                reread_count=0,
+                date_started=values.get("date_started"),
+                date_finished=values.get("date_finished"),
+                reread_count=values.get("reread_count") or 0,
                 score_provisional=0,
                 suggested_status=None,
                 created_at=now,
@@ -334,6 +340,9 @@ class DomainRepository:
             session.flush()
             session.add_all(
                 EntryShelfRow(entry_id=entry.id, shelf_id=shelf_id) for shelf_id in shelves
+            )
+            session.add_all(
+                EntryFormatRow(entry_id=entry.id, format=value) for value in dict.fromkeys(formats)
             )
             return EntryResult(item_id, entry.id, False)
 

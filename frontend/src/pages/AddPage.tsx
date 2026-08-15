@@ -19,7 +19,6 @@ import { ProviderHealthNotice } from "@/components/ProviderHealthNotice";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Field } from "@/features/detail/Field";
@@ -31,8 +30,16 @@ import {
 } from "@/features/detail/schemas";
 import type { EntryStatus, ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
-import { statusesFor } from "@/features/library/labels";
 import { CandidateFacts } from "@/features/add/CandidateFacts";
+import { ShelfPicker } from "@/features/shelves/ShelfPicker";
+import { FormatPicker } from "@/features/library/FormatPicker";
+import {
+  formatsFor,
+  hasEntryField,
+  statusesFor,
+} from "@/features/library/labels";
+import { createShelf, type ShelfWithCount } from "@/api/shelves";
+import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 export function AddPage() {
@@ -56,9 +63,7 @@ export function AddPage() {
   const [warning, setWarning] = useState("");
   const [near, setNear] = useState<number[]>([]);
   const [pending, setPending] = useState(false);
-  const [shelves, setShelves] = useState<Array<{ id: number; name: string }>>(
-    [],
-  );
+  const [shelves, setShelves] = useState<ShelfWithCount[]>([]);
   const [shelfIds, setShelfIds] = useState<number[]>([]);
   // The candidate as fetched in full, when the reader asked for it. Kept beside
   // `selected` rather than replacing it, so the identity that was clicked stays the
@@ -66,6 +71,13 @@ export function AddPage() {
   const [fullRecord, setFullRecord] = useState<SearchCandidate | null>(null);
   const [loadingFull, setLoadingFull] = useState(false);
   const [previewError, setPreviewError] = useState("");
+  // The rest of the opinion, set while adding rather than by adding and then
+  // immediately opening the edit dialog.
+  const [notes, setNotes] = useState("");
+  const [formats, setFormats] = useState<string[]>([]);
+  const [dateStarted, setDateStarted] = useState("");
+  const [dateFinished, setDateFinished] = useState("");
+  const [rereadCount, setRereadCount] = useState("");
   const titleRef = useRef<HTMLInputElement | null>(null);
   const searchRequestId = useRef(0);
   const statusRef = useRef<HTMLButtonElement>(null);
@@ -169,6 +181,20 @@ export function AddPage() {
         status,
         score: score ? Number(score) : undefined,
         shelf_ids: shelfIds,
+        // Only what the reader actually filled in, and only fields this domain
+        // has: the API refuses a reread count on a record with a 422, and it is
+        // right to (DEC-057).
+        ...(notes.trim() ? { notes: notes.trim() } : {}),
+        ...(formats.length ? { formats } : {}),
+        ...(has("date_started") && dateStarted
+          ? { date_started: dateStarted }
+          : {}),
+        ...(has("date_finished") && dateFinished
+          ? { date_finished: dateFinished }
+          : {}),
+        ...(has("reread_count") && rereadCount
+          ? { reread_count: Number(rereadCount) }
+          : {}),
         confirm_near_match: confirmed,
       });
       if (result.near_matches.length && !confirmed) {
@@ -216,6 +242,11 @@ export function AddPage() {
     ? form.handleSubmit((values) => submit(values))
     : () => submit(form.getValues());
   const editing = manual || selected;
+  // Asked of the domain rather than branched on the type: a record has no reread
+  // count and no started/finished dates (DEC-057).
+  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+    hasEntryField(itemType, itemTypes, field);
+  const domainFormats = formatsFor(itemType, itemTypes);
   const searchLabel = itemType === "book" ? "Search books" : "Search albums";
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
@@ -497,29 +528,87 @@ export function AddPage() {
               />
             </div>
           </div>
-          {shelves.length > 0 && (
-            <fieldset>
-              <legend>Shelves</legend>
-              <div className="flex flex-wrap gap-3">
-                {shelves.map((shelf) => (
-                  <div key={shelf.id} className="flex items-center gap-2">
-                    <Checkbox
-                      id={`shelf-${shelf.id}`}
-                      checked={shelfIds.includes(shelf.id)}
-                      onCheckedChange={(checked) =>
-                        setShelfIds((old) =>
-                          checked
-                            ? [...old, shelf.id]
-                            : old.filter((id) => id !== shelf.id),
-                        )
-                      }
-                    />
-                    <Label htmlFor={`shelf-${shelf.id}`}>{shelf.name}</Label>
-                  </div>
-                ))}
+          {/* The same control as the detail page: find a shelf as you type, or
+              create one on the spot. It holds the choice locally until the entry
+              it belongs to exists. */}
+          <div>
+            <span className="mb-2 block text-sm">Shelves</span>
+            <ShelfPicker
+              current={shelves.filter((shelf) => shelfIds.includes(shelf.id))}
+              available={shelves}
+              onChange={async (ids) => setShelfIds(ids)}
+              onCreate={async (name) => {
+                const created = await createShelf(name);
+                setShelves((old) => [...old, created]);
+                return created;
+              }}
+            />
+          </div>
+          <div className="flex flex-wrap items-end gap-4">
+            {domainFormats.length > 0 && (
+              <div>
+                <span className="mb-1 block text-sm">Format</span>
+                <FormatPicker
+                  formats={domainFormats}
+                  value={formats}
+                  onChange={setFormats}
+                />
               </div>
-            </fieldset>
-          )}
+            )}
+            {has("date_started") && (
+              <div>
+                <Label htmlFor="add-started" className="mb-1 block text-sm">
+                  Started
+                </Label>
+                <Input
+                  id="add-started"
+                  type="date"
+                  className="h-11"
+                  value={dateStarted}
+                  onChange={(event) => setDateStarted(event.target.value)}
+                />
+              </div>
+            )}
+            {has("date_finished") && (
+              <div>
+                <Label htmlFor="add-finished" className="mb-1 block text-sm">
+                  Finished
+                </Label>
+                <Input
+                  id="add-finished"
+                  type="date"
+                  className="h-11"
+                  value={dateFinished}
+                  onChange={(event) => setDateFinished(event.target.value)}
+                />
+              </div>
+            )}
+            {has("reread_count") && (
+              <div>
+                <Label htmlFor="add-rereads" className="mb-1 block text-sm">
+                  Reread count
+                </Label>
+                <Input
+                  id="add-rereads"
+                  type="number"
+                  min="0"
+                  className="h-11 w-28"
+                  value={rereadCount}
+                  onChange={(event) => setRereadCount(event.target.value)}
+                />
+              </div>
+            )}
+          </div>
+          <div>
+            <Label htmlFor="add-notes" className="mb-1 block text-sm">
+              Notes
+            </Label>
+            <Textarea
+              id="add-notes"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </div>
           {near.length > 0 && (
             <div role="alert">
               <p>

@@ -11,8 +11,8 @@ import {
   statusesFor,
 } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { FormatPicker } from "@/features/library/FormatPicker";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -22,7 +22,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "./Field";
 import { opinionSchema, type OpinionValues } from "./schemas";
@@ -130,43 +129,25 @@ export function OpinionDialog({
             {(props) => <Textarea {...props} {...form.register("notes")} />}
           </Field>
           {formats.length > 0 && (
-            <fieldset>
-              <legend className="text-sm font-medium">Format</legend>
-              {/* Its own control, never rendered as a shelf: shelves are the higher
-                  tier of organization and formats are not that (DEC-059). Legal on
-                  any status, which is what makes "wishlist → vinyl" expressible. */}
+            <div>
+              <span className="mb-1 block text-sm font-medium">Format</span>
+              {/* The same control as the add screen, and deliberately *not* the
+                  shelf control: a format is a closed per-domain vocabulary you
+                  pick from, a shelf is a tier you invent, and DEC-059 turns on
+                  that distinction. Legal on any status, which is what makes
+                  "wishlist → vinyl" expressible. */}
               <Controller
                 control={form.control}
                 name="formats"
                 render={({ field }) => (
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {formats.map((format) => (
-                      <div
-                        key={format.value}
-                        className="flex items-center gap-2"
-                      >
-                        <Checkbox
-                          id={`opinion-format-${format.value}`}
-                          checked={field.value.includes(format.value)}
-                          onCheckedChange={(checked) =>
-                            field.onChange(
-                              checked
-                                ? [...field.value, format.value]
-                                : field.value.filter(
-                                    (value: string) => value !== format.value,
-                                  ),
-                            )
-                          }
-                        />
-                        <Label htmlFor={`opinion-format-${format.value}`}>
-                          {format.label}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
+                  <FormatPicker
+                    formats={formats}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
                 )}
               />
-            </fieldset>
+            </div>
           )}
           {has("date_started") && (
             <Field

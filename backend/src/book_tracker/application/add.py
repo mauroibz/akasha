@@ -9,7 +9,11 @@ from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.domains import (
     DEFAULT_DOMAIN,
     DOMAINS,
+    InvalidEntryField,
+    InvalidFormat,
     InvalidStatus,
+    validate_entry_fields,
+    validate_formats,
     validate_status,
 )
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
@@ -112,6 +116,11 @@ class AddService:
         shelf_ids: Sequence[int],
         idempotency_key: str | None,
         confirm_near_match: bool = False,
+        #: Notes, formats and the domain's passage fields, so a book you just
+        #: finished does not have to be added and then immediately edited. Validated
+        #: against the item's own domain below, before anything is written.
+        entry_values: Mapping[str, Any] | None = None,
+        formats: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         creator_sort: str | None = None
         # Manual entry is a book form; a provider add is whatever domain that provider
@@ -182,6 +191,16 @@ class AddService:
                 validate_status(domain, status)
             except InvalidStatus as error:
                 raise LibraryError("invalid_status", str(error), status_code=422) from error
+        # The same rule `PATCH` follows (DEC-060 judgement 3), applied on the way in.
+        # It runs before the write, so a refusal leaves no half-added row behind.
+        try:
+            checked_values = validate_entry_fields(domain, entry_values or {})
+        except InvalidEntryField as error:
+            raise LibraryError("invalid_entry_field", str(error), status_code=422) from error
+        try:
+            checked_formats = validate_formats(domain, formats or ())
+        except InvalidFormat as error:
+            raise LibraryError("invalid_format", str(error), status_code=422) from error
         try:
             result = self.repository.create_cached_entry(
                 title=title,
@@ -195,6 +214,8 @@ class AddService:
                 shelf_ids=shelf_ids,
                 creator_sort=creator_sort,
                 item_type=item_type,
+                entry_values=checked_values,
+                formats=checked_formats,
             )
         except IdentityConflict as error:
             raise LibraryError(

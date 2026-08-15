@@ -513,10 +513,12 @@ test("the domain tab strip is built from the registry, not from a hardcoded list
   renderPage();
   await screen.findByText("Rayuela");
 
-  const strip = await screen.findByRole("tablist", { name: "Choose a domain" });
+  const strip = await screen.findByRole("radiogroup", {
+    name: "Choose a domain",
+  });
   expect(
     within(strip)
-      .getAllByRole("tab")
+      .getAllByRole("radio")
       .map((tab) => tab.textContent),
   ).toEqual(["All", "Book", "Record", "Wine"]);
   // Nothing has been chosen, so the library is unfiltered.
@@ -531,7 +533,7 @@ test("choosing a domain filters the library, and the choice is in the URL", asyn
   await screen.findByText("Rayuela");
   const user = userEvent.setup();
 
-  await user.click(screen.getByRole("tab", { name: "Record" }));
+  await user.click(screen.getByRole("radio", { name: "Record" }));
 
   await waitFor(() => {
     expect(
@@ -542,8 +544,8 @@ test("choosing a domain filters the library, and the choice is in the URL", asyn
   });
   // In the URL like every other filter, which is what makes a reload and the back
   // button work without the page owning any of that itself.
-  expect(screen.getByRole("tab", { name: "Record" })).toHaveAttribute(
-    "aria-selected",
+  expect(screen.getByRole("radio", { name: "Record" })).toHaveAttribute(
+    "aria-checked",
     "true",
   );
 });
@@ -561,8 +563,8 @@ test("the last domain used is where a fresh visit lands", async () => {
       ),
     ).toBe(true);
   });
-  expect(screen.getByRole("tab", { name: "Record" })).toHaveAttribute(
-    "aria-selected",
+  expect(screen.getByRole("radio", { name: "Record" })).toHaveAttribute(
+    "aria-checked",
     "true",
   );
 });
@@ -612,7 +614,7 @@ test("switching domain drops a status the new domain has no vocabulary for", asy
   await screen.findByText("Rayuela");
   const user = userEvent.setup();
 
-  await user.click(screen.getByRole("tab", { name: "Record" }));
+  await user.click(screen.getByRole("radio", { name: "Record" }));
 
   // Otherwise the list stays filtered to a status the visible chips cannot clear,
   // and the library reads as empty for no reason the screen can explain.

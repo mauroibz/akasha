@@ -572,7 +572,13 @@ test("a card status listbox is not recycled out from under the reader", async ({
   await page.mouse.wheel(0, 4000);
   await expect(listbox).toBeVisible();
   await expect(card).toBeVisible();
-  expect(await page.evaluate(() => window.scrollY)).toBe(0);
+  // The gesture asked for 4000px and the document must not have taken it. Bounded
+  // rather than asserted at exactly zero: with the page as the scroll container,
+  // Radix's scroll lock leaves a measured 2px residual as it swaps body overflow
+  // and compensates the scrollbar gutter. Under the old fixed-height container the
+  // lock held the *container* at exactly 0, which is what this used to assert.
+  // Two pixels is not "recycled out from under the reader"; four thousand is.
+  expect(await page.evaluate(() => window.scrollY)).toBeLessThan(10);
 
   await page.getByRole("option", { name: "Reading", exact: true }).click();
   await expect(listbox).toBeHidden();

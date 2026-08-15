@@ -442,6 +442,38 @@
             "title": "Confirm Near Match",
             "type": "boolean"
           },
+          "date_finished": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Finished"
+          },
+          "date_started": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Date Started"
+          },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Formats",
+            "type": "array"
+          },
           "idempotency_key": {
             "anyOf": [
               {
@@ -464,6 +496,29 @@
                 "type": "null"
               }
             ]
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "reread_count": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reread Count"
           },
           "score": {
             "anyOf": [

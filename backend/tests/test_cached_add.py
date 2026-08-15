@@ -388,3 +388,104 @@ async def test_contradictory_exact_identities_do_not_attach(tmp_path: Path) -> N
             )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "identity_conflict"
+
+
+class AlbumProvider:
+    """A record, so the domain's refusals can be exercised on the way in."""
+
+    name = "musicbrainz"
+    item_type = "album"
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Kind of Blue",
+            subtitle=None,
+            creators=("Miles Davis",),
+            year=1959,
+            cover_url=None,
+            identifiers={},
+            language=None,
+            metadata={"creators": ["Miles Davis"]},
+        )
+
+
+@pytest.mark.anyio
+async def test_an_opinion_can_be_set_while_adding(tmp_path: Path) -> None:
+    """Adding a book you have just finished should not mean adding it and then
+    immediately opening the edit dialog on it."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": Provider()}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={
+                    "source": "openlibrary",
+                    "source_id": "OL1M",
+                    "status": "read",
+                    "score": 9,
+                    "notes": "Read it twice, in both orders.",
+                    "formats": ["physical", "digital"],
+                    "date_started": "2026-01-02",
+                    "date_finished": "2026-02-03",
+                    "reread_count": 2,
+                },
+            )
+            entry_id = created.json()["entry"]["id"]
+            stored = await client.get(f"/api/entries/{entry_id}")
+
+    assert created.status_code == 201
+    body = stored.json()
+    assert body["notes"] == "Read it twice, in both orders."
+    assert body["formats"] == ["physical", "digital"]
+    assert body["date_started"] == "2026-01-02"
+    assert body["date_finished"] == "2026-02-03"
+    assert body["reread_count"] == 2
+
+
+@pytest.mark.anyio
+async def test_adding_refuses_a_field_the_domain_does_not_have(tmp_path: Path) -> None:
+    """The same rule `PATCH` follows (DEC-060 judgement 3), on the way in: a value
+    nothing can ever mean is refused rather than stored. And the refusal happens
+    before anything is written."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"musicbrainz": AlbumProvider()}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            rereads = await client.post(
+                "/api/entries",
+                json={
+                    "source": "musicbrainz",
+                    "source_id": "MB1",
+                    "status": "owned",
+                    "reread_count": 2,
+                },
+            )
+            wrong_format = await client.post(
+                "/api/entries",
+                json={
+                    "source": "musicbrainz",
+                    "source_id": "MB1",
+                    "status": "owned",
+                    "formats": ["borrowed"],
+                },
+            )
+            listed = await client.get("/api/entries", params={"status": "unsorted"})
+            everything = await client.get("/api/entries", params={"status": "owned"})
+
+    for refused in (rereads, wrong_format):
+        assert refused.status_code == 422
+        assert "Album" in refused.json()["error"]["message"]
+    # Refused before the write, so no half-added record is left behind.
+    assert listed.json()["total"] == 0
+    assert everything.json()["total"] == 0

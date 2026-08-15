@@ -44,7 +44,6 @@ import {
   viewPreferenceKey,
   type LibraryView,
 } from "@/features/library/library";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
@@ -519,24 +518,37 @@ export function HomePage() {
         </div>
       </section>
       {/* The domain strip. Rendered from `/api/item-types`, so a third domain
-          appears here by existing rather than by anybody editing this file. */}
+          appears here by existing rather than by anybody editing this file.
+
+          A radio group and not a Radix `Tabs`, for the same reason the add screen
+          chooses its domain this way: a tab claims a panel it controls, and a
+          `TabsTrigger` with no `TabsContent` behind it points `aria-controls` at
+          an element that does not exist — which axe reports as a critical
+          `aria-valid-attr-value` failure. This is a single-choice filter, and a
+          radio group is what that is. */}
       {domains.length > 1 && (
-        <Tabs
-          value={selectedDomain || allDomains}
-          onValueChange={(value) =>
-            chooseDomain(value === allDomains ? "" : value)
-          }
-          className="mt-6"
+        <div
+          role="radiogroup"
+          aria-label="Choose a domain"
+          className="mt-6 inline-flex rounded-full bg-surface p-1"
         >
-          <TabsList aria-label="Choose a domain">
-            <TabsTrigger value={allDomains}>All</TabsTrigger>
-            {domains.map((type) => (
-              <TabsTrigger key={type.id} value={type.id}>
-                {type.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
+          {[{ id: "", label: "All" }, ...domains].map((choice) => (
+            <button
+              key={choice.id || allDomains}
+              type="button"
+              role="radio"
+              aria-checked={selectedDomain === choice.id}
+              className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+                selectedDomain === choice.id
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              } focus-ring`}
+              onClick={() => chooseDomain(choice.id)}
+            >
+              {choice.label}
+            </button>
+          ))}
+        </div>
       )}
       {/* One row per domain, each under its own name.
           A library holding books and records has no single status vocabulary to

@@ -33,7 +33,7 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
-import { ShelfPicker } from "@/features/detail/ShelfPicker";
+import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
   entryPanelLabel,

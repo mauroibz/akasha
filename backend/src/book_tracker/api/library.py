@@ -211,6 +211,14 @@ class EntryCreateBody(BaseModel):
     status: EntryStatus | None = None
     score: int | None = Field(default=None, ge=1, le=10)
     shelf_ids: list[int] = Field(default_factory=list, max_length=100)
+    #: The rest of the opinion, so a book you just finished is one action rather
+    #: than an add followed by an edit. Each is validated against the item's own
+    #: domain, exactly as `PATCH` does — a record refuses a reread count.
+    notes: str | None = None
+    formats: list[str] = Field(default_factory=list, max_length=20)
+    date_started: date | None = None
+    date_finished: date | None = None
+    reread_count: int | None = Field(default=None, ge=0)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=100)
     confirm_near_match: bool = False
 
@@ -379,6 +387,19 @@ async def create_entry(
         status=body.status.value if body.status else None,
         score=body.score,
         shelf_ids=body.shelf_ids,
+        entry_values={
+            key: value
+            for key, value in (
+                ("notes", body.notes),
+                ("date_started", body.date_started.isoformat() if body.date_started else None),
+                ("date_finished", body.date_finished.isoformat() if body.date_finished else None),
+                ("reread_count", body.reread_count),
+            )
+            # Only what was actually sent: `validate_entry_fields` refuses a key the
+            # domain does not have, and a `None` nobody typed is not a key.
+            if value is not None
+        },
+        formats=body.formats,
         idempotency_key=body.idempotency_key,
         confirm_near_match=body.confirm_near_match,
     )

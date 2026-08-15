@@ -548,4 +548,159 @@ describe("AddPage", () => {
       screen.getByRole("button", { name: /Add to library/ }),
     ).toBeEnabled();
   });
+
+  it("creates a shelf from the add screen and adds with it", async () => {
+    const bodies: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(
+          JSON.stringify([
+            {
+              id: "book",
+              label: "Book",
+              fields: [],
+              formats: [],
+              entry_fields: [],
+            },
+          ]),
+        );
+      if (url === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
+      if (url === "/api/shelves" && init?.method === "POST")
+        return new Response(
+          JSON.stringify({
+            id: 5,
+            name: "Ensayo",
+            slug: "ensayo",
+            entry_count: 0,
+          }),
+        );
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/entries" && init?.method === "POST") {
+        bodies.push(String(init.body));
+        return new Response(
+          JSON.stringify({
+            entry: { id: 3, item: { id: 1 } },
+            already_exists: false,
+            near_matches: [],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(JSON.stringify([richCandidate]));
+    });
+    renderPage();
+    const user = await selectFirstResult();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Add to a shelf" }),
+    );
+    await user.type(
+      await screen.findByRole("combobox", { name: "Find or create a shelf" }),
+      "Ensayo",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: /Create .Ensayo./ }),
+    );
+    await user.click(screen.getByRole("button", { name: /Add to library/ }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(JSON.parse(bodies[0]).shelf_ids).toEqual([5]);
+  });
+
+  it("sets notes, format and the domain's own date fields while adding", async () => {
+    const bodies: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(
+          JSON.stringify([
+            {
+              id: "book",
+              label: "Book",
+              fields: [],
+              formats: [
+                { value: "physical", label: "Physical" },
+                { value: "digital", label: "Digital" },
+              ],
+              entry_fields: ["date_started", "date_finished", "reread_count"],
+              default_status: "read",
+            },
+          ]),
+        );
+      if (url === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/entries" && init?.method === "POST") {
+        bodies.push(String(init.body));
+        return new Response(
+          JSON.stringify({
+            entry: { id: 3, item: { id: 1 } },
+            already_exists: false,
+            near_matches: [],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(JSON.stringify([richCandidate]));
+    });
+    renderPage();
+    const user = await selectFirstResult();
+
+    await user.type(screen.getByRole("textbox", { name: "Notes" }), "Finally.");
+    await user.click(screen.getByRole("combobox", { name: "Format" }));
+    await user.click(await screen.findByRole("option", { name: "Physical" }));
+    await user.keyboard("{Escape}");
+    await user.type(screen.getByLabelText("Finished"), "2026-02-03");
+    await user.click(screen.getByRole("button", { name: /Add to library/ }));
+
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    const body = JSON.parse(bodies[0]);
+    expect(body.notes).toBe("Finally.");
+    expect(body.formats).toEqual(["physical"]);
+    expect(body.date_finished).toBe("2026-02-03");
+  });
+
+  it("offers a record none of the fields it has no meaning for", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(
+          JSON.stringify([
+            {
+              id: "book",
+              label: "Book",
+              fields: [],
+              formats: [],
+              entry_fields: ["reread_count"],
+            },
+            {
+              id: "album",
+              label: "Album",
+              fields: [],
+              formats: [{ value: "vinyl", label: "Vinyl" }],
+              entry_fields: [],
+              default_status: "owned",
+            },
+          ]),
+        );
+      if (url === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
+      if (url === "/api/shelves") return new Response("[]");
+      return new Response(JSON.stringify([richCandidate]));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("radio", { name: "Album" }));
+    await user.type(screen.getByRole("searchbox"), "Kind of Blue");
+    await user.click(await screen.findByRole("button", { name: /Rayuela/ }));
+
+    // DEC-057: a record has no reread count and no started/finished dates.
+    expect(screen.queryByLabelText("Finished")).toBeNull();
+    expect(screen.queryByLabelText("Reread count")).toBeNull();
+    // But it does have notes and its own formats.
+    expect(screen.getByRole("textbox", { name: "Notes" })).toBeVisible();
+    expect(screen.getByRole("combobox", { name: "Format" })).toBeVisible();
+  });
 });
