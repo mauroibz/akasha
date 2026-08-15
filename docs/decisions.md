@@ -2214,3 +2214,69 @@ Append-only record of material architecture choices, product-default resolutions
   when a second domain existed and that games and series were Sprints 027 and 028, both superseded by
   DEC-058. `AGENTS.md` gains the domain boundary as a non-negotiable invariant and `docs/README.md`
   as required reading.
+
+## DEC-071 — Depth is one level and provider-shaped; copy neutrality lands in 029; the music release is not gated on a third domain
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Supersedes:** section 6 of `docs/domain-expansion-assessment.md` where the two differ. The
+  assessment recommended deciding depth *before* a third domain and folding the chrome copy into
+  Sprint 029. The owner accepted the second, resequenced the first, and rejected a premise the
+  assessment had left implicit.
+- **Context:** the Sprint 028 assessment found one item that could force a redesign — an entry is
+  flat, which blocks television, anime, comics and podcasts — and separated it from six additive
+  comfort gaps. The owner answered the same day.
+- **Decision.**
+
+  **1. Copy neutrality is Sprint 029's sixth deliverable.** Eighteen user-visible strings across
+  eight files say "book" on screens that hold albums. Sprint 029 rebuilds most of those screens, so
+  doing it anywhere else means doing it twice. The rule is written into that sprint: copy that names
+  one domain comes from that domain's `label`, or is neutral. The `/books/:entryId` route stays out
+  of scope (DEC-067 row 8, reaffirmed).
+
+  **2. Entry depth is Sprint 030, Phase A only, and it runs after 029 rather than before it.** The
+  assessment argued for deciding it first; the owner scheduled it second, which is the right call for
+  a reason the assessment underweighted — 029 is already built and specified, and reordering settled
+  work to answer an open question costs more than the question does.
+
+  **The owner's hypothesis, which Phase A tests rather than assumes:**
+
+  > Most scenarios can be modelled by going **one level down only** — series into seasons, books into
+  > chapters if any, albums into songs, at most. The depth available is decided by **how the provider
+  > stores it**: if a TV provider returns one entry per season, no finer grain exists to model. In
+  > the other direction, items can be **grouped into sets** — the individual Harry Potter books as
+  > one set — and a set may be useful for fields other than depth.
+
+  **This hypothesis already has a precedent in the codebase, and Phase A must start from it.** A
+  tracklist is one level down and is modelled as *metadata rows on the item, not as entities*
+  (Sprint 026, DEC-057). It cost one `inc=recordings` parameter and nothing hangs off a track. So
+  representation is solved. The open question is narrower and sharper than "hierarchy":
+
+  **Does a child need state of its own?** A tracklist is read-only display. *"Watched through season
+  3, episode 7"* is a status on a child. That difference is the entire sprint, and "flat, with a
+  per-domain progress field" is a complete and correct Phase A outcome — on current evidence the
+  likeliest one.
+
+  Per-domain imports moves from Sprint 030 to **Sprint 031**; `FINAL_SPRINT` moves 30 → 31. This is
+  the same renumbering DEC-065 performed on an unbuilt, unfiled sprint, for the same reason: the
+  sprint has no file and no closed work depends on its number. The two forward references inside the
+  closed Sprint 028 file are corrected *visibly*, naming the old number and this decision, rather
+  than silently rewritten.
+
+  **3. The music release is not gated on a third domain.** The assessment recommended building a real
+  third domain to learn what two similar domains cannot teach, and the owner accepts the reasoning
+  without accepting the gate: **a release waits for a feature, not for a validation exercise.** Music
+  ships when music is ready. The only thing that would justify holding it is a specific feature going
+  in with it — depth being the named example.
+
+  This matters beyond scheduling, because it corrects a drift in how "gated" has been used. DEC-035
+  and DEC-042 introduced gates to stop *building* something whose cost was unknown. Nothing in that
+  pattern licenses withholding finished work until an unrelated experiment reports.
+
+- **Consequences.** Plan revision **12**. The line is 029 → 030 (entry depth, gated) → 031
+  (per-domain imports), and the project reaches `complete` at the end of 031. Sprint 029 gains a
+  deliverable, an acceptance criterion and a test requirement. The assessment's options B and E
+  (per-domain list mechanics; attachment level and per-domain caps) stay unscheduled and unbuilt,
+  waiting for a real domain to ask — which is the assessment's own recommendation and DEC-052's
+  standing rule against designing an abstraction from domains that agree with each other. Whether to
+  merge and release the album work is a separate owner action, now unblocked by this entry.

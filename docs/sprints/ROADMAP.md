@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 11
+**Plan revision:** 12
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [Sprint 029](029-one-search-bar.md)
 
@@ -25,10 +25,11 @@ Post-v1 work branches:
                  └─ 027 Library shell and shelves
                      └─ 028 The domain contract  [GATED]
                          └─ 029 One search bar
-                             └─ 030 Per-domain imports   ← the plan ends here
+                             └─ 030 Entry depth  [GATED, Phase A only]
+                                 └─ 031 Per-domain imports   ← the plan ends here
 ```
 
-**The plan stops at 030, and that is the point (DEC-058, extended once by DEC-065).** Sprint 025 asked whether a second domain
+**The plan stops at 031, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -81,13 +82,14 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
 | [029](029-one-search-bar.md) | One search bar | 027, 028 | **ready** |
-| 030 | Per-domain imports | 029 | planned |
+| 030 | Entry depth: the decision **[GATED]** | 029 | planned |
+| 031 | Per-domain imports | 030 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 029 have files; 030 does not.
+incorporating actual deviations. Sprints 019 through 029 have files; 030 and 031 do not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -382,7 +384,52 @@ It runs after 028 because it is the sprint most likely to amend the contract's a
 *screen* renders from the registry; the backend contract and the conformance suite are untouched by
 it.
 
-### Sprint 030 — Per-domain imports
+### Sprint 030 — Entry depth: the decision
+
+**Gated, and Phase A only by design.** Scheduled by DEC-071 after the Sprint 028 assessment
+(`docs/domain-expansion-assessment.md`) named it as the **one thing on the whole list that could
+force a redesign rather than an extension**. Everything else the assessment found — sorting, search,
+facets, field types, manual entry, chrome copy, attachments — is additive and can wait for a real
+domain to ask. This cannot: an entry is flat, and hierarchy reaches the entry model, keyset
+pagination and its cursor, triage selection, bulk operations, every facet count and the library row.
+
+**It runs before per-domain imports and before any third domain**, because a domain built against
+the wrong answer is the expensive mistake, and the answer costs half a sprint.
+
+**The owner's hypothesis, to be tested rather than assumed** (DEC-071):
+
+> Most scenarios can be modelled by going **one level down only** — series into seasons, books into
+> chapters if any, albums into songs, at most. And the depth available is decided by **how the
+> provider stores it**: if a TV provider returns one entry per season, no finer grain exists to
+> model. In the other direction, items can be **grouped into sets** — the individual Harry Potter
+> books as one set — and a set may be useful for things other than depth.
+
+**One precedent already exists and Phase A must start from it.** A tracklist is one level down, and
+it is modelled as **metadata rows on the item, not as entities** (Sprint 026, DEC-057). It works, it
+cost one `inc=recordings` parameter, and nothing hangs off a track. So the question is not "can we
+represent children" — we can, today. The question is narrower and sharper:
+
+**Does a child need state of its own?** A tracklist is read-only display. *"Watched through season 3,
+episode 7"* is a status on a child. That difference is the whole sprint.
+
+Phase A must produce a written verdict answering, with evidence:
+
+1. **What the providers actually return** — TMDB seasons and episodes, IGDB DLC and editions,
+   MusicBrainz recordings — measured against the live APIs the way DEC-052 was, not reasoned about.
+2. **Which of three shapes wins**, costed as a table: (a) a per-domain `progress` field on the
+   existing flat entry; (b) `rows` metadata plus a progress marker into it; (c) real child entities
+   with their own status. And what each costs in pagination, triage, bulk operations, counts,
+   export, the import ledger and undo.
+3. **Whether "a set" is the same concept as depth or a different one**, since the owner names it as
+   possibly useful for other fields. A set that groups items across a domain is not a parent entity.
+4. **What the cheapest thing that satisfies a real user sentence is** — "I'm on season 3" — because
+   the assessment's own warning applies here: designing depth from zero serial domains is the
+   Strategy-B failure DEC-052 rejected on evidence.
+
+**Phase A concluding "flat, with a per-domain progress field" is a complete and correct outcome**,
+and on current evidence the likeliest one. Phase B, if it happens at all, is authorized separately.
+
+### Sprint 031 — Per-domain imports
 
 The last sprint in the plan. Import is book-only today. Sprint 028 moved the two readers into the
 domain they serve — `domains/book/goodreads.py` and `domains/book/calibre.py` — so what remains
@@ -402,7 +449,7 @@ When this closes, the project state goes `complete` per `WORKFLOW.md`'s final-sp
 ## Future epics, after this plan
 
 Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
-contract and Sprint 030's import boundary, developed in parallel without interfering with the others.
+contract and Sprint 031's import boundary, developed in parallel without interfering with the others.
 
 - **Games — IGDB.** Carries DEC-052's prediction that games need no seam albums did not; Sprint 028's
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
@@ -415,7 +462,7 @@ contract and Sprint 030's import boundary, developed in parallel without interfe
   operations and every count in the UI. Note the vocabulary collision before it causes confusion —
   book-series already exists as a free-text `metadata` field, and product spec section 11 item 4
   records the deliberate choice not to model it.
-- **Music imports — `spotify → music`.** The natural first exercise of Sprint 030's boundary.
+- **Music imports — `spotify → music`.** The natural first exercise of Sprint 031's boundary.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 

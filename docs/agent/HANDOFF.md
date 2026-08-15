@@ -2,8 +2,9 @@
 
 **Last completed:** Sprint 028 (the domain contract), 2026-08-15. Both phases ran.
 **Next:** Sprint 029 (one search bar) — status `ready`, file at
-`docs/sprints/029-one-search-bar.md`. Plan revision **11**. Then Sprint 030 (per-domain imports),
-which has no file yet. The plan ends there.
+`docs/sprints/029-one-search-bar.md`. Plan revision **12**. Then **Sprint 030 (entry depth — a
+gated, Phase-A-only decision, scheduled by DEC-071)** and Sprint 031 (per-domain imports). Neither
+has a file yet; the plan ends at 031.
 
 ## Do this first
 
@@ -25,6 +26,15 @@ proposal. `CONTRIBUTING.md` is the human entry point; `AGENTS.md` still governs 
 one entry in `DOMAINS`, its provider wired in the lifespan, three lines in the published enums, one
 cover-host allowlist line if its art is hosted somewhere new, and configuration if its provider needs
 credentials. **No migration, and no edit to another domain's files.**
+
+**Sprint 029 gained a sixth deliverable after it was written** (DEC-071): the chrome stops saying
+"book". Eighteen user-visible strings across eight files, listed in the sprint file with the rule for
+each. Read that deliverable before starting 029 — it is small, but it is the kind of thing a rewrite
+of those screens silently carries forward.
+
+**The music release is not gated on a third domain** (DEC-071). A release waits for a feature, not
+for a validation exercise. Merging and releasing the album work is an owner action, and nothing in
+the plan blocks it.
 
 ## Read this first
 
@@ -107,7 +117,7 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
   `itemType === "book"` branches remain in `pages/AddPage.tsx` (DEC-067 row 6). Sprint 029 rebuilds
   that screen.
 - The import layer is still book-only above the domain packages — `application/imports.py` and
-  `api/imports.py`. That is Sprint 030's whole outcome.
+  `api/imports.py`. That is Sprint 031's whole outcome.
 - `data/covers/` holds two stale `cover-*.jpg.tmp` files from an interrupted install; harmless.
 - One dev-library item has **`OL14454691A` as its creator**; item 7 stores `"O'Reilly Media, Inc."`
   **with the quotes**. Both pre-existing.

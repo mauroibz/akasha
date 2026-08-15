@@ -115,8 +115,9 @@ Two of those are worse than a file to edit, and are the findings Phase A must co
   `TriagePage.tsx:358,745`, `AddPage.tsx:209,631`).
 - The whole **import layer is book-only** — `domain/goodreads.py`, `domain/calibre.py`,
   `application/imports.py`, and `api/imports.py` whose preview rows carry `goodreads_book_id`,
-  `calibre_book_id`, `calibre_uuid` and `isbn`. That is **Sprint 030's** outcome; Phase A names its
-  cost and moves none of it.
+  `calibre_book_id`, `calibre_uuid` and `isbn`. That is the **per-domain imports** sprint's outcome —
+  numbered 030 when this was written, renumbered **031** by DEC-071, which inserted the entry-depth
+  decision ahead of it. Phase A names its cost and moves none of it.
 - `domain/goodreads.py` and `domain/calibre.py` sit in `domain/` beside the shared domain model,
   which is the clearest symptom of there being no per-domain code home at all.
 
@@ -207,8 +208,9 @@ should change, and that has to be seen rather than asserted.
 
 - **Building a third domain.** That is an epic on top of this contract (DEC-058), and building one
   here would be the thing this sprint exists to make unnecessary.
-- **Per-domain imports.** Sprint 030. Phase A *names* the book-shaped import layer as misplaced and
-  costs it; moving it is 030's whole outcome.
+- **Per-domain imports.** Sprint 031 (030 when this was written; DEC-071 inserted entry depth ahead
+  of it). Phase A *names* the book-shaped import layer as misplaced and costs it; moving it is that
+  sprint's whole outcome.
 - **The one search bar.** Sprint 029 (DEC-065).
 - **A plugin runtime.** Product spec section 2 has held the line since v1: the registry is code.
 - Re-opening DEC-057, DEC-059 or DEC-062.

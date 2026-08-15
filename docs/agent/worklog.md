@@ -1544,3 +1544,26 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   left — they assert over rows the test itself seeded, which is correct and not closed-world.
 - Next: Sprint 029 (one search bar) is `ready`. It rebuilds `/` around a single bar and removes "All"
   as a filter.
+
+## 2026-08-15 — Assessment answered, plan revision 12 (no sprint active work)
+- Done: wrote `docs/domain-expansion-assessment.md` at the owner's request — what the domain work
+  proved (a throwaway third domain passed everything with five shared lines and no migration), the
+  structural limit of that proof (the conformance suite cannot check whether the *contract* is
+  sufficient, and both domains are the same shape), one rewrite risk (a flat entry blocks serial
+  domains) and six additive gaps, with costed options. The owner answered the same day: **DEC-071**.
+  Sprint 029 gains deliverable 6 (chrome copy neutrality, 18 strings, listed with the rule and an
+  acceptance criterion); **entry depth becomes Sprint 030, Phase A only**, carrying the owner's
+  one-level/provider-shaped hypothesis and the tracklist precedent; per-domain imports moves to
+  **031**; `FINAL_SPRINT` 30 → 31; plan revision **12**.
+- Verified: `python scripts/validate_project.py` and `make check` green. No code changed.
+- Deviations: the assessment recommended depth *before* 029; the owner resequenced it after, and the
+  decision records why that is the better call. It also rejected the implicit premise that the music
+  release should wait for a third domain — a release waits for a feature, not a validation exercise,
+  and DEC-071 corrects that drift in how "gated" was being used.
+- Dead ends worth not repeating: renumbering an unbuilt sprint is cheap **only** because it has no
+  file and nothing closed depends on it (the DEC-065 precedent). The two forward references inside
+  the closed Sprint 028 file were corrected visibly — naming the old number and the decision — rather
+  than silently rewritten, which is what `AGENTS.md` actually forbids.
+- Blocked/open: **merging and releasing the album work is an owner action and is now unblocked.**
+  Nothing else.
+- Next: Sprint 029 (one search bar, now with copy neutrality) is `ready`.

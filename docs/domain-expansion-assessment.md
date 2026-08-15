@@ -4,6 +4,9 @@
 committing to a third domain.
 **Question:** *"Did we reach our goals? Is the abstraction good enough to work comfortably without
 having to rewrite it? Is the frontend modular enough? Does the attachment feature carry risk?"*
+**Outcome:** answered by the owner the same day and recorded as **DEC-071** — option D folded into
+Sprint 029, option C scheduled as Sprint 030, and the music release explicitly not gated on a third
+domain. Section 6's recommendation is superseded by that decision where the two differ.
 **Short verdict:** **Yes for the class of domain we have proved, no for the class we have not.**
 Nothing here needs a rewrite. One open question needs deciding **before** a particular kind of
 domain is started, and it is the only item on this page that could force a redesign.
@@ -74,7 +77,7 @@ architecture's central unanswered question, and building three flat domains firs
 | **Facets are closed** | Only `status_counts`, `status_counts_by_type`, `format_counts` | No per-domain filter dimension: platform, genre, decade, medium |
 | **Field *types* are a closed set** | `text` / `long_text` / `number` / `rows` | A date, a rating, a URL, an image list is a shared-code change |
 | **Manual entry is a book form** | `application/add.py` binds it to `DEFAULT_DOMAIN`; the validator says "A book needs a title" | A new domain has no hand-entry path at all |
-| **Import is book-only above the readers** | `application/imports.py`, `api/imports.py`, and the whole 376-line `ImportPage.tsx` | Already scheduled as Sprint 030 |
+| **Import is book-only above the readers** | `application/imports.py`, `api/imports.py`, and the whole 376-line `ImportPage.tsx` | Already scheduled (Sprint 031 since DEC-071) |
 | **Enrichment is ISBN-keyed** | `_backfillable_items` joins `kind = 'isbn'`; `PROVIDER_ORDER` is books' | Deferred with a trigger (DEC-067 row 3); no domain has exercised it |
 
 **One of these is measured rather than estimated.** Adding the `rows` field type for tracklists

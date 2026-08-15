@@ -2,7 +2,7 @@
 
 **Status:** ready
 **Depends on:** 027, 028
-**Roadmap revision:** 11
+**Roadmap revision:** 12
 
 ## Objective
 
@@ -69,6 +69,35 @@ Observed 2026-08-15 at Sprint 027's close. **Re-derive at activation.**
 5. **Reconciling what is left.** `/add` keeps manual entry and stays a working deep link; the
    header's *Add to library* button and the `a` shortcut focus the bar instead of navigating; `j`/`k`
    and the digit shortcuts get a stated rule while web results are on screen.
+6. **The chrome stops saying "book"** (DEC-071, added after the Sprint 028 assessment). The rendering
+   layer is already domain-neutral; the copy is not, and this sprint rebuilds the screens where most
+   of it lives, so doing it anywhere else would mean doing it twice.
+
+   **Eighteen user-visible strings, across eight files**, measured 2026-08-15:
+
+   | Where | What it says |
+   |---|---|
+   | `pages/AddPage.tsx` | *Book added*, *Book could not be added*, *You can still enter this book manually*, `itemType === "book"` branches for the search label and the placeholder |
+   | `pages/ImportPage.tsx` | *Import books*, and `book`/`books` in three result counts |
+   | `pages/ShelvesPage.tsx` | *Your books are retained*, `N books` per shelf |
+   | `pages/TriagePage.tsx` | *Import books to start triaging*, *Filter by title or author* |
+   | `features/library/VirtualLibrary.tsx` | *Loading more books* |
+   | `features/detail/CoverDialog.tsx` | *This book has no provider reference or ISBN…*, *…no other editions with covers for this book* |
+   | `features/detail/schemas.ts` | *A book needs a title* |
+   | `components/ProviderHealthNotice.tsx` | *You can still add a book manually* |
+   | `api/add.ts` | *Book could not be added* |
+
+   **The rule:** copy that names one domain must come from that domain's `label`, or be neutral.
+   `Book added` becomes the domain's label; `N books` on a shelf becomes `N items` — a shelf spans
+   domains and always did. **The three `itemType === "book"` branches in `AddPage` are deleted, not
+   moved**: the search label and the placeholder are per-domain copy the registry can carry, and if
+   this sprint needs a new `Domain` field for a placeholder, that is a legitimate registry addition
+   with a conformance check, not a branch.
+
+   **Deliberately out of scope:** the route `/books/:entryId`. Renaming it touches every `navigate`
+   call and seven e2e specs to fix something cosmetic (DEC-067 row 8, reaffirmed). And
+   `ImportPage.tsx` beyond its copy — the import screen is book-shaped structurally, and that is
+   Sprint 031's problem, not this sprint's.
 
 ### The functionality inventory (deliverable 4's contract)
 
@@ -104,6 +133,10 @@ Every one of these exists on `/add` today and must exist in the dialog flow:
    with two result regions on one page.
 8. Nothing renders a format as a shelf; imports, triage, undo, bulk edit, backup, formats and
    statuses are unchanged.
+9. **No screen names a domain in copy that the registry could supply.** Grepping the frontend for
+   `book` outside `book_tracker`, imports and comments returns only the `/books/:entryId` route,
+   which is explicitly out of scope. Demonstrated on an album: adding one says *Album added*, the
+   shelf count reads *N items*, and the cover chooser is absent as Sprint 028 left it.
 
 ## Required tests (TDD)
 
@@ -117,6 +150,8 @@ Every one of these exists on `/add` today and must exist in the dialog flow:
   prevent.**
 - The 10,000-entry scale test and the feed-semantics accessibility test, re-run with a web-results
   block rendered above the library.
+- **A test that fails on domain-named copy**: the add flow asserted against an *album*, expecting the
+  domain's label rather than "Book", so the copy cannot regress to one domain's vocabulary silently.
 
 ## Verification
 
