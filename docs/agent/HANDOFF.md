@@ -16,7 +16,11 @@ and a verdict, and changes nothing user-visible. **Phase A concluding that almos
 misplaced is a complete, correct outcome** — do not pad it into a refactor to justify the sprint.
 Phase B runs only on that verdict plus an explicit owner go-ahead.
 
-**Music and the library shell are finished.** Do not re-litigate DEC-057 (an album's status is
+**Sprint 027 was reopened once**, after the owner tried it and reported the add flow, and closed
+again the same day. Its file carries both passes; DEC-064 is the second one. That is the precedent
+Sprint 020 set for its Phase B, not an inconsistency to repair.
+
+**Music, the library shell and the add flow are finished.** Do not re-litigate DEC-057 (an album's status is
 possession), DEC-059 (format is an independent, entry-level, multi-valued, per-domain tag) or
 DEC-062 (the tab remembers the last domain; `type` clears the status facets and applies to
 `format_counts`). All three are built.
@@ -58,12 +62,31 @@ catch in review. **Writing that contract down, and a suite that enforces it, is 
   never built, which Sprint 027's own baseline got wrong.
 - **`src/test/setup.ts` shims `ResizeObserver`** because jsdom has none and cmdk constructs one.
 
+## What Sprint 027's second pass left behind
+
+- **`GET /api/search/preview`** fetches one candidate's full record and writes nothing. It is one
+  live provider request per call — there is no provider response cache — which is why it is a button
+  on the add screen and not an effect. It follows `search`'s quota rule (DEC-045): recorded, never
+  blocked.
+- **`POST /api/entries` now takes the whole opinion** — notes, formats and the passage fields — each
+  validated against the item's own domain **before** the write, so a 422 leaves no half-added row.
+- **One control per concept, shared.** `features/shelves/ShelfPicker` (create-on-type) is used by the
+  detail page and the add screen; `features/library/FormatPicker` (closed, no create) is used by the
+  add screen and the opinion dialog. **They must stay distinct** — DEC-059 is about a shelf being a
+  tier you invent and a format being a vocabulary the domain declares, and one widget doing both
+  would erase that.
+- **`CandidateFacts` de-duplicates against the field spec.** Both domains declare `language` and
+  books declare `original_year`, while a candidate carries columns of the same name; the domain's
+  label wins and the column is its fallback value.
+
 ## Known and left, in the order they are likely to bite
 
-- **The dev library at `data/` is 7 books plus items 13 *Discovery* and 14 *Kind of Blue***, both
-  `owned` with formats and covers. Backed up before the Sprint 027 walkthrough to
-  `backups/pre-sprint027-20260815T154413Z`. The walkthrough left a shelf "Latin American" on item 6
-  and added two books to "Work" (now 3 entries); both are realistic test data and were kept.
+- **The dev library at `data/` is 8 books plus items 13 *Discovery* and 14 *Kind of Blue***, both
+  `owned` with formats and covers. Backed up before the Sprint 027 walkthroughs to
+  `backups/pre-sprint027-20260815T154413Z` and `backups/pre-container-*`. The walkthroughs left a
+  shelf "Latin American" on item 6, four books on "Work", and **entry 17** — a *Rayuela* added with
+  a shelf "Rayuelas", notes, a format, a finished date and two rereads, all set in one action. All
+  realistic test data and kept deliberately.
 - **`data/` has been made group/other-writable and the container has been run against it** so the
   owner could test Sprint 027 in Docker. Files the container creates are owned by uid 10001; if
   running the app directly fails on permissions, hand ownership back with

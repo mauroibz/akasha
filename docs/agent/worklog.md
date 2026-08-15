@@ -1404,3 +1404,42 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: Sprint 028 (the domain contract) is `ready` at `docs/sprints/028-the-domain-contract.md`.
   **It is gated**: Phase A writes the contract and a conformance suite and changes nothing
   user-visible, and Phase A concluding that little is misplaced is a complete outcome.
+
+## 2026-08-15 — Sprint 027, second pass (the add flow), complete
+- Done: the owner tried the closed sprint and reported the add screen, and directed it folded into
+  this sprint rather than scheduled — so 027 was reopened, the way 020 was for its Phase B. Three
+  commits `762ed70`..`d722135` plus the closing one. `GET /api/search/preview`; the confirm screen
+  rendering everything the search already returned, from the domain field spec; notes, formats and
+  the domain's passage fields on `POST /api/entries`, validated against the item's own domain before
+  the write; the create-on-type shelf control moved to `features/shelves` and shared with the add
+  screen; one closed `FormatPicker` shared by the add screen and the opinion dialog. DEC-064
+  appended; product spec §7 and technical spec §7.1 updated.
+- Verified: `make check`, `make test` (**419 backend, 126 frontend**), `npm run test:e2e`
+  (**86 passed, 2 skipped**), `validate_project.py` — all green. Walkthrough against the real dev
+  library and **live providers** at `127.0.0.1:8123`: a MusicBrainz search showed year and artist
+  credit instantly with zero preview requests; *Load full details* spent exactly one and added
+  label, catalogue number, country, format and track count, after which the button is gone. A record
+  offers notes and formats and no dates or reread count; a book offers all of them. Added *Rayuela*
+  with a brand-new shelf, notes, `physical`, a finished date and 2 rereads in one action — entry 17,
+  everything persisted, publisher and page count fetched. No console or page errors.
+- Deviations: the measurement changed the design. The owner asked "do we already have the data?" and
+  the answer is **partly** — identity yes, description/tracklist no, and there is no provider
+  response cache — so it is a button rather than an effect, and the fork was put to the owner with
+  that cost stated (DEC-064).
+- Dead ends worth not repeating: **a `TabsTrigger` with no `TabsContent` behind it is a critical axe
+  failure** — `aria-controls` points at an element that does not exist. A single-choice filter is a
+  radio group, which is what `AddPage` already used for the very same choice. **`Command`'s `label`
+  prop is the only way to name a cmdk input** in this version; there is no `Command.Label`. And
+  **`make format` runs prettier over the tests**, so a scripted edit matching a pre-format string
+  silently no-ops — two of my own verification edits did exactly that and made a test look like it
+  bit when it did not. Assert on every replacement, and re-check that a new test fails for the
+  reason claimed *after* formatting.
+- Blocked/open: none. **Two defects the unit tests could not see, each caught by the gate built for
+  it**: the axe suite caught the tab strip's dangling `aria-controls`, and the walkthrough caught
+  `Language` rendered twice on a real MusicBrainz record, because both domains declare it as a field
+  while the candidate also carries a column of that name.
+- Observed and out of scope: the walkthrough left entry 17 (*Rayuela*, 2000 Alfaguara edition) and a
+  shelf "Rayuelas" in the dev library. The library now holds 10 entries.
+- Next: Sprint 028 (the domain contract) is `ready`. **Gated**: Phase A writes the contract and a
+  conformance suite and changes nothing user-visible, and concluding that little is misplaced is a
+  complete outcome.

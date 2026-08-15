@@ -1821,3 +1821,64 @@ Append-only record of material architecture choices, product-default resolutions
   sprint.
 - **Consequences.** Three sprints' work is on one branch and still unpushed. The merge decision is
   unchanged and still the owner's; it now covers 025, 026 and 027 together.
+
+## DEC-064 — The add screen shows what is already known, and asks before fetching more
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Extends:** DEC-045 (the provider quota and the rule that search is recorded but never blocked),
+  DEC-052 seam 3 (a screen renders from the field spec), DEC-059 (a format is not a shelf).
+- **Context:** the owner tried the closed Sprint 027 and reported the add flow: *"the search page,
+  after you clicked on an item, feels empty. If we have the data, we could show the metadata there
+  before confirming."* The question in it — *do we already have the data?* — was measured before
+  anything was designed, and the answer is **partly**, which is what shaped the decision.
+
+  A `SearchCandidate` carries `title`, `subtitle`, `creators`, `credit`, `year`, `original_year`,
+  `language`, `identifiers` and `cover_url`. The confirm screen rendered the cover, the title and
+  the credit, and discarded the rest. It does **not** carry `publisher`, `page_count`, `description`
+  or `subjects` for a book, or `label`, `catalog_number`, `format` or `tracklist` for a record:
+  those come from `provider.fetch`, which ran only at add time. There is no provider response cache
+  — Sprint 005's "cached add" caches the resulting *item*, not the HTTP call — so previewing them
+  costs one live request per candidate clicked.
+
+- **Decision.** **Free data immediately, the full record on demand.**
+
+  Everything the search already returned renders the instant a result is clicked, at no cost and
+  with nothing to wait for, from the domain's field spec rather than a book-shaped list.
+  `GET /api/search/preview` fetches one candidate's complete payload, writes nothing, and is reached
+  by a button rather than an effect — because it is a request, and a reader comparing four editions
+  should spend four requests only if they meant to.
+
+  Costed against the alternatives:
+
+  | | Shape | For | Against | Verdict |
+  |---|---|---|---|---|
+  | **A** | Free data only | No endpoint, no cost, no waiting | The description and the tracklist stay invisible until the thing is already in the library, which is the half of the complaint that motivated it | Rejected — solves the symptom, not the ask |
+  | **B** | Fetch the full record on every click | Richest possible screen | Browsing a result list spends a request per click against a rate-limited free API; MusicBrainz adds 1.1 s of pacing to each | Rejected — makes browsing expensive |
+  | **C** | Free data now, full record on a button | Instant by default, complete when asked, and the cost is visible and chosen | One more endpoint and one more piece of state | **Accepted** |
+
+  **The preview follows search's quota rule, not enrichment's.** The spend is recorded and never
+  blocked, because somebody is waiting for this one — the same reasoning DEC-045 applied to search:
+  the last request of a day belongs to a person, not to background work that can defer to tomorrow.
+
+- **And the opinion is set while adding.** `POST /api/entries` accepts `notes`, `formats`,
+  `date_started`, `date_finished` and `reread_count`, each validated against the item's own domain
+  and refused with a 422 naming it — the same rule `PATCH` follows (DEC-060 judgement 3), applied on
+  the way in and **before the write**, so a refusal leaves no half-added row. Adding a book you just
+  finished was previously an add followed immediately by an edit.
+
+- **One control per concept, shared across screens.** The create-on-type shelf control moved to
+  `features/shelves` and is used by the detail page and the add screen. Formats became one closed
+  multi-select control used by the add screen and the opinion dialog, replacing two checkbox rows.
+  **The two controls stay distinct, and that is DEC-059 and not styling**: the shelf control has a
+  text input and offers to create, because a shelf is a tier you invent; the format control has
+  neither, because a format is a closed vocabulary the domain declares. A single widget doing both
+  would erase the distinction the owner drew.
+
+- **Consequences.** The library and the add screen now render every domain-shaped thing from
+  `GET /api/item-types`, so Sprint 028's conformance suite covers one more surface a domain gets for
+  free. Two defects the suite could not see were found by the walkthrough and the axe gate
+  respectively: a fact declared both as a candidate column and as a domain field was named twice,
+  and the first pass's domain strip was a Radix `Tabs` whose triggers pointed `aria-controls` at a
+  panel that was never rendered — it is a radio group now, the pattern the add screen already used
+  for the same choice.

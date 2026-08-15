@@ -632,13 +632,21 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 **`/add` — Search & add.**
 - Single input accepting free text, URL, or ISBN; detects which
 - Picker grid per §4.3
-- On select: a small form — status (default `read`), score, shelves — then save
+- On select: **what we already know** about the thing you clicked — everything the
+  search returned, rendered from the domain's field spec, at no cost and with nothing
+  to wait for — plus *Load full details*, which fetches the complete record (the
+  description, the page count, the tracklist) in one provider request when asked
+  (DEC-064). Then a small form: status (the domain's default), score, shelves,
+  notes, format and whichever passage fields the domain declares, so a book you just
+  finished is one action rather than an add followed by an edit
   returns to `/` with the new entry highlighted
 
 **`/books/{entry_id}` — Detail.**
 - Cover, full metadata, description
 - Editable: status, score, notes, format, and — for a domain that has them — dates and
-  reread count, in one *Edit your opinion* dialog
+  reread count, in one *Edit your opinion* dialog. A format is picked from one closed
+  multi-select control, the same one the add screen uses, and never from a control that
+  can invent a value (DEC-059, DEC-064)
 - **Shelves are edited inline, where they are read** — the entry's shelves as removable
   chips plus one control that filters existing shelves as you type and offers to create
   what does not exist yet, creating and assigning in one action. Not in the opinion dialog

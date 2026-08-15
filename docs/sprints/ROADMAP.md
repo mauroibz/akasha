@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 027](027-library-shell-and-shelves.md)
+**Active sprint:** [Sprint 028](028-the-domain-contract.md)
 
 ## Shape of the plan
 
@@ -77,8 +77,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [024](024-export.md) | Export | 020 | completed |
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
-| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | **in progress** |
-| [028](028-the-domain-contract.md) | The domain contract | 027 | planned |
+| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
+| [028](028-the-domain-contract.md) | The domain contract | 027 | **ready** |
 | 029 | Per-domain imports | 028 | planned |
 
 ## Contracts for planned sprints
@@ -318,7 +318,13 @@ and was tested, but no control sent it, and product spec §7 said so. The tab de
 with the owner as **the last domain used** (DEC-062), which also records why `type` clears the
 status facets but applies to `format_counts`. The library now virtualizes against the window;
 Sprint 013's scale and feed-semantics checks were re-run against that rather than assumed. Ran on
-`sprint-025-albums` per DEC-063.]
+`sprint-025-albums` per DEC-063.
+
+**Reopened the same day** at the owner's request to fold in the add flow, which is the same
+complaint one screen over: the confirm screen showed three of the fields the search had already
+returned and discarded the rest. It now shows all of them for free and fetches the full record on a
+button (DEC-064), shelves and the whole opinion can be set while adding, and one shared control per
+concept replaced two rows of checkboxes.]
 
 ### [Sprint 028 — The domain contract](028-the-domain-contract.md)
 

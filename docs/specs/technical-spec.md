@@ -328,7 +328,15 @@ The product-spec route list is authoritative, with these refinements:
 - `POST /entries/accept-suggested` returns affected count and operates in one transaction over the server-side filter, not client-loaded IDs.
 - `POST /items/{id}/refresh` requires explicit overwrite confirmation.
 - `POST /entries` requires `confirm_near_match=true` before creating a title/first-author
-  near-match; the initial 409 includes advisory existing entry IDs and performs no write.
+  near-match; the initial 409 includes advisory existing entry IDs and performs no write. It also
+  accepts `notes`, `formats` and the passage fields, each validated against the item's own domain
+  and refused with a 422 naming it — the same rule `PATCH` follows, applied **before the write**, so
+  a refusal never leaves a half-added row.
+- `GET /search/preview` returns one candidate's full provider payload and writes nothing. It exists
+  because a search result carries an identity but not a description, a page count or a tracklist,
+  and there is no provider response cache, so it is one live request per call (DEC-064). It follows
+  `search`'s quota rule rather than enrichment's: the spend is recorded and never blocked, because
+  somebody is waiting for it.
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - Import commit bodies contain preview batch IDs, not client-controlled source payloads.

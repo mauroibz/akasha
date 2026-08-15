@@ -1,6 +1,6 @@
 # Sprint 027 — Library shell and shelves
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 026
 **Roadmap revision:** 11
 
@@ -245,10 +245,57 @@ no console or page errors anywhere:
   failed in a full-file run and passed alone and on every re-run, including the full suite. Motion
   sampling timing, not a regression.
 
+### Second pass — the add flow (folded in after the first close)
+
+The owner tried the closed sprint and reported the add screen, which is the same complaint one
+screen over. Three commits `762ed70`..`d722135`, and DEC-064.
+
+6/7. **The confirm screen shows what is already known, and asks before fetching more** (`762ed70`).
+Measured first, and the answer was *partly*: a candidate already carries subtitle, year, original
+year, language and every identifier, and the screen rendered three fields of it. Those now render
+for free, from the domain's field spec. `GET /api/search/preview` fetches the rest — the
+description, the page count, the tracklist — on a button, writing nothing, recorded against the
+quota but never blocked by it (DEC-045's rule for search, for the same reason).
+
+8/9. **Shelves and the whole opinion, while adding** (`a8709e4`). The create-on-type control moved
+to `features/shelves` and is shared with the detail page. `POST /api/entries` accepts `notes`,
+`formats` and the domain's passage fields, validated against the item's own domain and refused with
+a 422 **before the write**, so a refusal leaves no half-added row.
+
+10. **One format control** (`a8709e4`), shared by the add screen and the opinion dialog, replacing
+both checkbox rows. Closed, no create option, visibly not the shelf control — DEC-059 turns on that
+distinction and a single widget doing both would erase it.
+
+**Two defects the unit tests could not see**, each caught by the gate built for it:
+
+- **The axe gate caught the first pass's tab strip.** It was a Radix `Tabs` whose triggers pointed
+  `aria-controls` at a `TabsContent` that was never rendered — a critical `aria-valid-attr-value`
+  failure. It is a radio group now, the pattern `AddPage` already used for the same choice.
+- **The walkthrough caught a fact named twice.** Both domains declare `language` and books declare
+  `original_year`, while a candidate carries columns of the same names, so a real MusicBrainz record
+  rendered "Language: eng" twice (`d722135`). The domain's label wins; the candidate's column is the
+  fallback value.
+
+**One e2e assertion was rebased, not weakened.** "A card status listbox is not recycled out from
+under the reader" asserted the scroll container's `scrollTop` was exactly 0. With the page as the
+scroll container, Radix's scroll lock leaves a measured 2px residual, so a 4000px gesture is now
+bounded to under 10px, with the reason recorded in the test.
+
+### Second-pass verification
+
+`make check`, `make test` (**419 backend, 126 frontend**), `npm run test:e2e` (**86 passed, 2
+skipped**) — all green. Walkthrough against the real dev library and **live providers**: searching
+MusicBrainz showed year and artist credit instantly with **zero** preview requests; *Load full
+details* spent exactly one and added label, catalogue number, country, format and track count, after
+which the button is gone. A record offers notes and formats and **no** dates or reread count
+(DEC-057); a book offers all of them. Added *Rayuela* with a brand-new shelf "Rayuelas", notes, the
+`physical` format, a finished date and a reread count of 2 — all in one action, all persisted
+(entry 17), with publisher and page count fetched. No console or page errors.
+
 ### Impact on later sprints
 
 - **Sprint 028** — the conformance suite gains what a domain now gets for free by existing: a tab,
-  its chips, its formats, its counts. `ItemTypeName` is a third published union to check for drift.
+  its chips, its formats, its counts, its add-screen facts and its add-screen opinion fields. `ItemTypeName` is a third published union to check for drift.
   The facet asymmetry in DEC-062 is a rule the contract has to state, not a detail.
 - **Sprint 029** — unaffected. Import remains book-only and triage remains domain-agnostic, which is
   why `EntryFilter` deliberately did **not** gain `type`.
