@@ -124,11 +124,8 @@ async def enrichment_providers(
     not one HTTP call — an Open Library edition drags in its authors and its work — and
     counting them is what turns a per-book cost into an import-sized one.
     """
-    from book_tracker.infrastructure.providers import (
-        GoogleBooksProvider,
-        OpenLibraryProvider,
-        create_provider_client,
-    )
+    from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
+    from book_tracker.infrastructure.providers import create_provider_client
 
     providers: dict[str, Any] = {}
     clients: list[httpx.AsyncClient] = []

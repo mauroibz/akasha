@@ -11,10 +11,10 @@ from sqlalchemy.orm import Session
 
 from book_tracker.application.enrichment import enqueue_enrichment_backfill
 from book_tracker.application.library import LibraryError
-from book_tracker.domain.calibre import CalibreAdapter
-from book_tracker.domain.goodreads import parse_goodreads
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.matching import MatchKind
+from book_tracker.domains.book.calibre import CalibreAdapter
+from book_tracker.domains.book.goodreads import parse_goodreads
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_uploaded_cover
 from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
 from book_tracker.infrastructure.repositories import DomainRepository, ImportRepository

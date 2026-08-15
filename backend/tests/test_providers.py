@@ -11,12 +11,8 @@ from book_tracker.application.providers import (
 )
 from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
 from book_tracker.domains.book import BOOK_IDENTITY
-from book_tracker.infrastructure.providers import (
-    MAX_PROVIDER_BYTES,
-    GoogleBooksProvider,
-    OpenLibraryProvider,
-    ProviderPayloadError,
-)
+from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
+from book_tracker.infrastructure.providers import MAX_PROVIDER_BYTES, ProviderPayloadError
 
 
 @pytest.fixture

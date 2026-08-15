@@ -8,16 +8,15 @@ from __future__ import annotations
 import pytest
 from recordings import recording, redirect_location, replay
 
-from book_tracker.infrastructure.providers import (
+from book_tracker.domains.book.providers import (
     EDITION_CONFIRMED,
     EDITION_CONTRADICTED,
     EDITION_UNVERIFIABLE,
     GoogleBooksProvider,
     OpenLibraryProvider,
-    ProviderPayloadError,
     classify_edition,
-    create_provider_client,
 )
+from book_tracker.infrastructure.providers import ProviderPayloadError, create_provider_client
 
 GOOGLE_RECORDING = "googlebooks_isbn_9788437604572.json"
 

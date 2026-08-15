@@ -34,8 +34,9 @@ akasha/
 │   ├── src/book_tracker/
 │   │   ├── api/             # thin FastAPI routers and error mapping
 │   │   ├── application/     # use cases and transaction boundaries
-│   │   ├── domain/          # enums, value objects, provider/import contracts
-│   │   ├── infrastructure/  # SQLAlchemy repositories, providers, files, jobs
+│   │   ├── domain/          # what a domain is (spec), which exist (registry), shared contracts
+│   │   ├── domains/         # one package per domain: book/, album/ (section 6.6)
+│   │   ├── infrastructure/  # SQLAlchemy repositories, provider HTTP, files, jobs
 │   │   └── main.py          # app factory, lifespan, static SPA mount
 │   └── tests/               # unit, integration, contract
 ├── frontend/

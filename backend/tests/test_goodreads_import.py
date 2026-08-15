@@ -6,9 +6,9 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from book_tracker.config import Settings
-from book_tracker.domain import goodreads
 from book_tracker.domains.album import DOMAIN as ALBUM
 from book_tracker.domains.book import DOMAIN as BOOK
+from book_tracker.domains.book import goodreads
 from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app

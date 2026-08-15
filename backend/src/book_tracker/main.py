@@ -24,13 +24,10 @@ from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
 from book_tracker.domain.registry import DOMAINS
+from book_tracker.domains.album.providers import MusicBrainzProvider
+from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
-from book_tracker.infrastructure.musicbrainz import MusicBrainzProvider
-from book_tracker.infrastructure.providers import (
-    GoogleBooksProvider,
-    OpenLibraryProvider,
-    create_provider_client,
-)
+from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import pending_revisions, schema_is_current, upgrade

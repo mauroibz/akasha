@@ -16,7 +16,8 @@ from book_tracker.application.providers import search_providers
 from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
 from book_tracker.domains.album import ALBUM_IDENTITY
 from book_tracker.domains.book import BOOK_IDENTITY
-from book_tracker.infrastructure.providers import OpenLibraryProvider, create_provider_client
+from book_tracker.domains.book.providers import OpenLibraryProvider
+from book_tracker.infrastructure.providers import create_provider_client
 
 RAYUELA_ROUTES = {"/search.json": (200, recording("search_rayuela.json"))}
 # The provider ranks the intended edition first; five unrelated titles sort before

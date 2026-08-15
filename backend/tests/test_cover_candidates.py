@@ -24,7 +24,8 @@ from book_tracker.application.providers import (
 )
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
-from book_tracker.infrastructure.providers import OpenLibraryProvider, create_provider_client
+from book_tracker.domains.book.providers import OpenLibraryProvider
+from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.main import create_app
 from book_tracker.migrations import upgrade
 

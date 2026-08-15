@@ -92,7 +92,8 @@ async def test_search_still_answers_from_one_provider_when_the_other_is_absent(
 ) -> None:
     from recordings import recording, replay
 
-    from book_tracker.infrastructure.providers import OpenLibraryProvider, create_provider_client
+    from book_tracker.domains.book.providers import OpenLibraryProvider
+    from book_tracker.infrastructure.providers import create_provider_client
 
     app = create_app(settings(tmp_path))
     async with (

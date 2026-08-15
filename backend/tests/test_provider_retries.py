@@ -22,10 +22,10 @@ import pytest
 from recordings import recording, redirect_location
 from sqlalchemy import Engine
 
+from book_tracker.domains.book.providers import OpenLibraryProvider
 from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.providers import (
     PROVIDER_ATTEMPTS,
-    OpenLibraryProvider,
     ProviderPayloadError,
     create_provider_client,
 )

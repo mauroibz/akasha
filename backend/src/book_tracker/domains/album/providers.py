@@ -1,4 +1,9 @@
-"""The album domain's provider: MusicBrainz for the record, Cover Art Archive for the art.
+"""Albums' adapter: MusicBrainz, plus the Cover Art Archive.
+
+It sits in this domain's package rather than in `infrastructure/`, so the album's
+adapter, vocabulary and identity rule are one directory (technical spec 6.6).
+
+The album domain's provider: MusicBrainz for the record, Cover Art Archive for the art.
 
 Three things here are not how the book providers work, and each one is measured rather
 than assumed (DEC-052, `docs/domain-architecture-proposal.md` section 2):
@@ -28,8 +33,8 @@ from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRe
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
-    _bounded_json,
-    _year,
+    bounded_json,
+    parse_year,
 )
 
 MUSICBRAINZ_BASE = "https://musicbrainz.org/ws/2"
@@ -139,7 +144,7 @@ class MusicBrainzProvider:
                 if waiting > 0:
                     await self._sleep(waiting)
             self._last_request = time.monotonic()
-        return await _bounded_json(
+        return await bounded_json(
             self.client,
             f"{MUSICBRAINZ_BASE}{path}",
             params={**params, "fmt": "json"},
@@ -160,7 +165,7 @@ class MusicBrainzProvider:
             title=title,
             subtitle=None,
             creators=creators,
-            year=_year(group.get("first-release-date")),
+            year=parse_year(group.get("first-release-date")),
             cover_url=COVER_ART_THUMBNAIL.format(release_group=release_group_id),
             # A barcode is not an edition key (obs. 3) and a release group has no
             # global identifier at all, so nothing here is offered as one.
@@ -257,7 +262,7 @@ class MusicBrainzProvider:
             title=str(group.get("title") or release.get("title") or ""),
             subtitle=None,
             creators=creators,
-            year=_year(group.get("first-release-date")) or _year(release.get("date")),
+            year=parse_year(group.get("first-release-date")) or parse_year(release.get("date")),
             cover_url=COVER_ART_THUMBNAIL.format(release_group=source_id),
             identifiers={},
             language=language,

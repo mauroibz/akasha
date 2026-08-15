@@ -11,7 +11,7 @@ import httpx
 import pytest
 from recordings import recording, replay
 
-from book_tracker.infrastructure.musicbrainz import (
+from book_tracker.domains.album.providers import (
     COVER_ART_THUMBNAIL,
     MUSICBRAINZ_MIN_INTERVAL_SECONDS,
     MusicBrainzProvider,
