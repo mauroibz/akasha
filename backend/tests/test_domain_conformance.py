@@ -286,14 +286,17 @@ def the_published_unions_carry_this_domain(domain: Domain, _engine: Engine) -> N
 
 @core_check
 def the_database_accepts_every_declared_status(domain: Domain, engine: Engine) -> None:
-    """The check the measurement forced, and the one that fails for a new domain.
+    """The check the measurement forced, and the reason `ck_entries_status` is gone.
 
-    `entries.ck_entries_status` is rendered from `ALL_STATUSES` **at migration-write
-    time** (`0013_entry_formats.py`), so it is a frozen list rather than a live rule. A
-    domain declaring a status books and albums lack passes `validate_status` and is then
-    refused by SQLite — which means adding a domain currently requires a migration on a
-    shared table. Passing the API and failing the database is the worst possible split,
-    because it fails at write time on the reader's data rather than at import time.
+    It was rendered from `ALL_STATUSES` **at migration-write time**
+    (`0013_entry_formats.py`), so it was a frozen list rather than a live rule: a domain
+    declaring a status books and albums lacked passed `validate_status` and was then
+    refused by SQLite, which meant adding a domain required a migration on a shared
+    table. Passing the API and failing the database is the worst possible split, because
+    it fails at write time on the reader's data rather than at registration.
+
+    Migration `0014_status_is_the_domains` dropped it (DEC-067 row 1). This check now
+    holds the property that replaced it: whatever a domain declares, the database takes.
     """
     with engine.begin() as connection:
         item_id = connection.execute(
@@ -318,9 +321,9 @@ def the_database_accepts_every_declared_status(domain: Domain, engine: Engine) -
                 )
         except IntegrityError as error:
             raise AssertionError(
-                f"the database refuses {domain.item_type}'s status {status.value!r}: "
-                "ck_entries_status holds a list frozen when its migration was written, "
-                "so this domain cannot be added without a migration on the shared table"
+                f"the database refuses {domain.item_type}'s status {status.value!r}, "
+                "so this domain cannot be added without a migration on the shared "
+                "`entries` table"
             ) from error
 
 
@@ -435,16 +438,15 @@ def test_a_domain_that_does_not_exist_yet_satisfies_the_contract_alone(name: str
     REGISTRY_CHECKS[name](a_third_domain())
 
 
-def test_but_the_core_cannot_host_it_yet(migrated: Engine) -> None:
-    """The measurement, as a test. **This is the finding, not a bug in the fixture.**
+def test_the_core_now_hosts_a_status_no_registered_domain_declares(migrated: Engine) -> None:
+    """The measurement, and then the repair. **This test was written to flip, and did.**
 
-    `a_third_domain` reuses statuses books and albums already declare, so it passes. Give
-    it one of its own — `playing`, which is what a game actually needs — and it is
-    refused twice over: the published union does not carry it, and neither does the
-    database. Both are shared, and both need editing by whoever adds the domain.
-
-    When Phase B removes that coupling this test flips, loudly, and should be rewritten
-    to assert the new behaviour rather than deleted.
+    Phase A asserted the opposite: a third domain declaring `playing` was refused twice
+    over, by the published union and by the database. DEC-067 costed the two separately
+    and they were answered differently, which is the point of pricing them apart —
+    `ck_entries_status` was dropped in `0014_status_is_the_domains` because a per-domain
+    migration on a shared table is a real barrier, and the hand-spelled unions were kept
+    because three lines caught by a test are cheaper than any way of removing them.
     """
     with_its_own_status = a_third_domain(
         statuses=(
@@ -458,10 +460,12 @@ def test_but_the_core_cannot_host_it_yet(migrated: Engine) -> None:
     for check in REGISTRY_CHECKS.values():
         check(with_its_own_status)
 
+    # The database now takes whatever a domain declares: adding a domain is no longer a
+    # schema change, and two domain teams no longer collide on one alembic head.
+    CORE_CHECKS["the_database_accepts_every_declared_status"](with_its_own_status, migrated)
+    # The published union is still a hand-spelled line per value, deliberately (row 2).
     with pytest.raises(AssertionError, match="EntryStatus"):
         CORE_CHECKS["the_published_unions_carry_this_domain"](with_its_own_status, migrated)
-    with pytest.raises(AssertionError, match="ck_entries_status"):
-        CORE_CHECKS["the_database_accepts_every_declared_status"](with_its_own_status, migrated)
 
 
 MALFORMED: list[tuple[str, str, Domain]] = [

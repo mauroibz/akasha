@@ -118,7 +118,7 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
         "covers": 1,
         "attachments": 0,
     }
-    assert result.manifest["alembic_revision"] == "0013_entry_formats"
+    assert result.manifest["alembic_revision"] == "0014_status_is_the_domains"
     verify_backup(result.path)
 
 

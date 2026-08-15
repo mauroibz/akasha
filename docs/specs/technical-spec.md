@@ -144,7 +144,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 `entries`
 
 - product-spec fields plus foreign key `item_id` with restrict-on-delete
-- checks for status, score, nonnegative `reread_count`, and boolean `score_provisional`
+- checks for score, nonnegative `reread_count`, and boolean `score_provisional`. **There is no CHECK on `status`** (migration `0014`, DEC-067 row 1): the vocabulary is the domain's, and a constraint listing the union of every domain's values could neither express "`owned` is not a book status" nor admit a domain added later without a migration on this table. `validate_status`, keyed on the item's own domain, is the authority and is strictly stronger
 - unique `(user_id, item_id)`
 - indexes supporting status/score/date list paths
 
@@ -368,7 +368,7 @@ Exactly three things stay shared, and they are the registration points rather th
 2. **Provider wiring** in the application lifespan, where its adapter is constructed with its configuration.
 3. **Migrations**, which are global by nature and are the one path to a schema change.
 
-Anything else a domain has to edit outside its own package is a coupling, and a coupling is a defect to record and cost. Three are known and open as of Sprint 028, and are what a new domain still pays: the published unions (`EntryStatus`, `EntryFormat`, `ItemTypeName`), `entries.ck_entries_status` — a CHECK rendered from the registry when its migration was written, so a status no existing domain declares is accepted by the API and refused by the database — and the cover host allowlist. See DEC-066.
+Anything else a domain has to edit outside its own package is a coupling, and a coupling is a defect to record and cost. Two remain after Sprint 028, both deliberately (DEC-066, DEC-067): the published unions (`EntryStatus`, `EntryFormat`, `ItemTypeName`), which are three type-safe lines per domain that a test refuses to let drift, and the cover host allowlist, which is central precisely so a domain cannot widen it from its own package. The third — `entries.ck_entries_status`, a CHECK rendered from the registry when its migration was written — was removed in migration `0014`, because a domain needing a schema change on a shared table is not a coupling that can be paid per domain: two domain teams would both write that migration against the same alembic head.
 
 #### How the core serves a domain
 

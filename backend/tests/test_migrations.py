@@ -79,6 +79,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0011_creator_sort_names",
         "0012_creators",
         "0013_entry_formats",
+        "0014_status_is_the_domains",
     ]
 
     upgrade(configured.database_url)
@@ -149,6 +150,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0011_creator_sort_names",
         "0012_creators",
         "0013_entry_formats",
+        "0014_status_is_the_domains",
     ]
 
 
@@ -490,3 +492,60 @@ def test_the_widened_constraint_admits_an_album_status_and_still_refuses_nonsens
             (NOW, NOW, NOW),
         )
     connection.close()
+
+
+def test_the_status_check_is_gone_and_the_neutral_ones_are_not(tmp_path: Path) -> None:
+    """DEC-067 row 1, and the trap its own migration warns about.
+
+    `copy_from` skips reflection, and SQLAlchemy does not reflect SQLite CHECK
+    constraints at all — so a rebuild that dropped one constraint could silently drop
+    the other three with it. Score, reread count and provisionality are neutral facts
+    about an entry that no domain redefines, and they have to survive.
+    """
+    configured = database_at(tmp_path / "data", "head")
+    database_path = configured.data_dir / "books.db"
+    connection = sqlite3.connect(database_path)
+    schema = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+
+    assert "ck_entries_status" not in schema
+    assert "ck_entries_suggested_status" not in schema
+    for surviving in (
+        "ck_entries_score",
+        "ck_entries_reread_count",
+        "ck_entries_score_provisional",
+    ):
+        assert surviving in schema
+
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'game', 'Outer Wilds', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    # A status no registered domain declares is now the database's business no longer:
+    # `validate_status` is keyed on the item's own domain and is strictly stronger.
+    connection.execute(
+        "INSERT INTO entries (id, user_id, item_id, status, date_added, reread_count,"
+        " score_provisional, created_at, updated_at)"
+        " VALUES (1, 1, 1, 'playing', ?, 0, 0, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    # A score out of range is still refused, which is the half that must not have moved.
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute("UPDATE entries SET score = 11 WHERE id = 1")
+    connection.close()
+
+
+def test_the_status_check_comes_back_on_a_downgrade(tmp_path: Path) -> None:
+    """Down restores the snapshot, which is the honest inverse rather than a no-op."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", "head")
+    assert configured.database_url is not None
+    command.downgrade(alembic_config(configured.database_url), "0013_entry_formats")
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    schema = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+    connection.close()
+
+    assert "ck_entries_status" in schema
+    assert "'owned'" in schema
