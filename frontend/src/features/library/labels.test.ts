@@ -6,6 +6,7 @@ import {
   formatsFor,
   hasEntryField,
   hotkeysFor,
+  statusLabelFor,
   statusLabels,
   statusesFor,
 } from "@/features/library/labels";
@@ -58,11 +59,18 @@ const registry: ItemType[] = [
 ];
 
 describe("the status vocabulary", () => {
-  it("labels every status the API can return", () => {
+  it("never renders nothing for a status the API can return", () => {
+    // The fallback table is deliberately partial, so a domain added later needs no edit
+    // here (DEC-067 row 10). What must hold is that the *lookup* always answers: with
+    // the domain's own label, else the shared fallback, else the stored value.
     for (const status of entryStatuses) {
-      expect(statusLabels[status]).toBeTruthy();
+      expect(statusLabelFor("book", undefined, status)).toBeTruthy();
     }
-    expect(Object.keys(statusLabels).sort()).toEqual([...entryStatuses].sort());
+    // Every fallback it does carry belongs to the published union — a label for a value
+    // no domain can hold is dead copy.
+    for (const value of Object.keys(statusLabels)) {
+      expect([...entryStatuses]).toContain(value);
+    }
   });
 
   it.each(registry)("gives $id a complete, non-drifting table", (type) => {

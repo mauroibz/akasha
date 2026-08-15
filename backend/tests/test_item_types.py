@@ -16,6 +16,7 @@ import pytest
 from sqlalchemy import text
 
 from book_tracker.config import Settings
+from book_tracker.domain.registry import DOMAINS
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 
@@ -40,7 +41,11 @@ async def test_every_domain_publishes_its_fields(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     published = {row["id"]: row for row in response.json()}
-    assert set(published) == {"book", "album"}
+    # Every registered domain, not a closed list: a third domain must not have to edit
+    # this test to be published. The two below are then asserted by name because what
+    # they declare is the point of the rest of this test.
+    assert set(published) == set(DOMAINS)
+    assert {"book", "album"} <= set(published)
 
     book_fields = {field["name"]: field for field in published["book"]["fields"]}
     assert book_fields["creators"]["multiplicity"] == "many"

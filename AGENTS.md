@@ -9,6 +9,8 @@ From the repository root:
 1. Run `git status --short --branch` and `python scripts/validate_project.py`.
 2. Read, in order:
    - this file;
+   - `docs/README.md` — the documentation map, which says of every document whether it is
+     canonical, historical or a proposal. A dated path inside a closed sprint is not an instruction;
    - `docs/agent/state.json`;
    - the active sprint file named by `active_sprint_file`;
    - every document listed in that sprint's `Required context` section;
@@ -96,5 +98,6 @@ When documents conflict, do not guess. If the product intent is clear, reconcile
 - Network providers are never consulted while rendering cached library pages.
 - Calibre is opened read-only.
 - v1 has no auth and must remain LAN-only.
+- A domain is a package under `backend/src/book_tracker/domains/`, and the shared layers never branch on which one they are holding. `if item_type == "book"` above the registry is a defect, not a shortcut — technical spec 6.6 is the contract and `docs/guides/adding-a-domain.md` is how to satisfy it.
 - Internal names are permanent: the code package stays `book_tracker` and the core entities stay `items`/`entries` regardless of product branding. No session renames them to match a brand; user-facing copy is the only thing that follows the brand.
 - Secrets, databases, uploaded imports, and covers are never committed.

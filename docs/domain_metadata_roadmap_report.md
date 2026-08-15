@@ -1,5 +1,17 @@
 # Metadata Domains for a “MyAnimeList for Everything” Self-Hosted App
 
+**Status:** historical — a viability survey, not a design. Written before the domain architecture
+existed. Its per-provider assessments (catalogue breadth, Spanish coverage, artwork, licensing) are
+still the reference for *which* domain to build next and are not superseded by anything.
+
+**Its architecture recommendation is superseded.** "Build the plugin boundary now, keep it internal
+and lightweight" was answered by DEC-052 and built by Sprints 025–028: the boundary exists, it is
+code rather than a plugin runtime, and how to attach a domain to it is
+[`guides/adding-a-domain.md`](guides/adding-a-domain.md). Read the sections below for provider
+economics, not for how this codebase is organised.
+
+---
+
 ## Executive summary
 
 There are enough viable domains to justify a **generic domain/plugin architecture now** rather than hard-coding books plus one or two additions.

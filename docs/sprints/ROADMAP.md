@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 029](029-one-search-bar.md)
+**Active sprint:** [Sprint 028](028-the-domain-contract.md)
 
 ## Shape of the plan
 
@@ -79,8 +79,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
-| [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
-| [029](029-one-search-bar.md) | One search bar | 027, 028 | **ready** |
+| [028](028-the-domain-contract.md) | The domain contract | 027 | **in progress** |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | planned |
 | 030 | Per-domain imports | 029 | planned |
 
 ## Contracts for planned sprints
@@ -381,9 +381,12 @@ it.
 
 ### Sprint 030 — Per-domain imports
 
-The last sprint in the plan. Import is book-only today — `domain/goodreads.py`, `domain/calibre.py`
-and `application/imports.py` assume books throughout, while the ledger, the preview and undo are
-genuinely shared and must stay that way.
+The last sprint in the plan. Import is book-only today. Sprint 028 moved the two readers into the
+domain they serve — `domains/book/goodreads.py` and `domains/book/calibre.py` — so what remains
+book-shaped is the layer *above* them: `application/imports.py` and `api/imports.py` assume books
+throughout, while the ledger, the preview and undo are genuinely shared and must stay that way. The
+boundary this sprint draws is therefore between the shared pipeline and importers that already live
+in the right place (DEC-069).
 
 The outcome is a pipeline where `calibre → books` is one importer among several rather than the
 shape of importing itself, so that `spotify → music` and `steam → games` are **epics somebody else

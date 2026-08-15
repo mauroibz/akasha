@@ -49,7 +49,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Frontend | React + Vite + TypeScript + Tailwind + shadcn/ui + Motion | Highest polish-per-unit-effort for someone without frontend experience |
 | Imports | Goodreads CSV + Calibre `metadata.db`, both in v1 | Existing libraries in both; hand-entry is not viable |
 | Metadata sources | Open Library + Google Books, manual fallback | Free, keyless (OL) / good Spanish coverage (GB) |
-| Domain generality | `items.type` present, provider interface defined, **no plugin runtime** | Extract the registry when a second domain actually exists |
+| Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
 | List rendering | TanStack Virtual + keyset pagination on `/` and `/triage` | Calibre libraries reach thousands of rows |
 | Auth | None. LAN-only; internal proxying allowed, no internet-reachable route | Deferred with sharing; see §9 |
@@ -774,18 +774,29 @@ ever lives on a different machine than the tracker, Calibre's Content Server
 exposes `/ajax/search` and `/ajax/books` over HTTP. Direct `metadata.db` reads
 are simpler while both are on the ZimaBoard.
 
-**Scheduled — second domain (albums).** The `items`/`entries` split and the
-two-method provider shape are the entire preparation. The second domain is
-**albums, scheduled as Sprint 025** under plan revision 10, not wine as this
-section originally assumed: MusicBrainz needs no OAuth, release-group versus
-release maps onto the work-versus-edition problem already solved for books, and
-Cover Art Archive exercises the separate-image-provider case. Sprint 026 is the
-status vocabulary; games (027) and series (028) follow. DEC-052 replaced the
-"add a provider and see" shape with **six named seams**, validated against the
-live MusicBrainz API rather than assumed — and found that casting an album into
-book fields is lossy, because MusicBrainz only inverts a *person's* sort name and
-a barcode is not a unique edition key. Do **not** build the plugin runtime before
-two domains exist.
+**Built — the second domain (albums), and the contract behind it.** The
+`items`/`entries` split and the two-method provider shape were the entire
+preparation. Albums were chosen over wine, which this section originally assumed:
+MusicBrainz needs no OAuth, release-group versus release maps onto the
+work-versus-edition problem already solved for books, and Cover Art Archive
+exercises the separate-image-provider case. DEC-052 replaced the "add a provider
+and see" shape with **six named seams**, validated against the live MusicBrainz
+API rather than assumed — and found that casting an album into book fields is
+lossy, because MusicBrainz only inverts a *person's* sort name and a barcode is
+not a unique edition key.
+
+Sprints 025–027 built albums; **Sprint 028 wrote the contract and made a domain a
+unit of code**: each one lives in its own package, holds its own vocabulary and
+adapter, and is held to a conformance suite it passes by existing. A third domain
+is now an **epic on top of that contract** rather than a sprint inside this plan
+(DEC-058), and it costs its own package, one registry entry, provider wiring and
+three enum lines — no migration, and no edit to another domain's files (DEC-069).
+**Games and series are named as future epics and carry no sprint number.** The
+guide is `docs/guides/adding-a-domain.md`.
+
+The line that has not moved: **no plugin runtime.** The registry is code, built
+and shipped with the application. Nothing here proposes discovery, sandboxing or
+versioning between a domain and the core.
 
 Wine stays exploratory and unscheduled — see `docs/domain_metadata_roadmap_report.md`.
 Expect it to be manual-entry-first: there's no free equivalent of ISBN, identity

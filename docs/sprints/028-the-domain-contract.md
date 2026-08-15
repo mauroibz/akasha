@@ -1,6 +1,6 @@
 # Sprint 028 — The domain contract
 
-**Status:** completed
+**Status:** in_progress
 **Depends on:** 027
 **Roadmap revision:** 11
 **Branch:** `sprint-025-albums`, continuing DEC-053/DEC-061/DEC-063. The owner settled this at

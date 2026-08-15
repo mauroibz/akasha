@@ -1,5 +1,12 @@
 # Project assessment — 2026-08-08
 
+**Status:** historical. An audit of the repository as it stood after Sprint 013, kept because the
+diagnosis and the gates it produced are still load-bearing — every verification rule in
+`CONTRIBUTING.md` traces to it. **File paths below describe the code on that date** and several have
+moved since; the current layout is in technical spec §2.
+
+---
+
 **Author:** audit session preceding roadmap revision 6
 **Trigger:** after Sprint 013 the owner reported the product as a candidate failure — clunky UI,
 incomplete flows, searched books not found, books added without metadata, missing polish — and

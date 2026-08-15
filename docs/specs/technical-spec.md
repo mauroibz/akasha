@@ -313,11 +313,25 @@ A **domain** is a kind of thing the library holds: books, albums. This section i
 
 **The core is neutral and stays that way.** `items` has been `type` / `title` / `subtitle` / `year` / `cover_path` / `identifiers` / opaque `metadata` since Sprint 002, and `entries` hold one person's opinion of an item. No shared layer branches on which domain it is holding; a domain is never translated into another domain's vocabulary, and there is no `if item_type == ...` anywhere above the registry. **A shared layer that needs to know the domain asks the registry for a declaration; it does not grow a branch.**
 
+```text
+  api/ · application/ · infrastructure/     shared layers — never branch on item type
+                    ▲
+                    │ ask the registry for a declaration
+  domain/spec.py     what a domain IS          domain/registry.py   which ones EXIST
+                    ▲                                    ▲
+      ┌─────────────┴─────────────┐        ┌─────────────┴─────────────┐
+      │  domains/book/            │        │  domains/album/           │
+      │  declaration · adapters   │        │  declaration · adapter    │
+      │  · importers              │        │                           │
+      └───────────────────────────┘        └───────────────────────────┘
+                     never import each other
+```
+
 **The registry is code, not a plugin runtime** (product spec section 2). A domain is a Python object registered at import time. There is no discovery, no entry point, no sandbox and no versioning between a domain and the core: they are built and shipped together.
 
 #### What a domain supplies
 
-One `Domain` (`backend/src/book_tracker/domain/domains.py`), whose every field is an obligation:
+One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in `backend/src/book_tracker/domains/<item_type>/__init__.py`), whose every field is an obligation:
 
 | Field | Obligation |
 |---|---|
@@ -336,7 +350,7 @@ One `Domain` (`backend/src/book_tracker/domain/domains.py`), whose every field i
 
 Plus, outside the record itself:
 
-- **An adapter** implementing the `Provider` protocol (`domain/providers.py`) in `infrastructure/`: `name`, `item_type`, `async search(query, limit)` and `async fetch(source_id)`, returning `SearchCandidate` / `ItemPayload`. It owns its own rate limit, User-Agent and authentication, and never leaks a raw provider response above infrastructure (section 6.2). Its boundary behaviour is proven against committed recorded responses, never against a mock of the method under test (DEC-025).
+- **An adapter** implementing the `Provider` protocol (`domain/providers.py`), in the domain's own package as `domains/<item_type>/providers.py`: `name`, `item_type`, `async search(query, limit)` and `async fetch(source_id)`, returning `SearchCandidate` / `ItemPayload`. It owns its own rate limit, User-Agent and authentication, and never leaks a raw provider response above infrastructure (section 6.2). Its boundary behaviour is proven against committed recorded responses, never against a mock of the method under test (DEC-025).
 - **Cover URLs**, as candidates only. The shared pipeline keeps sole ownership of https upgrading, the host allowlist, the redirect policy and the pixel and byte bounds; a domain whose art lives on a new host adds that host to the allowlist and nothing else (seam 4).
 - **A curated sort name where the source knows one.** `SearchCandidate.creator_sort` seeds the owner's override; the `creator_sort_name` heuristic runs only when nothing knew. A source that distinguishes a person from a group must say so this way rather than let the heuristic invert `Daft Punk` (DEC-051, DEC-052).
 
@@ -361,7 +375,9 @@ Plus, outside the record itself:
 
 One package per domain, `backend/src/book_tracker/domains/<item_type>/`, holding its registry entry, its field spec, its status and format vocabularies, its identity strategy, its URL recognizer, its provider adapter and its importers. The point is that **one domain's team edits one directory**, so two domains can be built in parallel without contending for the same files.
 
-**This layout is prescribed and not yet inhabited.** As of Sprint 028 Phase A, books' and albums' parts are still spread across `domain/domains.py`, `domain/providers.py`, `domain/goodreads.py`, `domain/calibre.py`, `infrastructure/providers.py` and `infrastructure/musicbrainz.py`; moving them is that sprint's gated Phase B. A domain built before the move follows the same rule by keeping its own parts together and adding nothing to another domain's file.
+Books and albums live there as of Sprint 028: `domains/book/` holds its declaration, its Open Library and Google Books adapters and its Goodreads and Calibre importers; `domains/album/` holds its declaration and its MusicBrainz adapter. What remains in `infrastructure/providers.py` is the shared HTTP boundary — the bounded retrying JSON read, the retry policy and the one client every adapter uses — which belongs to no domain. `domain/spec.py` is what a domain is; `domain/registry.py` is which domains exist.
+
+**The practical guide to building one is [`docs/guides/adding-a-domain.md`](../guides/adding-a-domain.md)**, which walks this section step by step with diagrams and a worked example. This section is the contract; that guide is how to satisfy it.
 
 Exactly three things stay shared, and they are the registration points rather than the domain's substance:
 

@@ -33,7 +33,13 @@ from book_tracker.application.providers import resolve_input
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
-from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
+from book_tracker.domain.registry import (
+    ALL_STATUSES,
+    DOMAINS,
+    EntryFormat,
+    EntryStatus,
+    ItemTypeName,
+)
 from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     RESERVED_FIELD_NAMES,
@@ -445,13 +451,21 @@ def test_the_core_now_hosts_a_status_no_registered_domain_declares(migrated: Eng
     migration on a shared table is a real barrier, and the hand-spelled unions were kept
     because three lines caught by a test are cheaper than any way of removing them.
     """
+    # Derived rather than written: `playing` was the example while books and albums were
+    # the only domains, and a real games domain registering it would have broken this
+    # test's premise rather than its point. A dry run of the contributor guide did
+    # exactly that. The value only has to be one no registered domain declares.
+    unclaimed = next(
+        value
+        for value in (f"conformance_status_{index}" for index in range(100))
+        if value not in ALL_STATUSES
+    )
     with_its_own_status = a_third_domain(
         statuses=(
             StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
-            StatusSpec("playing", "Playing", hotkey="g"),
-            StatusSpec("finished", "Finished", hotkey="f"),
+            StatusSpec(unclaimed, "Something of its own", hotkey="q"),
         ),
-        default_status="playing",
+        default_status=unclaimed,
     )
     # It is internally consistent: nothing about the domain itself is wrong.
     for check in REGISTRY_CHECKS.values():

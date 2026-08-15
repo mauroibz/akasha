@@ -177,6 +177,43 @@ FastAPI, SQLAlchemy, Alembic and SQLite on the backend. React 18, Vite, TypeScri
 Tailwind, shadcn/ui and TanStack Query on the frontend. One container, one process,
 one SQLite file.
 
+### Domains
+
+A **domain** is a kind of thing the library holds. Books ship; albums are built and
+waiting to be released. The point of the structure is that a third one — games, films,
+board games — is somebody else's afternoon rather than a fork.
+
+```text
+backend/src/book_tracker/
+├── api/             # thin FastAPI routers and error mapping
+├── application/     # use cases and transaction boundaries
+├── domain/          # spec.py: what a domain IS · registry.py: which ones EXIST
+├── domains/         # one package per domain
+│   ├── book/        #   declaration · Open Library + Google Books · Goodreads + Calibre
+│   └── album/       #   declaration · MusicBrainz + Cover Art Archive
+├── infrastructure/  # SQLAlchemy, provider HTTP, covers, jobs
+└── main.py
+```
+
+A domain declares its metadata fields, its status vocabulary, its formats, its identity
+rule and what it recognises in the add box. **That one declaration is served over the API
+and every screen renders from it** — tabs, chips, the metadata dialog, triage hotkeys, the
+detail page. There is no `if item_type == "book"` anywhere above the registry, and a
+conformance suite parametrised over the registry holds every domain to the same contract
+*by existing*.
+
+Adding one costs your own package, one registry entry, provider wiring and three enum
+lines. **No database migration, and no edit to another domain's files.**
+
+→ **[How to add a domain](docs/guides/adding-a-domain.md)** · the binding contract is
+[technical spec §6.6](docs/specs/technical-spec.md)
+
+### The documentation
+
+[`docs/README.md`](docs/README.md) is the map. Every document there says whether it is
+**canonical**, **historical** or a **proposal**, so a dated file is never mistaken for
+instructions.
+
 Architecture and contracts live in [the technical spec](docs/specs/technical-spec.md);
 product behaviour is canonical in [the product spec](docs/specs/product-spec.md).
 Every material decision, with its reasoning, is in [`docs/decisions.md`](docs/decisions.md).
@@ -198,10 +235,15 @@ icons as a sibling.
 
 ## Contributing
 
-Issues and pull requests are welcome. Two things worth knowing first:
+Issues and pull requests are welcome. **[`CONTRIBUTING.md`](CONTRIBUTING.md)** has the
+setup, the gates and the rules that are not style preferences. Three things worth knowing
+before you open it:
 
-- Read [`AGENTS.md`](AGENTS.md) — it governs how changes are made here, and the test
-  and verification gates are strict on purpose.
+- **Adding a domain has its own guide** —
+  [`docs/guides/adding-a-domain.md`](docs/guides/adding-a-domain.md). You should never
+  have to reverse-engineer how albums were built.
+- [`AGENTS.md`](AGENTS.md) governs how changes are made here, and the verification gates
+  are strict on purpose.
 - Provider fixtures in `backend/tests/fixtures/providers/` are pinned recordings of
   real API responses. **Never re-record one to make a test pass** — that turns a
   regression test into a rubber stamp.

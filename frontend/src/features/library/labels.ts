@@ -15,8 +15,13 @@ import type {
  * arrived or could not be fetched: the registry must never be the reason a row is
  * unreadable. It is the book vocabulary because books are what a library holds when
  * nothing else is known.
+ *
+ * **Partial on purpose.** A domain added later must not have to edit this table to be
+ * readable — an exhaustive `Record` made a new status a TypeScript error here, which is
+ * a coupling a domain should not pay for a fallback that only shows before the registry
+ * arrives. Anything absent falls back to the stored value, which is legible.
  */
-export const statusLabels: Record<EntryStatus, string> = {
+export const statusLabels: Partial<Record<EntryStatus, string>> = {
   unsorted: "Inbox",
   read: "Read",
   reading: "Reading",
@@ -75,7 +80,9 @@ export function statusLabelFor(
   status: EntryStatus,
 ): string {
   const spec = statusesFor(itemType, types).find((row) => row.value === status);
-  return spec?.label ?? statusLabels[status];
+  // The stored value is the last resort, and a perfectly readable one: a domain
+  // registered after this table was written should render as `playing`, not as blank.
+  return spec?.label ?? statusLabels[status] ?? status;
 }
 
 /**
