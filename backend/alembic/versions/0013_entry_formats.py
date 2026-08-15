@@ -18,7 +18,6 @@ formats are not that.
 import sqlalchemy as sa
 
 from alembic import op
-from book_tracker.domain.domains import ALL_STATUSES
 
 revision = "0013_entry_formats"
 down_revision = "0012_creators"
@@ -26,9 +25,13 @@ branch_labels = None
 depends_on = None
 
 
-#: Spelled from the registry rather than typed out, so a domain added later cannot
-#: leave a status the API accepts and the database refuses.
-_STATUS_LIST = ", ".join(f"'{value}'" for value in ALL_STATUSES)
+#: **Frozen, not read from the registry.** This migration used to import
+#: `ALL_STATUSES`, so two installs running it a month apart could build different
+#: constraints from the same revision — a migration is history and must not change
+#: behaviour when the registry does. 0014 drops these constraints entirely
+#: (DEC-067 row 1); the list is kept literal here so the revision still describes
+#: what it actually did.
+_STATUS_LIST = "'unsorted', 'read', 'reading', 'to_read', 'wishlist', 'dropped', 'pending', 'owned'"
 _BOOK_STATUS_LIST = "'unsorted','read','reading','to_read','wishlist','dropped'"
 
 TIMESTAMPS = (

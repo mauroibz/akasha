@@ -10,8 +10,10 @@ from sqlalchemy import Engine, and_, case, delete, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.domains import (
-    DOMAINS,
+from book_tracker.domain.normalization import normalize_text, shelf_slug
+from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
+from book_tracker.domain.registry import DOMAINS
+from book_tracker.domain.spec import (
     Domain,
     InvalidEntryField,
     InvalidFormat,
@@ -20,8 +22,6 @@ from book_tracker.domain.domains import (
     validate_formats,
     validate_status,
 )
-from book_tracker.domain.normalization import normalize_text, shelf_slug
-from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
 from book_tracker.infrastructure.attachments import (
     StoredBlob,
     delete_blob_if_unreferenced,

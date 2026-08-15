@@ -9,12 +9,8 @@ from book_tracker.application.providers import (
     resolve_input,
     search_providers,
 )
-from book_tracker.domain.providers import (
-    BOOK_IDENTITY,
-    SearchCandidate,
-    SourceRef,
-    merge_and_rank,
-)
+from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
+from book_tracker.domains.book import BOOK_IDENTITY
 from book_tracker.infrastructure.providers import (
     MAX_PROVIDER_BYTES,
     GoogleBooksProvider,

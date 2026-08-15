@@ -3,7 +3,6 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
-from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.normalization import normalize_text
 
 
@@ -59,28 +58,6 @@ class Provider(Protocol):
     async def fetch(self, source_id: str) -> ItemPayload: ...
 
 
-def isbn_identity(candidate: SearchCandidate) -> str | None:
-    """Books' cross-provider identity: an ISBN is globally unique, so it can group."""
-    value = candidate.identifiers.get("isbn13") or candidate.identifiers.get("isbn")
-    if not value:
-        return None
-    try:
-        return normalize_identifier("isbn", value).normalized_value
-    except InvalidIdentifier:
-        return None
-
-
-def no_shared_identity(_candidate: SearchCandidate) -> None:
-    """Albums have no cross-provider identity, and that is a complete answer.
-
-    DEC-052 observed barcode `888837168625` on three distinct releases. A barcode is
-    therefore not an edition key, and there is no other global identifier a second
-    provider would carry — so the correct behaviour is to merge nothing rather than
-    to merge on a weaker key.
-    """
-    return None
-
-
 @dataclass(frozen=True)
 class IdentityStrategy:
     """How a domain decides two candidates are the same record, and who wins a merge.
@@ -94,13 +71,8 @@ class IdentityStrategy:
     source_preference: tuple[str, ...]
 
 
-SOURCE_PREFERENCE = ("openlibrary", "googlebooks")
-BOOK_IDENTITY = IdentityStrategy(isbn_identity, SOURCE_PREFERENCE)
-ALBUM_IDENTITY = IdentityStrategy(no_shared_identity, ("musicbrainz",))
-
-
 def _source_rank(source: str, preference: Sequence[str]) -> tuple[int, str]:
-    """Product spec 4.3 prefers Open Library's record; alphabetical order does not."""
+    """A source the domain named ranks by that order; anything else sorts after it."""
     if source in preference:
         return (preference.index(source), "")
     return (len(preference), source)

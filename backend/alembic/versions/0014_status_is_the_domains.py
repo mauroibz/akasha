@@ -22,17 +22,17 @@ neutral facts about an entry that no domain gets to redefine.
 import sqlalchemy as sa
 
 from alembic import op
-from book_tracker.domain.domains import ALL_STATUSES
 
 revision = "0014_status_is_the_domains"
 down_revision = "0013_entry_formats"
 branch_labels = None
 depends_on = None
 
-#: Only for the downgrade, and only from the registry as it stands when the
-#: downgrade runs — the same frozen-snapshot problem, which is precisely why up is
-#: the direction that removes it.
-_STATUS_LIST = ", ".join(f"'{value}'" for value in ALL_STATUSES)
+#: Only for the downgrade, and frozen rather than read from the registry: a
+#: migration is history, and one that reads live code describes a different schema
+#: on every install. Restoring a snapshot is exactly what makes down the wrong
+#: direction here, which is the point.
+_STATUS_LIST = "'unsorted', 'read', 'reading', 'to_read', 'wishlist', 'dropped', 'pending', 'owned'"
 
 TIMESTAMPS = (
     sa.Column("created_at", sa.Text(), nullable=False),

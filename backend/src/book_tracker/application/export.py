@@ -34,7 +34,7 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.domains import DEFAULT_DOMAIN
+from book_tracker.domain.registry import DEFAULT_DOMAIN
 from book_tracker.infrastructure.models import (
     AttachmentRow,
     EntryFormatRow,

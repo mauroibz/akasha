@@ -3,9 +3,9 @@ import io
 from datetime import datetime
 from typing import Any
 
-from book_tracker.domain.domains import BOOK
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.normalization import shelf_slug
+from book_tracker.domains.book import DOMAIN as BOOK
 
 REQUIRED_COLUMNS = {
     "Book Id",

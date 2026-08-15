@@ -13,13 +13,9 @@ import pytest
 from recordings import recording, replay
 
 from book_tracker.application.providers import search_providers
-from book_tracker.domain.providers import (
-    ALBUM_IDENTITY,
-    BOOK_IDENTITY,
-    SearchCandidate,
-    SourceRef,
-    merge_and_rank,
-)
+from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
+from book_tracker.domains.album import ALBUM_IDENTITY
+from book_tracker.domains.book import BOOK_IDENTITY
 from book_tracker.infrastructure.providers import OpenLibraryProvider, create_provider_client
 
 RAYUELA_ROUTES = {"/search.json": (200, recording("search_rayuela.json"))}

@@ -22,8 +22,8 @@ from book_tracker.application.library import LibraryError
 from book_tracker.backup import BackupError, create_backup, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
-from book_tracker.domain.domains import DOMAINS
 from book_tracker.domain.providers import Provider
+from book_tracker.domain.registry import DOMAINS
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.musicbrainz import MusicBrainzProvider
 from book_tracker.infrastructure.providers import (

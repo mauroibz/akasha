@@ -11,8 +11,8 @@ from book_tracker.application.providers import (
     resolve_input,
     search_providers,
 )
-from book_tracker.domain.domains import DEFAULT_DOMAIN, DOMAINS
 from book_tracker.domain.providers import Provider, SearchCandidate
+from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
 
 router = APIRouter(prefix="/api")
 

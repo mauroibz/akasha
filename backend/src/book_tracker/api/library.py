@@ -16,15 +16,9 @@ from book_tracker.application.library import (
     clean_attachment_filename,
 )
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
-from book_tracker.domain.domains import (
-    DOMAINS,
-    EntryFormat,
-    EntryStatus,
-    InvalidMetadata,
-    ItemTypeName,
-    validate_metadata_patch,
-)
 from book_tracker.domain.providers import SourceRef
+from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
+from book_tracker.domain.spec import InvalidMetadata, validate_metadata_patch
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
     AttachmentTooLarge,

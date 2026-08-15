@@ -1,25 +1,27 @@
 import pytest
 
-from book_tracker.domain.domains import (
-    ALBUM,
-    ALL_FORMATS,
-    ALL_STATUSES,
-    BOOK,
-    DOMAINS,
-    EntryFormat,
-    EntryStatus,
-    InvalidEntryField,
-    InvalidFormat,
-    InvalidStatus,
-    ItemTypeName,
-    validate_entry_fields,
-    validate_formats,
-    validate_status,
-)
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
 from book_tracker.domain.normalization import creator_sort_name, normalize_text, strip_html
+from book_tracker.domain.registry import (
+    ALL_FORMATS,
+    ALL_STATUSES,
+    DOMAINS,
+    EntryFormat,
+    EntryStatus,
+    ItemTypeName,
+)
+from book_tracker.domain.spec import (
+    InvalidEntryField,
+    InvalidFormat,
+    InvalidStatus,
+    validate_entry_fields,
+    validate_formats,
+    validate_status,
+)
+from book_tracker.domains.album import DOMAIN as ALBUM
+from book_tracker.domains.book import DOMAIN as BOOK
 
 
 @pytest.mark.parametrize(

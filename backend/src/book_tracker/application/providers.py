@@ -3,8 +3,9 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
-from book_tracker.domain.domains import DEFAULT_DOMAIN, DOMAINS, Domain
 from book_tracker.domain.providers import Provider, SearchCandidate, merge_and_rank
+from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
+from book_tracker.domain.spec import Domain
 from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS
 
 logger = logging.getLogger(__name__)

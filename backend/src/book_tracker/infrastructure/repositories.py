@@ -9,11 +9,11 @@ from sqlalchemy import Engine, delete, func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.domains import DEFAULT_DOMAIN
 from book_tracker.domain.identity import Identifier
 from book_tracker.domain.matching import MatchDecision, MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
 from book_tracker.domain.normalization import normalize_text, shelf_slug
+from book_tracker.domain.registry import DEFAULT_DOMAIN
 from book_tracker.infrastructure.models import (
     EntryFormatRow,
     EntryRow,

@@ -32,20 +32,17 @@ from sqlalchemy.exc import IntegrityError
 from book_tracker.application.providers import resolve_input
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
-from book_tracker.domain.domains import (
-    DOMAINS,
+from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
+from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
+from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     RESERVED_FIELD_NAMES,
     Domain,
-    EntryFormat,
-    EntryStatus,
     FieldSpec,
     FormatSpec,
-    ItemTypeName,
     StatusSpec,
     UrlMatch,
 )
-from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 from book_tracker.migrations import upgrade

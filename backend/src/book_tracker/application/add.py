@@ -6,9 +6,11 @@ import httpx
 from sqlalchemy import Engine
 
 from book_tracker.application.library import LibraryError, LibraryService
-from book_tracker.domain.domains import (
-    DEFAULT_DOMAIN,
-    DOMAINS,
+from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
+from book_tracker.domain.matching import MatchKind
+from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
+from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
+from book_tracker.domain.spec import (
     InvalidEntryField,
     InvalidFormat,
     InvalidStatus,
@@ -16,9 +18,6 @@ from book_tracker.domain.domains import (
     validate_formats,
     validate_status,
 )
-from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
-from book_tracker.domain.matching import MatchKind
-from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.repositories import (
     DomainRepository,

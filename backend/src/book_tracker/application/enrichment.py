@@ -13,8 +13,8 @@ import httpx
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.domains import DOMAINS
 from book_tracker.domain.providers import ItemPayload
+from book_tracker.domain.registry import DOMAINS
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import (
