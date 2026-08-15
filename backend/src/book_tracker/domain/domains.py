@@ -12,15 +12,30 @@ the earlier plan did not anticipate and the one most likely to be wrong.
 
 import re
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
+from enum import StrEnum
 from typing import Any, Literal
 from urllib.parse import parse_qs, urlsplit
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.providers import ALBUM_IDENTITY, BOOK_IDENTITY, IdentityStrategy
 
-FieldType = Literal["text", "long_text", "number"]
+FieldType = Literal["text", "long_text", "number", "rows"]
 Multiplicity = Literal["one", "many"]
+
+
+@dataclass(frozen=True)
+class ColumnSpec:
+    """One cell of a `rows` field — a tracklist's position, title or length.
+
+    The first metadata shape the spec could not describe was an ordered list of
+    structured rows: a tracklist is not text, not a number and not a list of strings.
+    This describes the row so the renderer and the validator stay data-driven.
+    """
+
+    name: str
+    label: str
+    type: Literal["text", "number", "duration"] = "text"
 
 
 @dataclass(frozen=True)
@@ -37,6 +52,8 @@ class FieldSpec:
     multiplicity: Multiplicity = "one"
     minimum: int | None = None
     maximum: int | None = None
+    #: Only for `type="rows"`: what one row holds.
+    columns: tuple[ColumnSpec, ...] = ()
 
 
 # The four item columns the dialog edits beside the metadata — `title`, `subtitle`,
@@ -70,15 +87,74 @@ ALBUM_FIELDS = (
 )
 
 
-# Seam 5a: the *labels* are the domain's, the values are not. `read` is a permanent
-# internal name and an album renders it as "Listened". Sprint 026 takes the other half —
-# per-domain status *vocabularies*, validation off the global `EntryStatus`, the filter
-# chips and the triage keys — which is the piece carrying a product decision (DEC-052).
-ALBUM_STATUS_LABELS = {
-    "read": "Listened",
-    "reading": "Listening",
-    "to_read": "To listen",
-}
+@dataclass(frozen=True)
+class StatusSpec:
+    """One status a domain's entries can be in.
+
+    Seam 5a gave a domain the right to *rename* a shared status; seam 5b gives it the
+    right to have different ones (DEC-057). `value` is the permanent stored name,
+    `label` is copy, `choosable` is false for a status nothing may be set to directly,
+    and `hotkey` is the triage key — kept beside the status it sets rather than in a
+    second table that can drift away from this one.
+    """
+
+    value: str
+    label: str
+    choosable: bool = True
+    hotkey: str | None = None
+
+
+@dataclass(frozen=True)
+class FormatSpec:
+    """How a copy is held: `Vinyl`, `Borrowed`. A property of the entry, not the item.
+
+    The vocabulary is closed and declared here rather than stored, which is the whole
+    difference between this and a shelf: a shelf is something the owner invents
+    ("work", "fiction"), a format is something the domain knows (DEC-059).
+    """
+
+    value: str
+    label: str
+
+
+#: Where an import lands, in every domain. The default library view hides it, so it is
+#: never something to choose — only something to leave.
+UNSORTED = StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u")
+
+BOOK_STATUSES = (
+    UNSORTED,
+    StatusSpec("read", "Read", hotkey="r"),
+    StatusSpec("reading", "Reading", hotkey="g"),
+    StatusSpec("to_read", "To read", hotkey="t"),
+    StatusSpec("wishlist", "Wishlist", hotkey="w"),
+    StatusSpec("dropped", "Dropped", hotkey="d"),
+)
+
+# DEC-057, in the owner's words: an album is played hundreds of times or twice, and the
+# interesting fact is whether you have it. So this is not the book vocabulary renamed —
+# it is a different concept with three states, and `read`/`reading` are absent rather
+# than relabelled.
+ALBUM_STATUSES = (
+    UNSORTED,
+    StatusSpec("wishlist", "Wishlist", hotkey="w"),
+    StatusSpec("pending", "On the way", hotkey="p"),
+    StatusSpec("owned", "Owned", hotkey="o"),
+)
+
+BOOK_FORMATS = (
+    FormatSpec("physical", "Physical"),
+    FormatSpec("borrowed", "Borrowed"),
+    FormatSpec("digital", "Digital"),
+)
+ALBUM_FORMATS = (
+    FormatSpec("vinyl", "Vinyl"),
+    FormatSpec("cd", "CD"),
+    FormatSpec("digital", "Digital"),
+)
+
+#: The three entry columns that date a passage through a work. A domain declares which
+#: of them it has; DEC-057 says an album has none of them.
+PASSAGE_FIELDS = frozenset({"date_started", "date_finished", "reread_count"})
 
 
 @dataclass(frozen=True)
@@ -93,10 +169,23 @@ class Domain:
     #: returns everything an album has, where a Goodreads row starts as little more
     #: than an ISBN — so "this domain does not enrich" is a simplification, not a gap.
     enriches: bool = True
-    #: Overrides for the shared status vocabulary; absent statuses keep their names.
-    status_labels: Mapping[str, str] = field(default_factory=dict)
+    #: The statuses an entry on this domain can hold, in the order a control offers
+    #: them, and the one a newly added entry gets when nobody chose.
+    statuses: tuple[StatusSpec, ...] = BOOK_STATUSES
+    default_status: str = "read"
+    #: Which of `PASSAGE_FIELDS` this domain's entries have. Anything absent is refused
+    #: on write, not merely hidden: a reread count on a record is not a display problem.
+    entry_fields: frozenset[str] = PASSAGE_FIELDS
+    #: How a copy of this is held (DEC-059).
+    formats: tuple[FormatSpec, ...] = BOOK_FORMATS
+    #: The heading over the personal region of the detail page. "Your reading data" is
+    #: a book's phrase, and an album's entry records possession rather than reading.
+    entry_panel_label: str = "Your reading data"
     #: Recognizes a URL or identifier this domain can resolve, for add-by-URL.
     recognize: Callable[[str], "UrlMatch | None"] = lambda _value: None
+
+    def status(self, value: str) -> StatusSpec | None:
+        return next((row for row in self.statuses if row.value == value), None)
 
 
 BOOK = Domain(
@@ -112,7 +201,11 @@ ALBUM = Domain(
     identity=ALBUM_IDENTITY,
     fields=ALBUM_FIELDS,
     enriches=False,
-    status_labels=ALBUM_STATUS_LABELS,
+    statuses=ALBUM_STATUSES,
+    default_status="owned",
+    entry_fields=frozenset(),
+    formats=ALBUM_FORMATS,
+    entry_panel_label="Your copy",
     recognize=lambda value: recognize_album_url(value),
 )
 
@@ -121,6 +214,100 @@ DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBU
 # Every route, importer and repository that predates the second domain works on books;
 # naming that here keeps `"book"` out of those call sites as a literal.
 DEFAULT_DOMAIN = BOOK
+
+
+def _ordered_union(values: Sequence[Sequence[str]]) -> tuple[str, ...]:
+    """Every value once, in first-declared order. Order is the API's, not a set's."""
+    seen: dict[str, None] = {}
+    for group in values:
+        for value in group:
+            seen.setdefault(value, None)
+    return tuple(seen)
+
+
+#: Every status any domain declares. A *filter* legitimately spans domains — a triage
+#: selection or a facet count can hold both — so the query parameter validates against
+#: this, while a *write* validates against the item's own domain.
+ALL_STATUSES = _ordered_union(
+    [[status.value for status in domain.statuses] for domain in DOMAINS.values()]
+)
+ALL_FORMATS = _ordered_union([[row.value for row in domain.formats] for domain in DOMAINS.values()])
+
+
+class EntryStatus(StrEnum):
+    """The published union, so OpenAPI enumerates what a client may send.
+
+    Spelled out rather than built from `ALL_STATUSES`, because a dynamic enum is
+    opaque to the type checker and this is a public surface. `test_domain.py` asserts
+    the two agree, so adding a domain status and forgetting this fails a test instead
+    of quietly dropping the value from the API contract.
+
+    It is not the authority on what is legal for a given item: that is
+    `validate_status`, keyed on the item's own type (seam 5b).
+    """
+
+    UNSORTED = "unsorted"
+    READ = "read"
+    READING = "reading"
+    TO_READ = "to_read"
+    WISHLIST = "wishlist"
+    DROPPED = "dropped"
+    PENDING = "pending"
+    OWNED = "owned"
+
+
+class EntryFormat(StrEnum):
+    """The published union of every domain's formats, for filters and facets."""
+
+    PHYSICAL = "physical"
+    BORROWED = "borrowed"
+    DIGITAL = "digital"
+    VINYL = "vinyl"
+    CD = "cd"
+
+
+class InvalidStatus(ValueError):
+    """A status the item's own domain does not have."""
+
+
+class InvalidFormat(ValueError):
+    """A format the item's own domain does not have."""
+
+
+class InvalidEntryField(ValueError):
+    """An entry field the item's own domain does not have (DEC-057)."""
+
+
+def validate_status(domain: Domain, value: str) -> str:
+    """The one place a status is checked against the domain holding the item.
+
+    The message names the domain, because the value is very often perfectly valid one
+    row further down the library and "invalid status" would send the reader hunting.
+    """
+    if domain.status(value) is None:
+        raise InvalidStatus(f"{domain.label} has no status named {value!r}")
+    return value
+
+
+def validate_formats(domain: Domain, values: Sequence[str]) -> list[str]:
+    """Refuse anything outside the vocabulary, and keep the domain's own order."""
+    declared = [row.value for row in domain.formats]
+    for value in values:
+        if value not in declared:
+            raise InvalidFormat(f"{domain.label} has no format named {value!r}")
+    return [value for value in declared if value in set(values)]
+
+
+def validate_entry_fields(domain: Domain, changes: Mapping[str, Any]) -> dict[str, Any]:
+    """Refuse the passage fields a domain does not have, and pass everything else.
+
+    Hiding them in the UI would leave the API, the importers and the export able to
+    store a reread count on a record — a value nothing can ever mean (DEC-057).
+    """
+    for name in PASSAGE_FIELDS - domain.entry_fields:
+        if name in changes:
+            raise InvalidEntryField(f"{domain.label} entries have no {name!r}")
+    return dict(changes)
 
 
 @dataclass(frozen=True)

@@ -123,12 +123,12 @@ async def test_metadata_stays_opaque_in_the_response(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
-async def test_a_domain_renames_the_statuses_it_shares(tmp_path: Path) -> None:
-    """Seam 5a: the labels are the domain's, the values are everyone's.
+async def test_each_domain_publishes_the_statuses_it_actually_has(tmp_path: Path) -> None:
+    """Seam 5b: not the shared vocabulary renamed, a different one (DEC-057).
 
-    An album is listened to, not read. What it is *called* moves; `read` stays the
-    stored value, so no data migrates and no filter breaks. Sprint 026 takes the other
-    half — whether a domain may have different statuses at all.
+    Seam 5a let an album call `read` "Listened". That was honest and temporary: an
+    album is played hundreds of times or twice, so possession is the fact worth
+    storing, and `read` is not a state it can be in at all.
     """
     app = create_app(settings(tmp_path))
     async with (
@@ -137,10 +137,49 @@ async def test_a_domain_renames_the_statuses_it_shares(tmp_path: Path) -> None:
     ):
         published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
 
-    assert published["album"]["status_labels"] == {
-        "read": "Listened",
-        "reading": "Listening",
-        "to_read": "To listen",
-    }
-    # A book keeps the shared vocabulary, so it overrides nothing.
-    assert published["book"]["status_labels"] == {}
+    album = published["album"]
+    assert [row["value"] for row in album["statuses"]] == [
+        "unsorted",
+        "wishlist",
+        "pending",
+        "owned",
+    ]
+    assert album["default_status"] == "owned"
+    assert album["entry_panel_label"] == "Your copy"
+    # The passage fields go with the consumption vocabulary that no longer exists here.
+    assert album["entry_fields"] == []
+
+    book = published["book"]
+    assert [row["value"] for row in book["statuses"]] == [
+        "unsorted",
+        "read",
+        "reading",
+        "to_read",
+        "wishlist",
+        "dropped",
+    ]
+    assert book["default_status"] == "read"
+    assert sorted(book["entry_fields"]) == ["date_finished", "date_started", "reread_count"]
+    # Every domain has the inbox, and nothing offers it as a choice.
+    for domain in published.values():
+        inbox = next(row for row in domain["statuses"] if row["value"] == "unsorted")
+        assert inbox["choosable"] is False
+        assert inbox["hotkey"] == "u"
+
+
+@pytest.mark.anyio
+async def test_each_domain_publishes_its_own_format_vocabulary(tmp_path: Path) -> None:
+    """DEC-059: a closed vocabulary the domain declares, not free text and not a shelf."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
+
+    assert [row["value"] for row in published["album"]["formats"]] == ["vinyl", "cd", "digital"]
+    assert [row["label"] for row in published["book"]["formats"]] == [
+        "Physical",
+        "Borrowed",
+        "Digital",
+    ]

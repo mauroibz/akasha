@@ -6,6 +6,8 @@ from sqlalchemy import func, select, text
 from sqlalchemy.orm import Session
 
 from book_tracker.config import Settings
+from book_tracker.domain import goodreads
+from book_tracker.domain.domains import ALBUM, BOOK
 from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
@@ -256,3 +258,18 @@ async def test_commit_fills_only_empty_shared_metadata(tmp_path: Path) -> None:
             assert item.year == 1944
             assert '"publisher": "Manual"' in item.metadata
             assert '"page_count": 200' in item.metadata
+
+
+def test_the_status_suggestion_belongs_to_the_domain_this_importer_serves() -> None:
+    """Deliverable 4: book-only by declaration, not by accident.
+
+    Import is book-only today because books are the only domain with an importer, not
+    because anything says so. Once a domain can have statuses of its own, a suggestion
+    map that nobody tied to a vocabulary is a map that can suggest `read` for a record.
+    """
+    assert goodreads.DOMAIN is BOOK
+    for value in goodreads.SUGGESTED_STATUS.values():
+        assert BOOK.status(value) is not None, f"{value!r} is not a status a book can hold"
+    # And the other domain declares no suggestions at all, so nothing can leak across.
+    for value in goodreads.SUGGESTED_STATUS.values():
+        assert ALBUM.status(value) is None

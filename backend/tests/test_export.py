@@ -391,3 +391,34 @@ async def test_the_goodreads_csv_carries_books_and_leaves_the_other_domains_to_t
     titles = [row.split(",")[1] for row in csv_body.strip().splitlines()[1:]]
     assert titles == ["Rayuela"]
     assert {row["title"] for row in everything["items"]} == {"Rayuela", "Kind of Blue"}
+
+
+@pytest.mark.anyio
+async def test_export_carries_the_format_of_a_copy(tmp_path: Path) -> None:
+    """DEC-059 formats are owner data in DEC-054's sense: nothing derives them.
+
+    The item says a release was pressed on vinyl in 1959. The entry says *you* have
+    it on vinyl and digital — a different fact, unreconstructable from the item, so an
+    export that dropped it would lose something only the owner knew.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET type='album' WHERE id=:id"), {"id": album.item_id}
+            )
+        await client.patch(
+            f"/api/entries/{album.entry_id}",
+            json={"status": "wishlist", "formats": ["vinyl", "digital"]},
+        )
+        document = json.loads("".join(export_json(app.state.engine)))
+
+    entry = document["entries"][0]
+    assert entry["formats"] == ["digital", "vinyl"]
+    # Independent axes: the export carries both without one implying the other.
+    assert entry["status"] == "wishlist"

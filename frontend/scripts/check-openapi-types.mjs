@@ -13,12 +13,24 @@ const expected = {
     "score",
     "item",
     "shelves",
+    "formats",
     "score_provisional",
   ],
   ItemResponse: ["id", "type", "title", "creator", "cover_url", "metadata"],
-  ItemTypeResponse: ["id", "label", "fields"],
+  ItemTypeResponse: [
+    "id",
+    "label",
+    "fields",
+    "statuses",
+    "default_status",
+    "entry_fields",
+    "formats",
+    "entry_panel_label",
+  ],
   FieldSpecResponse: ["name", "label", "type", "multiplicity"],
-  FacetsResponse: ["status_counts"],
+  StatusSpecResponse: ["value", "label", "choosable", "hotkey"],
+  FormatSpecResponse: ["value", "label"],
+  FacetsResponse: ["status_counts", "format_counts"],
   ShelfResponse: ["id", "name", "slug", "entry_count"],
 };
 
@@ -31,6 +43,9 @@ for (const [name, properties] of Object.entries(expected)) {
   }
 }
 
+// The union of every domain's vocabulary, which is what a filter spans. Which of
+// these a given entry may hold is the domain's business and is checked per item type
+// on the server (seam 5b) — this only pins the surface a client can send.
 const statuses = components.EntryStatus?.enum ?? [];
 for (const status of [
   "unsorted",
@@ -39,9 +54,17 @@ for (const status of [
   "to_read",
   "wishlist",
   "dropped",
+  "pending",
+  "owned",
 ]) {
   if (!statuses.includes(status))
     throw new Error(`OpenAPI EntryStatus is missing ${status}`);
+}
+
+const formats = components.EntryFormat?.enum ?? [];
+for (const format of ["physical", "borrowed", "digital", "vinyl", "cd"]) {
+  if (!formats.includes(format))
+    throw new Error(`OpenAPI EntryFormat is missing ${format}`);
 }
 
 console.log("Frontend library types match the checked OpenAPI surface.");

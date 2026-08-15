@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from book_tracker.domain.domains import DEFAULT_DOMAIN
 from book_tracker.infrastructure.models import (
     AttachmentRow,
+    EntryFormatRow,
     EntryRow,
     EntryShelfRow,
     ItemIdentifierRow,
@@ -227,9 +228,28 @@ def _shelves_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]
     return shelves
 
 
+def _formats_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]:
+    """One query per batch, like the shelves beside it.
+
+    A format is owner data in exactly the sense DEC-054 means: nothing derives "I have
+    this on vinyl" from the item, because the item describes a release and this
+    describes your copy. An export that dropped it would lose a fact only you knew.
+    """
+    formats: dict[int, list[str]] = {}
+    for entry_id, value in session.execute(
+        select(EntryFormatRow.entry_id, EntryFormatRow.format)
+        .where(EntryFormatRow.entry_id.in_(entry_ids))
+        .order_by(EntryFormatRow.entry_id, EntryFormatRow.format)
+    ).all():
+        formats.setdefault(entry_id, []).append(value)
+    return formats
+
+
 def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
     for batch in _batches(session, _ENTRY_COLUMNS):
-        shelves = _shelves_for(session, [entry.id for entry in batch])
+        entry_ids = [entry.id for entry in batch]
+        shelves = _shelves_for(session, entry_ids)
+        formats = _formats_for(session, entry_ids)
         for entry in batch:
             yield {
                 "id": entry.id,
@@ -246,6 +266,7 @@ def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
                 # Names rather than ids: an id means nothing outside this database,
                 # and the name is what the owner typed.
                 "shelves": shelves.get(entry.id, []),
+                "formats": formats.get(entry.id, []),
             }
 
 

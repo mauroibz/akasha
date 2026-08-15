@@ -1,6 +1,6 @@
 # Sprint 026 — Statuses, formats and tracklists
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 025
 **Roadmap revision:** 11
 

@@ -3,6 +3,7 @@ import io
 from datetime import datetime
 from typing import Any
 
+from book_tracker.domain.domains import BOOK
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.normalization import shelf_slug
 
@@ -18,6 +19,17 @@ REQUIRED_COLUMNS = {
     "Bookshelves",
     "Exclusive Shelf",
 }
+
+
+#: Goodreads' exclusive shelf, mapped onto the statuses of the domain this importer
+#: serves (product spec 5.1). Stated against `BOOK` rather than left to the accident
+#: that books are the only domain with an importer: a `pending` record has no Goodreads
+#: spelling, and a future importer for another domain declares its own map or none.
+#: `DOMAIN.status(...)` is asserted over this in `test_goodreads_import.py`, so a
+#: status renamed out from under it fails a test rather than silently suggesting
+#: nothing.
+DOMAIN = BOOK
+SUGGESTED_STATUS = {"read": "read", "currently-reading": "reading", "to-read": "to_read"}
 
 
 class GoodreadsCSVError(ValueError):
@@ -84,9 +96,7 @@ def parse_goodreads(data: bytes) -> list[dict[str, Any]]:
             except ValueError:
                 errors.append({"field": "my_rating", "code": "invalid_rating", "value": rating_raw})
         exclusive = (row.get("Exclusive Shelf") or "").strip()
-        suggested = {"read": "read", "currently-reading": "reading", "to-read": "to_read"}.get(
-            exclusive
-        )
+        suggested = SUGGESTED_STATUS.get(exclusive)
         shelves = []
         for value in (row.get("Bookshelves") or "").split(","):
             value = value.strip()

@@ -131,6 +131,15 @@ class EntryShelfRow(Base):
     shelf_id: Mapped[int] = mapped_column(ForeignKey("shelves.id"), primary_key=True)
 
 
+class EntryFormatRow(Base):
+    """How you hold this copy (DEC-059). The join copies `entry_shelves`; the value
+    is a vocabulary the domain declares rather than a row the owner created."""
+
+    __tablename__ = "entry_formats"
+    entry_id: Mapped[int] = mapped_column(ForeignKey("entries.id"), primary_key=True)
+    format: Mapped[str] = mapped_column(primary_key=True)
+
+
 class ImportBatchRow(Base):
     __tablename__ = "import_batches"
     id: Mapped[str] = mapped_column(primary_key=True)

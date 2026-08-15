@@ -78,6 +78,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0010_attachments",
         "0011_creator_sort_names",
         "0012_creators",
+        "0013_entry_formats",
     ]
 
     upgrade(configured.database_url)
@@ -147,6 +148,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0010_attachments",
         "0011_creator_sort_names",
         "0012_creators",
+        "0013_entry_formats",
     ]
 
 
@@ -418,3 +420,73 @@ def test_stored_descriptions_are_reduced_to_plain_text(tmp_path: Path) -> None:
     # An all-markup description would otherwise read as "present, and blank".
     assert descriptions[4] is None
     assert descriptions[99] is None
+
+
+def test_every_book_status_survives_the_vocabulary_change(tmp_path: Path) -> None:
+    """Sprint 026 AC3: no data migration silently remaps a value.
+
+    `entries` is rebuilt by 0013 to widen a CHECK constraint that listed the six book
+    statuses, and a rebuild copies every row. This seeds one entry in each of those
+    six statuses *before* the change and reads them back after, because "the copy
+    preserved the data" is the kind of claim a schema test does not make on its own.
+    """
+    configured = database_at(tmp_path / "data", "0012_creators")
+    assert configured.database_url is not None
+    before = ["unsorted", "read", "reading", "to_read", "wishlist", "dropped"]
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    for index, status in enumerate(before, start=1):
+        connection.execute(
+            "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+            " VALUES (?, 'book', ?, '{}', '{}', ?, ?)",
+            (index, f"Book {index}", NOW, NOW),
+        )
+        connection.execute(
+            "INSERT INTO entries (id, user_id, item_id, status, suggested_status, score, notes,"
+            " date_added, date_started, date_finished, reread_count, score_provisional,"
+            " created_at, updated_at)"
+            " VALUES (?, 1, ?, ?, ?, 7, 'kept', ?, '2026-01-01', '2026-02-02', 3, 1, ?, ?)",
+            (index, index, status, status, NOW, NOW, NOW),
+        )
+    connection.commit()
+    connection.close()
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    rows = connection.execute(
+        "SELECT id, status, suggested_status, score, notes, date_started, date_finished,"
+        " reread_count, score_provisional FROM entries ORDER BY id"
+    ).fetchall()
+    connection.close()
+    assert [row[1] for row in rows] == before
+    assert [row[2] for row in rows] == before
+    # The rest of the row rides along in the same copy, so it is asserted in the same
+    # place rather than trusted.
+    assert all(row[3:] == (7, "kept", "2026-01-01", "2026-02-02", 3, 1) for row in rows)
+
+
+def test_the_widened_constraint_admits_an_album_status_and_still_refuses_nonsense(
+    tmp_path: Path,
+) -> None:
+    configured = database_at(tmp_path / "data", "head")
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'album', 'Discovery', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO entries (id, user_id, item_id, status, date_added, reread_count,"
+        " score_provisional, created_at, updated_at)"
+        " VALUES (1, 1, 1, 'owned', ?, 0, 0, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO entries (id, user_id, item_id, status, date_added, reread_count,"
+            " score_provisional, created_at, updated_at)"
+            " VALUES (2, 1, 1, 'listened', ?, 0, 0, ?, ?)",
+            (NOW, NOW, NOW),
+        )
+    connection.close()

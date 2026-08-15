@@ -216,6 +216,14 @@
       },
       "BulkSet": {
         "properties": {
+          "add_formats": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Add Formats",
+            "type": "array"
+          },
           "add_shelves": {
             "items": {
               "type": "integer"
@@ -227,6 +235,14 @@
             "default": false,
             "title": "Clear Provisional",
             "type": "boolean"
+          },
+          "remove_formats": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 20,
+            "title": "Remove Formats",
+            "type": "array"
           },
           "remove_shelves": {
             "items": {
@@ -275,6 +291,29 @@
           "library_path"
         ],
         "title": "CalibrePreviewBody",
+        "type": "object"
+      },
+      "ColumnSpecResponse": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "label",
+          "type"
+        ],
+        "title": "ColumnSpecResponse",
         "type": "object"
       },
       "CommitBody": {
@@ -480,8 +519,14 @@
             "type": "array"
           },
           "status": {
-            "$ref": "#/components/schemas/EntryStatus",
-            "default": "read"
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntryStatus"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "title": "EntryCreateBody",
@@ -514,6 +559,13 @@
       },
       "EntryFilter": {
         "properties": {
+          "format": {
+            "items": {
+              "$ref": "#/components/schemas/EntryFormat"
+            },
+            "title": "Format",
+            "type": "array"
+          },
           "q": {
             "anyOf": [
               {
@@ -549,6 +601,18 @@
         },
         "title": "EntryFilter",
         "type": "object"
+      },
+      "EntryFormat": {
+        "description": "The published union of every domain's formats, for filters and facets.",
+        "enum": [
+          "physical",
+          "borrowed",
+          "digital",
+          "vinyl",
+          "cd"
+        ],
+        "title": "EntryFormat",
+        "type": "string"
       },
       "EntryListResponse": {
         "properties": {
@@ -612,6 +676,21 @@
               }
             ],
             "title": "Date Started"
+          },
+          "formats": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "maxItems": 20,
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Formats"
           },
           "notes": {
             "anyOf": [
@@ -705,6 +784,13 @@
             ],
             "title": "Date Started"
           },
+          "formats": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Formats",
+            "type": "array"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
@@ -780,19 +866,23 @@
           "score_provisional",
           "suggested_status",
           "item",
-          "shelves"
+          "shelves",
+          "formats"
         ],
         "title": "EntryResponse",
         "type": "object"
       },
       "EntryStatus": {
+        "description": "The published union, so OpenAPI enumerates what a client may send.\n\nSpelled out rather than built from `ALL_STATUSES`, because a dynamic enum is\nopaque to the type checker and this is a public surface. `test_domain.py` asserts\nthe two agree, so adding a domain status and forgetting this fails a test instead\nof quietly dropping the value from the API contract.\n\nIt is not the authority on what is legal for a given item: that is\n`validate_status`, keyed on the item's own type (seam 5b).",
         "enum": [
           "unsorted",
           "read",
           "reading",
           "to_read",
           "wishlist",
-          "dropped"
+          "dropped",
+          "pending",
+          "owned"
         ],
         "title": "EntryStatus",
         "type": "string"
@@ -835,6 +925,13 @@
       },
       "FacetsResponse": {
         "properties": {
+          "format_counts": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Format Counts",
+            "type": "object"
+          },
           "status_counts": {
             "additionalProperties": {
               "type": "integer"
@@ -844,13 +941,28 @@
           }
         },
         "required": [
-          "status_counts"
+          "status_counts",
+          "format_counts"
         ],
         "title": "FacetsResponse",
         "type": "object"
       },
       "FieldSpecResponse": {
         "properties": {
+          "columns": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/ColumnSpecResponse"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Columns"
+          },
           "label": {
             "title": "Label",
             "type": "string"
@@ -897,6 +1009,24 @@
           "multiplicity"
         ],
         "title": "FieldSpecResponse",
+        "type": "object"
+      },
+      "FormatSpecResponse": {
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label"
+        ],
+        "title": "FormatSpecResponse",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -1367,11 +1497,33 @@
       "ItemTypeResponse": {
         "description": "What a domain says about itself, so a screen can render it without branching.",
         "properties": {
+          "default_status": {
+            "title": "Default Status",
+            "type": "string"
+          },
+          "entry_fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Entry Fields",
+            "type": "array"
+          },
+          "entry_panel_label": {
+            "title": "Entry Panel Label",
+            "type": "string"
+          },
           "fields": {
             "items": {
               "$ref": "#/components/schemas/FieldSpecResponse"
             },
             "title": "Fields",
+            "type": "array"
+          },
+          "formats": {
+            "items": {
+              "$ref": "#/components/schemas/FormatSpecResponse"
+            },
+            "title": "Formats",
             "type": "array"
           },
           "id": {
@@ -1382,19 +1534,23 @@
             "title": "Label",
             "type": "string"
           },
-          "status_labels": {
-            "additionalProperties": {
-              "type": "string"
+          "statuses": {
+            "items": {
+              "$ref": "#/components/schemas/StatusSpecResponse"
             },
-            "title": "Status Labels",
-            "type": "object"
+            "title": "Statuses",
+            "type": "array"
           }
         },
         "required": [
           "id",
           "label",
           "fields",
-          "status_labels"
+          "statuses",
+          "default_status",
+          "entry_fields",
+          "formats",
+          "entry_panel_label"
         ],
         "title": "ItemTypeResponse",
         "type": "object"
@@ -1922,6 +2078,40 @@
         "title": "SourceResponse",
         "type": "object"
       },
+      "StatusSpecResponse": {
+        "properties": {
+          "choosable": {
+            "title": "Choosable",
+            "type": "boolean"
+          },
+          "hotkey": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hotkey"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "label",
+          "choosable"
+        ],
+        "title": "StatusSpecResponse",
+        "type": "object"
+      },
       "UndoEffectSummary": {
         "properties": {
           "batch_id": {
@@ -2073,6 +2263,25 @@
                 }
               ],
               "title": "Shelf"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryFormat"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
             }
           },
           {

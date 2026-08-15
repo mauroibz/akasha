@@ -16,9 +16,14 @@ from book_tracker.application.library import (
     clean_attachment_filename,
 )
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
-from book_tracker.domain.domains import DOMAINS, InvalidMetadata, validate_metadata_patch
+from book_tracker.domain.domains import (
+    DOMAINS,
+    EntryFormat,
+    EntryStatus,
+    InvalidMetadata,
+    validate_metadata_patch,
+)
 from book_tracker.domain.providers import SourceRef
-from book_tracker.domain.types import EntryStatus
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
     AttachmentTooLarge,
@@ -78,6 +83,12 @@ class SourceResponse(BaseModel):
     is_primary: bool
 
 
+class ColumnSpecResponse(BaseModel):
+    name: str
+    label: str
+    type: str
+
+
 class FieldSpecResponse(BaseModel):
     name: str
     label: str
@@ -85,6 +96,20 @@ class FieldSpecResponse(BaseModel):
     multiplicity: str
     minimum: int | None = None
     maximum: int | None = None
+    #: Present only on a `rows` field: what one row of it holds.
+    columns: list[ColumnSpecResponse] | None = None
+
+
+class StatusSpecResponse(BaseModel):
+    value: str
+    label: str
+    choosable: bool
+    hotkey: str | None = None
+
+
+class FormatSpecResponse(BaseModel):
+    value: str
+    label: str
 
 
 class ItemTypeResponse(BaseModel):
@@ -93,9 +118,14 @@ class ItemTypeResponse(BaseModel):
     id: str
     label: str
     fields: list[FieldSpecResponse]
-    #: Overrides for the shared status vocabulary — `read` reads as "Listened" on an
-    #: album. The values are permanent internal names; only the copy moves (seam 5a).
-    status_labels: dict[str, str]
+    #: The statuses this domain's entries can hold, in the order a control offers them
+    #: (seam 5b). An album is not a book with different words: it has different states
+    #: entirely, and the passage fields below go with the ones it does not have.
+    statuses: list[StatusSpecResponse]
+    default_status: str
+    entry_fields: list[str]
+    formats: list[FormatSpecResponse]
+    entry_panel_label: str
 
 
 class ItemResponse(BaseModel):
@@ -130,10 +160,14 @@ class EntryResponse(BaseModel):
     suggested_status: EntryStatus | None
     item: ItemResponse
     shelves: list[ShelfResponse]
+    #: How you hold this copy, in the domain's declared order (DEC-059). Independent
+    #: of status: a `wishlist` entry carrying `vinyl` is the pressing you mean to buy.
+    formats: list[str]
 
 
 class FacetsResponse(BaseModel):
     status_counts: dict[str, int]
+    format_counts: dict[str, int]
 
 
 class EntryListResponse(BaseModel):
@@ -167,7 +201,9 @@ class EntryCreateBody(BaseModel):
     source_id: str | None = Field(default=None, max_length=200)
     source_refs: list[SourceRefBody] = Field(default_factory=list, max_length=10)
     manual: ManualItemBody | None = None
-    status: EntryStatus = EntryStatus.READ
+    #: Absent means "whatever this domain's default is" — `read` for a book, `owned`
+    #: for an album. The API cannot have one default, because the domains disagree.
+    status: EntryStatus | None = None
     score: int | None = Field(default=None, ge=1, le=10)
     shelf_ids: list[int] = Field(default_factory=list, max_length=100)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=100)
@@ -205,6 +241,8 @@ class EntryPatch(BaseModel):
     date_finished: date | None = None
     reread_count: int | None = Field(default=None, ge=0)
     shelf_ids: list[int] | None = None
+    #: Replaces the set, the way `shelf_ids` does; `[]` clears it.
+    formats: list[str] | None = Field(default=None, max_length=20)
 
     @model_validator(mode="after")
     def required_status_when_present(self) -> "EntryPatch":
@@ -243,6 +281,7 @@ class RefreshBody(BaseModel):
 class EntryFilter(BaseModel):
     status: list[EntryStatus] | None = None
     shelf: list[str] = Field(default_factory=list)
+    format: list[EntryFormat] = Field(default_factory=list)
     q: str | None = None
 
 
@@ -251,6 +290,8 @@ class BulkSet(BaseModel):
     score: int | None = Field(default=None, ge=1, le=10)
     add_shelves: list[int] = Field(default_factory=list)
     remove_shelves: list[int] = Field(default_factory=list)
+    add_formats: list[str] = Field(default_factory=list, max_length=20)
+    remove_formats: list[str] = Field(default_factory=list, max_length=20)
     clear_provisional: bool = False
 
     @model_validator(mode="after")
@@ -284,6 +325,7 @@ async def list_entries(
     library: Library,
     status: Annotated[list[EntryStatus] | None, Query()] = None,
     shelf: Annotated[list[str] | None, Query()] = None,
+    format: Annotated[list[EntryFormat] | None, Query()] = None,
     q: str | None = None,
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
@@ -296,6 +338,7 @@ async def list_entries(
         library.list_entries(
             statuses=[value.value for value in status] if status is not None else None,
             shelves=shelf or [],
+            formats=[value.value for value in format or []],
             q=q,
             sort=sort,
             order=order,
@@ -325,7 +368,7 @@ async def create_entry(
         source=body.source,
         source_id=body.source_id,
         supplied_refs=[SourceRef(value.source, value.source_id) for value in body.source_refs],
-        status=body.status.value,
+        status=body.status.value if body.status else None,
         score=body.score,
         shelf_ids=body.shelf_ids,
         idempotency_key=body.idempotency_key,
@@ -409,8 +452,20 @@ async def list_item_types() -> list[ItemTypeResponse]:
         ItemTypeResponse(
             id=domain.item_type,
             label=domain.label,
-            fields=[FieldSpecResponse(**vars(field)) for field in domain.fields],
-            status_labels=dict(domain.status_labels),
+            fields=[
+                FieldSpecResponse(
+                    **{key: value for key, value in vars(field).items() if key != "columns"},
+                    columns=[ColumnSpecResponse(**vars(column)) for column in field.columns]
+                    if field.columns
+                    else None,
+                )
+                for field in domain.fields
+            ],
+            statuses=[StatusSpecResponse(**vars(status)) for status in domain.statuses],
+            default_status=domain.default_status,
+            entry_fields=sorted(domain.entry_fields),
+            formats=[FormatSpecResponse(**vars(row)) for row in domain.formats],
+            entry_panel_label=domain.entry_panel_label,
         )
         for domain in DOMAINS.values()
     ]

@@ -6,7 +6,12 @@ import httpx
 from sqlalchemy import Engine
 
 from book_tracker.application.library import LibraryError, LibraryService
-from book_tracker.domain.domains import DEFAULT_DOMAIN
+from book_tracker.domain.domains import (
+    DEFAULT_DOMAIN,
+    DOMAINS,
+    InvalidStatus,
+    validate_status,
+)
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
@@ -100,7 +105,9 @@ class AddService:
         source: str | None,
         source_id: str | None,
         supplied_refs: Sequence[SourceRef],
-        status: str,
+        #: `None` means "whatever this domain's default is": the API cannot have one
+        #: default, because a book is added `read` and a record is added `owned`.
+        status: str | None,
         score: int | None,
         shelf_ids: Sequence[int],
         idempotency_key: str | None,
@@ -167,6 +174,14 @@ class AddService:
                 "A similar edition is already in your library",
                 details={"entry_ids": near_matches},
             )
+        domain = DOMAINS.get(item_type, DEFAULT_DOMAIN)
+        if status is None:
+            status = domain.default_status
+        else:
+            try:
+                validate_status(domain, status)
+            except InvalidStatus as error:
+                raise LibraryError("invalid_status", str(error), status_code=422) from error
         try:
             result = self.repository.create_cached_entry(
                 title=title,

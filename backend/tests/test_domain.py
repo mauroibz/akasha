@@ -1,5 +1,20 @@
 import pytest
 
+from book_tracker.domain.domains import (
+    ALBUM,
+    ALL_FORMATS,
+    ALL_STATUSES,
+    BOOK,
+    DOMAINS,
+    EntryFormat,
+    EntryStatus,
+    InvalidEntryField,
+    InvalidFormat,
+    InvalidStatus,
+    validate_entry_fields,
+    validate_formats,
+    validate_status,
+)
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
@@ -114,3 +129,100 @@ def test_creator_sort_name_keeps_every_token_after_the_first_as_the_surname() ->
     wrong until the owner corrects it by hand.
     """
     assert creator_sort_name("John Ronald Reuel Tolkien") == "Ronald Reuel Tolkien, John"
+
+
+# --------------------------------------------------------------------------------------
+# The domain registry: what an *entry* on this domain can be (seam 5b, DEC-057/DEC-059)
+# --------------------------------------------------------------------------------------
+
+
+def test_every_domain_declares_a_usable_status_vocabulary() -> None:
+    """Written against the registry rather than against books or albums by name.
+
+    A third domain added after this sprint inherits the same rules without anyone
+    remembering to extend a list here, which is the whole point of seam 5b.
+    """
+    for domain in DOMAINS.values():
+        values = [status.value for status in domain.statuses]
+        assert values, f"{domain.item_type} declares no statuses"
+        assert len(values) == len(set(values)), f"{domain.item_type} repeats a status"
+        # Imports land in the inbox whatever the domain, and the default library view
+        # hides it — so it exists everywhere and is never offered as a choice.
+        assert "unsorted" in values
+        assert not next(row for row in domain.statuses if row.value == "unsorted").choosable
+        assert domain.default_status in values
+        assert all(status.label for status in domain.statuses)
+        keys = [status.hotkey for status in domain.statuses if status.hotkey]
+        assert len(keys) == len(set(keys)), f"{domain.item_type} binds one key twice"
+        assert all(status.hotkey for status in domain.statuses if status.choosable)
+
+
+def test_every_domain_declares_a_format_vocabulary() -> None:
+    for domain in DOMAINS.values():
+        values = [row.value for row in domain.formats]
+        assert values, f"{domain.item_type} declares no formats"
+        assert len(values) == len(set(values))
+        assert all(row.label for row in domain.formats)
+
+
+def test_the_two_domains_disagree_about_what_a_status_means() -> None:
+    """DEC-057: an album's status is possession, a book's is consumption."""
+    assert [row.value for row in ALBUM.statuses] == ["unsorted", "wishlist", "pending", "owned"]
+    assert ALBUM.default_status == "owned"
+    assert BOOK.default_status == "read"
+    assert "read" not in {row.value for row in ALBUM.statuses}
+    # ...and they still share the one status that means the same thing in both.
+    assert "wishlist" in {row.value for row in BOOK.statuses}
+
+
+def test_a_status_is_validated_against_the_domain_that_owns_the_item() -> None:
+    assert validate_status(BOOK, "read") == "read"
+    assert validate_status(ALBUM, "owned") == "owned"
+    with pytest.raises(InvalidStatus) as refused:
+        validate_status(ALBUM, "read")
+    # The message names the domain: "that is not a status" is unactionable when the
+    # value is perfectly valid one row further down the library.
+    assert "Album" in str(refused.value)
+    with pytest.raises(InvalidStatus):
+        validate_status(BOOK, "owned")
+
+
+def test_a_format_is_validated_against_the_domain_that_owns_the_item() -> None:
+    assert validate_formats(ALBUM, ["vinyl", "digital"]) == ["vinyl", "digital"]
+    with pytest.raises(InvalidFormat) as refused:
+        validate_formats(ALBUM, ["borrowed"])
+    assert "Album" in str(refused.value)
+    with pytest.raises(InvalidFormat):
+        validate_formats(BOOK, ["vinyl"])
+
+
+def test_an_album_has_no_reread_count_and_no_dates() -> None:
+    """DEC-057: those date a passage through a book an album does not have."""
+    assert BOOK.entry_fields == frozenset({"date_started", "date_finished", "reread_count"})
+    assert ALBUM.entry_fields == frozenset()
+    assert validate_entry_fields(BOOK, {"reread_count": 2}) == {"reread_count": 2}
+    with pytest.raises(InvalidEntryField) as refused:
+        validate_entry_fields(ALBUM, {"reread_count": 2})
+    assert "Album" in str(refused.value)
+    # Fields every domain has are never refused by this check.
+    assert validate_entry_fields(ALBUM, {"score": 8, "notes": "x"}) == {"score": 8, "notes": "x"}
+
+
+def test_the_status_union_is_ordered_and_covers_every_domain() -> None:
+    assert set(ALL_STATUSES) == {
+        value for domain in DOMAINS.values() for value in (row.value for row in domain.statuses)
+    }
+    assert ALL_STATUSES[0] == "unsorted"
+    assert len(ALL_STATUSES) == len(set(ALL_STATUSES))
+    assert set(ALL_FORMATS) == {row.value for domain in DOMAINS.values() for row in domain.formats}
+
+
+def test_the_published_enums_agree_with_the_registry() -> None:
+    """The drift assertion for the API surface.
+
+    `EntryStatus` and `EntryFormat` are what OpenAPI publishes and therefore what a
+    client may send. They are spelled out for the type checker, so this is the thing
+    that fails when a domain declares a value nobody added to them.
+    """
+    assert {member.value for member in EntryStatus} == set(ALL_STATUSES)
+    assert {member.value for member in EntryFormat} == set(ALL_FORMATS)
