@@ -465,3 +465,57 @@ test("triage animates its action bar but not under reduced motion", async ({
   const long = still.filter((sample) => sample.duration > 0.01);
   expect(long, JSON.stringify(long.slice(0, 5))).toEqual([]);
 });
+
+test("triage puts a selection on a shelf in bulk", async ({ page }) => {
+  // Listed in product spec section 7 as `Set status · Add shelves · Set score ·
+  // Clear provisional` and never built: `add_shelves` existed on the bulk endpoint
+  // and was tested, but no control ever sent it.
+  const entries = makeEntries(10);
+  let bulkBody: unknown = null;
+  await page.route("**/api/shelves", (route) =>
+    route.fulfill({
+      json: [
+        { id: 4, name: "Argentina", slug: "argentina", entry_count: 12 },
+        { id: 7, name: "Ensayo", slug: "ensayo", entry_count: 3 },
+      ],
+    }),
+  );
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: 10,
+        facets: {
+          status_counts: { unsorted: 10 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.route("**/api/entries/bulk", (route) => {
+    bulkBody = route.request().postDataJSON();
+    return route.fulfill({ json: { affected: 2 } });
+  });
+
+  await page.goto("/triage");
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+  await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
+  await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
+  await expect(page.getByText("2 selected")).toBeVisible();
+
+  await chooseOption(
+    page,
+    page.getByRole("combobox", { name: "Add selected to a shelf" }),
+    "Ensayo",
+  );
+
+  await expect
+    .poll(() => bulkBody)
+    .toEqual({
+      entry_ids: [1, 2],
+      set: { add_shelves: [7] },
+    });
+  await expect(page.getByText("2 entries updated")).toBeVisible();
+});

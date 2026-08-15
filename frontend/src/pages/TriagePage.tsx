@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
@@ -17,6 +18,7 @@ import {
   type LibraryFilters,
   type SortKey,
 } from "@/api/library";
+import { getShelves } from "@/api/shelves";
 import { ChevronRight } from "lucide-react";
 
 import { CoverImage } from "@/components/CoverImage";
@@ -121,6 +123,19 @@ export function TriagePage() {
     [library.data],
   );
   const firstPage = library.data?.pages[0];
+
+  // Every shelf, for the bulk control. One request for the page, and a failure
+  // costs the control rather than the screen.
+  const shelfQuery = useQuery({
+    queryKey: ["shelves"],
+    queryFn: getShelves,
+    retry: false,
+  });
+  const shelfChoices = useMemo(() => {
+    const rows = shelfQuery.data;
+    if (!Array.isArray(rows)) return [];
+    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  }, [shelfQuery.data]);
 
   const bulkMutation = useMutation({
     mutationFn: (body: Parameters<typeof bulkUpdateEntries>[0]) =>
@@ -564,6 +579,34 @@ export function TriagePage() {
                   ))}
                 </SelectContent>
               </Select>
+              {shelfChoices.length > 0 && (
+                // Product spec section 7 has listed this beside the others since
+                // v1 and it was never built, so putting twenty imported books on
+                // one shelf meant opening twenty detail pages. Fire-and-reset like
+                // the two above it: it is an action, not a field.
+                <Select
+                  value=""
+                  onValueChange={(value) =>
+                    bulkMutation.mutate(
+                      buildBulkBody({ add_shelves: [Number(value)] }),
+                    )
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Add selected to a shelf"
+                    className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
+                  >
+                    <SelectValue placeholder="Add to shelf…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shelfChoices.map((shelf) => (
+                      <SelectItem key={shelf.id} value={String(shelf.id)}>
+                        {shelf.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Button
                 variant="secondary"
                 className="rounded-full text-sm"

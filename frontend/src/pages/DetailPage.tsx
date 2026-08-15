@@ -33,6 +33,7 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
+import { ShelfPicker } from "@/features/detail/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
   entryPanelLabel,
@@ -226,13 +227,22 @@ export function DetailPage() {
     }
   }
 
+  /**
+   * Create a shelf and hand it back, so the caller can put this entry on it
+   * without a second trip through the UI.
+   *
+   * The error is re-thrown as well as reported: the picker has to know the shelf
+   * does not exist, or it would go on to assign an id it never received.
+   */
   async function handleCreateShelf(name: string) {
     try {
-      await createShelf(name);
+      const created = await createShelf(name);
       void cache.invalidateQueries({ queryKey: ["shelves"] });
       toast.success(`Shelf "${name}" created`);
+      return created;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Shelf could not be created");
+      throw e;
     }
   }
 
@@ -353,8 +363,20 @@ export function DetailPage() {
                   {entry.reread_count}
                 </Fact>
               )}
+              {/* Editable where it is read. The owner's complaint was distance:
+                  shelf membership lived inside a dialog named after something
+                  else, and creating a shelf was a whole route. */}
               <Fact name="shelves" label="Shelves">
-                {entry.shelves.map((s) => s.name).join(", ") || "—"}
+                <ShelfPicker
+                  current={entry.shelves}
+                  available={shelves.data ?? []}
+                  onChange={async (shelfIds) => {
+                    await update.mutateAsync(() =>
+                      patchEntry(entry.id, { shelf_ids: shelfIds }),
+                    );
+                  }}
+                  onCreate={handleCreateShelf}
+                />
               </Fact>
             </dl>
             {entry.notes && (
@@ -463,7 +485,6 @@ export function DetailPage() {
         open={dialog === "opinion"}
         onOpenChange={(open) => setDialog(open ? "opinion" : null)}
         entry={entry}
-        shelves={shelves.data ?? []}
         onSave={(values) =>
           update
             .mutateAsync(() =>
@@ -471,7 +492,6 @@ export function DetailPage() {
                 status: values.status,
                 score: values.score,
                 notes: values.notes,
-                shelf_ids: values.shelf_ids,
                 formats: values.formats,
                 // Sent only by a domain that has them. The server refuses a reread
                 // count on a record with a 422, and it is right to (DEC-057).
@@ -488,7 +508,6 @@ export function DetailPage() {
             )
             .then(() => undefined)
         }
-        onCreateShelf={handleCreateShelf}
       />
 
       <CoverDialog

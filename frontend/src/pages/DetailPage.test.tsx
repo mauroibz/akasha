@@ -717,4 +717,176 @@ describe("DetailPage", () => {
       expect(score?.className).toContain("text-background");
     });
   });
+
+  /**
+   * The owner's words: "shelves kinda suck, having to create them by going on a
+   * new screen + having to click 'edit opinion' to be able to change them is not
+   * ideal." Both frictions are asserted here — one control, no dialog, no route.
+   */
+  function stubShelves(
+    existing = [
+      { id: 1, name: "Favorites", slug: "favorites", entry_count: 4 },
+    ],
+  ) {
+    return vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves" && init?.method === "POST") {
+          const body = JSON.parse(String(init.body)) as { name: string };
+          return new Response(
+            JSON.stringify({
+              id: 9,
+              name: body.name,
+              slug: body.name.toLowerCase(),
+              entry_count: 0,
+            }),
+          );
+        }
+        if (url === "/api/shelves")
+          return new Response(JSON.stringify(existing));
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (url.includes("/attachments"))
+          return new Response('{"attachments":[]}');
+        if (url === "/api/entries/7" && init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body)) as { shelf_ids: number[] };
+          return new Response(
+            JSON.stringify({
+              ...entry,
+              shelves: body.shelf_ids.map((id) => ({
+                id,
+                name: id === 9 ? "Ensayo" : "Favorites",
+                slug: id === 9 ? "ensayo" : "favorites",
+              })),
+            }),
+          );
+        }
+        return new Response(JSON.stringify(entry));
+      });
+  }
+
+  it("creates a shelf and puts the book on it in one control", async () => {
+    const request = stubShelves();
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Add to a shelf" }));
+    await user.type(
+      await screen.findByRole("combobox", { name: "Find or create a shelf" }),
+      "Ensayo",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: /Create .Ensayo./ }),
+    );
+
+    // Created, then assigned, without the opinion dialog and without /shelves.
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/shelves",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/entries/7",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shelf_ids: [1, 9] }),
+        }),
+      ),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("adds an existing shelf from the same control", async () => {
+    const request = stubShelves([
+      { id: 1, name: "Favorites", slug: "favorites", entry_count: 4 },
+      { id: 9, name: "Ensayo", slug: "ensayo", entry_count: 2 },
+    ]);
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Add to a shelf" }));
+    await user.click(await screen.findByRole("option", { name: "Ensayo" }));
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/entries/7",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shelf_ids: [1, 9] }),
+        }),
+      ),
+    );
+    // Nothing was created: it already existed.
+    expect(
+      request.mock.calls.filter(
+        ([url, init]) =>
+          String(url) === "/api/shelves" &&
+          (init as RequestInit | undefined)?.method === "POST",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("takes the book off a shelf from the same place", async () => {
+    const request = stubShelves();
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove from Favorites" }),
+    );
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/entries/7",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shelf_ids: [] }),
+        }),
+      ),
+    );
+  });
+
+  it("does not offer shelves in the opinion dialog any more", async () => {
+    stubShelves();
+    // Re-stub with a domain that declares formats, so the assertion that the
+    // format control *stayed* is about the dialog and not about the fixture.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(
+          JSON.stringify([
+            {
+              ...itemTypes[0],
+              formats: [
+                { value: "physical", label: "Physical" },
+                { value: "digital", label: "Digital" },
+              ],
+            },
+          ]),
+        );
+      if (url.includes("/attachments"))
+        return new Response('{"attachments":[]}');
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit opinion" }));
+    const dialog = await screen.findByRole("dialog");
+    // Shelf membership moved out; the format control did not, because a format is
+    // not a shelf and the two must not converge (DEC-059).
+    expect(within(dialog).queryByText("Shelves")).toBeNull();
+    expect(
+      within(dialog).queryByRole("textbox", { name: "New shelf name" }),
+    ).toBeNull();
+    expect(within(dialog).getByText("Format")).toBeVisible();
+  });
 });

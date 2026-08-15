@@ -19,6 +19,19 @@ if (!Element.prototype.hasPointerCapture) {
 if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined;
 }
+/**
+ * jsdom has no `ResizeObserver` at all, and cmdk constructs one as it mounts, so
+ * the shelf picker's list throws before it can render. Nothing here measures
+ * anything — every layout assertion lives in the Playwright suite, which runs in a
+ * browser that has the real thing.
+ */
+if (typeof globalThis.ResizeObserver === "undefined") {
+  globalThis.ResizeObserver = class {
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  } as unknown as typeof ResizeObserver;
+}
 
 /**
  * Every test runs under `prefers-reduced-motion: reduce` unless it opts out

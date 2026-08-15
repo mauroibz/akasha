@@ -3,7 +3,6 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import type { LibraryEntry } from "@/api/library";
-import type { ShelfWithCount } from "@/api/shelves";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
 import {
@@ -32,21 +31,24 @@ interface OpinionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entry: LibraryEntry;
-  shelves: ShelfWithCount[];
   onSave: (values: OpinionValues) => Promise<void>;
-  onCreateShelf: (name: string) => Promise<void>;
 }
 
+/**
+ * Your opinion of this thing — and only that.
+ *
+ * Shelf membership used to live here, which is what made putting a book on a shelf
+ * mean opening a dialog named after something else. It is edited on the page now,
+ * beside the shelves it lists. Format stayed: a format is a fact about your copy,
+ * not an organizational tier, and it is not a shelf (DEC-059).
+ */
 export function OpinionDialog({
   open,
   onOpenChange,
   entry,
-  shelves,
   onSave,
-  onCreateShelf,
 }: OpinionDialogProps) {
   const itemTypes = useItemTypes();
-  const [newShelfName, setNewShelfName] = useState("");
   const [saveError, setSaveError] = useState("");
   const form = useForm<OpinionValues>({
     resolver: zodResolver(opinionSchema),
@@ -57,7 +59,6 @@ export function OpinionDialog({
       date_started: entry.date_started ?? "",
       date_finished: entry.date_finished ?? "",
       reread_count: String(entry.reread_count),
-      shelf_ids: entry.shelves.map((shelf) => shelf.id),
       formats: entry.formats ?? [],
     },
   });
@@ -74,8 +75,8 @@ export function OpinionDialog({
         <DialogHeader>
           <DialogTitle>Edit your opinion</DialogTitle>
           <DialogDescription>
-            Your score, status, format, notes, and shelves belong to you alone
-            and are never overwritten by a provider.
+            Your score, status, format and notes belong to you alone and are
+            never overwritten by a provider.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -216,60 +217,6 @@ export function OpinionDialog({
               )}
             </Field>
           )}
-          {shelves.length > 0 && (
-            <fieldset>
-              <legend className="text-sm font-medium">Shelves</legend>
-              <Controller
-                control={form.control}
-                name="shelf_ids"
-                render={({ field }) => (
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {shelves.map((shelf) => (
-                      <div key={shelf.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`opinion-shelf-${shelf.id}`}
-                          checked={field.value.includes(shelf.id)}
-                          onCheckedChange={(checked) =>
-                            field.onChange(
-                              checked
-                                ? [...field.value, shelf.id]
-                                : field.value.filter(
-                                    (id: number) => id !== shelf.id,
-                                  ),
-                            )
-                          }
-                        />
-                        <Label htmlFor={`opinion-shelf-${shelf.id}`}>
-                          {shelf.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              />
-            </fieldset>
-          )}
-          <div className="flex gap-2">
-            <Input
-              className="h-11 flex-1"
-              aria-label="New shelf name"
-              placeholder="New shelf name"
-              value={newShelfName}
-              onChange={(event) => setNewShelfName(event.target.value)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full"
-              disabled={!newShelfName.trim()}
-              onClick={async () => {
-                await onCreateShelf(newShelfName.trim());
-                setNewShelfName("");
-              }}
-            >
-              Create shelf
-            </Button>
-          </div>
           {saveError && (
             <p role="alert" className="text-sm text-destructive">
               {saveError}
