@@ -585,6 +585,10 @@ class GoogleBooksProvider:
     name = "googlebooks"
     item_type = "book"
 
+    #: Why this provider is not wired, when it is not. Read by
+    #: `GET /api/health/providers`, which no longer knows any provider by name.
+    unavailable_reason = "GOOGLE_BOOKS_API_KEY is not set"
+
     def __init__(self, client: httpx.AsyncClient, api_key: str) -> None:
         self.client = client
         self.api_key = api_key
