@@ -30,7 +30,7 @@ const expected = {
   FieldSpecResponse: ["name", "label", "type", "multiplicity"],
   StatusSpecResponse: ["value", "label", "choosable", "hotkey"],
   FormatSpecResponse: ["value", "label"],
-  FacetsResponse: ["status_counts", "format_counts"],
+  FacetsResponse: ["status_counts", "status_counts_by_type", "format_counts"],
   ShelfResponse: ["id", "name", "slug", "entry_count"],
 };
 

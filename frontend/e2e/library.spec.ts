@@ -309,7 +309,11 @@ test("a cover that arrives late shifts nothing in its card", async ({
         items,
         next_cursor: null,
         total: 60,
-        facets: { status_counts: { read: 60 }, format_counts: {} },
+        facets: {
+          status_counts: { read: 60 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       }),
     });
   });

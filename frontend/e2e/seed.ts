@@ -64,6 +64,7 @@ export async function seedLibrary(page: Page, count = 5000) {
         total: count,
         facets: {
           status_counts: { read: count, unsorted: 27 },
+          status_counts_by_type: {},
           format_counts: {},
         },
       }),

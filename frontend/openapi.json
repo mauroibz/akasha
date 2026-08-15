@@ -938,10 +938,21 @@
             },
             "title": "Status Counts",
             "type": "object"
+          },
+          "status_counts_by_type": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "type": "integer"
+              },
+              "type": "object"
+            },
+            "title": "Status Counts By Type",
+            "type": "object"
           }
         },
         "required": [
           "status_counts",
+          "status_counts_by_type",
           "format_counts"
         ],
         "title": "FacetsResponse",

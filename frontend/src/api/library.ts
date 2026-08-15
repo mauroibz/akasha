@@ -140,7 +140,10 @@ export interface LibraryPage {
   next_cursor: string | null;
   total: number;
   facets: {
+    /** Whole-library totals: what the inbox badge counts. */
     status_counts: Partial<Record<EntryStatus, number>>;
+    /** The same counts per item type, for a screen that lists domains separately. */
+    status_counts_by_type: Record<string, Partial<Record<EntryStatus, number>>>;
     format_counts: Partial<Record<EntryFormat, number>>;
   };
 }

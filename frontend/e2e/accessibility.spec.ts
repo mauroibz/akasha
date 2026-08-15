@@ -121,6 +121,7 @@ async function stubTriage(page: Page) {
         total: entries.length,
         facets: {
           status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
           format_counts: {},
         },
       },

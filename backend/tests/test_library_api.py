@@ -286,3 +286,29 @@ async def test_status_counts_cover_statuses_only_one_domain_has(tmp_path: Path) 
         page = await client.get("/api/entries")
 
     assert page.json()["facets"]["status_counts"] == {"owned": 1, "read": 1}
+
+
+@pytest.mark.anyio
+async def test_a_shared_status_is_counted_per_domain_not_once(tmp_path: Path) -> None:
+    """Found in the walkthrough, not in the suite.
+
+    `wishlist` exists in both vocabularies. With one row of chips per domain, a
+    single global count put the wishlisted *record* under "Book · Wishlist" — a
+    number that is right about the library and wrong about the row it is in.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        book_entry, album_entry = await _one_of_each(app)
+        await client.patch(f"/api/entries/{album_entry}", json={"status": "wishlist"})
+        await client.patch(f"/api/entries/{book_entry}", json={"status": "read"})
+        facets = (await client.get("/api/entries")).json()["facets"]
+
+    assert facets["status_counts_by_type"] == {
+        "album": {"wishlist": 1},
+        "book": {"read": 1},
+    }
+    # The whole-library total still exists, because that is what the inbox badge is.
+    assert facets["status_counts"] == {"wishlist": 1, "read": 1}

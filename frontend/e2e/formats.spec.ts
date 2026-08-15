@@ -54,6 +54,7 @@ async function library(page: Page, entries: unknown[], counts = {}) {
         total: entries.length,
         facets: {
           status_counts: { owned: 1 },
+          status_counts_by_type: { album: { owned: 1 }, book: { read: 4 } },
           format_counts: { vinyl: 1, ...counts },
         },
       },

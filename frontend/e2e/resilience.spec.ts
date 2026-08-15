@@ -56,7 +56,11 @@ test("a failed library load says so and can be retried", async ({ page }) => {
         items: [],
         next_cursor: null,
         total: 0,
-        facets: { status_counts: {}, format_counts: {} },
+        facets: {
+          status_counts: {},
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     });
   });

@@ -704,9 +704,21 @@ class LibraryService:
             # Each facet clears its own dimension, so a count reads as "what you would
             # get if you clicked this" rather than as a count of the current page.
             facet_base = self._filtered_entries([], shelves, q, formats).subquery()
+            # Grouped by the item's type as well as the status, because a status two
+            # domains share is not one number on a screen that lists them separately:
+            # a wishlisted record counted under "Book · Wishlist" is a wrong answer
+            # the walkthrough caught. `status_counts` stays the whole-library total,
+            # which is what the inbox badge means.
             facet_rows = session.execute(
-                select(facet_base.c.status, func.count()).group_by(facet_base.c.status)
+                select(facet_base.c.status, ItemRow.type, func.count())
+                .join(ItemRow, ItemRow.id == facet_base.c.item_id)
+                .group_by(facet_base.c.status, ItemRow.type)
             ).all()
+            status_counts: dict[str, int] = {}
+            by_type: dict[str, dict[str, int]] = {}
+            for status_value, item_type, count in facet_rows:
+                status_counts[status_value] = status_counts.get(status_value, 0) + count
+                by_type.setdefault(item_type, {})[status_value] = count
             format_base = self._filtered_entries(statuses, shelves, q).subquery()
             format_rows = session.execute(
                 select(EntryFormatRow.format, func.count())
@@ -745,7 +757,8 @@ class LibraryService:
                 "next_cursor": next_cursor,
                 "total": total,
                 "facets": {
-                    "status_counts": {row[0]: row[1] for row in facet_rows},
+                    "status_counts": status_counts,
+                    "status_counts_by_type": by_type,
                     "format_counts": {row[0]: row[1] for row in format_rows},
                 },
             }

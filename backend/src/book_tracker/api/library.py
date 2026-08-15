@@ -166,7 +166,11 @@ class EntryResponse(BaseModel):
 
 
 class FacetsResponse(BaseModel):
+    #: Whole-library totals per status, which is what the inbox badge counts.
     status_counts: dict[str, int]
+    #: The same counts split by item type, because a status two domains share is
+    #: not one number on a screen that lists each domain's statuses separately.
+    status_counts_by_type: dict[str, dict[str, int]]
     format_counts: dict[str, int]
 
 

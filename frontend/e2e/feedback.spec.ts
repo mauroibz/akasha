@@ -74,7 +74,7 @@ const emptyLibrary = {
   items: [],
   next_cursor: null,
   total: 0,
-  facets: { status_counts: {}, format_counts: {} },
+  facets: { status_counts: {}, status_counts_by_type: {}, format_counts: {} },
 };
 
 async function stubLibrary(page: Page) {
@@ -254,7 +254,11 @@ test.describe("a rejected write", () => {
           items: [entry],
           next_cursor: null,
           total: 1,
-          facets: { status_counts: { reading: 1 }, format_counts: {} },
+          facets: {
+            status_counts: { reading: 1 },
+            status_counts_by_type: {},
+            format_counts: {},
+          },
         },
       }),
     );

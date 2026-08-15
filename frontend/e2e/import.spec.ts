@@ -37,7 +37,11 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
         })),
         next_cursor: null,
         total: 3,
-        facets: { status_counts: { unsorted: 3 }, format_counts: {} },
+        facets: {
+          status_counts: { unsorted: 3 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );

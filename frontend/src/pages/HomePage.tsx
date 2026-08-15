@@ -27,9 +27,7 @@ import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -163,6 +161,18 @@ export function HomePage() {
     if (!Array.isArray(rows)) return [];
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   }, [shelfQuery.data]);
+  // Every format any domain declares, once. The filter spans domains — an entry
+  // carries formats, not a domain — so this is a flat list rather than a group per
+  // domain, which offered `Digital` twice with one meaning.
+  const formatChoices = useMemo(() => {
+    const seen = new Map<string, { value: EntryFormat; label: string }>();
+    for (const type of domainsFrom(itemTypes.data)) {
+      for (const format of type.formats ?? []) {
+        if (!seen.has(format.value)) seen.set(format.value, format);
+      }
+    }
+    return Array.from(seen.values());
+  }, [itemTypes.data]);
   const firstPage = library.data?.pages[0];
 
   const mutation = useMutation({
@@ -405,19 +415,15 @@ export function HomePage() {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={allFormats}>All formats</SelectItem>
-            {domainsFrom(itemTypes.data).map((type) => (
-              <SelectGroup key={type.id}>
-                <SelectLabel>{type.label}</SelectLabel>
-                {type.formats.map((format) => (
-                  <SelectItem
-                    key={`${type.id}-${format.value}`}
-                    value={format.value}
-                  >
-                    {format.label}{" "}
-                    {firstPage?.facets.format_counts[format.value] ?? 0}
-                  </SelectItem>
-                ))}
-              </SelectGroup>
+            {/* One entry per distinct format, not one per domain that declares it:
+                `digital` belongs to books and records both, and listing it twice
+                gave two options with the same value and the same count. The filter
+                itself spans domains, so a flat list is what it actually does. */}
+            {formatChoices.map((format) => (
+              <SelectItem key={format.value} value={format.value}>
+                {format.label}{" "}
+                {firstPage?.facets.format_counts[format.value] ?? 0}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -481,7 +487,9 @@ export function HomePage() {
                 }
               >
                 {status.label}{" "}
-                {firstPage?.facets.status_counts[status.value] ?? 0}
+                {firstPage?.facets.status_counts_by_type?.[type.id]?.[
+                  status.value
+                ] ?? 0}
               </button>
             );
           })}

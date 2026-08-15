@@ -47,6 +47,7 @@ async function stubEntry(page: Page) {
         total: 1,
         facets: {
           status_counts: { reading: 1, unsorted: 5 },
+          status_counts_by_type: {},
           format_counts: {},
         },
       },
