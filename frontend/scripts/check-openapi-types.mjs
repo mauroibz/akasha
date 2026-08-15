@@ -43,28 +43,16 @@ for (const [name, properties] of Object.entries(expected)) {
   }
 }
 
-// The union of every domain's vocabulary, which is what a filter spans. Which of
-// these a given entry may hold is the domain's business and is checked per item type
-// on the server (seam 5b) — this only pins the surface a client can send.
-const statuses = components.EntryStatus?.enum ?? [];
-for (const status of [
-  "unsorted",
-  "read",
-  "reading",
-  "to_read",
-  "wishlist",
-  "dropped",
-  "pending",
-  "owned",
-]) {
-  if (!statuses.includes(status))
-    throw new Error(`OpenAPI EntryStatus is missing ${status}`);
-}
-
-const formats = components.EntryFormat?.enum ?? [];
-for (const format of ["physical", "borrowed", "digital", "vinyl", "cd"]) {
-  if (!formats.includes(format))
-    throw new Error(`OpenAPI EntryFormat is missing ${format}`);
+// The published vocabularies must exist here, because `src/api/library.ts` mirrors
+// them by hand. **What is in them is not listed here**: a third copy of every
+// domain's statuses would be one more file to edit when a domain is added, and one
+// more place for the vocabulary to drift. `src/api/library.test.ts` pins the client's
+// arrays against these enums, and `backend/tests/test_domain.py` pins the enums
+// against the registry, so the chain runs registry -> enum -> OpenAPI -> client with
+// no hand-maintained list in the middle.
+for (const name of ["EntryStatus", "EntryFormat", "ItemTypeName"]) {
+  if (!components[name]?.enum?.length)
+    throw new Error(`OpenAPI schema ${name} publishes no values`);
 }
 
 console.log("Frontend library types match the checked OpenAPI surface.");

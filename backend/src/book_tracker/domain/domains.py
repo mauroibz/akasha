@@ -15,7 +15,7 @@ from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any, Literal
-from urllib.parse import parse_qs, urlsplit
+from urllib.parse import SplitResult, parse_qs, urlsplit
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.providers import ALBUM_IDENTITY, BOOK_IDENTITY, IdentityStrategy
@@ -360,6 +360,24 @@ _MUSICBRAINZ_RELEASE_GROUP = re.compile(
 )
 
 
+def split_url(value: str) -> tuple[SplitResult, str] | None:
+    """A parsed URL and its casefolded host, or `None` for anything unparseable.
+
+    `urlsplit` **raises** on a malformed authority — `http://[` is `ValueError: Invalid
+    IPv6 URL` — and a recognizer that raises does not fail only its own domain:
+    `resolve_input` asks each registered domain in turn, so the first one to raise
+    denies every domain after it its turn. Every recognizer therefore parses through
+    here rather than reaching for `urlsplit` itself, and a domain that forgets is caught
+    by `test_domain_conformance.py`.
+    """
+    try:
+        parsed = urlsplit(value)
+        host = (parsed.hostname or "").casefold()
+    except ValueError:
+        return None
+    return parsed, host
+
+
 def recognize_book_input(value: str) -> UrlMatch | None:
     """An ISBN, an Open Library edition or work, or a Google Books volume."""
     try:
@@ -368,8 +386,10 @@ def recognize_book_input(value: str) -> UrlMatch | None:
         isbn = None
     if isbn:
         return UrlMatch("", "search", f"isbn:{isbn}")
-    parsed = urlsplit(value)
-    host = (parsed.hostname or "").casefold()
+    split = split_url(value)
+    if split is None:
+        return None
+    parsed, host = split
     if host in _OPENLIBRARY_HOSTS:
         edition = _OPENLIBRARY_EDITION.fullmatch(parsed.path)
         if edition:
@@ -390,8 +410,11 @@ def recognize_album_url(value: str) -> UrlMatch | None:
     The item is the release group; pointing at one pressing would silently add a
     different record from the one the link names.
     """
-    parsed = urlsplit(value)
-    if (parsed.hostname or "").casefold() not in _MUSICBRAINZ_HOSTS:
+    split = split_url(value)
+    if split is None:
+        return None
+    parsed, host = split
+    if host not in _MUSICBRAINZ_HOSTS:
         return None
     group = _MUSICBRAINZ_RELEASE_GROUP.fullmatch(parsed.path)
     return UrlMatch("musicbrainz", "fetch", group.group(1)) if group else None

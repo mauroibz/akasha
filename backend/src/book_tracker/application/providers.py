@@ -58,7 +58,20 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
     """
     cleaned = value.strip()
     for domain in DOMAINS.values():
-        match = domain.recognize(cleaned)
+        try:
+            match = domain.recognize(cleaned)
+        except Exception as error:
+            # One domain must not be able to break another's add box. This loop asks
+            # every registered domain in turn, so a recognizer that raises would end the
+            # loop and deny every domain after it its turn — a domain added by one team
+            # silently breaking a domain added by another. The recognizer is still
+            # wrong, and `test_domain_conformance.py` is what says so; here it is only
+            # this domain's mistake.
+            logger.warning(
+                "domain recognizer failed",
+                extra={"item_type": domain.item_type, "error": type(error).__name__},
+            )
+            continue
         if match is None:
             continue
         if match.action == "search":
