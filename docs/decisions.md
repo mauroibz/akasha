@@ -1999,3 +1999,121 @@ Append-only record of material architecture choices, product-default resolutions
   while planning are repaired under `AGENTS.md` §1: `ROADMAP.md` still headed the per-domain-imports
   contract "Sprint 029" after DEC-065 renumbered it to 030, and `HANDOFF.md`'s "no `type === "album"`
   branch anywhere" was true of albums and silent about books.
+
+## DEC-067 — What the conformance suite measured, and what each coupling costs to remove
+
+- **Date:** 2026-08-15
+- **Status:** accepted (the measurement); the Phase B selection below awaits the owner's go-ahead
+- **Context:** Sprint 028 Phase A deliverable 3. DEC-066 listed what a third domain must edit; this
+  prices each one. Every row is a fork with its options and costs rather than a single recommended
+  path, because a gate whose measurement recommends work in every row is not a gate. **Four of the
+  ten rows recommend doing nothing**, and that is the honest outcome rather than a smaller sprint.
+- **What the suite proved, before any of this was costed.** The conformance suite
+  (`backend/tests/test_domain_conformance.py`) is parametrized over `DOMAINS` and splits its checks
+  in two. A fixture domain that is registered nowhere satisfies **every** check about a domain's own
+  consistency — its vocabularies, fields, identity rule and recognizer. Give it a status of its own
+  and it fails both checks about whether the core can host it. **That is the finding in one
+  sentence: a domain can be written against the contract today, and cannot be added without editing
+  the core.**
+
+  The suite also found a live defect on its first run, which is repaired in this sprint rather than
+  costed: `urlsplit` raises on a malformed authority (`http://[`), `resolve_input` asks each
+  registered domain in turn, and the first recognizer to raise **denied every domain after it its
+  turn**. One domain breaking another's add box is precisely the failure mode this epic exists to
+  prevent, and it was reachable from the add box by pasting a typo. Both recognizers now parse
+  through a shared `split_url`, and the loop isolates a raising recognizer regardless.
+
+| # | Coupling | Options | Cost | Recommendation |
+|---|---|---|---|---|
+| 1 | `entries.ck_entries_status` is a list frozen at migration-write time, so a new domain's status passes the API and is refused by SQLite | (a) migration per domain; (b) drop the CHECK and let `validate_status` be the authority; (c) a `domain_statuses` table and a trigger | (a) a batch rebuild of `entries` per domain **and an alembic head collision between two teams**; (b) one batch rebuild, once, and the loss of a defence-in-depth the application is the only writer behind; (c) makes the registry partly data, contradicting "the registry is code" | **(b)**, as the one schema change that removes a per-domain migration forever. Owner's call at the gate |
+| 2 | The published unions `EntryStatus` / `EntryFormat` / `ItemTypeName` are spelled out by hand | (a) keep; (b) build the `StrEnum` from the registry; (c) generate the source | (a) three lines per domain, type-safe, and a test fails when it is forgotten; (b) opaque to mypy and loses the literal types in the API models — the reason it was written this way; (c) a build step for three lines | **(a) keep. Do nothing.** The coupling is real and cheaper than any of its removals |
+| 3 | Enrichment is keyed on ISBN below the `enriches` flag (`_backfillable_items`, `_fetch`, `PROVIDER_ORDER`) | (a) leave and document what the flag means; (b) declare an enrichment key and an incompleteness rule per domain; (c) move enrichment behind the adapter | (a) nothing now; a domain wanting enrichment discovers the gap late; (b) rewrite of one SQL query and the fetch loop, ~half a sprint; (c) reaches the job payload and the ledger | **(a) for now.** No domain needs it: albums declare `enriches=False`, and a game record arrives complete in one query. Build (b) when a domain actually asks |
+| 4 | The cover host allowlist is central | (a) keep; (b) let a domain declare its own hosts | (a) one line per domain; (b) a domain could widen the allowlist from its own package, which is what an allowlist exists to prevent | **(a) keep. Do nothing.** This one is central on purpose |
+| 5 | `provider_health` names `openlibrary` / `musicbrainz` / `googlebooks` as literals | (a) derive the rows from the registered providers; (b) leave | (a) ~15 lines, and the response gains a row per provider automatically; (b) a domain's provider is invisible to the health endpoint until someone remembers | **(a)**, in Phase B. Cheap, and shared infrastructure should not name a provider |
+| 6 | The manual add path is a book form bound to `DEFAULT_DOMAIN` | (a) leave; (b) render it from the field spec | (a) a new domain has no manual path — which matches the product decision that manual entry is a book fallback; (b) medium frontend work on the exact screen Sprint 029 rebuilds | **(a) now, named for Sprint 029.** Building it here would be built twice |
+| 7 | The cover chooser offers itself on an album and can only say no (`cover_candidates` takes an Open Library provider) | (a) hide it unless the domain declares it can choose covers; (b) a per-domain cover-candidate strategy; (c) leave a fourth time | (a) one declaration plus one condition, and it is user-visible so it re-arms the walkthrough; (b) a seam nothing needs yet; (c) the reader keeps meeting a control that cannot work | **(a)**, in Phase B. The sprint required this be decided rather than deferred again |
+| 8 | The detail route is `/books/:id` for every domain | (a) leave; (b) `/items/:id` with a redirect | (a) a cosmetically wrong URL; (b) every `navigate` call and seven e2e specs, on the screens 029 rebuilds | **(a) leave. Do nothing** — and revisit inside 029, which is already there |
+| 9 | The import layer is book-only end to end | — | Sprint 030's whole outcome | Named, not moved. Out of scope by the sprint's own boundary |
+| 10 | The frontend fallback vocabulary in `labels.ts` is the book vocabulary | (a) keep; (b) drop the fallback | (a) a row from an unknown domain renders under a book's label if the registry fetch fails; (b) an unreadable row instead | **(a) keep. Do nothing.** The registry must never be the reason a row is unreadable |
+
+- **Decision — what Phase B should be, if it runs.** In this order, each its own commit:
+
+  1. **The per-domain packages** the contract now prescribes (technical spec 6.6), with books and
+     albums moved into them. This is the row that is not in the table, because it is not a coupling
+     to remove but the layout that makes the remaining ones visible. It is also the largest piece,
+     and the one to hand forward with the contract already written if it runs long.
+  2. **`provider_health` derived from the registry** (row 5).
+  3. **The cover chooser declared per domain** (row 7), which re-arms the walkthrough gate.
+  4. **Dropping `ck_entries_status`** (row 1) — separately, because it is the only schema change and
+     the only irreversible one.
+
+- **Consequences.** Rows 2, 4, 8 and 10 are recorded as **deliberate couplings that stay**, so a
+  later reader finds a decision rather than an oversight. Row 3 is the one place the "second domain
+  never tested this" risk is real, and it is left with its trigger named: the first domain that
+  wants background enrichment on a non-ISBN key pays for (b) then, with a real case to design
+  against instead of a hypothetical one.
+
+## DEC-068 — IGDB on paper: no seventh seam, one new kind of infrastructure, six files two teams would fight over
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** Sprint 028 Phase A deliverable 4, and where DEC-052's falsifiable prediction —
+  *"games need no seam albums did not"* — is finally tested. A paper walk against the conformance
+  suite is cheaper and more honest than a third bespoke sprint, which is the whole reason the plan
+  stops at a contract rather than at a third domain (DEC-058).
+- **What this is and is not.** **Reasoned from IGDB's published API, not measured against it.** DEC-052
+  earned its conclusions from live probes on 2026-08-14; this one has not, and must not be read as
+  though it had. Every claim below that a real integration would depend on is marked as one to
+  verify first.
+- **Seam by seam, against the contract in technical spec 6.6.**
+
+  1. **Creators.** IGDB attributes a game to companies through `involved_companies`, flagged
+     developer / publisher / porting / supporting. A company is an organisation and its name never
+     inverts, so the adapter supplies `creator_sort` unchanged and the `creator_sort_name` heuristic
+     never runs — **exactly the rule MusicBrainz's `Group` already exercises** (DEC-051, DEC-052
+     seam 1). No new seam. *Verify:* that a developer is reliably distinguishable from a publisher,
+     because which one is "the creator" is a product decision, not an API one.
+  2. **Identity.** With one provider there is nothing to merge across, so `identity_key` returns
+     `None` — albums' answer, and a complete one. No new seam. *Verify:* if a second games provider
+     is ever added, whether `external_games` (Steam appids and the like) is unique enough to group
+     on; a barcode was not, which is the precedent for not assuming.
+  3. **Metadata.** Platforms and genres are lists of text, summary is long text, the release year is
+     a number, developer and publisher are text. Every one fits an existing `FieldSpec`; the only
+     candidate for the `rows` type the tracklist introduced is per-platform release dates, and
+     nothing requires it. No new seam.
+  4. **Covers.** Art is served from `images.igdb.com` at a template-sized path. **One allowlist
+     entry** — DEC-067 row 4 keeps that central deliberately. *Verify:* whether the URL arrives
+     protocol-relative (`//images.igdb.com/...`), which the seam-4 https upgrade already handles but
+     which decides whether the adapter normalises it or the pipeline does.
+  5. **Statuses and formats.** Games plainly want a vocabulary of their own — `playing` and a
+     backlog have no book or album equivalent — which is seam 5b working exactly as designed at the
+     domain level, and which lands squarely on **DEC-067 rows 1 and 2**: the published unions and
+     the frozen CHECK constraint. No new seam; two known couplings, and this is the domain that
+     makes row 1 unavoidable rather than theoretical.
+  6. **Enrichment and add-by-URL.** One IGDB query returns everything the field list asks for, so
+     `enriches=False` — albums' answer again, and the reason DEC-067 row 3 can wait. The recognizer
+     is an `igdb.com/games/{slug}` URL resolving through the adapter's own slug lookup. No new seam.
+
+- **Decision — the prediction holds, with one qualification.** Games need **no seventh seam**. What
+  they need that no domain has needed is **authentication with a lifetime**: IGDB requires Twitch
+  client credentials exchanged for a bearer token that expires and must be refreshed, where every
+  provider so far has needed at most a static key or a descriptive User-Agent. That is not a seam —
+  it fits inside the adapter, which already owns its own rate limit and headers — but it is the
+  first adapter to hold **mutable state and a secret pair**, and it adds a `config.py` entry, which
+  DEC-067 already counts as a coupling. *Verify before building:* the token lifetime and the refresh
+  failure mode, and whether a 401 mid-import is retryable without losing the batch.
+- **What two parallel domain teams would collide over.** The epic's actual question, answered by
+  listing the files an IGDB team and a `spotify → music` team would both edit today:
+  `domain/domains.py`, the three published unions inside it, `domain/providers.py`, `main.py`,
+  `config.py`, `infrastructure/covers.py` and `frontend/src/api/library.ts` — **six files and one
+  block of enums.**
+
+  **The sharp one is not a file, it is the migration.** Both teams need a status of their own, both
+  therefore write a migration widening `ck_entries_status`, and both point `down_revision` at the
+  same head. Whoever merges second rebases a schema change — the one class of conflict that cannot
+  be resolved by reading two diffs side by side. **That single fact is the strongest argument for
+  DEC-067 row 1(b)**, and it is worth more than the file count: after it, two domain teams contend
+  over declarations, which merge, rather than over a schema, which does not.
+- **Consequences.** DEC-052's prediction is recorded as **held**, tested the way DEC-058 said it
+  would be. Games remain an unnumbered future epic. Nothing here authorises building one, and the
+  verification list above is what that epic starts from rather than repeats.

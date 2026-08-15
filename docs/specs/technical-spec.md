@@ -103,7 +103,7 @@ Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_
 
 ## 5. Canonical data model
 
-All timestamps are UTC RFC 3339 strings at API boundaries and timezone-aware Python datetimes internally. User-entered reading dates are ISO `YYYY-MM-DD`. Scores are nullable integers 1–10. Status is one of `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`.
+All timestamps are UTC RFC 3339 strings at API boundaries and timezone-aware Python datetimes internally. User-entered reading dates are ISO `YYYY-MM-DD`. Scores are nullable integers 1–10. **Status is per-domain**: each domain declares its own vocabulary and every domain has `unsorted` (DEC-057, section 6.6). Books are `unsorted`/`read`/`reading`/`to_read`/`wishlist`/`dropped`; albums are `unsorted`/`wishlist`/`pending`/`owned`. A write is validated against the item's own domain; a filter spans the union.
 
 ### 5.1 Tables
 
@@ -305,6 +305,82 @@ Commit accepts a preview batch ID, rejects stale/missing/mismatched previews or 
 Enrichment is enqueued after commit and limited to about two provider requests per second. Every metadata or cover fill performed for an import appends its `import_effect` in the same short transaction as the mutation, so undo includes asynchronous effects. Triage is immediately usable. Job progress is polled from the API.
 
 Undo is available in the UI until `undo_expires_at` (24 hours), while the durable audit ledger remains recoverable. Reverse effects in order, cancel queued jobs, and make late job results no-ops. Delete only batch-created entities that remain unmodified and unreferenced; revert a filled field only when its current value equals recorded `after_values`. The response reports reverted, retained, and skipped effects, and repeated undo is harmless.
+
+### 6.6 The domain contract
+
+A **domain** is a kind of thing the library holds: books, albums. This section is the whole contract. A new domain is built from it alone; reading how albums were built is not required and is not a substitute, because that record describes one domain's choices rather than the rules (DEC-052, DEC-066).
+
+**The core is neutral and stays that way.** `items` has been `type` / `title` / `subtitle` / `year` / `cover_path` / `identifiers` / opaque `metadata` since Sprint 002, and `entries` hold one person's opinion of an item. No shared layer branches on which domain it is holding; a domain is never translated into another domain's vocabulary, and there is no `if item_type == ...` anywhere above the registry. **A shared layer that needs to know the domain asks the registry for a declaration; it does not grow a branch.**
+
+**The registry is code, not a plugin runtime** (product spec section 2). A domain is a Python object registered at import time. There is no discovery, no entry point, no sandbox and no versioning between a domain and the core: they are built and shipped together.
+
+#### What a domain supplies
+
+One `Domain` (`backend/src/book_tracker/domain/domains.py`), whose every field is an obligation:
+
+| Field | Obligation |
+|---|---|
+| `item_type` | The value stored in `items.type`. **Permanent** — a lowercase identifier, never renamed, never user-facing. |
+| `label` | The user-facing name of one item ("Book", "Album"). Copy, and free to change. |
+| `identity` | An `IdentityStrategy`: how two candidates are judged the same record, and which source wins a merge. |
+| `fields` | The ordered `FieldSpec` list describing this domain's metadata. Storage stays opaque; this is the only description of it that exists. |
+| `enriches` | Whether background enrichment applies at all. `False` is a complete answer, not a gap. |
+| `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. |
+| `default_status` | What a newly added entry gets when nobody chose. Must be one of `statuses`. |
+| `entry_fields` | Which of `date_started` / `date_finished` / `reread_count` this domain's entries have. Anything absent is **refused on write**, not merely hidden. |
+| `formats` | The `FormatSpec` vocabulary for how a copy is held. Closed and declared, which is what a shelf is not (DEC-059). |
+| `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
+| `recognize` | What a string pasted into the add box means to this domain, or `None`. |
+
+Plus, outside the record itself:
+
+- **An adapter** implementing the `Provider` protocol (`domain/providers.py`) in `infrastructure/`: `name`, `item_type`, `async search(query, limit)` and `async fetch(source_id)`, returning `SearchCandidate` / `ItemPayload`. It owns its own rate limit, User-Agent and authentication, and never leaks a raw provider response above infrastructure (section 6.2). Its boundary behaviour is proven against committed recorded responses, never against a mock of the method under test (DEC-025).
+- **Cover URLs**, as candidates only. The shared pipeline keeps sole ownership of https upgrading, the host allowlist, the redirect policy and the pixel and byte bounds; a domain whose art lives on a new host adds that host to the allowlist and nothing else (seam 4).
+- **A curated sort name where the source knows one.** `SearchCandidate.creator_sort` seeds the owner's override; the `creator_sort_name` heuristic runs only when nothing knew. A source that distinguishes a person from a group must say so this way rather than let the heuristic invert `Daft Punk` (DEC-051, DEC-052).
+
+#### Rules each supplied part must satisfy
+
+- **Statuses.** Values are permanent and stored; labels are copy. `unsorted` exists in every domain because imports land there and the default library view hides it, and it is never offered as a choice. Every choosable status carries a triage hotkey, unique within the domain — the hotkey lives on the status rather than in a second table that can drift from it.
+- **Formats.** Multi-valued on the entry and independent of status, so "wishlist → vinyl" is expressible. The vocabulary is closed and declared; a value the owner invents is a **shelf**, and the two must never converge into one control (DEC-059).
+- **Entry fields.** A domain's entries have only the passage fields it declares. Declaring a name outside `PASSAGE_FIELDS` is a defect the conformance suite refuses: `validate_entry_fields` refuses what is *absent*, so an invented name would be a field the domain believes in and nothing writes.
+- **Metadata fields.** Names are permanent, labels are copy. A `rows` field declares `columns` and no other field type may; the renderer and the validator both key on that. A field may never shadow `title`, `subtitle`, `year` or `creator_sort_override` — those are neutral item columns edited *beside* the metadata, and a metadata field of the same name would render twice and save to one of them.
+- **Identity.** `identity_key(candidate) -> str | None`, where `None` means *never merge this candidate*. That is a complete answer, not a degraded one: barcodes are not unique across releases, so albums have no cross-provider identity and merging on a weaker key would be wrong rather than approximate. `source_preference` decides which row of a merged group is primary and breaks ranking ties.
+- **The URL recognizer must answer for any string and must never raise.** `resolve_input` asks every registered domain in turn, so a recognizer that raises does not fail its own domain — it denies every domain after it in the registry its turn. Parse through `split_url`, which is the shared guard (`urlsplit` raises on a malformed authority such as `http://[`). The shared loop isolates a raising recognizer as well, so the failure is contained; a domain that raises is still in breach.
+
+#### What a domain may never touch
+
+- **`items` and `entries` columns.** Everything a domain knows that the neutral columns do not carry goes in opaque `metadata`. A domain never adds a column, and never stores a value one of the four reserved item columns already holds.
+- **Another domain.** No domain imports another, reads another's vocabulary, or renders under another's labels. A value that exists in two domains (`wishlist`, `digital`) is a coincidence of spelling, not shared state.
+- **The shared pipelines.** Keyset pagination and cursors, the job runner, the import ledger and undo, backup, attachments, shelves, and the score/notes/dates entry layer are the core's. A domain that appears to need a change in one of them has found a seventh seam, and that is a decision to record, not a patch to make (DEC-055).
+- **The cover pipeline's safety rules.** A domain supplies URLs; it does not relax the scheme, the allowlist, the redirect check or the size bounds.
+- **The screens.** No screen branches on the item type. A domain that needs a screen to render differently declares the difference — a label, a vocabulary, a field spec — and the screen renders the declaration.
+
+#### Where a domain's code lives
+
+One package per domain, `backend/src/book_tracker/domains/<item_type>/`, holding its registry entry, its field spec, its status and format vocabularies, its identity strategy, its URL recognizer, its provider adapter and its importers. The point is that **one domain's team edits one directory**, so two domains can be built in parallel without contending for the same files.
+
+**This layout is prescribed and not yet inhabited.** As of Sprint 028 Phase A, books' and albums' parts are still spread across `domain/domains.py`, `domain/providers.py`, `domain/goodreads.py`, `domain/calibre.py`, `infrastructure/providers.py` and `infrastructure/musicbrainz.py`; moving them is that sprint's gated Phase B. A domain built before the move follows the same rule by keeping its own parts together and adding nothing to another domain's file.
+
+Exactly three things stay shared, and they are the registration points rather than the domain's substance:
+
+1. **The registry** — the domain is added to `DOMAINS`, which is what makes it exist.
+2. **Provider wiring** in the application lifespan, where its adapter is constructed with its configuration.
+3. **Migrations**, which are global by nature and are the one path to a schema change.
+
+Anything else a domain has to edit outside its own package is a coupling, and a coupling is a defect to record and cost. Three are known and open as of Sprint 028, and are what a new domain still pays: the published unions (`EntryStatus`, `EntryFormat`, `ItemTypeName`), `entries.ck_entries_status` — a CHECK rendered from the registry when its migration was written, so a status no existing domain declares is accepted by the API and refused by the database — and the cover host allowlist. See DEC-066.
+
+#### How the core serves a domain
+
+- `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order.
+- **A write is validated against the item's own domain** (`LibraryService._validated`), refused with a 422 that names the domain — the value is very often valid one row further down the library, so "invalid status" alone would send the reader hunting. A bulk write spanning domains is refused whole.
+- **A filter legitimately spans domains**, so query parameters validate against the union of every domain's values while writes validate against one domain. `type` is not an ordinary facet dimension: both status facets clear it so the inbox badge keeps agreeing with the domain-agnostic triage screen, while `format_counts` applies it because that selector sits under the tab (DEC-062).
+- Enrichment is queued only for domains that declare `enriches`.
+
+#### How a domain is verified
+
+`backend/tests/test_domain_conformance.py` is parametrized over `DOMAINS`: a domain is held to the contract **by existing**, and nothing in that file is extended when one is added. Its checks split in two, and the split is load-bearing. `REGISTRY_CHECKS` are what a domain satisfies on its own, and an unregistered fixture domain satisfies all of them — that is what makes this a contract rather than a description of books and albums. `CORE_CHECKS` are whether the core can host the domain: whether the published unions carry its values, and whether the database will accept them.
+
+The suite is required to be able to fail. Malformed domains declared inside the file — a status with no label, a default outside the vocabulary, a `rows` field with no columns, a recognizer that raises — must each be rejected by the check that owns them.
 
 ## 7. HTTP API contract
 
