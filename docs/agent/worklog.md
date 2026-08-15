@@ -1443,3 +1443,43 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: Sprint 028 (the domain contract) is `ready`. **Gated**: Phase A writes the contract and a
   conformance suite and changes nothing user-visible, and concluding that little is misplaced is a
   complete outcome.
+
+## 2026-08-15 — Sprint 028 planning pass, and Phase A (in progress)
+- Done: re-derived Sprint 028's baseline from the code rather than 027's summary, since the file said
+  to (`4cb28f8`, DEC-066). Rewrote the sprint's objective, baseline, deliverables and acceptance
+  criteria around the finding; repaired three stale references while reading (ROADMAP still headed
+  the per-domain-imports contract "Sprint 029" after DEC-065 renumbered it 030; WORKFLOW still named
+  028 as the final sprint; HANDOFF's "no `type === "album"` branch anywhere" was silent about the
+  three `itemType === "book"` branches on the add screen). Then Phase A: the conformance suite
+  (`afbf5ff`) and the contract plus both verdicts (`a35c027`). Three owner decisions were taken at
+  planning time and are DEC-066: 028 runs on this branch, the frozen CHECK constraint is a costed
+  finding rather than pre-authorized work, and the contract prescribes a per-domain code home.
+- Verified: `make format`, `make check`, `make test` (460 backend, 129 frontend), `npx playwright
+  test` (86 passed, 2 skipped), `make build`, `make smoke-container`, `git diff --check`,
+  `validate_project.py`. **The suite was shown to bite against a registered domain, not only against
+  its fixtures**: removing `pending`'s hotkey from `ALBUM_STATUSES` failed
+  `[album-statuses_are_a_usable_vocabulary]` and renaming `track_count` to `year` failed
+  `[album-fields_are_described_completely]`; both injected, observed, reverted. The recognizer repair
+  was exercised against the running app on the real dev library with live providers: `http://[` is
+  now 422 with the actionable message rather than 502, an ISBN still resolves, a real MusicBrainz
+  release-group URL still resolves with its tracklist, no errors in the log.
+- Deviations: **AC6 (Phase A changes nothing user-visible) was broken deliberately and once.** The
+  suite failed on its first run against both shipped domains — `urlsplit` raises on `http://[`, and
+  because `resolve_input` asks each domain in turn, the first recognizer to raise denied every domain
+  after it its turn. That is one domain breaking another's add box, which is the exact failure this
+  epic exists to prevent, so it was repaired here rather than costed: a shared `split_url`, plus
+  isolation in the loop. Recorded in DEC-067 and the sprint Outcome.
+- Dead ends worth not repeating: under **vitest, `import.meta.url` is the dev server's URL, not a
+  file path** — `readFileSync(new URL(...))` fails with "The URL must be of scheme file"; read from
+  `process.cwd()` instead. `ruff` will not wrap a long f-string inside an `assert` message, so the
+  100-column limit has to be met by splitting the literal by hand. And `make format` runs prettier
+  over everything, so re-run the focused test *after* formatting rather than before.
+- Blocked/open: **the Phase B gate.** DEC-067 orders it — per-domain packages, `provider_health`
+  derived from the registry, the cover chooser declared per domain, then dropping
+  `ck_entries_status` as a separate schema change — and it runs only on an explicit owner
+  go-ahead. Nothing else is open.
+- Observed and out of scope: resolving a "Kind of Blue" release-group URL returns the Swiss Blues
+  Authority record, which is the arbitrary release selection already on record rather than a
+  regression. The dev library is now 13 entries — the owner has been adding albums since 027 closed.
+- Next: put the Phase B gate to the owner with DEC-067's costed table. On a go-ahead, start with the
+  per-domain packages; on a no, close Sprint 028 with Phase A as the complete outcome.

@@ -237,5 +237,63 @@ should change, and that has to be seen rather than asserted.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+### Phase A — delivered 2026-08-15, awaiting the Phase B gate
+
+**Commits:** `4cb28f8` (re-derived baseline, DEC-066), `afbf5ff` (the conformance suite and the
+recognizer repair), `a35c027` (the contract, DEC-067 and DEC-068).
+
+**1. The contract** is `docs/specs/technical-spec.md` section 6.6: what a domain supplies as a table
+of every `Domain` field and its obligation, the rules each supplied part must satisfy, what a domain
+may never touch, where its code lives, what the core does for it, and how it is verified. Section 5's
+status sentence was still the pre-DEC-057 book vocabulary and was corrected with it.
+
+**2. The conformance suite** is `backend/tests/test_domain_conformance.py`, parametrized over
+`DOMAINS`. Its checks are functions rather than test bodies, so the same code runs over the
+registered domains and over broken ones. They split in two, and **the split is the finding**:
+`REGISTRY_CHECKS` are what a domain satisfies alone — an unregistered `game` fixture satisfies every
+one — and `CORE_CHECKS` are whether the core can host it, which that fixture fails twice over as
+soon as it declares a status of its own.
+
+**3. The measurement is DEC-067**, one costed fork per coupling. **Four of ten rows recommend doing
+nothing**: the hand-spelled unions are cheaper than any removal, the central cover allowlist is
+central on purpose, the book-shaped route is not worth the churn, and the frontend fallback
+vocabulary must stay a fallback.
+
+**4. The IGDB paper walk is DEC-068.** DEC-052's prediction **holds** — no seventh seam. Games need
+one thing no domain has needed, and it is not a seam: authentication with a lifetime, which fits
+inside the adapter. It is explicitly reasoned from published API documentation rather than measured
+live, and carries the list of what to verify first. Two parallel domain teams would contend over six
+files **and over one alembic head**, which is the argument the file count is not.
+
+**Deviation from acceptance criterion 6 (Phase A changes nothing user-visible).** The suite failed on
+its first run against **both shipped domains**: `urlsplit` raises on a malformed authority such as
+`http://[`, and `resolve_input` asks each registered domain in turn, so the first recognizer to raise
+denied every domain after it its turn — one domain breaking another's add box, reachable by pasting a
+typo. Repaired as a prerequisite defect: both recognizers parse through a shared `split_url`, and the
+loop isolates a raising recognizer regardless. The user-visible change is that a malformed paste
+returns `422 invalid_resolution` with the actionable message instead of `502 provider_failure`.
+
+**Verified.** `make format`, `make check`, `make test` (**460 backend, 129 frontend**),
+`npx playwright test` (**86 passed, 2 skipped**), `make build`, `make smoke-container`,
+`git diff --check`, `python scripts/validate_project.py` — all green.
+
+**Walkthrough (the gate's Phase A form, plus the repair).** The suite was shown to bite against a
+*registered* domain, not only against fixtures: removing `pending`'s hotkey from `ALBUM_STATUSES`
+failed `[album-statuses_are_a_usable_vocabulary]`, and renaming `track_count` to `year` failed
+`[album-fields_are_described_completely]`; both defects were injected, observed and reverted. The
+repair was exercised against the running application on the real dev library with live providers:
+`http://[` now answers 422 with "Use an ISBN, an Open Library edition/work URL, a Google Books URL,
+or a MusicBrainz release group URL"; an ISBN still resolves (*Cien años de soledad*); a real
+MusicBrainz release-group URL still resolves with its 12-track tracklist; `/api/item-types` still
+publishes both vocabularies; no errors in the server log.
+
+**Observed and out of scope.** Resolving a release-group URL for "Kind of Blue" returns the Swiss
+Blues Authority record rather than Miles Davis's — the arbitrary release selection already recorded
+in the handoff, not a regression. The dev library now holds 13 entries, including albums the owner
+added since Sprint 027 closed.
+
+### Phase B — not started
+
+DEC-067 names it and orders it: the per-domain packages, `provider_health` derived from the registry,
+the cover chooser declared per domain, and dropping `ck_entries_status` as a separate schema change.
+**It runs only on an explicit owner go-ahead**, which is what the sprint is waiting for.
