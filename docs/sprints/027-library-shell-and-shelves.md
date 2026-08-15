@@ -1,6 +1,6 @@
 # Sprint 027 — Library shell and shelves
 
-**Status:** completed
+**Status:** in_progress
 **Depends on:** 026
 **Roadmap revision:** 11
 
@@ -65,6 +65,37 @@ Observed 2026-08-15 at Sprint 026's close. **Re-derive at activation.**
 5. **If Sprint 026 had deferred its tracklist slice it would land here.** It did not, so this is
    noted only to close the question.
 
+## Deliverables — second pass, folded in 2026-08-15 after the first close
+
+The owner tried the closed sprint and raised the add flow, which is the same complaint one screen
+over: *"the search page, after you clicked on an item, feels empty. If we have the data, we could
+show the metadata there before confirming. Also on that same screen we should allow users to search
+and create shelves on the spot. A dropdown menu that allows for new shelf creation instead of
+checkboxes makes more sense. Same for everything that can be changed in the 'edit opinion' panel,
+notes, format for music, etc."*
+
+**Measured before designing.** A search candidate already carries `title`, `subtitle`, `creators`,
+`credit`, `year`, `original_year`, `language`, `identifiers` and `cover_url`; the confirm screen
+renders three of them and discards the rest. It does **not** carry publisher, page count,
+description or subjects for a book, or label, catalogue number, format or tracklist for a record —
+those come from the per-item fetch that runs at add time, and there is no provider response cache,
+so previewing them costs one quota-counted request per candidate clicked.
+
+6. **The confirm screen shows what is already known**, for free and instantly, rendered from the
+   domain's field spec rather than from a book-shaped list.
+7. **A full record on demand.** `GET /api/search/preview` fetches one candidate's complete payload
+   without writing anything, behind the same quota guard as any other provider request. One request,
+   and only when the reader asks for it.
+8. **Shelves are chosen the same way everywhere** — the create-on-type control from deliverable 4,
+   moved somewhere shared and used on the add screen in place of its checkboxes.
+9. **The opinion is set while adding** — notes, formats and the domain's own passage fields, so a
+   book you just finished does not need adding and then immediately editing. `POST /api/entries`
+   accepts them and validates each against the item's own domain, exactly as `PATCH` does.
+10. **A format is picked the same way everywhere too** — one closed multi-select control, shared by
+    the add screen and the opinion dialog, replacing the checkbox row. **It stays visibly distinct
+    from the shelf control** and offers no create option: DEC-059's rule is that a format is never
+    rendered as a shelf, and a closed vocabulary you pick from is not a tier you invent.
+
 ## Acceptance criteria
 
 1. Choosing a domain shows only that domain's entries, and the choice survives a reload and a back
@@ -80,6 +111,16 @@ Observed 2026-08-15 at Sprint 026's close. **Re-derive at activation.**
    "still works" assumed a control that had never been built.)*
 7. Every behaviour the suite covers is unchanged: imports, triage, undo, bulk edit, backup, formats
    and statuses.
+8. Clicking a search result shows every field the search already returned, with no provider request
+   made and nothing to wait for.
+9. A full record can be fetched before confirming, costs exactly one provider request, is refused
+   when the daily quota is spent, and writes nothing to the library.
+10. A shelf can be created and applied from the add screen, in the same control as on the detail
+    page, without leaving for `/shelves`.
+11. Notes, formats and the domain's passage fields can be set while adding, and a field the item's
+    domain does not have is refused with a 422 naming the domain rather than silently stored.
+12. Nothing renders a format as a shelf, on any screen: the format control offers a closed
+    vocabulary and no way to invent a value.
 
 ## Required tests (TDD)
 

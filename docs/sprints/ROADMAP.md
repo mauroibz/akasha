@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 028](028-the-domain-contract.md)
+**Active sprint:** [Sprint 027](027-library-shell-and-shelves.md)
 
 ## Shape of the plan
 
@@ -77,8 +77,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [024](024-export.md) | Export | 020 | completed |
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
-| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
-| [028](028-the-domain-contract.md) | The domain contract | 027 | **ready** |
+| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | **in progress** |
+| [028](028-the-domain-contract.md) | The domain contract | 027 | planned |
 | 029 | Per-domain imports | 028 | planned |
 
 ## Contracts for planned sprints

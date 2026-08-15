@@ -3888,6 +3888,59 @@
         "summary": "Search"
       }
     },
+    "/api/search/preview": {
+      "get": {
+        "description": "One candidate's full record, fetched without adding anything.\n\nA search result carries an identity \u2014 title, creators, year, language, ISBNs \u2014\nbut not a description, a page count or a tracklist: those live in the per-item\nfetch that used to run only at add time, which is why the confirm screen had\nnothing to show. This is that fetch, on demand and writing nothing.\n\nIt follows `search`'s quota rule rather than enrichment's (DEC-045): the spend is\nrecorded and never blocked, because somebody is waiting for this one. It is a\nrequest per press, so the screen asks rather than fetching on every click.",
+        "operationId": "preview_api_search_preview_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "source",
+            "required": true,
+            "schema": {
+              "maxLength": 50,
+              "minLength": 1,
+              "title": "Source",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "source_id",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 1,
+              "title": "Source Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SearchCandidateResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Preview"
+      }
+    },
     "/api/search/resolve": {
       "get": {
         "operationId": "resolve_api_search_resolve_get",

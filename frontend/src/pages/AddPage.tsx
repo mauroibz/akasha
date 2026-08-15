@@ -5,6 +5,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  previewCandidate,
   createEntry,
   getShelves,
   NearMatchError,
@@ -31,6 +32,7 @@ import {
 import type { EntryStatus, ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
 import { statusesFor } from "@/features/library/labels";
+import { CandidateFacts } from "@/features/add/CandidateFacts";
 import { cn } from "@/lib/utils";
 
 export function AddPage() {
@@ -58,6 +60,12 @@ export function AddPage() {
     [],
   );
   const [shelfIds, setShelfIds] = useState<number[]>([]);
+  // The candidate as fetched in full, when the reader asked for it. Kept beside
+  // `selected` rather than replacing it, so the identity that was clicked stays the
+  // thing being added even if the provider answers with a different shape.
+  const [fullRecord, setFullRecord] = useState<SearchCandidate | null>(null);
+  const [loadingFull, setLoadingFull] = useState(false);
+  const [previewError, setPreviewError] = useState("");
   const titleRef = useRef<HTMLInputElement | null>(null);
   const searchRequestId = useRef(0);
   const statusRef = useRef<HTMLButtonElement>(null);
@@ -128,6 +136,9 @@ export function AddPage() {
   }, [manual]);
   useEffect(() => {
     if (selected) statusRef.current?.focus();
+    // A record fetched for the previous selection describes a different edition.
+    setFullRecord(null);
+    setPreviewError("");
   }, [selected]);
   useEffect(() => {
     if (near.length) nearRef.current?.focus();
@@ -421,6 +432,50 @@ export function AddPage() {
                 <p>{selected?.credit ?? selected?.creators.join(", ")}</p>
               </div>
             </div>
+          )}
+          {/* Everything the search already returned, for free, plus whatever the
+              on-demand fetch added on top of it. */}
+          {selected && (
+            <>
+              <CandidateFacts
+                candidate={fullRecord ?? selected}
+                fields={
+                  itemTypes.find((type) => type.id === itemType)?.fields ?? []
+                }
+              />
+              {!fullRecord && (
+                <div className="flex flex-wrap items-center gap-3">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="rounded-full"
+                    disabled={loadingFull}
+                    onClick={() => {
+                      setLoadingFull(true);
+                      setPreviewError("");
+                      void previewCandidate(selected.source, selected.source_id)
+                        .then(setFullRecord)
+                        .catch((e: Error) => setPreviewError(e.message))
+                        .finally(() => setLoadingFull(false));
+                    }}
+                  >
+                    {loadingFull ? "Loading…" : "Load full details"}
+                  </Button>
+                  {/* Said once, in plain terms: this is a live request against a
+                      rate-limited provider, so it is asked for rather than made on
+                      every click through a result list. */}
+                  <span className="text-xs text-muted-foreground">
+                    Asks the provider for the description and the rest
+                  </span>
+                </div>
+              )}
+              {previewError && (
+                <p role="alert" className="text-sm text-destructive">
+                  {previewError}
+                </p>
+              )}
+            </>
           )}
           <div className="flex flex-wrap gap-4">
             <div>

@@ -371,4 +371,181 @@ describe("AddPage", () => {
     await screen.findByRole("heading", { name: /library page/i });
     expect(posts).toBe(2);
   });
+
+  /**
+   * The owner's report: "the search page, after you clicked on an item, feels
+   * empty." Measured before designing — the search response already carries far
+   * more than the three fields the confirm screen rendered, so showing the rest
+   * costs no request and no wait.
+   */
+  const richCandidate = {
+    source: "openlibrary",
+    source_id: "OL1M",
+    source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+    title: "Rayuela",
+    subtitle: "Una novela",
+    creators: ["Julio Cortázar"],
+    credit: "Julio Cortázar",
+    year: 1963,
+    original_year: 1963,
+    cover_url: null,
+    identifiers: { isbn13: "9788437604572" },
+    language: "es",
+    metadata: { publisher: "Sudamericana" },
+  };
+
+  const bookFields = [
+    {
+      name: "publisher",
+      label: "Publisher",
+      type: "text",
+      multiplicity: "one",
+    },
+    {
+      name: "page_count",
+      label: "Page count",
+      type: "number",
+      multiplicity: "one",
+    },
+    {
+      name: "description",
+      label: "Description",
+      type: "long_text",
+      multiplicity: "one",
+    },
+  ];
+
+  function stubAdd({
+    candidate = richCandidate,
+    preview,
+    fields = bookFields,
+  }: {
+    candidate?: unknown;
+    preview?: () => Response;
+    fields?: unknown[];
+  } = {}) {
+    return vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(
+          JSON.stringify([
+            {
+              id: "book",
+              label: "Book",
+              fields,
+              formats: [],
+              entry_fields: [],
+            },
+            {
+              id: "album",
+              label: "Album",
+              fields: [],
+              formats: [],
+              entry_fields: [],
+            },
+          ]),
+        );
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/health/providers")
+        return new Response(JSON.stringify({ providers: [], degraded: false }));
+      if (url.startsWith("/api/search/preview"))
+        return preview
+          ? preview()
+          : new Response(JSON.stringify(candidate), { status: 200 });
+      return new Response(JSON.stringify([candidate]));
+    });
+  }
+
+  async function selectFirstResult() {
+    const user = userEvent.setup();
+    await user.type(screen.getByRole("searchbox"), "Rayuela");
+    await user.click(await screen.findByRole("button", { name: /Rayuela/ }));
+    return user;
+  }
+
+  it("shows what the search already returned, without asking a provider again", async () => {
+    const request = stubAdd();
+    renderPage();
+    await selectFirstResult();
+
+    // Everything the candidate carried, not just cover/title/credit.
+    const panel = await screen.findByRole("region", { name: "What we know" });
+    const text = panel.textContent ?? "";
+    for (const value of [
+      "Una novela",
+      "1963",
+      "es",
+      "9788437604572",
+      "Sudamericana",
+    ])
+      expect(text, `missing ${value}`).toContain(value);
+
+    // And nothing was fetched to show it.
+    expect(
+      request.mock.calls.filter(([url]) =>
+        String(url).startsWith("/api/search/preview"),
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("fetches the full record only when asked, and exactly once", async () => {
+    const request = stubAdd({
+      preview: () =>
+        new Response(
+          JSON.stringify({
+            ...richCandidate,
+            metadata: {
+              publisher: "Sudamericana",
+              page_count: 736,
+              description: "A novel that can be read in more than one order.",
+            },
+          }),
+        ),
+    });
+    renderPage();
+    const user = await selectFirstResult();
+
+    const button = await screen.findByRole("button", {
+      name: "Load full details",
+    });
+    await user.click(button);
+
+    expect(
+      await screen.findByText(/read in more than one order/),
+    ).toBeVisible();
+    expect(screen.getByText("736")).toBeVisible();
+    await waitFor(() =>
+      expect(
+        request.mock.calls.filter(([url]) =>
+          String(url).startsWith("/api/search/preview"),
+        ),
+      ).toHaveLength(1),
+    );
+    // Nothing left to load, so nothing left to press.
+    expect(
+      screen.queryByRole("button", { name: "Load full details" }),
+    ).toBeNull();
+  });
+
+  it("says so when the full record cannot be fetched, and still lets you add", async () => {
+    stubAdd({
+      preview: () =>
+        new Response(JSON.stringify({ error: { code: "provider_failure" } }), {
+          status: 502,
+        }),
+    });
+    renderPage();
+    const user = await selectFirstResult();
+
+    await user.click(
+      await screen.findByRole("button", { name: "Load full details" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /could not be loaded/i,
+    );
+    // The point of the guard: a failed preview costs the reader nothing.
+    expect(
+      screen.getByRole("button", { name: /Add to library/ }),
+    ).toBeEnabled();
+  });
 });

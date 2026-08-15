@@ -1,6 +1,6 @@
 # Sprint 028 — The domain contract
 
-**Status:** ready
+**Status:** planned
 **Depends on:** 027
 **Roadmap revision:** 11
 

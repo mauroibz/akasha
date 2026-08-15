@@ -20,6 +20,30 @@ export interface SearchCandidate {
   language: string | null;
   metadata: Record<string, unknown>;
 }
+/**
+ * One candidate's full record, fetched on demand and writing nothing.
+ *
+ * A search result carries an identity — title, creators, year, language, ISBNs —
+ * but not a description, a page count or a tracklist. Those come from the per-item
+ * fetch that used to run only at add time, so the confirm screen had nothing to
+ * show. One provider request per call, which is why it is a button and not an
+ * effect.
+ */
+export async function previewCandidate(
+  source: string,
+  sourceId: string,
+  signal?: AbortSignal,
+): Promise<SearchCandidate> {
+  const params = new URLSearchParams({ source, source_id: sourceId });
+  const response = await fetch(`/api/search/preview?${params.toString()}`, {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw new Error("The full record could not be loaded from the provider");
+  return (await response.json()) as SearchCandidate;
+}
+
 export interface ManualItem {
   title: string;
   subtitle?: string;

@@ -4,7 +4,7 @@ import httpx
 import pytest
 
 from book_tracker.config import Settings
-from book_tracker.domain.providers import SearchCandidate, SourceRef
+from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
 from book_tracker.main import create_app
 
 
@@ -197,3 +197,109 @@ async def test_a_url_is_resolved_by_the_domain_that_recognizes_it(tmp_path: Path
         ("openlibrary", "OL19845805M"),
     ]
     assert nonsense.status_code == 422
+
+
+class PreviewProvider:
+    """A provider whose fetch returns more than its search did, which is the point."""
+
+    name = "openlibrary"
+    item_type = "book"
+
+    def __init__(self) -> None:
+        self.fetched: list[str] = []
+
+    async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        self.fetched.append(source_id)
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Rayuela",
+            subtitle=None,
+            creators=("Julio Cortázar",),
+            year=1963,
+            cover_url=None,
+            identifiers={"isbn13": "9788437604572"},
+            language="es",
+            metadata={"publisher": "Sudamericana", "page_count": 736, "description": "A novel"},
+        )
+
+
+@pytest.mark.anyio
+async def test_a_candidate_can_be_previewed_in_full_without_adding_it(tmp_path: Path) -> None:
+    """The search response carries an identity; the description and page count do not
+    come with it. This is the fetch that has them, on demand and writing nothing."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    provider = PreviewProvider()
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": provider}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            preview = await client.get(
+                "/api/search/preview", params={"source": "openlibrary", "source_id": "OL1M"}
+            )
+            unknown = await client.get(
+                "/api/search/preview", params={"source": "discogs", "source_id": "1"}
+            )
+            entries = await client.get("/api/entries", params={"status": "unsorted"})
+
+    assert preview.status_code == 200
+    body = preview.json()
+    assert body["metadata"]["page_count"] == 736
+    assert body["metadata"]["description"] == "A novel"
+    assert provider.fetched == ["OL1M"]
+    assert unknown.status_code == 422
+    # Nothing was written: a preview is a look, not an add.
+    assert entries.json()["total"] == 0
+
+
+@pytest.mark.anyio
+async def test_a_preview_records_its_spend_but_is_never_blocked(tmp_path: Path) -> None:
+    """`search`'s rule, not enrichment's (DEC-045): somebody is waiting for this one,
+    so the last request of a day belongs to them."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": PreviewProvider()}
+
+        recorded: list[str] = []
+
+        class Quota:
+            def record(self, name: str, moment: object) -> None:
+                recorded.append(name)
+
+            def allows(self, name: str, moment: object) -> bool:
+                return False
+
+        app.state.provider_quota = Quota()
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            response = await client.get(
+                "/api/search/preview", params={"source": "openlibrary", "source_id": "OL1M"}
+            )
+
+    assert response.status_code == 200
+    assert recorded == ["openlibrary"]
+
+
+@pytest.mark.anyio
+async def test_a_failed_preview_is_a_502_and_not_a_crash(tmp_path: Path) -> None:
+    class Broken(PreviewProvider):
+        async def fetch(self, source_id: str) -> ItemPayload:
+            raise RuntimeError("upstream is down")
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": Broken()}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            response = await client.get(
+                "/api/search/preview", params={"source": "openlibrary", "source_id": "OL1M"}
+            )
+    assert response.status_code == 502
+    assert response.json()["error"]["code"] == "provider_failure"

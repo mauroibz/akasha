@@ -92,6 +92,38 @@ async def resolve(
     return [SearchCandidateResponse.from_domain(row) for row in rows]
 
 
+@router.get("/search/preview", response_model=SearchCandidateResponse)
+async def preview(
+    request: Request,
+    source: Annotated[str, Query(min_length=1, max_length=50)],
+    source_id: Annotated[str, Query(min_length=1, max_length=200)],
+) -> SearchCandidateResponse:
+    """One candidate's full record, fetched without adding anything.
+
+    A search result carries an identity — title, creators, year, language, ISBNs —
+    but not a description, a page count or a tracklist: those live in the per-item
+    fetch that used to run only at add time, which is why the confirm screen had
+    nothing to show. This is that fetch, on demand and writing nothing.
+
+    It follows `search`'s quota rule rather than enrichment's (DEC-045): the spend is
+    recorded and never blocked, because somebody is waiting for this one. It is a
+    request per press, so the screen asks rather than fetching on every click.
+    """
+    provider = _providers(request).get(source)
+    if provider is None:
+        raise LibraryError("unknown_provider", f"No provider named {source!r}", status_code=422)
+    quota = getattr(request.app.state, "provider_quota", None)
+    if quota is not None:
+        quota.record(source, datetime.now(UTC))
+    try:
+        payload = await provider.fetch(source_id)
+    except Exception as error:
+        raise LibraryError(
+            "provider_failure", "Metadata could not be fetched", status_code=502
+        ) from error
+    return SearchCandidateResponse.from_domain(payload)
+
+
 @router.get("/search", response_model=list[SearchCandidateResponse])
 async def search(
     q: Annotated[str, Query(min_length=1, max_length=300)],
