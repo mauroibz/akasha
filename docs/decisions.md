@@ -1882,3 +1882,62 @@ Append-only record of material architecture choices, product-default resolutions
   and the first pass's domain strip was a Radix `Tabs` whose triggers pointed `aria-controls` at a
   panel that was never rendered — it is a radio group now, the pattern the add screen already used
   for the same choice.
+
+## DEC-065 — One search bar on `/`, and the library always names a domain
+
+- **Date:** 2026-08-15
+- **Status:** accepted by the owner
+- **Accepts:** `docs/unified-search-proposal.md`, with two amendments the owner made to it.
+- **Context:** after Sprint 027's second pass the owner asked for the main page to carry both
+  jobs — *"1 large searchbar up top for both,"* with the domain selector to its left and an **Add**
+  button to its right, a local search that consults no provider when it hits, and a web search
+  below when it misses. The proposal measured the two searches before designing anything, because
+  they are not the same kind of thing: one is SQL and free, the other is up to 5 s per provider and
+  counted against a daily budget of 900 (DEC-045).
+
+- **Decision.** The proposal is accepted, with the owner's amendments:
+
+  1. **A web search fires on settled-and-empty, or on the button.** Not on every local miss. The
+     literal rule fires once per keystroke while typing any title not already owned — which is
+     every add — so `Kind of Blue` would cost twelve provider searches at a 5 s timeout each, and a
+     session of adding would breach the free tier that DEC-044 already measured and rejected for
+     enrichment. A search fires when the query has been still for ~800 ms, is at least 3 characters,
+     and returned **zero** library rows, and never twice for the same string. **Add** forces one at
+     any time.
+
+  2. **"All" is removed as a filter** — *the owner's amendment, overriding the proposal's
+     recommendation.* The proposal kept "All" and had the **Add** button ask which domain to search;
+     the owner chose to drop it instead. The tab strip now always names exactly one domain, which is
+     what makes one bar able to mean both things at once: the same choice picks the rows you filter
+     and the providers you would search, with nothing left to disambiguate at the moment of pressing
+     a button.
+
+     This overrides DEC-062's "starting at All until one is picked". The remembered-domain rule
+     survives unchanged; what changes is that the fallback when nothing is remembered is the first
+     declared domain rather than everything. The whole-library view is not lost — `/triage` and the
+     export both still span domains, and `status_counts_by_type` still carries a live count for the
+     tab you are not on, which is now the only way to see that the other domain has anything.
+
+  3. **The confirm step is a dialog over `/`** — accepted *"as long as we don't lose any
+     functionality"*, which the sprint turns into an enumerated acceptance criterion rather than an
+     intention. Eleven behaviours are listed there, and the near-match confirmation and the manual
+     fallback are the two most likely to be dropped by accident.
+
+- **`/add` survives** as the manual-entry route and a deep-link target. It is lazy-loaded, so
+  keeping it costs nothing in the bundle, and moving manual entry inline as well is what would push
+  this past one sprint.
+
+- **Consequences.** This is **Sprint 029, and it runs after Sprint 028** — reversing the proposal's
+  recommendation, which was written before the constraint was checked. The proposal argued this
+  should go first so the domain contract describes a settled shell, and treated the sprint numbers
+  as identities rather than a schedule. They are not: `scripts/validate_project.py` requires the
+  active sprint to be `len(completed) + 1`, so in this project the number *is* the order. Running
+  this first would therefore require renumbering, and renumbering would rewrite forward references
+  inside closed sprints' Outcome sections and inside accepted decisions (DEC-052, DEC-058, DEC-060,
+  DEC-062, DEC-064) — which `AGENTS.md` forbids and which is a much larger cost than the one being
+  avoided.
+
+  **What the original concern is worth, now that it is priced:** 028's conformance suite and its
+  account of the backend registry are untouched by this sprint. Only its description of what a
+  *screen* renders is exposed, and that is one section, which 029's close amends. 028's file now
+  says so. `FINAL_SPRINT` moves from 29 to 30 and per-domain imports becomes Sprint 030.

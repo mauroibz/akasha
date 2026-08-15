@@ -24,10 +24,11 @@ Post-v1 work branches:
              └─ 026 Statuses, formats and tracklists
                  └─ 027 Library shell and shelves
                      └─ 028 The domain contract  [GATED]
-                         └─ 029 Per-domain imports   ← the plan ends here
+                         └─ 029 One search bar
+                             └─ 030 Per-domain imports   ← the plan ends here
 ```
 
-**The plan stops at 029, and that is the point (DEC-058).** Sprint 025 asked whether a second domain
+**The plan stops at 030, and that is the point (DEC-058, extended once by DEC-065).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -79,13 +80,14 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
 | [028](028-the-domain-contract.md) | The domain contract | 027 | **ready** |
-| 029 | Per-domain imports | 028 | planned |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | planned |
+| 030 | Per-domain imports | 029 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 028 have files; 029 does not.
+incorporating actual deviations. Sprints 019 through 029 have files; 030 does not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -457,7 +459,7 @@ Both are UI-shaped rather than model-shaped — `POST /api/shelves` and the entr
 do what is needed, and bulk shelf assignment already exists in triage. Likely shape: shelf editing
 inline on the detail page and on a card, with create-on-type in the same control.
 
-## Proposed, not yet scheduled
+## Scheduled from owner feedback
 
 ### One search bar on `/` — adding and searching in the same place
 
@@ -466,13 +468,14 @@ functionalities open to the user: adding and searching for your data… 1 large 
 both,"* with the domain selector to its left and an **Add** button to its right, a local search that
 consults no provider when it hits, and a web search below when it misses.
 
-**Scoped in `docs/unified-search-proposal.md`.** It is one sprint if manual entry stays on `/add`
-and Sprint 027's confirm form is reused rather than redesigned. The proposal costs three decisions
-the owner has to make — when a web search fires (the literal "no local hit" rule fires once per
-keystroke while typing any new title, which breaches the Google free tier), what "All" means when
-there is no single domain to search, and where the confirm step lives. It also recommends running
-**before** Sprint 028, so the domain contract describes a settled shell rather than one about to be
-rebuilt.
+**Scoped in `docs/unified-search-proposal.md`, accepted as DEC-065, and scheduled as
+[Sprint 029](029-one-search-bar.md).** The owner amended it twice: **"All" is removed as a filter**,
+so the tab strip always names exactly one domain and nothing has to ask which domain a search
+means; and the confirm step becomes a dialog **on condition that no functionality is lost**, which
+the sprint carries as an eleven-row inventory rather than an intention. A web search fires only once
+a query has settled and returned nothing, or on the button — the literal "no local hit" rule fires
+once per keystroke while typing any new title, which breaches the Google free tier DEC-044 already
+measured.
 
 ## Not scheduled
 

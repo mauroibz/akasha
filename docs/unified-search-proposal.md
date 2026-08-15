@@ -1,6 +1,9 @@
 # One search bar — proposal
 
-**Status:** proposed, awaiting the owner's decision
+**Status:** **accepted** by the owner, 2026-08-15 — see DEC-065 and
+[Sprint 029](sprints/029-one-search-bar.md). Two amendments: "All" is removed as a filter
+(section 3.2 option **B**, over this document's recommendation), and the confirm dialog is accepted
+on condition that no functionality is lost, which Sprint 029 carries as an enumerated inventory.
 **Written:** 2026-08-15, against Sprint 027's close (028 `ready`, not started)
 **Answers:** the owner's feedback of 2026-08-15 — *"the main page should have both functionalities
 open to the user: adding and searching for your data… 1 large searchbar up top for both."*
@@ -129,13 +132,19 @@ library* button and the `a` shortcut point at the search bar instead.
 
 **Sequencing against Sprint 028.** 028's Phase A writes down what a domain declares and what every
 screen renders from it. This proposal changes what the main screen renders and makes the domain
-selector drive provider choice as well as filtering. Writing the contract first means writing it
-against a shell that is about to be rebuilt. **Recommendation: this sprint runs first, and 028
-describes the settled reality** — which is also the order that keeps 028's conformance suite honest.
+selector drive provider choice as well as filtering, so writing the contract first exposes one
+section of it to revision.
+
+~~**Recommendation: this sprint runs first.**~~ **Withdrawn when the cost was checked** — see
+DEC-065. `scripts/validate_project.py` requires the active sprint to be `len(completed) + 1`, so the
+numbers *are* the schedule here, and going first would mean renumbering and rewriting forward
+references inside closed sprints' Outcomes and inside five accepted decisions. **This is Sprint 029
+and runs after 028**, whose file now records which of its sections to expect 029 to amend.
 
 ## 6. What the owner has to decide
 
 1. The firing rule — **C** (settled-and-empty plus the button) is recommended over the literal reading.
 2. What "All" does when you press Add — **C** (ask once) is recommended.
 3. Confirm as a dialog over `/` — **B** is recommended.
-4. Whether this runs before Sprint 028. Recommended: **yes**.
+4. ~~Whether this runs before Sprint 028.~~ Answered by the constraint rather than by preference:
+   it runs **after**, as Sprint 029. See DEC-065.

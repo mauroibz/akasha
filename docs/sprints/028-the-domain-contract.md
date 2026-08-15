@@ -11,6 +11,11 @@ Phase A produces that contract — what a domain must supply, what it may never 
 lives — plus a conformance suite a domain must pass, run against books and albums first to prove it
 describes reality rather than intentions. Phase B moves only what the suite proves is misplaced.
 
+**Sprint 029 rebuilds the main screen right after this one** (DEC-065), so the contract's account of
+what a *screen* renders from the registry is the part most likely to need revising. Write it against
+the registry rather than against today's layout, and expect 029's close to amend the screen-facing
+section — the backend contract and the conformance suite are unaffected by that sprint.
+
 **Gated** (DEC-035, DEC-042): Phase A is a written verdict in `docs/decisions.md` and changes nothing
 user-visible. Phase A concluding that little is misplaced is a complete, correct outcome, and Phase B
 runs only on that verdict plus an explicit owner go-ahead.

@@ -3,6 +3,10 @@
 **Last completed:** Sprint 027 (library shell and shelves), 2026-08-15.
 **Next:** Sprint 028 (the domain contract) — status `ready`, file at
 `docs/sprints/028-the-domain-contract.md`. Plan revision **11**.
+**Then Sprint 029 (one search bar)**, accepted by the owner as DEC-065 and already written up at
+`docs/sprints/029-one-search-bar.md`. It rebuilds `/` around a single bar and **removes "All" as a
+filter**, so read it before writing 028's account of what a screen renders — that is the one section
+029 is expected to amend. Per-domain imports is now Sprint 030.
 
 ## Do this first
 
