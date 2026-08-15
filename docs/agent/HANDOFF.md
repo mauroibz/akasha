@@ -9,9 +9,14 @@ has a file yet; the plan ends at 031.
 ## Do this first
 
 **You are on branch `sprint-025-albums`, not `main`.** Sprints 025 through **028** ran and closed
-there; thirty-plus commits are local and nothing has been pushed. **Merging back is the owner's
-decision** — that is the entire reason the branch exists (DEC-053, amended by DEC-061, DEC-063 and
-DEC-066). Ask before merging.
+there; thirty-plus commits are local and nothing has been pushed. The branch exists so merging is a
+deliberate act (DEC-053, amended by DEC-061, DEC-063 and DEC-066).
+
+**The merge is scheduled: after Sprint 029 closes, not before (DEC-072).** Sprint 029 carries copy
+neutrality, so merging first would ship music's first release on screens that say *Import books*.
+Sprint 030 does not gate it. **Two things go in with that merge**, because both describe the product
+to a user: `README.md`'s feature copy stops being book-only, and
+`docs/operations/release-notes-v1.2.md` is written, following the v1 and v1.1 precedent.
 
 **The domain contract is written down, twice.** `docs/specs/technical-spec.md` **section 6.6** is the
 binding contract; **`docs/guides/adding-a-domain.md`** is how to satisfy it — diagrams, a nine-row
@@ -33,8 +38,7 @@ each. Read that deliverable before starting 029 — it is small, but it is the k
 of those screens silently carries forward.
 
 **The music release is not gated on a third domain** (DEC-071). A release waits for a feature, not
-for a validation exercise. Merging and releasing the album work is an owner action, and nothing in
-the plan blocks it.
+for a validation exercise — and it is now scheduled for right after 029 (DEC-072).
 
 ## Read this first
 

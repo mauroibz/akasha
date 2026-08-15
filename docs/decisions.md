@@ -2280,3 +2280,28 @@ Append-only record of material architecture choices, product-default resolutions
   waiting for a real domain to ask — which is the assessment's own recommendation and DEC-052's
   standing rule against designing an abstraction from domains that agree with each other. Whether to
   merge and release the album work is a separate owner action, now unblocked by this entry.
+
+## DEC-072 — The album work merges after Sprint 029, not before
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Completes:** DEC-071, which unblocked the release without scheduling it.
+- **Context:** DEC-071 established that a release waits for a feature rather than for a validation
+  exercise, leaving the timing an owner action. The timing is now settled, and the reason is the
+  sequencing consequence that entry named: Sprint 029 carries copy neutrality, so merging first would
+  ship a music release whose screens say *Import books* and *Book added* over albums.
+- **Decision.** **`sprint-025-albums` merges into `main` after Sprint 029 closes, and not before.**
+  Music's first release is the one where the interface stops calling everything a book.
+
+  Sprint 030 (entry depth) does **not** gate the merge. It is a Phase-A decision whose outcome may add
+  a feature later; it is not a prerequisite for shipping what is already built and verified.
+- **Consequences.** Sprints 025–029 all land on `main` in one merge. Two things must be done *with*
+  that merge rather than after it, because both describe the product to a user:
+
+  1. **`README.md`'s product copy** stops describing a book-only product. Its Development section
+     already documents the domain structure; the feature copy was deliberately left book-only until
+     albums could actually be run (DEC-066 era note in the handoff).
+  2. **`docs/operations/release-notes-v1.2.md`**, following the v1 and v1.1 precedent.
+
+  The branch keeps its DEC-053 property until then: a sprint may run on it, it ends clean, nothing is
+  pushed, and merging remains a deliberate act rather than a side effect.

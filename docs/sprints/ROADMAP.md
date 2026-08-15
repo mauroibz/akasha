@@ -422,6 +422,13 @@ Phase A must produce a written verdict answering, with evidence:
    export, the import ledger and undo.
 3. **Whether "a set" is the same concept as depth or a different one**, since the owner names it as
    possibly useful for other fields. A set that groups items across a domain is not a parent entity.
+
+   **This question is already open in the spec and the two must be answered together.** Product spec
+   section 11 item 4 adopts a default — *series is free text in `metadata`, not modelled* — and names
+   its own breaking point: *"show me the Malazan books in reading order"*, which needs a real series
+   and position pair. DEC-058 flagged the vocabulary collision separately. The owner's Harry Potter
+   set and the spec's Malazan series are the same feature asked for twice, four months apart, and
+   Phase A answers them once or leaves both open honestly.
 4. **What the cheapest thing that satisfies a real user sentence is** — "I'm on season 3" — because
    the assessment's own warning applies here: designing depth from zero serial domains is the
    Strategy-B failure DEC-052 rejected on evidence.
