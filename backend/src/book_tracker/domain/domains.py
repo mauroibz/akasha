@@ -282,6 +282,18 @@ class EntryFormat(StrEnum):
     CD = "cd"
 
 
+class ItemTypeName(StrEnum):
+    """The published union of domain names, so `?type=` enumerates in OpenAPI.
+
+    Spelled out for the same reason `EntryStatus` is, and pinned to `DOMAINS` by the
+    same test. Unlike a status, a type is never validated against an item's own domain
+    — it *is* the domain — so this enum is the whole check the filter needs.
+    """
+
+    BOOK = "book"
+    ALBUM = "album"
+
+
 class InvalidStatus(ValueError):
     """A status the item's own domain does not have."""
 

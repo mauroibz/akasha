@@ -1,6 +1,6 @@
 # Sprint 027 — Library shell and shelves
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 026
 **Roadmap revision:** 11
 

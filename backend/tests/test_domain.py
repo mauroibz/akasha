@@ -11,6 +11,7 @@ from book_tracker.domain.domains import (
     InvalidEntryField,
     InvalidFormat,
     InvalidStatus,
+    ItemTypeName,
     validate_entry_fields,
     validate_formats,
     validate_status,
@@ -226,3 +227,7 @@ def test_the_published_enums_agree_with_the_registry() -> None:
     """
     assert {member.value for member in EntryStatus} == set(ALL_STATUSES)
     assert {member.value for member in EntryFormat} == set(ALL_FORMATS)
+    # The domain names themselves are a published union too, since Sprint 027 made
+    # `type` a query parameter. Same reason, same failure mode: a third domain that
+    # nobody adds here is a domain the library cannot be filtered to.
+    assert {member.value for member in ItemTypeName} == set(DOMAINS)

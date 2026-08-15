@@ -312,3 +312,61 @@ async def test_a_shared_status_is_counted_per_domain_not_once(tmp_path: Path) ->
     }
     # The whole-library total still exists, because that is what the inbox badge is.
     assert facets["status_counts"] == {"wishlist": 1, "read": 1}
+
+
+@pytest.mark.anyio
+async def test_the_library_filters_to_one_domain(tmp_path: Path) -> None:
+    """The other half of Sprint 025's decision: a mixed library paginated, but it
+    could not be *narrowed*, so books and records read as one mixed bag."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        book_entry, album_entry = await _one_of_each(app)
+        await client.patch(f"/api/entries/{album_entry}", json={"status": "owned"})
+        await client.patch(f"/api/entries/{book_entry}", json={"status": "read"})
+
+        books = await client.get("/api/entries", params={"type": "book"})
+        albums = await client.get("/api/entries", params={"type": "album"})
+        both = await client.get("/api/entries", params={"type": ["book", "album"]})
+        unknown = await client.get("/api/entries", params={"type": "wine"})
+
+    assert [row["id"] for row in books.json()["items"]] == [book_entry]
+    assert books.json()["total"] == 1
+    assert [row["id"] for row in albums.json()["items"]] == [album_entry]
+    # Repeated like `status`: two of them widen, because a type is one value per row.
+    assert {row["id"] for row in both.json()["items"]} == {book_entry, album_entry}
+    assert unknown.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_the_facets_under_a_domain_filter(tmp_path: Path) -> None:
+    """The two facet families answer different questions, so `type` reaches them
+    differently.
+
+    `status_counts` is the whole-library total the inbox badge means, and
+    `status_counts_by_type` is already split by type, so both clear the filter and
+    every tab can show a live count while it is not the selected one. `format_counts`
+    feeds a selector that sits *under* the tab, so it applies the filter: offering
+    "Physical 312" while the library is showing records is an answer to a question
+    nobody asked.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        book_entry, album_entry = await _one_of_each(app)
+        await client.patch(
+            f"/api/entries/{album_entry}", json={"status": "owned", "formats": ["vinyl"]}
+        )
+        await client.patch(
+            f"/api/entries/{book_entry}", json={"status": "read", "formats": ["physical"]}
+        )
+        albums = await client.get("/api/entries", params={"type": "album"})
+
+    facets = albums.json()["facets"]
+    assert facets["status_counts"] == {"owned": 1, "read": 1}
+    assert facets["status_counts_by_type"] == {"book": {"read": 1}, "album": {"owned": 1}}
+    assert facets["format_counts"] == {"vinyl": 1}

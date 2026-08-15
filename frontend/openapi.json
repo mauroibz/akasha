@@ -1505,6 +1505,15 @@
         "title": "ItemResponse",
         "type": "object"
       },
+      "ItemTypeName": {
+        "description": "The published union of domain names, so `?type=` enumerates in OpenAPI.\n\nSpelled out for the same reason `EntryStatus` is, and pinned to `DOMAINS` by the\nsame test. Unlike a status, a type is never validated against an item's own domain\n\u2014 it *is* the domain \u2014 so this enum is the whole check the filter needs.",
+        "enum": [
+          "book",
+          "album"
+        ],
+        "title": "ItemTypeName",
+        "type": "string"
+      },
       "ItemTypeResponse": {
         "description": "What a domain says about itself, so a screen can render it without branching.",
         "properties": {
@@ -2293,6 +2302,25 @@
                 }
               ],
               "title": "Format"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/ItemTypeName"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Type"
             }
           },
           {

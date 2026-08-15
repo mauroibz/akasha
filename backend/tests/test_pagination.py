@@ -311,3 +311,45 @@ async def test_author_sort_orders_by_the_creator_sort_name(tmp_path: Path) -> No
         "Cien años de soledad",
         "Pedro Páramo",
     ]
+
+
+@pytest.mark.anyio
+async def test_a_cursor_cut_under_one_domain_is_refused_under_another(tmp_path: Path) -> None:
+    """The `_filter_key` guard, extended to the domain filter.
+
+    A cursor carries the filter it was cut under. If `type` were left out of that key,
+    paging a book-filtered list with an album-filtered request would be *accepted* and
+    would skip or repeat a page silently — a wrong answer rather than an error, which
+    is exactly what the key exists to prevent.
+    """
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    app = create_app(configured)
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        for index in range(4):
+            repository.create_or_get_entry(title=f"Book {index}")
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(text("UPDATE entries SET status='read'"))
+            connection.execute(
+                text("UPDATE items SET type='album' WHERE id=:id"), {"id": album.item_id}
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            first = (await client.get("/api/entries", params={"type": "book", "limit": 2})).json()
+            cursor = first["next_cursor"]
+            assert cursor is not None
+
+            same = await client.get(
+                "/api/entries", params={"type": "book", "limit": 2, "after": cursor}
+            )
+            unfiltered = await client.get("/api/entries", params={"limit": 2, "after": cursor})
+            other = await client.get(
+                "/api/entries", params={"type": "album", "limit": 2, "after": cursor}
+            )
+
+    assert same.status_code == 200
+    for refused in (unfiltered, other):
+        assert refused.status_code == 400
+        assert refused.json()["error"]["code"] == "invalid_cursor"

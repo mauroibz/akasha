@@ -568,6 +568,7 @@ class LibraryService:
         shelves: Sequence[str],
         q: str | None,
         formats: Sequence[str] = (),
+        types: Sequence[str] = (),
     ) -> str:
         """What a cursor is bound to. Every filter has to be in here.
 
@@ -580,6 +581,7 @@ class LibraryService:
                 "shelves": sorted(shelves),
                 "statuses": sorted(statuses or []),
                 "formats": sorted(formats),
+                "types": sorted(types),
             },
             separators=(",", ":"),
             sort_keys=True,
@@ -592,12 +594,17 @@ class LibraryService:
         shelves: Sequence[str],
         q: str | None,
         formats: Sequence[str] = (),
+        types: Sequence[str] = (),
     ) -> Any:
         query = (
             select(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
+        if types:
+            # Unlike shelves and formats, repeating this *widens*: a row has exactly
+            # one type, so asking for two of them is a union rather than a narrowing.
+            query = query.where(ItemRow.type.in_(types))
         if statuses is None:
             query = query.where(EntryRow.status != "unsorted")
         elif statuses:
@@ -643,6 +650,7 @@ class LibraryService:
         shelves: Sequence[str] = (),
         q: str | None = None,
         formats: Sequence[str] = (),
+        types: Sequence[str] = (),
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -661,7 +669,7 @@ class LibraryService:
         }
         expression = sort_expressions[sort]
         bucket = case((expression.is_(None), 1), else_=0)
-        filter_key = self._filter_key(statuses, shelves, q, formats)
+        filter_key = self._filter_key(statuses, shelves, q, formats, types)
         state = None
         if after:
             try:
@@ -669,7 +677,7 @@ class LibraryService:
             except CursorError as error:
                 raise LibraryError("invalid_cursor", str(error), status_code=400) from error
 
-        query = self._filtered_entries(statuses, shelves, q, formats)
+        query = self._filtered_entries(statuses, shelves, q, formats, types)
         if state is not None:
             id_comparison = (
                 EntryRow.id > state.entry_id if order == "asc" else EntryRow.id < state.entry_id
@@ -698,11 +706,19 @@ class LibraryService:
             has_more = len(entries) > limit
             entries = entries[:limit]
             total_query = select(func.count()).select_from(
-                self._filtered_entries(statuses, shelves, q, formats).order_by(None).subquery()
+                self._filtered_entries(statuses, shelves, q, formats, types)
+                .order_by(None)
+                .subquery()
             )
             total = session.scalar(total_query) or 0
             # Each facet clears its own dimension, so a count reads as "what you would
             # get if you clicked this" rather than as a count of the current page.
+            # `type` is deliberately *cleared* here while every other filter is kept.
+            # The two consumers below both need to see across the selected domain:
+            # `status_counts` is the whole-library total the inbox badge means, and
+            # narrowing it would make the badge disagree with `/triage`, which is
+            # domain-agnostic; `status_counts_by_type` is already split by type, so a
+            # tab that is *not* selected still has a live count to show.
             facet_base = self._filtered_entries([], shelves, q, formats).subquery()
             # Grouped by the item's type as well as the status, because a status two
             # domains share is not one number on a screen that lists them separately:
@@ -719,7 +735,10 @@ class LibraryService:
             for status_value, item_type, count in facet_rows:
                 status_counts[status_value] = status_counts.get(status_value, 0) + count
                 by_type.setdefault(item_type, {})[status_value] = count
-            format_base = self._filtered_entries(statuses, shelves, q).subquery()
+            # The format selector sits *under* the tab, so this one keeps the type
+            # filter: offering "Physical 312" while the library is showing records is
+            # an answer to a question nobody asked.
+            format_base = self._filtered_entries(statuses, shelves, q, (), types).subquery()
             format_rows = session.execute(
                 select(EntryFormatRow.format, func.count())
                 .join(format_base, format_base.c.id == EntryFormatRow.entry_id)

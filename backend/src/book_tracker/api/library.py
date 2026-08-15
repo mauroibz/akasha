@@ -21,6 +21,7 @@ from book_tracker.domain.domains import (
     EntryFormat,
     EntryStatus,
     InvalidMetadata,
+    ItemTypeName,
     validate_metadata_patch,
 )
 from book_tracker.domain.providers import SourceRef
@@ -330,6 +331,8 @@ async def list_entries(
     status: Annotated[list[EntryStatus] | None, Query()] = None,
     shelf: Annotated[list[str] | None, Query()] = None,
     format: Annotated[list[EntryFormat] | None, Query()] = None,
+    #: Which domains to show. Repeated like `status`; absent means every domain.
+    type: Annotated[list[ItemTypeName] | None, Query()] = None,
     q: str | None = None,
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
@@ -343,6 +346,7 @@ async def list_entries(
             statuses=[value.value for value in status] if status is not None else None,
             shelves=shelf or [],
             formats=[value.value for value in format or []],
+            types=[value.value for value in type or []],
             q=q,
             sort=sort,
             order=order,
