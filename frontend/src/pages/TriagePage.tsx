@@ -50,6 +50,8 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     statuses: statuses.length ? statuses : ["unsorted"],
     shelves: params.getAll("shelf"),
     formats: [],
+    // Triage has no domain tab: the inbox is one queue whatever landed in it.
+    types: [],
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",

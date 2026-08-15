@@ -152,6 +152,8 @@ export interface LibraryFilters {
   statuses: EntryStatus[];
   shelves: string[];
   formats: EntryFormat[];
+  /** Which domains to show. Empty means every one of them. */
+  types: string[];
   query: string;
   sort: SortKey;
   order: SortOrder;
@@ -166,6 +168,7 @@ export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
   filters.statuses.forEach((status) => params.append("status", status));
   filters.shelves.forEach((shelf) => params.append("shelf", shelf));
   filters.formats.forEach((format) => params.append("format", format));
+  filters.types.forEach((type) => params.append("type", type));
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (cursor) params.set("after", cursor);
   return params.toString();

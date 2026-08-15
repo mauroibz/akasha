@@ -440,3 +440,185 @@ test("Enter opens a focused row to detail", async () => {
     expect(screen.getByRole("heading", { name: "Book detail" })).toBeVisible();
   });
 });
+
+/**
+ * Three domains, one of which this build has never heard of.
+ *
+ * The point of the third is that no hardcoded list could produce it: if the strip
+ * renders "Wines", it renders from `/api/item-types` and not from a table beside it.
+ */
+const threeDomains = [
+  {
+    id: "book",
+    label: "Book",
+    fields: [],
+    statuses: [
+      { value: "read", label: "Read", choosable: true, hotkey: "r" },
+      { value: "reading", label: "Reading", choosable: true, hotkey: "g" },
+    ],
+    default_status: "read",
+    entry_fields: ["date_started", "date_finished", "reread_count"],
+    formats: [
+      { value: "physical", label: "Physical" },
+      { value: "digital", label: "Digital" },
+    ],
+    entry_panel_label: "Your reading data",
+  },
+  {
+    id: "album",
+    label: "Record",
+    fields: [],
+    statuses: [
+      { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+    ],
+    default_status: "owned",
+    entry_fields: [],
+    formats: [
+      { value: "vinyl", label: "Vinyl" },
+      { value: "digital", label: "Digital" },
+    ],
+    entry_panel_label: "Your copy",
+  },
+  {
+    id: "wine",
+    label: "Wine",
+    fields: [],
+    statuses: [
+      { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+    ],
+    default_status: "owned",
+    entry_fields: [],
+    formats: [{ value: "physical", label: "Bottle" }],
+    entry_panel_label: "Your cellar",
+  },
+];
+
+function stubRegistry(page = populated) {
+  const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    if (String(request).startsWith("/api/item-types"))
+      return new Response(JSON.stringify(threeDomains));
+    if (String(request).startsWith("/api/shelves")) return new Response("[]");
+    return new Response(JSON.stringify(page), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function requestedUrls(fetchMock: ReturnType<typeof stubRegistry>): string[] {
+  return fetchMock.mock.calls.map((call) => String(call[0]));
+}
+
+test("the domain tab strip is built from the registry, not from a hardcoded list", async () => {
+  const fetchMock = stubRegistry();
+  renderPage();
+  await screen.findByText("Rayuela");
+
+  const strip = await screen.findByRole("tablist", { name: "Choose a domain" });
+  expect(
+    within(strip)
+      .getAllByRole("tab")
+      .map((tab) => tab.textContent),
+  ).toEqual(["All", "Book", "Record", "Wine"]);
+  // Nothing has been chosen, so the library is unfiltered.
+  expect(requestedUrls(fetchMock).some((url) => url.includes("type="))).toBe(
+    false,
+  );
+});
+
+test("choosing a domain filters the library, and the choice is in the URL", async () => {
+  const fetchMock = stubRegistry();
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole("tab", { name: "Record" }));
+
+  await waitFor(() => {
+    expect(
+      requestedUrls(fetchMock).some(
+        (url) => url.startsWith("/api/entries?") && url.includes("type=album"),
+      ),
+    ).toBe(true);
+  });
+  // In the URL like every other filter, which is what makes a reload and the back
+  // button work without the page owning any of that itself.
+  expect(screen.getByRole("tab", { name: "Record" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
+
+test("the last domain used is where a fresh visit lands", async () => {
+  localStorage.setItem("akasha.library.domain", "album");
+  const fetchMock = stubRegistry();
+  renderPage();
+  await screen.findByText("Rayuela");
+
+  await waitFor(() => {
+    expect(
+      requestedUrls(fetchMock).some(
+        (url) => url.startsWith("/api/entries?") && url.includes("type=album"),
+      ),
+    ).toBe(true);
+  });
+  expect(screen.getByRole("tab", { name: "Record" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+});
+
+test("a type already in the URL beats the remembered domain", async () => {
+  localStorage.setItem("akasha.library.domain", "album");
+  const fetchMock = stubRegistry();
+  renderPage("/?type=book");
+  await screen.findByText("Rayuela");
+
+  await waitFor(() => {
+    expect(
+      requestedUrls(fetchMock).some(
+        (url) => url.startsWith("/api/entries?") && url.includes("type=book"),
+      ),
+    ).toBe(true);
+  });
+  expect(
+    requestedUrls(fetchMock).some((url) => url.includes("type=album")),
+  ).toBe(false);
+});
+
+test("with a domain chosen, only that domain's status chips and formats render", async () => {
+  stubRegistry();
+  renderPage("/?type=album");
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  // The record row, without the domain heading the tab already carries.
+  expect(screen.getByRole("button", { name: /^Owned/ })).toBeVisible();
+  expect(screen.queryByRole("button", { name: /^Read / })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Reading/ })).toBeNull();
+
+  // And the format selector narrows to that domain's vocabulary.
+  await user.click(screen.getByRole("combobox", { name: "Filter by format" }));
+  const listbox = await screen.findByRole("listbox");
+  expect(
+    within(listbox)
+      .getAllByRole("option")
+      .map((option) => option.textContent?.replace(/\s+\d+$/, "")),
+  ).toEqual(["All formats", "Vinyl", "Digital"]);
+});
+
+test("switching domain drops a status the new domain has no vocabulary for", async () => {
+  const fetchMock = stubRegistry();
+  renderPage("/?type=book&status=reading");
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole("tab", { name: "Record" }));
+
+  // Otherwise the list stays filtered to a status the visible chips cannot clear,
+  // and the library reads as empty for no reason the screen can explain.
+  await waitFor(() => {
+    const last = requestedUrls(fetchMock).at(-1)!;
+    expect(last).toContain("type=album");
+    expect(last).not.toContain("status=reading");
+  });
+});

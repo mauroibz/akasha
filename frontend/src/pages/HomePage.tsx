@@ -35,17 +35,22 @@ import { VirtualLibrary } from "@/features/library/VirtualLibrary";
 import { domainsFrom, sortLabels } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import {
+  domainPreferenceKey,
   isEditableTarget,
   libraryMotionKey,
   mergeUniqueEntries,
+  readDomainPreference,
   readViewPreference,
   viewPreferenceKey,
   type LibraryView,
 } from "@/features/library/library";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
 const allFormats = "__all_formats__";
+/** The same problem one tier up: "every domain" is a tab and needs a value. */
+const allDomains = "__all_domains__";
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
@@ -53,6 +58,7 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     statuses,
     shelves: params.getAll("shelf"),
     formats: params.getAll("format") as EntryFormat[],
+    types: params.getAll("type"),
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
@@ -64,6 +70,7 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   filters.statuses.forEach((s) => params.append("status", s));
   filters.shelves.forEach((s) => params.append("shelf", s));
   filters.formats.forEach((s) => params.append("format", s));
+  filters.types.forEach((s) => params.append("type", s));
   if (filters.query.trim()) params.set("q", filters.query.trim());
   params.set("sort", filters.sort);
   params.set("order", filters.order);
@@ -132,6 +139,31 @@ export function HomePage() {
     return () => window.clearTimeout(timer);
   }, [search, filters.query, setSearchParams]);
 
+  /**
+   * A fresh visit lands on the domain last used.
+   *
+   * It runs once, before anything is fetched, and writes the value into the URL —
+   * from there the choice is an ordinary filter, so a reload, the back button and a
+   * shared link all behave without this effect being involved again. A `type`
+   * already in the URL wins, because that is somebody being explicit.
+   */
+  const restoredDomain = useRef(false);
+  useEffect(() => {
+    if (restoredDomain.current) return;
+    restoredDomain.current = true;
+    if (searchParams.has("type")) return;
+    const remembered = readDomainPreference();
+    if (!remembered) return;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("type", remembered);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams]);
+
   const library = useInfiniteQuery({
     queryKey: ["library", filters],
     queryFn: ({ pageParam, signal }) =>
@@ -161,18 +193,31 @@ export function HomePage() {
     if (!Array.isArray(rows)) return [];
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   }, [shelfQuery.data]);
-  // Every format any domain declares, once. The filter spans domains — an entry
-  // carries formats, not a domain — so this is a flat list rather than a group per
-  // domain, which offered `Digital` twice with one meaning.
+  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  // One domain at a time is the whole point of the strip, so the filter carries at
+  // most one value even though the API accepts a repeated parameter.
+  const selectedDomain = filters.types[0] ?? "";
+  // The domains the chips and the format list describe: one when a tab is chosen,
+  // all of them under "All".
+  const shownDomains = useMemo(
+    () =>
+      selectedDomain
+        ? domains.filter((type) => type.id === selectedDomain)
+        : domains,
+    [domains, selectedDomain],
+  );
+  // Every format the shown domains declare, once. The filter spans domains — an
+  // entry carries formats, not a domain — so this is a flat list rather than a group
+  // per domain, which offered `Digital` twice with one meaning.
   const formatChoices = useMemo(() => {
     const seen = new Map<string, { value: EntryFormat; label: string }>();
-    for (const type of domainsFrom(itemTypes.data)) {
+    for (const type of shownDomains) {
       for (const format of type.formats ?? []) {
         if (!seen.has(format.value)) seen.set(format.value, format);
       }
     }
     return Array.from(seen.values());
-  }, [itemTypes.data]);
+  }, [shownDomains]);
   const firstPage = library.data?.pages[0];
 
   const mutation = useMutation({
@@ -293,6 +338,26 @@ export function HomePage() {
   const updateFilters = (changes: Partial<LibraryFilters>) => {
     const next = { ...filters, ...changes };
     setSearchParams(paramsFromFilters(next), { replace: true });
+  };
+  /**
+   * Choosing a domain, which is a filter change plus one piece of bookkeeping.
+   *
+   * Statuses that belong to the domain being left are dropped: keeping `reading`
+   * while switching to records leaves the list filtered by a value none of the
+   * visible chips can clear, so the library reads as empty for no reason the screen
+   * can explain.
+   */
+  const chooseDomain = (id: string) => {
+    const kept = new Set(
+      (id ? domains.filter((type) => type.id === id) : domains).flatMap(
+        (type) => type.statuses.map((status) => status.value),
+      ),
+    );
+    localStorage.setItem(domainPreferenceKey, id);
+    updateFilters({
+      types: id ? [id] : [],
+      statuses: filters.statuses.filter((value) => kept.has(value)),
+    });
   };
   const setLibraryView = (next: LibraryView) => {
     setView(next);
@@ -453,22 +518,44 @@ export function HomePage() {
           </Button>
         </div>
       </section>
+      {/* The domain strip. Rendered from `/api/item-types`, so a third domain
+          appears here by existing rather than by anybody editing this file. */}
+      {domains.length > 1 && (
+        <Tabs
+          value={selectedDomain || allDomains}
+          onValueChange={(value) =>
+            chooseDomain(value === allDomains ? "" : value)
+          }
+          className="mt-6"
+        >
+          <TabsList aria-label="Choose a domain">
+            <TabsTrigger value={allDomains}>All</TabsTrigger>
+            {domains.map((type) => (
+              <TabsTrigger key={type.id} value={type.id}>
+                {type.label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+      )}
       {/* One row per domain, each under its own name.
           A library holding books and records has no single status vocabulary to
           put in one row: "Read" and "Owned" beside each other with no indication
-          of what they belong to reads as one confused list. Grouping is the
-          owner's call, and it survives Sprint 027's domain tabs, which will scope
-          this to one row at a time. */}
-      {domainsFrom(itemTypes.data).map((type) => (
+          of what they belong to reads as one confused list (DEC-060). With a tab
+          chosen there is only one row and the tab already carries the name, so the
+          heading comes off rather than saying it twice. */}
+      {shownDomains.map((type) => (
         <div
           key={type.id}
           className="mt-4 flex flex-wrap items-center gap-2"
           aria-label={`Filter ${type.label.toLowerCase()}s by status`}
           role="group"
         >
-          <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {type.label}
-          </span>
+          {!selectedDomain && (
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              {type.label}
+            </span>
+          )}
           {type.statuses.map((status) => {
             const active = filters.statuses.includes(status.value);
             return (

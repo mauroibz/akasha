@@ -2,11 +2,14 @@ import type { LibraryEntry, LibraryFilters } from "@/api/library";
 
 export type LibraryView = "grid" | "table";
 export const viewPreferenceKey = "akasha.library.view";
+/** The domain the library was last showing, so a fresh visit lands where you left. */
+export const domainPreferenceKey = "akasha.library.domain";
 
 export const defaultLibraryFilters: LibraryFilters = {
   statuses: [],
   shelves: [],
   formats: [],
+  types: [],
   query: "",
   sort: "date_added",
   order: "desc",
@@ -59,12 +62,28 @@ export function libraryMotionKey(filters: LibraryFilters): string {
     filters.order,
     [...filters.statuses].sort().join("+"),
     [...filters.shelves].sort().join("+"),
+    // Formats were missed when Sprint 026 added them, so changing that filter
+    // swapped the list out with no crossfade at all.
+    [...filters.formats].sort().join("+"),
+    [...filters.types].sort().join("+"),
     filters.query.trim(),
   ].join("|");
 }
 
 export function readViewPreference(): LibraryView {
   return localStorage.getItem(viewPreferenceKey) === "table" ? "table" : "grid";
+}
+
+/**
+ * The remembered domain, or nothing.
+ *
+ * Read once on mount and then written into the URL, so from that moment on the
+ * choice is an ordinary filter: a reload, the back button and a shared link all work
+ * without this preference being consulted again. `""` is the stored form of "All",
+ * which is deliberately distinct from never having chosen.
+ */
+export function readDomainPreference(): string {
+  return localStorage.getItem(domainPreferenceKey) ?? "";
 }
 
 export function mergeUniqueEntries(pages: LibraryEntry[][]): LibraryEntry[] {
