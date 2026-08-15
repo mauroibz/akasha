@@ -109,11 +109,62 @@ export const bookItemType = {
       maximum: 9999,
     },
   ],
+  statuses: [
+    { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+    { value: "read", label: "Read", choosable: true, hotkey: "r" },
+    { value: "reading", label: "Reading", choosable: true, hotkey: "g" },
+    { value: "to_read", label: "To read", choosable: true, hotkey: "t" },
+    { value: "wishlist", label: "Wishlist", choosable: true, hotkey: "w" },
+    { value: "dropped", label: "Dropped", choosable: true, hotkey: "d" },
+  ],
+  default_status: "read",
+  entry_fields: ["date_started", "date_finished", "reread_count"],
+  formats: [
+    { value: "physical", label: "Physical" },
+    { value: "borrowed", label: "Borrowed" },
+    { value: "digital", label: "Digital" },
+  ],
+  entry_panel_label: "Your reading data",
+};
+
+/** The album domain, whose entries record possession rather than reading. */
+export const albumItemType = {
+  id: "album",
+  label: "Album",
+  fields: [
+    { name: "creators", label: "Artists", type: "text", multiplicity: "many" },
+    { name: "label", label: "Label", type: "text", multiplicity: "one" },
+    {
+      name: "tracklist",
+      label: "Tracklist",
+      type: "rows",
+      multiplicity: "many",
+      columns: [
+        { name: "position", label: "#", type: "number" },
+        { name: "title", label: "Title", type: "text" },
+        { name: "length_ms", label: "Length", type: "duration" },
+      ],
+    },
+  ],
+  statuses: [
+    { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+    { value: "wishlist", label: "Wishlist", choosable: true, hotkey: "w" },
+    { value: "pending", label: "On the way", choosable: true, hotkey: "p" },
+    { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+  ],
+  default_status: "owned",
+  entry_fields: [],
+  formats: [
+    { value: "vinyl", label: "Vinyl" },
+    { value: "cd", label: "CD" },
+    { value: "digital", label: "Digital" },
+  ],
+  entry_panel_label: "Your copy",
 };
 
 /** Every screen that renders metadata needs the spec that describes it. */
-export async function stubItemTypes(page: Page) {
+export async function stubItemTypes(page: Page, types = [bookItemType]) {
   await page.route("**/api/item-types", (route) =>
-    route.fulfill({ json: [bookItemType] }),
+    route.fulfill({ json: types }),
   );
 }

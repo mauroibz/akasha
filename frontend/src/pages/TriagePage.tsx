@@ -168,12 +168,8 @@ export function TriagePage() {
       statusesFor(type, itemTypes.data),
     );
     if (!lists.length) return [];
-    return lists[0].filter(
-      (status) =>
-        status.choosable &&
-        lists.every((list) =>
-          list.some((other) => other.value === status.value),
-        ),
+    return lists[0].filter((status) =>
+      lists.every((list) => list.some((other) => other.value === status.value)),
     );
   }, [allMatching, entries, selectedIds, itemTypes.data]);
 
@@ -290,9 +286,16 @@ export function TriagePage() {
       // and one shared table would have to pick a winner (seam 5b).
       const focused = entries.find((row) => row.id === focusedId);
       const key = event.key.toLowerCase();
-      const statusKey = focused
+      const fromFocus = focused
         ? hotkeysFor(focused.item.type, itemTypes.data)[key]
         : undefined;
+      // With rows selected the selection answers, because Ctrl+A selects
+      // everything without focusing anything and the keyboard still has to work.
+      const fromSelection = selectionStatuses.find(
+        (status) => status.hotkey === key,
+      )?.value;
+      const statusKey =
+        selectionCount > 0 ? (fromSelection ?? fromFocus) : fromFocus;
       if (statusKey) {
         event.preventDefault();
         if (selectionCount === 0) {
@@ -301,10 +304,11 @@ export function TriagePage() {
             entry_ids: [focused!.id],
             set: { status: statusKey },
           });
-        } else if (selectionStatuses.some((row) => row.value === statusKey)) {
+        } else if (fromSelection) {
           bulkMutation.mutate(buildBulkBody({ status: statusKey }));
         } else {
-          // Saying why beats a key that silently does nothing on a mixed selection.
+          // Saying why beats a key that silently does nothing on a selection
+          // spanning domains that disagree about this status.
           toast.error(
             `Not every selected row can be set to ${statusLabelFor(
               focused!.item.type,
@@ -529,11 +533,13 @@ export function TriagePage() {
                   <SelectValue placeholder="Set status…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {selectionStatuses.map((status) => (
-                    <SelectItem key={status.value} value={status.value}>
-                      {status.label}
-                    </SelectItem>
-                  ))}
+                  {selectionStatuses
+                    .filter((status) => status.choosable)
+                    .map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <Select

@@ -58,7 +58,7 @@ export function OpinionDialog({
       date_finished: entry.date_finished ?? "",
       reread_count: String(entry.reread_count),
       shelf_ids: entry.shelves.map((shelf) => shelf.id),
-      formats: entry.formats,
+      formats: entry.formats ?? [],
     },
   });
   const errors = form.formState.errors;

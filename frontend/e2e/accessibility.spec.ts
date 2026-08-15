@@ -52,6 +52,7 @@ const detailEntry = {
     sources: [{ source: "openlibrary", source_id: "OL1M", is_primary: true }],
   },
   shelves: [{ id: 1, name: "Favorites", slug: "favorites" }],
+  formats: ["physical"],
 };
 
 async function stubShelves(page: Page) {

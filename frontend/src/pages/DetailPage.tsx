@@ -56,11 +56,16 @@ function formatFact(value: unknown, field: FieldSpec): string {
   return String(value);
 }
 
-/** A duration in milliseconds as a listener reads it: 9:22, or 1:02:11. */
+/** A duration in milliseconds as a listener reads it: 9:22, or 1:02:11.
+ *
+ * Truncated rather than rounded, which is what every player does: a 3:32.5 track
+ * reads 3:32 on the sleeve and on the display, and rounding it up to 3:33 would
+ * disagree with both.
+ */
 function duration(value: unknown): string {
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
     return "";
-  const total = Math.round(value / 1000);
+  const total = Math.floor(value / 1000);
   const parts = [Math.floor(total / 60) % 60, total % 60];
   if (total >= 3600) parts.unshift(Math.floor(total / 3600));
   return parts
