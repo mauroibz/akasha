@@ -1690,3 +1690,71 @@ Append-only record of material architecture choices, product-default resolutions
   format on the card; "schedule my next purchase" is filtering `wishlist` by format. The closed
   vocabulary lives on `Domain` beside `fields` and the statuses, so a future domain declares its own
   — and the conformance suite in Sprint 028 gains one more thing to check.
+
+## DEC-060 — Seam 5b, as built: what a domain declares about its entries
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Implements:** DEC-057 and DEC-059. Records the three judgements Sprint 026 was told to surface
+  rather than settle silently, and the two things the build found that the plan did not.
+- **Decision.** `Domain` now declares what an *entry* on it can be, not only what an item is: an
+  ordered status vocabulary carrying its own labels and triage keys, the default a newly added entry
+  takes, which of `date_started` / `date_finished` / `reread_count` exist, its formats, and the
+  heading over the personal region of the detail page. `status_labels` is gone — a label lives on the
+  status it names.
+
+  The three open judgements, answered by the owner on 2026-08-15:
+
+  1. **Filter chips are one row per domain**, each under that domain's name, rather than a single
+     union row. A library holding books and records has no one status vocabulary, and "Read" beside
+     "Owned" with nothing saying which is which reads as one confused list. This survives Sprint
+     027's domain tabs, which scope the rows to one at a time.
+  2. **No status migration.** The album domain has never left this branch, so the only album entries
+     that existed were three walkthrough rows in the dev library. They were deleted and re-added
+     rather than remapped, and a test seeds one entry per book status *before* the change and reads
+     all six back (Sprint 026 AC3).
+  3. **A field a domain does not have is refused on write with a 422**, not merely hidden. Hiding
+     leaves the API, the importers and the export able to store a reread count on a record — a value
+     nothing can ever mean.
+
+- **What the build found that the plan did not:**
+
+  - **`entries` carried the six book statuses as a CHECK constraint.** Seam 5b was book-shaped one
+    layer *below* the API as well. Migration `0013_entry_formats` rebuilds the table with the
+    constraint widened to the union of every domain's vocabulary. It still catches a typo; it cannot
+    express the real rule, which depends on the joined item's type. SQLite cannot alter a CHECK in
+    place, and SQLAlchemy does not reflect SQLite CHECK constraints at all, so the rebuild spells the
+    table out rather than relying on reflection — a reflected rebuild would have silently dropped
+    every check.
+  - **The add path had one default status for every domain.** It asks the domain now: a book is
+    added `read`, a record `owned`.
+  - **A track carries two numbers.** `position` is the sequential index and `number` is what is
+    printed — `A1`, `A2` on a record. They are different strings in the same response, and the
+    printed one is what a person reads off the sleeve, so it is what is stored.
+  - **The walkthrough found two defects the suite could not**, which is the gate working as intended:
+    a status two domains share was counted once and shown in both rows, and `digital` — declared by
+    books and records both — appeared twice in the format filter under one value. `status_counts` is
+    now split by item type beside the whole-library total, and the format list is flat.
+
+- **Deliberately not built.** A `rows` field is not editable by hand: correcting a tracklist is a
+  table editor, and `Refresh from provider` is the repair path until somebody needs more. Sprint 028
+  inherits the `rows` field type as one more thing its conformance suite must describe.
+- **Consequences.** A third domain now declares its statuses, its default, its formats, its entry
+  fields and its panel copy, and no screen branches on which domain it is holding. `EntryStatus` and
+  `EntryFormat` remain published unions for the parameters that legitimately span domains — a filter,
+  a facet — and a test pins them to the registry so a domain cannot add a value the API surface
+  forgets.
+
+## DEC-061 — Sprint 026 ran on the Sprint 025 branch
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Amends:** DEC-053 for this sprint only.
+- **Context:** DEC-053 says a domain-line sprint cuts its branch from `main`. Sprint 025 closed on
+  `sprint-025-albums` and has not been merged, because merging is the owner's decision and the branch
+  exists precisely so that it is one.
+- **Decision.** The owner directed Sprint 026 to run on `sprint-025-albums`. Cutting from `main`
+  would have produced a branch with no album domain in it, and every acceptance criterion of this
+  sprint is about albums.
+- **Consequences.** Both sprints' work is on one branch and still unpushed. The merge decision is
+  unchanged and still the owner's; it now covers 025 and 026 together.

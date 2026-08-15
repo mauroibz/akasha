@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 026](026-statuses-formats-tracklists.md)
+**Active sprint:** [Sprint 027](027-library-shell-and-shelves.md)
 
 ## Shape of the plan
 
@@ -76,8 +76,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [023](023-creator-sort-names.md) | Creator sort names | 020 | completed |
 | [024](024-export.md) | Export | 020 | completed |
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
-| [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | **ready** |
-| 027 | Library shell and shelves | 026 | planned |
+| [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
+| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | **ready** |
 | 028 | The domain contract | 027 | planned |
 | 029 | Per-domain imports | 028 | planned |
 
@@ -85,7 +85,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 026 have files; 027, 028 and 029 do not.
+incorporating actual deviations. Sprints 019 through 027 have files; 028 and 029 do not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -287,7 +287,7 @@ Three decisions arrive with it, all already made, none needing re-litigation:
 The sprint's own risk note names the tracklist slice as the one to defer to 027 if it runs long,
 rather than the one to rush.
 
-### Sprint 027 — Library shell and shelves
+### [Sprint 027 — Library shell and shelves](027-library-shell-and-shelves.md)
 
 The polish pass on the screen the owner spends their time in, scheduled by DEC-058 as the last
 feature work before the contract sprints. Three findings from the Sprint 025 walkthrough, all in the
@@ -309,7 +309,8 @@ feature work before the contract sprints. Three findings from the Sprint 025 wal
   respect — shelves are the higher tier ("work", "fiction"); formats are not shelves and must not be
   rendered as one.
 
-If Sprint 026 has to defer its tracklist slice, it lands here.
+Sprint 026 did **not** defer its tracklist slice, so this sprint carries only the three items above.
+It also inherits `facets.status_counts_by_type`, which is half of the tab strip already built.
 
 ### Sprint 028 — The domain contract
 
@@ -364,7 +365,7 @@ contract and Sprint 029's import boundary, developed in parallel without interfe
 ## Owner feedback — recorded 2026-08-14, unscheduled
 
 Raised while trying Sprint 025's albums in the running application. **All of it is now scheduled**
-(DEC-058): items 1, 4 and 5 are Sprint 027, items 2 and 3 are Sprint 026. The causes below were
+(DEC-058): items 1, 4 and 5 are Sprint 027, items 2 and 3 were Sprint 026 and are **delivered**. The causes below were
 traced when the feedback was recorded, so the sprints that pick them up start from evidence rather
 than from a rediscovery. The status half became **DEC-057** and the ownership half **DEC-059**.
 

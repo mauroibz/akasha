@@ -45,9 +45,10 @@ good and why. No social media features, fully offline.
 - **Adding books.** Search Open Library and Google Books, or type a book in by hand.
   Covers are fetched once and stored locally; providers are never called while
   rendering a page you already have.
-- **Your opinions, protected.** Score, status, dates, reread count, notes and shelves.
-  Nothing you wrote is ever overwritten by a metadata refresh — that is an invariant
-  the test suite enforces, not a promise.
+- **Your opinions, protected.** Score, status, notes, shelves, and how you own your copy
+  — plus dates and a reread count for the kinds of thing that have them. Nothing you
+  wrote is ever overwritten by a metadata refresh — that is an invariant the test suite
+  enforces, not a promise.
 - **Keyboard triage.** Work through a backlog with `j`/`k` to move, digits to score,
   letters to set status, `Enter` to accept.
 - **Imports with a preview and an undo.** Goodreads CSV and a read-only Calibre

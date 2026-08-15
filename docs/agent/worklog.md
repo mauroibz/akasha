@@ -1320,3 +1320,40 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: Sprint 026 (status vocabulary, seam 5b) is `ready` at `docs/sprints/026-status-vocabulary.md`.
   **Its first deliverable is a question for the owner, not code**: whether `reread_count` and
   `date_finished` mean anything for an album.
+
+## 2026-08-15 — Sprint 026 (statuses, formats and tracklists), complete
+- Done: seam 5b on branch `sprint-025-albums` (DEC-061, amending DEC-053 for this sprint at the
+  owner's direction), six commits `ebe6827`..`7246134`, nothing pushed. `Domain` declares what an
+  *entry* can be: an ordered status vocabulary with its own labels and triage keys, a default status,
+  which of the passage fields exist, its formats, and the personal panel's heading. Migration
+  `0013_entry_formats` adds the join table **and** rebuilds `entries`. Tracklists landed rather than
+  being deferred. DEC-060 and DEC-061 appended; product spec §3.2/§3.3/§7 and technical spec §5.1/
+  §7.1 updated.
+- Verified: `validate_project.py`, `make check`, `make test` (**411 backend, 110 frontend**),
+  `npm run test:e2e` (**84 passed, 2 skipped**), `make build`, `make smoke-container`,
+  `git diff --check` — all green. Walkthrough in Chromium against the **real dev library** at
+  `127.0.0.1:8123`; it auto-migrated 0012→0013 and wrote `backups/pre-migration-20260815T145406Z`
+  first. Added *Discovery* with **no status in the request** and it landed `owned`; added *Kind of
+  Blue* as `wishlist` and marked it `Vinyl` with neither value moving the other; both fetched cover
+  art through the whole CAA chain. `read` on an album, `owned` on a book, `reread_count` on an album
+  and `borrowed` on an album are each a 422 naming the domain. The album page reads "YOUR COPY" with
+  five tracks `A1`..`B2`; the book page still reads "YOUR READING DATA" with rereads and dates and no
+  tracklist. Triage `o` set the focused album to `owned`. No console errors.
+- Deviations: checkpoints 1 and 3 straddle, because migration 0013 had to carry both the new table
+  and the `entries` rebuild. A `rows` field is deliberately **not** hand-editable. Two MusicBrainz
+  fixtures were re-recorded in their own commit (`9821d30`) because the adapter's own request
+  changed. The dev library's three albums were deleted rather than migrated, per the owner, after a
+  backup to `backups/pre-sprint026-20260815T142246Z`.
+- Dead ends worth not repeating: **a dynamically built `StrEnum` is opaque to mypy** — spell the
+  published unions out and pin them to the registry with a test instead. **SQLAlchemy does not
+  reflect SQLite CHECK constraints**, so a batch rebuild that relies on reflection silently drops
+  every one of them; `copy_from` with the table spelled out is the only safe form. **Ctrl+A selects
+  every triage row without focusing one**, so a per-domain hotkey map must fall back to the
+  selection's own vocabulary or the keyboard dies on a select-all. And the frontend's registry
+  helpers must tolerate a partial or odd-shaped `/api/item-types` response: several tests mock every
+  URL with one body, and a helper that trusted the shape took the whole page down.
+- Blocked/open: none. **The two defects the suite could not see were both found by the walkthrough**
+  — a shared status counted once across domains, and `digital` listed twice in the format filter.
+- Next: Sprint 027 (library shell and shelves) is `ready` at
+  `docs/sprints/027-library-shell-and-shelves.md`. **Its first act is a question for the owner**:
+  whether the domain tab defaults to all or to the last domain used.

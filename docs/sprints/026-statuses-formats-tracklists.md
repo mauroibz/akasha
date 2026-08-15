@@ -1,6 +1,6 @@
 # Sprint 026 — Statuses, formats and tracklists
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 025
 **Roadmap revision:** 11
 
@@ -159,5 +159,82 @@ from the library grid, the detail page and triage; filter by each chip; and repo
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Closed 2026-08-15 on `sprint-025-albums` (DEC-061), six commits `ebe6827`..`7246134`, nothing
+pushed. All nine acceptance criteria met, including the tracklist slice the risk note allowed to be
+deferred.** DEC-060 records seam 5b as built; DEC-061 records the branch.
+
+### Delivered
+
+1. **Per-domain statuses (AC1, AC2).** `Domain` declares an ordered status vocabulary with its own
+   labels and triage keys, the default a new entry takes, which passage fields exist, its formats,
+   and the personal region's heading. `status_labels` is gone — a label lives on the status it names.
+   No component branches on `type === "album"`. A foreign status is refused with a 422 naming the
+   domain, on create, patch and bulk.
+2. **The surfaces that follow it (AC4, AC5).** `StatusSelect` has no list of its own; the triage
+   keyboard reads the focused row's domain, and the bulk chooser narrows to the statuses every
+   selected row can take, because the server refuses a mixed write whole. **Filter chips are one row
+   per domain** (owner's choice, DEC-060).
+3. **The Goodreads suggestion is book-only by declaration** (deliverable 4), with a test asserting
+   every suggested value is one of `BOOK`'s statuses.
+4. **DEC-057 in the UI and the API (AC6).** An album shows no reread count and no dates, a book still
+   shows all three, and the fields are **refused on write** rather than merely hidden — the owner's
+   third judgement.
+5. **Formats (AC8).** `entry_formats`, a closed per-domain vocabulary on `Domain`, the filter and
+   facet copied from the shelf machinery, the format on the library row and in the export. A
+   `wishlist` record can be `vinyl` with neither implying the other.
+6. **Tracklists (AC9).** One `inc=…+recordings` parameter, no extra request. A new `rows` field type
+   with declared columns; a book declares none and gains no empty list.
+7. **AC3, AC7.** No status was remapped: album entries were deleted and re-added per the owner, and a
+   test seeds one entry per book status before the change and reads all six back. The whole suite
+   covering imports, triage, undo, bulk edit and backup is unchanged and green.
+
+### Verified
+
+`python scripts/validate_project.py`, `make format`, `make check`, `make test` (**411 backend, 110
+frontend**), `npm run test:e2e` (**84 passed, 2 skipped**), `make build`, `make smoke-container`,
+`git diff --check` — all green.
+
+**Walkthrough** in Chromium against the real dev library at `127.0.0.1:8123`, which auto-migrated it
+0012 → 0013 and wrote `backups/pre-migration-20260815T145406Z` first. Added *Discovery* through
+MusicBrainz with **no status in the request** and it landed `owned`; added *Kind of Blue* as
+`wishlist` and marked it `Vinyl` — neither value moved the other. Both fetched cover art through the
+whole Cover Art Archive redirect chain. Confirmed by hand: `read` on an album, `owned` on a book,
+`reread_count` on an album and `borrowed` on an album are each a 422 naming the domain; a book still
+takes rereads, dates and `physical`. The album detail page reads "YOUR COPY" with no rereads and no
+dates and lists five tracks as `A1 So What 9:05` … `B2 Flamenco Sketches 9:24`; the book's still
+reads "YOUR READING DATA" with all three and no tracklist. Triage `o` set the focused album to
+`owned`. No console errors.
+
+### Deviations, all deliberate
+
+- **Checkpoints 1 and 3 are partly merged.** Migration `0013` had to carry both the new table and the
+  `entries` rebuild, so the formats *storage* shipped with the statuses commit and the formats *UI*
+  with checkpoint 2's. The four named checkpoints all exist; two of them straddle.
+- **A `rows` field is not hand-editable.** The metadata dialog skips it. Correcting a tracklist is a
+  table editor, and `Refresh from provider` is the repair path (DEC-060).
+- **Two fixtures were re-recorded** (`9821d30`), in their own commit as the fixture README requires,
+  because the adapter's own request changed. Verified byte-identical apart from the new `tracks`
+  array.
+- **The dev library's three albums were deleted** rather than migrated, per the owner: "just delete
+  the albums, this is a test db". Backed up to `backups/pre-sprint026-20260815T142246Z` first.
+
+### What the walkthrough caught that the suite could not
+
+Both are fixed in `7246134`, and both are the gate working as designed:
+
+- **A status two domains share was counted once**, so the wishlisted record showed as
+  "Book · Wishlist 1". `facets.status_counts_by_type` now splits the counts by item type beside the
+  whole-library total the inbox badge uses.
+- **`digital` is declared by both domains**, so the format filter listed "Digital" twice under one
+  value. The list is flat now; an entry carries formats, not a domain.
+
+### Impact on later sprints
+
+- **Sprint 027** inherits a `type` dimension already present in the facets, which is half of the
+  domain tab strip it has to build, and chip rows that will scope to one domain rather than being
+  rewritten. Its shelf work must keep DEC-059's boundary: formats are not shelves.
+- **Sprint 028** gains three more things a domain must supply and its conformance suite must check —
+  a status vocabulary with a default, an entry-field declaration, and a format vocabulary — plus the
+  `rows` field type, which is the first field the spec could not describe and the one most likely to
+  need generalizing.
+- **Sprint 029** is unaffected: the importers stayed book-only, now by declaration.

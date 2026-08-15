@@ -42,7 +42,8 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 |---|---|---|
 | Rating | Integer 1–10, no half points, nullable | The whole reason for not using Goodreads |
 | Shelves | Many-per-book (tags) | Confirmed |
-| Statuses | unsorted (inbox), read, reading, to_read, wishlist, dropped | Confirmed |
+| Statuses | Per domain (DEC-057). Books: unsorted (inbox), read, reading, to_read, wishlist, dropped. Albums: unsorted, wishlist, pending, owned | A book's status tracks consumption; an album's tracks possession |
+| Formats | Per domain, multi-valued, on the entry (DEC-059). Books: physical, borrowed, digital. Albums: vinyl, cd, digital | How *you* hold a copy; independent of status, so "wishlist → vinyl" is expressible |
 | Schema split | `items` (shared metadata) / `entries` (personal opinion) | Enables multiuser + sharing later without migration |
 | Backend | Python 3.12 + FastAPI + SQLite | Confirmed |
 | Frontend | React + Vite + TypeScript + Tailwind + shadcn/ui + Motion | Highest polish-per-unit-effort for someone without frontend experience |
@@ -142,11 +143,27 @@ CREATE TABLE entries (
 
 CREATE INDEX idx_entries_status ON entries(user_id, status);
 CREATE INDEX idx_entries_score  ON entries(user_id, score DESC);
+
+-- How you hold this copy (DEC-059). The value is stored rather than joined to a
+-- vocabulary table: unlike a shelf, which you invent, the vocabulary is closed and
+-- declared by the domain.
+CREATE TABLE entry_formats (
+    entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    format   TEXT NOT NULL,
+    PRIMARY KEY (entry_id, format)
+);
 ```
 
-**Status enum:** `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`
+`entries.status` carries a CHECK constraint listing the union of every domain's statuses.
+It catches a typo; it cannot express the real rule, which depends on the joined item's
+type and is enforced in the domain layer.
 
-Semantics worth writing down now so the UI doesn't drift:
+**Statuses belong to a domain, not to the application** (DEC-057, seam 5b). Each domain
+declares an ordered vocabulary, which of its statuses may be chosen directly, the triage
+key for each, and the status a newly added entry takes. `GET /api/item-types` publishes
+all of it, and a status outside the item's own domain is refused with a 422.
+
+**Books** — `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`; default `read`:
 
 - `unsorted` = **the inbox.** Exists in the library, has metadata, has no opinion
   attached yet. Everything imported lands here. Hidden from the main list by
@@ -154,8 +171,25 @@ Semantics worth writing down now so the UI doesn't drift:
 - `to_read` = I own it or can get it, intent to read
 - `wishlist` = I don't have it, want to acquire it
 - `dropped` = started, abandoned; may still carry a score
+
+**Albums** — `unsorted`, `wishlist`, `pending`, `owned`; default `owned`. An album's status
+records **possession, not consumption**: a record is played hundreds of times or twice, and
+the interesting fact is whether you have it. `pending` is "on the way". There is no
+relisten counter, and `date_started` / `date_finished` / `reread_count` do not exist for an
+album — they are refused on write, not merely hidden. The score and the note carry the
+opinion, as they always did.
+
+`unsorted` is universal, because an import lands there whatever the domain.
+
 - Score is independent of status. A `dropped` book can be a 3. A `to_read` book
   has no score. Never block scoring on status.
+
+**Formats** (DEC-059) are a second, independent axis on the **entry**: how *you* hold this
+copy, multi-valued, from a closed vocabulary the domain declares — `physical`/`borrowed`/
+`digital` for a book, `vinyl`/`cd`/`digital` for a record. Legal on any status, so a
+`wishlist` record can be `vinyl`: the pressing you mean to buy. Not a shelf — shelves are
+the higher tier of organization ("work", "fiction") — and not the item's `format`, which
+describes the release rather than your copy.
 
 Dates are ISO-8601 strings (`YYYY-MM-DD` for dates, full timestamp for
 `date_added`). SQLite has no date type; be consistent and it sorts correctly as
@@ -577,7 +611,9 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 **`/` — My Books.** The primary screen and the one to get right.
 - Grid (covers) / compact table toggle, persisted in localStorage
-- Filter chips: status, shelf. Free-text filter over cached title/author, local
+- Filter chips: status, **one row per domain under that domain's name**, because a library
+  holding two domains has no single status vocabulary and a shared status ("wishlist") is
+  counted per domain rather than once. Plus shelf and format selectors. Free-text filter over cached title/author, local
   SQL only, no network
 - Sort dropdown per §6
 - Inline score editing directly from the list — click the number, type, done.
@@ -592,7 +628,8 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 **`/books/{entry_id}` — Detail.**
 - Cover, full metadata, description
-- Editable: status, score, notes, dates, shelves, reread count
+- Editable: status, score, notes, shelves, format, and — for a domain that has them —
+  dates and reread count
 - Link to edit underlying item metadata
 - **Files** — attachments on the edition: name, size, download, rename, remove.
   Loaded as its own request so a slow read never delays the page. Renaming is

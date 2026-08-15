@@ -148,6 +148,13 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - unique `(user_id, item_id)`
 - indexes supporting status/score/date list paths
 
+`entry_formats`
+
+- one row per (entry, format); `ON DELETE CASCADE` from `entries`, indexed by `format`
+- the value is a closed vocabulary the domain declares (DEC-059), not a joined row: a
+  shelf is something the owner invents, a format is something the domain knows
+- writes are validated against the item's own domain and refused with 422 otherwise
+
 `shelves` and `entry_shelves`
 
 - as in product spec, with normalized unique slug per user
@@ -315,7 +322,9 @@ The product-spec route list is authoritative, with these refinements:
 
 - Define static routes such as `/entries/bulk` before `/entries/{entry_id}`.
 - Bulk mutation accepts either explicit `entry_ids` or a validated server-side filter plus `excluded_entry_ids`; never both. This supports select-all across unloaded virtual rows without sending thousands of IDs. Return affected count and apply in one transaction.
-- `GET /entries` accepts repeated `status`, `shelf`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. The response is `{items, next_cursor, total, facets}`, where `facets.status_counts` supplies the unobtrusive status counts required by the library UI for the current non-status filters.
+- `GET /entries` accepts repeated `status`, `shelf`, `format`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. The response is `{items, next_cursor, total, facets}`. `facets.status_counts` is the whole-library total per status — what the inbox badge counts — `facets.status_counts_by_type` splits the same counts by item type, because a status two domains share is not one number on a screen that lists each domain's statuses separately, and `facets.format_counts` does the same for formats. Each facet clears its own dimension, so a count reads as "what you would get if you clicked this".
+- `GET /item-types` publishes each domain's metadata fields, its ordered status vocabulary (value, label, whether it is directly choosable, triage key), its default status, which entry fields it has, its formats, and the heading for the personal region of the detail page. Every screen renders from it rather than branching on the item type (seam 5b).
+- Writes validate `status`, `formats` and the passage fields (`date_started`, `date_finished`, `reread_count`) against **the item's own domain**, returning 422 with a message naming the domain. A bulk write spanning domains is refused whole rather than half-applied.
 - `POST /entries/accept-suggested` returns affected count and operates in one transaction over the server-side filter, not client-loaded IDs.
 - `POST /items/{id}/refresh` requires explicit overwrite confirmation.
 - `POST /entries` requires `confirm_near_match=true` before creating a title/first-author
