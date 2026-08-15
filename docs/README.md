@@ -47,6 +47,7 @@ Kept because they are the record, not because they are current.
 | [`agent/worklog.md`](agent/worklog.md) | One entry per working session: what was done, verified, and what went wrong. Append-only. | — |
 | [`sprints/`](sprints/) | One file per sprint, each with its acceptance criteria and its outcome. **File paths inside closed sprints predate later refactors** — Sprint 028 moved each domain into its own package, so anything referring to `domain/domains.py`, `domain/goodreads.py`, `domain/calibre.py` or `infrastructure/musicbrainz.py` is describing where those lived at the time. | technical spec §2 and §6.6 |
 | [`assessment.md`](assessment.md) | The 2026-08-08 audit after thirteen sprints closed green on a product that did not work. Diagnosis and remedies. | DEC-024, DEC-025, DEC-026 |
+| [`domain-expansion-assessment.md`](domain-expansion-assessment.md) | 2026-08-15, after Sprint 028: did the domain work reach its goal? What is proved, what is missing, and the one open question that could force a redesign. Costed options. | — |
 | [`domain_metadata_roadmap_report.md`](domain_metadata_roadmap_report.md) | Which domains are viable at all, by provider: catalogue breadth, Spanish coverage, licensing. | — for viability; its architecture recommendation is superseded by DEC-052 |
 | [`operations/release-notes-v1.md`](operations/release-notes-v1.md), [`release-notes-v1.1.md`](operations/release-notes-v1.1.md) | What shipped, per release. | — |
 | [`brand/brand-handoff.md`](brand/brand-handoff.md) | The brand work as delivered. | `brand/BRAND.md` |
