@@ -1,6 +1,6 @@
 # Sprint 028 — The domain contract
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 027
 **Roadmap revision:** 11
 **Branch:** `sprint-025-albums`, continuing DEC-053/DEC-061/DEC-063. The owner settled this at
@@ -356,3 +356,36 @@ a real browser at `localhost:5199`:
 
 **Observed and out of scope.** The library tab strip still reads `All | Book | Album`; DEC-065 removes
 "All" in Sprint 029, so that is scheduled rather than a regression.
+
+### Third pass — the documentation, 2026-08-15
+
+**Reopened at the owner's request** before closing, to make the new structure findable: a
+contributor-facing guide, old documents updated, diagrams, a README pass and a general cleanup
+(DEC-070). Same precedent as Sprint 020's Phase B and Sprint 027's add flow.
+
+**Commit:** `f7569fa`.
+
+- **`docs/guides/adding-a-domain.md`** — three diagrams, the whole job as a nine-row table, the
+  step-by-step against `domains/album/`, what a domain gets for free, what it may never touch, the two
+  unsolved things, and the IGDB verdict as a worked plan.
+- **`CONTRIBUTING.md`** — the human entry point the repository never had; `AGENTS.md` still governs
+  agent sessions.
+- **`docs/README.md`** — the documentation map, labelling every document canonical, historical or
+  proposal. **Nothing was deleted**: a historical document is not wrong, it is dated, and four gained
+  status headers saying what supersedes them.
+- **README** gains a Domains section with the package tree and the registration cost, and points at
+  the guide. Its product copy still says books, deliberately — albums are unreleased.
+- **Repaired:** technical spec 6.6 still claimed the per-domain layout was "not yet inhabited" (a
+  Phase B edit lost to a second write in the same script), and product spec section 9 still said the
+  registry would be extracted later and that games and series were Sprints 027 and 028.
+
+**The guide was proved by following it.** A throwaway `game` domain was built from it alone and
+registered: **conformance suite green, 480 backend tests green, no migration.** Three things broke
+that the guide had not predicted, and all three were repaired rather than documented as gotchas — a
+hardcoded `playing` in the suite's own fixture, a closed-world `{"book", "album"}` assertion in
+`test_item_types.py`, and an exhaustive `Record<EntryStatus, string>` in the frontend that made a new
+status a TypeScript error. The throwaway domain was then removed; the three repairs stayed.
+
+**Verified.** `make check`, `make test` (**469 backend, 130 frontend** after the revert; 480 backend
+with the throwaway domain registered), `python scripts/validate_project.py` — green. No application
+behaviour changed in this pass beyond the `Partial` fallback table, which is covered by its test.

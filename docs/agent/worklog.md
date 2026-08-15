@@ -1516,3 +1516,31 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   "All" in Sprint 029. The walkthrough left album entry 16 back at `owned` where it started.
 - Next: Sprint 029 (one search bar) is `ready` at `docs/sprints/029-one-search-bar.md`. It rebuilds
   `/` around a single bar and removes "All" as a filter.
+
+## 2026-08-15 — Sprint 028 third pass (documentation), sprint closed again (complete)
+- Done: the owner asked, before closing, that the docs convey the new structure. Reopened 028 rather
+  than scheduling it (DEC-070; same precedent as 020 and 027). New: `docs/guides/adding-a-domain.md`
+  (three ASCII diagrams, a nine-row job table, step-by-step against `domains/album/`, what you get
+  free, what you may never touch, the IGDB worked verdict), `CONTRIBUTING.md`, `docs/README.md` (the
+  map, labelling every document canonical/historical/proposal). Updated: README gains a Domains
+  section and a docs pointer; AGENTS.md gains the domain boundary as an invariant and the map as
+  required reading; product spec §2 table and §9; ROADMAP's Sprint 030 contract paths; status headers
+  on `assessment.md`, `domain-architecture-proposal.md`, `domain_metadata_roadmap_report.md`.
+  **Nothing deleted** — a historical doc is dated, not wrong. Commit `f7569fa`.
+- Verified: **the guide was tested by following it.** Built a throwaway `game` domain from the guide
+  alone — own package, three fields, `playing`/`finished` statuses, own formats, identity strategy —
+  registered it, and ran everything: conformance suite green (56), **480 backend tests green, no
+  migration needed**. The only legitimate gate failure was OpenAPI drift, which is a documented step.
+  Then removed the domain and re-ran: `make check`, `make test` (469 backend, 130 frontend) green.
+- Deviations: **two documentation defects from earlier in this sprint were found and repaired** —
+  technical spec 6.6 still said the per-domain layout was "not yet inhabited" (a Phase B edit lost
+  because a second `write_text` in the same script used the pre-edit string), and product spec §9
+  still said the registry would be extracted later and that games/series were Sprints 027/028.
+- Dead ends worth not repeating: **two `p.write_text(t.replace(...))` calls in one script silently
+  discard the first edit** unless `t` is reassigned between them. That is how the spec regression
+  shipped. Assert on the file afterwards, not on the return value.
+- Blocked/open: none.
+- Observed and out of scope: four other `{"book", "album"}` assertions were checked and deliberately
+  left — they assert over rows the test itself seeded, which is correct and not closed-world.
+- Next: Sprint 029 (one search bar) is `ready`. It rebuilds `/` around a single bar and removes "All"
+  as a filter.

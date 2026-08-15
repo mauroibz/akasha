@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 028](028-the-domain-contract.md)
+**Active sprint:** [Sprint 029](029-one-search-bar.md)
 
 ## Shape of the plan
 
@@ -79,8 +79,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
-| [028](028-the-domain-contract.md) | The domain contract | 027 | **in progress** |
-| [029](029-one-search-bar.md) | One search bar | 027, 028 | planned |
+| [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | **ready** |
 | 030 | Per-domain imports | 029 | planned |
 
 ## Contracts for planned sprints
@@ -366,7 +366,10 @@ after it its turn. **The owner authorized all four Phase B items** (DEC-069): pe
 `provider_health` read from the registry, the cover chooser declared per domain, and migration `0014`
 dropping `ck_entries_status`. The move itself exposed three more shared things quietly shaped like
 books, all repaired. **A third domain now costs its own package, one registry entry, provider wiring,
-three enum lines, and no migration.**]
+three enum lines, and no migration.** Reopened once more for the documentation pass (DEC-070):
+`docs/guides/adding-a-domain.md`, `CONTRIBUTING.md` and `docs/README.md`, with the guide proved by
+building a throwaway third domain from it — which found three closed-world assumptions and removed
+them.]
 
 ### [Sprint 029 — One search bar](029-one-search-bar.md)
 

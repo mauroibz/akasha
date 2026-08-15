@@ -2158,3 +2158,59 @@ Append-only record of material architecture choices, product-default resolutions
   Sprint 030 is unaffected in scope but its ground is better: `domains/book/goodreads.py` and
   `domains/book/calibre.py` already sit in the domain they serve, so the boundary that sprint draws
   is between the shared ledger and importers that already live in the right place.
+
+## DEC-070 — Sprint 028 reopened for the documentation pass, and the guide was proved by following it
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** Sprint 028 closed having built the contract, the conformance suite and the per-domain
+  packages. The owner then asked, before considering it closed, that **the documentation convey the
+  new structure**: a contributor-facing guide to adding a module, old documents removed or updated,
+  diagrams welcome, and a general cleanup. The sprint was reopened rather than the work scheduled —
+  the same precedent Sprint 020 set for its Phase B and Sprint 027 for its add flow. A contract
+  nobody can find is not a contract.
+- **Decision.** Three new documents, and a rule for the old ones.
+
+  - **`docs/guides/adding-a-domain.md`** — the practical counterpart to technical spec 6.6. Three
+    diagrams (where a domain plugs into the layers, where its one declaration travels, and the nine
+    points a single add consults it), the whole job as a nine-row table, the step-by-step against
+    `domains/album/` as the worked example, what a domain gets for free, what it may never touch, the
+    two things that are not solved yet, and the IGDB verdict as a worked plan.
+  - **`CONTRIBUTING.md`** — the human entry point, which the repository did not have. Setup, the
+    gates and why each exists, the rules that are not style preferences, and a pointer to the domain
+    guide above everything else. `AGENTS.md` still governs agent sessions and says so.
+  - **`docs/README.md`** — the documentation map. **Every document is labelled `canonical`,
+    `historical` or `proposal`**, which is the rule that replaces deleting things: *a historical
+    document is not wrong, it is dated.* A path inside a closed sprint describes the repository on
+    the day it closed and is not an instruction. Nothing was deleted; four documents gained status
+    headers saying what they are and what supersedes them.
+
+- **The guide was verified by following it**, which is the documentation equivalent of the
+  walkthrough gate. A throwaway `game` domain — its own package, three fields, a status vocabulary
+  containing `playing` and `finished`, its own formats and identity strategy — was built from the
+  guide alone and registered. **The conformance suite and all 480 backend tests passed, with no
+  migration**, which is exactly what DEC-067 row 1 bought. The only gate that failed for a legitimate
+  reason was the OpenAPI drift check, which is a documented step.
+
+  **Three things broke that the guide had not predicted, and each was repaired rather than written
+  down as a gotcha** — a step a contributor must know about is a step the design failed to remove:
+
+  1. A conformance test used `playing` as its example of "a status no registered domain declares".
+     A real games domain would have broken its premise rather than its point; it derives an unclaimed
+     value now.
+  2. `test_item_types.py` asserted the published set was exactly `{"book", "album"}` — a closed-world
+     assertion a third domain fails. It asserts against `DOMAINS` now. (Four similar-looking
+     assertions elsewhere were checked and left: they assert over rows the test itself seeded, which
+     is correct.)
+  3. `statusLabels` in the frontend was an exhaustive `Record<EntryStatus, string>`, so a new status
+     was a **TypeScript error** until somebody wrote a fallback label. It is `Partial` now and the
+     lookup falls back to the stored value, which is legible. DEC-067 row 10 keeps the fallback
+     table; what changes is that a domain no longer has to edit it.
+
+- **Consequences.** The registration cost in DEC-069 is unchanged and now written where a contributor
+  will find it. Two documentation defects from earlier in this sprint were also repaired: technical
+  spec 6.6 still said the per-domain layout was "not yet inhabited" — a Phase B edit lost to a second
+  write in the same script — and product spec section 9 still said the registry would be extracted
+  when a second domain existed and that games and series were Sprints 027 and 028, both superseded by
+  DEC-058. `AGENTS.md` gains the domain boundary as a non-negotiable invariant and `docs/README.md`
+  as required reading.

@@ -12,10 +12,14 @@ there; thirty-plus commits are local and nothing has been pushed. **Merging back
 decision** — that is the entire reason the branch exists (DEC-053, amended by DEC-061, DEC-063 and
 DEC-066). Ask before merging.
 
-**The domain contract is written down.** `docs/specs/technical-spec.md` **section 6.6** is the whole
-of it: what a domain supplies, the rules each part must satisfy, what it may never touch, where its
-code lives, what the core does for it, how it is verified. **Read that instead of reading how albums
-were built.** Sprints 025–027 are history, not instructions.
+**The domain contract is written down, twice.** `docs/specs/technical-spec.md` **section 6.6** is the
+binding contract; **`docs/guides/adding-a-domain.md`** is how to satisfy it — diagrams, a nine-row
+table of the whole job, the step-by-step, and a worked verdict. **Read those instead of reading how
+albums were built.** Sprints 025–027 are history, not instructions, and their file paths predate
+Sprint 028's move.
+
+**`docs/README.md` is the documentation map**, and it labels every document canonical, historical or
+proposal. `CONTRIBUTING.md` is the human entry point; `AGENTS.md` still governs agent sessions.
 
 **A third domain now costs** (DEC-069): its own package under `backend/src/book_tracker/domains/`,
 one entry in `DOMAINS`, its provider wired in the lifespan, three lines in the published enums, one
@@ -65,7 +69,8 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
   10 recommend doing nothing** and are deliberate couplings that stay: the hand-spelled unions (three
   type-safe lines a test refuses to let drift), the central cover-host allowlist (central so a domain
   cannot widen it), the `/books/:id` route for every domain, and the book-shaped fallback vocabulary
-  in `labels.ts`. Do not "fix" these without re-reading why.
+  in `labels.ts` — which is now a **`Partial` record**, so a new domain needs no entry there and an
+  unknown status renders its stored value. Do not "fix" these without re-reading why.
 - **Row 3 is the one live risk left.** Enrichment is still ISBN-keyed below the `enriches` flag
   (`_backfillable_items`, `_fetch`, `PROVIDER_ORDER`). Albums declare `enriches=False`, so **no domain
   has ever exercised that seam**. The first domain wanting background enrichment on another key pays
@@ -89,8 +94,10 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
 - **`data/` has been made group/other-writable and the container has been run against it.** Files the
   container creates are owned by uid 10001; hand ownership back with
   `docker run --rm --user 0 -v "$PWD/data:/data" akasha:local chown -R 1000:1000 /data`.
-- **`README.md` still describes a book-only product.** The album domain has never been released or
-  merged, so advertising it there would describe something no user can run.
+- **`README.md` describes a book-only *product* on purpose.** Its Development section now documents
+  the domain structure, because that is true of this branch, but the feature copy still says books:
+  the album domain has never been released or merged, and advertising it would describe something no
+  user can run. Change that copy when the branch merges, not before.
 - **The library tab strip still reads `All | Book | Album`.** DEC-065 removes "All" in Sprint 029.
 - **The Inbox label is ambiguous on `/`**: the header badge and each domain's `unsorted` chip all read
   "Inbox". Correct in each place, confusing together. Unscheduled.
