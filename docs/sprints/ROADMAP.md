@@ -457,6 +457,23 @@ Both are UI-shaped rather than model-shaped — `POST /api/shelves` and the entr
 do what is needed, and bulk shelf assignment already exists in triage. Likely shape: shelf editing
 inline on the detail page and on a card, with create-on-type in the same control.
 
+## Proposed, not yet scheduled
+
+### One search bar on `/` — adding and searching in the same place
+
+Owner feedback, 2026-08-15, after Sprint 027's second pass: *"the main page should have both
+functionalities open to the user: adding and searching for your data… 1 large searchbar up top for
+both,"* with the domain selector to its left and an **Add** button to its right, a local search that
+consults no provider when it hits, and a web search below when it misses.
+
+**Scoped in `docs/unified-search-proposal.md`.** It is one sprint if manual entry stays on `/add`
+and Sprint 027's confirm form is reused rather than redesigned. The proposal costs three decisions
+the owner has to make — when a web search fires (the literal "no local hit" rule fires once per
+keystroke while typing any new title, which breaches the Google free tier), what "All" means when
+there is no single domain to search, and where the confirm step lives. It also recommends running
+**before** Sprint 028, so the domain contract describes a settled shell rather than one about to be
+rebuilt.
+
 ## Not scheduled
 
 - **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
