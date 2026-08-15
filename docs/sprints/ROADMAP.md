@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 027](027-library-shell-and-shelves.md)
+**Active sprint:** [Sprint 028](028-the-domain-contract.md)
 
 ## Shape of the plan
 
@@ -77,15 +77,15 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [024](024-export.md) | Export | 020 | completed |
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
-| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | **ready** |
-| 028 | The domain contract | 027 | planned |
+| [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
+| [028](028-the-domain-contract.md) | The domain contract | 027 | **ready** |
 | 029 | Per-domain imports | 028 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 027 have files; 028 and 029 do not.
+incorporating actual deviations. Sprints 019 through 028 have files; 029 does not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -312,7 +312,15 @@ feature work before the contract sprints. Three findings from the Sprint 025 wal
 Sprint 026 did **not** defer its tracklist slice, so this sprint carries only the three items above.
 It also inherits `facets.status_counts_by_type`, which is half of the tab strip already built.
 
-### Sprint 028 — The domain contract
+[Closed 2026-08-15. All three delivered, plus a fourth the sprint's own baseline got wrong: **the
+bulk *Add shelves* action in triage had never been built** — `add_shelves` existed on the endpoint
+and was tested, but no control sent it, and product spec §7 said so. The tab default was settled
+with the owner as **the last domain used** (DEC-062), which also records why `type` clears the
+status facets but applies to `format_counts`. The library now virtualizes against the window;
+Sprint 013's scale and feed-semantics checks were re-run against that rather than assumed. Ran on
+`sprint-025-albums` per DEC-063.]
+
+### [Sprint 028 — The domain contract](028-the-domain-contract.md)
 
 **Gated**, and the first of the two sprints DEC-058 makes the gate to further domains.
 
@@ -364,12 +372,14 @@ contract and Sprint 029's import boundary, developed in parallel without interfe
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 
-Raised while trying Sprint 025's albums in the running application. **All of it is now scheduled**
-(DEC-058): items 1, 4 and 5 are Sprint 027, items 2 and 3 were Sprint 026 and are **delivered**. The causes below were
+Raised while trying Sprint 025's albums in the running application. **All of it is now delivered**:
+items 2 and 3 by Sprint 026, items 1, 4 and 5 by Sprint 027. The causes below were
 traced when the feedback was recorded, so the sprints that pick them up start from evidence rather
 than from a rediscovery. The status half became **DEC-057** and the ownership half **DEC-059**.
 
 ### 1. The library should select a domain, not mix them
+
+**Delivered by Sprint 027.** The default was the one real question and the owner settled it: the last domain used, remembered between visits (DEC-062).
 
 > "The main library should really have a tab selector to choose between domains, there is no point
 > in showing books and albums combined."
@@ -411,6 +421,8 @@ your copy, which is a different thing wearing the same word.
 
 ### 4. The library grid is a window inside the page
 
+**Delivered by Sprint 027.** The virtualizer measures the window; Sprint 013's scale and feed-semantics checks were re-run against the new model rather than assumed.
+
 > "The main coverart/library scroll does not use the entire page, it's a window, even though it's
 > the primary thing we are looking at."
 
@@ -425,6 +437,8 @@ The fix is to let the **page** scroll and have the virtualizer measure the windo
 accessibility feed semantics) run against it rather than being folded into a feature sprint.
 
 ### 5. Shelves are too far from the thing being shelved
+
+**Delivered by Sprint 027**, on the detail page and — a third friction nobody had named — in the triage bulk bar, where *Add shelves* had been specified since v1 and never built.
 
 > "Shelves kinda suck, having to create them by going on a new screen + having to click 'edit
 > opinion' to be able to change them is not ideal."

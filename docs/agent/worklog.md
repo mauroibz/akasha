@@ -1357,3 +1357,50 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: Sprint 027 (library shell and shelves) is `ready` at
   `docs/sprints/027-library-shell-and-shelves.md`. **Its first act is a question for the owner**:
   whether the domain tab defaults to all or to the last domain used.
+
+## 2026-08-15 — Sprint 027 (library shell and shelves), complete
+- Done: the three owner-feedback items from 2026-08-14 (roadmap items 1, 4, 5), on branch
+  `sprint-025-albums` at the owner's direction (DEC-063, amending DEC-053 as DEC-061 did for 026).
+  Four commits `80fea5f`..`531f38f` plus the closing one, nothing pushed. A `type` filter on
+  `GET /api/entries` with a published `ItemTypeName` union and `type` in `_filter_key`; a domain tab
+  strip rendered from `GET /api/item-types`, defaulting to the last domain used; the library
+  virtualizing against the window instead of a fixed-height box; inline shelf editing on the detail
+  page with create-on-type, out of `OpinionDialog`. DEC-062 and DEC-063 appended; product spec §7
+  and technical spec §7.1/§7.2/§8 updated. Sprint 028 expanded into its own file.
+- Verified: `validate_project.py`, `make check`, `make test` (**414 backend, 120 frontend**),
+  `npm run test:e2e` (**86 passed, 2 skipped**), `make build`, `make smoke-container`,
+  `git diff --check` — all green. Walkthrough in Chromium against the **real dev library** at
+  `127.0.0.1:8123`, backed up to `backups/pre-sprint027-20260815T154413Z` first. Tabs render
+  `All / Book / Album`; Album gives two records, one chip row without the redundant heading, and a
+  format selector holding no `Physical`; "All" keeps both grouped rows and the flat five-format
+  union. The choice survives a reload and a return from a detail page. The feed has **0px of inner
+  scroll** at 375/768/1440 with 1/2/4 columns while the document scrolls and nothing overflows
+  sideways; six presses of `j` moved focus to entry 11 and scrolled the window to 341px with the row
+  fully in view. *Cien años de soledad* onto a brand-new shelf in one control with no dialog and no
+  navigation; two triage rows onto "Work" in bulk, `entry_count` 1 → 3. No console or page errors.
+- Deviations: **AC6 rested on a false premise.** It asserted that bulk shelf assignment "still works
+  in triage"; `add_shelves` existed on the endpoint and was tested, but no control ever sent it, and
+  product spec §7 line 671 said so. Building it was the owner's call at planning time. No shelf
+  control on a library card — the sprint named that as where scope grows and the owner chose detail
+  plus triage instead. `EntryFilter` deliberately did **not** gain `type`: triage has no domain tab
+  and the bulk path already refuses a selection spanning domains.
+- Dead ends worth not repeating: **`offsetTop` is the wrong scroll margin** — it walks a chain of
+  offset parents the motion wrapper interrupts, so read `getBoundingClientRect().top + window.scrollY`
+  instead, and observe `document.body` as well as the list, because the chips above it reflow without
+  the list's own size ever changing. **cmdk points its input's `aria-labelledby` at the element its
+  `label` prop renders**, which beats an `aria-label` on the input itself, so the input had no
+  accessible name until the name was given to `Command`; there is no `Command.Label` in this version
+  to render one by hand. **jsdom has no `ResizeObserver`** and cmdk constructs one on mount, so the
+  test setup shims it. And `libraryQueryString` puts `sort`/`order`/`limit` first, so a test
+  asserting `"/api/entries?type=album"` is asserting the parameter order, not the filter.
+- Blocked/open: none. One flaky failure seen once — `triage animates its action bar but not under
+  reduced motion` failed in a single full-file run and passed alone and in every subsequent run
+  including the full suite. Motion sampling timing, not a regression, but worth watching.
+- Observed and out of scope: the header Inbox badge and each domain's `unsorted` chip both read
+  "Inbox", so three buttons on `/` share that label — correct in each place, ambiguous together.
+  `/triage` still scrolls inside `h-[min(70vh,760px)]`; that is deliberate for a dense working table
+  and was left. The walkthrough created a shelf "Latin American" on item 6 and added two books to
+  "Work"; both left in place as realistic test data.
+- Next: Sprint 028 (the domain contract) is `ready` at `docs/sprints/028-the-domain-contract.md`.
+  **It is gated**: Phase A writes the contract and a conformance suite and changes nothing
+  user-visible, and Phase A concluding that little is misplaced is a complete outcome.

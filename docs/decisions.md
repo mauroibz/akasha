@@ -1758,3 +1758,66 @@ Append-only record of material architecture choices, product-default resolutions
   sprint is about albums.
 - **Consequences.** Both sprints' work is on one branch and still unpushed. The merge decision is
   unchanged and still the owner's; it now covers 025 and 026 together.
+
+## DEC-062 — The library selects a domain, and the tab remembers
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Answers:** the question Sprint 027 was told to put to the owner rather than settle silently,
+  plus the facet rule the build found underneath it.
+- **Context:** Sprint 025 left `GET /api/entries` with no `type` filter on purpose — its AC4 asked
+  only that a mixed library paginate correctly, which it does. The owner then reported the other
+  half from the running application: *"the main library should really have a tab selector to choose
+  between domains, there is no point in showing books and albums combined."* What needed deciding
+  was only the default: every domain, or the last one used.
+- **Decision.** **The last domain used**, remembered in `localStorage` under
+  `akasha.library.domain` beside the existing grid/table preference, starting at "All" until a tab
+  is chosen. The value is written into the URL once on mount and read from the URL from then on, so
+  the choice is an ordinary filter for every purpose after that: a reload, a return from a detail
+  page and a shared link all behave without the preference being consulted again, and an explicit
+  `?type=` beats what was remembered.
+
+  "All" was the alternative and it is not wrong — it keeps today's behaviour and makes the tabs
+  optional. It was rejected because a person with four hundred books and thirty records is
+  overwhelmingly in one of them at a time, and the cost of the wrong default is one click on every
+  visit forever.
+
+  **The strip renders from `GET /api/item-types`**, like every other domain-shaped control since
+  DEC-052 seam 3, and only when the build has more than one domain — a book-only build has no tab
+  strip rather than a strip with one tab.
+
+  **The chips keep DEC-060 judgement 1.** Under "All" they stay one row per domain under that
+  domain's name. With a tab chosen there is one row and the tab already carries the name, so the
+  heading comes off rather than being said twice. Switching tabs drops statuses the new domain has
+  no vocabulary for, which would otherwise leave the list filtered by a value none of the visible
+  chips can clear — a library that reads as empty for no reason the screen can explain.
+
+- **The facets treat `type` asymmetrically, and that is deliberate.** The existing rule is that each
+  facet clears its own dimension. `type` is not one dimension:
+
+  - `status_counts` and `status_counts_by_type` **clear** it. `status_counts` is the whole-library
+    total the inbox badge counts, and narrowing it would make the badge disagree with `/triage`,
+    which is domain-agnostic. `status_counts_by_type` is already split by type (DEC-060), so
+    clearing the filter is what lets a tab that is *not* selected still have a live count.
+  - `format_counts` **applies** it. That selector sits under the tab, so offering "Physical 312"
+    while the library is showing records is an answer to a question nobody asked.
+
+- **Consequences.** `type` is in `_filter_key`, so a cursor cut under one domain is refused under
+  another instead of silently skipping or repeating a page. `ItemTypeName` joins `EntryStatus` and
+  `EntryFormat` as a published union spelled out for the type checker and pinned to the registry by
+  a test. Sprint 028's conformance suite gains one more thing a domain gets for free by existing:
+  a tab, its chips, its formats and its counts.
+
+## DEC-063 — Sprint 027 ran on the Sprint 025 branch
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Amends:** DEC-053 for this sprint, as DEC-061 did for Sprint 026.
+- **Context:** DEC-053 says a domain-line sprint cuts its branch from `main`. Sprints 025 and 026
+  both closed on `sprint-025-albums` and neither has been merged, because merging is the owner's
+  decision and the branch exists precisely so that it is one.
+- **Decision.** The owner directed Sprint 027 to run on `sprint-025-albums`. A branch cut from
+  `main` would have no album domain in it, and a domain tab strip over one domain is not this
+  sprint.
+- **Consequences.** Three sprints' work is on one branch and still unpushed. The merge decision is
+  unchanged and still the owner's; it now covers 025, 026 and 027 together.

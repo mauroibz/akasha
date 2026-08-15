@@ -610,11 +610,20 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 ### Screens
 
 **`/` — My Books.** The primary screen and the one to get right.
+- **A domain tab strip** — All, then one tab per domain, rendered from the registry and
+  present only when the build has more than one domain. The choice lives in the URL like
+  every other filter and is remembered between visits, so a fresh visit lands on the domain
+  last used (DEC-062). Books and records beside each other read as a mixed bag rather than
+  as one library.
 - Grid (covers) / compact table toggle, persisted in localStorage
 - Filter chips: status, **one row per domain under that domain's name**, because a library
   holding two domains has no single status vocabulary and a shared status ("wishlist") is
-  counted per domain rather than once. Plus shelf and format selectors. Free-text filter over cached title/author, local
+  counted per domain rather than once. With a tab chosen there is one row and the heading
+  comes off, because the tab already says it. Plus shelf and format selectors, the format
+  list narrowed to the domains on screen. Free-text filter over cached title/author, local
   SQL only, no network
+- **The page scrolls, not the grid.** The library is the primary surface and uses the whole
+  page; the virtualizer measures the window rather than a fixed-height box of its own
 - Sort dropdown per §6
 - Inline score editing directly from the list — click the number, type, done.
   No modal, no navigation.
@@ -628,8 +637,13 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 **`/books/{entry_id}` — Detail.**
 - Cover, full metadata, description
-- Editable: status, score, notes, shelves, format, and — for a domain that has them —
-  dates and reread count
+- Editable: status, score, notes, format, and — for a domain that has them — dates and
+  reread count, in one *Edit your opinion* dialog
+- **Shelves are edited inline, where they are read** — the entry's shelves as removable
+  chips plus one control that filters existing shelves as you type and offers to create
+  what does not exist yet, creating and assigning in one action. Not in the opinion dialog
+  and not a trip to `/shelves`; and never converged with the format control, because a
+  shelf is one you invent and a format is a closed per-domain vocabulary (DEC-059)
 - Link to edit underlying item metadata
 - **Files** — attachments on the edition: name, size, download, rename, remove.
   Loaded as its own request so a slow read never delays the page. Renaming is
@@ -668,7 +682,8 @@ unless you choose it.
   this list: `s` was specified here as a shelf-autocomplete shortcut and
   retired unbuilt in Sprint 019 (DEC-043), because the surface it needs is a
   feature rather than a shortcut. Shelves are assigned from a book's detail
-  page. The *Add shelves* bulk action listed above is also still unbuilt.
+  page — or, for a whole selection at once, from the *Add to shelf* control in the
+  bulk action bar.
 - **Conflicts** — rows with unresolved conflicts in their joined import audit
   records show a marker; clicking expands both values inline with one click to
   choose. Never a modal.

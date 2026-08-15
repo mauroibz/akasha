@@ -1,6 +1,6 @@
 # Sprint 027 — Library shell and shelves
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 026
 **Roadmap revision:** 11
 
@@ -43,7 +43,9 @@ Observed 2026-08-15 at Sprint 026's close. **Re-derive at activation.**
   measures that element, which is why it was written that way — it is not decorative.
 - Shelf membership is edited inside `OpinionDialog`; creating a shelf is the whole `/shelves` route.
   `POST /api/shelves` and the entry's `shelf_ids` already do what is needed, and triage already has
-  bulk shelf assignment.
+  bulk shelf assignment. **[Corrected at activation: it does not.** `add_shelves` exists on the bulk
+  endpoint and is tested, but no control in `TriagePage.tsx` ever sent it, and product spec §7 said
+  so at line 671. AC6 was untestable as written; the control was built instead.]
 
 ## Deliverables
 
@@ -74,7 +76,8 @@ Observed 2026-08-15 at Sprint 026's close. **Re-derive at activation.**
    the checks Sprint 013 introduced rather than by inspection.
 5. A book can be put on a new shelf from the detail page without opening the opinion dialog and
    without leaving for `/shelves`, in at most one control.
-6. Nothing renders a format as a shelf, and shelf assignment still works in triage in bulk.
+6. Nothing renders a format as a shelf, and shelf assignment works in triage in bulk. *(Restated:
+   "still works" assumed a control that had never been built.)*
 7. Every behaviour the suite covers is unchanged: imports, triage, undo, bulk edit, backup, formats
    and statuses.
 
@@ -134,5 +137,77 @@ you saw.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Completed 2026-08-15** on `sprint-025-albums` (DEC-063), four implementation commits
+`80fea5f`..`531f38f` plus this one. Nothing pushed.
+
+### Delivered
+
+1. **`type` on `GET /api/entries`** (`80fea5f`) — repeated like `status`, validated against a
+   published `ItemTypeName` union spelled out for mypy and pinned to `DOMAINS` by a test, in
+   `_filter_key` so a cursor is bound to it. Unlike `shelf` and `format`, repeating it *widens*: a
+   row has one type. The facet asymmetry is DEC-062: both status facets clear `type`, `format_counts`
+   applies it.
+2. **The domain tab strip** (`b679229`) — from `GET /api/item-types`, present only when the build
+   has more than one domain. Default settled with the owner: **the last domain used**, in
+   `localStorage`, written into the URL on mount so the choice is an ordinary filter thereafter. A
+   chosen tab renders one chip row without the redundant heading and narrows the format selector;
+   "All" keeps DEC-060's grouped rows. Switching tabs drops statuses the new domain lacks.
+3. **The page scrolls, not the grid** (`699ab9b`) — `useWindowVirtualizer` with a `scrollMargin`
+   read from the bounding rect plus `window.scrollY` (not `offsetTop`, which walks offset parents
+   the motion wrapper interrupts), observing `document.body` as well as the list because the chips
+   above it reflow without the list's own size changing.
+4. **Inline shelf editing** (`531f38f`) — chips plus one create-on-type control on the detail page,
+   creating and assigning in one action; shelf membership out of `OpinionDialog`, format untouched
+   (DEC-059). Plus the **bulk *Add to shelf*** in triage that product spec §7 has listed since v1 and
+   that was never built.
+
+### Verified
+
+`validate_project.py`, `make check`, `make test` (**414 backend, 120 frontend**, from 411/110),
+`npm run test:e2e` (**86 passed, 2 skipped**, from 84/2), `make build`, `make smoke-container`,
+`git diff --check` — all green.
+
+Walkthrough in Chromium against the **real dev library** (7 books, 2 albums) at `127.0.0.1:8123`,
+no console or page errors anywhere:
+
+- Tabs render `All / Book / Album`. Choosing Album gives `?type=album`, two records, one chip row
+  (`Inbox 0 · Wishlist 0 · On the way 0 · Owned 2`) with no domain heading, and a format selector of
+  `Vinyl 2 · CD 1 · Digital 1` — no `Physical`. Under "All": both grouped rows, and the flat
+  five-format union with `Digital` once.
+- The choice survives a reload, and survives opening a record and pressing back. **It does not
+  survive `history.back()` from the library itself, and cannot**: every filter uses
+  `replace: true` so that fiddling with filters does not stuff the history stack, which predates
+  this sprint and applies to sort, shelf, status and format equally.
+- The feed has **0px of inner scroll** at 375, 768 and 1440 while the document scrolls, with no
+  horizontal overflow and 1/2/4 columns respectively. `j` six times moves focus to entry 11 and
+  scrolls the window to 341px with the focused row fully in view.
+- *Cien años de soledad* onto a brand-new shelf "Latin American" from its detail page, in one
+  control, with no dialog opened and no navigation; then "Work" added from the same control and
+  removed again. The opinion dialog no longer mentions Shelves and still offers Format.
+- Two rows selected in triage and put on "Work" in bulk: `entry_count` 1 → 3.
+- API directly: `type=wine` is 422; a cursor cut under `type=book` is 400 `invalid_cursor` when
+  replayed unfiltered or under `type=album`.
+
+### Deviations and decisions
+
+- **AC6 rested on a false premise** and was restated: bulk shelf assignment existed only on the
+  endpoint. Building the control was the owner's call at planning time and is deliverable 4b.
+- **No shelf control on a library card.** The sprint named this as where scope grows; the owner
+  chose detail page plus triage bulk instead.
+- **Two things fixed in passing**, both the same bug class as work being done: `libraryMotionKey`
+  never included `formats` (Sprint 026), so changing that filter swapped the list with no crossfade;
+  and cmdk points its input's `aria-labelledby` at the element its `label` prop renders, which beats
+  an `aria-label` on the input, so the shelf input had no accessible name until it was given there.
+- **jsdom has no `ResizeObserver`**, which cmdk constructs on mount; `src/test/setup.ts` shims one
+  beside the existing pointer-capture shims.
+- One flaky failure observed once: `triage animates its action bar but not under reduced motion`
+  failed in a full-file run and passed alone and on every re-run, including the full suite. Motion
+  sampling timing, not a regression.
+
+### Impact on later sprints
+
+- **Sprint 028** — the conformance suite gains what a domain now gets for free by existing: a tab,
+  its chips, its formats, its counts. `ItemTypeName` is a third published union to check for drift.
+  The facet asymmetry in DEC-062 is a rule the contract has to state, not a detail.
+- **Sprint 029** — unaffected. Import remains book-only and triage remains domain-agnostic, which is
+  why `EntryFilter` deliberately did **not** gain `type`.

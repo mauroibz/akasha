@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 11,
-  "project_status": "in_progress",
-  "active_sprint": "027",
-  "active_sprint_file": "docs/sprints/027-library-shell-and-shelves.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "026",
+  "project_status": "ready",
+  "active_sprint": "028",
+  "active_sprint_file": "docs/sprints/028-the-domain-contract.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "027",
   "completed_sprints": [
     "001",
     "002",
@@ -32,8 +32,9 @@
     "023",
     "024",
     "025",
-    "026"
+    "026",
+    "027"
   ],
-  "started_at": "2026-08-15T15:30:00-03:00",
-  "updated_at": "2026-08-15T15:30:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-08-15T16:05:00-03:00"
 }
