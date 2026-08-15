@@ -206,6 +206,7 @@ export function DetailPage() {
   // An ordered list of structured rows is neither a fact nor a paragraph, so it
   // gets its own region rather than being joined into one line (a tracklist).
   const rowFields = fields.filter((field) => field.type === "rows");
+  const editableFields = fields.filter((field) => field.type !== "rows");
   const has = (field: "date_started" | "date_finished" | "reread_count") =>
     hasEntryField(item.type, itemTypes.data, field);
 
@@ -505,7 +506,11 @@ export function DetailPage() {
         open={dialog === "metadata"}
         onOpenChange={(open) => setDialog(open ? "metadata" : null)}
         item={item}
-        fields={fields}
+        // A `rows` field is read here and not edited: correcting a tracklist by
+        // hand is a table editor, and the sprint that added the field type
+        // deliberately did not also build one. `Refresh from provider` is the way
+        // a wrong tracklist gets fixed today.
+        fields={editableFields}
         onSave={(values) =>
           update
             .mutateAsync(() =>

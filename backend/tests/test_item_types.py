@@ -183,3 +183,57 @@ async def test_each_domain_publishes_its_own_format_vocabulary(tmp_path: Path) -
         "Borrowed",
         "Digital",
     ]
+
+
+@pytest.mark.anyio
+async def test_a_tracklist_is_described_as_rows_and_validated_as_rows(tmp_path: Path) -> None:
+    """The first field the spec could not describe (Sprint 026 deliverable 7).
+
+    Text, a number and a list of strings could all be validated by shape alone. An
+    ordered list of structured rows needs the row described too, or the dialog and
+    the export are back to knowing that `tracklist` is a music thing.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
+        repository = DomainRepository(app.state.engine)
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET type='album' WHERE id=:id"), {"id": album.item_id}
+            )
+        accepted = await client.patch(
+            f"/api/items/{album.item_id}",
+            json={
+                "metadata": {
+                    "tracklist": [{"number": "A1", "title": "One More Time", "length_ms": 320306}]
+                }
+            },
+        )
+        invented_column = await client.patch(
+            f"/api/items/{album.item_id}",
+            json={"metadata": {"tracklist": [{"bpm": 123}]}},
+        )
+        wrong_cell_type = await client.patch(
+            f"/api/items/{album.item_id}",
+            json={"metadata": {"tracklist": [{"length_ms": "5:20"}]}},
+        )
+        not_rows = await client.patch(
+            f"/api/items/{album.item_id}", json={"metadata": {"tracklist": ["A1 So What"]}}
+        )
+
+    spec = next(field for field in published["album"]["fields"] if field["name"] == "tracklist")
+    assert spec["type"] == "rows"
+    assert [column["name"] for column in spec["columns"]] == ["number", "title", "length_ms"]
+    assert spec["columns"][2]["type"] == "duration"
+    # A book has no tracklist at all, so its detail page cannot render an empty one.
+    assert all(field["type"] != "rows" for field in published["book"]["fields"])
+
+    assert accepted.status_code == 200
+    assert accepted.json()["metadata"]["tracklist"][0]["title"] == "One More Time"
+    assert invented_column.status_code == 422
+    assert wrong_cell_type.status_code == 422
+    assert not_rows.status_code == 422

@@ -71,6 +71,41 @@ def _credit(artist_credit: Sequence[Any]) -> tuple[tuple[str, ...], str, str | N
     return tuple(names), "".join(rendered).strip(), sort_name
 
 
+def _tracklist(media: Sequence[Any]) -> list[dict[str, Any]]:
+    """Every track on the release, in the order the response lists them.
+
+    Two numbers arrive per track and they are not the same string: `position` is the
+    sequential index and `number` is what is printed — `A1`, `A2` on a record. The
+    printed one is what a person reads off the sleeve, so it is what is stored, and
+    a multi-disc release qualifies it with the medium ("2-A1") rather than repeating
+    bare numbers that no longer identify a track.
+
+    The order is the response's own. Deriving one here would reshuffle a tracklist on
+    the next refresh, which overwrites metadata wholesale.
+    """
+    usable = [medium for medium in media if isinstance(medium, Mapping)]
+    rows: list[dict[str, Any]] = []
+    for medium in usable:
+        for track in medium.get("tracks") or []:
+            if not isinstance(track, Mapping):
+                continue
+            title = _text(track.get("title"))
+            if not title:
+                continue
+            number = _text(track.get("number")) or str(track.get("position") or len(rows) + 1)
+            if len(usable) > 1:
+                number = f"{medium.get('position') or 1}-{number}"
+            length = track.get("length")
+            rows.append(
+                {
+                    "number": number,
+                    "title": title,
+                    "length_ms": length if isinstance(length, int) else None,
+                }
+            )
+    return rows
+
+
 def _text(value: object) -> str | None:
     text = str(value).strip() if isinstance(value, str) else ""
     return text or None
@@ -176,7 +211,10 @@ class MusicBrainzProvider:
             raise ProviderPayloadError("MusicBrainz release group has no releases")
         release = await self._json(
             f"/release/{release_stub['id']}",
-            {"inc": "artist-credits+labels+media+release-groups"},
+            # `recordings` is what turns `media` into a tracklist. Measured
+            # 2026-08-14 and again on re-recording: 6.5 KB for *Kind of Blue*, in
+            # the same request, so it costs no extra rate-limit budget.
+            {"inc": "artist-credits+labels+media+release-groups+recordings"},
         )
         # DEC-044: a record that cannot be tied to the one that was asked for is
         # refused rather than partially merged.
@@ -210,6 +248,7 @@ class MusicBrainzProvider:
             "language": language,
             "format": _text(medium.get("format")),
             "track_count": track_count if isinstance(track_count, int) else None,
+            "tracklist": _tracklist(release.get("media") or []) or None,
         }
         return ItemPayload(
             source=self.name,

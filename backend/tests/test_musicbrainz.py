@@ -128,6 +128,8 @@ async def test_fetch_reaches_the_release_for_what_only_an_edition_knows() -> Non
         "language": "eng",
         "format": '12" Vinyl',
         "track_count": 5,
+        # The tracklist rides along in the same request; its own tests are below.
+        "tracklist": payload.metadata["tracklist"],
     }
     # The 1959 release carries no barcode at all, which is the second half of why
     # albums have no cross-provider identity.
@@ -198,3 +200,67 @@ async def test_throttling_arrives_as_503_and_is_retried() -> None:
 
     assert len(attempts) == 2
     assert rows[0].title == "Kind of Blue"
+
+
+@pytest.mark.anyio
+async def test_a_release_carries_its_tracklist_as_ordered_metadata() -> None:
+    """One `inc` parameter and no extra request, measured 2026-08-14 and re-measured
+    on re-recording: 6.5 KB for *Kind of Blue*.
+
+    Tracks are metadata on the album, not child entities. Nothing hangs off a track,
+    nothing opens one, and entry hierarchy stays Sprint 028's much larger question.
+    """
+    async with create_provider_client(transport=replay(FETCH_ROUTES)) as client:
+        payload = await MusicBrainzProvider(client, CONTACT, min_interval_seconds=0).fetch(
+            KIND_OF_BLUE
+        )
+
+    tracks = payload.metadata["tracklist"]
+    assert [row["title"] for row in tracks] == [
+        "So What",
+        "Freddie Freeloader",
+        "Blue in Green",
+        "All Blues",
+        "Flamenco Sketches",
+    ]
+    # The number as printed on the sleeve, not the sequential index: this is a record,
+    # so side A track 1 is `A1`. They are different strings in the same response.
+    assert [row["number"] for row in tracks] == ["A1", "A2", "A3", "B1", "B2"]
+    assert tracks[0]["length_ms"] == 545426
+    assert payload.metadata["track_count"] == 5
+
+
+@pytest.mark.anyio
+async def test_the_tracklist_is_stable_across_repeated_fetches() -> None:
+    """A refresh overwrites metadata wholesale, so an order derived from anything but
+    the response itself would reshuffle a tracklist behind the owner's back."""
+    async with create_provider_client(transport=replay(FETCH_ROUTES)) as client:
+        provider = MusicBrainzProvider(client, CONTACT, min_interval_seconds=0)
+        first = await provider.fetch(KIND_OF_BLUE)
+        second = await provider.fetch(KIND_OF_BLUE)
+
+    assert first.metadata["tracklist"] == second.metadata["tracklist"]
+
+
+@pytest.mark.anyio
+async def test_a_release_with_no_recordings_carries_no_tracklist_key() -> None:
+    """Absent, not empty: a domain that has no tracks renders no empty list, and
+    DEC-056 says the API serves the metadata that exists and nothing else."""
+    release = dict(recording("musicbrainz_release_kind_of_blue_mono.json"))
+    release["media"] = [
+        {key: value for key, value in medium.items() if key != "tracks"}
+        for medium in release["media"]
+    ]
+    routes = {
+        f"/ws/2/release-group/{KIND_OF_BLUE}": (
+            200,
+            recording("musicbrainz_release_group_kind_of_blue.json"),
+        ),
+        f"/ws/2/release/{ORIGINAL_RELEASE}": (200, release),
+    }
+    async with create_provider_client(transport=replay(routes)) as client:
+        payload = await MusicBrainzProvider(client, CONTACT, min_interval_seconds=0).fetch(
+            KIND_OF_BLUE
+        )
+
+    assert "tracklist" not in payload.metadata

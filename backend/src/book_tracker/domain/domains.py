@@ -84,6 +84,22 @@ ALBUM_FIELDS = (
     FieldSpec("language", "Language"),
     FieldSpec("format", "Format"),
     FieldSpec("track_count", "Tracks", type="number", minimum=1, maximum=10_000),
+    # The first field the spec could not describe: an ordered list of structured
+    # rows. It costs one `inc=…+recordings` parameter on a request the adapter
+    # already makes, and it is *metadata on the album* — tracks are not entities,
+    # nothing hangs off one, and entry hierarchy stays Sprint 028's question.
+    FieldSpec(
+        "tracklist",
+        "Tracklist",
+        type="rows",
+        multiplicity="many",
+        columns=(
+            # As printed on the sleeve — `A1` on a record — not the sequential index.
+            ColumnSpec("number", "#"),
+            ColumnSpec("title", "Title"),
+            ColumnSpec("length_ms", "Length", type="duration"),
+        ),
+    ),
 )
 
 
@@ -385,6 +401,26 @@ def validate_metadata_patch(domain: Domain, patch: Mapping[str, Any]) -> dict[st
         if field is None:
             raise InvalidMetadata(f"{domain.label} metadata has no field named {name!r}")
         if value is None:
+            continue
+        if field.type == "rows":
+            if not isinstance(value, Sequence) or isinstance(value, str | bytes):
+                raise InvalidMetadata(f"{name!r} is a list of rows")
+            declared = {column.name: column for column in field.columns}
+            for row in value:
+                if not isinstance(row, Mapping):
+                    raise InvalidMetadata(f"{name!r} is a list of rows")
+                for key, cell in row.items():
+                    column = declared.get(key)
+                    if column is None:
+                        raise InvalidMetadata(f"{name!r} rows have no column {key!r}")
+                    if cell is None:
+                        continue
+                    if column.type == "text" and not isinstance(cell, str):
+                        raise InvalidMetadata(f"{key!r} is text")
+                    if column.type in {"number", "duration"} and (
+                        isinstance(cell, bool) or not isinstance(cell, int)
+                    ):
+                        raise InvalidMetadata(f"{key!r} is a whole number")
             continue
         if field.multiplicity == "many":
             if not isinstance(value, Sequence) or isinstance(value, str | bytes):
