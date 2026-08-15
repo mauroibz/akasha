@@ -1,6 +1,6 @@
 # Sprint 028 — The domain contract
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 027
 **Roadmap revision:** 11
 **Branch:** `sprint-025-albums`, continuing DEC-053/DEC-061/DEC-063. The owner settled this at
@@ -292,8 +292,67 @@ Blues Authority record rather than Miles Davis's — the arbitrary release selec
 in the handoff, not a regression. The dev library now holds 13 entries, including albums the owner
 added since Sprint 027 closed.
 
-### Phase B — not started
+### Phase B — delivered 2026-08-15
 
-DEC-067 names it and orders it: the per-domain packages, `provider_health` derived from the registry,
-the cover chooser declared per domain, and dropping `ck_entries_status` as a separate schema change.
-**It runs only on an explicit owner go-ahead**, which is what the sprint is waiting for.
+**The owner authorized all four items** at the gate. They ran smallest-first rather than in DEC-067's
+written order, so the largest — the package move — was the tail that could be handed forward intact
+if it ran long, which the sprint's own risk note provides for. It did not run long.
+
+**Commits:** `acbbbbf` (health endpoint), `47ac1bc` (cover chooser), `ff94c7f` (migration 0014),
+`82fb11c` (domain packages), `fa67410` (adapters and importers), `12dd7fc` (smoke script).
+
+1. **`provider_health` reads the registry** (DEC-067 row 5). The lifespan builds a catalog of every
+   provider this build can construct, wired or not; `providers` is its enabled subset, so "disabled,
+   not failed" is unchanged. The endpoint orders rows by each domain's own source preference and
+   reads the reason off the provider. Rows are now `openlibrary`, `googlebooks`, `musicbrainz` —
+   registry order rather than an order the endpoint chose.
+2. **The cover chooser is declared per domain** (row 7). `Domain.chooses_covers`, published at
+   `/api/item-types`, rendered by the detail page, applied by the endpoint as `not_supported`. The
+   conformance suite holds the other half: a domain may only declare it if Open Library is one of its
+   preferred sources, which is exactly as far as the shared chooser reaches.
+3. **Migration `0014_status_is_the_domains` drops `ck_entries_status`** and its `suggested_status`
+   twin (row 1). `validate_status` is the authority and is strictly stronger — the CHECK could only
+   hold the union and so accepted `owned` on a book. Score, reread count and provisionality survive,
+   asserted by a test, because `copy_from` skips reflection and SQLAlchemy does not reflect SQLite
+   CHECKs at all.
+4. **Each domain has its own package.** `domains/book/` holds its declaration, its Open Library and
+   Google Books adapters and its Goodreads and Calibre importers; `domains/album/` holds its
+   declaration and its MusicBrainz adapter. `domain/spec.py` is what a domain *is*;
+   `domain/registry.py` is which domains exist; `infrastructure/providers.py` is the shared HTTP
+   boundary and nothing else — 701 lines to 153.
+
+**Three defects the move exposed, all repaired here:**
+
+- **`Domain`'s defaults were books' answers.** `statuses`, `default_status`, `entry_fields`,
+  `formats` and `entry_panel_label` all defaulted to the book vocabulary, so a domain that forgot one
+  inherited it silently — the book shape hiding inside the shared type. They are required now, and
+  `chooses_covers` defaults to `False` for the same reason.
+- **Both status migrations imported `ALL_STATUSES` from the live registry**, so two installs running
+  the same revision a month apart could build different constraints. A migration is history; the
+  lists are frozen literals now.
+- **The container smoke script imported the Calibre adapter by module path** inside the running
+  image. No unit test could see it; `make smoke-container` did, which is the gate working as
+  designed.
+
+**Verified.** `make format`, `make check`, `make test` (**469 backend, 130 frontend**),
+`npx playwright test` (**86 passed, 2 skipped**), `make build`, `make smoke-container`,
+`git diff --check`, `python scripts/validate_project.py` — all green.
+
+**Walkthrough**, against the real dev library (13 entries, books and albums) with live providers, in
+a real browser at `localhost:5199`:
+
+- Migration `0014` ran on the real database on startup, after writing
+  `backups/pre-migration-20260815T223017Z`. `ck_entries_status` is gone from the live schema and
+  `ck_entries_score` is still there.
+- **The album detail page no longer offers "Choose a cover"; the book page still does.** Screenshots
+  taken of both. "Replace cover" stays on both, correctly — uploading your own always works.
+- `GET /api/items/{id}/cover-candidates` answers `not_supported` for all three album items and still
+  lists candidates for a book.
+- Both adapters answer from their new homes: an Open Library book search returned 18 results, a
+  MusicBrainz album search 20.
+- An album's status went `owned` → `wishlist` → `owned` with no CHECK behind it, and `read` on that
+  same album is still refused with *"Album has no status named 'read'"*.
+- No console errors on any page, no errors in the server log.
+
+**Observed and out of scope.** The library tab strip still reads `All | Book | Album`; DEC-065 removes
+"All" in Sprint 029, so that is scheduled rather than a regression.

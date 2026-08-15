@@ -2,7 +2,7 @@
 
 **Plan revision:** 11
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 028](028-the-domain-contract.md)
+**Active sprint:** [Sprint 029](029-one-search-bar.md)
 
 ## Shape of the plan
 
@@ -79,8 +79,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [025](025-second-domain-albums.md) | Second domain — albums: the six seams | 024 | completed |
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
-| [028](028-the-domain-contract.md) | The domain contract | 027 | **ready** |
-| [029](029-one-search-bar.md) | One search bar | 027, 028 | planned |
+| [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | **ready** |
 | 030 | Per-domain imports | 029 | planned |
 
 ## Contracts for planned sprints
@@ -355,6 +355,18 @@ proof that the layout exists.
 **This is where DEC-052's falsifiable prediction gets tested properly.** "Games need no seam albums
 did not" is checked by writing the conformance suite against the seams and seeing whether a paper
 walk through IGDB passes it — which is cheaper and more honest than another bespoke sprint.
+
+[Closed 2026-08-15. **Both phases ran.** Phase A wrote the contract (technical spec 6.6), the
+conformance suite (`test_domain_conformance.py`, parametrized over `DOMAINS`), the costed measurement
+(DEC-067, four of ten rows recommending no work) and the IGDB paper walk (DEC-068: **no seventh
+seam**, but the first adapter needing mutable state and a secret pair, and six shared files plus one
+alembic head that two parallel domain teams would contend over). The suite found a live defect on its
+first run — `urlsplit` raises on `http://[`, and one domain's raising recognizer denied every domain
+after it its turn. **The owner authorized all four Phase B items** (DEC-069): per-domain packages,
+`provider_health` read from the registry, the cover chooser declared per domain, and migration `0014`
+dropping `ck_entries_status`. The move itself exposed three more shared things quietly shaped like
+books, all repaired. **A third domain now costs its own package, one registry entry, provider wiring,
+three enum lines, and no migration.**]
 
 ### [Sprint 029 — One search bar](029-one-search-bar.md)
 

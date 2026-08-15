@@ -2117,3 +2117,44 @@ Append-only record of material architecture choices, product-default resolutions
 - **Consequences.** DEC-052's prediction is recorded as **held**, tested the way DEC-058 said it
   would be. Games remain an unnumbered future epic. Nothing here authorises building one, and the
   verification list above is what that epic starts from rather than repeats.
+
+## DEC-069 — Phase B ran in full, and the move found three things the measurement could not
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** DEC-067 costed ten couplings and recommended four Phase B items. The owner authorized
+  **all four** at the gate. This records what changed against that plan and what the work itself
+  turned up, because DEC-067 was written from reading the code and Phase B was written by moving it.
+- **Decision — one deliberate departure from DEC-067's ordering.** It put the per-domain packages
+  first, on the reasoning that the layout makes the remaining couplings visible. They ran **last**
+  instead, smallest first, so the largest piece was the tail that could be handed forward intact if
+  it ran long — which the sprint's own risk note provides for and which costs nothing, since none of
+  the three smaller items depended on the layout. It did not run long.
+- **What the move found that reading could not.** All three are repaired in the same sprint, and all
+  three are the same species: **a shared thing quietly shaped like books.**
+
+  1. **`Domain`'s defaults were the book vocabulary.** `statuses`, `default_status`, `entry_fields`,
+     `formats` and `entry_panel_label` all defaulted to books' answers, so a third domain that
+     omitted one would inherit `read`/`reading`/`to_read` or "Your reading data" **silently** — the
+     precise failure the whole seam model exists to prevent, sitting in the shared type the model is
+     built on. It was invisible while books lived in the same file as the type. All five are required
+     now, and `chooses_covers` defaults to `False` rather than `True` on the same principle: a domain
+     that has not thought about covers offers no chooser.
+  2. **Both status migrations read the live registry.** `0013` rendered its CHECK from
+     `ALL_STATUSES` *when the migration ran*, so two installs applying the same revision a month
+     apart could end up with different constraints, and a migration's meaning changed whenever a
+     domain was added. A migration is history and must not read live code; both lists are frozen
+     literals now. This is a second, subtler form of the same coupling DEC-067 row 1 removed.
+  3. **The container smoke script imported an adapter by module path.** `make smoke-container` failed
+     on it after the move — no unit test, type check or e2e run could have, because the import
+     happens inside the running image. The DEC-025 gate earning its place again.
+- **Consequences.** Two couplings remain by decision (DEC-067 rows 2 and 4): the hand-spelled
+  published unions and the central cover-host allowlist. **A third domain now costs: its own package,
+  one entry in `DOMAINS`, its provider wired in the lifespan, three enum lines, one allowlist line if
+  its art is hosted somewhere new, and configuration if its provider needs credentials. No migration,
+  and no edit to another domain's files.** That is what DEC-058 asked the two gate sprints to
+  deliver, and it is the state Sprint 029 and Sprint 030 inherit.
+
+  Sprint 030 is unaffected in scope but its ground is better: `domains/book/goodreads.py` and
+  `domains/book/calibre.py` already sit in the domain they serve, so the boundary that sprint draws
+  is between the shared ledger and importers that already live in the right place.

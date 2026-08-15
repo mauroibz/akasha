@@ -1,124 +1,106 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 027 (library shell and shelves), 2026-08-15.
-**Next:** Sprint 028 (the domain contract) — status `ready`, file at
-`docs/sprints/028-the-domain-contract.md`. Plan revision **11**.
-**Then Sprint 029 (one search bar)**, accepted by the owner as DEC-065 and already written up at
-`docs/sprints/029-one-search-bar.md`. It rebuilds `/` around a single bar and **removes "All" as a
-filter**, so read it before writing 028's account of what a screen renders — that is the one section
-029 is expected to amend. Per-domain imports is now Sprint 030.
+**Last completed:** Sprint 028 (the domain contract), 2026-08-15. Both phases ran.
+**Next:** Sprint 029 (one search bar) — status `ready`, file at
+`docs/sprints/029-one-search-bar.md`. Plan revision **11**. Then Sprint 030 (per-domain imports),
+which has no file yet. The plan ends there.
 
 ## Do this first
 
-**You are on branch `sprint-025-albums`, not `main`.** Sprints 025, 026 *and* 027 ran and closed
-there. Twenty-three commits are local and nothing has been pushed. **Merging back is the owner's
-decision** — that is the entire reason the branch exists (DEC-053, amended by DEC-061 and DEC-063).
-**The owner has settled where 028 runs: here, on `sprint-025-albums` (DEC-066).** Do not merge to
-`main` and do not cut a new branch; the contract is written against a codebase that holds two
-domains.
+**You are on branch `sprint-025-albums`, not `main`.** Sprints 025 through **028** ran and closed
+there; thirty-plus commits are local and nothing has been pushed. **Merging back is the owner's
+decision** — that is the entire reason the branch exists (DEC-053, amended by DEC-061, DEC-063 and
+DEC-066). Ask before merging.
 
-**Sprint 028 is gated (DEC-035, DEC-042).** Phase A produces a written contract, a conformance suite
-and a verdict, and changes nothing user-visible. **Phase A concluding that almost nothing is
-misplaced is a complete, correct outcome** — do not pad it into a refactor to justify the sprint.
-Phase B runs only on that verdict plus an explicit owner go-ahead.
+**The domain contract is written down.** `docs/specs/technical-spec.md` **section 6.6** is the whole
+of it: what a domain supplies, the rules each part must satisfy, what it may never touch, where its
+code lives, what the core does for it, how it is verified. **Read that instead of reading how albums
+were built.** Sprints 025–027 are history, not instructions.
 
-**Its baseline was re-derived on 2026-08-15 (DEC-066) and is now a table of what a third domain must
-still touch.** Two findings drive the sprint: `entries.ck_entries_status` is a status list frozen at
-migration-write time, so a new domain's status is accepted by the API and refused by SQLite; and
-enrichment is book-shaped below its seam, which albums never tested because they declare
-`enriches=False`. The owner decided both the CHECK constraint stays a costed Phase A finding rather
-than pre-authorized work, and that **the contract prescribes a per-domain code home with books and
-albums moved into it in Phase B**.
-
-**Sprint 027 was reopened once**, after the owner tried it and reported the add flow, and closed
-again the same day. Its file carries both passes; DEC-064 is the second one. That is the precedent
-Sprint 020 set for its Phase B, not an inconsistency to repair.
-
-**Music, the library shell and the add flow are finished.** Do not re-litigate DEC-057 (an album's status is
-possession), DEC-059 (format is an independent, entry-level, multi-valued, per-domain tag) or
-DEC-062 (the tab remembers the last domain; `type` clears the status facets and applies to
-`format_counts`). All three are built.
+**A third domain now costs** (DEC-069): its own package under `backend/src/book_tracker/domains/`,
+one entry in `DOMAINS`, its provider wired in the lifespan, three lines in the published enums, one
+cover-host allowlist line if its art is hosted somewhere new, and configuration if its provider needs
+credentials. **No migration, and no edit to another domain's files.**
 
 ## Read this first
 
-**`Domain` is the whole per-domain contract**, in `backend/src/book_tracker/domain/domains.py`. It
-carries `item_type`, `label`, `identity`, `fields`, `enriches`, `recognize`, `statuses`,
-`default_status`, `entry_fields`, `formats` and `entry_panel_label`. `GET /api/item-types` publishes
-all of it and every screen renders from it — the library's tabs, chips and format selector included
-since Sprint 027. There is no `type === "album"` branch anywhere, and adding one is the thing to
-catch in review. **Writing that contract down, and a suite that enforces it, is Sprint 028.**
+**The layout, as of Sprint 028:**
 
-**There are, however, three `itemType === "book"` branches** — `pages/AddPage.tsx:112,250,299`, the
-search label, the placeholder and the manual-fallback copy. The add screen's manual form is book-only
-end to end (`application/add.py:129-148`, `features/detail/schemas.ts`). Sprint 028's re-derived
-baseline lists them with the rest of what a third domain would still have to touch; read that table
-before assuming the registry covers everything.
+- `domain/spec.py` — what a domain *is*: `Domain`, `FieldSpec`, `StatusSpec`, `FormatSpec`, the
+  validators, `UrlMatch`, `split_url`. No domain lives here.
+- `domain/registry.py` — which domains exist: `DOMAINS`, `DEFAULT_DOMAIN`, and the three published
+  unions `EntryStatus` / `EntryFormat` / `ItemTypeName`.
+- `domains/book/` — its declaration, `providers.py` (Open Library, Google Books), `goodreads.py`,
+  `calibre.py`.
+- `domains/album/` — its declaration and `providers.py` (MusicBrainz, Cover Art Archive).
+- `infrastructure/providers.py` — the shared HTTP boundary only: `bounded_json`, `parse_year`, the
+  retry policy, `create_provider_client`. It is 153 lines, down from 701.
 
-**Four rules the code depends on:**
+**Five rules the code depends on:**
 
+- **`Domain` has no book-shaped defaults any more.** `statuses`, `default_status`, `entry_fields`,
+  `formats` and `entry_panel_label` are required; `chooses_covers` defaults to `False`. A domain that
+  omits one now fails to construct rather than silently inheriting books' vocabulary.
 - **A write is validated against the item's own domain**, in `LibraryService._validated`, refused
-  with a 422 naming the domain. A bulk write spanning domains is refused *whole*.
-- **`_filter_key` must list every filter.** It is what a keyset cursor is bound to. Sprint 027 added
-  `type` there; forgetting the next one is a silent paging bug, not a test failure.
-- **The published unions (`EntryStatus`, `EntryFormat`, `ItemTypeName`) are spelled out** and pinned
-  to the registry by a test. A dynamically built `StrEnum` is opaque to mypy, so the drift assertion
-  is the safety net rather than the construction. Sprint 028's suite should absorb this pattern.
-- **`type` is not an ordinary facet dimension** (DEC-062). Both status facets clear it, so the inbox
-  badge keeps agreeing with the domain-agnostic `/triage` and an unselected tab still has a count;
-  `format_counts` applies it, because that selector sits under the tab.
+  with a 422 naming the domain. **There is no CHECK constraint behind it** — migration `0014` dropped
+  `ck_entries_status` (DEC-067 row 1), so `validate_status` is the only authority and is strictly
+  stronger than the constraint was.
+- **`_filter_key` must list every filter.** It is what a keyset cursor is bound to; forgetting the
+  next one is a silent paging bug, not a test failure.
+- **A recognizer must answer for any string and never raise.** `resolve_input` asks every domain in
+  turn, so one that raises denies every domain after it its turn. Parse through `split_url`. The loop
+  isolates a raising recognizer as well, and the conformance suite refuses one.
+- **A migration must never import the live registry.** `0013` did, so two installs applying the same
+  revision a month apart could build different constraints. Both status lists are frozen literals.
 
-## What Sprint 027 left behind
+**`backend/tests/test_domain_conformance.py` is the gate on all of it.** It is parametrized over
+`DOMAINS`, so a domain is held to the contract *by existing*. Its checks split into what a domain
+satisfies alone and whether the core can host it, and it must be able to fail — malformed domains are
+declared inside the file for exactly that. **Adding a field to `Domain` without adding a check fails
+`test_the_suite_covers_every_field_of_the_contract`.** That is intended.
 
-- **The library virtualizes against the window** (`useWindowVirtualizer`), with a `scrollMargin` read
-  from `getBoundingClientRect().top + window.scrollY` — *not* `offsetTop`, which walks offset parents
-  the motion wrapper interrupts — and a `ResizeObserver` on `document.body` as well as the list,
-  because the chips above it reflow without the list's own size changing. The DEC-023 mounted-DOM
-  bounds are unchanged and re-asserted at 10,000 entries against the window.
-- **`/triage` deliberately keeps its `h-[min(70vh,760px)]` container.** A dense working table inside
-  a page is the intent there; only the library was the owner's complaint.
-- **Shelf membership left `OpinionDialog`** for an inline create-on-type control on the detail page.
-  The format checkboxes stayed in the dialog and must not converge with it (DEC-059).
-- **The triage bulk *Add to shelf* now exists.** It had been in product spec §7 since v1 and was
-  never built, which Sprint 027's own baseline got wrong.
-- **`src/test/setup.ts` shims `ResizeObserver`** because jsdom has none and cmdk constructs one.
+## What Sprint 028 left behind
 
-## What Sprint 027's second pass left behind
-
-- **`GET /api/search/preview`** fetches one candidate's full record and writes nothing. It is one
-  live provider request per call — there is no provider response cache — which is why it is a button
-  on the add screen and not an effect. It follows `search`'s quota rule (DEC-045): recorded, never
-  blocked.
-- **`POST /api/entries` now takes the whole opinion** — notes, formats and the passage fields — each
-  validated against the item's own domain **before** the write, so a 422 leaves no half-added row.
-- **One control per concept, shared.** `features/shelves/ShelfPicker` (create-on-type) is used by the
-  detail page and the add screen; `features/library/FormatPicker` (closed, no create) is used by the
-  add screen and the opinion dialog. **They must stay distinct** — DEC-059 is about a shelf being a
-  tier you invent and a format being a vocabulary the domain declares, and one widget doing both
-  would erase that.
-- **`CandidateFacts` de-duplicates against the field spec.** Both domains declare `language` and
-  books declare `original_year`, while a candidate carries columns of the same name; the domain's
-  label wins and the column is its fallback value.
+- **DEC-067** prices every coupling a third domain pays, one costed fork per row. **Rows 2, 4, 8 and
+  10 recommend doing nothing** and are deliberate couplings that stay: the hand-spelled unions (three
+  type-safe lines a test refuses to let drift), the central cover-host allowlist (central so a domain
+  cannot widen it), the `/books/:id` route for every domain, and the book-shaped fallback vocabulary
+  in `labels.ts`. Do not "fix" these without re-reading why.
+- **Row 3 is the one live risk left.** Enrichment is still ISBN-keyed below the `enriches` flag
+  (`_backfillable_items`, `_fetch`, `PROVIDER_ORDER`). Albums declare `enriches=False`, so **no domain
+  has ever exercised that seam**. The first domain wanting background enrichment on another key pays
+  for it then, with a real case to design against.
+- **DEC-068** is the IGDB paper walk: no seventh seam, but the first adapter needing mutable state
+  and a secret pair (Twitch OAuth with refresh). It is **reasoned from published docs, not measured**,
+  and carries the list of what to verify first. Do not cite it as measurement.
+- `Domain.chooses_covers` gates the cover chooser. The shared chooser is still Open Library's
+  work-editions path, so the conformance suite refuses a domain that declares it without preferring
+  that source. Generalising the *mechanism* is DEC-067 row 7 option (b) and nothing needs it yet.
+- `/api/health/providers` rows are derived: order from each domain's `identity.source_preference`,
+  rows from the lifespan's provider catalog, reason from the provider. They now read
+  `openlibrary`, `googlebooks`, `musicbrainz`.
 
 ## Known and left, in the order they are likely to bite
 
-- **The dev library at `data/` is 8 books plus items 13 *Discovery* and 14 *Kind of Blue***, both
-  `owned` with formats and covers. Backed up before the Sprint 027 walkthroughs to
-  `backups/pre-sprint027-20260815T154413Z` and `backups/pre-container-*`. The walkthroughs left a
-  shelf "Latin American" on item 6, four books on "Work", and **entry 17** — a *Rayuela* added with
-  a shelf "Rayuelas", notes, a format, a finished date and two rereads, all set in one action. All
-  realistic test data and kept deliberately.
-- **`data/` has been made group/other-writable and the container has been run against it** so the
-  owner could test Sprint 027 in Docker. Files the container creates are owned by uid 10001; if
-  running the app directly fails on permissions, hand ownership back with
+- **The dev library at `data/` is 13 entries**, books plus *Discovery*, *Kind of Blue* and *Humanz*.
+  Migrated to `0014` on 2026-08-15 after writing `backups/pre-migration-20260815T223017Z`. The
+  Sprint 028 walkthrough moved album entry 16's status to `wishlist` and back to `owned`; it is where
+  it started.
+- **`data/` has been made group/other-writable and the container has been run against it.** Files the
+  container creates are owned by uid 10001; hand ownership back with
   `docker run --rm --user 0 -v "$PWD/data:/data" akasha:local chown -R 1000:1000 /data`.
 - **`README.md` still describes a book-only product.** The album domain has never been released or
   merged, so advertising it there would describe something no user can run.
-- **The Inbox label is ambiguous on `/`**: the header badge and each domain's `unsorted` chip all
-  read "Inbox", so three buttons share it. Correct in each place, confusing together. Unscheduled.
-- **"Choose a cover" still appears on an album and can only say no** — the chooser is Open Library's
-  work-editions path. Unchanged since Sprint 025, and Sprint 028 is told to decide it rather than
-  leave it unmentioned a fourth time.
-- **Release selection is still arbitrary between same-day originals**, stable but not meaningful.
+- **The library tab strip still reads `All | Book | Album`.** DEC-065 removes "All" in Sprint 029.
+- **The Inbox label is ambiguous on `/`**: the header badge and each domain's `unsorted` chip all read
+  "Inbox". Correct in each place, confusing together. Unscheduled.
+- **Release selection is still arbitrary between same-day originals** — resolving a "Kind of Blue"
+  release-group URL returns the Swiss Blues Authority record. Stable but not meaningful.
+- The manual add path is still a book form bound to `DEFAULT_DOMAIN`, and three
+  `itemType === "book"` branches remain in `pages/AddPage.tsx` (DEC-067 row 6). Sprint 029 rebuilds
+  that screen.
+- The import layer is still book-only above the domain packages — `application/imports.py` and
+  `api/imports.py`. That is Sprint 030's whole outcome.
 - `data/covers/` holds two stale `cover-*.jpg.tmp` files from an interrupted install; harmless.
 - One dev-library item has **`OL14454691A` as its creator**; item 7 stores `"O'Reilly Media, Inc."`
   **with the quotes**. Both pre-existing.
@@ -127,10 +109,10 @@ before assuming the registry covers everything.
 - `HEAD` on any route returns 405, application-wide.
 - "Replace cover" on the detail page is still a raw unstyled `<input type=file>`.
 - The orphaned cover file is still not collected; the reclaim is scoped to attachments on purpose.
-- `e2e/triage.spec.ts` "animates its action bar but not under reduced motion" flaked once in a
-  full-file run and passed alone and on every re-run. Motion sampling timing; watch it.
+- `e2e/triage.spec.ts` "animates its action bar but not under reduced motion" flaked once several
+  sprints ago and has passed every run since. Motion sampling timing; watch it.
 
 ## State
 
-Migration head `0013_entry_formats` — Sprint 027 added no migration. Worktree clean; all commits
-local on `sprint-025-albums`, nothing pushed.
+Migration head `0014_status_is_the_domains`. Worktree clean; all commits local on
+`sprint-025-albums`, nothing pushed.

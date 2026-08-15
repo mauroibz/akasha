@@ -1,6 +1,6 @@
 # Sprint 029 — One search bar
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 027, 028
 **Roadmap revision:** 11
 

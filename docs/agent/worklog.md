@@ -1483,3 +1483,36 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   regression. The dev library is now 13 entries — the owner has been adding albums since 027 closed.
 - Next: put the Phase B gate to the owner with DEC-067's costed table. On a go-ahead, start with the
   per-domain packages; on a no, close Sprint 028 with Phase A as the complete outcome.
+
+## 2026-08-15 — Sprint 028 Phase B, and the sprint closed (complete)
+- Done: the owner authorized **all four** DEC-067 items at the gate. Ran smallest-first rather than in
+  DEC-067's order, so the package move was the tail that could be handed forward if it ran long
+  (DEC-069 records the departure). `acbbbbf` provider_health from the registry; `47ac1bc`
+  `Domain.chooses_covers` and the chooser hidden where it cannot work; `ff94c7f` migration
+  `0014_status_is_the_domains`; `82fb11c` `domains/book/` and `domains/album/` with `domain/spec.py`
+  and `domain/registry.py` behind them; `fa67410` the adapters and importers into their packages;
+  `12dd7fc` the smoke script's module path. DEC-069 appended; technical spec 2, 5.1 and 6.6 updated.
+- Verified: `make check`, `make test` (**469 backend, 130 frontend**), `npx playwright test` (86
+  passed, 2 skipped), `make build`, `make smoke-container`, `git diff --check`, `validate_project.py`.
+  Walkthrough on the **real dev library with live providers** in a browser at `localhost:5199`:
+  migration 0014 ran on the real database after writing `backups/pre-migration-20260815T223017Z`,
+  `ck_entries_status` is gone from the live schema and `ck_entries_score` is not; the album detail
+  page no longer offers *Choose a cover* and the book page still does (screenshots taken);
+  cover-candidates answers `not_supported` for all three album items; an Open Library book search
+  returned 18 results and a MusicBrainz album search 20 from their new homes; an album's status went
+  `owned` → `wishlist` → `owned` with no CHECK behind it and `read` was still refused with "Album has
+  no status named 'read'". No console errors, no server errors.
+- Deviations: Phase A broke AC6 once, deliberately — the recognizer repair turns a malformed paste
+  from 502 into 422. Phase B reordered DEC-067's list. Both recorded.
+- Dead ends worth not repeating: **a scripted import rewrite must be indentation-aware** — three
+  function-local imports were rewritten at column 0 and ruff refused to parse the file. **`make
+  format` reflows a long import back into a parenthesised block**, so a follow-up `sed` matching the
+  single-line form silently no-ops; this is the second sprint to hit that. And **a migration that
+  imports the live registry is a bug even when it passes**: `0013` rendered its CHECK from
+  `ALL_STATUSES` at run time, so two installs a month apart could build different constraints.
+- Blocked/open: none. Two couplings remain **by decision** (DEC-067 rows 2 and 4): the hand-spelled
+  published unions and the central cover-host allowlist.
+- Observed and out of scope: the library tab strip still reads `All | Book | Album`; DEC-065 removes
+  "All" in Sprint 029. The walkthrough left album entry 16 back at `owned` where it started.
+- Next: Sprint 029 (one search bar) is `ready` at `docs/sprints/029-one-search-bar.md`. It rebuilds
+  `/` around a single bar and removes "All" as a filter.
