@@ -401,6 +401,8 @@ describe("AddPage", () => {
       type: "text",
       multiplicity: "one",
     },
+    // Declared by both real domains, and the candidate carries one of its own.
+    { name: "language", label: "Language", type: "text", multiplicity: "one" },
     {
       name: "page_count",
       label: "Page count",
@@ -479,6 +481,9 @@ describe("AddPage", () => {
       "Sudamericana",
     ])
       expect(text, `missing ${value}`).toContain(value);
+    // Both domains declare `language` as a field and the candidate carries one of
+    // its own, so a naive panel renders that label twice.
+    expect(text.match(/Language/g) ?? []).toHaveLength(1);
 
     // And nothing was fetched to show it.
     expect(

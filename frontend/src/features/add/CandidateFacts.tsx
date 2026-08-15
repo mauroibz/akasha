@@ -21,20 +21,38 @@ export function CandidateFacts({
   candidate: SearchCandidate;
   fields: FieldSpec[];
 }) {
+  // Both domains declare `language`, and books declare `original_year`, so a naive
+  // identity block renders "Language: eng" twice — once from the candidate's own
+  // column and once from the field spec. The domain's label wins where the two
+  // overlap, and the candidate's column is the fallback value for it.
+  const declared = new Set(fields.map((field) => field.name));
+  const fallbacks: Record<string, unknown> = {
+    language: candidate.language,
+    original_year: candidate.original_year,
+  };
+
   const identity: Array<[string, string]> = [];
   if (candidate.subtitle) identity.push(["Subtitle", candidate.subtitle]);
   if (candidate.year != null) identity.push(["Year", String(candidate.year)]);
-  // Only when it says something the edition year does not.
   if (
+    !declared.has("original_year") &&
     candidate.original_year != null &&
+    // Only when it says something the edition year does not.
     candidate.original_year !== candidate.year
   )
     identity.push(["Originally published", String(candidate.original_year)]);
-  if (candidate.language) identity.push(["Language", candidate.language]);
+  if (!declared.has("language") && candidate.language)
+    identity.push(["Language", candidate.language]);
 
   const domainFacts = fields
     .filter((field) => field.name !== "creators" && field.type !== "rows")
-    .map((field) => [field, candidate.metadata[field.name]] as const)
+    .map(
+      (field) =>
+        [
+          field,
+          candidate.metadata[field.name] ?? fallbacks[field.name],
+        ] as const,
+    )
     .filter(
       ([, value]) => value !== null && value !== undefined && value !== "",
     )
