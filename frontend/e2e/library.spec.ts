@@ -86,10 +86,10 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   expect(Number(await library.getAttribute("data-mounted-count"))).toBeLessThan(
     20,
   );
-  await library.evaluate((element) => {
-    element.scrollTop = 250_000;
-    element.dispatchEvent(new Event("scroll"));
-  });
+  // The page is the scroll container now, so the scale check drives the window.
+  // Deep into a 10,000-entry list, which is where a virtualizer that quietly
+  // stopped virtualizing would show up.
+  await page.evaluate(() => window.scrollTo(0, 250_000));
   await expect
     .poll(async () => Number(await library.getAttribute("data-mounted-count")))
     .toBeLessThan(20);
@@ -110,10 +110,7 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   await page.getByRole("button", { name: "Table view" }).click();
   const table = page.getByRole("feed", { name: "Library" });
   await expect(page.locator("[data-entry-id]").first()).toBeVisible();
-  await table.evaluate((element) => {
-    element.scrollTop = 120_000;
-    element.dispatchEvent(new Event("scroll"));
-  });
+  await page.evaluate(() => window.scrollTo(0, 120_000));
   await expect
     .poll(async () => Number(await table.getAttribute("data-mounted-count")))
     .toBeLessThan(20);
@@ -559,9 +556,12 @@ test("a card status listbox is not recycled out from under the reader", async ({
   // Addressed by class, not by role: while the listbox is open Radix marks the
   // rest of the document aria-hidden, so the feed role is deliberately absent
   // from the accessibility tree until it closes.
-  const scroller = page.locator(".library-scroll");
-  const box = (await scroller.boundingBox())!;
-  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  // The list no longer scrolls itself, so what must not move under the reader is
+  // the page. Addressed through the viewport rather than the feed role: while the
+  // listbox is open Radix marks the rest of the document aria-hidden, so the feed
+  // is deliberately absent from the accessibility tree until it closes.
+  const viewport = page.viewportSize()!;
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 };
 
   await card.getByRole("combobox").click();
   const listbox = page.getByRole("listbox");
@@ -572,17 +572,17 @@ test("a card status listbox is not recycled out from under the reader", async ({
   await page.mouse.wheel(0, 4000);
   await expect(listbox).toBeVisible();
   await expect(card).toBeVisible();
-  expect(await scroller.evaluate((node) => node.scrollTop)).toBe(0);
+  expect(await page.evaluate(() => window.scrollY)).toBe(0);
 
   await page.getByRole("option", { name: "Reading", exact: true }).click();
   await expect(listbox).toBeHidden();
   await expectSelected(card.getByRole("combobox"), "Reading");
 
-  // Once it is closed the list scrolls normally again.
+  // Once it is closed the page scrolls normally again.
   await page.mouse.move(centre.x, centre.y);
   await page.mouse.wheel(0, 4000);
   await expect
-    .poll(() => scroller.evaluate((node) => node.scrollTop))
+    .poll(() => page.evaluate(() => window.scrollY))
     .toBeGreaterThan(0);
   expect(pageErrors).toEqual([]);
 });
@@ -661,4 +661,41 @@ test("grid and table views both keep inline editing, navigation and persistence"
     .getByRole("button", { name: /^Open / })
     .click();
   await expect(page).toHaveURL(/\/books\/3$/);
+});
+
+test("the library scrolls with the page and never inside a box", async ({
+  page,
+}) => {
+  // The owner's words: "the main coverart/library scroll does not use the entire
+  // page, it's a window, even though it's the primary thing we are looking at."
+  // The cause was `h-[min(70vh,760px)]` on the virtualizer's scroll container, so
+  // this asserts the shape of the fix rather than the absence of that class: the
+  // feed has nothing to scroll, and the document does.
+  await seedLibrary(page, 10_000);
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+    const library = page.getByRole("feed", { name: "Library" });
+
+    const overflow = await library.evaluate((node) => ({
+      scrollHeight: node.scrollHeight,
+      clientHeight: node.clientHeight,
+    }));
+    expect(
+      overflow.scrollHeight,
+      `${viewport.name}: the library still has its own scrollbar`,
+    ).toBeLessThanOrEqual(overflow.clientHeight + 1);
+
+    // And the page is what moves instead.
+    await page.mouse.move(viewport.width / 2, viewport.height / 2);
+    await page.mouse.wheel(0, 3000);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), {
+        message: `${viewport.name}: the page did not scroll`,
+      })
+      .toBeGreaterThan(0);
+    // The virtualizer is following the window, not sitting still inside it.
+    await expect(page.locator("[data-entry-id='1']")).toBeHidden();
+  }
 });

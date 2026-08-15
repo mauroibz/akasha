@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -152,29 +152,42 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   const navigate = useNavigate();
   const isGrid = props.view !== "table";
   const [containerWidth, setContainerWidth] = useState(0);
+  // How far down the document the list starts. The window virtualizer measures
+  // the viewport, so it needs to know what sits above the list — the header, the
+  // controls, the chips — or every row is placed that far too high.
+  const [scrollMargin, setScrollMargin] = useState(0);
 
   useLayoutEffect(() => {
     const element = parentRef.current;
     if (!element) return;
-    const measure = () => setContainerWidth(element.clientWidth);
+    const measure = () => {
+      setContainerWidth(element.clientWidth);
+      // Read against the document rather than the viewport: `offsetTop` walks a
+      // chain of offset parents that the motion wrapper can interrupt, and this
+      // number has to stay right while the page is scrolled.
+      setScrollMargin(element.getBoundingClientRect().top + window.scrollY);
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
+    // The chips and the filter row above the list reflow, which moves the list's
+    // start without ever changing its own size — so the body is observed too.
     const observer = new ResizeObserver(measure);
     observer.observe(element);
+    observer.observe(document.body);
     return () => observer.disconnect();
   }, []);
 
   const columns = isGrid ? gridColumnCount(containerWidth) : 1;
   const rowHeight = isGrid ? gridRowHeight : tableRowHeight;
   const rowCount = Math.ceil(props.entries.length / columns);
-  const virtualizer = useVirtualizer({
+  const virtualizer = useWindowVirtualizer({
     count: rowCount,
-    getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
     // A grid row mounts `columns` cards, so it uses a smaller overscan to keep
     // the mounted-DOM budget comparable to the table.
     overscan: isGrid ? 2 : 4,
     getItemKey: (index) => props.entries[index * columns]?.id ?? index,
+    scrollMargin,
     initialRect: { width: 1000, height: 640 },
   });
   const virtualItems = virtualizer.getVirtualItems();
@@ -293,7 +306,11 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   return (
     <div
       ref={parentRef}
-      className="library-scroll mt-5 h-[min(70vh,760px)] overflow-y-auto overflow-x-hidden rounded-2xl bg-surface/40"
+      // No height and no overflow: the page scrolls, not the grid. The owner's
+      // report was that the primary surface was a window inside the page, and the
+      // fixed height was the whole of it. `overflow-x-hidden` stays, because a
+      // wide card must not push the document sideways.
+      className="library-scroll mt-5 overflow-x-hidden rounded-2xl bg-surface/40"
       role="feed"
       aria-label="Library"
       aria-busy={props.isFetchingNextPage}
@@ -320,7 +337,9 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               key={row.key}
               style={{
                 height: row.size,
-                transform: `translateY(${row.start}px)`,
+                // Positions from the window virtualizer are document-relative, so
+                // the list's own offset comes back off to place a row inside it.
+                transform: `translateY(${row.start - scrollMargin}px)`,
               }}
             >
               <div
