@@ -1941,3 +1941,61 @@ Append-only record of material architecture choices, product-default resolutions
   account of the backend registry are untouched by this sprint. Only its description of what a
   *screen* renders is exposed, and that is one section, which 029's close amends. 028's file now
   says so. `FINAL_SPRINT` moves from 29 to 30 and per-domain imports becomes Sprint 030.
+
+## DEC-066 — Sprint 028's baseline, re-derived: a domain is not yet a unit of code
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** Sprint 028's file carried a baseline written at Sprint 027's close and marked
+  *"Re-derive at activation."* The owner asked for the next sprint to be planned with the state of
+  the repository stated explicitly against the epic goal — **each domain independent enough that
+  separate teams can add one, with its own imports and features, without breaking another** — so it
+  was re-derived from the code on 2026-08-15 rather than from the previous sprint's summary.
+- **What the measurement found.** The registry half of DEC-052 is real and holds: `Domain` carries
+  the whole per-domain contract, `GET /api/item-types` publishes it, every screen renders from it,
+  writes validate against the item's own domain, and there is no `type === "album"` branch anywhere.
+  `backend/tests/test_domain.py:140-179` already parametrizes over `DOMAINS`, so part of the
+  conformance suite exists.
+
+  **What does not hold is that a domain is a unit of code.** Adding a third one edits nine files that
+  books and albums live in — `domain/domains.py` (fields, statuses, formats, the registry and all
+  three published unions), `domain/providers.py`, `main.py` (including a `provider_health` that names
+  three providers as literals), `config.py`, `infrastructure/covers.py`, a migration,
+  `frontend/src/api/library.ts`, `features/library/labels.ts`, and three surviving
+  `itemType === "book"` branches in `pages/AddPage.tsx`. Two are worse than a file to edit:
+
+  - **`entries.ck_entries_status` is frozen.** `alembic/versions/0013_entry_formats.py:66` renders
+    the CHECK from `ALL_STATUSES` at migration-write time, so a domain declaring a status books and
+    albums lack passes `validate_status` and is refused by SQLite. **A new domain currently requires
+    a schema migration on a shared table** — the sharpest contradiction of the epic goal in the
+    repository.
+  - **Enrichment is book-shaped below its seam.** `_backfillable_items` filters on `domain.enriches`
+    correctly, but its SQL joins `item_identifiers.kind = 'isbn'` and `_fetch` takes an ISBN against
+    a hardcoded `PROVIDER_ORDER`. Albums declare `enriches=False`, so the second domain never tested
+    it.
+
+  Also recorded rather than rediscovered: the manual add path is a book form bound to
+  `DEFAULT_DOMAIN`; `cover_candidates` takes an Open Library provider as an argument, which is why
+  the cover chooser offers itself on an album and can only say no; the detail route is `/books/:id`
+  for every domain; and the import layer is book-only end to end, which is Sprint 030's outcome.
+- **Decision.** Three answers from the owner, so the executing agent does not re-litigate them:
+
+  1. **Sprint 028 runs on `sprint-025-albums`**, continuing DEC-053, DEC-061 and DEC-063. Sprints
+     025–027 stay unmerged; the contract is written against a codebase that holds two domains.
+  2. **The CHECK-constraint blocker is a Phase A finding with costed alternatives**, decided at the
+     gate — not pre-authorized Phase B work. The gate stays a gate.
+  3. **The contract prescribes a per-domain code home, and Phase B moves books and albums into it.**
+     A contract that only documented today's shared-file layout would describe the very thing the
+     epic exists to remove, and one that prescribed a layout no domain demonstrates would not be
+     evidence of anything.
+- **Consequences.** Sprint 028's baseline, deliverables and acceptance criteria are rewritten around
+  this: the conformance suite gains a check that every declared value is accepted by *the database*
+  and not only by the API, and a check that the frontend's hand-mirrored unions agree with the
+  registry; the measurement is delivered as a costed table of alternatives per finding rather than
+  one recommended path; and the IGDB paper walk additionally answers which shared files two parallel
+  domain teams would contend over, which is the falsifiable form of "developed in parallel". The
+  per-domain package move is named as the largest thing in the sprint and as the slice to hand
+  forward with the contract written, rather than to rush. Two documentation inconsistencies found
+  while planning are repaired under `AGENTS.md` §1: `ROADMAP.md` still headed the per-domain-imports
+  contract "Sprint 029" after DEC-065 renumbered it to 030, and `HANDOFF.md`'s "no `type === "album"`
+  branch anywhere" was true of albums and silent about books.

@@ -13,12 +13,22 @@ filter**, so read it before writing 028's account of what a screen renders — t
 **You are on branch `sprint-025-albums`, not `main`.** Sprints 025, 026 *and* 027 ran and closed
 there. Twenty-three commits are local and nothing has been pushed. **Merging back is the owner's
 decision** — that is the entire reason the branch exists (DEC-053, amended by DEC-061 and DEC-063).
-Ask before merging, and cut Sprint 028's branch from whatever the owner settles on.
+**The owner has settled where 028 runs: here, on `sprint-025-albums` (DEC-066).** Do not merge to
+`main` and do not cut a new branch; the contract is written against a codebase that holds two
+domains.
 
 **Sprint 028 is gated (DEC-035, DEC-042).** Phase A produces a written contract, a conformance suite
 and a verdict, and changes nothing user-visible. **Phase A concluding that almost nothing is
 misplaced is a complete, correct outcome** — do not pad it into a refactor to justify the sprint.
 Phase B runs only on that verdict plus an explicit owner go-ahead.
+
+**Its baseline was re-derived on 2026-08-15 (DEC-066) and is now a table of what a third domain must
+still touch.** Two findings drive the sprint: `entries.ck_entries_status` is a status list frozen at
+migration-write time, so a new domain's status is accepted by the API and refused by SQLite; and
+enrichment is book-shaped below its seam, which albums never tested because they declare
+`enriches=False`. The owner decided both the CHECK constraint stays a costed Phase A finding rather
+than pre-authorized work, and that **the contract prescribes a per-domain code home with books and
+albums moved into it in Phase B**.
 
 **Sprint 027 was reopened once**, after the owner tried it and reported the add flow, and closed
 again the same day. Its file carries both passes; DEC-064 is the second one. That is the precedent
@@ -37,6 +47,12 @@ carries `item_type`, `label`, `identity`, `fields`, `enriches`, `recognize`, `st
 all of it and every screen renders from it — the library's tabs, chips and format selector included
 since Sprint 027. There is no `type === "album"` branch anywhere, and adding one is the thing to
 catch in review. **Writing that contract down, and a suite that enforces it, is Sprint 028.**
+
+**There are, however, three `itemType === "book"` branches** — `pages/AddPage.tsx:112,250,299`, the
+search label, the placeholder and the manual-fallback copy. The add screen's manual form is book-only
+end to end (`application/add.py:129-148`, `features/detail/schemas.ts`). Sprint 028's re-derived
+baseline lists them with the rest of what a third domain would still have to touch; read that table
+before assuming the registry covers everything.
 
 **Four rules the code depends on:**
 

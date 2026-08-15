@@ -342,11 +342,32 @@ prove it describes reality rather than intentions.
 Phase A also measures what is still misplaced: book-shaped logic sitting in shared layers that two
 domains happened not to collide over. Phase B moves only what the suite proves is misplaced.
 
+**The baseline was re-derived on 2026-08-15 and sharpened the sprint.** A domain is not yet a unit of
+code: adding a third one edits nine shared files, two of them badly. `entries.ck_entries_status`
+holds a status list frozen at migration-write time, so a domain declaring a status books and albums
+lack is accepted by the API and refused by SQLite — **a new domain currently needs a migration on a
+shared table.** And enrichment is book-shaped below its seam (`_backfillable_items` joins on ISBN),
+which albums never tested because they declare `enriches=False`. The owner settled two things at
+planning time: that constraint is measured and costed here rather than pre-authorized, and **the
+contract prescribes a per-domain code home, with books and albums moved into it in Phase B** as the
+proof that the layout exists.
+
 **This is where DEC-052's falsifiable prediction gets tested properly.** "Games need no seam albums
 did not" is checked by writing the conformance suite against the seams and seeing whether a paper
 walk through IGDB passes it — which is cheaper and more honest than another bespoke sprint.
 
-### Sprint 029 — Per-domain imports
+### [Sprint 029 — One search bar](029-one-search-bar.md)
+
+Accepted as DEC-065 and scoped in `docs/unified-search-proposal.md`. `/` is rebuilt around a single
+bar that searches the library and adds to it, with the domain selector beside it and **"All" removed
+as a filter**, so the tab strip always names exactly one domain. The full description, including the
+owner's two amendments, is under *Scheduled from owner feedback* below.
+
+It runs after 028 because it is the sprint most likely to amend the contract's account of what a
+*screen* renders from the registry; the backend contract and the conformance suite are untouched by
+it.
+
+### Sprint 030 — Per-domain imports
 
 The last sprint in the plan. Import is book-only today — `domain/goodreads.py`, `domain/calibre.py`
 and `application/imports.py` assume books throughout, while the ledger, the preview and undo are
@@ -363,7 +384,7 @@ When this closes, the project state goes `complete` per `WORKFLOW.md`'s final-sp
 ## Future epics, after this plan
 
 Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
-contract and Sprint 029's import boundary, developed in parallel without interfering with the others.
+contract and Sprint 030's import boundary, developed in parallel without interfering with the others.
 
 - **Games — IGDB.** Carries DEC-052's prediction that games need no seam albums did not; Sprint 028's
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
@@ -376,7 +397,7 @@ contract and Sprint 029's import boundary, developed in parallel without interfe
   operations and every count in the UI. Note the vocabulary collision before it causes confusion —
   book-series already exists as a free-text `metadata` field, and product spec section 11 item 4
   records the deliberate choice not to model it.
-- **Music imports — `spotify → music`.** The natural first exercise of Sprint 029's boundary.
+- **Music imports — `spotify → music`.** The natural first exercise of Sprint 030's boundary.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 
