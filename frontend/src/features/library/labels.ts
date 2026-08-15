@@ -131,6 +131,19 @@ export function hasEntryField(
   return declared ? declared.includes(field) : true;
 }
 
+/** Whether this domain offers the cover chooser at all (DEC-067 row 7). */
+export function choosesCovers(
+  itemType: string,
+  types: ItemType[] | undefined,
+): boolean {
+  const declared = Array.isArray(types)
+    ? types.find((type) => type.id === itemType)?.chooses_covers
+    : undefined;
+  // Unknown domain: the book shape, as everywhere else here. A registry that has not
+  // arrived must never be the reason a control the reader expects is missing.
+  return declared ?? true;
+}
+
 export function entryPanelLabel(
   itemType: string,
   types: ItemType[] | undefined,

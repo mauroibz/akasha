@@ -127,6 +127,8 @@ class ItemTypeResponse(BaseModel):
     entry_fields: list[str]
     formats: list[FormatSpecResponse]
     entry_panel_label: str
+    #: Whether to offer the cover chooser at all (DEC-067 row 7).
+    chooses_covers: bool
 
 
 class ItemResponse(BaseModel):
@@ -495,6 +497,7 @@ async def list_item_types() -> list[ItemTypeResponse]:
             entry_fields=sorted(domain.entry_fields),
             formats=[FormatSpecResponse(**vars(row)) for row in domain.formats],
             entry_panel_label=domain.entry_panel_label,
+            chooses_covers=domain.chooses_covers,
         )
         for domain in DOMAINS.values()
     ]
@@ -539,7 +542,13 @@ async def list_cover_candidates(item_id: int, request: Request) -> CoverCandidat
     page renders, which is the invariant that keeps cached pages provider-free.
     """
     library = LibraryService(request.app.state.engine)
-    library.get_item(item_id)
+    item = library.get_item(item_id)
+    domain = DOMAINS.get(str(item["type"]))
+    if domain is not None and not domain.chooses_covers:
+        # Asked of the domain rather than branched on the type. The screen already hides
+        # the control, and this is the same rule on the way in, so a client that asks
+        # anyway gets an answer instead of a provider request that cannot help.
+        return CoverCandidates(candidates=[], reason="not_supported")
     provider = request.app.state.providers.get("openlibrary")
     if provider is None:
         return CoverCandidates(candidates=[], reason="provider_disabled")

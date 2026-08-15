@@ -199,6 +199,12 @@ class Domain:
     entry_panel_label: str = "Your reading data"
     #: Recognizes a URL or identifier this domain can resolve, for add-by-URL.
     recognize: Callable[[str], "UrlMatch | None"] = lambda _value: None
+    #: Whether this domain can offer alternative covers to choose from (DEC-067 row 7).
+    #: The shared implementation is still Open Library's work-editions path, so only a
+    #: domain Open Library serves may declare it: an album has no work and no editions,
+    #: and the control could only ever say no. Declaring this is what stops a screen
+    #: offering a chooser that cannot work, rather than a screen knowing the type.
+    chooses_covers: bool = True
 
     def status(self, value: str) -> StatusSpec | None:
         return next((row for row in self.statuses if row.value == value), None)
@@ -223,6 +229,7 @@ ALBUM = Domain(
     formats=ALBUM_FORMATS,
     entry_panel_label="Your copy",
     recognize=lambda value: recognize_album_url(value),
+    chooses_covers=False,
 )
 
 DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM)}

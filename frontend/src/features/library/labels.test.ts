@@ -33,6 +33,7 @@ const registry: ItemType[] = [
       { value: "digital", label: "Digital" },
     ],
     entry_panel_label: "Your reading data",
+    chooses_covers: true,
   },
   {
     id: "album",
@@ -52,6 +53,7 @@ const registry: ItemType[] = [
       { value: "digital", label: "Digital" },
     ],
     entry_panel_label: "Your copy",
+    chooses_covers: false,
   },
 ];
 

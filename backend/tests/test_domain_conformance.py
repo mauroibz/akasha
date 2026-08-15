@@ -164,6 +164,24 @@ def fields_are_described_completely(domain: Domain) -> None:
 
 
 @registry_check
+def the_cover_chooser_is_only_declared_where_it_can_work(domain: Domain) -> None:
+    """DEC-067 row 7 chose to declare the capability, not to generalise the mechanism.
+
+    The shared chooser is Open Library's work-editions path, so a domain may only
+    declare `chooses_covers` if Open Library is one of the sources it prefers. Anything
+    else offers the reader a control that can only say no — which is what an album did
+    from Sprint 025 until this sprint. A domain with its own cover-candidate source is
+    the point at which the mechanism becomes per-domain rather than the declaration.
+    """
+    if not domain.chooses_covers:
+        return
+    assert "openlibrary" in domain.identity.source_preference, (
+        f"{domain.item_type} declares it chooses covers, but the shared chooser is "
+        "Open Library's work-editions path and this domain does not prefer that source"
+    )
+
+
+@registry_check
 def identity_is_a_strategy(domain: Domain) -> None:
     """Seam 2: how two candidates are judged the same record, and who wins a merge.
 
@@ -354,6 +372,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "fields": "fields_are_described_completely",
         "identity": "identity_is_a_strategy",
         "recognize": "the_recognizer_answers_for_any_string",
+        "chooses_covers": "the_cover_chooser_is_only_declared_where_it_can_work",
         # Declarative and checked by the enrichment path rather than by shape: a domain
         # that does not enrich is queued no jobs (`_backfillable_items`).
         "enriches": None,
@@ -399,6 +418,8 @@ def a_third_domain(**overrides: object) -> Domain:
         "formats": (FormatSpec("digital", "Digital"),),
         "entry_panel_label": "Your copy",
         "recognize": lambda _value: None,
+        # Nothing supplies game covers through Open Library's work-editions path.
+        "chooses_covers": False,
     }
     return Domain(**{**base, **overrides})  # type: ignore[arg-type]
 
@@ -513,6 +534,11 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "the_domain_names_itself",
         "an item type that is not storable",
         a_third_domain(item_type="Board Game"),
+    ),
+    (
+        "the_cover_chooser_is_only_declared_where_it_can_work",
+        "a chooser no provider can serve",
+        a_third_domain(chooses_covers=True),
     ),
 ]
 

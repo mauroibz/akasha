@@ -1572,6 +1572,10 @@
       "ItemTypeResponse": {
         "description": "What a domain says about itself, so a screen can render it without branching.",
         "properties": {
+          "chooses_covers": {
+            "title": "Chooses Covers",
+            "type": "boolean"
+          },
           "default_status": {
             "title": "Default Status",
             "type": "string"
@@ -1625,7 +1629,8 @@
           "default_status",
           "entry_fields",
           "formats",
-          "entry_panel_label"
+          "entry_panel_label",
+          "chooses_covers"
         ],
         "title": "ItemTypeResponse",
         "type": "object"

@@ -426,3 +426,32 @@ async def test_the_chooser_gives_up_rather_than_making_someone_wait(
     assert elapsed < 5
     # A dialog someone opened is allowed to wait a little, not a lot.
     assert CANDIDATE_BUDGET_SECONDS <= 15.0
+
+
+@pytest.mark.anyio
+async def test_a_domain_that_does_not_choose_covers_is_never_offered_the_chooser(
+    tmp_path: Path, engine: Engine
+) -> None:
+    """DEC-067 row 7. The chooser is Open Library's work-editions path.
+
+    An album has no work and no editions, so the control could only ever say no — and
+    it had said no on every album since Sprint 025. The domain declares whether it
+    offers cover choice, the screen renders the declaration, and the endpoint refuses
+    without reaching a provider, so a client that asks anyway gets the same answer.
+    """
+    item_id = seed_item(engine, source="openlibrary", isbn="9788437604572")
+    with engine.begin() as connection:
+        connection.execute(text("UPDATE items SET type='album' WHERE id=:id"), {"id": item_id})
+    # Routes that would answer if anything reached them: the point is that nothing does.
+    app = app_with(tmp_path, engine, WORK_ROUTES)
+
+    async with httpx.AsyncClient(
+        transport=httpx.ASGITransport(app=app), base_url="http://test"
+    ) as client:
+        response = await client.get(f"/api/items/{item_id}/cover-candidates")
+        published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
+
+    assert response.status_code == 200
+    assert response.json() == {"candidates": [], "reason": "not_supported"}
+    assert published["album"]["chooses_covers"] is False
+    assert published["book"]["chooses_covers"] is True

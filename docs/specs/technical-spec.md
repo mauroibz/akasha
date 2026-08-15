@@ -331,6 +331,7 @@ One `Domain` (`backend/src/book_tracker/domain/domains.py`), whose every field i
 | `formats` | The `FormatSpec` vocabulary for how a copy is held. Closed and declared, which is what a shelf is not (DEC-059). |
 | `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |
+| `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
 
 Plus, outside the record itself:
 

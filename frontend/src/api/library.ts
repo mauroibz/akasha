@@ -82,6 +82,12 @@ export interface ItemType {
   formats: FormatSpec[];
   /** The heading over the personal region of the detail page. */
   entry_panel_label: string;
+  /**
+   * Whether to offer the cover chooser (DEC-067 row 7). The shared chooser is Open
+   * Library's work-editions path, so a domain it does not serve declares `false` and
+   * the control is not rendered rather than rendered and unable to answer.
+   */
+  chooses_covers: boolean;
 }
 
 /**

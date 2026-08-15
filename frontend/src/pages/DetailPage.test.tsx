@@ -377,6 +377,7 @@ describe("DetailPage", () => {
           { value: "cd", label: "CD" },
         ],
         entry_panel_label: "Your copy",
+        chooses_covers: false,
       },
     ];
     const album = {
@@ -406,6 +407,40 @@ describe("DetailPage", () => {
     expect(document.querySelector("[data-fact='rereads']")).toBeNull();
     expect(document.querySelector("[data-fact='started']")).toBeNull();
     expect(document.querySelector("[data-fact='finished']")).toBeNull();
+    // And the cover chooser, which is Open Library's work-editions path, is not
+    // offered where it could only ever say no (DEC-067 row 7).
+    expect(screen.queryByRole("button", { name: "Choose a cover" })).toBeNull();
+  });
+
+  it("still offers the cover chooser to a domain that declares it", async () => {
+    const bookTypes = [
+      {
+        id: "book",
+        label: "Book",
+        fields: [],
+        statuses: [
+          { value: "read", label: "Read", choosable: true, hotkey: "r" },
+        ],
+        default_status: "read",
+        entry_fields: ["date_started", "date_finished", "reread_count"],
+        formats: [],
+        entry_panel_label: "Your reading data",
+        chooses_covers: true,
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(bookTypes));
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    expect(
+      screen.getByRole("button", { name: "Choose a cover" }),
+    ).toBeVisible();
   });
 
   it("keeps a book's reading data, the half DEC-057 did not touch", async () => {

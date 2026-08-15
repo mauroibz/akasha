@@ -26,6 +26,7 @@ const expected = {
     "entry_fields",
     "formats",
     "entry_panel_label",
+    "chooses_covers",
   ],
   FieldSpecResponse: ["name", "label", "type", "multiplicity"],
   StatusSpecResponse: ["value", "label", "choosable", "hotkey"],

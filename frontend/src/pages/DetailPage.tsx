@@ -36,6 +36,7 @@ import { OpinionDialog } from "@/features/detail/OpinionDialog";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
+  choosesCovers,
   entryPanelLabel,
   formatLabels,
   hasEntryField,
@@ -266,13 +267,18 @@ export function DetailPage() {
               aria-label="No cover"
             />
           )}
-          <Button
-            variant="secondary"
-            className="mt-3 w-full"
-            onClick={() => setDialog("cover")}
-          >
-            Choose a cover
-          </Button>
+          {/* Asked of the domain, not branched on the type: the chooser is Open
+              Library's work-editions path, and an album has no work and no
+              editions, so the control could only ever say no (DEC-067 row 7). */}
+          {choosesCovers(item.type, itemTypes.data) && (
+            <Button
+              variant="secondary"
+              className="mt-3 w-full"
+              onClick={() => setDialog("cover")}
+            >
+              Choose a cover
+            </Button>
+          )}
           <div className="mt-3 block text-sm">
             <Label htmlFor="replace-cover">Replace cover</Label>
             <Input
