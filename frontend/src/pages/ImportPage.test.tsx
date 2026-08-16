@@ -156,7 +156,7 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
     expect(await screen.findByRole("status")).toHaveTextContent(
-      /1 book added/i,
+      /1 entry added/i,
     );
     const commit = requests.find(([input]) => String(input).endsWith("commit"));
     expect(JSON.parse(String(commit?.[1]?.body))).toEqual({
@@ -227,7 +227,7 @@ describe("ImportPage", () => {
     expect(screen.getByRole("button", { name: /import/i })).toBeEnabled();
   });
   it("sends a finished import to the rows it left unsorted", async () => {
-    // The defect: a commit reported "1 book added" and the library showed
+    // The defect: a commit reported "1 entry added" and the library showed
     // nothing, because imports land `unsorted` and the default view hides
     // exactly that. The result panel now says where the rows went.
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
@@ -289,7 +289,7 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
     const result = await screen.findByRole("status");
-    expect(result).toHaveTextContent(/7 books are waiting in triage/i);
+    expect(result).toHaveTextContent(/7 entries are waiting in triage/i);
     expect(screen.getByRole("link", { name: /triage/i })).toHaveAttribute(
       "href",
       "/triage",

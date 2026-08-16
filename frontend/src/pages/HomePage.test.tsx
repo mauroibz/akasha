@@ -1144,3 +1144,24 @@ test("row 12+13: a superseded search is aborted, and a late response cannot land
   expect(bar.signals[0].aborted).toBe(true);
   expect(bar.signals[1].aborted).toBe(false);
 });
+
+test("deliverable 6: adding a record says Record added, not Book added", async () => {
+  // The guard on copy neutrality. Every string the add flow shows has to come
+  // from the domain's own label, so this asserts the flow against the domain
+  // that is *not* the default -- the one a hardcoded "Book" would get wrong.
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole("radio", { name: "Record" }));
+  const dialog = await openConfirmDialog(user);
+  await user.click(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  );
+
+  // Sonner's store is module-global and outlives a single test, so this asserts
+  // the toast this add produced rather than scanning the document for the word.
+  // A hardcoded "Book added" fails it by never producing the one named here.
+  expect(await findToast("Record added")).toBeInTheDocument();
+});

@@ -20,7 +20,7 @@ export function NotFoundPage() {
           className="flex min-h-11 items-center rounded-full border border-border px-5 text-foreground focus-ring"
           to="/add"
         >
-          Add a book
+          Enter by hand
         </Link>
       </div>
     </main>

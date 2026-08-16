@@ -236,7 +236,7 @@ for (const size of widths) {
       });
       await page.getByRole("button", { name: /preview import/i }).click();
       await page.getByRole("button", { name: /^Import 1 ready row$/ }).click();
-      await expectVisibleToast(page, /Import complete: 1 book added/);
+      await expectVisibleToast(page, /Import complete: 1 entry added/);
     });
   });
 }

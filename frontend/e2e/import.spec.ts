@@ -85,11 +85,11 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
   await page
     .getByRole("button", { name: /import 1 ready row/i })
     .press("Enter");
-  await expect(page.getByRole("status")).toContainText("1 book added");
+  await expect(page.getByRole("status")).toContainText("1 entry added");
   // Imports land `unsorted` and the default library view hides `unsorted`, so
   // the result panel names the pile and offers the click that reaches it.
   await expect(page.getByRole("status")).toContainText(
-    "3 books are waiting in Triage",
+    "3 entries are waiting in Triage",
   );
   await page.getByRole("link", { name: /open triage/i }).click();
   await expect(page).toHaveURL(/\/triage/);
@@ -154,7 +154,7 @@ test("Calibre preview and re-sync are keyboard-complete at mobile width", async 
   await page
     .getByRole("button", { name: /import 1 ready row/i })
     .press("Enter");
-  await expect(page.getByRole("status")).toContainText("1 book added");
+  await expect(page.getByRole("status")).toContainText("1 entry added");
   expect(previewBody).toEqual({ library_path: "Library" });
   expect(commitBody).toEqual({ batch_id: "calibre-1", choices: [] });
 });
@@ -292,7 +292,7 @@ test("undo flow from import history", async ({ page }) => {
   });
   await page.getByRole("button", { name: /preview import/i }).click();
   await page.getByRole("button", { name: /import 1 ready row/i }).click();
-  await expect(page.getByRole("status")).toContainText("1 book added");
+  await expect(page.getByRole("status")).toContainText("1 entry added");
   await expect(
     page.getByRole("button", { name: /undo this import/i }),
   ).toBeVisible();

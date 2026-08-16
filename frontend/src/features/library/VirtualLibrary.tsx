@@ -367,7 +367,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
       </div>
       {props.isFetchingNextPage && (
         <p role="status" className="sr-only">
-          Loading more books
+          Loading more
         </p>
       )}
     </div>

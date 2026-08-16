@@ -116,6 +116,8 @@ export function createEntry(body: {
       if (value.error?.code === "near_match_confirmation_required")
         throw new NearMatchError(value.error.details?.entry_ids ?? []);
     }
-    return json<CreateEntryResponse>(response, "Book could not be added");
+    // Neutral rather than the domain's label: this layer has no registry to ask,
+    // and AddForm names the domain when it has one to name.
+    return json<CreateEntryResponse>(response, "That could not be added");
   });
 }

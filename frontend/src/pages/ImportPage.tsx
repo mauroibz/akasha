@@ -63,7 +63,7 @@ export function ImportPage() {
       <Link className="focus-ring" to="/">
         ← Library
       </Link>
-      <h1 className="mt-6 text-4xl font-semibold">Import books</h1>
+      <h1 className="mt-6 text-4xl font-semibold">Import</h1>
       <p className="mt-2 text-muted-foreground">
         Preview a source before anything enters your library. Existing values
         are preserved when a re-sync only supplies missing metadata.
@@ -257,7 +257,7 @@ export function ImportPage() {
                   setResult(committed);
                   toast.success(
                     `Import complete: ${committed.created_entries} ${
-                      committed.created_entries === 1 ? "book" : "books"
+                      committed.created_entries === 1 ? "entry" : "entries"
                     } added`,
                     {
                       description: committed.unsorted_entries
@@ -280,7 +280,7 @@ export function ImportPage() {
         <div ref={resultRef} tabIndex={-1} className="mt-8" role="status">
           <p className="text-xl">
             Import complete: {result.created_entries}{" "}
-            {result.created_entries === 1 ? "book" : "books"} added;{" "}
+            {result.created_entries === 1 ? "entry" : "entries"} added;{" "}
             {result.unchanged_entries} already present.
           </p>
           {/* Imported rows land `unsorted`, and the library's default view
@@ -291,9 +291,9 @@ export function ImportPage() {
           {result.unsorted_entries > 0 && (
             <p className="mt-2 text-muted-foreground">
               {result.unsorted_entries}{" "}
-              {result.unsorted_entries === 1 ? "book is" : "books are"} waiting
-              in Triage. Your library hides unsorted books until you sort them,
-              so this is where the import went.{" "}
+              {result.unsorted_entries === 1 ? "entry is" : "entries are"}{" "}
+              waiting in Triage. Your library hides unsorted entries until you
+              sort them, so this is where the import went.{" "}
               <Link className="focus-ring text-primary" to="/triage">
                 Open Triage →
               </Link>

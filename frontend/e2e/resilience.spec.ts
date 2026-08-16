@@ -108,7 +108,7 @@ test("a degraded provider is named on the add screen", async ({ page }) => {
   // a shrug.
   await expect(notice).toContainText("googlebooks");
   await expect(notice).toContainText("no API key configured");
-  await expect(notice).toContainText(/add a book manually/i);
+  await expect(notice).toContainText(/enter it by hand/i);
 });
 
 test("library to detail and back is possible without a pointer", async ({

@@ -135,7 +135,7 @@ export function optionalInt(value: string): number | null {
 
 /** The manual-entry form on /add: the same rules as the metadata dialog. */
 export const manualBookSchema = z.object({
-  title: z.string().trim().min(1, "A book needs a title"),
+  title: z.string().trim().min(1, "A title is required"),
   creators: z.string(),
   subtitle: z.string(),
   year: optionalNumber("Use a year between 0 and 9999", 0, 9999),

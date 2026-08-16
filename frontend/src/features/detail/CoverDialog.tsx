@@ -21,9 +21,8 @@ interface CoverDialogProps {
 
 const reasons: Record<string, string> = {
   no_provider_reference:
-    "This book has no provider reference or ISBN, so there is nothing to look editions up by.",
-  no_candidates:
-    "Open Library lists no other editions with covers for this book.",
+    "This entry has no provider reference or ISBN, so there is nothing to look editions up by.",
+  no_candidates: "Open Library lists no other editions with covers for it.",
   provider_unavailable:
     "Open Library could not be reached. Nothing was changed.",
   provider_disabled: "The Open Library provider is not enabled.",

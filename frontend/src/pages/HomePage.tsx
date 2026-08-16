@@ -736,7 +736,7 @@ export function HomePage() {
         <section className="py-24 text-center">
           <h2 className="text-2xl font-semibold">Your library is waiting</h2>
           <p className="mt-2 text-muted-foreground">
-            Add a book or visit the inbox to get started.
+            Search above to add something, or visit the inbox to get started.
           </p>
         </section>
       )}

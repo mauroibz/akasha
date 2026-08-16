@@ -222,7 +222,7 @@ test("shelf management creates, renames, and deletes shelves", async ({
 
   await page.goto("/shelves");
   await expect(page.getByText("Favorites")).toBeVisible();
-  await expect(page.getByText("5 books")).toBeVisible();
+  await expect(page.getByText("5 items")).toBeVisible();
 
   // Create a new shelf
   await page.getByPlaceholder(/new shelf name/i).fill("Sci-fi");

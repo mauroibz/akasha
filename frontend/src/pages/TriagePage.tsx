@@ -484,7 +484,7 @@ export function TriagePage() {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Filter by title or author  /"
+            placeholder="Filter by title or creator  /"
             className="h-11 rounded-full bg-surface"
           />
         </label>
@@ -510,7 +510,7 @@ export function TriagePage() {
         <section className="py-24 text-center">
           <h2 className="text-2xl font-semibold">Inbox is clear</h2>
           <p className="mt-2 text-muted-foreground">
-            Import books to start triaging.
+            Import something to start triaging.
           </p>
         </section>
       )}

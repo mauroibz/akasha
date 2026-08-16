@@ -149,7 +149,7 @@ describe("AddPage", () => {
     // The field error is announced and tied to the control that caused it.
     const title = screen.getByLabelText(/^title$/i);
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      /needs a title/i,
+      /title is required/i,
     );
     expect(title).toHaveAttribute("aria-invalid", "true");
     expect(title).toHaveAttribute(
