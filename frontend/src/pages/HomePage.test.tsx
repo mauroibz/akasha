@@ -1191,3 +1191,26 @@ test("deliverable 5: the shortcuts belong to the surface the reader is standing 
   await user.keyboard("j");
   expect(bar.urls.filter((u) => u === "/api/entries/7").length).toBe(before);
 });
+
+test("row 11, properly: a successful add clears the query so the new row is actually visible", async () => {
+  // Found by the Sprint 029 walkthrough. The web search only ran because the
+  // library had nothing for this string, so closing the dialog onto that filtered
+  // view and highlighting a row it excludes shows the reader nothing.
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  await user.click(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  );
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+
+  // The bar is empty, the web results are gone, and the library is back.
+  expect(await screen.findByRole("searchbox")).toHaveValue("");
+  await waitFor(() =>
+    expect(screen.queryByRole("heading", { name: "From the web" })).toBeNull(),
+  );
+  expect(await screen.findByText("Rayuela")).toBeVisible();
+});

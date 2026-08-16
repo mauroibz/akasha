@@ -853,6 +853,29 @@ export function HomePage() {
                   return;
                 }
                 toast.success(`${domainLabel} added`);
+                /**
+                 * Clearing the query is what makes the highlight mean anything.
+                 *
+                 * The web search only ran because the library had nothing for this
+                 * string, so the library behind the dialog is showing an empty
+                 * filtered view. Closing the dialog onto it and highlighting a row
+                 * that the filter excludes shows the reader nothing at all — which
+                 * is what the walkthrough found. The old flow got this for free by
+                 * navigating to an unfiltered `/`; here it has to be done.
+                 *
+                 * The domain filter stays: that is a choice the reader made, and the
+                 * thing just added is in it.
+                 */
+                setSearch("");
+                web.clear();
+                setSearchParams(
+                  (prev) => {
+                    const next = new URLSearchParams(prev);
+                    next.delete("q");
+                    return next;
+                  },
+                  { replace: true },
+                );
                 // On `/` the handoff is a dialog closing rather than a
                 // navigation, so the highlight is set directly instead of
                 // travelling as router state.
