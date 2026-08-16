@@ -1,22 +1,35 @@
 # Handoff — current reality
 
-**Last completed:** Sprint 028 (the domain contract), 2026-08-15. Both phases ran.
-**Next:** Sprint 029 (one search bar) — status `ready`, file at
-`docs/sprints/029-one-search-bar.md`. Plan revision **12**. Then **Sprint 030 (entry depth — a
-gated, Phase-A-only decision, scheduled by DEC-071)** and Sprint 031 (per-domain imports). Neither
-has a file yet; the plan ends at 031.
+**Sprint 029 (one search bar) is `in_progress`, and all of its code and verification are
+done.** What remains is documentation and the close. Plan revision **12**.
 
 ## Do this first
 
-**You are on branch `sprint-025-albums`, not `main`.** Sprints 025 through **028** ran and closed
-there; thirty-plus commits are local and nothing has been pushed. The branch exists so merging is a
-deliberate act (DEC-053, amended by DEC-061, DEC-063 and DEC-066).
+**Finish Sprint 029's documentation.** Nothing is broken and nothing is half-built; the
+worktree is clean and every gate is green. The remaining work is listed at the end of the
+2026-08-16 worklog entry, and it is:
 
-**The merge is scheduled: after Sprint 029 closes, not before (DEC-072).** Sprint 029 carries copy
-neutrality, so merging first would ship music's first release on screens that say *Import books*.
-Sprint 030 does not gate it. **Two things go in with that merge**, because both describe the product
-to a user: `README.md`'s feature copy stops being book-only, and
-`docs/operations/release-notes-v1.2.md` is written, following the v1 and v1.1 precedent.
+1. **Product spec section 7** still describes `/add` as the screen you search from. It is
+   the manual-entry route now; searching and adding happen on `/`.
+2. **Technical spec sections 7.1 and 8** describe the two debounces (250 ms library,
+   300 ms provider). The library's 250 ms is unchanged; the provider search is now the
+   settled-and-empty rule instead — ~800 ms still, at least three characters, the URL
+   caught up, the library answered, and it answered with zero rows, never twice for the
+   same string, with **Add** as the override.
+3. **A decision entry** is owed. Four things want recording: the firing rule as actually
+   built; `/add` losing its domain chooser; the results rendering *below* the library
+   rather than above; and deliverable 6 needing **no new `Domain` field** after all.
+4. Then the sprint `Outcome`, the ROADMAP impact review, `state.json`, this file, and
+   `docs(sprint-029): close sprint and hand off`.
+
+**The album work merges into `main` after 029 closes (DEC-072)** — that is the next thing
+after the close, and two things go in with it: `README.md`'s feature copy stops being
+book-only, and `docs/operations/release-notes-v1.2.md` is written, following the v1 and v1.1
+precedent.
+
+**You are on branch `sprint-025-albums`, not `main`.** Sprints 025 through 028 closed there and 029
+is running there; forty-odd commits are local and nothing has been pushed. The branch exists so
+merging is a deliberate act (DEC-053, amended by DEC-061, DEC-063 and DEC-066).
 
 **The domain contract is written down, twice.** `docs/specs/technical-spec.md` **section 6.6** is the
 binding contract; **`docs/guides/adding-a-domain.md`** is how to satisfy it — diagrams, a nine-row
@@ -32,10 +45,12 @@ one entry in `DOMAINS`, its provider wired in the lifespan, three lines in the p
 cover-host allowlist line if its art is hosted somewhere new, and configuration if its provider needs
 credentials. **No migration, and no edit to another domain's files.**
 
-**Sprint 029 gained a sixth deliverable after it was written** (DEC-071): the chrome stops saying
-"book". Eighteen user-visible strings across eight files, listed in the sprint file with the rule for
-each. Read that deliverable before starting 029 — it is small, but it is the kind of thing a rewrite
-of those screens silently carries forward.
+**The chrome no longer says "book"** (DEC-071, built in 029). It was twenty-four strings across
+eleven files, not the eighteen across eight the sprint file first claimed. **AC9 is a runnable
+command**, in the sprint file: grep `book` under `frontend/src`, excluding tests, comments, the
+`/books/:entryId` route and the identifiers. It returns two lines, both JSX comment continuations,
+and nothing that reaches a screen. Run it before claiming the criterion — it caught a regression
+once already, when a `git checkout` used to undo a mutation test restored "Add a book".
 
 **The music release is not gated on a third domain** (DEC-071). A release waits for a feature, not
 for a validation exercise — and it is now scheduled for right after 029 (DEC-072).
@@ -101,10 +116,11 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
 
 ## Known and left, in the order they are likely to bite
 
-- **The dev library at `data/` is 13 entries**, books plus *Discovery*, *Kind of Blue* and *Humanz*.
-  Migrated to `0014` on 2026-08-15 after writing `backups/pre-migration-20260815T223017Z`. The
-  Sprint 028 walkthrough moved album entry 16's status to `wishlist` and back to `owned`; it is where
-  it started.
+- **The dev library at `data/` is 16 entries**, up from 13. The Sprint 029 walkthrough added *The
+  Left Hand of Darkness* (19), *Selected Ambient Works 85–92* (20), *Kid A* (21) and *OK Computer*
+  (22), two of them carrying a `Walkthrough, sprint 029.` note, and created a shelf named
+  **Walkthrough** (id 5). Left in place rather than deleted; the pre-walkthrough database is at
+  `backups/pre-sprint029-20260816T042730Z/books.db`. Migration head is still `0014`.
 - **`data/` has been made group/other-writable and the container has been run against it.** Files the
   container creates are owned by uid 10001; hand ownership back with
   `docker run --rm --user 0 -v "$PWD/data:/data" akasha:local chown -R 1000:1000 /data`.
@@ -112,14 +128,17 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
   the domain structure, because that is true of this branch, but the feature copy still says books:
   the album domain has never been released or merged, and advertising it would describe something no
   user can run. Change that copy when the branch merges, not before.
-- **The library tab strip still reads `All | Book | Album`.** DEC-065 removes "All" in Sprint 029.
 - **The Inbox label is ambiguous on `/`**: the header badge and each domain's `unsorted` chip all read
   "Inbox". Correct in each place, confusing together. Unscheduled.
 - **Release selection is still arbitrary between same-day originals** — resolving a "Kind of Blue"
   release-group URL returns the Swiss Blues Authority record. Stable but not meaningful.
-- The manual add path is still a book form bound to `DEFAULT_DOMAIN`, and three
-  `itemType === "book"` branches remain in `pages/AddPage.tsx` (DEC-067 row 6). Sprint 029 rebuilds
-  that screen.
+- **The manual add path is still bound to `DEFAULT_DOMAIN`** (DEC-067 row 6). Sprint 029 removed
+  `/add`'s domain chooser rather than leaving it lying: it showed a record's statuses and fields and
+  then wrote a book. Giving manual entry a real domain is unscheduled and needs an API change.
+- **A provider fetch can fail at add time.** One album add in the Sprint 029 walkthrough returned
+  **502** from `POST /api/entries` (MusicBrainz, at the payload fetch); the identical retry returned
+  201. The dialog stays open and the error is shown, which is right, but the failure is invisible in
+  any test because it is upstream. Watch it if album adds start failing more often.
 - The import layer is still book-only above the domain packages — `application/imports.py` and
   `api/imports.py`. That is Sprint 031's whole outcome.
 - `data/covers/` holds two stale `cover-*.jpg.tmp` files from an interrupted install; harmless.
