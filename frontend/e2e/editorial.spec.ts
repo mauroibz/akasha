@@ -150,7 +150,7 @@ test("confirmed deletion removes the entry and returns to library", async ({
     .getByRole("alertdialog", { name: /remove this/i })
     .getByRole("button", { name: /delete entry/i })
     .click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   expect(deleted).toBe(true);
 });
 
@@ -252,7 +252,7 @@ test("unknown route shows a useful 404", async ({ page }) => {
     page.getByRole("button", { name: /go to library/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: /go to library/i }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });
 
 test("navigation shell exposes all four destinations at desktop width", async ({
@@ -283,5 +283,5 @@ test("navigation shell exposes all four destinations at desktop width", async ({
     .getByRole("link", { name: /library/i })
     .first()
     .click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });

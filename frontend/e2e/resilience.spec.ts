@@ -94,7 +94,12 @@ test("a degraded provider is named on the add screen", async ({ page }) => {
       },
     }),
   );
-  await page.goto("/add");
+  // The notice sits with the web results: a library page reaches no provider, so
+  // a degraded one is only the reader's problem once they are adding.
+  await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
+  await page.goto("/");
+  await page.getByRole("searchbox").fill("rayuela");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   const notice = page
     .getByRole("status")
     .filter({ hasText: /fewer providers/i });
@@ -163,7 +168,7 @@ test("library to detail and back is possible without a pointer", async ({
     .first()
     .focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();

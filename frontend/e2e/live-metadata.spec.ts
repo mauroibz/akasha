@@ -23,10 +23,9 @@ test("live provider editions add with metadata and cached covers", async ({
   test.skip(mode !== "add");
   const saved: Array<{ url: string; title: string; editionYear: string }> = [];
   for (const book of books) {
-    await page.goto("/add");
-    await page
-      .getByRole("searchbox", { name: /search books/i })
-      .fill(book.query);
+    await page.goto("/");
+    await page.getByRole("searchbox").fill(book.query);
+    await page.getByRole("button", { name: "Add", exact: true }).click();
     const result = page
       .getByRole("button", { name: book.author })
       .filter({ hasText: /Edition year:\s*\d{4}/ })

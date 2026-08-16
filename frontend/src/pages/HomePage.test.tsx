@@ -20,6 +20,7 @@ function renderPage(initialEntry = "/", client = makeClient()) {
           <Route path="/" element={<HomePage />} />
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
           <Route path="/triage" element={<h1>Triage</h1>} />
+          <Route path="/add" element={<h1>Add page</h1>} />
         </Routes>
         <Toaster />
       </MemoryRouter>
@@ -717,30 +718,83 @@ const candidate = {
  * The whole point of the bar is which requests it does and does not make, so the
  * stub records every URL and the tests count them.
  */
-function stubBar({ libraryHasRows = true } = {}) {
+interface BarStub {
+  libraryHasRows?: boolean;
+  /** Answer provider search with a failure instead of a result set. */
+  searchFails?: boolean;
+  health?: unknown;
+  /** What `POST /api/entries` answers. */
+  onCreate?: (body: unknown) => Response;
+  onPreview?: () => Response;
+}
+
+function stubBar(options: BarStub = {}) {
+  const { libraryHasRows = true } = options;
   const urls: string[] = [];
-  const fetchMock = vi.fn(async (request: string | URL | Request) => {
-    const url = String(request);
-    urls.push(url);
-    if (url.startsWith("/api/item-types"))
-      return new Response(JSON.stringify(threeDomains));
-    if (url.startsWith("/api/shelves")) return new Response("[]");
-    if (url.startsWith("/api/health/providers"))
-      return new Response(JSON.stringify({ providers: [], degraded: false }));
-    if (url.startsWith("/api/search"))
-      return new Response(JSON.stringify([candidate]));
-    // The library. A query in the URL is the "did you already own it" question.
-    const hasQuery = url.includes("q=");
-    return new Response(
-      JSON.stringify(hasQuery && !libraryHasRows ? empty : populated),
-      { status: 200 },
-    );
-  });
+  const posts: unknown[] = [];
+  const signals: AbortSignal[] = [];
+  const fetchMock = vi.fn(
+    async (request: string | URL | Request, init?: RequestInit) => {
+      const url = String(request);
+      urls.push(url);
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(threeDomains));
+      if (url.startsWith("/api/shelves")) return new Response("[]");
+      if (url.startsWith("/api/health/providers"))
+        return new Response(
+          JSON.stringify(options.health ?? { providers: [], degraded: false }),
+        );
+      if (url.startsWith("/api/search/preview"))
+        return options.onPreview?.() ?? new Response(JSON.stringify(candidate));
+      if (url.startsWith("/api/search")) {
+        if (init?.signal) signals.push(init.signal);
+        return options.searchFails
+          ? new Response("upstream is down", { status: 502 })
+          : new Response(JSON.stringify([candidate]));
+      }
+      if (init?.method === "POST" && url === "/api/entries") {
+        const body: unknown = JSON.parse(String(init.body));
+        posts.push(body);
+        return (
+          options.onCreate?.(body) ??
+          new Response(
+            JSON.stringify({
+              entry: { ...populated.items[0], id: 42 },
+              already_exists: false,
+              near_matches: [],
+            }),
+            { status: 201 },
+          )
+        );
+      }
+      // The library. A query in the URL is the "did you already own it" question.
+      const hasQuery = url.includes("q=");
+      return new Response(
+        JSON.stringify(hasQuery && !libraryHasRows ? empty : populated),
+        { status: 200 },
+      );
+    },
+  );
   vi.stubGlobal("fetch", fetchMock);
   return {
     urls,
-    providerCalls: () => urls.filter((u) => u.startsWith("/api/search")),
+    posts,
+    signals,
+    providerCalls: () =>
+      urls.filter((u) => u.startsWith("/api/search") && !u.includes("preview")),
   };
+}
+
+/** Type a miss, wait for the one search it costs, and open the confirm dialog. */
+async function openConfirmDialog(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+  const result = await screen.findByRole(
+    "button",
+    { name: /Dune Messiah/ },
+    { timeout: 3000 },
+  );
+  await user.click(result);
+  return screen.findByRole("dialog");
 }
 
 const settle = (ms = 1400) => new Promise((r) => setTimeout(r, ms));
@@ -871,4 +925,222 @@ test("choosing a web result opens the confirm form over the library", async () =
   expect(
     within(dialog).getByRole("button", { name: /add to library/i }),
   ).toBeVisible();
+});
+
+/* ------------------------------------------------------------------ *
+ * The functionality inventory (deliverable 4). Each row is the thing
+ * the owner asked not to lose, demonstrated from `/` rather than /add.
+ * ------------------------------------------------------------------ */
+
+test("row 3+4: a degraded provider is announced, and a failed search offers the way past it", async () => {
+  stubBar({
+    libraryHasRows: false,
+    searchFails: true,
+    health: {
+      providers: [{ name: "googlebooks", healthy: false, reason: "quota" }],
+      degraded: true,
+    },
+  });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+  // A failed search is a dead end unless it says so and offers a way past it.
+  expect(
+    await screen.findByRole("alert", {}, { timeout: 3000 }),
+  ).toHaveTextContent(/providers are unavailable/i);
+  expect(screen.getByRole("button", { name: /enter manually/i })).toBeVisible();
+});
+
+test("row 6: None of these leaves for the manual form", async () => {
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+  await user.click(
+    await screen.findByRole(
+      "button",
+      { name: /enter manually/i },
+      { timeout: 3000 },
+    ),
+  );
+  expect(
+    await screen.findByRole("heading", { name: /add page/i }),
+  ).toBeVisible();
+});
+
+test("row 7: the confirm form shows what the search already returned, and fetches the rest only when asked", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  // Free data, immediately, with no second provider request (DEC-064).
+  expect(within(dialog).getByText("Frank Herbert")).toBeVisible();
+  expect(bar.urls.some((u) => u.includes("/api/search/preview"))).toBe(false);
+
+  await user.click(
+    within(dialog).getByRole("button", { name: /load full details/i }),
+  );
+  await waitFor(() =>
+    expect(
+      bar.urls.filter((u) => u.includes("/api/search/preview")),
+    ).toHaveLength(1),
+  );
+  // Exactly once: the button goes once it has answered.
+  expect(
+    within(dialog).queryByRole("button", { name: /load full details/i }),
+  ).toBeNull();
+});
+
+test("row 7: a failed preview says so and still lets you add", async () => {
+  stubBar({
+    libraryHasRows: false,
+    onPreview: () => new Response("nope", { status: 502 }),
+  });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  await user.click(
+    within(dialog).getByRole("button", { name: /load full details/i }),
+  );
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    /could not be loaded/i,
+  );
+  expect(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  ).toBeEnabled();
+});
+
+test("row 8+9: a near match must be confirmed, and the confirmation takes focus", async () => {
+  let posts = 0;
+  const bar = stubBar({
+    libraryHasRows: false,
+    onCreate: () => {
+      posts += 1;
+      return posts === 1
+        ? new Response(
+            JSON.stringify({
+              error: {
+                code: "near_match_confirmation_required",
+                details: { entry_ids: [7] },
+              },
+            }),
+            { status: 409 },
+          )
+        : new Response(
+            JSON.stringify({
+              entry: { ...populated.items[0], id: 42 },
+              already_exists: false,
+              near_matches: [],
+            }),
+            { status: 201 },
+          );
+    },
+  });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  await user.click(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  );
+  const confirm = await within(dialog).findByRole("button", {
+    name: /add separate edition/i,
+  });
+  // Row 9: the 409 puts focus on the button that resolves it.
+  expect(confirm).toHaveFocus();
+  expect(
+    within(dialog).getByRole("button", { name: /open existing entry/i }),
+  ).toBeVisible();
+
+  await user.click(confirm);
+  await waitFor(() => expect(bar.posts).toHaveLength(2));
+  expect(
+    (bar.posts[1] as { confirm_near_match?: boolean }).confirm_near_match,
+  ).toBe(true);
+});
+
+test("row 9: choosing a result focuses the status control", async () => {
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  await waitFor(() =>
+    expect(
+      within(dialog).getByRole("combobox", { name: /status/i }),
+    ).toHaveFocus(),
+  );
+});
+
+test("row 10+11: an add that already exists opens it, and a new one is highlighted in place", async () => {
+  const bar = stubBar({
+    libraryHasRows: false,
+    onCreate: () =>
+      new Response(
+        JSON.stringify({
+          entry: { ...populated.items[0], id: 7 },
+          already_exists: true,
+          near_matches: [],
+        }),
+        { status: 200 },
+      ),
+  });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  await user.click(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  );
+  expect(await findToast("Already in your library")).toBeInTheDocument();
+  // Row 10: exactly one POST, and no second add behind the 200.
+  expect(bar.posts).toHaveLength(1);
+});
+
+test("row 11: a successful add closes the dialog and stays on the library", async () => {
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const dialog = await openConfirmDialog(user);
+
+  await user.click(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  );
+  expect(await findToast("Book added")).toBeInTheDocument();
+  // The handoff on `/` is a dialog closing, not a navigation.
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  expect(screen.queryByRole("heading", { name: /book detail/i })).toBeNull();
+});
+
+test("row 12+13: a superseded search is aborted, and a late response cannot land", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const box = await screen.findByRole("searchbox");
+
+  // Two presses of Add for two different strings: the first request must be
+  // cancelled rather than left running against a rate-limited free API.
+  await user.type(box, "Dune Messiah");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(bar.signals.length).toBe(1));
+  await user.clear(box);
+  await user.type(box, "Children of Dune");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(bar.signals.length).toBe(2));
+
+  expect(bar.signals[0].aborted).toBe(true);
+  expect(bar.signals[1].aborted).toBe(false);
 });

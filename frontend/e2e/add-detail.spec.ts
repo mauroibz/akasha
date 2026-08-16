@@ -68,13 +68,13 @@ test("manual add is keyboard-complete and cached detail edits persist", async ({
   await page.route("**/api/items/3", (route) =>
     route.fulfill({ json: { ...entry.item, title: "Rayuela corregida" } }),
   );
+  // /add opens straight on the manual form, with the cursor already in it.
   await page.goto("/add");
-  await page.getByRole("button", { name: /enter manually/i }).press("Enter");
   await expect(page.getByLabel(/^title$/i)).toBeFocused();
   await page.getByLabel(/^title$/i).fill("Rayuela");
   await page.getByRole("button", { name: /add to library/i }).press("Enter");
   // New entries return to the library with a success toast
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   expect(posted).toBe(1);
   // Navigate to detail to verify the entry was created
   await page.goto("/books/7");
@@ -97,10 +97,11 @@ test("work resolution exposes edition choice and exact duplicate navigates", asy
       json: { entry, already_exists: true, near_matches: [] },
     }),
   );
-  await page.goto("/add");
-  await page
-    .getByRole("searchbox", { name: /search books/i })
-    .fill("https://openlibrary.org/works/OL1W");
+  // Resolving a pasted URL is one of the eleven behaviours that had to survive
+  // the move onto `/` (Sprint 029, inventory row 2).
+  await page.goto("/");
+  await page.getByRole("searchbox").fill("https://openlibrary.org/works/OL1W");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(
     page.getByRole("button", { name: /Rayuela.*1963/i }),
   ).toBeVisible();
@@ -209,15 +210,16 @@ test("search results stagger in and selecting one keeps the keyboard flow", asyn
       ),
     }),
   );
-  await page.goto("/add");
+  await page.goto("/");
 
   const samples = await sampleAnimations(page, async () => {
-    await page.getByRole("searchbox", { name: "Search books" }).fill("Rayuela");
+    await page.getByRole("searchbox").fill("Rayuela");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(
       page.getByRole("button", { name: /None of these/ }),
     ).toBeVisible();
     await expect(
-      page.locator("section[aria-label='Search results'] button"),
+      page.locator("section[aria-label='Results from the web'] button"),
     ).toHaveCount(7);
   });
   // Six results plus the manual fallback, each entering in its own right. The

@@ -345,7 +345,7 @@ test("add has no serious accessibility violations", async ({ page }) => {
   await stubProviderHealth(page);
   await page.goto("/add");
   await expect(
-    page.getByRole("heading", { name: /add to your library/i }),
+    page.getByRole("heading", { name: /enter by hand/i }),
   ).toBeVisible();
   await expectNoSeriousViolations(page, "add");
 });
@@ -355,14 +355,8 @@ test("the add manual form has no serious accessibility violations", async ({
 }) => {
   await stubShelves(page);
   await stubProviderHealth(page);
-  // The manual escape hatch sits at the end of a result list, so the form is
-  // only reachable once a search has come back.
-  await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
+  // The manual form is the whole of /add now, reached directly.
   await page.goto("/add");
-  await page.getByRole("searchbox", { name: "Search books" }).fill("rayuela");
-  await page
-    .getByRole("button", { name: /enter manually/i })
-    .click({ timeout: 15_000 });
   await expect(page.getByLabel("Title", { exact: true })).toBeVisible();
   await expectNoSeriousViolations(page, "add (manual form)");
 });
@@ -372,7 +366,13 @@ test("the degraded provider notice has no serious accessibility violations", asy
 }) => {
   await stubShelves(page);
   await stubProviderHealth(page, true);
-  await page.goto("/add");
+  // The notice sits with the web results, which is where a degraded provider is
+  // the reader's problem — a library page reaches no provider at all.
+  await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
+  await seedLibrary(page, 1);
+  await page.goto("/");
+  await page.getByRole("searchbox").fill("rayuela");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(page.getByText(/running on fewer providers/i)).toBeVisible();
   await expectNoSeriousViolations(page, "add (degraded providers)");
 });

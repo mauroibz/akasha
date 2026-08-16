@@ -364,14 +364,13 @@ test("keyboard guards and reduced motion remain effective", async ({
   await seedLibrary(page);
   await page.goto("/");
   await page.keyboard.press("/");
-  await expect(
-    page.getByRole("searchbox", { name: "Search library" }),
-  ).toBeFocused();
+  const bar = page.getByRole("searchbox", {
+    name: "Search your library, or add something new",
+  });
+  await expect(bar).toBeFocused();
   await page.keyboard.type("a");
-  await expect(page).toHaveURL("/");
-  await expect(
-    page.getByRole("searchbox", { name: "Search library" }),
-  ).toHaveValue("a");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(bar).toHaveValue("a");
   const firstRow = page.locator("[data-entry-id='1']");
   await firstRow.focus();
   await page.keyboard.press("j");
@@ -397,7 +396,8 @@ test("keyboard guards and reduced motion remain effective", async ({
   await page.keyboard.press("Escape");
   await page.getByRole("heading", { name: "Akasha" }).click();
   await page.keyboard.press("a");
-  await expect(page).toHaveURL("/add");
+  // `a` focuses the bar instead of navigating: adding happens here now.
+  await expect(bar).toBeFocused();
 });
 
 for (const viewport of viewports) {
