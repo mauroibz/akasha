@@ -94,6 +94,10 @@ test("announces loading and then renders the populated library and inbox facet",
   );
   renderPage();
   expect(screen.getByRole("status")).toHaveTextContent("Loading your library");
+  // The list request now waits for `/api/item-types`, because every list request
+  // names a domain and on a cold visit the registry is where that name comes from.
+  // So the response cannot be resolved until the request has actually been made.
+  await waitFor(() => expect(resolveResponse).toBeDefined());
   resolveResponse?.(new Response(JSON.stringify(populated), { status: 200 }));
   expect(await screen.findByText("Rayuela")).toBeVisible();
   expect(screen.getAllByText(/Inbox 12/)[0]).toBeVisible();
@@ -520,11 +524,63 @@ test("the domain tab strip is built from the registry, not from a hardcoded list
     within(strip)
       .getAllByRole("radio")
       .map((tab) => tab.textContent),
-  ).toEqual(["All", "Book", "Record", "Wine"]);
-  // Nothing has been chosen, so the library is unfiltered.
-  expect(requestedUrls(fetchMock).some((url) => url.includes("type="))).toBe(
-    false,
+  ).toEqual(["Book", "Record", "Wine"]);
+  // The strip always names exactly one domain (DEC-065), so with nothing
+  // remembered the library is filtered to the first declared one rather than
+  // showing everything.
+  await waitFor(() => {
+    expect(
+      requestedUrls(fetchMock).some(
+        (url) => url.startsWith("/api/entries?") && url.includes("type=book"),
+      ),
+    ).toBe(true);
+  });
+});
+
+test("nothing remembered lands on the first declared domain, and there is no way back to All", async () => {
+  const fetchMock = stubRegistry();
+  renderPage();
+  await screen.findByText("Rayuela");
+
+  const strip = await screen.findByRole("radiogroup", {
+    name: "Choose a domain",
+  });
+  // "All" is gone as a control, not merely as a default: there is no way to
+  // express a library filtered by no domain at all.
+  expect(within(strip).queryByRole("radio", { name: "All" })).toBeNull();
+  expect(screen.getByRole("radio", { name: "Book" })).toHaveAttribute(
+    "aria-checked",
+    "true",
   );
+  // And every library request names a domain.
+  const libraryUrls = requestedUrls(fetchMock).filter((url) =>
+    url.startsWith("/api/entries?"),
+  );
+  expect(libraryUrls.length).toBeGreaterThan(0);
+  expect(libraryUrls.every((url) => url.includes("type="))).toBe(true);
+});
+
+test("a stored empty preference resolves to the first declared domain", async () => {
+  // Sprint 027 stored "" as the way of saying "All". That filter no longer
+  // exists, and `readDomainPreference` also returns "" for a first-ever visit,
+  // so one branch has to cover both.
+  localStorage.setItem("akasha.library.domain", "");
+  const fetchMock = stubRegistry();
+  renderPage();
+  await screen.findByText("Rayuela");
+
+  await waitFor(() => {
+    expect(
+      requestedUrls(fetchMock).some(
+        (url) => url.startsWith("/api/entries?") && url.includes("type=book"),
+      ),
+    ).toBe(true);
+  });
+  expect(
+    requestedUrls(fetchMock).some(
+      (url) => url.startsWith("/api/entries?") && !url.includes("type="),
+    ),
+  ).toBe(false);
 });
 
 test("choosing a domain filters the library, and the choice is in the URL", async () => {

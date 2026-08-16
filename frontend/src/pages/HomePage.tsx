@@ -48,8 +48,6 @@ import {
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
 const allFormats = "__all_formats__";
-/** The same problem one tier up: "every domain" is a tab and needs a value. */
-const allDomains = "__all_domains__";
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
@@ -138,37 +136,28 @@ export function HomePage() {
     return () => window.clearTimeout(timer);
   }, [search, filters.query, setSearchParams]);
 
+  const itemTypes = useItemTypes();
+  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
   /**
-   * A fresh visit lands on the domain last used.
+   * Whether the library can be asked for rows yet.
    *
-   * It runs once, before anything is fetched, and writes the value into the URL —
-   * from there the choice is an ordinary filter, so a reload, the back button and a
-   * shared link all behave without this effect being involved again. A `type`
-   * already in the URL wins, because that is somebody being explicit.
+   * Every list request names a domain now, and on a cold visit the domain is not
+   * known until the registry answers — so firing before that spends a request on an
+   * unfiltered page that is replaced a moment later, and flashes another domain's
+   * rows on the way. Waiting is one condition; the two ways of being ready are a
+   * `type` already resolved into the URL, and a build whose registry declares nothing
+   * to filter by, which includes the registry having failed. A registry outage must
+   * not be the reason the library is blank.
    */
-  const restoredDomain = useRef(false);
-  useEffect(() => {
-    if (restoredDomain.current) return;
-    restoredDomain.current = true;
-    if (searchParams.has("type")) return;
-    const remembered = readDomainPreference();
-    if (!remembered) return;
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        next.set("type", remembered);
-        return next;
-      },
-      { replace: true },
-    );
-  }, [searchParams, setSearchParams]);
-
+  const domainReady =
+    filters.types.length > 0 || (!itemTypes.isPending && domains.length === 0);
   const library = useInfiniteQuery({
     queryKey: ["library", filters],
     queryFn: ({ pageParam, signal }) =>
       getLibraryPage(filters, pageParam, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
+    enabled: domainReady,
     retry: false,
   });
   const entries = useMemo(
@@ -178,8 +167,6 @@ export function HomePage() {
   );
   // Every shelf, not only the ones on the pages loaded so far: a shelf whose books
   // are all further down the list was previously unfilterable.
-  // One cached request for the whole session, shared with every card on the page.
-  const itemTypes = useItemTypes();
   const shelfQuery = useQuery({
     queryKey: ["shelves"],
     queryFn: getShelves,
@@ -192,17 +179,54 @@ export function HomePage() {
     if (!Array.isArray(rows)) return [];
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   }, [shelfQuery.data]);
-  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  /**
+   * A fresh visit lands on the domain last used, and always on exactly one.
+   *
+   * It writes the value into the URL — from there the choice is an ordinary filter,
+   * so a reload, the back button and a shared link all behave without this effect
+   * being involved again. A `type` already in the URL wins, because that is somebody
+   * being explicit.
+   *
+   * The fallback is the **first declared domain**, not "everything" (DEC-065). Three
+   * cases reach it and they are deliberately one branch: never having chosen, the
+   * literal `""` Sprint 027 stored as its way of saying "All", and a remembered domain
+   * this build no longer declares. None of them can be honoured as a filter now, and
+   * a library filtered by no domain is exactly the state this sprint removes.
+   *
+   * It waits for the registry, because the fallback is a value only the registry has.
+   */
+  const restoredDomain = useRef(false);
+  useEffect(() => {
+    if (restoredDomain.current) return;
+    if (searchParams.has("type")) {
+      restoredDomain.current = true;
+      return;
+    }
+    if (itemTypes.isPending) return;
+    restoredDomain.current = true;
+    if (!domains.length) return;
+    const remembered = readDomainPreference();
+    const chosen = domains.some((type) => type.id === remembered)
+      ? remembered
+      : domains[0].id;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("type", chosen);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams, domains, itemTypes.isPending]);
   // One domain at a time is the whole point of the strip, so the filter carries at
   // most one value even though the API accepts a repeated parameter.
   const selectedDomain = filters.types[0] ?? "";
-  // The domains the chips and the format list describe: one when a tab is chosen,
-  // all of them under "All".
+  // The domain the chips and the format list describe. Always exactly one once the
+  // registry has loaded, which is what lets one control mean both "these rows" and
+  // "these providers" (DEC-065). It is a list only because the registry may not have
+  // answered yet, and because `.map` over nothing is the whole empty case.
   const shownDomains = useMemo(
-    () =>
-      selectedDomain
-        ? domains.filter((type) => type.id === selectedDomain)
-        : domains,
+    () => domains.filter((type) => type.id === selectedDomain),
     [domains, selectedDomain],
   );
   // Every format the shown domains declare, once. The filter spans domains — an
@@ -348,13 +372,13 @@ export function HomePage() {
    */
   const chooseDomain = (id: string) => {
     const kept = new Set(
-      (id ? domains.filter((type) => type.id === id) : domains).flatMap(
-        (type) => type.statuses.map((status) => status.value),
-      ),
+      domains
+        .filter((type) => type.id === id)
+        .flatMap((type) => type.statuses.map((status) => status.value)),
     );
     localStorage.setItem(domainPreferenceKey, id);
     updateFilters({
-      types: id ? [id] : [],
+      types: [id],
       statuses: filters.statuses.filter((value) => kept.has(value)),
     });
   };
@@ -532,9 +556,9 @@ export function HomePage() {
           aria-label="Choose a domain"
           className="mt-6 inline-flex rounded-full bg-surface p-1"
         >
-          {[{ id: "", label: "All" }, ...domains].map((choice) => (
+          {domains.map((choice) => (
             <button
-              key={choice.id || allDomains}
+              key={choice.id}
               type="button"
               role="radio"
               aria-checked={selectedDomain === choice.id}
@@ -550,12 +574,13 @@ export function HomePage() {
           ))}
         </div>
       )}
-      {/* One row per domain, each under its own name.
-          A library holding books and records has no single status vocabulary to
-          put in one row: "Read" and "Owned" beside each other with no indication
-          of what they belong to reads as one confused list (DEC-060). With a tab
-          chosen there is only one row and the tab already carries the name, so the
-          heading comes off rather than saying it twice. */}
+      {/* One row, for the one domain the strip names.
+          There was a second shape here — a row per domain, each under its own
+          heading — for the "All" filter that DEC-065 removed. A library holding
+          books and records has no single status vocabulary to put in one row, so
+          under "All" the headings were what stopped "Read" and "Owned" beside each
+          other reading as one confused list (DEC-060). With a domain always chosen
+          the tab carries the name, and the heading would say it twice. */}
       {shownDomains.map((type) => (
         <div
           key={type.id}
@@ -563,11 +588,6 @@ export function HomePage() {
           aria-label={`Filter ${type.label.toLowerCase()}s by status`}
           role="group"
         >
-          {!selectedDomain && (
-            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              {type.label}
-            </span>
-          )}
           {type.statuses.map((status) => {
             const active = filters.statuses.includes(status.value);
             return (
