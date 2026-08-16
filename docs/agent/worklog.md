@@ -1567,3 +1567,67 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Blocked/open: **merging and releasing the album work is an owner action and is now unblocked.**
   Nothing else.
 - Next: Sprint 029 (one search bar, now with copy neutrality) is `ready`.
+
+## 2026-08-16 — Sprint 029 (in progress: all code and verification done, docs pending)
+- Done, before the sprint: reviewed the ready sprint file against the code and
+  corrected it (`8d877a3`). The copy inventory claimed eighteen strings across eight
+  files while its own table listed nineteen across nine, and it missed `HomePage`'s
+  empty state and `NotFoundPage` entirely — `HomePage` being the screen the sprint
+  rebuilds. AC9 was a prose claim that could never reach zero without renaming
+  `manualBookSchema`/`ManualBookValues`; it is a runnable command with stated
+  exclusions now. The `AbortController` and the stale-response guard joined the
+  functionality inventory as rows 12 and 13. `WORKFLOW.md`'s final-sprint rule still
+  said Sprint 030 / revision 11 while citing `FINAL_SPRINT`, which DEC-071 moved to 31.
+- Done, the sprint: six commits. `397da78` removes "All" and makes the list query wait
+  for the registry; `a174842` extracts `AddForm` and `ResultsGrid` and adds `labelFor`;
+  `7c94cb4` builds the unified bar, the settled-and-empty rule, the web-results region
+  and the add dialog; `47e0b4d` leaves `/add` to manual entry and moves its tests;
+  `de12294` is copy neutrality; `97b4c34` is the AC7 gates and the keyboard rule;
+  `d845317` is the walkthrough fix.
+- Verified: 469 backend + 146 frontend tests, 90 e2e (2 skipped), `make check`,
+  `make build`, `make smoke-container` all green. **The quota rule was verified by
+  counting requests against live providers**, not by inspection: a title I own costs
+  0 provider requests; one I do not costs exactly 1; the same string retyped costs 0;
+  **Add** on a query with local hits costs 1; a pasted ISBN takes
+  `/api/search/resolve`. AC7 re-run with a web-results block: 28 mounted cards against
+  DEC-023's bound of 48, and the list's bounding box does not move when the block
+  appears — results render *below* the list, so `scrollMargin` never changes.
+- Deviations, and the one that matters: **AC7 says "with a web-results block above
+  it" while deliverable 3 and the accepted proposal both say results render *below*
+  the library.** Below is what shipped, because deliverable 3 is the specification
+  and the proposal's diagram agrees with it; the AC's "above" is an incidental phrase.
+  The consequence is that the Sprint 013 class of bug is avoided by construction
+  rather than survived — recorded here rather than quietly.
+  Also: `/add` lost its domain chooser. `LibraryService.add` types a manual item as
+  `DEFAULT_DOMAIN.item_type` whatever the client sends (DEC-067 row 6), so the old
+  chooser showed a record's statuses and fields and then wrote a book.
+  Also: deliverable 6 needed **no new `Domain` field**. One neutral placeholder
+  naming title, creator, ISBN and link serves every domain, and the resolve path it
+  advertises is domain-neutral anyway. The backend contract is untouched after all.
+- Dead ends worth not repeating: **do not `git checkout <file>` to undo a mutation
+  test.** It reverted uncommitted work twice — once losing the `data-web-results`
+  attribute and the results-grid label change, once restoring "Add a book" to the
+  library's empty state after the copy pass. AC9's grep is what caught the second;
+  copy the file to the scratchpad and copy it back instead.
+- Walkthrough gate, against the real dev library and live providers (Open Library,
+  Google Books, MusicBrainz): everything above, plus adding a record and a book from
+  `/` with notes, format and a created shelf, and the duplicate path (200, "Already in
+  your library", navigates to `/books/17`). **It found one defect, now fixed
+  (`d845317`)**: adding from `/` closed the dialog onto a library still filtered by
+  the query that had just missed, so the new entry was created and highlighted where
+  nothing could see it. The old flow got this free by navigating to an unfiltered `/`.
+  One transient **502 on an album add** (MusicBrainz at add time); the identical retry
+  returned 201. Not a sprint regression — the add path is unchanged — but worth
+  watching.
+- Dev library state: **16 entries, up from 13.** The walkthrough added *The Left Hand
+  of Darkness* (19), *Selected Ambient Works 85–92* (20), *Kid A* (21) and *OK
+  Computer* (22), and created a shelf named *Walkthrough* (id 5). Left in place rather
+  than deleted; the pre-walkthrough database is at
+  `backups/pre-sprint029-20260816T042730Z/books.db` if the owner wants it back.
+- Blocked/open: none.
+- Next: **documentation only.** Product spec section 7 still describes `/add` as the
+  place you search; technical spec sections 7.1/8 describe the two debounces; a
+  decision entry is owed for the settled-and-empty rule as built, the `/add` domain
+  chooser removal, the below-not-above resolution and the no-new-`Domain`-field
+  outcome. Then the sprint `Outcome`, the ROADMAP impact review, `state.json`,
+  `HANDOFF.md`, and the `docs(sprint-029): close sprint and hand off` commit.
