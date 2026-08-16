@@ -327,7 +327,9 @@ test("score shortcuts apply to a focused row but editable controls keep their ke
       screen.getByRole("button", { name: /score for rayuela: 5/i }),
     ).toBeVisible(),
   );
-  const search = screen.getByRole("searchbox", { name: "Search library" });
+  const search = screen.getByRole("searchbox", {
+    name: "Search your library, or add something new",
+  });
   await user.click(search);
   await user.keyboard("a");
   expect(search).toHaveValue("a");
@@ -679,4 +681,194 @@ test("switching domain drops a status the new domain has no vocabulary for", asy
     expect(last).toContain("type=album");
     expect(last).not.toContain("status=reading");
   });
+});
+
+/* ------------------------------------------------------------------ *
+ * Sprint 029 — one bar: the library first, a provider only on a miss.
+ * ------------------------------------------------------------------ */
+
+const empty = {
+  items: [],
+  next_cursor: null,
+  total: 0,
+  facets: {
+    status_counts: { unsorted: 0 },
+    status_counts_by_type: {},
+    format_counts: {},
+  },
+};
+
+const candidate = {
+  source: "openlibrary",
+  source_id: "OL1M",
+  source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+  title: "Dune Messiah",
+  subtitle: null,
+  creators: ["Frank Herbert"],
+  credit: "Frank Herbert",
+  year: 1969,
+  cover_url: null,
+  identifiers: {},
+  language: "en",
+  metadata: {},
+};
+
+/**
+ * The whole point of the bar is which requests it does and does not make, so the
+ * stub records every URL and the tests count them.
+ */
+function stubBar({ libraryHasRows = true } = {}) {
+  const urls: string[] = [];
+  const fetchMock = vi.fn(async (request: string | URL | Request) => {
+    const url = String(request);
+    urls.push(url);
+    if (url.startsWith("/api/item-types"))
+      return new Response(JSON.stringify(threeDomains));
+    if (url.startsWith("/api/shelves")) return new Response("[]");
+    if (url.startsWith("/api/health/providers"))
+      return new Response(JSON.stringify({ providers: [], degraded: false }));
+    if (url.startsWith("/api/search"))
+      return new Response(JSON.stringify([candidate]));
+    // The library. A query in the URL is the "did you already own it" question.
+    const hasQuery = url.includes("q=");
+    return new Response(
+      JSON.stringify(hasQuery && !libraryHasRows ? empty : populated),
+      { status: 200 },
+    );
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return {
+    urls,
+    providerCalls: () => urls.filter((u) => u.startsWith("/api/search")),
+  };
+}
+
+const settle = (ms = 1400) => new Promise((r) => setTimeout(r, ms));
+
+test("a library hit reaches no provider, however long the query gets", async () => {
+  const bar = stubBar({ libraryHasRows: true });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Rayuela");
+  await settle();
+
+  // AC1. Not "few requests" — none. The library answering is the whole reason
+  // this bar can be one bar.
+  expect(bar.providerCalls()).toEqual([]);
+});
+
+test("a settled query with nothing local reaches a provider exactly once", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+  await waitFor(() => expect(bar.providerCalls().length).toBe(1), {
+    timeout: 3000,
+  });
+  await settle();
+
+  // AC2, counted rather than eyeballed: typing twelve characters costs one
+  // search, not twelve (DEC-065, and DEC-044 for why that matters).
+  expect(bar.providerCalls().length).toBe(1);
+  expect(await screen.findByText("Dune Messiah")).toBeVisible();
+});
+
+test("the same query typed again reaches no provider at all", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const box = await screen.findByRole("searchbox");
+
+  await user.type(box, "Dune Messiah");
+  await waitFor(() => expect(bar.providerCalls().length).toBe(1), {
+    timeout: 3000,
+  });
+  await user.clear(box);
+  await user.type(box, "Dune Messiah");
+  await settle();
+
+  expect(bar.providerCalls().length).toBe(1);
+});
+
+test("Add searches immediately even when the library has the answer", async () => {
+  const bar = stubBar({ libraryHasRows: true });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Rayuela");
+  await settle();
+  expect(bar.providerCalls()).toEqual([]);
+
+  // AC3: the override for "I know this is a different edition".
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(bar.providerCalls().length).toBe(1));
+  expect(bar.providerCalls()[0]).toContain("/api/search?");
+});
+
+test("a pasted ISBN and a pasted URL both take the resolve route", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const box = await screen.findByRole("searchbox");
+
+  await user.type(box, "9780441013593");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(bar.providerCalls().length).toBe(1));
+  expect(bar.providerCalls()[0]).toContain("/api/search/resolve?url=");
+
+  await user.clear(box);
+  await user.type(box, "https://openlibrary.org/books/OL1M");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await waitFor(() => expect(bar.providerCalls().length).toBe(2));
+  expect(bar.providerCalls()[1]).toContain("/api/search/resolve?url=");
+});
+
+test("the domain chosen picks the providers as well as the rows", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  // AC4: one action, both meanings, and never a moment where the application
+  // would have to ask which domain a search means.
+  await user.click(screen.getByRole("radio", { name: "Record" }));
+  await user.type(await screen.findByRole("searchbox"), "Kind of Blue");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+
+  await waitFor(() => expect(bar.providerCalls().length).toBe(1));
+  expect(bar.providerCalls()[0]).toContain("type=album");
+  expect(
+    bar.urls.some((u) => u.includes("q=Kind") && u.includes("type=album")),
+  ).toBe(true);
+});
+
+test("choosing a web result opens the confirm form over the library", async () => {
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+  const result = await screen.findByRole(
+    "button",
+    { name: /Dune Messiah/ },
+    { timeout: 3000 },
+  );
+  await user.click(result);
+
+  const dialog = await screen.findByRole("dialog");
+  // The confirm form entire, in a dialog, over a library that is still there.
+  expect(
+    within(dialog).getByRole("combobox", { name: /status/i }),
+  ).toBeVisible();
+  expect(
+    within(dialog).getByRole("button", { name: /add to library/i }),
+  ).toBeVisible();
 });

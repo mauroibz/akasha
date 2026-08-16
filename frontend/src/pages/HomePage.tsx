@@ -32,7 +32,18 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
-import { domainsFrom, sortLabels } from "@/features/library/labels";
+import { domainsFrom, labelFor, sortLabels } from "@/features/library/labels";
+import { AddForm } from "@/features/add/AddForm";
+import { ResultsGrid } from "@/features/add/ResultsGrid";
+import { useWebSearch } from "@/features/add/useWebSearch";
+import { ProviderHealthNotice } from "@/components/ProviderHealthNotice";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { SearchCandidate } from "@/api/add";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import {
   domainPreferenceKey,
@@ -85,7 +96,19 @@ export function HomePage() {
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [rollbackId, setRollbackId] = useState<number | null>(null);
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<SearchCandidate | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  /**
+   * When the reader last touched the box.
+   *
+   * The settle rule is "still for ~800 ms", and the conditions that let a search
+   * fire — the URL caught up, the library answered, it answered with nothing —
+   * become true at their own pace. Measuring the wait from the last keystroke rather
+   * than from the last of those means a slow library does not push the search out by
+   * however long it took.
+   */
+  const lastTypedAt = useRef(0);
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
   const navigate = useNavigate();
@@ -328,7 +351,7 @@ export function HomePage() {
       }
       if (event.key === "a") {
         event.preventDefault();
-        void navigate("/add");
+        searchRef.current?.focus();
         return;
       }
       if (
@@ -388,6 +411,58 @@ export function HomePage() {
   };
 
   const inboxCount = firstPage?.facets.status_counts.unsorted ?? 0;
+  const domainLabel = labelFor(selectedDomain, domains);
+  const web = useWebSearch(selectedDomain);
+
+  /**
+   * Settled and empty: the only way typing reaches a provider (DEC-065).
+   *
+   * Every condition here is load-bearing. Three characters, because two is a
+   * fragment of a word. The URL caught up with the box, because until it has, the
+   * library on screen answers a different question. The library actually answered —
+   * pending or errored is not "the library has nothing", it is "we do not know yet",
+   * and guessing costs a request. Zero rows, strictly: searching `dune` while owning
+   * *Dune* returns one row and may well be somebody looking for *Dune Messiah*, and a
+   * strict rule is the only one that never guesses on the reader's behalf.
+   *
+   * The literal reading of the ask — search whenever the library misses — fires once
+   * per keystroke while typing any title not already owned, which is every add.
+   * `Kind of Blue` would cost twelve searches at a five-second timeout each.
+   */
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed.length < 3) return;
+    if (trimmed !== filters.query) return;
+    if (!library.isSuccess || library.isFetching) return;
+    if ((firstPage?.items.length ?? 0) > 0) return;
+    if (web.hasSearched(trimmed)) return;
+    const wait = Math.max(0, 800 - (Date.now() - lastTypedAt.current));
+    const timer = window.setTimeout(() => web.search(trimmed), wait);
+    return () => window.clearTimeout(timer);
+  }, [
+    search,
+    filters.query,
+    library.isSuccess,
+    library.isFetching,
+    firstPage,
+    web,
+  ]);
+
+  /**
+   * The override: search now, whatever the library holds.
+   *
+   * Cached when the string has already been searched, because pressing a button is
+   * not new information about the world — it is the reader saying "show me the web
+   * for this", and the web for this is already here.
+   */
+  const searchTheWeb = () => {
+    const trimmed = search.trim();
+    if (!trimmed) {
+      searchRef.current?.focus();
+      return;
+    }
+    web.search(trimmed);
+  };
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
@@ -421,27 +496,78 @@ export function HomePage() {
           </Button>
           <Button
             className="rounded-full px-5"
-            onClick={() => void navigate("/add")}
+            onClick={() => searchRef.current?.focus()}
           >
             Add to library
           </Button>
         </div>
       </header>
+      {/* One bar, one row: which domain, the query, and the override.
+          The domain strip sits inside it rather than under the filters, because it
+          now picks two things at once — the rows shown and the providers a search
+          would reach — and a control that means both belongs beside the thing it
+          means them about. */}
       <section
-        aria-label="Library controls"
+        aria-label="Search and add"
         className="mt-6 flex flex-wrap items-center gap-3"
       >
+        {domains.length > 1 && (
+          <div
+            role="radiogroup"
+            aria-label="Choose a domain"
+            className="inline-flex shrink-0 rounded-full bg-surface p-1"
+          >
+            {domains.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                role="radio"
+                aria-checked={selectedDomain === choice.id}
+                className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+                  selectedDomain === choice.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                } focus-ring`}
+                onClick={() => chooseDomain(choice.id)}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="relative min-w-60 flex-1">
-          <span className="sr-only">Search library</span>
+          <span className="sr-only">
+            Search your library, or add something new
+          </span>
           <Input
             ref={searchRef}
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title or creator  /"
+            onChange={(event) => {
+              lastTypedAt.current = Date.now();
+              setSearch(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                searchTheWeb();
+              }
+            }}
+            placeholder="Title, creator, ISBN or link  /"
             className="h-11 rounded-full bg-surface"
           />
         </label>
+        <Button
+          className="h-11 shrink-0 rounded-full px-6"
+          onClick={searchTheWeb}
+        >
+          Add
+        </Button>
+      </section>
+      <section
+        aria-label="Library controls"
+        className="mt-3 flex flex-wrap items-center gap-3"
+      >
         <Select
           value={`${filters.sort}:${filters.order}`}
           onValueChange={(value) => {
@@ -541,39 +667,6 @@ export function HomePage() {
           </Button>
         </div>
       </section>
-      {/* The domain strip. Rendered from `/api/item-types`, so a third domain
-          appears here by existing rather than by anybody editing this file.
-
-          A radio group and not a Radix `Tabs`, for the same reason the add screen
-          chooses its domain this way: a tab claims a panel it controls, and a
-          `TabsTrigger` with no `TabsContent` behind it points `aria-controls` at
-          an element that does not exist — which axe reports as a critical
-          `aria-valid-attr-value` failure. This is a single-choice filter, and a
-          radio group is what that is. */}
-      {domains.length > 1 && (
-        <div
-          role="radiogroup"
-          aria-label="Choose a domain"
-          className="mt-6 inline-flex rounded-full bg-surface p-1"
-        >
-          {domains.map((choice) => (
-            <button
-              key={choice.id}
-              type="button"
-              role="radio"
-              aria-checked={selectedDomain === choice.id}
-              className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                selectedDomain === choice.id
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              } focus-ring`}
-              onClick={() => chooseDomain(choice.id)}
-            >
-              {choice.label}
-            </button>
-          ))}
-        </div>
-      )}
       {/* One row, for the one domain the strip names.
           There was a second shape here — a row per domain, each under its own
           heading — for the "All" filter that DEC-065 removed. A library holding
@@ -683,6 +776,79 @@ export function HomePage() {
           </m.div>
         )}
       </AnimatePresence>
+      {/* Below the library, and a region of its own.
+          The library is a `role="feed"` carrying server-side `aria-posinset` and
+          `aria-setsize` (DEC-038); these are not feed items and must never be
+          counted as some. A plain labelled section is what keeps the two apart, and
+          below rather than above is also what keeps the virtualizer's `scrollMargin`
+          still — a variable-height block over a window-virtualized list is the
+          Sprint 013 class of bug. */}
+      {web.query && (
+        <section aria-labelledby="web-results-title" className="mt-12">
+          <h2 id="web-results-title" className="text-xl font-semibold">
+            From the web
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Not in your library. Results for “{web.query}”.
+          </p>
+          <ProviderHealthNotice />
+          {web.pending && <p role="status">Searching metadata providers…</p>}
+          {web.error && <p role="alert">{web.error}</p>}
+          {web.warning && <p role="status">{web.warning}</p>}
+          {!web.pending && (
+            <ResultsGrid
+              results={web.results}
+              label="Results from the web"
+              onSelect={setSelectedCandidate}
+              onManual={() => void navigate("/add")}
+            />
+          )}
+        </section>
+      )}
+      {/* The confirm step, over the library rather than instead of it. Escape is
+          already the way out of every other dialog here, and the library staying
+          behind it is what makes adding stop being a place you go. */}
+      <Dialog
+        open={selectedCandidate !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCandidate(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add to your library</DialogTitle>
+          </DialogHeader>
+          {selectedCandidate && (
+            <AddForm
+              itemType={selectedDomain}
+              itemTypes={domains}
+              candidate={selectedCandidate}
+              manual={false}
+              onAdded={(entryId, alreadyExists) => {
+                setSelectedCandidate(null);
+                if (alreadyExists) {
+                  toast("Already in your library", {
+                    description: "Opened the entry you already have.",
+                  });
+                  void navigate(`/books/${entryId}`);
+                  return;
+                }
+                toast.success(`${domainLabel} added`);
+                // On `/` the handoff is a dialog closing rather than a
+                // navigation, so the highlight is set directly instead of
+                // travelling as router state.
+                setHighlightId(entryId);
+                setFocusedId(entryId);
+                void queryClient.invalidateQueries({ queryKey: ["library"] });
+              }}
+              onOpenExisting={(entryId) => {
+                setSelectedCandidate(null);
+                void navigate(`/books/${entryId}`);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }
