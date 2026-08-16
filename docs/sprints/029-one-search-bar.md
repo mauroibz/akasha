@@ -29,7 +29,12 @@ Accepted as `docs/unified-search-proposal.md` and **DEC-065**, with the owner's 
 5. `frontend/src/pages/AddPage.tsx` and `frontend/src/pages/HomePage.tsx` in full, and
    `frontend/src/api/add.ts`
 6. `docs/specs/product-spec.md` section 7; `docs/specs/technical-spec.md` sections 7.1 and 8
-7. `docs/agent/HANDOFF.md` and the last worklog entry
+7. **Only if deliverable 6 adds a `Domain` field:** `docs/specs/technical-spec.md` **section 6.6**
+   (the binding domain contract), `docs/guides/adding-a-domain.md`, and
+   `backend/tests/test_domain_conformance.py` — whose
+   `test_the_suite_covers_every_field_of_the_contract` **fails by design** when a field is added to
+   `Domain` without a check. That failure is the contract working, not a defect to route around.
+8. `docs/agent/HANDOFF.md` and the last worklog entry
 
 ## Current implementation baseline
 
@@ -57,8 +62,11 @@ Observed 2026-08-15 at Sprint 027's close. **Re-derive at activation.**
    reach. The input keeps the library's current debounce and URL behaviour exactly.
 2. **"All" is removed** (DEC-065). The tab strip always names exactly one domain. The remembered
    domain rule is unchanged; the fallback when nothing is remembered is the **first declared
-   domain**. A stored `""` from Sprint 027 must resolve to that fallback rather than to a filter
-   nobody can express. The grouped-chip-rows branch goes away, since there is now always one row.
+   domain**. An **absent or empty** stored preference must resolve to that fallback rather than to a
+   filter nobody can express — note that `readDomainPreference` in
+   `frontend/src/features/library/library.ts` returns `""` both for a value stored by Sprint 027 and
+   for a first-ever visit with nothing stored, so one branch must cover both. The grouped-chip-rows
+   branch goes away, since there is now always one row.
 3. **Web results on `/`, under the settled-and-empty rule.** A provider search fires when the query
    has been still for ~800 ms, is ≥3 characters, and the library returned **zero** rows — never
    twice for the same string — or immediately when **Add** is pressed. Results render in their own
@@ -73,13 +81,19 @@ Observed 2026-08-15 at Sprint 027's close. **Re-derive at activation.**
    layer is already domain-neutral; the copy is not, and this sprint rebuilds the screens where most
    of it lives, so doing it anywhere else would mean doing it twice.
 
-   **Eighteen user-visible strings, across eight files**, measured 2026-08-15:
+   **Twenty-four user-visible strings, across eleven files.** First stated 2026-08-15 as eighteen
+   across eight; **re-measured 2026-08-16 and corrected** — the original count was assembled
+   separately from the rest of this file, missed two whole screens, and did not match its own table,
+   which already listed nine files and nineteen strings. Line numbers are as of the re-measurement
+   and will drift; the strings are the contract, not the numbers.
 
    | Where | What it says |
    |---|---|
    | `pages/AddPage.tsx` | *Book added*, *Book could not be added*, *You can still enter this book manually*, `itemType === "book"` branches for the search label and the placeholder |
-   | `pages/ImportPage.tsx` | *Import books*, and `book`/`books` in three result counts |
-   | `pages/ShelvesPage.tsx` | *Your books are retained*, `N books` per shelf |
+   | `pages/HomePage.tsx` | **:626** *Add a book or visit the inbox to get started.* — the empty state of the very screen this sprint rebuilds |
+   | `pages/NotFoundPage.tsx` | **:23** *Add a book* — the link label on the 404 |
+   | `pages/ImportPage.tsx` | *Import books*, `book`/`books` in three result counts, and **:295** *Your library hides unsorted books until you sort them* |
+   | `pages/ShelvesPage.tsx` | *Your books are retained*, `N books` per shelf, **:99** *Deleting a shelf removes the tag from your books but never deletes the books themselves*, **:241** *This shelf will be removed from all your books. The books themselves are retained…* |
    | `pages/TriagePage.tsx` | *Import books to start triaging*, *Filter by title or author* |
    | `features/library/VirtualLibrary.tsx` | *Loading more books* |
    | `features/detail/CoverDialog.tsx` | *This book has no provider reference or ISBN…*, *…no other editions with covers for this book* |
@@ -93,6 +107,29 @@ Observed 2026-08-15 at Sprint 027's close. **Re-derive at activation.**
    moved**: the search label and the placeholder are per-domain copy the registry can carry, and if
    this sprint needs a new `Domain` field for a placeholder, that is a legitimate registry addition
    with a conformance check, not a branch.
+
+   **Where the two arms differ in substance, the rule above does not decide it, and the sprint must
+   record which behaviour survives rather than picking one silently.** Two of the three branches are
+   like this, and neither is a noun swap:
+
+   - `AddPage.tsx:112` — books get *"You can still enter this book manually."*, albums get *"Try
+     again in a moment."* One arm offers a recovery path the other withholds. **Decide whether every
+     domain is offered manual entry on a failed provider search**, and say so in the Outcome. Manual
+     entry today is bound to `DEFAULT_DOMAIN` (DEC-067 row 6), so offering it for every domain is a
+     promise the add path must actually keep — if it cannot, the neutral copy must not imply it.
+   - `AddPage.tsx:299` — books get *"Title, author, ISBN, or URL"*, albums get *"Album or artist"*.
+     The book arm advertises the **resolve** path, and resolve is domain-neutral: a MusicBrainz URL
+     resolves exactly as an Open Library one does. So the placeholder for every domain names that
+     path. This is the branch most likely to want the `Domain` field.
+
+   **On that field, decide at the boundary rather than mid-flight.** A per-domain placeholder is a
+   declarative addition to `Domain` and costs a conformance check
+   (`test_the_suite_covers_every_field_of_the_contract` fails until it has one) plus the mirrored
+   client union. It is in scope — but note that the roadmap's line about this sprint leaving the
+   backend contract untouched was written before deliverable 6 existed and has been narrowed to
+   match. The alternative, if the field is judged not worth it, is one neutral placeholder for every
+   domain naming title, creator and URL. **Either is acceptable; a surviving `itemType === "book"`
+   branch is not.**
 
    **Deliberately out of scope:** the route `/books/:entryId`. Renaming it touches every `navigate`
    call and seven e2e specs to fix something cosmetic (DEC-067 row 8, reaffirmed). And
@@ -116,6 +153,8 @@ Every one of these exists on `/add` today and must exist in the dialog flow:
 | 9 | Focus management: the bar on open, the status control on selecting a result, the near-match button on a 409, the title field on choosing manual entry |
 | 10 | `already_exists` returning 200 rather than 201, and not double-adding |
 | 11 | On success the new entry is highlighted in the library — which on `/` is now a dialog close rather than a navigation |
+| 12 | **The `AbortController`** (`AddPage.tsx:95`, `:124`): each keystroke aborts the in-flight provider search. A provider search takes about five seconds, so without it a few keystrokes leave several multi-second requests running against a rate-limited free API for results that are thrown away. This is quota protection, not tidiness — see the first risk below |
+| 13 | **The stale-response guard** (`searchRequestId`): a response for a superseded query is discarded, so a slow earlier search cannot overwrite a newer result set |
 
 ## Acceptance criteria
 
@@ -133,18 +172,43 @@ Every one of these exists on `/add` today and must exist in the dialog flow:
    with two result regions on one page.
 8. Nothing renders a format as a shelf; imports, triage, undo, bulk edit, backup, formats and
    statuses are unchanged.
-9. **No screen names a domain in copy that the registry could supply.** Grepping the frontend for
-   `book` outside `book_tracker`, imports and comments returns only the `/books/:entryId` route,
-   which is explicitly out of scope. Demonstrated on an album: adding one says *Album added*, the
-   shelf count reads *N items*, and the cover chooser is absent as Sprint 028 left it.
+9. **No screen names a domain in copy that the registry could supply.** Verified by running this
+   exact command, not by inspection:
+
+   ```bash
+   grep -rniE 'book' frontend/src --include='*.ts' --include='*.tsx' \
+     | grep -v '\.test\.' \
+     | grep -vE '^[^:]+:[0-9]+: *(//|\*|/\*)' \
+     | grep -vE '/books/|book_tracker|manualBookSchema|ManualBookValues|_book_id|Bookmark'
+   ```
+
+   The exclusions are deliberate and each is out of scope for a stated reason: test files assert on
+   copy and follow it; the `/books/:entryId` route stays (DEC-067 row 8); `manualBookSchema`,
+   `ManualBookValues`, `goodreads_book_id` / `calibre_book_id` and lucide's `Bookmark` icon are
+   identifiers, and internal names are permanent by project invariant.
+
+   **The command returns 27 lines today** (measured 2026-08-16) — that is the pre-implementation
+   baseline, and it is the twenty-four strings above plus three lines that are not copy: two JSX
+   comment continuations in `HomePage.tsx` that survive the comment filter because they wrap
+   inside a `{/* … */}` block, and `AddPage.tsx:49`'s `useState("book")`, a domain id rather than
+   a word anyone reads. **On completion, every line the command still returns must be a comment or
+   a non-rendered identifier, and zero may be a string that reaches the screen.** The residue is
+   small enough to read, so read it — do not assert on the count. Record the actual output in the
+   Outcome.
+
+   Demonstrated on an album besides: adding one says *Album added*, the shelf count reads *N items*,
+   and the cover chooser is absent as Sprint 028 left it.
 
 ## Required tests (TDD)
 
 - A library hit reaches no provider: a request counter over a full typed query with matches.
 - Settled-and-empty fires once, and a repeat of the same string fires none.
 - **Add** fires with local hits present; a URL and a bare ISBN both take the resolve route.
-- Removing "All": a stored `""` preference resolves to the first declared domain, and no control
-  offers a way back to an unfiltered library.
+- Removing "All": **both** an absent preference (first-ever visit) and a stored `""` resolve to the
+  first declared domain, and no control offers a way back to an unfiltered library.
+- **Inventory row 12**: a superseded provider search is aborted rather than left running — asserted
+  on the `AbortSignal`, since this is the quota protection and DEC-044 is what happens without it.
+- **Inventory row 13**: a late response for an older query does not replace a newer result set.
 - One test per inventory row, or an existing `AddPage` test moved to the new flow rather than
   deleted — **a test deleted here is functionality lost, which is the thing the owner asked to
   prevent.**

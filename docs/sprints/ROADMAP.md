@@ -381,8 +381,12 @@ as a filter**, so the tab strip always names exactly one domain. The full descri
 owner's two amendments, is under *Scheduled from owner feedback* below.
 
 It runs after 028 because it is the sprint most likely to amend the contract's account of what a
-*screen* renders from the registry; the backend contract and the conformance suite are untouched by
-it.
+*screen* renders from the registry. **Narrowed 2026-08-16:** this paragraph originally said the
+backend contract and the conformance suite were untouched by it, which was written before DEC-071
+added copy neutrality as the sprint's sixth deliverable. That deliverable may add **one declarative
+field** to `Domain` for a per-domain search placeholder, with the conformance check such a field
+requires. The invariant that holds either way is the one that matters: no shared layer branches on
+which domain it is holding.
 
 ### Sprint 030 — Entry depth: the decision
 
