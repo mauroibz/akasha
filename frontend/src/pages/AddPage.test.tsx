@@ -37,35 +37,37 @@ const itemTypes = [
 describe("AddPage", () => {
   it("debounces provider search and offers keyboard-accessible manual fallback", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input) === "/api/shelves" ||
-      String(input) === "/api/health/providers"
-        ? new Response(
-            String(input) === "/api/shelves"
-              ? "[]"
-              : JSON.stringify({ providers: [], degraded: false }),
-          )
-        : new Response(
-            JSON.stringify([
-              {
-                source: "openlibrary",
-                source_id: "OL1M",
-                source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
-                title: "Rayuela",
-                subtitle: null,
-                creators: ["Julio Cortázar"],
-                year: 1963,
-                cover_url: null,
-                identifiers: {},
-                language: "es",
-                metadata: {},
-              },
-            ]),
-            { status: 200 },
-          ),
+      String(input) === "/api/item-types"
+        ? new Response(JSON.stringify(itemTypes))
+        : String(input) === "/api/shelves" ||
+            String(input) === "/api/health/providers"
+          ? new Response(
+              String(input) === "/api/shelves"
+                ? "[]"
+                : JSON.stringify({ providers: [], degraded: false }),
+            )
+          : new Response(
+              JSON.stringify([
+                {
+                  source: "openlibrary",
+                  source_id: "OL1M",
+                  source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+                  title: "Rayuela",
+                  subtitle: null,
+                  creators: ["Julio Cortázar"],
+                  year: 1963,
+                  cover_url: null,
+                  identifiers: {},
+                  language: "es",
+                  metadata: {},
+                },
+              ]),
+              { status: 200 },
+            ),
     );
     renderPage();
     await userEvent.type(
-      screen.getByRole("searchbox", { name: /search books/i }),
+      await screen.findByRole("searchbox", { name: /search books/i }),
       "Rayuela",
     );
     // One search request for the whole typed string, not one per keystroke.
@@ -134,7 +136,9 @@ describe("AddPage", () => {
         }),
     );
     renderPage();
-    const search = screen.getByRole("searchbox", { name: /search books/i });
+    const search = await screen.findByRole("searchbox", {
+      name: /search books/i,
+    });
     await userEvent.type(search, "first");
     await waitFor(() => expect(signals).toHaveLength(1));
     await userEvent.clear(search);
@@ -164,7 +168,7 @@ describe("AddPage", () => {
     });
     renderPage();
     await userEvent.type(
-      screen.getByRole("searchbox", { name: /search books/i }),
+      await screen.findByRole("searchbox", { name: /search books/i }),
       "Rayuela",
     );
     // A failed search is a dead end unless it says so and offers the way past
@@ -172,7 +176,7 @@ describe("AddPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(
       /providers are unavailable/i,
     );
-    expect(screen.getByText(/still enter this book manually/i)).toBeVisible();
+    expect(screen.getByText(/still enter it by hand/i)).toBeVisible();
     await userEvent.click(
       screen.getByRole("button", { name: /enter manually/i }),
     );
@@ -183,18 +187,20 @@ describe("AddPage", () => {
     const request = vi
       .spyOn(globalThis, "fetch")
       .mockImplementation(async (input) =>
-        String(input) === "/api/shelves"
-          ? new Response("[]")
-          : String(input) === "/api/health/providers"
-            ? new Response(JSON.stringify({ providers: [], degraded: false }))
-            : new Response(
-                JSON.stringify({
-                  entry: { id: 7 },
-                  already_exists: true,
-                  near_matches: [],
-                }),
-                { status: 200 },
-              ),
+        String(input) === "/api/item-types"
+          ? new Response(JSON.stringify(itemTypes))
+          : String(input) === "/api/shelves"
+            ? new Response("[]")
+            : String(input) === "/api/health/providers"
+              ? new Response(JSON.stringify({ providers: [], degraded: false }))
+              : new Response(
+                  JSON.stringify({
+                    entry: { id: 7 },
+                    already_exists: true,
+                    near_matches: [],
+                  }),
+                  { status: 200 },
+                ),
       );
     renderPage();
     await userEvent.click(
@@ -213,18 +219,20 @@ describe("AddPage", () => {
 
   it("confirms a successful add on the visible toast surface", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input) === "/api/shelves"
-        ? new Response("[]")
-        : String(input) === "/api/health/providers"
-          ? new Response(JSON.stringify({ providers: [], degraded: false }))
-          : new Response(
-              JSON.stringify({
-                entry: { id: 11 },
-                already_exists: false,
-                near_matches: [],
-              }),
-              { status: 201 },
-            ),
+      String(input) === "/api/item-types"
+        ? new Response(JSON.stringify(itemTypes))
+        : String(input) === "/api/shelves"
+          ? new Response("[]")
+          : String(input) === "/api/health/providers"
+            ? new Response(JSON.stringify({ providers: [], degraded: false }))
+            : new Response(
+                JSON.stringify({
+                  entry: { id: 11 },
+                  already_exists: false,
+                  near_matches: [],
+                }),
+                { status: 201 },
+              ),
     );
     renderPage();
     await userEvent.click(

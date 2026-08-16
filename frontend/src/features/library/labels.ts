@@ -151,6 +151,29 @@ export function choosesCovers(
   return declared ?? true;
 }
 
+/**
+ * The domain's own name for one of its things, for copy that has to name it.
+ *
+ * This is what deliverable 6 of Sprint 029 replaced eighteen hardcoded "book"s
+ * with: a toast that said *Book added* over an album is wrong in a way no
+ * rendering-layer neutrality fixes, because the word is the message. Copy either
+ * comes from here or is written to name nothing.
+ *
+ * The fallback is deliberately generic rather than "Book". Everywhere else in this
+ * file an unknown domain assumes the book shape, because guessing wrong there hides
+ * a reader's own data; here guessing wrong just puts the wrong noun on a screen, and
+ * "Item" is wrong for nobody.
+ */
+export function labelFor(
+  itemType: string,
+  types: ItemType[] | undefined,
+): string {
+  const declared = Array.isArray(types)
+    ? types.find((type) => type.id === itemType)?.label
+    : undefined;
+  return declared ?? "Item";
+}
+
 export function entryPanelLabel(
   itemType: string,
   types: ItemType[] | undefined,
