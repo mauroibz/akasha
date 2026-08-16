@@ -122,6 +122,106 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   expect(tableCards).toBeLessThan(48);
 });
 
+test("the 10,000-entry library keeps its DOM budget with web results on the page", async ({
+  page,
+}) => {
+  // AC7. Sprint 013 exists because a block whose height the virtualizer does not
+  // know about moved the list out from under it. Web results render *below* the
+  // library, so `scrollMargin` should not move at all -- which is the claim being
+  // checked here rather than assumed.
+  await seedLibrary(page, 10_000);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: Array.from({ length: 6 }, (_, index) => ({
+        source: "openlibrary",
+        source_id: `OL${index}M`,
+        source_refs: [{ source: "openlibrary", source_id: `OL${index}M` }],
+        title: `Web result ${index}`,
+        subtitle: null,
+        creators: ["Someone"],
+        credit: "Someone",
+        year: 1970 + index,
+        cover_url: null,
+        identifiers: {},
+        language: "en",
+        metadata: {},
+      })),
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  const library = page.getByRole("feed", { name: "Library" });
+  const before = await library.boundingBox();
+
+  await page.getByRole("searchbox").fill("something not held");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "From the web" }),
+  ).toBeVisible();
+
+  // The list has not moved, so nothing it measured itself against has.
+  const after = await library.boundingBox();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(2);
+
+  // And the DOM budget still holds deep into the list, with the block rendered.
+  await page.evaluate(() => window.scrollTo(0, 250_000));
+  await expect
+    .poll(async () => Number(await library.getAttribute("data-mounted-count")))
+    .toBeLessThan(20);
+  const mountedCards = await page.locator("[data-entry-id]").count();
+  console.log(
+    `grid 10k + web results: mounted cards=${mountedCards} (DEC-023 bound: <48)`,
+  );
+  expect(mountedCards).toBeLessThan(48);
+});
+
+test("web results are a region beside the feed, not rows inside it", async ({
+  page,
+}) => {
+  // AC7's other half. The library carries server-side aria-posinset/aria-setsize
+  // (DEC-038); a screen reader must not hear six provider results announced as
+  // part of a ten-thousand-item feed.
+  await seedLibrary(page, 20);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: [
+        {
+          source: "openlibrary",
+          source_id: "OL1M",
+          source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+          title: "Web result",
+          subtitle: null,
+          creators: ["Someone"],
+          credit: "Someone",
+          year: 1970,
+          cover_url: null,
+          identifiers: {},
+          language: "en",
+          metadata: {},
+        },
+      ],
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await page.getByRole("searchbox").fill("something not held");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+
+  const results = page.getByRole("region", { name: "From the web" });
+  await expect(results).toBeVisible();
+  // Not inside the feed, and carrying none of its item semantics.
+  const feed = page.getByRole("feed", { name: "Library" });
+  await expect(feed.getByRole("heading", { name: "From the web" })).toHaveCount(
+    0,
+  );
+  await expect(results.locator("[aria-posinset]")).toHaveCount(0);
+  await expect(results.getByRole("article")).toHaveCount(0);
+});
+
 test("the edition year line is readable at every width, not clipped", async ({
   page,
 }) => {

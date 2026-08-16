@@ -219,7 +219,7 @@ test("search results stagger in and selecting one keeps the keyboard flow", asyn
       page.getByRole("button", { name: /None of these/ }),
     ).toBeVisible();
     await expect(
-      page.locator("section[aria-label='Results from the web'] button"),
+      page.locator("section[aria-labelledby='web-results-title'] button"),
     ).toHaveCount(7);
   });
   // Six results plus the manual fallback, each entering in its own right. The

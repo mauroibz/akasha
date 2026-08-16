@@ -1165,3 +1165,29 @@ test("deliverable 6: adding a record says Record added, not Book added", async (
   // A hardcoded "Book added" fails it by never producing the one named here.
   expect(await findToast("Record added")).toBeInTheDocument();
 });
+
+test("deliverable 5: the shortcuts belong to the surface the reader is standing in", async () => {
+  const bar = stubBar({ libraryHasRows: true });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  // Two lists on one page. On a library row the digits still score it.
+  await user.type(await screen.findByRole("searchbox"), "Rayuela");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await screen.findByRole("heading", { name: "From the web" });
+  const row = screen.getByRole("article", { name: "Rayuela" });
+  act(() => row.focus());
+  await user.keyboard("5");
+  await waitFor(() =>
+    expect(bar.urls.some((u) => u === "/api/entries/7")).toBe(true),
+  );
+
+  // Standing on a provider result, they do not reach back into the library.
+  const before = bar.urls.filter((u) => u === "/api/entries/7").length;
+  const result = screen.getByRole("button", { name: /Dune Messiah/ });
+  act(() => result.focus());
+  await user.keyboard("6");
+  await user.keyboard("j");
+  expect(bar.urls.filter((u) => u === "/api/entries/7").length).toBe(before);
+});

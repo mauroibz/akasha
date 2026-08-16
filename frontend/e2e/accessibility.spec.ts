@@ -194,6 +194,83 @@ test("library in table view has no serious accessibility violations", async ({
   await expectNoSeriousViolations(page, "library (table)");
 });
 
+test("the library with web results on it has no serious accessibility violations", async ({
+  page,
+}) => {
+  // AC7: two result sets on one page is the hazard, so the axe gate is run on
+  // the page that has both.
+  await seedLibrary(page);
+  await stubShelves(page);
+  await stubProviderHealth(page);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: [
+        {
+          source: "openlibrary",
+          source_id: "OL1M",
+          source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+          title: "Web result",
+          subtitle: null,
+          creators: ["Someone"],
+          credit: "Someone",
+          year: 1970,
+          cover_url: null,
+          identifiers: {},
+          language: "en",
+          metadata: {},
+        },
+      ],
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await page.getByRole("searchbox").fill("something not held");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "From the web" }),
+  ).toBeVisible();
+  await expectNoSeriousViolations(page, "library (with web results)");
+});
+
+test("the add dialog over the library has no serious accessibility violations", async ({
+  page,
+}) => {
+  await seedLibrary(page);
+  await stubShelves(page);
+  await stubProviderHealth(page);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: [
+        {
+          source: "openlibrary",
+          source_id: "OL1M",
+          source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+          title: "Web result",
+          subtitle: null,
+          creators: ["Someone"],
+          credit: "Someone",
+          year: 1970,
+          cover_url: null,
+          identifiers: {},
+          language: "en",
+          metadata: {},
+        },
+      ],
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await page.getByRole("searchbox").fill("something not held");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: /Web result/ }).click();
+  await expect(page.getByRole("dialog")).toBeVisible();
+  await expectNoSeriousViolations(page, "library (add dialog)");
+});
+
 test("the expanded score picker overlay is accessible inside its card", async ({
   page,
 }) => {

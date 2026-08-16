@@ -344,6 +344,22 @@ export function HomePage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
+      /**
+       * The shortcuts belong to the surface the reader is in.
+       *
+       * `j`/`k` and the digits address library rows. With web results on screen
+       * there are two lists on one page, and the rule this sprint adopts is that
+       * focus decides: standing on a provider result, `j` must not scroll a
+       * different list and `7` must not score a row the reader is not looking at.
+       * Nothing else changes — the results are reached by Tab, and the confirm
+       * dialog is covered already, since `isEditableTarget` refuses anything
+       * inside `[role="dialog"]`.
+       */
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest("[data-web-results]")
+      )
+        return;
       if (event.key === "/") {
         event.preventDefault();
         searchRef.current?.focus();
@@ -784,7 +800,11 @@ export function HomePage() {
           still — a variable-height block over a window-virtualized list is the
           Sprint 013 class of bug. */}
       {web.query && (
-        <section aria-labelledby="web-results-title" className="mt-12">
+        <section
+          aria-labelledby="web-results-title"
+          data-web-results=""
+          className="mt-12"
+        >
           <h2 id="web-results-title" className="text-xl font-semibold">
             From the web
           </h2>
@@ -798,7 +818,6 @@ export function HomePage() {
           {!web.pending && (
             <ResultsGrid
               results={web.results}
-              label="Results from the web"
               onSelect={setSelectedCandidate}
               onManual={() => void navigate("/add")}
             />

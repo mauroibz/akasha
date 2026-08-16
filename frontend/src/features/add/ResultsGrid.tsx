@@ -9,7 +9,15 @@ export interface ResultsGridProps {
   onSelect: (candidate: SearchCandidate) => void;
   /** Where *None of these* goes. The host owns it: on `/` it leaves for `/add`. */
   onManual: () => void;
-  label: string;
+  /**
+   * An accessible name, when the grid is not already inside a named region.
+   *
+   * Omitted on `/`, deliberately: the host wraps the grid in a labelled section
+   * that also holds the heading and the pending/error text, and a named `section`
+   * is a landmark — two nested landmarks whose names contain one another is a
+   * worse reading experience than one, not a more thorough one.
+   */
+  label?: string;
 }
 
 /**
@@ -28,6 +36,8 @@ export function ResultsGrid(props: ResultsGridProps) {
     // after a handful of cards: a twenty-result search would otherwise take most of
     // a second to finish arriving, which reads as slow rather than as considered.
     <m.section
+      // A `section` is only a landmark once it has an accessible name, so leaving
+      // this undefined is what keeps the grid inside the host's region.
       aria-label={props.label}
       className="mt-6 grid gap-3 sm:grid-cols-2"
       key={resultsKey}
