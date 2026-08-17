@@ -72,27 +72,27 @@ test("the format of a copy is readable from the library row", async ({
   await expect(row.locator("[data-card-formats]")).toContainText("Vinyl");
 });
 
-test("the chips are the chosen domain's, and only that domain's", async ({
+test("the status filter offers the chosen domain's vocabulary, and only that domain's", async ({
   page,
 }) => {
-  // Sprint 029 removed "All", so there is never more than one row. The rule this
-  // replaces -- a row per domain, each under its own heading -- existed for the
-  // filter that is gone; what still has to hold is that no domain's vocabulary
-  // leaks into another's row.
+  // Sprint 029 removed "All", so exactly one domain is named at a time. The rule
+  // this replaces -- a row of chips per domain, each under its own heading --
+  // existed for the filter that is gone, and the chips themselves folded into one
+  // control in 029's second pass. What still has to hold is that no domain's
+  // vocabulary leaks into another's list.
   await library(page, [album()]);
   await page.goto("/");
 
-  const books = page.getByRole("group", { name: /filter books by status/i });
-  await expect(books.getByRole("button", { name: /^Read \d/ })).toBeVisible();
-  await expect(books.getByRole("button", { name: /^Owned/ })).toHaveCount(0);
+  const status = page.getByRole("combobox", { name: "Filter by status" });
+  await status.click();
+  await expect(page.getByRole("option", { name: /^Read \d/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /^Owned/ })).toHaveCount(0);
+  await page.keyboard.press("Escape");
 
   await page.getByRole("radio", { name: "Album" }).click();
-  const albums = page.getByRole("group", { name: /filter albums by status/i });
-  await expect(albums.getByRole("button", { name: /^Owned/ })).toBeVisible();
-  await expect(albums.getByRole("button", { name: /^Read /i })).toHaveCount(0);
-  await expect(
-    page.getByRole("group", { name: /filter books by status/i }),
-  ).toHaveCount(0);
+  await status.click();
+  await expect(page.getByRole("option", { name: /^Owned/ })).toBeVisible();
+  await expect(page.getByRole("option", { name: /^Read \d/ })).toHaveCount(0);
 });
 
 test("filtering to owned asks the server for that status", async ({ page }) => {
@@ -104,10 +104,8 @@ test("filtering to owned asks the server for that status", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("radio", { name: "Album" }).click();
-  await page
-    .getByRole("group", { name: /filter albums by status/i })
-    .getByRole("button", { name: /^Owned/ })
-    .click();
+  await page.getByRole("combobox", { name: "Filter by status" }).click();
+  await page.getByRole("option", { name: /^Owned/ }).click();
 
   await expect
     .poll(() => requests.some((url) => url.includes("status=owned")))

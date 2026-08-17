@@ -646,16 +646,18 @@ test("a type already in the URL beats the remembered domain", async () => {
   ).toBe(false);
 });
 
-test("with a domain chosen, only that domain's status chips and formats render", async () => {
+test("with a domain chosen, only that domain's statuses and formats render", async () => {
   stubRegistry();
   renderPage("/?type=album");
   await screen.findByText("Rayuela");
   const user = userEvent.setup();
 
-  // The record row, without the domain heading the tab already carries.
-  expect(screen.getByRole("button", { name: /^Owned/ })).toBeVisible();
-  expect(screen.queryByRole("button", { name: /^Read / })).toBeNull();
-  expect(screen.queryByRole("button", { name: /^Reading/ })).toBeNull();
+  // The record's vocabulary, without the domain heading the tab already carries.
+  await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
+  expect(await screen.findByRole("option", { name: /^Owned/ })).toBeVisible();
+  expect(screen.queryByRole("option", { name: /^Read / })).toBeNull();
+  expect(screen.queryByRole("option", { name: /^Reading/ })).toBeNull();
+  await user.keyboard("{Escape}");
 
   // And the format selector narrows to that domain's vocabulary.
   await user.click(screen.getByRole("combobox", { name: "Filter by format" }));
@@ -1260,4 +1262,47 @@ test("a query that misses says so in one line, not in a screen of empty state", 
     await screen.findByText(/nothing in your library matches/i),
   ).toBeVisible();
   expect(screen.queryByText("Your library is waiting")).toBeNull();
+});
+
+test("the status filter is one control beside the others, and it holds more than one status", async () => {
+  const bar = stubBar();
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  // A row of chips was a third row of chrome above the library. It is the fourth
+  // control now, beside sort, shelf and format.
+  await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
+  await user.click(await screen.findByRole("option", { name: /^Read \d/ }));
+  await waitFor(() =>
+    expect(bar.urls.some((u) => u.includes("status=read"))).toBe(true),
+  );
+
+  // Multi-valued, like the chips it replaces: a second status widens the filter
+  // rather than replacing the first.
+  await user.click(await screen.findByRole("option", { name: /^Reading \d/ }));
+  await waitFor(() =>
+    expect(
+      bar.urls.some(
+        (u) => u.includes("status=read") && u.includes("status=reading"),
+      ),
+    ).toBe(true),
+  );
+});
+
+test("the status filter offers the chosen domain's vocabulary and only that domain's", async () => {
+  stubBar();
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
+  expect(await screen.findByRole("option", { name: /^Read \d/ })).toBeVisible();
+  expect(screen.queryByRole("option", { name: /^Owned/ })).toBeNull();
+  await user.keyboard("{Escape}");
+
+  await user.click(screen.getByRole("radio", { name: "Record" }));
+  await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
+  expect(await screen.findByRole("option", { name: /^Owned/ })).toBeVisible();
+  expect(screen.queryByRole("option", { name: /^Read \d/ })).toBeNull();
 });

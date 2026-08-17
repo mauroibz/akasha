@@ -31,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StatusFilter } from "@/features/library/StatusFilter";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
 import { domainsFrom, labelFor, sortLabels } from "@/features/library/labels";
 import { AddForm } from "@/features/add/AddForm";
@@ -698,6 +699,20 @@ export function HomePage() {
             ))}
           </SelectContent>
         </Select>
+        {/* The fourth filter, in the row of filters.
+            It was a row of chips of its own -- one whole row of chrome above the
+            library for the vocabulary the tab already names. `shownDomains` is at
+            most one domain, and empty only until the registry answers, so this
+            renders exactly when there is a vocabulary to render. */}
+        {shownDomains.map((type) => (
+          <StatusFilter
+            key={type.id}
+            statuses={type.statuses}
+            counts={firstPage?.facets.status_counts_by_type?.[type.id] ?? {}}
+            value={filters.statuses}
+            onChange={(statuses) => updateFilters({ statuses })}
+          />
+        ))}
         <div
           className="flex rounded-full bg-surface p-1"
           aria-label="Library view"
@@ -724,46 +739,6 @@ export function HomePage() {
           </Button>
         </div>
       </section>
-      {/* One row, for the one domain the strip names.
-          There was a second shape here — a row per domain, each under its own
-          heading — for the "All" filter that DEC-065 removed. A library holding
-          books and records has no single status vocabulary to put in one row, so
-          under "All" the headings were what stopped "Read" and "Owned" beside each
-          other reading as one confused list (DEC-060). With a domain always chosen
-          the tab carries the name, and the heading would say it twice. */}
-      {shownDomains.map((type) => (
-        <div
-          key={type.id}
-          className="mt-4 flex flex-wrap items-center gap-2"
-          aria-label={`Filter ${type.label.toLowerCase()}s by status`}
-          role="group"
-        >
-          {type.statuses.map((status) => {
-            const active = filters.statuses.includes(status.value);
-            return (
-              <button
-                key={status.value}
-                aria-pressed={active}
-                className="min-h-11 rounded-full border border-border px-4 text-sm aria-pressed:border-primary aria-pressed:text-primary focus-ring"
-                onClick={() =>
-                  updateFilters({
-                    statuses: active
-                      ? filters.statuses.filter(
-                          (value) => value !== status.value,
-                        )
-                      : [...filters.statuses, status.value],
-                  })
-                }
-              >
-                {status.label}{" "}
-                {firstPage?.facets.status_counts_by_type?.[type.id]?.[
-                  status.value
-                ] ?? 0}
-              </button>
-            );
-          })}
-        </div>
-      ))}
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole
