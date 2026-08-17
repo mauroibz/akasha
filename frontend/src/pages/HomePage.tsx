@@ -789,14 +789,25 @@ export function HomePage() {
           </Button>
         </div>
       )}
-      {firstPage?.items.length === 0 && (
-        <section className="py-24 text-center">
-          <h2 className="text-2xl font-semibold">Your library is waiting</h2>
-          <p className="mt-2 text-muted-foreground">
-            Search above to add something, or visit the inbox to get started.
+      {/* Two different silences, and only one of them is worth a screen.
+          An empty library is news: there is nothing here and here is what to do
+          about it. An empty *result* is the ordinary case of looking something up
+          before adding it -- the settled-and-empty rule is about to search the web
+          for exactly this string -- so it gets one line, and the results land where
+          the screenful of encouragement used to push them. */}
+      {firstPage?.items.length === 0 &&
+        (filters.query ? (
+          <p className="py-6 text-center text-muted-foreground">
+            Nothing in your library matches “{filters.query}”.
           </p>
-        </section>
-      )}
+        ) : (
+          <section className="py-24 text-center">
+            <h2 className="text-2xl font-semibold">Your library is waiting</h2>
+            <p className="mt-2 text-muted-foreground">
+              Search above to add something, or visit the inbox to get started.
+            </p>
+          </section>
+        ))}
       {/* The crossfade is on the container and nowhere else. `mode="wait"` is
           not a stylistic choice: with the default, moving to a filter TanStack
           already has cached mounts the old and new lists in the same commit,

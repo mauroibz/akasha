@@ -1244,3 +1244,20 @@ test("the clear button empties the bar, the query and the web results in one pre
   );
   expect(box).toHaveFocus();
 });
+
+test("a query that misses says so in one line, not in a screen of empty state", async () => {
+  // "Your library is waiting" is the right thing to say to somebody who has no
+  // library. Said to somebody who is mid-search it is a screenful of nothing
+  // between the bar and the results the search is about to return.
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+
+  expect(
+    await screen.findByText(/nothing in your library matches/i),
+  ).toBeVisible();
+  expect(screen.queryByText("Your library is waiting")).toBeNull();
+});
