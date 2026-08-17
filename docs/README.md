@@ -60,7 +60,7 @@ canonical documents summarise but do not reproduce.
 | Document | Status |
 |---|---|
 | [`domain-architecture-proposal.md`](domain-architecture-proposal.md) | **Accepted** (DEC-052) and **delivered** by Sprints 025–028. The live measurements against MusicBrainz are here; how domains work *now* is technical spec §6.6 and [`guides/adding-a-domain.md`](guides/adding-a-domain.md). |
-| [`unified-search-proposal.md`](unified-search-proposal.md) | **Accepted** (DEC-065), amended twice, scheduled as Sprint 029. Not built yet. |
+| [`unified-search-proposal.md`](unified-search-proposal.md) | **Accepted** (DEC-065), amended twice, and **delivered** by Sprint 029. The measurement of the two searches is here; what was actually built — the firing rule, results below the library, `/add` as manual entry — is DEC-073, product spec §7 and technical spec §8. |
 
 ## For agents
 

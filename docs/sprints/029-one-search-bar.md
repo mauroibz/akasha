@@ -1,6 +1,6 @@
 # Sprint 029 — One search bar
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 027, 028
 **Roadmap revision:** 12
 
@@ -270,5 +270,112 @@ owned.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Delivered 2026-08-16; closed 2026-08-17.** Adding and searching are one screen. `/` carries a
+single bar — domain selector, input, **Add** — that filters the library over SQL as you type and
+reaches a provider only when the library has nothing and the query has settled, or when **Add** is
+pressed. The confirm step is a dialog over the library; `/add` is manual entry and a deep link.
+
+**Commits:** `8d877a3` (pre-sprint: the sprint file corrected against the code), `397da78` ("All"
+removed and the list query made to wait for the registry), `a174842` (`AddForm`, `ResultsGrid` and
+`labelFor` extracted so both screens host one component), `7c94cb4` (the unified bar, the
+settled-and-empty rule, the web-results region and the add dialog), `47e0b4d` (`/add` left to manual
+entry, its tests moved not deleted), `de12294` (copy neutrality), `97b4c34` (the AC7 gates and the
+keyboard rule), `d845317` (the walkthrough fix), and this closing commit.
+
+### Deliverables
+
+1. **The unified bar** is one row at the top of `/`: the domain radio group, the input, **Add**. The
+   library's 250 ms debounce into the URL's `q` is unchanged.
+2. **"All" is gone.** The strip always names exactly one domain; an absent preference and a stored
+   `""` both resolve to the first declared domain, in one branch, because `readDomainPreference`
+   cannot tell them apart. The grouped-chip-rows branch went with it. The list query now waits for
+   the registry: firing before a domain is known spent a request on an unfiltered page and flashed
+   another domain's rows on the way — but a registry that declares nothing, including one that
+   failed, must not leave the library blank, so that is the second way of being ready.
+3. **Web results on `/`**, under the settled-and-empty rule, in their own labelled region **below**
+   the library. The URL/ISBN resolve path survives.
+4. **The add dialog** hosts Sprint 027's confirm form over the library. All thirteen inventory rows
+   carried over, each with a test.
+5. **Reconciled:** `/add` keeps manual entry and still deep-links; *Add to library* and `a` focus the
+   bar rather than navigating; `j`/`k` and the digits stay with the library and do nothing from
+   inside the results region.
+6. **The chrome stopped saying "book"** — twenty-four strings across eleven files, become registry
+   labels or neutral copy. `N books` on a shelf is `N items`; a shelf spans domains and always did.
+
+### Verification — commands and actual results
+
+`make format`, `make check`, `make test` (**469 backend, 146 frontend**), `npm run test:e2e`
+(**90 passed, 2 skipped**), `make build`, `make smoke-container`, `git diff --check` and
+`python scripts/validate_project.py` all green. Backend and frontend suites re-run at the close,
+unchanged: 469 and 146.
+
+**AC1–AC4, counted against live providers rather than inspected**, because the count is the
+criterion: a title in the library costs **0** provider requests at any query length; one not in it
+costs exactly **1**; the same string retyped costs **0**; **Add** on a query with local hits costs
+**1**; a pasted ISBN takes `/api/search/resolve`. Rows 12 and 13 are asserted directly — a
+superseded search is aborted on its `AbortSignal`, and a late response for an older query does not
+replace a newer set.
+
+**AC7**, re-run with a web-results block rendered: **28 mounted cards against DEC-023's bound of
+48** at 10,000 entries, and the library's bounding box does not move when the block appears. The
+feed keeps its `role="feed"` and server-side `aria-posinset`/`aria-setsize`; the results are a
+labelled `section` and are never announced as feed items.
+
+**AC9**, by running the sprint's own command rather than by inspection. It returned 27 lines before
+implementation and **returns two now**, both JSX comment continuations inside `{/* … */}` blocks:
+
+```text
+frontend/src/pages/HomePage.tsx:649:  `digital` belongs to books and records both, and listing it twice
+frontend/src/pages/HomePage.tsx:689:  books and records has no single status vocabulary to put in one row, so
+```
+
+Nothing that reaches a screen. `AddPage.tsx:49`'s `useState("book")` is gone with the domain
+chooser. Demonstrated on an album besides: adding one says *Album added*, a shelf reads *N items*,
+and the cover chooser is absent as Sprint 028 left it.
+
+**Walkthrough gate**, against the real dev library with live providers (Open Library, Google Books,
+MusicBrainz): every counted behaviour above, plus adding a record and a book from `/` with notes,
+format and a newly created shelf, and the duplicate path (200, *Already in your library*, opens the
+existing entry). **It found one defect, fixed in `d845317`**: adding from `/` closed the dialog onto
+a library still filtered by the query that had just missed, so the new entry was created and
+highlighted where nothing could see it. The old flow got this free by navigating to an unfiltered
+`/`; on `/` it has to be done deliberately.
+
+### Deviations and decisions — all four recorded as DEC-073
+
+1. **Results render below the library, not above.** AC7's phrase said above; deliverable 3 and the
+   accepted proposal say below, and below is what shipped. It is not a tie-break: the library
+   virtualizes against the window, so a variable-height block above it moves the `scrollMargin` and
+   re-opens the Sprint 013 class of bug. Below avoids it by construction.
+2. **`/add` lost its domain chooser.** `LibraryService.add` types a manual item as
+   `DEFAULT_DOMAIN.item_type` whatever the client sends (DEC-067 row 6), so the chooser showed a
+   record's statuses and fields and then wrote a book. Manual entry is now offered to every domain —
+   the route works for anyone — while the copy stops implying a domain it cannot honour.
+3. **The firing rule gained three clauses** DEC-065's sentence did not have: the wait is measured
+   from the last keystroke, the library must have *succeeded* rather than be pending, and the row
+   count must be strictly zero.
+4. **Deliverable 6 needed no new `Domain` field.** One neutral placeholder naming title, creator,
+   ISBN and link serves every domain, and the resolve path it advertises is domain-neutral. **The
+   backend contract is untouched**, so the roadmap's narrowing for this sprint is narrowed back.
+
+**A dead end worth not repeating:** do not `git checkout <file>` to undo a mutation test. It
+reverted uncommitted work twice — once losing `data-web-results` and the results-grid label, once
+restoring *"Add a book"* to the library's empty state after the copy pass. AC9's grep caught the
+second. Copy the file aside and copy it back instead.
+
+**Observed, not a regression:** one album add returned **502** from `POST /api/entries`
+(MusicBrainz, at the payload fetch); the identical retry returned 201. The dialog stays open and
+shows the error, which is right, but no test can see this because it is upstream.
+
+### Impact on every future sprint
+
+- **Sprint 030 (entry depth, Phase A only, gated):** unaffected in substance, and its file is
+  expanded and `ready`. One thing to carry: `/` now has two result surfaces and a dialog over the
+  library, so any depth shape that adds a third surface inherits the focus rule stated here.
+- **Sprint 031 (per-domain imports):** unaffected. The import layer above the domain packages is
+  still book-shaped structurally, which is that sprint's whole outcome. Its **copy** is neutral now,
+  so 031 inherits one less job.
+- **The merge (DEC-072):** this close is what unblocked it. `sprint-025-albums` merges into `main`
+  next, with `README.md`'s feature copy and `docs/operations/release-notes-v1.2.md` going in with it.
+- **Future epics:** unchanged. A third domain still costs what DEC-069 priced, and one line less of
+  it, since no `Domain` field was added.

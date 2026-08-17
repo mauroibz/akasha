@@ -609,19 +609,42 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — My Books.** The primary screen and the one to get right.
-- **A domain tab strip** — All, then one tab per domain, rendered from the registry and
-  present only when the build has more than one domain. The choice lives in the URL like
-  every other filter and is remembered between visits, so a fresh visit lands on the domain
-  last used (DEC-062). Books and records beside each other read as a mixed bag rather than
-  as one library.
+**`/` — The library.** The primary screen and the one to get right. Since Sprint 029 it is
+also **the screen you search from and the screen you add from** (DEC-065, DEC-073); adding
+something no provider lists is the only thing that still leaves it.
+
+- **One bar across the top: the domain selector, the search input, and *Add*.** One control
+  picks two things at once — the rows you see *and* the providers a search would reach — so
+  there is never a moment where the application has to ask which domain you meant.
+- **The domain strip names exactly one domain**, one tab per domain, rendered from the
+  registry and present only when the build has more than one. **"All" is not a filter**
+  (DEC-065): the choice lives in the URL like every other filter and is remembered between
+  visits, and a visit with nothing remembered lands on the first declared domain (DEC-062,
+  amended). The whole-library view is not lost — `/triage` and the export both still span
+  domains, and the unselected tab still carries a live count.
+- **Typing searches your library, over SQL, and reaches no provider** — at any query length,
+  for as long as the library has a match. This is the invariant §4.5 buys and it survives
+  having one bar: rendering a library page never makes a network call.
+- **A provider is reached only when the library has nothing and the query has settled**, or
+  immediately when you press **Add**. The exact rule is in DEC-065 and technical spec §8;
+  the reason it is a rule rather than a feel is the quota (DEC-045, and the tier breach
+  DEC-044 measured).
+- **Web results render below the library, in their own labelled region** — *From the web* —
+  never inside it. Below rather than above is deliberate: the library virtualizes against
+  the window, and a variable-height block above it moves the offset every row measures
+  itself against (DEC-073).
+- **Selecting a web result opens the confirm step as a dialog over the library**, not as a
+  navigation: the same form `/add` used to host — what is already known about the result,
+  *Load full details*, status, score, shelves, notes, format and the domain's passage
+  fields — plus the near-match path and *None of these — enter manually*. On success the
+  dialog closes onto the library with the new entry highlighted, and the query is cleared,
+  because the filter that had just missed would otherwise hide the thing you added.
 - Grid (covers) / compact table toggle, persisted in localStorage
-- Filter chips: status, **one row per domain under that domain's name**, because a library
-  holding two domains has no single status vocabulary and a shared status ("wishlist") is
-  counted per domain rather than once. With a tab chosen there is one row and the heading
-  comes off, because the tab already says it. Plus shelf and format selectors, the format
-  list narrowed to the domains on screen. Free-text filter over cached title/author, local
-  SQL only, no network
+- Filter chips: status, **one row, under the chosen domain's vocabulary** — a library holding
+  two domains has no single status vocabulary, and a shared status ("wishlist") is counted
+  per domain rather than once; the tab says which domain the row belongs to, so the row
+  carries no heading of its own. Plus shelf and format selectors, the format list narrowed to
+  the domain on screen
 - **The page scrolls, not the grid.** The library is the primary surface and uses the whole
   page; the virtualizer measures the window rather than a fixed-height box of its own
 - Sort dropdown per §6
@@ -629,17 +652,27 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
   No modal, no navigation.
 - Counts per status somewhere unobtrusive
 
-**`/add` — Search & add.**
-- Single input accepting free text, URL, or ISBN; detects which
-- Picker grid per §4.3
-- On select: **what we already know** about the thing you clicked — everything the
-  search returned, rendered from the domain's field spec, at no cost and with nothing
-  to wait for — plus *Load full details*, which fetches the complete record (the
-  description, the page count, the tracklist) in one provider request when asked
-  (DEC-064). Then a small form: status (the domain's default), score, shelves,
-  notes, format and whichever passage fields the domain declares, so a book you just
-  finished is one action rather than an add followed by an edit
-  returns to `/` with the new entry highlighted
+**`/add` — Enter by hand.** Searching moved to `/` in Sprint 029 (DEC-065); what is left
+here is the one thing no provider can do for you.
+
+- The full validated manual form: title, creator and the domain's fields, then status (the
+  domain's default), score, shelves, notes and format — the same confirm step the dialog on
+  `/` hosts, rendered from the registry rather than branching on the item type.
+- **Reached deliberately**, from *None of these — enter manually* in the web results, or as a
+  deep link. It stays a route rather than moving inline; it is lazy-loaded, so keeping it
+  costs nothing in the bundle.
+- **It offers no domain choice**, and that is honest rather than missing: a manual add is
+  typed as the default domain whatever the client sends (DEC-067 row 6, DEC-073). Naming a
+  domain here would show one domain's statuses and fields and then write another's row.
+  Giving manual entry a real domain needs an API change and is unscheduled.
+- On success it returns to `/` with the new entry highlighted.
+
+The confirm step itself — **what we already know** about the thing you clicked, everything
+the search returned rendered from the domain's field spec, at no cost and with nothing to
+wait for, plus *Load full details*, which fetches the complete record (the description, the
+page count, the tracklist) in one provider request when asked (DEC-064) — now lives in the
+dialog on `/`, so a book you just finished is one action rather than an add followed by an
+edit.
 
 **`/books/{entry_id}` — Detail.**
 - Cover, full metadata, description
@@ -708,8 +741,14 @@ enrichment. "Undo last import" for 24 hours.
 
 ### Interaction notes
 
-- Keyboard: `/` focuses search, `a` opens add, digits `1`–`9` + `0` set score on
-  a focused row
+- Keyboard: `/` focuses search, `a` focuses the same bar — adding is no longer a
+  place to go, so there is nothing for it to open (DEC-073) — and digits `1`–`9` + `0`
+  set score on a focused row
+- **With web results on screen, focus decides which surface the shortcuts address.**
+  Standing inside the results region, `j`/`k` do not scroll the library and a digit does
+  not score a row you are not looking at; the results are reached by Tab, and the confirm
+  dialog is covered already, since shortcuts are off while a dialog owns focus
+  (technical spec §8)
 - Confirmation dialogs are limited to delete and explicit provider refresh overwrite.
 - Dark mode, since this runs next to Jellyfin at night
 

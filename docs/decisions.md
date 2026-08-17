@@ -2305,3 +2305,82 @@ Append-only record of material architecture choices, product-default resolutions
 
   The branch keeps its DEC-053 property until then: a sprint may run on it, it ends clean, nothing is
   pushed, and merging remains a deliberate act rather than a side effect.
+
+## DEC-073 — What Sprint 029 actually built: the firing rule, results below, `/add` without a chooser, and no new `Domain` field
+
+- **Date:** 2026-08-17
+- **Status:** accepted
+- **Implements:** DEC-065, whose two owner amendments this sprint carried out. **Amends:** DEC-062's
+  "starting at All" (already overridden by DEC-065) and DEC-064's account of where the confirm step
+  lives. **Narrows:** DEC-071's deliverable 6, which reserved the option of a new `Domain` field.
+- **Context:** DEC-065 accepted a design; it did not decide four things that only building it could
+  decide. Sprint 029 decided them, and they are recorded here rather than left in the code, because
+  each one is a promise a later sprint could break without noticing.
+
+- **1. The firing rule, as built and as verified.** A provider search fires when *all* of: the query
+  has been still for ~800 ms **measured from the last keystroke**, it is at least three characters,
+  the URL has caught up with the box, the library query has **succeeded and is not refetching**, and
+  it returned **zero** rows — and never twice for the same string within a domain. **Add** overrides
+  every clause and searches immediately, serving a repeat from cache.
+
+  Three of those clauses are not in DEC-065's sentence and each is load-bearing:
+
+  - **Measured from the last keystroke, not from the last condition becoming true.** The conditions
+    settle at their own pace; timing the wait from whichever settled last means a slow library
+    pushes the search out by however long the library took.
+  - **Succeeded and not fetching.** Pending or errored is *"we do not know yet"*, not *"the library
+    has nothing"*. Guessing there costs a request every time the library is slow.
+  - **Strictly zero rows.** Searching `dune` while owning *Dune* returns one row and may well be
+    somebody looking for *Dune Messiah* — but a threshold ("few enough rows") guesses on the
+    reader's behalf, and the strict rule never does.
+
+  **Verified by counting requests against live providers**, which is the acceptance criterion:
+  a title in the library costs 0, one not in it costs exactly 1, the same string retyped costs 0,
+  **Add** on a query with local hits costs 1, and a pasted ISBN takes `/api/search/resolve` instead.
+
+- **2. Results render *below* the library, not above.** Deliverable 3 and the accepted proposal both
+  say below; acceptance criterion 7 said *"with a web-results block above it"*. **Below shipped**,
+  because the deliverable is the specification and the AC's phrase was incidental — and the choice
+  is worth more than a tie-break. The library virtualizes against the **window**, so anything of
+  variable height above it moves the `scrollMargin` every row measures itself against, which is
+  precisely the Sprint 013 class of bug. Below means the offset never moves: the library's bounding
+  box is unchanged when results appear, measured. The Sprint 013 bug is avoided **by construction
+  rather than survived**, and a later sprint that moves the block above the list re-opens it.
+
+- **3. `/add` lost its domain chooser rather than keeping a decorative one.** `LibraryService.add`
+  types a manual item as `DEFAULT_DOMAIN.item_type` whatever the client sends (DEC-067 row 6). The
+  old screen offered the choice anyway, so picking Records showed a record's statuses and fields and
+  then wrote a book. **A control that cannot keep its promise is worse than its absence**, so the
+  screen now names the one domain it actually writes. Giving manual entry a real domain needs an API
+  change and stays unscheduled; this is the honest state until then, not the end state.
+
+  The same reasoning settled the copy the sprint file left open. Books offered *"You can still enter
+  this book manually"* on a failed provider search and albums offered *"Try again in a moment"* —
+  one arm promising a recovery path the other withheld. **Manual entry is offered to every domain**,
+  because the route exists and works for anyone; what it cannot yet do is honour the domain, and the
+  neutral copy does not claim it can.
+
+- **4. Deliverable 6 needed no new `Domain` field.** The sprint authorized one — a per-domain search
+  placeholder, with the conformance check such a field requires — and it was not taken. One neutral
+  placeholder naming title, creator, ISBN and link serves every domain, and the resolve path it
+  advertises is domain-neutral anyway (a MusicBrainz URL resolves as an Open Library one does). So
+  **the backend contract is untouched after all**, which is what the roadmap originally claimed for
+  this sprint before DEC-071 added the deliverable, and the narrowing that entry forced can be
+  narrowed back. Twenty-four strings across eleven files became registry labels or neutral copy;
+  `N books` on a shelf became `N items`, because a shelf spans domains and always did.
+
+  **The `Domain` field remains the right shape for the day a domain actually needs different copy.**
+  This decision is that no domain needs it yet — not that per-domain copy is disallowed.
+
+- **Consequences.**
+  - Product spec section 7 now describes `/` as the screen you search and add from, and `/add` as
+    manual entry; technical spec section 7.1 names the two searches and section 8 carries the firing
+    rule, the two-regions rule and the focus rule for shortcuts.
+  - **The quota rule is a counted test, permanently.** Any change to the firing conditions is
+    re-verified by counting requests, not by feel.
+  - `j`/`k` and the digit shortcuts address the surface that has focus: standing inside the results
+    region, neither reaches the library.
+  - A defect the walkthrough found is fixed and worth not re-introducing: a successful add from `/`
+    must clear the query, because the web search only ran when the library had nothing, so closing
+    the dialog onto that filtered view highlights a row nothing can see. The old flow got this free
+    by navigating to an unfiltered `/`.

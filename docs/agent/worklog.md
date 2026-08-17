@@ -1631,3 +1631,37 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   chooser removal, the below-not-above resolution and the no-new-`Domain`-field
   outcome. Then the sprint `Outcome`, the ROADMAP impact review, `state.json`,
   `HANDOFF.md`, and the `docs(sprint-029): close sprint and hand off` commit.
+
+## 2026-08-17 — Sprint 029 closed (complete), Sprint 030 ready
+- Done: the documentation close the previous session left, and nothing else — no
+  application code was touched. Product spec section 7 now describes `/` as the screen
+  you search and add from (one bar, one domain, results below, the confirm step as a
+  dialog) and `/add` as manual entry with no domain chooser and why; its Interaction
+  notes carry the `a`-focuses-the-bar change and the focus rule for `j`/`k`. Technical
+  spec 7.1 names the two searches, what each costs, and that which one a keystroke
+  reaches is a frontend rule; section 8 carries the firing rule clause by clause, the
+  two-regions rule, the below-not-above reason and the shortcut rule. **DEC-073**
+  records all four open items: the firing rule as built (three clauses DEC-065's
+  sentence did not have), results below rather than above, `/add` losing its domain
+  chooser, and deliverable 6 needing no new `Domain` field. Sprint 029's Outcome,
+  the ROADMAP impact review, `docs/README.md`'s proposal row, `state.json` and
+  `HANDOFF.md` follow, plus `docs/sprints/030-entry-depth.md` expanded from the
+  template.
+- Verified: `make test` re-run at the close — **469 backend, 146 frontend**, the same
+  counts the implementation session recorded. `python scripts/validate_project.py`
+  green. AC9's grep re-run: **two lines, both JSX comment continuations** in
+  `HomePage.tsx`, nothing that reaches a screen. `make check`, `git diff --check`
+  green. The container was rebuilt and run for the owner to look at.
+- Deviations: none from the plan. The one thing worth naming is that the previous
+  session's note about "technical spec sections 7.1 and 8 describing the two
+  debounces" was approximate — neither section stated a debounce value; section 8
+  had one generic line about search being debounced and cancellable. The rule is
+  written there now rather than corrected there.
+- Blocked/open: none. **Sprint 030 is Phase A only and gated** — it ends with a
+  verdict and a question to the owner, not with an implementation.
+- Next: **the merge (DEC-072)**, which is an owner action. `sprint-025-albums` goes
+  into `main` with two things in the same merge: `README.md`'s feature copy stops
+  being book-only, and `docs/operations/release-notes-v1.2.md` is written following
+  the v1 and v1.1 precedent. Neither was written on this branch, because the handoff
+  is explicit that the copy changes when the branch merges and not before. After
+  that, claim Sprint 030.

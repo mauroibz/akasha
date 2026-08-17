@@ -426,6 +426,18 @@ The product-spec route list is authoritative, with these refinements:
   accepts `notes`, `formats` and the passage fields, each validated against the item's own domain
   and refused with a 422 naming it — the same rule `PATCH` follows, applied **before the write**, so
   a refusal never leaves a half-added row.
+- **Two searches exist and they are not the same kind of thing.** `GET /entries?q=` is SQL over
+  stored normalized projections: free, local, and reached by every keystroke the library filter
+  makes. `GET /search?q=&type=` fans out to the chosen domain's providers at five seconds each and
+  is counted against a daily budget (DEC-045). Since Sprint 029 both are spent from `/` behind one
+  input, so **which of them a keystroke reaches is a frontend rule, stated in section 8** — the
+  backend contract is unchanged, and the invariant it protects is unchanged with it: rendering a
+  library page consults no provider, at any query length. A search reaches only the named domain's
+  providers (DEC-052 seam 4); the spend is recorded and never blocked, because somebody is waiting
+  for it.
+- `GET /search/resolve` takes the same input when it is a URL or a bare ISBN and skips the keyword
+  search entirely. It is domain-neutral: a MusicBrainz release-group URL resolves exactly as an Open
+  Library edition URL does, which is why the one bar advertises the path for every domain.
 - `GET /search/preview` returns one candidate's full provider payload and writes nothing. It exists
   because a search result carries an identity but not a description, a page count or a tracklist,
   and there is no provider response cache, so it is one live request per call (DEC-064). It follows
@@ -477,6 +489,32 @@ Cross-cutting behavior:
 - Query keys include every server filter/sort value.
 - Optimistic mutations snapshot and roll back cache; failed writes announce an accessible error and never silently lose input.
 - Search input is debounced and cancellable; stale responses cannot replace newer results.
+- **One input feeds both searches, and the rule deciding which it reaches is load-bearing**
+  (DEC-065, as built in DEC-073). The library filter is debounced **250 ms** into the URL's `q` and
+  is the only thing typing normally reaches. A **provider** search fires only when every one of
+  these holds: the query has been still for **~800 ms** measured from the last keystroke, it is at
+  least **three characters**, the URL has caught up with the box, the library has actually answered
+  — pending or errored is "we do not know yet", not "the library has nothing" — and it answered with
+  **zero** rows. It never fires twice for the same string and domain. The **Add** button overrides
+  all of it and searches immediately, serving a repeat from what it already holds.
+  - Every clause is there because the literal rule — search whenever the library misses — fires once
+    per keystroke while typing any title not already owned, which is every add. That is the quota
+    (DEC-045) and the tier breach DEC-044 already measured. **The rule is verified by counting
+    requests, not by inspection.**
+  - The provider search owns an `AbortController` and a request-id guard: a superseded request is
+    aborted rather than left running against a rate-limited API, and a late response for an older
+    query may not replace a newer result set. Both are quota protection, not tidiness.
+  - Results belong to the domain that produced them, and switching domain clears them rather than
+    showing one domain's results under another's name.
+- **Two result sets on one page are two regions, not one.** The library is a `role="feed"` with
+  server-side `aria-posinset`/`aria-setsize` (DEC-038); provider results are a plainly labelled
+  `section` beside it and are never announced as feed items. They render **below** the library:
+  the library virtualizes against the window, so a variable-height block above it moves the
+  `scrollMargin` every row measures itself against, which is the Sprint 013 class of bug avoided by
+  construction rather than survived (DEC-073).
+- **Keyboard shortcuts belong to the surface that has focus.** With provider results on screen,
+  `j`/`k` and the digit shortcuts stay with the library and do nothing from inside the results
+  region, so one list's shortcut never acts on the other list.
 - Route-level error boundaries and useful empty/loading states are mandatory.
 - Keyboard shortcuts are disabled while an input, textarea, select, dialog, or content-editable element owns focus unless explicitly relevant. The component library renders these as buttons carrying roles rather than as native tags, so the guard is on the `dialog`, `alertdialog`, `combobox`, `listbox`, and `menu` roles as well as on tag names (DEC-029).
 - `0` means score 10 only in score-shortcut context; Escape cancels an edit.

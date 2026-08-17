@@ -2,7 +2,7 @@
 
 **Plan revision:** 12
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 029](029-one-search-bar.md)
+**Active sprint:** [Sprint 030](030-entry-depth.md)
 
 ## Shape of the plan
 
@@ -81,15 +81,15 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
-| [029](029-one-search-bar.md) | One search bar | 027, 028 | **ready** |
-| 030 | Entry depth: the decision **[GATED]** | 029 | planned |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
+| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | **ready** |
 | 031 | Per-domain imports | 030 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 029 have files; 030 and 031 do not.
+incorporating actual deviations. Sprints 019 through 030 have files; 031 does not.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -388,7 +388,15 @@ field** to `Domain` for a per-domain search placeholder, with the conformance ch
 requires. The invariant that holds either way is the one that matters: no shared layer branches on
 which domain it is holding.
 
-### Sprint 030 — Entry depth: the decision
+**Delivered 2026-08-16, closed 2026-08-17 (DEC-073), and the narrowing is narrowed back:** the field
+was authorized and **not taken**. One neutral placeholder naming title, creator, ISBN and link serves
+every domain, so the backend contract and the conformance suite are untouched after all, as this
+paragraph first claimed. What the sprint did change is the account of the *screen*: `/` is now where
+you search and add, `/add` is manual entry, results render below the library rather than above it,
+and a provider is reached only on settled-and-empty or on **Add** — a rule verified by counting
+requests. The full Outcome is in the sprint file.
+
+### [Sprint 030 — Entry depth: the decision](030-entry-depth.md)
 
 **Gated, and Phase A only by design.** Scheduled by DEC-071 after the Sprint 028 assessment
 (`docs/domain-expansion-assessment.md`) named it as the **one thing on the whole list that could
@@ -573,6 +581,10 @@ the sprint carries as an eleven-row inventory rather than an intention. A web se
 a query has settled and returned nothing, or on the button — the literal "no local hit" rule fires
 once per keystroke while typing any new title, which breaches the Google free tier DEC-044 already
 measured.
+
+**Delivered and closed 2026-08-17.** The inventory grew to thirteen rows during the sprint and all
+thirteen carried over; the firing rule gained three clauses in the building and is recorded as built
+in DEC-073.
 
 ## Not scheduled
 
