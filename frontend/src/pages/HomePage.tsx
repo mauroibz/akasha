@@ -480,6 +480,30 @@ export function HomePage() {
     web.search(trimmed);
   };
 
+  /**
+   * Empty the bar, the query and the results together.
+   *
+   * The three are one state as far as the reader is concerned: what they asked. A
+   * clear that left any of them behind would leave the library filtered by a string
+   * no longer on screen. The URL is written directly rather than left to the 250 ms
+   * debounce, because a button press should not have a quarter second of lag on it.
+   */
+  const clearSearch = ({ refocus }: { refocus: boolean }) => {
+    setSearch("");
+    web.clear();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
+    // The button hands focus back to the box it just emptied. The add path does
+    // not: there the reader's attention is the row that just appeared.
+    if (refocus) searchRef.current?.focus();
+  };
+
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
       <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
@@ -570,8 +594,25 @@ export function HomePage() {
               }
             }}
             placeholder="Title, creator, ISBN or link  /"
-            className="h-11 rounded-full bg-surface"
+            // The trailing padding is the button's room: without it a long query
+            // runs underneath it. `appearance-none` removes WebKit's own tiny
+            // cancel glyph, which would otherwise sit beside this one saying the
+            // same thing in a style nothing else here uses -- and which Firefox
+            // does not render at all, so it could never have been the control.
+            className="h-11 rounded-full bg-surface pr-12 [&::-webkit-search-cancel-button]:appearance-none"
           />
+          {search && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => clearSearch({ refocus: true })}
+              className="focus-ring absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">
+                ×
+              </span>
+            </button>
+          )}
         </label>
         <Button
           className="h-11 shrink-0 rounded-full px-6"
@@ -866,16 +907,7 @@ export function HomePage() {
                  * The domain filter stays: that is a choice the reader made, and the
                  * thing just added is in it.
                  */
-                setSearch("");
-                web.clear();
-                setSearchParams(
-                  (prev) => {
-                    const next = new URLSearchParams(prev);
-                    next.delete("q");
-                    return next;
-                  },
-                  { replace: true },
-                );
+                clearSearch({ refocus: false });
                 // On `/` the handoff is a dialog closing rather than a
                 // navigation, so the highlight is set directly instead of
                 // travelling as router state.

@@ -1214,3 +1214,33 @@ test("row 11, properly: a successful add clears the query so the new row is actu
   );
   expect(await screen.findByText("Rayuela")).toBeVisible();
 });
+
+test("the clear button empties the bar, the query and the web results in one press", async () => {
+  const bar = stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+  const box = await screen.findByRole("searchbox");
+
+  // Nothing to clear yet, so nothing offers to.
+  expect(screen.queryByRole("button", { name: /clear search/i })).toBeNull();
+
+  await user.type(box, "Dune Messiah");
+  await user.click(screen.getByRole("button", { name: "Add" }));
+  await screen.findByRole("heading", { name: "From the web" });
+
+  await user.click(screen.getByRole("button", { name: /clear search/i }));
+
+  expect(box).toHaveValue("");
+  await waitFor(() =>
+    expect(screen.queryByRole("heading", { name: "From the web" })).toBeNull(),
+  );
+  // Back to the unfiltered library, and the caret is where the next search is
+  // typed rather than on a button that has just disappeared.
+  await waitFor(() =>
+    expect(
+      bar.urls.some((u) => u.startsWith("/api/entries?") && !u.includes("q=")),
+    ).toBe(true),
+  );
+  expect(box).toHaveFocus();
+});
