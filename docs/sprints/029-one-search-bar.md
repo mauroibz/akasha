@@ -408,8 +408,18 @@ silences), `84c2ec7` (the status filter), `4007e89` (Files as a region), and thi
    with its button at the weight of *Edit opinion*. Its own region rather than a button in that row,
    because the control belongs beside the list it produces.
 
-**Verified.** `make format`, `make check`, `make test` (**469 backend, 153 frontend** — seven new),
-`npx playwright test` (**90 passed, 2 skipped**), `make build`, `make smoke-container`,
+**6. A sixth item, found by the owner reviewing the five and repaired after the close.** Pressing
+the shell's **Library** link *while already on the library* left the page saying *Loading your
+library…* with nothing coming. The link points at `/` with no query, which strips `type` out of the
+URL; every list request names a domain since deliverable 2, and the restore that puts one back ran
+**once per mount** — right for every arrival that remounts the page, and wrong for the only one that
+does not. The restore answers to the URL lacking a `type` now, whenever that happens, and writing
+the value back is its own guard against repeating. Reproduced against the running container before
+the change and after it, and held by a unit test and an e2e test through the real shell; the e2e
+test was shown to fail against the old guard and pass against the new one.
+
+**Verified.** `make format`, `make check`, `make test` (**469 backend, 154 frontend** — eight new),
+`npx playwright test` (**91 passed, 2 skipped**), `make build`, `make smoke-container`,
 `git diff --check`, `python scripts/validate_project.py` — all green. Every change was written
 test-first and each new test observed failing for its own reason before the change that fixed it.
 
@@ -425,6 +435,9 @@ providers and screenshots of each:
 - `/books/19` shows **Files** as its own region with exactly one *Attach a file* button, and nothing
   inside *Edition facts*.
 - **No console errors on any screen.**
+- After the sixth item: *Library* pressed from the library keeps `?type=book` and its eleven cards,
+  survives being pressed three times running, returns to **Records** when records is where the reader
+  was, and the ordinary arrival from `/shelves` is unchanged.
 
 **One trap found, and it is not a defect in the product.** `add-detail.spec.ts`'s stagger test failed
 three runs in a row until the container was stopped: the e2e dev server proxies `/api` to

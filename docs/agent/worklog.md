@@ -1704,3 +1704,36 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: unchanged by this pass — **the merge (DEC-072)**, an owner action, carrying
   `README.md`'s feature copy and `docs/operations/release-notes-v1.2.md` with it.
   Then claim Sprint 030.
+
+## 2026-08-17 — Sprint 029 second pass, follow-on repair (complete)
+- Done: one defect the owner found reviewing the second pass. **The shell's
+  *Library* link, pressed while already on the library, left the page saying
+  "Loading your library…" with nothing coming.** The link is `/` with no query, so
+  it strips `type` out of the URL; every list request names a domain since 029's
+  deliverable 2, and the restore that supplies one ran once per mount — correct for
+  every arrival that remounts the page and wrong for the only one that does not.
+  The restore now answers to the URL lacking a `type`, whenever that happens;
+  writing the value back is its own guard against repeating, so the `restoredDomain`
+  ref is gone rather than replaced.
+- **Recorded in DEC-074 and in 029's second-pass Outcome rather than by reopening
+  the sprint a third time.** `WORKFLOW.md` has no `completed → in_progress`
+  transition; the repair is small, closed, tested and part of the same review.
+  State stays at 030 `ready` and the sprint stays `completed` — this was not done
+  with the sprint open, and the record says so.
+- Verified: reproduced against the running container first (`/` → 11 cards,
+  *Library* → 0 cards and the loading state), then fixed and re-checked — the URL
+  keeps `?type=book`, the eleven cards stay, three presses running are stable, the
+  **remembered** domain comes back (Records after choosing Records, five cards), and
+  the ordinary arrival from `/shelves` is unchanged. No console errors. Held by a
+  unit test that clicks a `Link` to `/` beside the mounted page and an e2e test
+  through the real shell; **the e2e test was mutated against the old guard and
+  observed failing** before being kept. `make check`, `make test` (469 backend,
+  **154** frontend), `npx playwright test` (**91 passed**, 2 skipped),
+  `git diff --check`, validator — green.
+- Deviations: none. Worth naming for the next agent: the first version of the new
+  e2e test passed alone and failed in the suite, because it left `/api/item-types`
+  unstubbed and so asserted against whatever answers `localhost:8000` — the same
+  proxy trap as before, in its other form. It stubs the registry now.
+- Blocked/open: none.
+- Next: unchanged — **the merge (DEC-072)**, an owner action, carrying `README.md`'s
+  feature copy and `docs/operations/release-notes-v1.2.md`. Then Sprint 030.

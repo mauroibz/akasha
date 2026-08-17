@@ -2432,6 +2432,25 @@ Append-only record of material architecture choices, product-default resolutions
     this page should copy them rather than invent a third interaction.
   - The `Attachments` component no longer owns its frame: the page wraps it in the labelled region.
     A future screen hosting it supplies its own.
+- **A sixth item, found reviewing the five, repaired after the close** — recorded here rather than
+  by reopening the sprint a third time, because `WORKFLOW.md` has no `completed → in_progress`
+  transition and the repair is small, closed and tested. **The shell's *Library* link, pressed while
+  already on the library, produced a permanent *Loading your library…*.** It points at `/` with no
+  query, so it strips `type` from the URL; deliverable 2 made every list request name a domain, and
+  the restore that supplies one ran **once per mount**. Every other way of reaching the library
+  remounts the page, so the one that does not was the one nothing covered.
+
+  **The rule this establishes: the domain restore answers to the URL, not to the mount.** A URL
+  without a `type` is precisely the state the restore exists to fix, whenever it occurs — and
+  writing the value back is what stops it repeating, so the effect is its own guard and needs no
+  other. A future control that clears the domain from the URL will be caught by the same effect
+  rather than needing its own.
+
+  Held at two layers on purpose: a unit test that clicks a `Link` to `/` beside a mounted page, and
+  an e2e test through the real shell, because **this is an integration defect between the shell and
+  the page and the unit layer alone did not see it for a whole sprint.** The e2e test was shown to
+  fail against the old guard before being kept.
+
   - **A trap the e2e suite has and does not announce:** the dev server proxies `/api` to
     `localhost:8000`, so a container left running on that port answers every request an e2e test
     forgot to stub, with the real dev library. It fails tests that look like regressions and are

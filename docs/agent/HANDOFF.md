@@ -62,6 +62,14 @@ panel, and if they turn out to be read constantly the answer is to surface them 
 to bring the row back**. Files is its own region on the detail page, at the weight of *Edit
 opinion*, with the component no longer owning its frame.
 
+**The domain restore answers to the URL, not to the mount**, and that is the repair for the last
+defect the second pass found. The shell's *Library* link is `/` with no query, so pressing it while
+already on the library strips `type` — and every list request names a domain, so a restore that ran
+once per mount left the page loading forever. A URL without a `type` is the state the restore exists
+to fix, whenever it occurs; writing the value back is its own guard. **A control that clears the
+domain from the URL is therefore already covered.** Held at the unit *and* e2e layers on purpose:
+the unit layer alone missed this for a whole sprint because it never mounts the shell.
+
 **Deliverable 6 needed no new `Domain` field.** One neutral placeholder serves every domain, so the
 backend contract is untouched. The field is still the right shape the day a domain actually needs
 different copy — DEC-073 says no domain needs it yet, not that it is disallowed.

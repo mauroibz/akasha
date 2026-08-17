@@ -8,7 +8,7 @@ import {
   sampleAnimations,
 } from "./motion";
 import { chooseOption, expectSelected } from "./radix";
-import { entry, pixelCover, seedLibrary } from "./seed";
+import { entry, pixelCover, seedLibrary, stubItemTypes } from "./seed";
 
 interface Box {
   x: number;
@@ -804,4 +804,30 @@ test("the library scrolls with the page and never inside a box", async ({
     // The virtualizer is following the window, not sitting still inside it.
     await expect(page.locator("[data-entry-id='1']")).toBeHidden();
   }
+});
+
+test("the shell's Library link lands on a library, from the library", async ({
+  page,
+}) => {
+  // The one arrival that does not remount the page: pressing *Library* while
+  // already on it. It points at `/` with no query, so it strips the domain out of
+  // the URL, and every list request names a domain -- which left the reader
+  // looking at "Loading your library…" with nothing coming.
+  // The registry is stubbed rather than proxied: the domain the URL is restored to
+  // is the registry's answer, so a test that leaves it to whatever is listening on
+  // the backend port asserts on that instead.
+  await stubItemTypes(page);
+  await seedLibrary(page, 20);
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Library" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await expect(page.getByText(/loading your library/i)).toHaveCount(0);
+  await expect(page).toHaveURL(/type=book/);
 });

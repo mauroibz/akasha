@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { Link, MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, expect, test, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
@@ -1305,4 +1305,44 @@ test("the status filter offers the chosen domain's vocabulary and only that doma
   await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
   expect(await screen.findByRole("option", { name: /^Owned/ })).toBeVisible();
   expect(screen.queryByRole("option", { name: /^Read \d/ })).toBeNull();
+});
+
+test("the shell's Library link lands on a library, not on a permanent loading state", async () => {
+  // The shell links to `/` with no query. Pressed from another page that remounts
+  // this one and the domain is restored on mount; pressed while already here it
+  // only strips `type` from the URL -- and every list request names a domain, so a
+  // page that restores once per mount then waits forever for a domain nothing will
+  // give it. The restore belongs to the URL lacking a type, not to the mount.
+  const fetchMock = stubRegistry();
+  // Records is where this reader was; the restore owes them that domain back and
+  // not merely the first one the registry declares.
+  localStorage.setItem("akasha.library.domain", "album");
+  render(
+    <QueryClientProvider client={makeClient()}>
+      <MemoryRouter initialEntries={["/?type=album"]}>
+        <Link to="/">Library</Link>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+        </Routes>
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  // Counted from here, so the assertion is about what the click produced rather
+  // than about the request the first render already made.
+  const before = fetchMock.mock.calls.length;
+  await user.click(screen.getByRole("link", { name: "Library" }));
+
+  // Back to a domain -- the one remembered, not merely the first declared.
+  await waitFor(() =>
+    expect(
+      fetchMock.mock.calls
+        .slice(before)
+        .some(([request]) => String(request).includes("type=album")),
+    ).toBe(true),
+  );
+  expect(await screen.findByText("Rayuela")).toBeVisible();
+  expect(screen.queryByText(/loading your library/i)).toBeNull();
 });

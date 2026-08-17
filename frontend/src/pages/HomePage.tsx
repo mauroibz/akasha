@@ -218,16 +218,19 @@ export function HomePage() {
    * a library filtered by no domain is exactly the state this sprint removes.
    *
    * It waits for the registry, because the fallback is a value only the registry has.
+   *
+   * **It answers to the URL, not to the mount.** It used to run once per mount, which
+   * is right for every way of arriving that remounts the page and wrong for the one
+   * that does not: the shell's *Library* link points at `/` with no query, so pressing
+   * it while already here strips `type` and leaves a mounted page whose restore has
+   * already fired. Every list request names a domain, so the library then waits for a
+   * domain nothing was going to give it and says "Loading your library…" forever. A
+   * URL without a `type` is exactly the state this effect exists to fix, whenever it
+   * occurs; writing the value back makes the effect its own guard against repeating.
    */
-  const restoredDomain = useRef(false);
   useEffect(() => {
-    if (restoredDomain.current) return;
-    if (searchParams.has("type")) {
-      restoredDomain.current = true;
-      return;
-    }
+    if (searchParams.has("type")) return;
     if (itemTypes.isPending) return;
-    restoredDomain.current = true;
     if (!domains.length) return;
     const remembered = readDomainPreference();
     const chosen = domains.some((type) => type.id === remembered)
