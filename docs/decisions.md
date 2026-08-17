@@ -2384,3 +2384,56 @@ Append-only record of material architecture choices, product-default resolutions
     must clear the query, because the web search only ran when the library had nothing, so closing
     the dialog onto that filtered view highlights a row nothing can see. The old flow got this free
     by navigating to an unfiltered `/`.
+
+## DEC-074 — Sprint 029's second pass: five things the screen got wrong, and the two judgement calls in fixing them
+
+- **Date:** 2026-08-17
+- **Status:** accepted
+- **Context:** the owner used what Sprint 029 built, against the real library, and found five
+  defects in the small — four on the screens 029 rebuilt and one on the detail page. None is a
+  regression from the sprint; three are things the sprint's own rebuild made newly visible, and two
+  predate it. **Sprint 029 reopened for a second pass** rather than deferring them to a sprint that
+  is about something else, on the precedent of Sprint 028's third pass (DEC-070).
+- **Decision.** Five changes, all frontend, no API and no schema:
+
+  1. **A `long_text` field spans both columns of the confirm step.** The split is on the field's
+     declared type, the way the detail page already splits `inlineFields` from `blockFields` — not
+     on the name "description", which no shared layer may know.
+  2. **The search bar clears in one press.** The box, the URL's `q` and the web results go
+     together; the successful-add path already did exactly this and both now call one function.
+  3. **An empty result is not an empty library.**
+  4. **The status filter is a control, not a row.**
+  5. **Files is its own region on the detail page**, at the weight of *Edit opinion*.
+
+- **Two judgement calls a later sprint could otherwise reverse blind:**
+
+  **The status counts moved inside the panel.** The chips showed every status's count at all times,
+  which is real information the dropdown hides behind a click. The row was still the wrong trade:
+  it was a whole row of chrome, above the library, for the fourth of four filters — and for a
+  vocabulary the domain tab already names. The counts are in the panel rather than dropped, and the
+  trigger names the current selection, so what is *chosen* is still readable without opening it.
+  **If the counts turn out to be read constantly, the answer is to surface them in the trigger, not
+  to bring the row back.**
+
+  **The empty state is suppressed during an active query, not deleted.** "Your library is waiting"
+  is correct and worth its screen for somebody with no library. Shown to somebody mid-search it is
+  two hundred pixels of encouragement between the bar and the results that the miss is about to
+  produce — and a miss is the *ordinary* path, since settled-and-empty only reaches a provider when
+  the library came back with nothing (DEC-073). So the tall state is kept for the empty library and
+  replaced, for an active query, by one line naming the string that missed. **One line rather than
+  nothing** is deliberate: the settle rule waits ~800 ms before searching, and a page that goes
+  blank in that gap reads as broken.
+
+- **Consequences.**
+  - Product spec section 7 describes four filters in one row, the clear control, the two silences
+    and Files as its own region.
+  - `StatusFilter` is the second control built on the `FormatPicker` shape — popover, checkmark
+    column, list stays open. **The two must keep behaving identically**; a third multi-select on
+    this page should copy them rather than invent a third interaction.
+  - The `Attachments` component no longer owns its frame: the page wraps it in the labelled region.
+    A future screen hosting it supplies its own.
+  - **A trap the e2e suite has and does not announce:** the dev server proxies `/api` to
+    `localhost:8000`, so a container left running on that port answers every request an e2e test
+    forgot to stub, with the real dev library. It fails tests that look like regressions and are
+    not — `add-detail.spec.ts`'s stagger test clicks a real *Rayuela* card instead of the web
+    result. **Stop the container before running the suite.**

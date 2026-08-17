@@ -615,7 +615,9 @@ something no provider lists is the only thing that still leaves it.
 
 - **One bar across the top: the domain selector, the search input, and *Add*.** One control
   picks two things at once — the rows you see *and* the providers a search would reach — so
-  there is never a moment where the application has to ask which domain you meant.
+  there is never a moment where the application has to ask which domain you meant. The input
+  carries a clear control while it holds anything, and clearing empties the box, the query and
+  any web results together, because they are one thing as far as the reader is concerned.
 - **The domain strip names exactly one domain**, one tab per domain, rendered from the
   registry and present only when the build has more than one. **"All" is not a filter**
   (DEC-065): the choice lives in the URL like every other filter and is remembered between
@@ -640,17 +642,24 @@ something no provider lists is the only thing that still leaves it.
   dialog closes onto the library with the new entry highlighted, and the query is cleared,
   because the filter that had just missed would otherwise hide the thing you added.
 - Grid (covers) / compact table toggle, persisted in localStorage
-- Filter chips: status, **one row, under the chosen domain's vocabulary** — a library holding
-  two domains has no single status vocabulary, and a shared status ("wishlist") is counted
-  per domain rather than once; the tab says which domain the row belongs to, so the row
-  carries no heading of its own. Plus shelf and format selectors, the format list narrowed to
-  the domain on screen
+- **Four filters in one row: sort, shelf, format and status.** Status is a multi-select rather
+  than a single choice, because wanting *Read* and *Reading* at once is ordinary; it offers
+  **the chosen domain's vocabulary and only that domain's**, with each status's count beside
+  it, since a library holding two domains has no single status vocabulary and a shared status
+  ("wishlist") is counted per domain rather than once. The tab already names the domain, so the
+  control carries no heading of its own. The format list is narrowed to the domain on screen.
+  Status had a row of its own until Sprint 029's second pass, which is a whole row of chrome
+  for the fourth of four filters (DEC-074)
 - **The page scrolls, not the grid.** The library is the primary surface and uses the whole
   page; the virtualizer measures the window rather than a fixed-height box of its own
 - Sort dropdown per §6
 - Inline score editing directly from the list — click the number, type, done.
   No modal, no navigation.
 - Counts per status somewhere unobtrusive
+- **An empty library and an empty result are different silences.** No library is news, and says
+  so with the screen it deserves. A search that matched nothing is the ordinary case — it is
+  what makes the web search fire — so it gets one line naming the string that missed, and the
+  results land where the encouragement would otherwise have pushed them (DEC-074)
 
 **`/add` — Enter by hand.** Searching moved to `/` in Sprint 029 (DEC-065); what is left
 here is the one thing no provider can do for you.
@@ -686,7 +695,8 @@ edit.
   and not a trip to `/shelves`; and never converged with the format control, because a
   shelf is one you invent and a format is a closed per-domain vocabulary (DEC-059)
 - Link to edit underlying item metadata
-- **Files** — attachments on the edition: name, size, download, rename, remove.
+- **Files** — its own region, at the weight of *Edit opinion* rather than a corner of the
+  edition facts (DEC-074): attachments on the edition, with name, size, download, rename, remove.
   Loaded as its own request so a slow read never delays the page. Renaming is
   inline, since the name is metadata and changing it moves no bytes; removing
   confirms first, because once the removed row is the last reference the upload

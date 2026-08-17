@@ -1,7 +1,7 @@
 # Handoff — current reality
 
-**Sprint 029 is closed and Sprint 030 is `ready`.** Plan revision **12**. The worktree is clean,
-every gate is green, and nothing is half-built.
+**Sprint 029 is closed — including its second pass — and Sprint 030 is `ready`.** Plan revision
+**12**. The worktree is clean, every gate is green, and nothing is half-built.
 
 ## Do this first
 
@@ -50,6 +50,17 @@ the `/books/:entryId` route and the identifiers. It returns two lines, both JSX 
 continuations, and nothing that reaches a screen. Run it before claiming the criterion — it caught a
 regression once already, when a `git checkout` used to undo a mutation test restored "Add a book".
 **Do not `git checkout <file>` to undo a mutation test**; copy the file aside and copy it back.
+
+**The second pass (DEC-074) changed five things on the screens, and two of them carry a judgement
+call.** A `long_text` field spans both columns of the confirm step, split on the declared type the
+way `DetailPage` splits `inlineFields` from `blockFields`. The bar clears in one press — box, `q`
+and web results together — sharing one function with the successful-add path. An active query with
+no rows gets one line rather than the tall empty state, which is kept for a library that really is
+empty. The status chips became a **fourth filter** beside sort, shelf and format, built on
+`FormatPicker`'s popover shape because the filter is multi-valued; **the counts moved into the
+panel, and if they turn out to be read constantly the answer is to surface them in the trigger, not
+to bring the row back**. Files is its own region on the detail page, at the weight of *Edit
+opinion*, with the component no longer owning its frame.
 
 **Deliverable 6 needed no new `Domain` field.** One neutral placeholder serves every domain, so the
 backend contract is untouched. The field is still the right shape the day a domain actually needs
@@ -130,6 +141,11 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
 
 ## Known and left, in the order they are likely to bite
 
+- **Stop the container before running the e2e suite.** The dev server proxies `/api` to
+  `localhost:8000`, so a container left running there answers every request a spec forgot to stub —
+  with the real dev library. `add-detail.spec.ts`'s stagger test then clicks a real *Rayuela* card
+  instead of the web result and fails three runs out of three, looking exactly like a regression.
+  It reproduces against older source, which is how to tell it apart from one (DEC-074).
 - **The dev library at `data/` is 16 entries**, up from 13. The Sprint 029 walkthrough added *The
   Left Hand of Darkness* (19), *Selected Ambient Works 85–92* (20), *Kid A* (21) and *OK Computer*
   (22), two of them carrying a `Walkthrough, sprint 029.` note, and created a shelf named

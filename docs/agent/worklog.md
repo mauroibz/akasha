@@ -1665,3 +1665,42 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   the v1 and v1.1 precedent. Neither was written on this branch, because the handoff
   is explicit that the copy changes when the branch merges and not before. After
   that, claim Sprint 030.
+
+## 2026-08-17 — Sprint 029 second pass (complete), Sprint 030 ready again
+- Done: five owner-reported UI defects, found by using what 029 built against the
+  real library. `d130fa0` a `long_text` field spans both columns of the confirm step
+  (split on the declared type, mirroring `DetailPage`'s `inlineFields`/`blockFields`,
+  not on the name "description"); `e746c32` the search bar clears in one press —
+  box, `q` and web results together, refocusing the box, sharing one function with
+  the successful-add path; `cc38640` an active query with no rows gets one line
+  instead of the tall empty state; `84c2ec7` the status chips become a fourth filter
+  beside sort/shelf/format, built on `FormatPicker`'s popover shape because the
+  filter is multi-valued; `4007e89` Files becomes its own region on the detail page
+  at the weight of *Edit opinion*. Then product spec §7, **DEC-074**, the sprint's
+  *Second pass* Outcome, and this close.
+- Verified: every change test-first, each new test observed failing for its own
+  reason first. `make check`, `make test` (**469 backend, 153 frontend**, seven new),
+  `npx playwright test` (**90 passed, 2 skipped**), `make build`,
+  `make smoke-container`, `git diff --check`, validator — green. Walkthrough against
+  the real dev library in the container with live providers and a screenshot of each
+  of the five: real counts in the status panel (Read 9, To read 2), one and two
+  statuses reaching the URL, *Neuromancer* producing the compact line and no tall
+  empty state, the clear control emptying box + URL + results and returning focus,
+  the description measured at 588px of a 622px panel, and `/books/19` showing Files
+  as its own region with exactly one attach button. No console errors.
+- **Trap worth not rediscovering: stop the container before running e2e.** The dev
+  server proxies `/api` to `localhost:8000`, so a container left running there
+  answers every request a spec forgot to stub — with the real dev library.
+  `add-detail.spec.ts`'s stagger test then clicks a real *Rayuela* card instead of
+  the web result and fails, three runs in a row, looking exactly like a regression.
+  It reproduces against the pre-pass source, which is how it was told apart from one.
+- Deviations: none. Two judgement calls are in DEC-074 rather than left in the code:
+  the status counts moved inside the panel (and if they turn out to be read
+  constantly, the fix is to surface them in the trigger, not to bring the row back),
+  and the empty state is suppressed during a query rather than deleted, with one
+  line rather than nothing because the settle rule waits ~800 ms and a page that
+  goes blank in that gap reads as broken.
+- Blocked/open: none.
+- Next: unchanged by this pass — **the merge (DEC-072)**, an owner action, carrying
+  `README.md`'s feature copy and `docs/operations/release-notes-v1.2.md` with it.
+  Then claim Sprint 030.

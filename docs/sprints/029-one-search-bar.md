@@ -1,6 +1,6 @@
 # Sprint 029 — One search bar
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 027, 028
 **Roadmap revision:** 12
 
@@ -379,3 +379,61 @@ shows the error, which is right, but no test can see this because it is upstream
   next, with `README.md`'s feature copy and `docs/operations/release-notes-v1.2.md` going in with it.
 - **Future epics:** unchanged. A third domain still costs what DEC-069 priced, and one line less of
   it, since no `Domain` field was added.
+
+### Second pass — the polish, 2026-08-17
+
+**Reopened at the owner's request** after using what the sprint built, on the precedent of Sprint
+028's third pass (DEC-070). Five defects in the small: four on the screens this sprint rebuilt and
+one on the detail page. None is a regression from the sprint; three are things its rebuild made
+newly visible. Recorded as **DEC-074**.
+
+**Commits:** `d130fa0` (the description's width), `e746c32` (the clear control), `cc38640` (the two
+silences), `84c2ec7` (the status filter), `4007e89` (Files as a region), and this closing commit.
+
+1. **A `long_text` field spans both columns of the confirm step.** A paragraph in one column of two
+   is twenty characters wide and the height of the panel. The split is on the field's declared type,
+   the way `DetailPage` already splits `inlineFields` from `blockFields` — not on the name
+   "description", which no shared layer may know. Measured in the running application: the block is
+   **588 px of a 622 px panel**.
+2. **The bar clears in one press.** The box, the URL's `q` and the web results go together, and
+   focus returns to the box. The successful-add path already did exactly this, so both call one
+   function, which takes the refocus as a parameter. WebKit's own cancel glyph is suppressed rather
+   than adopted — Firefox renders none, so it could never have been the control.
+3. **An empty result is not an empty library.** The tall state is kept for a library with nothing in
+   it and replaced, for an active query, by one line naming the string that missed.
+4. **The status filter is a control, not a row** — a fourth filter beside sort, shelf and format,
+   built on `FormatPicker`'s shape because the filter is multi-valued and a `Select` can only
+   replace. The counts moved into the panel with it.
+5. **Files is its own region** on the detail page, between the personal panel and the edition facts,
+   with its button at the weight of *Edit opinion*. Its own region rather than a button in that row,
+   because the control belongs beside the list it produces.
+
+**Verified.** `make format`, `make check`, `make test` (**469 backend, 153 frontend** — seven new),
+`npx playwright test` (**90 passed, 2 skipped**), `make build`, `make smoke-container`,
+`git diff --check`, `python scripts/validate_project.py` — all green. Every change was written
+test-first and each new test observed failing for its own reason before the change that fixed it.
+
+**Walkthrough**, against the real dev library in the container at `localhost:8000`, with live
+providers and screenshots of each:
+
+- The status panel reads the library's real counts — *Read 9*, *To read 2* — and one status then two
+  reach the URL as `?status=read` and `?status=read&status=reading`.
+- Searching *Neuromancer* (not owned): the compact line appears, **the tall empty state does not**,
+  and *From the web* is on screen without scrolling.
+- The clear control empties the box, drops `q` from the URL, removes the results and returns focus.
+- *Load full details* on a Neuromancer result renders its two-language description across the panel.
+- `/books/19` shows **Files** as its own region with exactly one *Attach a file* button, and nothing
+  inside *Edition facts*.
+- **No console errors on any screen.**
+
+**One trap found, and it is not a defect in the product.** `add-detail.spec.ts`'s stagger test failed
+three runs in a row until the container was stopped: the e2e dev server proxies `/api` to
+`localhost:8000`, so a container left running there answers every request a test forgot to stub,
+with the **real** dev library — and the test then clicks a real *Rayuela* card instead of the web
+result it meant. It reproduces identically against the pre-pass source, which is how it was told
+apart from a regression. **Stop the container before running the suite.** Recorded in DEC-074.
+
+**Impact on future sprints:** none beyond Sprint 029's own. Sprint 030 remains Phase A and gated;
+Sprint 031 is untouched. The merge (DEC-072) now carries the polish as well, which is the right
+order — the release that stops calling everything a book is also the one where the screens are the
+shape the owner asked for.

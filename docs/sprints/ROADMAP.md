@@ -2,7 +2,7 @@
 
 **Plan revision:** 12
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 029](029-one-search-bar.md) — second pass
+**Active sprint:** [Sprint 030](030-entry-depth.md)
 
 ## Shape of the plan
 
@@ -81,8 +81,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
-| [029](029-one-search-bar.md) | One search bar | 027, 028 | **in progress** (second pass) |
-| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | planned |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
+| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | **ready** |
 | 031 | Per-domain imports | 030 | planned |
 
 ## Contracts for planned sprints
@@ -395,6 +395,12 @@ paragraph first claimed. What the sprint did change is the account of the *scree
 you search and add, `/add` is manual entry, results render below the library rather than above it,
 and a provider is reached only on settled-and-empty or on **Add** — a rule verified by counting
 requests. The full Outcome is in the sprint file.
+
+**Reopened for a second pass, 2026-08-17 (DEC-074)**, on the owner's report after using it: the
+confirm step gives a `long_text` field both columns, the bar clears in one press, an active query
+that misses gets one line instead of the tall empty state, the status chips fold into a fourth
+filter beside sort/shelf/format, and Files becomes its own region on the detail page. Five frontend
+changes, no API and no schema.
 
 ### [Sprint 030 — Entry depth: the decision](030-entry-depth.md)
 

@@ -1,6 +1,6 @@
 # Sprint 030 — Entry depth: the decision
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 029
 **Roadmap revision:** 12
 
