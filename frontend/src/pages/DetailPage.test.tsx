@@ -801,6 +801,37 @@ describe("DetailPage", () => {
       });
   }
 
+  it("gives files a region of their own rather than a corner of the edition facts", async () => {
+    // Attaching a file is a feature of the entry, not a footnote on its publisher.
+    // It was a small outline button inside Edition facts; it is its own region at
+    // the weight of Edit opinion now, with the list it produces still beside it.
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (request: string | URL | Request) => {
+        const url = String(request);
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (url.startsWith("/api/shelves")) return new Response("[]");
+        if (url.includes("/attachments"))
+          return new Response('{"attachments":[]}');
+        return new Response(JSON.stringify(entry));
+      },
+    );
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    const files = screen.getByRole("region", { name: "Files" });
+    const attach = screen.getByRole("button", { name: "Attach a file" });
+    expect(files).toContainElement(attach);
+
+    // A peer of the other two regions, not inside either of them.
+    expect(
+      screen.getByRole("region", { name: "Edition facts" }),
+    ).not.toContainElement(files);
+    expect(
+      screen.getByRole("region", { name: "Your reading data" }),
+    ).not.toContainElement(files);
+  });
+
   it("creates a shelf and puts the book on it in one control", async () => {
     const request = stubShelves();
     renderPage();

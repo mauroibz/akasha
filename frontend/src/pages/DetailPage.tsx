@@ -410,6 +410,20 @@ export function DetailPage() {
             </div>
           </section>
 
+          {/* Files, at the weight of the thing it is.
+              It was a small outline button in the corner of Edition facts, which
+              is where a footnote goes, not where an attachment goes: what is
+              attached to an edition is the edition's, but *attaching* one is
+              something the reader does, like editing an opinion. Its own region,
+              between the two, keeps the control beside the list it produces --
+              which putting the button under the cover would not. */}
+          <section
+            className="mt-6 rounded-xl border border-border p-5"
+            aria-label="Files"
+          >
+            <Attachments itemId={item.id} />
+          </section>
+
           {/* Edition facts region */}
           <section
             className="mt-6 rounded-xl border border-border p-5"
@@ -456,9 +470,6 @@ export function DetailPage() {
                 </div>
               );
             })}
-            <div className="mt-5">
-              <Attachments itemId={item.id} />
-            </div>
             <div className="mt-5 flex flex-wrap gap-3">
               <Button
                 variant="outline"
