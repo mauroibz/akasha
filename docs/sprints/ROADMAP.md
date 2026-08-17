@@ -2,7 +2,7 @@
 
 **Plan revision:** 12
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 030](030-entry-depth.md)
+**Active sprint:** [Sprint 029](029-one-search-bar.md) — second pass
 
 ## Shape of the plan
 
@@ -81,8 +81,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [026](026-statuses-formats-tracklists.md) | Statuses, formats and tracklists | 025 | completed |
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
-| [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
-| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | **ready** |
+| [029](029-one-search-bar.md) | One search bar | 027, 028 | **in progress** (second pass) |
+| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | planned |
 | 031 | Per-domain imports | 030 | planned |
 
 ## Contracts for planned sprints

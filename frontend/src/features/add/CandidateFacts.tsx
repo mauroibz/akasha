@@ -58,13 +58,31 @@ export function CandidateFacts({
     )
     .map(([field, value]) => {
       const text = Array.isArray(value) ? value.join(", ") : String(value);
-      return [field.label, text] as [string, string];
+      return [field, text] as const;
     })
     .filter(([, text]) => text.length > 0);
 
+  // A paragraph is not a fact, and a paragraph in one column of two is a ribbon:
+  // twenty characters wide and the height of the panel. The detail page already
+  // splits its fields this way (`inlineFields` / `blockFields`), so this is the
+  // same rule in the other place a domain's fields are rendered. It reads the
+  // declared type rather than the field's name, so a domain that adds its own
+  // long field gets it without this component learning the name.
+  const inlineFacts = domainFacts.filter(
+    ([field]) => field.type !== "long_text",
+  );
+  const blockFacts = domainFacts.filter(
+    ([field]) => field.type === "long_text",
+  );
+
   const identifiers = Object.entries(candidate.identifiers ?? {});
-  const rows = [...identity, ...domainFacts];
-  if (!rows.length && !identifiers.length) return null;
+  const rows: Array<[string, string]> = [
+    ...identity,
+    ...inlineFacts.map(
+      ([field, text]) => [field.label, text] as [string, string],
+    ),
+  ];
+  if (!rows.length && !blockFacts.length && !identifiers.length) return null;
 
   return (
     <section
@@ -79,9 +97,19 @@ export function CandidateFacts({
         {rows.map(([label, value]) => (
           <div key={label} className="min-w-0">
             <dt className="text-xs text-muted-foreground">{label}</dt>
-            {/* Long values wrap rather than truncate: a description is the reason
-                somebody pressed the button that fetched it. */}
             <dd className="whitespace-pre-wrap break-words text-sm">{value}</dd>
+          </div>
+        ))}
+        {blockFacts.map(([field, text]) => (
+          <div
+            key={field.name}
+            className="min-w-0 sm:col-span-2"
+            data-block-fact=""
+          >
+            <dt className="text-xs text-muted-foreground">{field.label}</dt>
+            {/* Wraps rather than truncates: a description is the reason somebody
+                pressed the button that fetched it. */}
+            <dd className="whitespace-pre-wrap break-words text-sm">{text}</dd>
           </div>
         ))}
         {identifiers.length > 0 && (

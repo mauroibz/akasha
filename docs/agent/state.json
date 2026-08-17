@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 12,
-  "project_status": "ready",
-  "active_sprint": "030",
-  "active_sprint_file": "docs/sprints/030-entry-depth.md",
-  "active_sprint_status": "ready",
-  "last_completed_sprint": "029",
+  "project_status": "in_progress",
+  "active_sprint": "029",
+  "active_sprint_file": "docs/sprints/029-one-search-bar.md",
+  "active_sprint_status": "in_progress",
+  "last_completed_sprint": "028",
   "completed_sprints": [
     "001",
     "002",
@@ -34,9 +34,8 @@
     "025",
     "026",
     "027",
-    "028",
-    "029"
+    "028"
   ],
-  "started_at": "2026-08-17T19:00:00-03:00",
-  "updated_at": "2026-08-17T19:00:00-03:00"
+  "started_at": "2026-08-17T20:00:00-03:00",
+  "updated_at": "2026-08-17T20:00:00-03:00"
 }
