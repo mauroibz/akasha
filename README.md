@@ -46,7 +46,7 @@ Did you drop the book halfway through? Do you want to buy this album in vinyl so
 Add your item to a shelf and give it a status.
 - **Import your library** Importing from existing systems is supported and extensible.
 Bring your own Goodreads CSV, a read-only Calibre library and get your info migrated.
-- **Choose your covers.** If provided by the API, you can choose the cover you see in the library or upload your own.
+- **Choose your covers.** If provided by the API, or upload your own, you can choose the how your items look
 What you see in the app should reflect what's in your house.
 - **Upload your files** While not its primary feature, you can attach files to entries,
 in case you need a safe place to store that PDF.
