@@ -60,7 +60,7 @@ in case you need a safe place to store that PDF.
 
 ## Quick start
 
-You need Docker with the Compose plugin. Nothing else.
+You need Docker with the Compose plugin
 
 ```bash
 git clone https://github.com/mauroibz/akasha.git
@@ -79,8 +79,7 @@ Open `http://localhost:8000`.
 and startup refuses without it.
 
 `data` and `backups` are named Docker volumes, seeded from the image with the right
-ownership already on them — nothing to create, nothing to `chown`. Want them as real
-host directories instead (a NAS-backed `BACKUP_DIR`, direct access to the sqlite
+ownership already on them. Want them as real host directories instead (a NAS-backed `BACKUP_DIR`, direct access to the sqlite
 file)? See [Bind-mounting data and backups](#bind-mounting-data-and-backups).
 
 ### Configuration
@@ -137,6 +136,19 @@ backup first and refuses to migrate if it can't.
 Restore, rollback and reverse-proxy guidance are in
 **[the operator runbook](docs/operations/runbook.md)**.
 
+## Documentation
+
+[`docs/README.md`](docs/README.md) is the map, and says whether each document is
+canonical, historical or a proposal. Product behaviour is canonical in the
+[product spec](docs/specs/product-spec.md); architecture and contracts in the
+[technical spec](docs/specs/technical-spec.md); every material decision, with its
+reasoning, in [`docs/decisions.md`](docs/decisions.md). Visual identity — palette,
+type, the mark — is in [`docs/brand/`](docs/brand/).
+
+Akasha was built by following the [Seeds](https://github.com/mauroibz/seeds) methodology for agentic development.
+The sprint files, decision log and worklog in `docs/` are the real record of that,
+mistakes included.
+
 ## Development
 
 You need Node 22, npm, and [`uv`](https://docs.astral.sh/uv/). `uv` installs Python
@@ -170,24 +182,9 @@ A **domain** is a kind of thing the library holds — a book, an album. Each liv
 own package under `backend/src/book_tracker/domains/`, declaring its fields, statuses,
 formats, identity rule and provider; that declaration is served over the API and every
 screen renders from it, so nothing above the registry branches on type. Adding one
-costs a package, a registry entry and provider wiring — no migration, no edit to
+costs a package, a registry entry and provider wiring: no migration, no edit to
 another domain's files. See **[how to add a domain](docs/guides/adding-a-domain.md)**,
 binding contract in [technical spec §6.6](docs/specs/technical-spec.md).
-
-## Documentation
-
-[`docs/README.md`](docs/README.md) is the map, and says whether each document is
-canonical, historical or a proposal. Product behaviour is canonical in the
-[product spec](docs/specs/product-spec.md); architecture and contracts in the
-[technical spec](docs/specs/technical-spec.md); every material decision, with its
-reasoning, in [`docs/decisions.md`](docs/decisions.md). Visual identity — palette,
-type, the mark — is in [`docs/brand/`](docs/brand/).
-
-Akasha was built by an AI coding agent working sprint by sprint under a protocol in
-[`AGENTS.md`](AGENTS.md), with a human owner making the product decisions, following
-the [Seeds](https://github.com/mauroibz/seeds) methodology for agentic development.
-The sprint files, decision log and worklog in `docs/` are the real record of that,
-mistakes included.
 
 ## Contributing
 
