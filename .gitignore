@@ -21,7 +21,9 @@ test-results/
 .env.*
 !.env.example
 data/
-# Default Compose bind mounts. Backups contain the database and covers verbatim.
+# Tier-2 opt-in bind mounts only (compose.bind-mounts.yaml) — the default
+# deployment uses named Docker volumes instead. Backups contain the database
+# and covers verbatim.
 backups/
 calibre/
 *.db

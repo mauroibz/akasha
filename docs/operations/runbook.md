@@ -11,8 +11,7 @@ change every rating, note and shelf. Keep it on a trusted LAN.
 
 ```bash
 cp .env.example .env      # then edit it
-mkdir -p data backups calibre
-sudo chown -R 10001:10001 data backups
+mkdir -p calibre
 docker compose up -d
 ```
 
@@ -20,9 +19,10 @@ docker compose up -d
 asks callers to identify themselves. `GOOGLE_BOOKS_API_KEY` is optional; without
 it search runs on Open Library alone and Spanish-language coverage is poor.
 
-**The `chown` matters.** The container runs as uid 10001 and cannot write into a
-directory owned by anyone else. Skipping it produces `attempt to write a readonly
-database` at startup, which reads like corruption and is only permissions.
+`data` and `backups` are named Docker volumes by default (DEC-075), seeded from
+the image with the right ownership already on them — there is nothing to `chown`.
+Want either as a real host directory instead (a NAS-backed `BACKUP_DIR`, direct
+host access to the sqlite file)? See "Bind-mounting data and backups" below.
 
 Check it came up:
 
@@ -54,18 +54,31 @@ books it takes well under a second; the log line to look for is
 
 Alembic here is forward-only, so a rollback is a restore plus an older image.
 
+Docker has no way to rename a volume, so this restores into a fresh one and
+flips which volume Compose points at, rather than swapping directories on the
+host. The volume `data` is currently attached to is left untouched — it's the
+rollback point for the rollback, if this ever needs undoing.
+
 ```bash
 docker compose down
-ls backups/                                   # find the pre-migration copy
+docker run --rm -v akasha_backups:/backups:ro alpine ls /backups   # find the pre-migration copy
+docker volume create akasha_data_rollback
 docker run --rm --user 10001 \
-  -v "$PWD/backups:/backups:ro" -v "$PWD/data-restored:/data" \
+  -v akasha_backups:/backups:ro -v akasha_data_rollback:/data \
   akasha:local akasha-backup restore /backups/pre-migration-<stamp> --into /data
-mv data data-broken && mv data-restored data
+echo "AKASHA_DATA_VOLUME=akasha_data_rollback" >> .env
 git checkout <previous-tag-or-commit> && docker compose up -d --build
 ```
 
+On `compose.bind-mounts.yaml` (a real `backups/` directory), replace both
+`-v akasha_backups:/backups:ro` above with `-v "$PWD/backups:/backups:ro"`, and
+`ls backups/` works directly — `akasha-backup restore` itself doesn't care
+which kind of mount either side is.
+
 Restore refuses to write into a directory that is not empty, so it cannot
-silently overwrite a database you meant to keep.
+silently overwrite a database you meant to keep. To undo the rollback later,
+remove the `AKASHA_DATA_VOLUME` line from `.env` and `docker compose up -d`
+again — the volume it names is still there, untouched.
 
 ## Nightly backups
 
@@ -138,19 +151,45 @@ by inference, and inference belongs behind a person.
 
 ## Restoring
 
+As with a rollback, this restores into a fresh volume and flips which one
+Compose points at, rather than swapping directories on the host — the volume
+`data` is currently attached to is left alone.
+
 ```bash
 docker compose down
-mkdir data-restored
+docker volume create akasha_data_restored
 docker run --rm --user 10001 \
-  -v "$PWD/backups:/backups:ro" -v "$PWD/data-restored:/data" \
+  -v akasha_backups:/backups:ro -v akasha_data_restored:/data \
   akasha:local akasha-backup restore /backups/nightly-<stamp> --into /data
-mv data data-old && mv data-restored data
+echo "AKASHA_DATA_VOLUME=akasha_data_restored" >> .env
 docker compose up -d
 ```
 
+On `compose.bind-mounts.yaml`, replace `-v akasha_backups:/backups:ro` above
+with `-v "$PWD/backups:/backups:ro"` — `akasha-backup restore` doesn't care
+which kind of mount either side is.
+
 Restore verifies every checksum and re-runs `integrity_check` before writing
 anything. It needs no configuration at all — not even `USER_AGENT_CONTACT` —
-because the restore path deliberately does not build the application.
+because the restore path deliberately does not build the application. To go
+back, remove the `AKASHA_DATA_VOLUME` line from `.env` and `docker compose up
+-d` again — the old volume is still there.
+
+### Bind-mounting data and backups
+
+Prefer `./data` and `./backups` as real host directories — a NAS-backed
+`BACKUP_DIR`, direct host access to the sqlite file? Opt into
+`compose.bind-mounts.yaml`, which brings back the pre-DEC-075 mounts and their
+one extra requirement:
+
+```bash
+mkdir -p data backups
+sudo chown -R 10001:10001 data backups   # the container runs as uid 10001
+docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d
+```
+
+Use the same two `-f` flags on every subsequent `docker compose` command for
+this stack — upgrades, `down`, `logs`, all of it.
 
 ## Reverse proxy
 
@@ -166,11 +205,14 @@ container port is not reachable from the network directly.
 
 | Symptom | Cause |
 |---|---|
-| `attempt to write a readonly database` | `data/` is not owned by 10001 |
-| Startup exits with `Refusing to migrate without a backup` | `backups/` is missing or not owned by 10001 |
+| `attempt to write a readonly database` | on `compose.bind-mounts.yaml` only: `data/` is not owned by 10001 |
+| Startup exits with `Refusing to migrate without a backup` | on `compose.bind-mounts.yaml` only: `backups/` is missing or not owned by 10001 |
 | `/api/health/ready` returns 503 `schema_not_current` | migrations have not finished, or failed; check the logs |
 | Search finds nothing and the UI says degraded | no `GOOGLE_BOOKS_API_KEY`, or no outbound network |
 | The backup script says the service is not running | start the stack; an online backup needs a live database |
+
+On the default named-volume mounts, neither ownership row above is reachable —
+there's no host directory to get wrong.
 
 Logs are JSON, one object per line: `docker compose logs -f akasha`. Notes,
 review text, import rows and API keys are redacted before they are written.

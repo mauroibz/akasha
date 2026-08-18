@@ -2461,3 +2461,53 @@ Append-only record of material architecture choices, product-default resolutions
     forgot to stub, with the real dev library. It fails tests that look like regressions and are
     not — `add-detail.spec.ts`'s stagger test clicks a real *Rayuela* card instead of the web
     result. **Stop the container before running the suite.**
+
+## DEC-075 — `data` and `backups` default to named Docker volumes; bind mounts move to an opt-in second Compose file
+
+- **Date:** 2026-08-18
+- **Status:** accepted
+- **Extends:** DEC-040 (backups live outside the data volume)
+- **Context:** First install required `mkdir -p data backups calibre` followed by `sudo chown -R
+  10001:10001 data backups`, because Compose creates a missing bind-mount directory as root:root
+  and the container's fixed non-root user (uid 10001) cannot write into it — producing `attempt to
+  write a readonly database` at startup, which reads like corruption and is only permissions. The
+  Dockerfile already does `mkdir -p /data /backups && chown -R akasha:akasha /app /data /backups`
+  before `USER 10001:10001`, and a freshly created, never-before-populated named Docker volume is
+  seeded from that same image directory the first time a container mounts it — ownership included.
+  The `sudo chown` step was solving a problem specific to bind mounts, not to the deployment as a
+  whole, and requested by the owner ahead of sharing the repo more widely.
+- **Decision.** `/data` and `/backups` are named volumes by default — `data`/`backups` in
+  `compose.yaml`'s top-level `volumes:`, with the Docker volume name itself overridable via
+  `AKASHA_DATA_VOLUME`/`AKASHA_BACKUP_VOLUME` (`name: ${AKASHA_DATA_VOLUME:-akasha_data}`,
+  unprefixed by the Compose project — confirmed against a real `docker compose config` merge).
+  `sudo chown` and the `data`/`backups` `mkdir`s drop out of first install entirely. `/calibre`
+  stays a host bind mount unconditionally — it points at a real, pre-existing library, is mounted
+  read-only, and ownership is moot for a read-only mount. Operators who want `./data`/`./backups`
+  as real host directories — a NAS-backed `BACKUP_DIR`, or direct host access to the sqlite file —
+  opt in with a second, explicitly invoked Compose file, `compose.bind-mounts.yaml`
+  (`docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d`), which restores today's
+  `${DATA_DIR:-./data}:/data` / `${BACKUP_DIR:-./backups}:/backups` mounts verbatim, `mkdir`+
+  `chown` dance included. Deliberately not named `docker-compose.override.yml`, so it is never
+  merged in by accident. This does not touch DEC-040: backups still live on a separate mount from
+  data, named-volume or bind-mount either way.
+- **Consequences.**
+  - Restore and rollback lose the `mv data data-restored`-shaped move they used to reach for —
+    Docker has no volume rename — so both now restore into a fresh, separate named volume and flip
+    which volume Compose points at via `AKASHA_DATA_VOLUME`, leaving the previous volume untouched
+    as the safety net. `docs/operations/runbook.md`'s "Restoring" and "Rolling back" sections are
+    rewritten around that, each keeping a full, copy-pasteable snippet rather than cross-referencing
+    the other, and each noting the one-clause substitution (`-v "$PWD/backups:/backups:ro"`) that
+    covers the bind-mount tier instead of duplicating the whole procedure.
+  - `scripts/smoke_container.sh` drops the `DATA_DIR`/`BACKUP_DIR` host-tmp-dir dance, including the
+    throwaway root container that used to hand ownership back on cleanup, but must give
+    `AKASHA_DATA_VOLUME`/`AKASHA_BACKUP_VOLUME` a name unique per run: the `name:` override that
+    makes the volume's Docker name predictable also removes Compose's usual project-prefix collision
+    avoidance. A new step, AC4, drills the documented host-side restore-and-flip procedure directly
+    — AC3 only ever restored inside the already-running container's own filesystem, which never
+    exercised the bare `docker run` + volume-flip mechanic this decision introduces.
+  - `attempt to write a readonly database` and `Refusing to migrate without a backup` in the
+    runbook's troubleshooting table become tier-2 (bind-mount) symptoms specifically — a tier-1
+    install cannot reach either through an ownership mistake.
+  - `README.md`'s Quick Start, Configuration table and `docs/specs/technical-spec.md`'s Compose
+    mounts list move to the named-volume defaults, each pointing at `compose.bind-mounts.yaml` for
+    the host-path alternative. `.gitignore`'s `data/`/`backups/` entries are now tier-2-only.

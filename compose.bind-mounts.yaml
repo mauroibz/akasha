@@ -1,0 +1,21 @@
+# Opt-in tier 2: real host directories for /data and /backups, instead of the
+# named Docker volumes compose.yaml uses by default (DEC-075). Reach for this if
+# you want BACKUP_DIR on a NAS share, or direct host access to the sqlite file.
+#
+# Deliberately not named docker-compose.override.yml, so it is never merged in
+# by accident — invoke it explicitly:
+#
+#   docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d
+#
+# This brings back the pre-DEC-075 requirement: the directories must exist and
+# be owned by the container's non-root user before the first start.
+#
+#   mkdir -p data backups
+#   sudo chown -R 10001:10001 data backups
+#   docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d
+
+services:
+  akasha:
+    volumes:
+      - "${DATA_DIR:-./data}:/data"
+      - "${BACKUP_DIR:-./backups}:/backups"

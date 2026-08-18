@@ -4,8 +4,9 @@
 #
 # This drives `docker compose` rather than bare `docker run` because the thing
 # being tested is the documented deployment, mounts and recreation included.
-# Everything runs against throwaway directories under /tmp; the owner's ./data
-# is never touched.
+# data/backups are throwaway named volumes, unique to this run; calibre is a
+# throwaway directory under /tmp. The owner's own volumes and ./data are never
+# touched.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -13,10 +14,17 @@ cd "$root"
 
 workdir="$(mktemp -d /tmp/akasha-smoke.XXXXXX)"
 export COMPOSE_PROJECT_NAME="akasha-smoke"
-export DATA_DIR="$workdir/data"
-export BACKUP_DIR="$workdir/backups"
 export CALIBRE_DIR="$workdir/calibre"
 export USER_AGENT_CONTACT="smoke@example.invalid"
+# The `name:` override in compose.yaml's top-level `volumes:` makes the Docker
+# volume name literal, which bypasses Compose's usual project-prefix collision
+# protection — so a run-unique name is this script's job, not Compose's.
+run_id="$(basename "$workdir")"
+export AKASHA_DATA_VOLUME="akasha-smoke-${run_id}-data"
+export AKASHA_BACKUP_VOLUME="akasha-smoke-${run_id}-backups"
+# AC4 later re-points $AKASHA_DATA_VOLUME at a restored volume; keep the
+# original name so cleanup can still find and remove it.
+data_volume_original="$AKASHA_DATA_VOLUME"
 export GOOGLE_BOOKS_API_KEY=""
 export AKASHA_BIND="127.0.0.1"
 AKASHA_PORT="$(python3 -c 'import socket
@@ -26,12 +34,14 @@ print(s.getsockname()[1])
 s.close()')"
 export AKASHA_PORT
 
+restored_volume=""
+
 cleanup() {
   docker compose down --remove-orphans --timeout 10 >/dev/null 2>&1 || true
-  # The container writes as uid 10001, so the host cannot unlink what it left
-  # behind. Hand ownership back with a throwaway root container first.
-  docker run --rm --user 0 --volume "$workdir:/workdir" akasha:local \
-    chown -R "$(id -u):$(id -g)" /workdir >/dev/null 2>&1 || true
+  docker volume rm -f "$data_volume_original" "$AKASHA_BACKUP_VOLUME" >/dev/null 2>&1 || true
+  [ -z "$restored_volume" ] || docker volume rm -f "$restored_volume" >/dev/null 2>&1 || true
+  # calibre is a real host bind mount, host-owned throughout and mounted :ro,
+  # so nothing under it is ever container-written.
   rm -rf "$workdir"
 }
 trap cleanup EXIT
@@ -40,9 +50,7 @@ step() { printf '\n== %s ==\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; docker compose logs --no-color akasha >&2 || true; exit 1; }
 api() { curl -fsS --max-time 20 "http://127.0.0.1:${AKASHA_PORT}$1" "${@:2}"; }
 
-# The container runs as uid 10001 and has to write into the bind mounts.
-mkdir -p "$DATA_DIR" "$BACKUP_DIR" "$CALIBRE_DIR/Personal"
-chmod 0777 "$DATA_DIR" "$BACKUP_DIR"
+mkdir -p "$CALIBRE_DIR/Personal"
 
 python3 - "$CALIBRE_DIR/Personal/metadata.db" <<'PY'
 import sqlite3
@@ -177,6 +185,22 @@ assert row == ("Ficciones", 9, "Kept for the Aleph, reread for the maps."), row
 print("restored:", row)
 ' || fail "the restored database did not hold the values that were written"
 
+step "AC4: named-volume restore drill (runbook procedure)"
+# AC3 restores inside the already-running container's own filesystem. This
+# exercises the documented host-side path instead: a bare `docker run` against
+# the named volumes, and the AKASHA_DATA_VOLUME flip that runbook.md's
+# "Restoring" section describes.
+docker compose down --timeout 10 >/dev/null
+restored_volume="${AKASHA_DATA_VOLUME}-restored"
+docker volume create "$restored_volume" >/dev/null
+docker run --rm --user 10001 \
+  -v "$AKASHA_BACKUP_VOLUME:/backups:ro" -v "$restored_volume:/data" \
+  akasha:local akasha-backup restore "/backups/$backup_name" --into /data
+export AKASHA_DATA_VOLUME="$restored_volume"
+docker compose up --detach --wait=false >/dev/null
+wait_healthy
+[ "$(read_back)" = "$expected" ] || fail "the restored volume did not survive the flip: $(read_back)"
+
 step "AC2: data survives docker compose down && up"
 docker compose down --timeout 10 >/dev/null
 docker compose up --detach --wait=false >/dev/null
@@ -210,4 +234,5 @@ done
 printf 'stopped in %ss with exit code %s, shutdown was graceful\n' "$elapsed" "$exit_code"
 
 printf '\nContainer smoke test passed: healthcheck, non-root, no Node, API persistence across\n'
-printf 'recreation, every emitted chunk served, read-only Calibre, and a verified restore.\n'
+printf 'recreation, every emitted chunk served, read-only Calibre, an in-container restore,\n'
+printf 'and a named-volume restore drill through the documented host-side procedure.\n'

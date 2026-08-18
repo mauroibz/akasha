@@ -100,21 +100,19 @@ cd akasha
 cp .env.example .env
 $EDITOR .env                              # set USER_AGENT_CONTACT to a real address
 
-mkdir -p data backups calibre
-sudo chown -R 10001:10001 data backups    # the container runs as uid 10001
-
+mkdir -p calibre
 docker compose up -d
 ```
 
 Open `http://localhost:8000`.
 
-> [!IMPORTANT]
-> Don't skip the `chown`. The container runs as a non-root user and cannot write into
-> directories owned by anyone else. Missing it produces `attempt to write a readonly
-> database`, which looks like corruption and is only permissions.
-
 `USER_AGENT_CONTACT` is required — Open Library asks callers to identify themselves,
 and startup refuses without it.
+
+`data` and `backups` are named Docker volumes, seeded from the image with the right
+ownership already on them — nothing to create, nothing to `chown`. Want them as real
+host directories instead (a NAS-backed `BACKUP_DIR`, direct access to the sqlite
+file)? See [Bind-mounting data and backups](#bind-mounting-data-and-backups).
 
 ### Configuration
 
@@ -124,8 +122,8 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 |---|---|---|
 | `USER_AGENT_CONTACT` | *required* | Contact address sent to metadata providers |
 | `GOOGLE_BOOKS_API_KEY` | *empty* | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
-| `DATA_DIR` | `./data` | Database, covers and attached files |
-| `BACKUP_DIR` | `./backups` | Backups, deliberately outside the data volume |
+| `AKASHA_DATA_VOLUME` | `akasha_data` | Docker volume name for the database, covers and attached files |
+| `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume |
 | `CALIBRE_DIR` | `./calibre` | Your Calibre library, mounted read-only |
 | `AKASHA_PORT` | `8000` | Published port |
 | `AKASHA_BIND` | `0.0.0.0` | Set to `127.0.0.1` to keep it off the network |
@@ -137,6 +135,21 @@ Check which providers are live:
 ```bash
 curl -s localhost:8000/api/health/providers
 ```
+
+### Bind-mounting data and backups
+
+`data` and `backups` are named Docker volumes by default. Prefer real host directories
+— a NAS-backed `BACKUP_DIR`, or direct host access to the sqlite file? Opt into
+[`compose.bind-mounts.yaml`](compose.bind-mounts.yaml), which brings back the pre-DEC-075
+mounts and their one extra requirement:
+
+```bash
+mkdir -p data backups
+sudo chown -R 10001:10001 data backups   # the container runs as uid 10001
+docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d
+```
+
+Use the same two `-f` flags on every later `docker compose` command for this stack.
 
 ### Backups
 

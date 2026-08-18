@@ -568,11 +568,13 @@ Coverage is a diagnostic, not a target to game. Critical domain and import code 
 
 Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes, and do not rely on call sites to remember: `logging.py` redacts a denylist of keys (notes, review, description, payload, row/record, api_key, token and kin), scrubs configured secret values out of any string so a key embedded in a logged URL cannot escape, truncates oversized values under innocent keys, and recurses into nested structures. Standard-library records are routed through the same chain, so a `logger.warning(..., extra={...})` is rendered and redacted rather than having its structured fields silently dropped.
 
-The final image runs as a non-root user (uid 10001), has a healthcheck, and receives signals directly; `STOPSIGNAL` is `SIGTERM` and uvicorn runs its own graceful shutdown, so a stop closes SQLite rather than killing it mid-write. Compose mounts:
+The final image runs as a non-root user (uid 10001), has a healthcheck, and receives signals directly; `STOPSIGNAL` is `SIGTERM` and uvicorn runs its own graceful shutdown, so a stop closes SQLite rather than killing it mid-write. Compose mounts, by default (DEC-075):
 
-- `${DATA_DIR:-./data}:/data`
-- `${BACKUP_DIR:-./backups}:/backups`
+- `data:/data` — named volume, `AKASHA_DATA_VOLUME` overridable
+- `backups:/backups` — named volume, `AKASHA_BACKUP_VOLUME` overridable
 - `${CALIBRE_DIR:-./calibre}:/calibre:ro`
+
+A fresh named volume is seeded from the image's own `/data`, `/backups` on first mount, ownership included, so there is nothing to `chown` from the host. Opting into `${DATA_DIR:-./data}:/data` and `${BACKUP_DIR:-./backups}:/backups` as real host directories instead is a second, explicitly invoked Compose file, `compose.bind-mounts.yaml`.
 
 Backups live outside the data volume, not under `/data` (DEC-040): a copy kept inside the volume it protects is lost with that volume. `backup_dir` derives as a sibling of `data_dir`. The backup itself is `book_tracker.backup`, exposed as the `akasha-backup` console script and driven nightly from the host scheduler by `scripts/backup.sh` — the single application process is not a cron daemon. It copies the database through SQLite's online backup API and never file-by-file, archives covers and import audit metadata, writes a manifest and SHA-256 checksums, runs `PRAGMA integrity_check` on the copy, and enforces label-scoped retention. Restore verifies every checksum and the database before writing, and refuses a non-empty target. Nothing on the restore path imports the application, so restoring onto a bare machine needs no configuration.
 

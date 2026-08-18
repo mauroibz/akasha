@@ -22,12 +22,15 @@ services:
       GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
       BOOK_TRACKER_BACKUP_DIR: /backups
     volumes:
-      - "${DATA_DIR:-./data}:/data"
-      # Backups live outside the data volume on purpose (DEC-040): a backup kept
-      # inside the thing it backs up is lost with it. Point BACKUP_DIR at a NAS
-      # share if you have one, and chown it to 10001:10001 so the non-root user
-      # in the container can write to it.
-      - "${BACKUP_DIR:-./backups}:/backups"
+      - data:/data
+      # Named volumes by default (DEC-075): Docker seeds a fresh volume from the
+      # image's own /data, /backups — already chown'd to the non-root user — so
+      # there is nothing to chown from the outside. Backups still live on their
+      # own mount, outside the data volume, on purpose (DEC-040): a backup kept
+      # inside the thing it backs up is lost with it. Want BACKUP_DIR on a NAS
+      # share, or either directory as a real host path? Use
+      # `docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d`.
+      - backups:/backups
       # Calibre is opened read-only in the mount and again in code.
       - "${CALIBRE_DIR:-./calibre}:/calibre:ro"
     restart: unless-stopped
@@ -35,3 +38,9 @@ services:
     stop_grace_period: 20s
     labels:
       org.akasha.security-boundary: "LAN-only; v1 has no authentication and must never be internet-exposed"
+
+volumes:
+  data:
+    name: ${AKASHA_DATA_VOLUME:-akasha_data}
+  backups:
+    name: ${AKASHA_BACKUP_VOLUME:-akasha_backups}
