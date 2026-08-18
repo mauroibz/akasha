@@ -7,7 +7,7 @@
 
 # Akasha
 
-**A self-hosted library that records what you thought of a book or a record.**
+**A self-hosted library for your thoughts.**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-fbbf24?style=flat-square)](LICENSE)
 [![Self-hosted](https://img.shields.io/badge/deploy-LAN%20only-a1a1aa?style=flat-square)](SECURITY.md)
@@ -24,19 +24,12 @@
 
 ## What it is
 
-Akasha is a personal library that runs on a small server in your house. One user,
-no accounts, no social layer, no sharing. You add a book or a record, give it a score
-out of ten, write a note, put it on a shelf.
+You add a book or a record, score it out of ten, write a note, put it on a shelf.
+Reading trackers optimise for other people seeing your opinions and their vendors selling you stuff;
+this optimises for you remembering, three years later, whether something was any good.
 
-It holds **two kinds of thing so far**, and each brings its own vocabulary rather than
-borrowing the other's: a book is *read*, *reading* or *to read* and has a page count; a
-record is *owned*, *on the way* or *wishlisted* and has a tracklist and a label. Nothing
-above the registry knows which is which, so a third kind is a package rather than a
-rewrite.
-
-It exists because reading trackers optimise for other people seeing your shelves.
-This one optimises for you remembering, three years later, whether something was any
-good and why. No social media features, fully offline.
+Akasha is domain agnostic, it's built so you can extend it to hold information on anything you enjoy,
+but today it supports Books and Albums. See [Domains](#domains-and-stack) for more info.
 
 > [!WARNING]
 > **v1 has no authentication of any kind.** Anyone who can reach the port can read
@@ -45,47 +38,23 @@ good and why. No social media features, fully offline.
 
 ## What it does
 
-- **A library that stays fast.** Ten thousand entries scroll smoothly — a virtualized
-  grid and a compact table, keyset pagination, six sorts. Search and sorting are
-  accent-insensitive, so `avila` finds `Ávila`.
-- **One bar for finding and adding.** The same box searches your library as you type and
-  reaches the web only when your library has nothing and the query has settled — or when
-  you press **Add**. Books come from Open Library and Google Books, records from
-  MusicBrainz and the Cover Art Archive; paste a URL or an ISBN and it resolves that
-  instead of guessing. Covers are fetched once and stored locally, and **providers are
-  never called while rendering a page you already have**.
-- **Music, as its own domain.** Records are not books with different words on them: they
-  have their own statuses, their own formats (vinyl, CD, digital), their own fields and
-  their own provider. Adding one says *Album added*, and a shelf that holds both counts
-  *items*.
-- **Your opinions, protected.** Score, status, notes, shelves, and how you own your copy
-  — plus dates and a reread count for the kinds of thing that have them, and none for the
-  kinds that do not. Nothing you
-  wrote is ever overwritten by a metadata refresh — that is an invariant the test suite
-  enforces, not a promise.
-- **Keyboard triage.** Work through a backlog with `j`/`k` to move, digits to score,
-  letters to set status, `Enter` to accept.
-- **Imports with a preview and an undo.** Goodreads CSV and a read-only Calibre
-  library. You see exactly what will happen before it happens, and you can reverse it
-  after.
-- **Background enrichment.** A durable job queue fills in metadata and covers, retries
-  failures, and survives a restart.
-- **Files on an edition.** Attach an epub or a PDF to an edition and download it again
-  later. Stored by content, so the same file attached twice takes the space of one,
-  and seven nights of backups cost about one copy rather than seven. Files are served
-  as downloads and never rendered, and nothing here parses them — this is a shelf, not
-  a reader.
-- **Your library, exportable.** One request dumps everything as JSON, or as a
-  Goodreads-shaped CSV that opens in a spreadsheet. The dump keeps what you typed and
-  leaves out what the application derived, so nothing you corrected by hand is lost and
-  nothing rebuilt from a cache pretends to be authoritative.
-- **Accessible by default.** Twelve automated axe checks gate every change; both list
-  surfaces are proper ARIA feeds.
+- **One box for multiple domains.** Akasha reaches the web for public APIs
+(Open Library, Google Books, MusicBrainz) to find any piece of media you are thinking of.
+Paste a URL or an ISBN and it resolves that instead of guessing.
+- **Record your opinion.** Give it a score out of ten, leave notes if you have them.
+Did you drop the book halfway through? Do you want to buy this album in vinyl some day?
+Add your item to a shelf and give it a status.
+- **Import your library** Importing from existing systems is supported and extensible.
+Bring your own Goodreads CSV, a read-only Calibre library and get your info migrated.
+- **Choose your covers.** If provided by the API, you can choose the cover you see in the library or upload your own.
+What you see in the app should reflect what's in your house.
+- **Upload your files** While not its primary feature, you can attach files to entries,
+in case you need a safe place to store that PDF.
 
 <details>
 <summary><b>An entry's detail page</b></summary>
 
-![An entry's detail page](docs/brand/screenshots/detail.png)
+![An album's detail page](docs/brand/screenshots/detail.png)
 
 </details>
 
@@ -118,17 +87,17 @@ file)? See [Bind-mounting data and backups](#bind-mounting-data-and-backups).
 
 Everything is environment variables, all documented in [`.env.example`](.env.example).
 
-| Variable | Default | What it does |
-|---|---|---|
-| `USER_AGENT_CONTACT` | *required* | Contact address sent to metadata providers |
-| `GOOGLE_BOOKS_API_KEY` | *empty* | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
-| `AKASHA_DATA_VOLUME` | `akasha_data` | Docker volume name for the database, covers and attached files |
-| `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume |
-| `CALIBRE_DIR` | `./calibre` | Your Calibre library, mounted read-only |
-| `AKASHA_PORT` | `8000` | Published port |
-| `AKASHA_BIND` | `0.0.0.0` | Set to `127.0.0.1` to keep it off the network |
-| `TZ` | `UTC` | Timezone |
-| `LOG_LEVEL` | `INFO` | Log verbosity |
+| Variable               | Default          | What it does                                                                               |
+| ---------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
+| `USER_AGENT_CONTACT`   | *required*       | Contact address sent to metadata providers                                                 |
+| `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
+| `AKASHA_DATA_VOLUME`   | `akasha_data`    | Docker volume name for the database, covers and attached files                             |
+| `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume                       |
+| `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
+| `AKASHA_PORT`          | `8000`           | Published port                                                                             |
+| `AKASHA_BIND`          | `0.0.0.0`        | Set to `127.0.0.1` to keep it off the network                                              |
+| `TZ`                   | `UTC`            | Timezone                                                                                   |
+| `LOG_LEVEL`            | `INFO`           | Log verbosity                                                                              |
 
 Check which providers are live:
 
@@ -140,8 +109,8 @@ curl -s localhost:8000/api/health/providers
 
 `data` and `backups` are named Docker volumes by default. Prefer real host directories
 — a NAS-backed `BACKUP_DIR`, or direct host access to the sqlite file? Opt into
-[`compose.bind-mounts.yaml`](compose.bind-mounts.yaml), which brings back the pre-DEC-075
-mounts and their one extra requirement:
+[`compose.bind-mounts.yaml`](compose.bind-mounts.yaml), which mounts them as real host
+directories instead, with one extra requirement:
 
 ```bash
 mkdir -p data backups
@@ -153,24 +122,17 @@ Use the same two `-f` flags on every later `docker compose` command for this sta
 
 ### Backups
 
-There is a real backup, and the restore has been tested rather than described.
+Take one now, or schedule it nightly:
 
 ```bash
-# One backup now
-./scripts/backup.sh
-
-# Nightly, from the host's crontab — not from inside the container
-15 3 * * *  cd /srv/akasha && ./scripts/backup.sh >> /var/log/akasha-backup.log 2>&1
+./scripts/backup.sh                                                       # now
+15 3 * * *  cd /srv/akasha && ./scripts/backup.sh >> /var/log/akasha-backup.log 2>&1  # nightly, host crontab
 ```
 
-Each run copies the database through SQLite's online backup API (never a file copy of
-a live WAL database), archives covers and import metadata, hardlinks attached files so
-each night does not pay for a fresh copy of them, writes checksums, verifies itself
-with `PRAGMA integrity_check`, and keeps the last `BACKUP_RETENTION` nights.
-
-Upgrades take their own backup first: if a migration has pending work against an
-existing database, startup copies it before touching anything and refuses to migrate
-if it cannot.
+Each run backs up the live database through SQLite's own backup API, archives covers,
+hardlinks attached files so a week of backups costs about one copy, checksums and
+verifies itself, and keeps the last `BACKUP_RETENTION` nights. An upgrade takes its own
+backup first and refuses to migrate if it can't.
 
 Restore, rollback and reverse-proxy guidance are in
 **[the operator runbook](docs/operations/runbook.md)**.
@@ -188,98 +150,55 @@ make dev-backend    # terminal 1 — API at http://localhost:8000
 make dev-frontend   # terminal 2 — UI at http://localhost:5173
 ```
 
-| Command | What it does |
-|---|---|
-| `make check` | Format check, lint, types, project state, OpenAPI drift |
-| `make test` | Backend and frontend unit tests |
-| `make format` | Apply formatting |
-| `make build` | Python wheel and production SPA |
-| `make migrate` | Upgrade the configured database |
+| Command                | What it does                                                                                                                                           |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `make check`           | Format check, lint, types, project state, OpenAPI drift                                                                                                |
+| `make test`            | Backend and frontend unit tests                                                                                                                        |
+| `make format`          | Apply formatting                                                                                                                                       |
+| `make build`           | Python wheel and production SPA                                                                                                                        |
+| `make migrate`         | Upgrade the configured database                                                                                                                        |
 | `make smoke-container` | Full container proof: healthcheck, non-root, persistence across recreation, every asset chunk, read-only Calibre, backup and restore, graceful SIGTERM |
-| `npm run test:e2e` | Playwright, in `frontend/` — dev server *and* a real production build |
+| `npm run test:e2e`     | Playwright, in `frontend/` — dev server *and* a real production build                                                                                  |
 
-### Stack
+### Domains and stack
 
-FastAPI, SQLAlchemy, Alembic and SQLite on the backend. React 18, Vite, TypeScript,
+FastAPI, SQLAlchemy, Alembic and SQLite on the backend; React 18, Vite, TypeScript,
 Tailwind, shadcn/ui and TanStack Query on the frontend. One container, one process,
 one SQLite file.
 
-### Domains
+A **domain** is a kind of thing the library holds — a book, an album. Each lives in its
+own package under `backend/src/book_tracker/domains/`, declaring its fields, statuses,
+formats, identity rule and provider; that declaration is served over the API and every
+screen renders from it, so nothing above the registry branches on type. Adding one
+costs a package, a registry entry and provider wiring — no migration, no edit to
+another domain's files. See **[how to add a domain](docs/guides/adding-a-domain.md)**,
+binding contract in [technical spec §6.6](docs/specs/technical-spec.md).
 
-A **domain** is a kind of thing the library holds. Books ship; albums are built and
-waiting to be released. The point of the structure is that a third one — games, films,
-board games — is somebody else's afternoon rather than a fork.
+## Documentation
 
-```text
-backend/src/book_tracker/
-├── api/             # thin FastAPI routers and error mapping
-├── application/     # use cases and transaction boundaries
-├── domain/          # spec.py: what a domain IS · registry.py: which ones EXIST
-├── domains/         # one package per domain
-│   ├── book/        #   declaration · Open Library + Google Books · Goodreads + Calibre
-│   └── album/       #   declaration · MusicBrainz + Cover Art Archive
-├── infrastructure/  # SQLAlchemy, provider HTTP, covers, jobs
-└── main.py
-```
-
-A domain declares its metadata fields, its status vocabulary, its formats, its identity
-rule and what it recognises in the add box. **That one declaration is served over the API
-and every screen renders from it** — tabs, chips, the metadata dialog, triage hotkeys, the
-detail page. There is no `if item_type == "book"` anywhere above the registry, and a
-conformance suite parametrised over the registry holds every domain to the same contract
-*by existing*.
-
-Adding one costs your own package, one registry entry, provider wiring and three enum
-lines. **No database migration, and no edit to another domain's files.**
-
-→ **[How to add a domain](docs/guides/adding-a-domain.md)** · the binding contract is
-[technical spec §6.6](docs/specs/technical-spec.md)
-
-### The documentation
-
-[`docs/README.md`](docs/README.md) is the map. Every document there says whether it is
-**canonical**, **historical** or a **proposal**, so a dated file is never mistaken for
-instructions.
-
-Architecture and contracts live in [the technical spec](docs/specs/technical-spec.md);
-product behaviour is canonical in [the product spec](docs/specs/product-spec.md).
-Every material decision, with its reasoning, is in [`docs/decisions.md`](docs/decisions.md).
-
-### A note on how this was built
+[`docs/README.md`](docs/README.md) is the map, and says whether each document is
+canonical, historical or a proposal. Product behaviour is canonical in the
+[product spec](docs/specs/product-spec.md); architecture and contracts in the
+[technical spec](docs/specs/technical-spec.md); every material decision, with its
+reasoning, in [`docs/decisions.md`](docs/decisions.md). Visual identity — palette,
+type, the mark — is in [`docs/brand/`](docs/brand/).
 
 Akasha was built by an AI coding agent working sprint by sprint under a protocol in
-[`AGENTS.md`](AGENTS.md), with a human owner making the product decisions. The sprint
-files, the decision log and the worklog in `docs/` are the real record of that,
-including the parts that went wrong. If you are curious about what that process
-actually produces, that directory is more honest than most write-ups.
-
-## Design
-
-The visual identity — palette, typography, the mark and how it is constructed — is in
-[`docs/brand/`](docs/brand/). The short version: zinc-950 ground, a single amber
-accent, Inter, and a mark drawn on Lucide's 24px grid so it sits beside the interface
-icons as a sibling.
+[`AGENTS.md`](AGENTS.md), with a human owner making the product decisions, following
+the [Seeds](https://github.com/mauroibz/seeds) methodology for agentic development.
+The sprint files, decision log and worklog in `docs/` are the real record of that,
+mistakes included.
 
 ## Contributing
 
 Issues and pull requests are welcome. **[`CONTRIBUTING.md`](CONTRIBUTING.md)** has the
-setup, the gates and the rules that are not style preferences. Three things worth knowing
-before you open it:
-
-- **Adding a domain has its own guide** —
-  [`docs/guides/adding-a-domain.md`](docs/guides/adding-a-domain.md). You should never
-  have to reverse-engineer how albums were built.
-- [`AGENTS.md`](AGENTS.md) governs how changes are made here, and the verification gates
-  are strict on purpose.
-- Provider fixtures in `backend/tests/fixtures/providers/` are pinned recordings of
-  real API responses. **Never re-record one to make a test pass** — that turns a
-  regression test into a rubber stamp.
+setup and the gates. Provider fixtures in `backend/tests/fixtures/providers/` are
+pinned recordings of real API responses — never re-record one to make a test pass,
+that turns a regression test into a rubber stamp.
 
 ## License
 
-[GNU AGPL v3](LICENSE). You may run, modify and share Akasha freely, including inside
-an institution. If you redistribute it or run a modified version as a network service,
-you must publish your source under the same licence.
-
-For redistribution or hosting **without** those obligations, a separate commercial
-licence is available — see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).
+[GNU AGPL v3](LICENSE). Run, modify and share Akasha freely, including inside an
+institution. Redistributing it, or running a modified version as a network service,
+requires publishing your source under the same licence — for hosting or redistribution
+without that obligation, see [COMMERCIAL-LICENSE.md](COMMERCIAL-LICENSE.md).

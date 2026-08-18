@@ -2,6 +2,8 @@
 
 This is the single entrypoint for any coding agent working in this repository. A user instruction of `work` means: execute exactly one active sprint using this protocol, stopping only when it is complete or genuinely blocked.
 
+This protocol follows the [Seeds](https://github.com/mauroibz/seeds) methodology for agentic development.
+
 ## 1. Establish context
 
 From the repository root:
