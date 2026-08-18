@@ -2305,6 +2305,11 @@ Append-only record of material architecture choices, product-default resolutions
 
   The branch keeps its DEC-053 property until then: a sprint may run on it, it ends clean, nothing is
   pushed, and merging remains a deliberate act rather than a side effect.
+- **Carried out 2026-08-17.** `sprint-025-albums` merged into `main` as one `--no-ff` merge, with
+  both required items in it: `README.md`'s feature copy and
+  `docs/operations/release-notes-v1.2.md`. Tagged **`v1.2.0`**, and `main` pushed to `origin` — the
+  first push in this repository since v1.1.0, and the end of the DEC-053 arrangement for this line
+  of work.
 
 ## DEC-073 — What Sprint 029 actually built: the firing rule, results below, `/add` without a chooser, and no new `Domain` field
 

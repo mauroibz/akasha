@@ -1,26 +1,21 @@
 # Handoff — current reality
 
-**Sprint 029 is closed — including its second pass — and Sprint 030 is `ready`.** Plan revision
-**12**. The worktree is clean, every gate is green, and nothing is half-built.
+**The album line is merged and released as v1.2.0. Sprint 030 is `ready`.** Plan revision **12**.
+The worktree is clean, every gate is green, and nothing is half-built.
 
 ## Do this first
 
-**The merge (DEC-072) is an owner action and it is the next thing.** `sprint-025-albums` goes into
-`main` — sprints 025 through 029 in one merge — and **two things go in with it**, because both
-describe the product to a user:
+**Claim Sprint 030** (`docs/sprints/030-entry-depth.md`). The merge that stood in front of it is
+done: `sprint-025-albums` went into `main` on 2026-08-17 as one `--no-ff` merge carrying Sprints
+025–029, tagged **`v1.2.0`**, with `README.md`'s feature copy and
+`docs/operations/release-notes-v1.2.md` in the same commit as DEC-072 required. **`main` is pushed
+to `origin`** — the first push since v1.1.0.
 
-1. **`README.md`'s feature copy** stops being book-only. Its Development section already documents
-   the domain structure; the feature copy was deliberately left book-only while albums could not be
-   run by anyone.
-2. **`docs/operations/release-notes-v1.2.md`**, following the v1 and v1.1 precedent.
+**You are on `main` now, not on a sprint branch.** DEC-053's arrangement covered the album line and
+has been discharged; nothing says the next sprint needs a branch of its own, and nothing says it
+does not. Decide deliberately and record it if you take one.
 
-Neither is written yet, and that is deliberate: the copy changes *when* the branch merges, not
-before. **Do not merge without the owner saying so** (DEC-053, amended by DEC-061, DEC-063 and
-DEC-066) — the branch exists so that merging is a deliberate act. Forty-odd commits are local and
-nothing has been pushed.
-
-**After the merge, claim Sprint 030** (`docs/sprints/030-entry-depth.md`). It is **Phase A only and
-gated**: it produces a written verdict on whether a child of an entry needs state of its own, with
+**Sprint 030 is Phase A only and gated**: it produces a written verdict on whether a child of an entry needs state of its own, with
 provider measurements behind it, and ends with a question to the owner rather than an
 implementation. **"Flat, with a per-domain progress field" is a complete and correct outcome**, and
 on current evidence the likeliest one. A Phase A that ships a schema change has failed.
@@ -162,8 +157,10 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
 - **`data/` has been made group/other-writable and the container has been run against it.** Files the
   container creates are owned by uid 10001; hand ownership back with
   `docker run --rm --user 0 -v "$PWD/data:/data" akasha:local chown -R 1000:1000 /data`.
-- **`README.md` still describes a book-only *product*, and changing that is part of the merge**, not
-  a separate task. See *Do this first*.
+- **`README.md` describes both domains now** (it was book-only until the merge). Its screenshots
+  under `docs/brand/screenshots/` predate Sprint 029 and still show the old library chrome — the
+  status chip row and the separate add screen. Nothing depends on them; they are stale, not wrong
+  about anything a reader would act on.
 - **The Inbox label is ambiguous on `/`**: the header badge and each domain's `unsorted` chip all read
   "Inbox". Correct in each place, confusing together. Unscheduled.
 - **Release selection is still arbitrary between same-day originals** — resolving a "Kind of Blue"
@@ -187,5 +184,6 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
 
 ## State
 
-Migration head `0014_status_is_the_domains`. Worktree clean; all commits local on
-`sprint-025-albums`, nothing pushed.
+Migration head `0014_status_is_the_domains`. Released **v1.2.0**; `main` is merged, tagged and
+pushed to `origin`, and the worktree is clean. `sprint-025-albums` is kept as history rather than
+deleted.

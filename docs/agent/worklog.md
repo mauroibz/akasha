@@ -1737,3 +1737,30 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Blocked/open: none.
 - Next: unchanged — **the merge (DEC-072)**, an owner action, carrying `README.md`'s
   feature copy and `docs/operations/release-notes-v1.2.md`. Then Sprint 030.
+
+## 2026-08-17 — The merge and v1.2.0 (release)
+- Done: the owner authorized the merge, so DEC-072 was carried out. `build: release
+  v1.2.0` (`ba70c30`) carries the two things that had to go in *with* the merge:
+  `README.md`'s feature copy stops being book-only — two domains, one search bar,
+  music as its own vocabulary — and `docs/operations/release-notes-v1.2.md`,
+  following the v1 and v1.1 precedent including a *Known and left* section that
+  names manual entry's default-domain binding, book-only import and the arbitrary
+  release selection. Versions moved to **1.2.0** in `backend/pyproject.toml`,
+  `frontend/package.json` and the FastAPI string, with `uv.lock`,
+  `package-lock.json` and `frontend/openapi.json` regenerated — the FastAPI string
+  is part of the API contract, which is what makes the openapi file move with it.
+  Then `sprint-025-albums` merged into `main` as one `--no-ff` merge (`d4d50e9`),
+  tagged **`v1.2.0`**, and `main` pushed to `origin` — the first push since v1.1.0.
+- Verified: before the merge on the branch and again on `main` after it —
+  `python scripts/validate_project.py`, `make check`, `make test` (**469 backend,
+  154 frontend**), `npx playwright test` (**91 passed, 2 skipped**), `make build`,
+  `make smoke-container`, `git diff --check` — all green on both sides, so the merge
+  is proven rather than assumed. The container was rebuilt from the merged tree and
+  answers `/api/health/ready`.
+- Deviations: none. `git merge -F -` does not read stdin ("could not read file
+  '-'"); the message went through a file. Worth knowing for the next merge.
+- Blocked/open: none. **`sprint-025-albums` is kept rather than deleted**, as
+  history for the five sprints that ran on it.
+- Next: claim **Sprint 030** — Phase A only, gated, a verdict rather than an
+  implementation. It needs no branch by default: DEC-053's arrangement covered the
+  album line and is discharged. Taking one is a deliberate choice to record.
