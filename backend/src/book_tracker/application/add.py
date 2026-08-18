@@ -9,6 +9,15 @@ from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
+from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
+from book_tracker.domain.spec import (
+    InvalidEntryField,
+    InvalidFormat,
+    InvalidStatus,
+    validate_entry_fields,
+    validate_formats,
+    validate_status,
+)
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.repositories import (
     DomainRepository,
@@ -99,21 +108,33 @@ class AddService:
         source: str | None,
         source_id: str | None,
         supplied_refs: Sequence[SourceRef],
-        status: str,
+        #: `None` means "whatever this domain's default is": the API cannot have one
+        #: default, because a book is added `read` and a record is added `owned`.
+        status: str | None,
         score: int | None,
         shelf_ids: Sequence[int],
         idempotency_key: str | None,
         confirm_near_match: bool = False,
+        #: Notes, formats and the domain's passage fields, so a book you just
+        #: finished does not have to be added and then immediately edited. Validated
+        #: against the item's own domain below, before anything is written.
+        entry_values: Mapping[str, Any] | None = None,
+        formats: Sequence[str] | None = None,
     ) -> dict[str, Any]:
+        creator_sort: str | None = None
+        # Manual entry is a book form; a provider add is whatever domain that provider
+        # serves. Either way the type comes from the registry or the adapter, never
+        # from a literal at the call site.
+        item_type = DEFAULT_DOMAIN.item_type
         if manual is not None:
             cover_url = None
             cover_fallback_urls: Sequence[str] = ()
             title = str(manual["title"]).strip()
-            authors = tuple(
-                str(value).strip() for value in manual.get("authors", []) if str(value).strip()
+            creators = tuple(
+                str(value).strip() for value in manual.get("creators", []) if str(value).strip()
             )
             metadata = {
-                "authors": list(authors),
+                "creators": list(creators),
                 **{key: manual[key] for key in ("publisher", "language") if manual.get(key)},
             }
             identifiers = self._identifiers(
@@ -125,13 +146,16 @@ class AddService:
         else:
             assert source is not None and source_id is not None
             payload = await self._provider_payload(source, source_id, supplied_refs)
+            provider = self.providers.get(source)
+            item_type = getattr(provider, "item_type", item_type)
             cover_url = payload.cover_url
             cover_fallback_urls = payload.cover_fallback_urls
             title = payload.title
             subtitle = payload.subtitle
-            authors = payload.authors
+            creators = payload.creators
+            creator_sort = payload.creator_sort
             year = payload.year
-            metadata = {**payload.metadata, "authors": list(authors)}
+            metadata = {**payload.metadata, "creators": list(creators)}
             if payload.language:
                 metadata["language"] = payload.language
             identifiers = self._identifiers(payload.identifiers)
@@ -150,7 +174,7 @@ class AddService:
                     break
                 except CoverError:
                     prepared_cover = None
-        near_matches = self.repository.near_entry_ids(title, authors[0] if authors else "")
+        near_matches = self.repository.near_entry_ids(title, creators[0] if creators else "")
         exact = self.repository.match(identifiers=identifiers, sources=sources)
         if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
             raise LibraryError(
@@ -158,6 +182,24 @@ class AddService:
                 "A similar edition is already in your library",
                 details={"entry_ids": near_matches},
             )
+        domain = DOMAINS.get(item_type, DEFAULT_DOMAIN)
+        if status is None:
+            status = domain.default_status
+        else:
+            try:
+                validate_status(domain, status)
+            except InvalidStatus as error:
+                raise LibraryError("invalid_status", str(error), status_code=422) from error
+        # The same rule `PATCH` follows (DEC-060 judgement 3), applied on the way in.
+        # It runs before the write, so a refusal leaves no half-added row behind.
+        try:
+            checked_values = validate_entry_fields(domain, entry_values or {})
+        except InvalidEntryField as error:
+            raise LibraryError("invalid_entry_field", str(error), status_code=422) from error
+        try:
+            checked_formats = validate_formats(domain, formats or ())
+        except InvalidFormat as error:
+            raise LibraryError("invalid_format", str(error), status_code=422) from error
         try:
             result = self.repository.create_cached_entry(
                 title=title,
@@ -169,6 +211,10 @@ class AddService:
                 status=status,
                 score=score,
                 shelf_ids=shelf_ids,
+                creator_sort=creator_sort,
+                item_type=item_type,
+                entry_values=checked_values,
+                formats=checked_formats,
             )
         except IdentityConflict as error:
             raise LibraryError(

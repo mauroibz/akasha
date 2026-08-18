@@ -22,13 +22,14 @@ function makeEntries(count: number) {
       title: `Book ${i + 1}`,
       subtitle: null,
       year: 2000 + (i % 50),
-      sort_author: `Author ${i + 1}`,
+      creator: `Author ${i + 1}`,
       cover_url: null,
-      metadata: { authors: [`Author ${i + 1}`] },
+      metadata: { creators: [`Author ${i + 1}`] },
       identifiers: {},
       sources: [],
     },
     shelves: [],
+    formats: [],
   }));
   return entries;
 }
@@ -49,7 +50,11 @@ test("a provisional score is marked and the marker is explained", async ({
         items: entries,
         next_cursor: null,
         total: entries.length,
-        facets: { status_counts: { unsorted: entries.length } },
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -89,7 +94,11 @@ test("triage page renders and bulk-accepts suggested statuses", async ({
         items: entries.slice(0, 100),
         next_cursor: null,
         total: entries.length,
-        facets: { status_counts: { unsorted: 30 } },
+        facets: {
+          status_counts: { unsorted: 30 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -120,7 +129,11 @@ test("triage keyboard shortcuts set status on focused row", async ({
         items: entries,
         next_cursor: null,
         total: 5,
-        facets: { status_counts: { unsorted: 5 } },
+        facets: {
+          status_counts: { unsorted: 5 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -153,7 +166,11 @@ test("triage bulk status update with selection", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 10,
-        facets: { status_counts: { unsorted: 10 } },
+        facets: {
+          status_counts: { unsorted: 10 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -200,7 +217,11 @@ test("triage Ctrl+A selects all matching with server-side exclusions", async ({
         items: entries.slice(0, 100),
         next_cursor: null,
         total: 200,
-        facets: { status_counts: { unsorted: 200 } },
+        facets: {
+          status_counts: { unsorted: 200 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -249,7 +270,11 @@ test("triage j/k navigation moves focus between rows", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 5,
-        facets: { status_counts: { unsorted: 5 } },
+        facets: {
+          status_counts: { unsorted: 5 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -283,7 +308,11 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 200,
-        facets: { status_counts: { unsorted: 200 } },
+        facets: {
+          status_counts: { unsorted: 200 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -316,7 +345,11 @@ test("the bulk action bar enters without animating a single row", async ({
         items: entries,
         next_cursor: null,
         total: 12,
-        facets: { status_counts: { unsorted: 12 } },
+        facets: {
+          status_counts: { unsorted: 12 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -349,7 +382,11 @@ test("digits score the focused row and Enter opens it", async ({ page }) => {
         items: entries,
         next_cursor: null,
         total: 5,
-        facets: { status_counts: { unsorted: 5 } },
+        facets: {
+          status_counts: { unsorted: 5 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -394,7 +431,11 @@ test("triage animates its action bar but not under reduced motion", async ({
         items: entries,
         next_cursor: null,
         total: 8,
-        facets: { status_counts: { unsorted: 8 } },
+        facets: {
+          status_counts: { unsorted: 8 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
@@ -423,4 +464,58 @@ test("triage animates its action bar but not under reduced motion", async ({
   });
   const long = still.filter((sample) => sample.duration > 0.01);
   expect(long, JSON.stringify(long.slice(0, 5))).toEqual([]);
+});
+
+test("triage puts a selection on a shelf in bulk", async ({ page }) => {
+  // Listed in product spec section 7 as `Set status · Add shelves · Set score ·
+  // Clear provisional` and never built: `add_shelves` existed on the bulk endpoint
+  // and was tested, but no control ever sent it.
+  const entries = makeEntries(10);
+  let bulkBody: unknown = null;
+  await page.route("**/api/shelves", (route) =>
+    route.fulfill({
+      json: [
+        { id: 4, name: "Argentina", slug: "argentina", entry_count: 12 },
+        { id: 7, name: "Ensayo", slug: "ensayo", entry_count: 3 },
+      ],
+    }),
+  );
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: 10,
+        facets: {
+          status_counts: { unsorted: 10 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.route("**/api/entries/bulk", (route) => {
+    bulkBody = route.request().postDataJSON();
+    return route.fulfill({ json: { affected: 2 } });
+  });
+
+  await page.goto("/triage");
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+  await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
+  await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
+  await expect(page.getByText("2 selected")).toBeVisible();
+
+  await chooseOption(
+    page,
+    page.getByRole("combobox", { name: "Add selected to a shelf" }),
+    "Ensayo",
+  );
+
+  await expect
+    .poll(() => bulkBody)
+    .toEqual({
+      entry_ids: [1, 2],
+      set: { add_shelves: [7] },
+    });
+  await expect(page.getByText("2 entries updated")).toBeVisible();
 });

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "plan_revision": 10,
+  "plan_revision": 12,
   "project_status": "ready",
-  "active_sprint": "025",
-  "active_sprint_file": "docs/sprints/025-second-domain-albums.md",
+  "active_sprint": "030",
+  "active_sprint_file": "docs/sprints/030-entry-depth.md",
   "active_sprint_status": "ready",
-  "last_completed_sprint": "024",
+  "last_completed_sprint": "029",
   "completed_sprints": [
     "001",
     "002",
@@ -30,8 +30,13 @@
     "021",
     "022",
     "023",
-    "024"
+    "024",
+    "025",
+    "026",
+    "027",
+    "028",
+    "029"
   ],
-  "started_at": "",
-  "updated_at": "2026-08-14T16:40:00-03:00"
+  "started_at": "2026-08-17T21:00:00-03:00",
+  "updated_at": "2026-08-17T21:00:00-03:00"
 }

@@ -38,7 +38,7 @@ class RefreshProvider:
             source_refs=(SourceRef(self.name, source_id),),
             title="Provider title",
             subtitle=None,
-            authors=("Provider Author",),
+            creators=("Provider Author",),
             year=2020,
             cover_url=None,
             identifiers={},
@@ -63,7 +63,7 @@ async def test_typed_partial_metadata_patch_migrates_legacy_publisher_and_clears
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE items SET metadata = :metadata WHERE id = :id"),
-                {"metadata": '{"authors": ["A"], "publishers": ["Legacy House"]}', "id": item_id},
+                {"metadata": '{"creators": ["A"], "publishers": ["Legacy House"]}', "id": item_id},
             )
         migrated = await client.patch(
             f"/api/items/{item_id}", json={"metadata": {"language": "es"}}
@@ -79,7 +79,10 @@ async def test_typed_partial_metadata_patch_migrates_legacy_publisher_and_clears
     assert migrated.json()["metadata"]["language"] == "es"
     assert "publisher" not in cleared.json()["metadata"]
     assert invalid.status_code == 422
-    assert "BookMetadataPatch" in openapi["components"]["schemas"]
+    # The patch is no longer typed by a model that names book fields; the fields are
+    # published as data instead and the patch is checked against them (DEC-052 seam 3).
+    assert "/api/item-types" in openapi["paths"]
+    assert "ItemTypeResponse" in openapi["components"]["schemas"]
 
 
 @pytest.mark.anyio
@@ -149,9 +152,8 @@ async def test_confirmed_refresh_merges_present_metadata_and_failure_is_atomic(
     assert refreshed.json()["metadata"] == {
         "publisher": "New Publisher",
         "series": "Keep",
-        "authors": ["Provider Author"],
+        "creators": ["Provider Author"],
         "language": "es",
-        "subjects": [],
     }
     assert failed.status_code == 502
     assert after.json() == refreshed.json()
@@ -194,7 +196,7 @@ async def test_a_corrected_creator_sort_name_is_owner_data_and_outlives_a_refres
     assert corrected.json()["creator_sort"] == "Tolkien, J. R. R."
     assert corrected.json()["creator_sort_override"] == "Tolkien, J. R. R."
     # The refresh replaced the authors and left the correction alone.
-    assert refreshed.json()["metadata"]["authors"] == ["Provider Author"]
+    assert refreshed.json()["metadata"]["creators"] == ["Provider Author"]
     assert refreshed.json()["creator_sort"] == "Tolkien, J. R. R."
     # Clearing it is how the owner goes back to the automatic value.
     assert cleared.json()["creator_sort"] == "Author, Provider"

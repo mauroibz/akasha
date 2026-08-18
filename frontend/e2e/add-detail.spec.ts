@@ -2,6 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
+import { stubItemTypes } from "./seed";
 
 const candidate = (id: string, year: number) => ({
   source: "openlibrary",
@@ -9,7 +10,7 @@ const candidate = (id: string, year: number) => ({
   source_refs: [{ source: "openlibrary", source_id: id }],
   title: "Rayuela",
   subtitle: null,
-  authors: ["Julio Cortázar"],
+  creators: ["Julio Cortázar"],
   year,
   cover_url: null,
   identifiers: {},
@@ -34,17 +35,19 @@ const entry = {
     title: "Rayuela",
     subtitle: null,
     year: 1963,
-    sort_author: "Julio Cortázar",
+    creator: "Julio Cortázar",
     cover_path: null,
-    metadata: { authors: ["Julio Cortázar"], publisher: "Sudamericana" },
+    metadata: { creators: ["Julio Cortázar"], publisher: "Sudamericana" },
     identifiers: {},
     sources: [{ source: "openlibrary", source_id: "OL1M", is_primary: true }],
   },
   shelves: [],
+  formats: [],
 };
 
 async function common(page: Page) {
   await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
@@ -65,18 +68,18 @@ test("manual add is keyboard-complete and cached detail edits persist", async ({
   await page.route("**/api/items/3", (route) =>
     route.fulfill({ json: { ...entry.item, title: "Rayuela corregida" } }),
   );
+  // /add opens straight on the manual form, with the cursor already in it.
   await page.goto("/add");
-  await page.getByRole("button", { name: /enter manually/i }).press("Enter");
   await expect(page.getByLabel(/^title$/i)).toBeFocused();
   await page.getByLabel(/^title$/i).fill("Rayuela");
   await page.getByRole("button", { name: /add to library/i }).press("Enter");
   // New entries return to the library with a success toast
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   expect(posted).toBe(1);
   // Navigate to detail to verify the entry was created
   await page.goto("/books/7");
   await expect(page.getByText("Cached while providers are down")).toBeVisible();
-  await page.getByRole("button", { name: /edit book metadata/i }).click();
+  await page.getByRole("button", { name: /edit metadata/i }).click();
   await page.getByLabel(/^title$/i).fill("Rayuela corregida");
   await page.getByRole("button", { name: /save metadata/i }).click();
 });
@@ -94,10 +97,11 @@ test("work resolution exposes edition choice and exact duplicate navigates", asy
       json: { entry, already_exists: true, near_matches: [] },
     }),
   );
-  await page.goto("/add");
-  await page
-    .getByRole("searchbox", { name: /search books/i })
-    .fill("https://openlibrary.org/works/OL1W");
+  // Resolving a pasted URL is one of the eleven behaviours that had to survive
+  // the move onto `/` (Sprint 029, inventory row 2).
+  await page.goto("/");
+  await page.getByRole("searchbox").fill("https://openlibrary.org/works/OL1W");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   await expect(
     page.getByRole("button", { name: /Rayuela.*1963/i }),
   ).toBeVisible();
@@ -206,15 +210,16 @@ test("search results stagger in and selecting one keeps the keyboard flow", asyn
       ),
     }),
   );
-  await page.goto("/add");
+  await page.goto("/");
 
   const samples = await sampleAnimations(page, async () => {
-    await page.getByRole("searchbox", { name: "Search books" }).fill("Rayuela");
+    await page.getByRole("searchbox").fill("Rayuela");
+    await page.getByRole("button", { name: "Add", exact: true }).click();
     await expect(
       page.getByRole("button", { name: /None of these/ }),
     ).toBeVisible();
     await expect(
-      page.locator("section[aria-label='Search results'] button"),
+      page.locator("section[aria-labelledby='web-results-title'] button"),
     ).toHaveCount(7);
   });
   // Six results plus the manual fallback, each entering in its own right. The

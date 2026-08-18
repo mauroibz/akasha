@@ -154,7 +154,7 @@ fi
 docker compose exec -T akasha python -c '
 from pathlib import Path
 
-from book_tracker.domain.calibre import CalibreAdapter
+from book_tracker.domains.book.calibre import CalibreAdapter
 
 snapshot = CalibreAdapter(Path("/calibre")).read("Personal")
 assert [record["title"] for record in snapshot.records] == ["El Aleph"], snapshot.records

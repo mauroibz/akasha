@@ -199,7 +199,7 @@ async def test_enrichment_never_overwrites_a_populated_field(engine: Engine) -> 
         engine,
         "My Rayuela",
         year=1950,
-        metadata={"publisher": "Manual Press", "authors": ["Someone Else"]},
+        metadata={"publisher": "Manual Press", "creators": ["Someone Else"]},
     )
     async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
         await run_job(engine, providers, item_id)
@@ -209,7 +209,7 @@ async def test_enrichment_never_overwrites_a_populated_field(engine: Engine) -> 
     assert row.year == 1950
     metadata = json.loads(row.metadata)
     assert metadata["publisher"] == "Manual Press"
-    assert metadata["authors"] == ["Someone Else"]
+    assert metadata["creators"] == ["Someone Else"]
     # Fields that were empty are still filled.
     assert metadata["page_count"] == 746
 

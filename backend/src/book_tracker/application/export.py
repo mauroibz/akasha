@@ -5,14 +5,14 @@ Three rules shape this module.
 **Owner data in, derived data out.** `creator_sort_override` (DEC-051) and an
 attachment's `filename` (DEC-050) are values a person typed and no algorithm can
 reconstruct, so an export that drops either loses something real. The projections
-beside them -- `sort_author`, `creator_sort`, and the three `*_normalized` columns
+beside them -- `creator_primary`, `creator_sort`, and the `*_normalized` columns
 -- rebuild themselves on every write through the DEC-036 mapper event. Exporting
 them would present a cache as authority to whoever reads the dump later, so they
 are omitted deliberately and a test asserts their absence.
 
 **The entity shape, not a book shape.** An item is `type`, identifiers, sources
 and an opaque `metadata` object, exactly as the row stores it. `metadata` is
-passed through untransformed: the moment this module knows that `authors` is a
+passed through untransformed: the moment this module knows that `creators` is a
 field, the format needs a v2 for the second domain (DEC-052 seam 3). The
 Goodreads CSV beside it is allowed to be book-shaped because it is one domain's
 export view rather than the export.
@@ -34,8 +34,10 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
+from book_tracker.domain.registry import DEFAULT_DOMAIN
 from book_tracker.infrastructure.models import (
     AttachmentRow,
+    EntryFormatRow,
     EntryRow,
     EntryShelfRow,
     ItemIdentifierRow,
@@ -226,9 +228,28 @@ def _shelves_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]
     return shelves
 
 
+def _formats_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]:
+    """One query per batch, like the shelves beside it.
+
+    A format is owner data in exactly the sense DEC-054 means: nothing derives "I have
+    this on vinyl" from the item, because the item describes a release and this
+    describes your copy. An export that dropped it would lose a fact only you knew.
+    """
+    formats: dict[int, list[str]] = {}
+    for entry_id, value in session.execute(
+        select(EntryFormatRow.entry_id, EntryFormatRow.format)
+        .where(EntryFormatRow.entry_id.in_(entry_ids))
+        .order_by(EntryFormatRow.entry_id, EntryFormatRow.format)
+    ).all():
+        formats.setdefault(entry_id, []).append(value)
+    return formats
+
+
 def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
     for batch in _batches(session, _ENTRY_COLUMNS):
-        shelves = _shelves_for(session, [entry.id for entry in batch])
+        entry_ids = [entry.id for entry in batch]
+        shelves = _shelves_for(session, entry_ids)
+        formats = _formats_for(session, entry_ids)
         for entry in batch:
             yield {
                 "id": entry.id,
@@ -245,6 +266,7 @@ def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
                 # Names rather than ids: an id means nothing outside this database,
                 # and the name is what the owner typed.
                 "shelves": shelves.get(entry.id, []),
+                "formats": formats.get(entry.id, []),
             }
 
 
@@ -322,7 +344,7 @@ def _goodreads_date(value: str | None) -> str:
 
 def _row(entry: Any, item: Any, identifiers: dict[str, str], shelves: list[str]) -> dict[str, Any]:
     metadata = json.loads(item.metadata_json or "{}")
-    authors = metadata.get("authors")
+    authors = metadata.get("creators")
     authors = [str(name) for name in authors] if isinstance(authors, list) else []
     # Goodreads rates 1-5 and the importer doubled it (product spec 5.1). Halving
     # rounds a hand-set odd score up rather than down; the exact 1-10 value is in
@@ -352,7 +374,7 @@ def _row(entry: Any, item: Any, identifiers: dict[str, str], shelves: list[str])
 
 
 def export_csv(engine: Engine) -> Iterator[str]:
-    """Yield the Goodreads-shaped CSV a row at a time."""
+    """Yield the Goodreads-shaped CSV a row at a time, for books alone."""
     buffer = io.StringIO()
     writer = csv.DictWriter(buffer, fieldnames=list(GOODREADS_COLUMNS), lineterminator="\r\n")
 
@@ -387,6 +409,12 @@ def export_csv(engine: Engine) -> Iterator[str]:
             for entry in batch:
                 item = items.get(entry.item_id)
                 if item is None:  # pragma: no cover - the foreign key guarantees this
+                    continue
+                # One domain's export view, not the export. A Goodreads CSV describes
+                # books: an album emitted into it would arrive somewhere else as a book
+                # with no author, no ISBN and a page count. The JSON beside it is the
+                # lossless artifact and carries every type (DEC-052 seam 3).
+                if item.type != DEFAULT_DOMAIN.item_type:
                     continue
                 row_values = _row(
                     entry, item, identifiers.get(item.id, {}), shelves.get(entry.id, [])

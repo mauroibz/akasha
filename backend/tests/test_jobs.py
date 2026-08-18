@@ -143,7 +143,7 @@ def _create_item(
             {
                 "title": title,
                 "year": year,
-                "metadata": json.dumps(metadata or {"authors": ["A"]}),
+                "metadata": json.dumps(metadata or {"creators": ["A"]}),
             },
         ).scalar_one()
 

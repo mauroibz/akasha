@@ -16,7 +16,7 @@ class CursorState:
     value: Any
     entry_id: int
     null_bucket: int
-    # Bumped to 2 in Sprint 023. `sort_author` stopped ordering by the first author
+    # Bumped to 2 in Sprint 023. The creator sort stopped ordering by the first name
     # verbatim and started ordering by the stored creator sort name, so a cursor
     # issued before that migration compares "gabriel" against "garcia marquez
     # gabriel" and silently skips or repeats a page. Rejecting it is the point.

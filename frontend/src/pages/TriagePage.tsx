@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import {
   useInfiniteQuery,
   useMutation,
+  useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
 
@@ -17,6 +18,7 @@ import {
   type LibraryFilters,
   type SortKey,
 } from "@/api/library";
+import { getShelves } from "@/api/shelves";
 import { ChevronRight } from "lucide-react";
 
 import { CoverImage } from "@/components/CoverImage";
@@ -30,7 +32,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { chooseableStatuses } from "@/features/library/labels";
+import {
+  hotkeysFor,
+  statusLabelFor,
+  statusesFor,
+} from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import { useMotionPresets } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
@@ -39,29 +46,14 @@ import {
   mergeUniqueEntries,
 } from "@/features/library/library";
 
-const statusLabels: Record<EntryStatus, string> = {
-  unsorted: "Inbox",
-  read: "Read",
-  reading: "Reading",
-  to_read: "To read",
-  wishlist: "Wishlist",
-  dropped: "Dropped",
-};
-
-const statusHotkeys: Record<string, EntryStatus> = {
-  r: "read",
-  t: "to_read",
-  w: "wishlist",
-  d: "dropped",
-  g: "reading",
-  u: "unsorted",
-};
-
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
   return {
     statuses: statuses.length ? statuses : ["unsorted"],
     shelves: params.getAll("shelf"),
+    formats: [],
+    // Triage has no domain tab: the inbox is one queue whatever landed in it.
+    types: [],
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
@@ -74,6 +66,10 @@ export function TriagePage() {
     () => filtersFromParams(searchParams),
     [searchParams],
   );
+  // The bulk chooser below stays on the shared vocabulary on purpose: a selection can
+  // hold books and albums at once, and one of the two names would be wrong for half of
+  // it. Per-row copy follows the row's own domain.
+  const itemTypes = useItemTypes();
   const [search, setSearch] = useState(filters.query);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [allMatching, setAllMatching] = useState(false);
@@ -128,6 +124,19 @@ export function TriagePage() {
   );
   const firstPage = library.data?.pages[0];
 
+  // Every shelf, for the bulk control. One request for the page, and a failure
+  // costs the control rather than the screen.
+  const shelfQuery = useQuery({
+    queryKey: ["shelves"],
+    queryFn: getShelves,
+    retry: false,
+  });
+  const shelfChoices = useMemo(() => {
+    const rows = shelfQuery.data;
+    if (!Array.isArray(rows)) return [];
+    return [...rows].sort((a, b) => a.name.localeCompare(b.name));
+  }, [shelfQuery.data]);
+
   const bulkMutation = useMutation({
     mutationFn: (body: Parameters<typeof bulkUpdateEntries>[0]) =>
       bulkUpdateEntries(body),
@@ -155,6 +164,31 @@ export function TriagePage() {
   const selectionCount = allMatching
     ? (firstPage?.total ?? 0) - excludedIds.size
     : selectedIds.size;
+
+  /**
+   * The statuses every selected row can actually take.
+   *
+   * A selection legitimately spans domains, and the server refuses a mixed write
+   * whole rather than half-applying it. Offering a status only one domain has would
+   * therefore be offering a button that fails, so the chooser narrows to the
+   * intersection — which for a mixed selection is `wishlist` and the inbox.
+   */
+  const selectionStatuses = useMemo(() => {
+    const types = allMatching
+      ? new Set(entries.map((entry) => entry.item.type))
+      : new Set(
+          entries
+            .filter((entry) => selectedIds.has(entry.id))
+            .map((entry) => entry.item.type),
+        );
+    const lists = Array.from(types).map((type) =>
+      statusesFor(type, itemTypes.data),
+    );
+    if (!lists.length) return [];
+    return lists[0].filter((status) =>
+      lists.every((list) => list.some((other) => other.value === status.value)),
+    );
+  }, [allMatching, entries, selectedIds, itemTypes.data]);
 
   // Build bulk body from selection state
   const buildBulkBody = (
@@ -264,25 +298,47 @@ export function TriagePage() {
         setFocusedId(entries[next].id);
         return;
       }
-      // Status hotkeys (apply to focused row or selection)
-      const statusKey = statusHotkeys[event.key.toLowerCase()];
+      // Status hotkeys (apply to focused row or selection). The map is the
+      // *focused row's domain's*: `o` is Owned on a record and nothing on a book,
+      // and one shared table would have to pick a winner (seam 5b).
+      const focused = entries.find((row) => row.id === focusedId);
+      const key = event.key.toLowerCase();
+      const fromFocus = focused
+        ? hotkeysFor(focused.item.type, itemTypes.data)[key]
+        : undefined;
+      // With rows selected the selection answers, because Ctrl+A selects
+      // everything without focusing anything and the keyboard still has to work.
+      const fromSelection = selectionStatuses.find(
+        (status) => status.hotkey === key,
+      )?.value;
+      const statusKey =
+        selectionCount > 0 ? (fromSelection ?? fromFocus) : fromFocus;
       if (statusKey) {
         event.preventDefault();
-        const entry = entries.find((row) => row.id === focusedId);
-        if (entry && selectionCount === 0) {
+        if (selectionCount === 0) {
           // Single-row update via bulk API
           bulkMutation.mutate({
-            entry_ids: [entry.id],
+            entry_ids: [focused!.id],
             set: { status: statusKey },
           });
-        } else if (selectionCount > 0) {
+        } else if (fromSelection) {
           bulkMutation.mutate(buildBulkBody({ status: statusKey }));
+        } else {
+          // Saying why beats a key that silently does nothing on a selection
+          // spanning domains that disagree about this status.
+          toast.error(
+            `Not every selected row can be set to ${statusLabelFor(
+              focused!.item.type,
+              itemTypes.data,
+              statusKey,
+            )}`,
+          );
         }
         return;
       }
       // Score shortcuts (1-9, 0=10) on focused row
       const score = event.key === "0" ? 10 : Number(event.key);
-      const entry = entries.find((row) => row.id === focusedId);
+      const entry = focused;
       if (entry && score >= 1 && score <= 10) {
         event.preventDefault();
         if (selectionCount > 0) {
@@ -428,7 +484,7 @@ export function TriagePage() {
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder="Filter by title or author  /"
+            placeholder="Filter by title or creator  /"
             className="h-11 rounded-full bg-surface"
           />
         </label>
@@ -454,7 +510,7 @@ export function TriagePage() {
         <section className="py-24 text-center">
           <h2 className="text-2xl font-semibold">Inbox is clear</h2>
           <p className="mt-2 text-muted-foreground">
-            Import books to start triaging.
+            Import something to start triaging.
           </p>
         </section>
       )}
@@ -494,11 +550,13 @@ export function TriagePage() {
                   <SelectValue placeholder="Set status…" />
                 </SelectTrigger>
                 <SelectContent>
-                  {chooseableStatuses.map((status) => (
-                    <SelectItem key={status} value={status}>
-                      {statusLabels[status]}
-                    </SelectItem>
-                  ))}
+                  {selectionStatuses
+                    .filter((status) => status.choosable)
+                    .map((status) => (
+                      <SelectItem key={status.value} value={status.value}>
+                        {status.label}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
               <Select
@@ -521,6 +579,34 @@ export function TriagePage() {
                   ))}
                 </SelectContent>
               </Select>
+              {shelfChoices.length > 0 && (
+                // Product spec section 7 has listed this beside the others since
+                // v1 and it was never built, so putting twenty imported books on
+                // one shelf meant opening twenty detail pages. Fire-and-reset like
+                // the two above it: it is an action, not a field.
+                <Select
+                  value=""
+                  onValueChange={(value) =>
+                    bulkMutation.mutate(
+                      buildBulkBody({ add_shelves: [Number(value)] }),
+                    )
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Add selected to a shelf"
+                    className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
+                  >
+                    <SelectValue placeholder="Add to shelf…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {shelfChoices.map((shelf) => (
+                      <SelectItem key={shelf.id} value={String(shelf.id)}>
+                        {shelf.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Button
                 variant="secondary"
                 className="rounded-full text-sm"
@@ -611,15 +697,23 @@ export function TriagePage() {
                         {entry.item.title}
                       </p>
                       <p className="truncate text-xs text-muted-foreground">
-                        {entry.item.sort_author ?? "Unknown"}
+                        {entry.item.creator ?? "Unknown"}
                       </p>
                     </div>
                     {hasConflict && (
                       <span
                         className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
-                        title={`Suggested: ${statusLabels[entry.suggested_status!]}`}
+                        title={`Suggested: ${statusLabelFor(
+                          entry.item.type,
+                          itemTypes.data,
+                          entry.suggested_status!,
+                        )}`}
                       >
-                        {statusLabels[entry.suggested_status!]}
+                        {statusLabelFor(
+                          entry.item.type,
+                          itemTypes.data,
+                          entry.suggested_status!,
+                        )}
                       </span>
                     )}
                     <span

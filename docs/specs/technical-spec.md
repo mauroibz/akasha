@@ -34,8 +34,9 @@ akasha/
 │   ├── src/book_tracker/
 │   │   ├── api/             # thin FastAPI routers and error mapping
 │   │   ├── application/     # use cases and transaction boundaries
-│   │   ├── domain/          # enums, value objects, provider/import contracts
-│   │   ├── infrastructure/  # SQLAlchemy repositories, providers, files, jobs
+│   │   ├── domain/          # what a domain is (spec), which exist (registry), shared contracts
+│   │   ├── domains/         # one package per domain: book/, album/ (section 6.6)
+│   │   ├── infrastructure/  # SQLAlchemy repositories, provider HTTP, files, jobs
 │   │   └── main.py          # app factory, lifespan, static SPA mount
 │   └── tests/               # unit, integration, contract
 ├── frontend/
@@ -103,7 +104,7 @@ Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_
 
 ## 5. Canonical data model
 
-All timestamps are UTC RFC 3339 strings at API boundaries and timezone-aware Python datetimes internally. User-entered reading dates are ISO `YYYY-MM-DD`. Scores are nullable integers 1–10. Status is one of `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`.
+All timestamps are UTC RFC 3339 strings at API boundaries and timezone-aware Python datetimes internally. User-entered reading dates are ISO `YYYY-MM-DD`. Scores are nullable integers 1–10. **Status is per-domain**: each domain declares its own vocabulary and every domain has `unsorted` (DEC-057, section 6.6). Books are `unsorted`/`read`/`reading`/`to_read`/`wishlist`/`dropped`; albums are `unsorted`/`wishlist`/`pending`/`owned`. A write is validated against the item's own domain; a filter spans the union.
 
 ### 5.1 Tables
 
@@ -115,7 +116,7 @@ All timestamps are UTC RFC 3339 strings at API boundaries and timezone-aware Pyt
 - `subtitle`, `year`, and `cover_path` nullable
 - `identifiers` optional JSON API/cache projection derived from relational identifiers; never the uniqueness authority
 - `metadata` required JSON-as-text with application validation
-- `sort_author` generated from first metadata author — the name **as written**, which is what the UI displays and what the `q` filter matches
+- `creator_primary` generated from the first metadata creator — the name **as written**, which is what the `q` filter matches and what the API falls back to when the record carries no rendered `credit`
 - `creator_sort_override` nullable owner text: the sort name corrected by hand, or seeded from a Calibre `authors.sort`
 - `creator_sort` and `creator_sort_normalized` nullable, derived from `creator_sort_override` or the `creator_sort_name` heuristic and maintained by the same mapper event as the columns above (DEC-051). Ordering reads these; display and search do not
 - `created_at`, `updated_at` required
@@ -144,9 +145,16 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 `entries`
 
 - product-spec fields plus foreign key `item_id` with restrict-on-delete
-- checks for status, score, nonnegative `reread_count`, and boolean `score_provisional`
+- checks for score, nonnegative `reread_count`, and boolean `score_provisional`. **There is no CHECK on `status`** (migration `0014`, DEC-067 row 1): the vocabulary is the domain's, and a constraint listing the union of every domain's values could neither express "`owned` is not a book status" nor admit a domain added later without a migration on this table. `validate_status`, keyed on the item's own domain, is the authority and is strictly stronger
 - unique `(user_id, item_id)`
 - indexes supporting status/score/date list paths
+
+`entry_formats`
+
+- one row per (entry, format); `ON DELETE CASCADE` from `entries`, indexed by `format`
+- the value is a closed vocabulary the domain declares (DEC-059), not a joined row: a
+  shelf is something the owner invents, a format is something the domain knows
+- writes are validated against the item's own domain and refused with 422 otherwise
 
 `shelves` and `entry_shelves`
 
@@ -299,6 +307,99 @@ Enrichment is enqueued after commit and limited to about two provider requests p
 
 Undo is available in the UI until `undo_expires_at` (24 hours), while the durable audit ledger remains recoverable. Reverse effects in order, cancel queued jobs, and make late job results no-ops. Delete only batch-created entities that remain unmodified and unreferenced; revert a filled field only when its current value equals recorded `after_values`. The response reports reverted, retained, and skipped effects, and repeated undo is harmless.
 
+### 6.6 The domain contract
+
+A **domain** is a kind of thing the library holds: books, albums. This section is the whole contract. A new domain is built from it alone; reading how albums were built is not required and is not a substitute, because that record describes one domain's choices rather than the rules (DEC-052, DEC-066).
+
+**The core is neutral and stays that way.** `items` has been `type` / `title` / `subtitle` / `year` / `cover_path` / `identifiers` / opaque `metadata` since Sprint 002, and `entries` hold one person's opinion of an item. No shared layer branches on which domain it is holding; a domain is never translated into another domain's vocabulary, and there is no `if item_type == ...` anywhere above the registry. **A shared layer that needs to know the domain asks the registry for a declaration; it does not grow a branch.**
+
+```text
+  api/ · application/ · infrastructure/     shared layers — never branch on item type
+                    ▲
+                    │ ask the registry for a declaration
+  domain/spec.py     what a domain IS          domain/registry.py   which ones EXIST
+                    ▲                                    ▲
+      ┌─────────────┴─────────────┐        ┌─────────────┴─────────────┐
+      │  domains/book/            │        │  domains/album/           │
+      │  declaration · adapters   │        │  declaration · adapter    │
+      │  · importers              │        │                           │
+      └───────────────────────────┘        └───────────────────────────┘
+                     never import each other
+```
+
+**The registry is code, not a plugin runtime** (product spec section 2). A domain is a Python object registered at import time. There is no discovery, no entry point, no sandbox and no versioning between a domain and the core: they are built and shipped together.
+
+#### What a domain supplies
+
+One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in `backend/src/book_tracker/domains/<item_type>/__init__.py`), whose every field is an obligation:
+
+| Field | Obligation |
+|---|---|
+| `item_type` | The value stored in `items.type`. **Permanent** — a lowercase identifier, never renamed, never user-facing. |
+| `label` | The user-facing name of one item ("Book", "Album"). Copy, and free to change. |
+| `identity` | An `IdentityStrategy`: how two candidates are judged the same record, and which source wins a merge. |
+| `fields` | The ordered `FieldSpec` list describing this domain's metadata. Storage stays opaque; this is the only description of it that exists. |
+| `enriches` | Whether background enrichment applies at all. `False` is a complete answer, not a gap. |
+| `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. |
+| `default_status` | What a newly added entry gets when nobody chose. Must be one of `statuses`. |
+| `entry_fields` | Which of `date_started` / `date_finished` / `reread_count` this domain's entries have. Anything absent is **refused on write**, not merely hidden. |
+| `formats` | The `FormatSpec` vocabulary for how a copy is held. Closed and declared, which is what a shelf is not (DEC-059). |
+| `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
+| `recognize` | What a string pasted into the add box means to this domain, or `None`. |
+| `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
+
+Plus, outside the record itself:
+
+- **An adapter** implementing the `Provider` protocol (`domain/providers.py`), in the domain's own package as `domains/<item_type>/providers.py`: `name`, `item_type`, `async search(query, limit)` and `async fetch(source_id)`, returning `SearchCandidate` / `ItemPayload`. It owns its own rate limit, User-Agent and authentication, and never leaks a raw provider response above infrastructure (section 6.2). Its boundary behaviour is proven against committed recorded responses, never against a mock of the method under test (DEC-025).
+- **Cover URLs**, as candidates only. The shared pipeline keeps sole ownership of https upgrading, the host allowlist, the redirect policy and the pixel and byte bounds; a domain whose art lives on a new host adds that host to the allowlist and nothing else (seam 4).
+- **A curated sort name where the source knows one.** `SearchCandidate.creator_sort` seeds the owner's override; the `creator_sort_name` heuristic runs only when nothing knew. A source that distinguishes a person from a group must say so this way rather than let the heuristic invert `Daft Punk` (DEC-051, DEC-052).
+
+#### Rules each supplied part must satisfy
+
+- **Statuses.** Values are permanent and stored; labels are copy. `unsorted` exists in every domain because imports land there and the default library view hides it, and it is never offered as a choice. Every choosable status carries a triage hotkey, unique within the domain — the hotkey lives on the status rather than in a second table that can drift from it.
+- **Formats.** Multi-valued on the entry and independent of status, so "wishlist → vinyl" is expressible. The vocabulary is closed and declared; a value the owner invents is a **shelf**, and the two must never converge into one control (DEC-059).
+- **Entry fields.** A domain's entries have only the passage fields it declares. Declaring a name outside `PASSAGE_FIELDS` is a defect the conformance suite refuses: `validate_entry_fields` refuses what is *absent*, so an invented name would be a field the domain believes in and nothing writes.
+- **Metadata fields.** Names are permanent, labels are copy. A `rows` field declares `columns` and no other field type may; the renderer and the validator both key on that. A field may never shadow `title`, `subtitle`, `year` or `creator_sort_override` — those are neutral item columns edited *beside* the metadata, and a metadata field of the same name would render twice and save to one of them.
+- **Identity.** `identity_key(candidate) -> str | None`, where `None` means *never merge this candidate*. That is a complete answer, not a degraded one: barcodes are not unique across releases, so albums have no cross-provider identity and merging on a weaker key would be wrong rather than approximate. `source_preference` decides which row of a merged group is primary and breaks ranking ties.
+- **The URL recognizer must answer for any string and must never raise.** `resolve_input` asks every registered domain in turn, so a recognizer that raises does not fail its own domain — it denies every domain after it in the registry its turn. Parse through `split_url`, which is the shared guard (`urlsplit` raises on a malformed authority such as `http://[`). The shared loop isolates a raising recognizer as well, so the failure is contained; a domain that raises is still in breach.
+
+#### What a domain may never touch
+
+- **`items` and `entries` columns.** Everything a domain knows that the neutral columns do not carry goes in opaque `metadata`. A domain never adds a column, and never stores a value one of the four reserved item columns already holds.
+- **Another domain.** No domain imports another, reads another's vocabulary, or renders under another's labels. A value that exists in two domains (`wishlist`, `digital`) is a coincidence of spelling, not shared state.
+- **The shared pipelines.** Keyset pagination and cursors, the job runner, the import ledger and undo, backup, attachments, shelves, and the score/notes/dates entry layer are the core's. A domain that appears to need a change in one of them has found a seventh seam, and that is a decision to record, not a patch to make (DEC-055).
+- **The cover pipeline's safety rules.** A domain supplies URLs; it does not relax the scheme, the allowlist, the redirect check or the size bounds.
+- **The screens.** No screen branches on the item type. A domain that needs a screen to render differently declares the difference — a label, a vocabulary, a field spec — and the screen renders the declaration.
+
+#### Where a domain's code lives
+
+One package per domain, `backend/src/book_tracker/domains/<item_type>/`, holding its registry entry, its field spec, its status and format vocabularies, its identity strategy, its URL recognizer, its provider adapter and its importers. The point is that **one domain's team edits one directory**, so two domains can be built in parallel without contending for the same files.
+
+Books and albums live there as of Sprint 028: `domains/book/` holds its declaration, its Open Library and Google Books adapters and its Goodreads and Calibre importers; `domains/album/` holds its declaration and its MusicBrainz adapter. What remains in `infrastructure/providers.py` is the shared HTTP boundary — the bounded retrying JSON read, the retry policy and the one client every adapter uses — which belongs to no domain. `domain/spec.py` is what a domain is; `domain/registry.py` is which domains exist.
+
+**The practical guide to building one is [`docs/guides/adding-a-domain.md`](../guides/adding-a-domain.md)**, which walks this section step by step with diagrams and a worked example. This section is the contract; that guide is how to satisfy it.
+
+Exactly three things stay shared, and they are the registration points rather than the domain's substance:
+
+1. **The registry** — the domain is added to `DOMAINS`, which is what makes it exist.
+2. **Provider wiring** in the application lifespan, where its adapter is constructed with its configuration.
+3. **Migrations**, which are global by nature and are the one path to a schema change.
+
+Anything else a domain has to edit outside its own package is a coupling, and a coupling is a defect to record and cost. Two remain after Sprint 028, both deliberately (DEC-066, DEC-067): the published unions (`EntryStatus`, `EntryFormat`, `ItemTypeName`), which are three type-safe lines per domain that a test refuses to let drift, and the cover host allowlist, which is central precisely so a domain cannot widen it from its own package. The third — `entries.ck_entries_status`, a CHECK rendered from the registry when its migration was written — was removed in migration `0014`, because a domain needing a schema change on a shared table is not a coupling that can be paid per domain: two domain teams would both write that migration against the same alembic head.
+
+#### How the core serves a domain
+
+- `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order.
+- **A write is validated against the item's own domain** (`LibraryService._validated`), refused with a 422 that names the domain — the value is very often valid one row further down the library, so "invalid status" alone would send the reader hunting. A bulk write spanning domains is refused whole.
+- **A filter legitimately spans domains**, so query parameters validate against the union of every domain's values while writes validate against one domain. `type` is not an ordinary facet dimension: both status facets clear it so the inbox badge keeps agreeing with the domain-agnostic triage screen, while `format_counts` applies it because that selector sits under the tab (DEC-062).
+- Enrichment is queued only for domains that declare `enriches`.
+
+#### How a domain is verified
+
+`backend/tests/test_domain_conformance.py` is parametrized over `DOMAINS`: a domain is held to the contract **by existing**, and nothing in that file is extended when one is added. Its checks split in two, and the split is load-bearing. `REGISTRY_CHECKS` are what a domain satisfies on its own, and an unregistered fixture domain satisfies all of them — that is what makes this a contract rather than a description of books and albums. `CORE_CHECKS` are whether the core can host the domain: whether the published unions carry its values, and whether the database will accept them.
+
+The suite is required to be able to fail. Malformed domains declared inside the file — a status with no label, a default outside the vocabulary, a `rows` field with no columns, a recognizer that raises — must each be rejected by the check that owns them.
+
 ## 7. HTTP API contract
 
 All routes are under `/api`. JSON uses snake_case. Validation errors follow FastAPI's standard 422 shape; domain failures use:
@@ -315,11 +416,33 @@ The product-spec route list is authoritative, with these refinements:
 
 - Define static routes such as `/entries/bulk` before `/entries/{entry_id}`.
 - Bulk mutation accepts either explicit `entry_ids` or a validated server-side filter plus `excluded_entry_ids`; never both. This supports select-all across unloaded virtual rows without sending thousands of IDs. Return affected count and apply in one transaction.
-- `GET /entries` accepts repeated `status`, `shelf`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. The response is `{items, next_cursor, total, facets}`, where `facets.status_counts` supplies the unobtrusive status counts required by the library UI for the current non-status filters.
+- `GET /entries` accepts repeated `status`, `shelf`, `format`, `type`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. `type` selects domains and is validated against the registry; unlike `shelf` and `format`, repeating it *widens*, because a row has exactly one type. The response is `{items, next_cursor, total, facets}`. `facets.status_counts` is the whole-library total per status — what the inbox badge counts — `facets.status_counts_by_type` splits the same counts by item type, because a status two domains share is not one number on a screen that lists each domain's statuses separately, and `facets.format_counts` does the same for formats. Each facet clears its own dimension, so a count reads as "what you would get if you clicked this". **`type` is the exception and is not one dimension** (DEC-062): both status facets clear it, so the inbox badge keeps agreeing with the domain-agnostic `/triage` and an unselected tab still has a count to show, while `format_counts` applies it, because that selector sits under the tab.
+- `GET /item-types` publishes each domain's metadata fields, its ordered status vocabulary (value, label, whether it is directly choosable, triage key), its default status, which entry fields it has, its formats, and the heading for the personal region of the detail page. Every screen renders from it rather than branching on the item type (seam 5b).
+- Writes validate `status`, `formats` and the passage fields (`date_started`, `date_finished`, `reread_count`) against **the item's own domain**, returning 422 with a message naming the domain. A bulk write spanning domains is refused whole rather than half-applied.
 - `POST /entries/accept-suggested` returns affected count and operates in one transaction over the server-side filter, not client-loaded IDs.
 - `POST /items/{id}/refresh` requires explicit overwrite confirmation.
 - `POST /entries` requires `confirm_near_match=true` before creating a title/first-author
-  near-match; the initial 409 includes advisory existing entry IDs and performs no write.
+  near-match; the initial 409 includes advisory existing entry IDs and performs no write. It also
+  accepts `notes`, `formats` and the passage fields, each validated against the item's own domain
+  and refused with a 422 naming it — the same rule `PATCH` follows, applied **before the write**, so
+  a refusal never leaves a half-added row.
+- **Two searches exist and they are not the same kind of thing.** `GET /entries?q=` is SQL over
+  stored normalized projections: free, local, and reached by every keystroke the library filter
+  makes. `GET /search?q=&type=` fans out to the chosen domain's providers at five seconds each and
+  is counted against a daily budget (DEC-045). Since Sprint 029 both are spent from `/` behind one
+  input, so **which of them a keystroke reaches is a frontend rule, stated in section 8** — the
+  backend contract is unchanged, and the invariant it protects is unchanged with it: rendering a
+  library page consults no provider, at any query length. A search reaches only the named domain's
+  providers (DEC-052 seam 4); the spend is recorded and never blocked, because somebody is waiting
+  for it.
+- `GET /search/resolve` takes the same input when it is a URL or a bare ISBN and skips the keyword
+  search entirely. It is domain-neutral: a MusicBrainz release-group URL resolves exactly as an Open
+  Library edition URL does, which is why the one bar advertises the path for every domain.
+- `GET /search/preview` returns one candidate's full provider payload and writes nothing. It exists
+  because a search result carries an identity but not a description, a page count or a tracklist,
+  and there is no provider response cache, so it is one live request per call (DEC-064). It follows
+  `search`'s quota rule rather than enrichment's: the spend is recorded and never blocked, because
+  somebody is waiting for it.
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - Import commit bodies contain preview batch IDs, not client-controlled source payloads.
@@ -342,9 +465,9 @@ OpenAPI is the API contract. Generate or validate frontend request/response type
 
 ### 7.2 Keyset pagination
 
-Use an opaque base64url-encoded, versioned JSON cursor containing sort key, direction, last normalized value, last ID, and null bucket. Clients must treat it as opaque. Reject a cursor when sort/filter identity does not match the request. **The version is currently 2**; it is bumped whenever a stored projection a cursor compares against changes meaning, so a cursor issued before the change fails with `invalid_cursor` rather than silently skipping or repeating a page.
+Use an opaque base64url-encoded, versioned JSON cursor containing sort key, direction, last normalized value, last ID, and null bucket. Clients must treat it as opaque. Reject a cursor when sort/filter identity does not match the request. **The filter identity must list every filter**, `type` included: one that omits a filter accepts a cursor cut under a different query and then skips or repeats a page silently, which is a wrong answer rather than an error. **The version is currently 2**; it is bumped whenever a stored projection a cursor compares against changes meaning, so a cursor issued before the change fails with `invalid_cursor` rather than silently skipping or repeating a page.
 
-Every ordering is a whitelisted SQL expression plus `id` tie-breaker. NULL values always sort last using an explicit null bucket in both ordering and seek predicate. Text ordering, search, and cursor comparison read stored normalized projections. Search and the `title` sort read `items.title_normalized` and `items.sort_author_normalized`; the `sort_author` *ordering* reads `items.creator_sort_normalized` instead, because the name a creator sorts under is not the name it displays under (DEC-051). They hold the domain `normalize_text` value (Unicode NFKD, combining-mark removal, casefold, punctuation-to-space, and whitespace collapse) and maintained by a mapper event on every item write (DEC-036). They are not generated columns, because SQLite generated columns cannot call an application-registered function, which is also why the earlier per-row UDF was replaced: it cost 312 ms p95 on a contended 10,000-entry first page. Tests cover asc/desc, nulls, duplicate values, deleted boundary rows, filter changes, malformed cursors, and `EXPLAIN QUERY PLAN` for common composite indexes. `total` is exact but advisory under concurrent edits; do not add an invalidation-prone count cache until measurement proves it necessary. Any mutation of the active sort key invalidates infinite pages and reloads from page one while restoring focus by entry ID.
+Every ordering is a whitelisted SQL expression plus `id` tie-breaker. NULL values always sort last using an explicit null bucket in both ordering and seek predicate. Text ordering, search, and cursor comparison read stored normalized projections. Search and the `title` sort read `items.title_normalized` and `items.creator_primary_normalized`; the `creator` *ordering* reads `items.creator_sort_normalized` instead, because the name a creator sorts under is not the name it displays under (DEC-051). They hold the domain `normalize_text` value (Unicode NFKD, combining-mark removal, casefold, punctuation-to-space, and whitespace collapse) and maintained by a mapper event on every item write (DEC-036). They are not generated columns, because SQLite generated columns cannot call an application-registered function, which is also why the earlier per-row UDF was replaced: it cost 312 ms p95 on a contended 10,000-entry first page. Tests cover asc/desc, nulls, duplicate values, deleted boundary rows, filter changes, malformed cursors, and `EXPLAIN QUERY PLAN` for common composite indexes. `total` is exact but advisory under concurrent edits; do not add an invalidation-prone count cache until measurement proves it necessary. Any mutation of the active sort key invalidates infinite pages and reloads from page one while restoring focus by entry ID.
 
 ## 8. Frontend architecture and behavior
 
@@ -366,12 +489,39 @@ Cross-cutting behavior:
 - Query keys include every server filter/sort value.
 - Optimistic mutations snapshot and roll back cache; failed writes announce an accessible error and never silently lose input.
 - Search input is debounced and cancellable; stale responses cannot replace newer results.
+- **One input feeds both searches, and the rule deciding which it reaches is load-bearing**
+  (DEC-065, as built in DEC-073). The library filter is debounced **250 ms** into the URL's `q` and
+  is the only thing typing normally reaches. A **provider** search fires only when every one of
+  these holds: the query has been still for **~800 ms** measured from the last keystroke, it is at
+  least **three characters**, the URL has caught up with the box, the library has actually answered
+  — pending or errored is "we do not know yet", not "the library has nothing" — and it answered with
+  **zero** rows. It never fires twice for the same string and domain. The **Add** button overrides
+  all of it and searches immediately, serving a repeat from what it already holds.
+  - Every clause is there because the literal rule — search whenever the library misses — fires once
+    per keystroke while typing any title not already owned, which is every add. That is the quota
+    (DEC-045) and the tier breach DEC-044 already measured. **The rule is verified by counting
+    requests, not by inspection.**
+  - The provider search owns an `AbortController` and a request-id guard: a superseded request is
+    aborted rather than left running against a rate-limited API, and a late response for an older
+    query may not replace a newer result set. Both are quota protection, not tidiness.
+  - Results belong to the domain that produced them, and switching domain clears them rather than
+    showing one domain's results under another's name.
+- **Two result sets on one page are two regions, not one.** The library is a `role="feed"` with
+  server-side `aria-posinset`/`aria-setsize` (DEC-038); provider results are a plainly labelled
+  `section` beside it and are never announced as feed items. They render **below** the library:
+  the library virtualizes against the window, so a variable-height block above it moves the
+  `scrollMargin` every row measures itself against, which is the Sprint 013 class of bug avoided by
+  construction rather than survived (DEC-073).
+- **Keyboard shortcuts belong to the surface that has focus.** With provider results on screen,
+  `j`/`k` and the digit shortcuts stay with the library and do nothing from inside the results
+  region, so one list's shortcut never acts on the other list.
 - Route-level error boundaries and useful empty/loading states are mandatory.
 - Keyboard shortcuts are disabled while an input, textarea, select, dialog, or content-editable element owns focus unless explicitly relevant. The component library renders these as buttons carrying roles rather than as native tags, so the guard is on the `dialog`, `alertdialog`, `combobox`, `listbox`, and `menu` roles as well as on tag names (DEC-029).
 - `0` means score 10 only in score-shortcut context; Escape cancels an edit.
 - Virtual rows have stable keys and fixed measured sizes. Sort/filter changes crossfade the container; rows do not use layout animations.
 - Both list densities are `role="feed"` with `article` children carrying `aria-posinset`/`aria-setsize` from the server-side total, and the feed sets `aria-busy` while a page is loading. Neither is an ARIA table: they have no column headers and no cells, and claiming otherwise produced a structure screen readers could not navigate (DEC-038).
-- The library grid virtualizes rows of cards, not single entries. The column count is derived from the measured scroll-container width so no card falls below its minimum width; a virtual row is one fixed-height band of that many fixed-height cards. Mounted DOM is therefore bounded per row and per card, and both bounds are asserted.
+- The library grid virtualizes rows of cards, not single entries. The column count is derived from the measured container width so no card falls below its minimum width; a virtual row is one fixed-height band of that many fixed-height cards. Mounted DOM is therefore bounded per row and per card, and both bounds are asserted.
+- **The library virtualizes against the window, not against a scroll container of its own.** The primary surface uses the whole page, so the list element has no height and no overflow, and the virtualizer is given a `scroll margin` for what sits above it. The mounted-DOM bounds are unchanged by this and are re-asserted at 10,000 entries against the window; `/triage` keeps its own fixed-height container, where a dense working table inside a page is the intent.
 - A library card is a fixed box: fixed-size cover, clamped metadata, and a control row that never wraps. Controls that expand (the compact score picker) render as an overlay anchored inside the card, so expanding a control never changes a card's layout box or paints into a neighbor.
 - Two components are deliberately bespoke rather than library primitives, and must stay that way (DEC-026). The score picker may not become a portalled primitive, because its expanded panel is required to remain geometrically inside its card; portalling to `document.body` breaks that by construction. The library card box may not adopt a primitive carrying its own intrinsic padding, because the card height is pinned for fixed-size virtualization and the column calculation subtracts a matched row padding.
 - Every user action produces visible feedback. Feedback rendered only into a visually hidden element is a defect, not an implementation. The visible surface carries the accessible announcement rather than sitting beside a second, duplicate live region (DEC-028): a confirmation is announced once and seen once.

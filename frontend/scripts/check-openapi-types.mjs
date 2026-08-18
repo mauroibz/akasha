@@ -13,12 +13,25 @@ const expected = {
     "score",
     "item",
     "shelves",
+    "formats",
     "score_provisional",
   ],
-  ItemResponse: ["id", "type", "title", "sort_author", "cover_url", "metadata"],
-  BookMetadataResponse: ["authors", "subjects"],
-  BookMetadataPatch: ["authors", "publisher", "original_year"],
-  FacetsResponse: ["status_counts"],
+  ItemResponse: ["id", "type", "title", "creator", "cover_url", "metadata"],
+  ItemTypeResponse: [
+    "id",
+    "label",
+    "fields",
+    "statuses",
+    "default_status",
+    "entry_fields",
+    "formats",
+    "entry_panel_label",
+    "chooses_covers",
+  ],
+  FieldSpecResponse: ["name", "label", "type", "multiplicity"],
+  StatusSpecResponse: ["value", "label", "choosable", "hotkey"],
+  FormatSpecResponse: ["value", "label"],
+  FacetsResponse: ["status_counts", "status_counts_by_type", "format_counts"],
   ShelfResponse: ["id", "name", "slug", "entry_count"],
 };
 
@@ -31,17 +44,16 @@ for (const [name, properties] of Object.entries(expected)) {
   }
 }
 
-const statuses = components.EntryStatus?.enum ?? [];
-for (const status of [
-  "unsorted",
-  "read",
-  "reading",
-  "to_read",
-  "wishlist",
-  "dropped",
-]) {
-  if (!statuses.includes(status))
-    throw new Error(`OpenAPI EntryStatus is missing ${status}`);
+// The published vocabularies must exist here, because `src/api/library.ts` mirrors
+// them by hand. **What is in them is not listed here**: a third copy of every
+// domain's statuses would be one more file to edit when a domain is added, and one
+// more place for the vocabulary to drift. `src/api/library.test.ts` pins the client's
+// arrays against these enums, and `backend/tests/test_domain.py` pins the enums
+// against the registry, so the chain runs registry -> enum -> OpenAPI -> client with
+// no hand-maintained list in the middle.
+for (const name of ["EntryStatus", "EntryFormat", "ItemTypeName"]) {
+  if (!components[name]?.enum?.length)
+    throw new Error(`OpenAPI schema ${name} publishes no values`);
 }
 
 console.log("Frontend library types match the checked OpenAPI surface.");

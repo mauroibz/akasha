@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { entryStatuses } from "@/api/library";
+import { entryFormats, entryStatuses, type FieldSpec } from "@/api/library";
 
 /**
  * Validation for the two detail forms. Technical spec section 8 requires schema
@@ -47,7 +47,9 @@ export const opinionSchema = z
     date_started: optionalIsoDate,
     date_finished: optionalIsoDate,
     reread_count: optionalNumber("Rereads must be between 0 and 9999", 0, 9999),
-    shelf_ids: z.array(z.number()),
+    // The union; which of them this entry may hold is its domain's business and is
+    // enforced on the server against the item's own type (DEC-059).
+    formats: z.array(z.enum(entryFormats)),
   })
   .refine(
     (value) =>
@@ -59,22 +61,65 @@ export const opinionSchema = z
 
 export type OpinionValues = z.infer<typeof opinionSchema>;
 
-export const metadataSchema = z.object({
-  title: z.string().trim().min(1, "A book needs a title"),
-  subtitle: z.string(),
-  year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
-  authors: z.string(),
-  creator_sort_override: z.string().max(300, "That is too long to be a name"),
-  publisher: z.string(),
-  language: z.string(),
-  page_count: optionalNumber("Page count must be 1 or more", 1, 100_000),
-  description: z.string(),
-  subjects: z.string(),
-  series: z.string(),
-  original_year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
-});
+export type MetadataValues = Record<string, string>;
 
-export type MetadataValues = z.infer<typeof metadataSchema>;
+/**
+ * The metadata form is built from the field spec the API publishes, not from a list
+ * of book fields typed into this file (DEC-052 seam 3). The four item columns beside
+ * it — title, subtitle, year, and the sort-name override — belong to every domain and
+ * stay here.
+ */
+export function metadataSchema(
+  fields: FieldSpec[],
+): z.ZodType<MetadataValues, MetadataValues> {
+  const shape: Record<string, z.ZodType<string>> = {
+    title: z.string().trim().min(1, "A title is required"),
+    subtitle: z.string(),
+    year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
+    creator_sort_override: z.string().max(300, "That is too long to be a name"),
+  };
+  for (const field of fields) {
+    shape[field.name] =
+      field.type === "number"
+        ? optionalNumber(
+            numberMessage(field),
+            field.minimum ?? 0,
+            field.maximum ?? 9999,
+          )
+        : z.string();
+  }
+  // Zod infers `unknown` for a shape built at runtime; every branch above
+  // produces a string, which is what the form reads and writes.
+  return z.object(shape) as unknown as z.ZodType<
+    MetadataValues,
+    MetadataValues
+  >;
+}
+
+function numberMessage(field: FieldSpec): string {
+  if (
+    field.minimum !== null &&
+    field.minimum !== undefined &&
+    field.minimum > 0
+  )
+    return `${field.label} must be ${field.minimum} or more`;
+  return `${field.label} must be a whole number`;
+}
+
+/** The metadata half of the patch: only the fields this domain declares. */
+export function toMetadataPatch(
+  values: MetadataValues,
+  fields: FieldSpec[],
+): Record<string, unknown> {
+  const patch: Record<string, unknown> = {};
+  for (const field of fields) {
+    const raw = values[field.name] ?? "";
+    if (field.multiplicity === "many") patch[field.name] = splitList(raw);
+    else if (field.type === "number") patch[field.name] = optionalInt(raw);
+    else patch[field.name] = raw || null;
+  }
+  return patch;
+}
 
 /** "Borges, Bioy Casares" -> ["Borges", "Bioy Casares"] */
 export function splitList(value: string): string[] {
@@ -90,8 +135,8 @@ export function optionalInt(value: string): number | null {
 
 /** The manual-entry form on /add: the same rules as the metadata dialog. */
 export const manualBookSchema = z.object({
-  title: z.string().trim().min(1, "A book needs a title"),
-  authors: z.string(),
+  title: z.string().trim().min(1, "A title is required"),
+  creators: z.string(),
   subtitle: z.string(),
   year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
   isbn: z

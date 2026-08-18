@@ -26,7 +26,7 @@ describe("ImportPage", () => {
                 calibre_book_id: "1",
                 calibre_uuid: "uuid-1",
                 title: "Ficciones",
-                authors: ["Jorge Luis Borges"],
+                creators: ["Jorge Luis Borges"],
                 isbn: "9780141187761",
                 suggested_status: null,
                 score: 9,
@@ -95,7 +95,7 @@ describe("ImportPage", () => {
                 row_number: 2,
                 goodreads_book_id: "1",
                 title: "Rayuela",
-                authors: ["Julio Cortázar"],
+                creators: ["Julio Cortázar"],
                 isbn: null,
                 suggested_status: "read",
                 score: 8,
@@ -111,12 +111,13 @@ describe("ImportPage", () => {
                 row_number: 3,
                 goodreads_book_id: "2",
                 title: "Bad date",
-                authors: [],
+                creators: [],
                 isbn: null,
                 suggested_status: null,
                 score: null,
                 score_provisional: false,
                 shelves: [],
+                formats: [],
                 errors: [{ field: "date_read", code: "invalid_date" }],
                 planned_action: "error",
                 match_kind: "new",
@@ -155,7 +156,7 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
     expect(await screen.findByRole("status")).toHaveTextContent(
-      /1 book added/i,
+      /1 entry added/i,
     );
     const commit = requests.find(([input]) => String(input).endsWith("commit"));
     expect(JSON.parse(String(commit?.[1]?.body))).toEqual({
@@ -181,12 +182,13 @@ describe("ImportPage", () => {
               row_number: 2,
               goodreads_book_id: "4",
               title: "Ficciones",
-              authors: ["Borges"],
+              creators: ["Borges"],
               isbn: null,
               suggested_status: null,
               score: null,
               score_provisional: false,
               shelves: [],
+              formats: [],
               errors: [],
               planned_action: "ambiguous",
               match_kind: "ambiguous",
@@ -225,7 +227,7 @@ describe("ImportPage", () => {
     expect(screen.getByRole("button", { name: /import/i })).toBeEnabled();
   });
   it("sends a finished import to the rows it left unsorted", async () => {
-    // The defect: a commit reported "1 book added" and the library showed
+    // The defect: a commit reported "1 entry added" and the library showed
     // nothing, because imports land `unsorted` and the default view hides
     // exactly that. The result panel now says where the rows went.
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
@@ -242,12 +244,13 @@ describe("ImportPage", () => {
                   row_number: 2,
                   goodreads_book_id: "101",
                   title: "Rayuela",
-                  authors: ["Julio Cort\u00e1zar"],
+                  creators: ["Julio Cort\u00e1zar"],
                   isbn: "9788437604572",
                   suggested_status: "read",
                   score: 8,
                   score_provisional: true,
                   shelves: [],
+                  formats: [],
                   errors: [],
                   planned_action: "create_item",
                   match_kind: "new",
@@ -286,7 +289,7 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
     const result = await screen.findByRole("status");
-    expect(result).toHaveTextContent(/7 books are waiting in triage/i);
+    expect(result).toHaveTextContent(/7 entries are waiting in triage/i);
     expect(screen.getByRole("link", { name: /triage/i })).toHaveAttribute(
       "href",
       "/triage",

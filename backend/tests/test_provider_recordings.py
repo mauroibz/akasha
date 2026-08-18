@@ -8,16 +8,15 @@ from __future__ import annotations
 import pytest
 from recordings import recording, redirect_location, replay
 
-from book_tracker.infrastructure.providers import (
+from book_tracker.domains.book.providers import (
     EDITION_CONFIRMED,
     EDITION_CONTRADICTED,
     EDITION_UNVERIFIABLE,
     GoogleBooksProvider,
     OpenLibraryProvider,
-    ProviderPayloadError,
     classify_edition,
-    create_provider_client,
 )
+from book_tracker.infrastructure.providers import ProviderPayloadError, create_provider_client
 
 GOOGLE_RECORDING = "googlebooks_isbn_9788437604572.json"
 
@@ -53,7 +52,7 @@ async def test_fetch_by_isbn_replays_the_real_isbn_redirect_into_a_populated_pay
     assert "/books/9788437604572.json" not in requested
     assert payload.source_id == "OL19845805M"
     assert payload.title == "Rayuela"
-    assert payload.authors == ("Julio Cortázar",)
+    assert payload.creators == ("Julio Cortázar",)
     assert payload.year == 1984
     assert payload.identifiers == {"isbn13": "9788437604572"}
     assert payload.language == "es"

@@ -293,7 +293,7 @@ async def test_backfill_selects_only_items_that_an_isbn_lookup_could_still_help(
             "9780141187761",
             year=1949,
             cover_path="covers/9.jpg",
-            metadata={"authors": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
+            metadata={"creators": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
         )
 
         assert enqueue_enrichment_backfill(engine) == 1
@@ -375,3 +375,34 @@ async def test_backfill_endpoint_reports_how_many_items_were_queued(tmp_path: Pa
 
     assert response.status_code == 202
     assert response.json() == {"queued": 1}
+
+
+@pytest.mark.anyio
+async def test_an_album_is_never_queued_for_enrichment(tmp_path: Path) -> None:
+    """Seam 6: the album domain declares no background enrichment.
+
+    A Goodreads row starts as little more than an ISBN, which is why books enrich. One
+    MusicBrainz release fetch already returns title, date, country, label, catalogue
+    number, language, tracks and the credit — so there is nothing left for a job to
+    fill, and no ISBN to key one on.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        book = create_item_with_isbn(engine, "Rayuela", RECORDED_ISBN)
+        album = create_item_with_isbn(engine, "Kind of Blue", "9788437604573")
+        with engine.begin() as connection:
+            connection.execute(text("UPDATE items SET type='album' WHERE id=:id"), {"id": album})
+
+        queued = enqueue_enrichment_backfill(engine)
+
+        with engine.connect() as connection:
+            payloads = [
+                row[0]
+                for row in connection.execute(
+                    text("SELECT payload FROM jobs WHERE kind='enrich_item'")
+                )
+            ]
+
+    assert queued == 1
+    assert [json.loads(payload)["item_id"] for payload in payloads] == [book]

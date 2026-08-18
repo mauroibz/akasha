@@ -8,7 +8,7 @@ import {
   sampleAnimations,
 } from "./motion";
 import { chooseOption, expectSelected } from "./radix";
-import { entry, pixelCover, seedLibrary } from "./seed";
+import { entry, pixelCover, seedLibrary, stubItemTypes } from "./seed";
 
 interface Box {
   x: number;
@@ -86,10 +86,10 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   expect(Number(await library.getAttribute("data-mounted-count"))).toBeLessThan(
     20,
   );
-  await library.evaluate((element) => {
-    element.scrollTop = 250_000;
-    element.dispatchEvent(new Event("scroll"));
-  });
+  // The page is the scroll container now, so the scale check drives the window.
+  // Deep into a 10,000-entry list, which is where a virtualizer that quietly
+  // stopped virtualizing would show up.
+  await page.evaluate(() => window.scrollTo(0, 250_000));
   await expect
     .poll(async () => Number(await library.getAttribute("data-mounted-count")))
     .toBeLessThan(20);
@@ -110,10 +110,7 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
   await page.getByRole("button", { name: "Table view" }).click();
   const table = page.getByRole("feed", { name: "Library" });
   await expect(page.locator("[data-entry-id]").first()).toBeVisible();
-  await table.evaluate((element) => {
-    element.scrollTop = 120_000;
-    element.dispatchEvent(new Event("scroll"));
-  });
+  await page.evaluate(() => window.scrollTo(0, 120_000));
   await expect
     .poll(async () => Number(await table.getAttribute("data-mounted-count")))
     .toBeLessThan(20);
@@ -123,6 +120,106 @@ test("the deterministic 10,000-entry library mounts only overscanned rows", asyn
     `table 10k: mounted rows=${tableRows} cards=${tableCards} (DEC-023 bounds: <20 rows, <48 cards)`,
   );
   expect(tableCards).toBeLessThan(48);
+});
+
+test("the 10,000-entry library keeps its DOM budget with web results on the page", async ({
+  page,
+}) => {
+  // AC7. Sprint 013 exists because a block whose height the virtualizer does not
+  // know about moved the list out from under it. Web results render *below* the
+  // library, so `scrollMargin` should not move at all -- which is the claim being
+  // checked here rather than assumed.
+  await seedLibrary(page, 10_000);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: Array.from({ length: 6 }, (_, index) => ({
+        source: "openlibrary",
+        source_id: `OL${index}M`,
+        source_refs: [{ source: "openlibrary", source_id: `OL${index}M` }],
+        title: `Web result ${index}`,
+        subtitle: null,
+        creators: ["Someone"],
+        credit: "Someone",
+        year: 1970 + index,
+        cover_url: null,
+        identifiers: {},
+        language: "en",
+        metadata: {},
+      })),
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  const library = page.getByRole("feed", { name: "Library" });
+  const before = await library.boundingBox();
+
+  await page.getByRole("searchbox").fill("something not held");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "From the web" }),
+  ).toBeVisible();
+
+  // The list has not moved, so nothing it measured itself against has.
+  const after = await library.boundingBox();
+  expect(Math.abs(after!.y - before!.y)).toBeLessThan(2);
+
+  // And the DOM budget still holds deep into the list, with the block rendered.
+  await page.evaluate(() => window.scrollTo(0, 250_000));
+  await expect
+    .poll(async () => Number(await library.getAttribute("data-mounted-count")))
+    .toBeLessThan(20);
+  const mountedCards = await page.locator("[data-entry-id]").count();
+  console.log(
+    `grid 10k + web results: mounted cards=${mountedCards} (DEC-023 bound: <48)`,
+  );
+  expect(mountedCards).toBeLessThan(48);
+});
+
+test("web results are a region beside the feed, not rows inside it", async ({
+  page,
+}) => {
+  // AC7's other half. The library carries server-side aria-posinset/aria-setsize
+  // (DEC-038); a screen reader must not hear six provider results announced as
+  // part of a ten-thousand-item feed.
+  await seedLibrary(page, 20);
+  await page.route("**/api/search**", (route) =>
+    route.fulfill({
+      json: [
+        {
+          source: "openlibrary",
+          source_id: "OL1M",
+          source_refs: [{ source: "openlibrary", source_id: "OL1M" }],
+          title: "Web result",
+          subtitle: null,
+          creators: ["Someone"],
+          credit: "Someone",
+          year: 1970,
+          cover_url: null,
+          identifiers: {},
+          language: "en",
+          metadata: {},
+        },
+      ],
+    }),
+  );
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await page.getByRole("searchbox").fill("something not held");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
+
+  const results = page.getByRole("region", { name: "From the web" });
+  await expect(results).toBeVisible();
+  // Not inside the feed, and carrying none of its item semantics.
+  const feed = page.getByRole("feed", { name: "Library" });
+  await expect(feed.getByRole("heading", { name: "From the web" })).toHaveCount(
+    0,
+  );
+  await expect(results.locator("[aria-posinset]")).toHaveCount(0);
+  await expect(results.getByRole("article")).toHaveCount(0);
 });
 
 test("the edition year line is readable at every width, not clipped", async ({
@@ -309,7 +406,11 @@ test("a cover that arrives late shifts nothing in its card", async ({
         items,
         next_cursor: null,
         total: 60,
-        facets: { status_counts: { read: 60 } },
+        facets: {
+          status_counts: { read: 60 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       }),
     });
   });
@@ -363,14 +464,13 @@ test("keyboard guards and reduced motion remain effective", async ({
   await seedLibrary(page);
   await page.goto("/");
   await page.keyboard.press("/");
-  await expect(
-    page.getByRole("searchbox", { name: "Search library" }),
-  ).toBeFocused();
+  const bar = page.getByRole("searchbox", {
+    name: "Search your library, or add something new",
+  });
+  await expect(bar).toBeFocused();
   await page.keyboard.type("a");
-  await expect(page).toHaveURL("/");
-  await expect(
-    page.getByRole("searchbox", { name: "Search library" }),
-  ).toHaveValue("a");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+  await expect(bar).toHaveValue("a");
   const firstRow = page.locator("[data-entry-id='1']");
   await firstRow.focus();
   await page.keyboard.press("j");
@@ -396,7 +496,8 @@ test("keyboard guards and reduced motion remain effective", async ({
   await page.keyboard.press("Escape");
   await page.getByRole("heading", { name: "Akasha" }).click();
   await page.keyboard.press("a");
-  await expect(page).toHaveURL("/add");
+  // `a` focuses the bar instead of navigating: adding happens here now.
+  await expect(bar).toBeFocused();
 });
 
 for (const viewport of viewports) {
@@ -555,9 +656,12 @@ test("a card status listbox is not recycled out from under the reader", async ({
   // Addressed by class, not by role: while the listbox is open Radix marks the
   // rest of the document aria-hidden, so the feed role is deliberately absent
   // from the accessibility tree until it closes.
-  const scroller = page.locator(".library-scroll");
-  const box = (await scroller.boundingBox())!;
-  const centre = { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  // The list no longer scrolls itself, so what must not move under the reader is
+  // the page. Addressed through the viewport rather than the feed role: while the
+  // listbox is open Radix marks the rest of the document aria-hidden, so the feed
+  // is deliberately absent from the accessibility tree until it closes.
+  const viewport = page.viewportSize()!;
+  const centre = { x: viewport.width / 2, y: viewport.height / 2 };
 
   await card.getByRole("combobox").click();
   const listbox = page.getByRole("listbox");
@@ -568,17 +672,23 @@ test("a card status listbox is not recycled out from under the reader", async ({
   await page.mouse.wheel(0, 4000);
   await expect(listbox).toBeVisible();
   await expect(card).toBeVisible();
-  expect(await scroller.evaluate((node) => node.scrollTop)).toBe(0);
+  // The gesture asked for 4000px and the document must not have taken it. Bounded
+  // rather than asserted at exactly zero: with the page as the scroll container,
+  // Radix's scroll lock leaves a measured 2px residual as it swaps body overflow
+  // and compensates the scrollbar gutter. Under the old fixed-height container the
+  // lock held the *container* at exactly 0, which is what this used to assert.
+  // Two pixels is not "recycled out from under the reader"; four thousand is.
+  expect(await page.evaluate(() => window.scrollY)).toBeLessThan(10);
 
   await page.getByRole("option", { name: "Reading", exact: true }).click();
   await expect(listbox).toBeHidden();
   await expectSelected(card.getByRole("combobox"), "Reading");
 
-  // Once it is closed the list scrolls normally again.
+  // Once it is closed the page scrolls normally again.
   await page.mouse.move(centre.x, centre.y);
   await page.mouse.wheel(0, 4000);
   await expect
-    .poll(() => scroller.evaluate((node) => node.scrollTop))
+    .poll(() => page.evaluate(() => window.scrollY))
     .toBeGreaterThan(0);
   expect(pageErrors).toEqual([]);
 });
@@ -657,4 +767,67 @@ test("grid and table views both keep inline editing, navigation and persistence"
     .getByRole("button", { name: /^Open / })
     .click();
   await expect(page).toHaveURL(/\/books\/3$/);
+});
+
+test("the library scrolls with the page and never inside a box", async ({
+  page,
+}) => {
+  // The owner's words: "the main coverart/library scroll does not use the entire
+  // page, it's a window, even though it's the primary thing we are looking at."
+  // The cause was `h-[min(70vh,760px)]` on the virtualizer's scroll container, so
+  // this asserts the shape of the fix rather than the absence of that class: the
+  // feed has nothing to scroll, and the document does.
+  await seedLibrary(page, 10_000);
+  for (const viewport of viewports) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+    const library = page.getByRole("feed", { name: "Library" });
+
+    const overflow = await library.evaluate((node) => ({
+      scrollHeight: node.scrollHeight,
+      clientHeight: node.clientHeight,
+    }));
+    expect(
+      overflow.scrollHeight,
+      `${viewport.name}: the library still has its own scrollbar`,
+    ).toBeLessThanOrEqual(overflow.clientHeight + 1);
+
+    // And the page is what moves instead.
+    await page.mouse.move(viewport.width / 2, viewport.height / 2);
+    await page.mouse.wheel(0, 3000);
+    await expect
+      .poll(() => page.evaluate(() => window.scrollY), {
+        message: `${viewport.name}: the page did not scroll`,
+      })
+      .toBeGreaterThan(0);
+    // The virtualizer is following the window, not sitting still inside it.
+    await expect(page.locator("[data-entry-id='1']")).toBeHidden();
+  }
+});
+
+test("the shell's Library link lands on a library, from the library", async ({
+  page,
+}) => {
+  // The one arrival that does not remount the page: pressing *Library* while
+  // already on it. It points at `/` with no query, so it strips the domain out of
+  // the URL, and every list request names a domain -- which left the reader
+  // looking at "Loading your library…" with nothing coming.
+  // The registry is stubbed rather than proxied: the domain the URL is restored to
+  // is the registry's answer, so a test that leaves it to whatever is listening on
+  // the backend port asserts on that instead.
+  await stubItemTypes(page);
+  await seedLibrary(page, 20);
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+
+  await page.getByRole("link", { name: "Library" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await expect(page.getByText(/loading your library/i)).toHaveCount(0);
+  await expect(page).toHaveURL(/type=book/);
 });

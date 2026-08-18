@@ -1290,3 +1290,450 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Blocked/open: none.
 - Next: Sprint 025 (albums, six seams) is `ready`. **Its first act is to cut a branch from
   `main` (DEC-053)** — nothing else in the protocol changes.
+
+## 2026-08-14 — Sprint 025 (second domain, albums), complete
+- Done: all six seams on branch `sprint-025-albums` (DEC-053), twelve commits `510b2bc`..`07cfaea`,
+  nothing pushed. Seam 2 `IdentityStrategy` (grouping key + source preference), seam 1
+  `authors`→`creators`/`credit` with migration `0012_creators` and source-seeded sort names, seam 3
+  `FieldSpec` served at `GET /api/item-types`, seam 4 CAA covers with the https-per-hop and
+  `.archive.org` fixes, seam 6 no-enrichment plus per-domain URL recognizers, seam 5a status labels,
+  and `MusicBrainzProvider` with its own 1.1 s pacing. DEC-055 and DEC-056 appended.
+- Verified: `validate_project.py`, `make check`, `make test` (387 backend, 106 frontend),
+  `npm run test:e2e` (79 passed, 2 skipped), `make build`, `make smoke-container`, `git diff --check`
+  — all green. Walkthrough in Chromium against the **real dev library** at `127.0.0.1:8123`: it
+  auto-migrated 0011→0012 and wrote `backups/pre-migration-20260814T220529Z` first; added *Kind of
+  Blue* (item 8) and *Discovery* (item 9) as real albums with cover art fetched through the whole CAA
+  redirect chain. `Daft Punk` stored `Daft Punk` and `Miles Davis` stored `Davis, Miles`. Compared
+  every row against the pre-migration backup: no creator or sort name lost, item 3's hand correction
+  carried verbatim.
+- Deviations: checkpoints 5+6 and seams 6+5a merged into single commits; two extra fixture commits;
+  `/api/health/providers` now lists MusicBrainz; shared-surface copy stopped saying "book".
+- Dead ends worth not repeating: **the container cannot run the walkthrough against the dev checkout**
+  — compose runs as uid 10001 and `data/` is owned by the host user, so it dies with "attempt to
+  write a readonly database"; use `make smoke-container` for the container gate and run the app
+  directly for the library walkthrough. **Two MusicBrainz releases can share the group's own
+  `first-release-date`** (mono and stereo *Kind of Blue*), so release selection needs a stable
+  tiebreak or it flips between pressings. `text("... IN :param")` does not expand in SQLAlchemy —
+  build the placeholders. And a blanket `authors`→`creators` rename over the tests will break the
+  migration tests that deliberately seed *old* rows: those must keep the old key.
+- Blocked/open: none. The Goodreads CSV fix (`07cfaea`) came from the walkthrough, not the suite.
+- Next: Sprint 026 (status vocabulary, seam 5b) is `ready` at `docs/sprints/026-status-vocabulary.md`.
+  **Its first deliverable is a question for the owner, not code**: whether `reread_count` and
+  `date_finished` mean anything for an album.
+
+## 2026-08-15 — Sprint 026 (statuses, formats and tracklists), complete
+- Done: seam 5b on branch `sprint-025-albums` (DEC-061, amending DEC-053 for this sprint at the
+  owner's direction), six commits `ebe6827`..`7246134`, nothing pushed. `Domain` declares what an
+  *entry* can be: an ordered status vocabulary with its own labels and triage keys, a default status,
+  which of the passage fields exist, its formats, and the personal panel's heading. Migration
+  `0013_entry_formats` adds the join table **and** rebuilds `entries`. Tracklists landed rather than
+  being deferred. DEC-060 and DEC-061 appended; product spec §3.2/§3.3/§7 and technical spec §5.1/
+  §7.1 updated.
+- Verified: `validate_project.py`, `make check`, `make test` (**411 backend, 110 frontend**),
+  `npm run test:e2e` (**84 passed, 2 skipped**), `make build`, `make smoke-container`,
+  `git diff --check` — all green. Walkthrough in Chromium against the **real dev library** at
+  `127.0.0.1:8123`; it auto-migrated 0012→0013 and wrote `backups/pre-migration-20260815T145406Z`
+  first. Added *Discovery* with **no status in the request** and it landed `owned`; added *Kind of
+  Blue* as `wishlist` and marked it `Vinyl` with neither value moving the other; both fetched cover
+  art through the whole CAA chain. `read` on an album, `owned` on a book, `reread_count` on an album
+  and `borrowed` on an album are each a 422 naming the domain. The album page reads "YOUR COPY" with
+  five tracks `A1`..`B2`; the book page still reads "YOUR READING DATA" with rereads and dates and no
+  tracklist. Triage `o` set the focused album to `owned`. No console errors.
+- Deviations: checkpoints 1 and 3 straddle, because migration 0013 had to carry both the new table
+  and the `entries` rebuild. A `rows` field is deliberately **not** hand-editable. Two MusicBrainz
+  fixtures were re-recorded in their own commit (`9821d30`) because the adapter's own request
+  changed. The dev library's three albums were deleted rather than migrated, per the owner, after a
+  backup to `backups/pre-sprint026-20260815T142246Z`.
+- Dead ends worth not repeating: **a dynamically built `StrEnum` is opaque to mypy** — spell the
+  published unions out and pin them to the registry with a test instead. **SQLAlchemy does not
+  reflect SQLite CHECK constraints**, so a batch rebuild that relies on reflection silently drops
+  every one of them; `copy_from` with the table spelled out is the only safe form. **Ctrl+A selects
+  every triage row without focusing one**, so a per-domain hotkey map must fall back to the
+  selection's own vocabulary or the keyboard dies on a select-all. And the frontend's registry
+  helpers must tolerate a partial or odd-shaped `/api/item-types` response: several tests mock every
+  URL with one body, and a helper that trusted the shape took the whole page down.
+- Blocked/open: none. **The two defects the suite could not see were both found by the walkthrough**
+  — a shared status counted once across domains, and `digital` listed twice in the format filter.
+- Next: Sprint 027 (library shell and shelves) is `ready` at
+  `docs/sprints/027-library-shell-and-shelves.md`. **Its first act is a question for the owner**:
+  whether the domain tab defaults to all or to the last domain used.
+
+## 2026-08-15 — Sprint 027 (library shell and shelves), complete
+- Done: the three owner-feedback items from 2026-08-14 (roadmap items 1, 4, 5), on branch
+  `sprint-025-albums` at the owner's direction (DEC-063, amending DEC-053 as DEC-061 did for 026).
+  Four commits `80fea5f`..`531f38f` plus the closing one, nothing pushed. A `type` filter on
+  `GET /api/entries` with a published `ItemTypeName` union and `type` in `_filter_key`; a domain tab
+  strip rendered from `GET /api/item-types`, defaulting to the last domain used; the library
+  virtualizing against the window instead of a fixed-height box; inline shelf editing on the detail
+  page with create-on-type, out of `OpinionDialog`. DEC-062 and DEC-063 appended; product spec §7
+  and technical spec §7.1/§7.2/§8 updated. Sprint 028 expanded into its own file.
+- Verified: `validate_project.py`, `make check`, `make test` (**414 backend, 120 frontend**),
+  `npm run test:e2e` (**86 passed, 2 skipped**), `make build`, `make smoke-container`,
+  `git diff --check` — all green. Walkthrough in Chromium against the **real dev library** at
+  `127.0.0.1:8123`, backed up to `backups/pre-sprint027-20260815T154413Z` first. Tabs render
+  `All / Book / Album`; Album gives two records, one chip row without the redundant heading, and a
+  format selector holding no `Physical`; "All" keeps both grouped rows and the flat five-format
+  union. The choice survives a reload and a return from a detail page. The feed has **0px of inner
+  scroll** at 375/768/1440 with 1/2/4 columns while the document scrolls and nothing overflows
+  sideways; six presses of `j` moved focus to entry 11 and scrolled the window to 341px with the row
+  fully in view. *Cien años de soledad* onto a brand-new shelf in one control with no dialog and no
+  navigation; two triage rows onto "Work" in bulk, `entry_count` 1 → 3. No console or page errors.
+- Deviations: **AC6 rested on a false premise.** It asserted that bulk shelf assignment "still works
+  in triage"; `add_shelves` existed on the endpoint and was tested, but no control ever sent it, and
+  product spec §7 line 671 said so. Building it was the owner's call at planning time. No shelf
+  control on a library card — the sprint named that as where scope grows and the owner chose detail
+  plus triage instead. `EntryFilter` deliberately did **not** gain `type`: triage has no domain tab
+  and the bulk path already refuses a selection spanning domains.
+- Dead ends worth not repeating: **`offsetTop` is the wrong scroll margin** — it walks a chain of
+  offset parents the motion wrapper interrupts, so read `getBoundingClientRect().top + window.scrollY`
+  instead, and observe `document.body` as well as the list, because the chips above it reflow without
+  the list's own size ever changing. **cmdk points its input's `aria-labelledby` at the element its
+  `label` prop renders**, which beats an `aria-label` on the input itself, so the input had no
+  accessible name until the name was given to `Command`; there is no `Command.Label` in this version
+  to render one by hand. **jsdom has no `ResizeObserver`** and cmdk constructs one on mount, so the
+  test setup shims it. And `libraryQueryString` puts `sort`/`order`/`limit` first, so a test
+  asserting `"/api/entries?type=album"` is asserting the parameter order, not the filter.
+- Blocked/open: none. One flaky failure seen once — `triage animates its action bar but not under
+  reduced motion` failed in a single full-file run and passed alone and in every subsequent run
+  including the full suite. Motion sampling timing, not a regression, but worth watching.
+- Observed and out of scope: the header Inbox badge and each domain's `unsorted` chip both read
+  "Inbox", so three buttons on `/` share that label — correct in each place, ambiguous together.
+  `/triage` still scrolls inside `h-[min(70vh,760px)]`; that is deliberate for a dense working table
+  and was left. The walkthrough created a shelf "Latin American" on item 6 and added two books to
+  "Work"; both left in place as realistic test data.
+- Next: Sprint 028 (the domain contract) is `ready` at `docs/sprints/028-the-domain-contract.md`.
+  **It is gated**: Phase A writes the contract and a conformance suite and changes nothing
+  user-visible, and Phase A concluding that little is misplaced is a complete outcome.
+
+## 2026-08-15 — Sprint 027, second pass (the add flow), complete
+- Done: the owner tried the closed sprint and reported the add screen, and directed it folded into
+  this sprint rather than scheduled — so 027 was reopened, the way 020 was for its Phase B. Three
+  commits `762ed70`..`d722135` plus the closing one. `GET /api/search/preview`; the confirm screen
+  rendering everything the search already returned, from the domain field spec; notes, formats and
+  the domain's passage fields on `POST /api/entries`, validated against the item's own domain before
+  the write; the create-on-type shelf control moved to `features/shelves` and shared with the add
+  screen; one closed `FormatPicker` shared by the add screen and the opinion dialog. DEC-064
+  appended; product spec §7 and technical spec §7.1 updated.
+- Verified: `make check`, `make test` (**419 backend, 126 frontend**), `npm run test:e2e`
+  (**86 passed, 2 skipped**), `validate_project.py` — all green. Walkthrough against the real dev
+  library and **live providers** at `127.0.0.1:8123`: a MusicBrainz search showed year and artist
+  credit instantly with zero preview requests; *Load full details* spent exactly one and added
+  label, catalogue number, country, format and track count, after which the button is gone. A record
+  offers notes and formats and no dates or reread count; a book offers all of them. Added *Rayuela*
+  with a brand-new shelf, notes, `physical`, a finished date and 2 rereads in one action — entry 17,
+  everything persisted, publisher and page count fetched. No console or page errors.
+- Deviations: the measurement changed the design. The owner asked "do we already have the data?" and
+  the answer is **partly** — identity yes, description/tracklist no, and there is no provider
+  response cache — so it is a button rather than an effect, and the fork was put to the owner with
+  that cost stated (DEC-064).
+- Dead ends worth not repeating: **a `TabsTrigger` with no `TabsContent` behind it is a critical axe
+  failure** — `aria-controls` points at an element that does not exist. A single-choice filter is a
+  radio group, which is what `AddPage` already used for the very same choice. **`Command`'s `label`
+  prop is the only way to name a cmdk input** in this version; there is no `Command.Label`. And
+  **`make format` runs prettier over the tests**, so a scripted edit matching a pre-format string
+  silently no-ops — two of my own verification edits did exactly that and made a test look like it
+  bit when it did not. Assert on every replacement, and re-check that a new test fails for the
+  reason claimed *after* formatting.
+- Blocked/open: none. **Two defects the unit tests could not see, each caught by the gate built for
+  it**: the axe suite caught the tab strip's dangling `aria-controls`, and the walkthrough caught
+  `Language` rendered twice on a real MusicBrainz record, because both domains declare it as a field
+  while the candidate also carries a column of that name.
+- Observed and out of scope: the walkthrough left entry 17 (*Rayuela*, 2000 Alfaguara edition) and a
+  shelf "Rayuelas" in the dev library. The library now holds 10 entries.
+- Next: Sprint 028 (the domain contract) is `ready`. **Gated**: Phase A writes the contract and a
+  conformance suite and changes nothing user-visible, and concluding that little is misplaced is a
+  complete outcome.
+
+## 2026-08-15 — Sprint 028 planning pass, and Phase A (in progress)
+- Done: re-derived Sprint 028's baseline from the code rather than 027's summary, since the file said
+  to (`4cb28f8`, DEC-066). Rewrote the sprint's objective, baseline, deliverables and acceptance
+  criteria around the finding; repaired three stale references while reading (ROADMAP still headed
+  the per-domain-imports contract "Sprint 029" after DEC-065 renumbered it 030; WORKFLOW still named
+  028 as the final sprint; HANDOFF's "no `type === "album"` branch anywhere" was silent about the
+  three `itemType === "book"` branches on the add screen). Then Phase A: the conformance suite
+  (`afbf5ff`) and the contract plus both verdicts (`a35c027`). Three owner decisions were taken at
+  planning time and are DEC-066: 028 runs on this branch, the frozen CHECK constraint is a costed
+  finding rather than pre-authorized work, and the contract prescribes a per-domain code home.
+- Verified: `make format`, `make check`, `make test` (460 backend, 129 frontend), `npx playwright
+  test` (86 passed, 2 skipped), `make build`, `make smoke-container`, `git diff --check`,
+  `validate_project.py`. **The suite was shown to bite against a registered domain, not only against
+  its fixtures**: removing `pending`'s hotkey from `ALBUM_STATUSES` failed
+  `[album-statuses_are_a_usable_vocabulary]` and renaming `track_count` to `year` failed
+  `[album-fields_are_described_completely]`; both injected, observed, reverted. The recognizer repair
+  was exercised against the running app on the real dev library with live providers: `http://[` is
+  now 422 with the actionable message rather than 502, an ISBN still resolves, a real MusicBrainz
+  release-group URL still resolves with its tracklist, no errors in the log.
+- Deviations: **AC6 (Phase A changes nothing user-visible) was broken deliberately and once.** The
+  suite failed on its first run against both shipped domains — `urlsplit` raises on `http://[`, and
+  because `resolve_input` asks each domain in turn, the first recognizer to raise denied every domain
+  after it its turn. That is one domain breaking another's add box, which is the exact failure this
+  epic exists to prevent, so it was repaired here rather than costed: a shared `split_url`, plus
+  isolation in the loop. Recorded in DEC-067 and the sprint Outcome.
+- Dead ends worth not repeating: under **vitest, `import.meta.url` is the dev server's URL, not a
+  file path** — `readFileSync(new URL(...))` fails with "The URL must be of scheme file"; read from
+  `process.cwd()` instead. `ruff` will not wrap a long f-string inside an `assert` message, so the
+  100-column limit has to be met by splitting the literal by hand. And `make format` runs prettier
+  over everything, so re-run the focused test *after* formatting rather than before.
+- Blocked/open: **the Phase B gate.** DEC-067 orders it — per-domain packages, `provider_health`
+  derived from the registry, the cover chooser declared per domain, then dropping
+  `ck_entries_status` as a separate schema change — and it runs only on an explicit owner
+  go-ahead. Nothing else is open.
+- Observed and out of scope: resolving a "Kind of Blue" release-group URL returns the Swiss Blues
+  Authority record, which is the arbitrary release selection already on record rather than a
+  regression. The dev library is now 13 entries — the owner has been adding albums since 027 closed.
+- Next: put the Phase B gate to the owner with DEC-067's costed table. On a go-ahead, start with the
+  per-domain packages; on a no, close Sprint 028 with Phase A as the complete outcome.
+
+## 2026-08-15 — Sprint 028 Phase B, and the sprint closed (complete)
+- Done: the owner authorized **all four** DEC-067 items at the gate. Ran smallest-first rather than in
+  DEC-067's order, so the package move was the tail that could be handed forward if it ran long
+  (DEC-069 records the departure). `acbbbbf` provider_health from the registry; `47ac1bc`
+  `Domain.chooses_covers` and the chooser hidden where it cannot work; `ff94c7f` migration
+  `0014_status_is_the_domains`; `82fb11c` `domains/book/` and `domains/album/` with `domain/spec.py`
+  and `domain/registry.py` behind them; `fa67410` the adapters and importers into their packages;
+  `12dd7fc` the smoke script's module path. DEC-069 appended; technical spec 2, 5.1 and 6.6 updated.
+- Verified: `make check`, `make test` (**469 backend, 130 frontend**), `npx playwright test` (86
+  passed, 2 skipped), `make build`, `make smoke-container`, `git diff --check`, `validate_project.py`.
+  Walkthrough on the **real dev library with live providers** in a browser at `localhost:5199`:
+  migration 0014 ran on the real database after writing `backups/pre-migration-20260815T223017Z`,
+  `ck_entries_status` is gone from the live schema and `ck_entries_score` is not; the album detail
+  page no longer offers *Choose a cover* and the book page still does (screenshots taken);
+  cover-candidates answers `not_supported` for all three album items; an Open Library book search
+  returned 18 results and a MusicBrainz album search 20 from their new homes; an album's status went
+  `owned` → `wishlist` → `owned` with no CHECK behind it and `read` was still refused with "Album has
+  no status named 'read'". No console errors, no server errors.
+- Deviations: Phase A broke AC6 once, deliberately — the recognizer repair turns a malformed paste
+  from 502 into 422. Phase B reordered DEC-067's list. Both recorded.
+- Dead ends worth not repeating: **a scripted import rewrite must be indentation-aware** — three
+  function-local imports were rewritten at column 0 and ruff refused to parse the file. **`make
+  format` reflows a long import back into a parenthesised block**, so a follow-up `sed` matching the
+  single-line form silently no-ops; this is the second sprint to hit that. And **a migration that
+  imports the live registry is a bug even when it passes**: `0013` rendered its CHECK from
+  `ALL_STATUSES` at run time, so two installs a month apart could build different constraints.
+- Blocked/open: none. Two couplings remain **by decision** (DEC-067 rows 2 and 4): the hand-spelled
+  published unions and the central cover-host allowlist.
+- Observed and out of scope: the library tab strip still reads `All | Book | Album`; DEC-065 removes
+  "All" in Sprint 029. The walkthrough left album entry 16 back at `owned` where it started.
+- Next: Sprint 029 (one search bar) is `ready` at `docs/sprints/029-one-search-bar.md`. It rebuilds
+  `/` around a single bar and removes "All" as a filter.
+
+## 2026-08-15 — Sprint 028 third pass (documentation), sprint closed again (complete)
+- Done: the owner asked, before closing, that the docs convey the new structure. Reopened 028 rather
+  than scheduling it (DEC-070; same precedent as 020 and 027). New: `docs/guides/adding-a-domain.md`
+  (three ASCII diagrams, a nine-row job table, step-by-step against `domains/album/`, what you get
+  free, what you may never touch, the IGDB worked verdict), `CONTRIBUTING.md`, `docs/README.md` (the
+  map, labelling every document canonical/historical/proposal). Updated: README gains a Domains
+  section and a docs pointer; AGENTS.md gains the domain boundary as an invariant and the map as
+  required reading; product spec §2 table and §9; ROADMAP's Sprint 030 contract paths; status headers
+  on `assessment.md`, `domain-architecture-proposal.md`, `domain_metadata_roadmap_report.md`.
+  **Nothing deleted** — a historical doc is dated, not wrong. Commit `f7569fa`.
+- Verified: **the guide was tested by following it.** Built a throwaway `game` domain from the guide
+  alone — own package, three fields, `playing`/`finished` statuses, own formats, identity strategy —
+  registered it, and ran everything: conformance suite green (56), **480 backend tests green, no
+  migration needed**. The only legitimate gate failure was OpenAPI drift, which is a documented step.
+  Then removed the domain and re-ran: `make check`, `make test` (469 backend, 130 frontend) green.
+- Deviations: **two documentation defects from earlier in this sprint were found and repaired** —
+  technical spec 6.6 still said the per-domain layout was "not yet inhabited" (a Phase B edit lost
+  because a second `write_text` in the same script used the pre-edit string), and product spec §9
+  still said the registry would be extracted later and that games/series were Sprints 027/028.
+- Dead ends worth not repeating: **two `p.write_text(t.replace(...))` calls in one script silently
+  discard the first edit** unless `t` is reassigned between them. That is how the spec regression
+  shipped. Assert on the file afterwards, not on the return value.
+- Blocked/open: none.
+- Observed and out of scope: four other `{"book", "album"}` assertions were checked and deliberately
+  left — they assert over rows the test itself seeded, which is correct and not closed-world.
+- Next: Sprint 029 (one search bar) is `ready`. It rebuilds `/` around a single bar and removes "All"
+  as a filter.
+
+## 2026-08-15 — Assessment answered, plan revision 12 (no sprint active work)
+- Done: wrote `docs/domain-expansion-assessment.md` at the owner's request — what the domain work
+  proved (a throwaway third domain passed everything with five shared lines and no migration), the
+  structural limit of that proof (the conformance suite cannot check whether the *contract* is
+  sufficient, and both domains are the same shape), one rewrite risk (a flat entry blocks serial
+  domains) and six additive gaps, with costed options. The owner answered the same day: **DEC-071**.
+  Sprint 029 gains deliverable 6 (chrome copy neutrality, 18 strings, listed with the rule and an
+  acceptance criterion); **entry depth becomes Sprint 030, Phase A only**, carrying the owner's
+  one-level/provider-shaped hypothesis and the tracklist precedent; per-domain imports moves to
+  **031**; `FINAL_SPRINT` 30 → 31; plan revision **12**.
+- Verified: `python scripts/validate_project.py` and `make check` green. No code changed.
+- Deviations: the assessment recommended depth *before* 029; the owner resequenced it after, and the
+  decision records why that is the better call. It also rejected the implicit premise that the music
+  release should wait for a third domain — a release waits for a feature, not a validation exercise,
+  and DEC-071 corrects that drift in how "gated" was being used.
+- Dead ends worth not repeating: renumbering an unbuilt sprint is cheap **only** because it has no
+  file and nothing closed depends on it (the DEC-065 precedent). The two forward references inside
+  the closed Sprint 028 file were corrected visibly — naming the old number and the decision — rather
+  than silently rewritten, which is what `AGENTS.md` actually forbids.
+- Blocked/open: **merging and releasing the album work is an owner action and is now unblocked.**
+  Nothing else.
+- Next: Sprint 029 (one search bar, now with copy neutrality) is `ready`.
+
+## 2026-08-16 — Sprint 029 (in progress: all code and verification done, docs pending)
+- Done, before the sprint: reviewed the ready sprint file against the code and
+  corrected it (`8d877a3`). The copy inventory claimed eighteen strings across eight
+  files while its own table listed nineteen across nine, and it missed `HomePage`'s
+  empty state and `NotFoundPage` entirely — `HomePage` being the screen the sprint
+  rebuilds. AC9 was a prose claim that could never reach zero without renaming
+  `manualBookSchema`/`ManualBookValues`; it is a runnable command with stated
+  exclusions now. The `AbortController` and the stale-response guard joined the
+  functionality inventory as rows 12 and 13. `WORKFLOW.md`'s final-sprint rule still
+  said Sprint 030 / revision 11 while citing `FINAL_SPRINT`, which DEC-071 moved to 31.
+- Done, the sprint: six commits. `397da78` removes "All" and makes the list query wait
+  for the registry; `a174842` extracts `AddForm` and `ResultsGrid` and adds `labelFor`;
+  `7c94cb4` builds the unified bar, the settled-and-empty rule, the web-results region
+  and the add dialog; `47e0b4d` leaves `/add` to manual entry and moves its tests;
+  `de12294` is copy neutrality; `97b4c34` is the AC7 gates and the keyboard rule;
+  `d845317` is the walkthrough fix.
+- Verified: 469 backend + 146 frontend tests, 90 e2e (2 skipped), `make check`,
+  `make build`, `make smoke-container` all green. **The quota rule was verified by
+  counting requests against live providers**, not by inspection: a title I own costs
+  0 provider requests; one I do not costs exactly 1; the same string retyped costs 0;
+  **Add** on a query with local hits costs 1; a pasted ISBN takes
+  `/api/search/resolve`. AC7 re-run with a web-results block: 28 mounted cards against
+  DEC-023's bound of 48, and the list's bounding box does not move when the block
+  appears — results render *below* the list, so `scrollMargin` never changes.
+- Deviations, and the one that matters: **AC7 says "with a web-results block above
+  it" while deliverable 3 and the accepted proposal both say results render *below*
+  the library.** Below is what shipped, because deliverable 3 is the specification
+  and the proposal's diagram agrees with it; the AC's "above" is an incidental phrase.
+  The consequence is that the Sprint 013 class of bug is avoided by construction
+  rather than survived — recorded here rather than quietly.
+  Also: `/add` lost its domain chooser. `LibraryService.add` types a manual item as
+  `DEFAULT_DOMAIN.item_type` whatever the client sends (DEC-067 row 6), so the old
+  chooser showed a record's statuses and fields and then wrote a book.
+  Also: deliverable 6 needed **no new `Domain` field**. One neutral placeholder
+  naming title, creator, ISBN and link serves every domain, and the resolve path it
+  advertises is domain-neutral anyway. The backend contract is untouched after all.
+- Dead ends worth not repeating: **do not `git checkout <file>` to undo a mutation
+  test.** It reverted uncommitted work twice — once losing the `data-web-results`
+  attribute and the results-grid label change, once restoring "Add a book" to the
+  library's empty state after the copy pass. AC9's grep is what caught the second;
+  copy the file to the scratchpad and copy it back instead.
+- Walkthrough gate, against the real dev library and live providers (Open Library,
+  Google Books, MusicBrainz): everything above, plus adding a record and a book from
+  `/` with notes, format and a created shelf, and the duplicate path (200, "Already in
+  your library", navigates to `/books/17`). **It found one defect, now fixed
+  (`d845317`)**: adding from `/` closed the dialog onto a library still filtered by
+  the query that had just missed, so the new entry was created and highlighted where
+  nothing could see it. The old flow got this free by navigating to an unfiltered `/`.
+  One transient **502 on an album add** (MusicBrainz at add time); the identical retry
+  returned 201. Not a sprint regression — the add path is unchanged — but worth
+  watching.
+- Dev library state: **16 entries, up from 13.** The walkthrough added *The Left Hand
+  of Darkness* (19), *Selected Ambient Works 85–92* (20), *Kid A* (21) and *OK
+  Computer* (22), and created a shelf named *Walkthrough* (id 5). Left in place rather
+  than deleted; the pre-walkthrough database is at
+  `backups/pre-sprint029-20260816T042730Z/books.db` if the owner wants it back.
+- Blocked/open: none.
+- Next: **documentation only.** Product spec section 7 still describes `/add` as the
+  place you search; technical spec sections 7.1/8 describe the two debounces; a
+  decision entry is owed for the settled-and-empty rule as built, the `/add` domain
+  chooser removal, the below-not-above resolution and the no-new-`Domain`-field
+  outcome. Then the sprint `Outcome`, the ROADMAP impact review, `state.json`,
+  `HANDOFF.md`, and the `docs(sprint-029): close sprint and hand off` commit.
+
+## 2026-08-17 — Sprint 029 closed (complete), Sprint 030 ready
+- Done: the documentation close the previous session left, and nothing else — no
+  application code was touched. Product spec section 7 now describes `/` as the screen
+  you search and add from (one bar, one domain, results below, the confirm step as a
+  dialog) and `/add` as manual entry with no domain chooser and why; its Interaction
+  notes carry the `a`-focuses-the-bar change and the focus rule for `j`/`k`. Technical
+  spec 7.1 names the two searches, what each costs, and that which one a keystroke
+  reaches is a frontend rule; section 8 carries the firing rule clause by clause, the
+  two-regions rule, the below-not-above reason and the shortcut rule. **DEC-073**
+  records all four open items: the firing rule as built (three clauses DEC-065's
+  sentence did not have), results below rather than above, `/add` losing its domain
+  chooser, and deliverable 6 needing no new `Domain` field. Sprint 029's Outcome,
+  the ROADMAP impact review, `docs/README.md`'s proposal row, `state.json` and
+  `HANDOFF.md` follow, plus `docs/sprints/030-entry-depth.md` expanded from the
+  template.
+- Verified: `make test` re-run at the close — **469 backend, 146 frontend**, the same
+  counts the implementation session recorded. `python scripts/validate_project.py`
+  green. AC9's grep re-run: **two lines, both JSX comment continuations** in
+  `HomePage.tsx`, nothing that reaches a screen. `make check`, `git diff --check`
+  green. The container was rebuilt and run for the owner to look at.
+- Deviations: none from the plan. The one thing worth naming is that the previous
+  session's note about "technical spec sections 7.1 and 8 describing the two
+  debounces" was approximate — neither section stated a debounce value; section 8
+  had one generic line about search being debounced and cancellable. The rule is
+  written there now rather than corrected there.
+- Blocked/open: none. **Sprint 030 is Phase A only and gated** — it ends with a
+  verdict and a question to the owner, not with an implementation.
+- Next: **the merge (DEC-072)**, which is an owner action. `sprint-025-albums` goes
+  into `main` with two things in the same merge: `README.md`'s feature copy stops
+  being book-only, and `docs/operations/release-notes-v1.2.md` is written following
+  the v1 and v1.1 precedent. Neither was written on this branch, because the handoff
+  is explicit that the copy changes when the branch merges and not before. After
+  that, claim Sprint 030.
+
+## 2026-08-17 — Sprint 029 second pass (complete), Sprint 030 ready again
+- Done: five owner-reported UI defects, found by using what 029 built against the
+  real library. `d130fa0` a `long_text` field spans both columns of the confirm step
+  (split on the declared type, mirroring `DetailPage`'s `inlineFields`/`blockFields`,
+  not on the name "description"); `e746c32` the search bar clears in one press —
+  box, `q` and web results together, refocusing the box, sharing one function with
+  the successful-add path; `cc38640` an active query with no rows gets one line
+  instead of the tall empty state; `84c2ec7` the status chips become a fourth filter
+  beside sort/shelf/format, built on `FormatPicker`'s popover shape because the
+  filter is multi-valued; `4007e89` Files becomes its own region on the detail page
+  at the weight of *Edit opinion*. Then product spec §7, **DEC-074**, the sprint's
+  *Second pass* Outcome, and this close.
+- Verified: every change test-first, each new test observed failing for its own
+  reason first. `make check`, `make test` (**469 backend, 153 frontend**, seven new),
+  `npx playwright test` (**90 passed, 2 skipped**), `make build`,
+  `make smoke-container`, `git diff --check`, validator — green. Walkthrough against
+  the real dev library in the container with live providers and a screenshot of each
+  of the five: real counts in the status panel (Read 9, To read 2), one and two
+  statuses reaching the URL, *Neuromancer* producing the compact line and no tall
+  empty state, the clear control emptying box + URL + results and returning focus,
+  the description measured at 588px of a 622px panel, and `/books/19` showing Files
+  as its own region with exactly one attach button. No console errors.
+- **Trap worth not rediscovering: stop the container before running e2e.** The dev
+  server proxies `/api` to `localhost:8000`, so a container left running there
+  answers every request a spec forgot to stub — with the real dev library.
+  `add-detail.spec.ts`'s stagger test then clicks a real *Rayuela* card instead of
+  the web result and fails, three runs in a row, looking exactly like a regression.
+  It reproduces against the pre-pass source, which is how it was told apart from one.
+- Deviations: none. Two judgement calls are in DEC-074 rather than left in the code:
+  the status counts moved inside the panel (and if they turn out to be read
+  constantly, the fix is to surface them in the trigger, not to bring the row back),
+  and the empty state is suppressed during a query rather than deleted, with one
+  line rather than nothing because the settle rule waits ~800 ms and a page that
+  goes blank in that gap reads as broken.
+- Blocked/open: none.
+- Next: unchanged by this pass — **the merge (DEC-072)**, an owner action, carrying
+  `README.md`'s feature copy and `docs/operations/release-notes-v1.2.md` with it.
+  Then claim Sprint 030.
+
+## 2026-08-17 — Sprint 029 second pass, follow-on repair (complete)
+- Done: one defect the owner found reviewing the second pass. **The shell's
+  *Library* link, pressed while already on the library, left the page saying
+  "Loading your library…" with nothing coming.** The link is `/` with no query, so
+  it strips `type` out of the URL; every list request names a domain since 029's
+  deliverable 2, and the restore that supplies one ran once per mount — correct for
+  every arrival that remounts the page and wrong for the only one that does not.
+  The restore now answers to the URL lacking a `type`, whenever that happens;
+  writing the value back is its own guard against repeating, so the `restoredDomain`
+  ref is gone rather than replaced.
+- **Recorded in DEC-074 and in 029's second-pass Outcome rather than by reopening
+  the sprint a third time.** `WORKFLOW.md` has no `completed → in_progress`
+  transition; the repair is small, closed, tested and part of the same review.
+  State stays at 030 `ready` and the sprint stays `completed` — this was not done
+  with the sprint open, and the record says so.
+- Verified: reproduced against the running container first (`/` → 11 cards,
+  *Library* → 0 cards and the loading state), then fixed and re-checked — the URL
+  keeps `?type=book`, the eleven cards stay, three presses running are stable, the
+  **remembered** domain comes back (Records after choosing Records, five cards), and
+  the ordinary arrival from `/shelves` is unchanged. No console errors. Held by a
+  unit test that clicks a `Link` to `/` beside the mounted page and an e2e test
+  through the real shell; **the e2e test was mutated against the old guard and
+  observed failing** before being kept. `make check`, `make test` (469 backend,
+  **154** frontend), `npx playwright test` (**91 passed**, 2 skipped),
+  `git diff --check`, validator — green.
+- Deviations: none. Worth naming for the next agent: the first version of the new
+  e2e test passed alone and failed in the suite, because it left `/api/item-types`
+  unstubbed and so asserted against whatever answers `localhost:8000` — the same
+  proxy trap as before, in its other form. It stubs the registry now.
+- Blocked/open: none.
+- Next: unchanged — **the merge (DEC-072)**, an owner action, carrying `README.md`'s
+  feature copy and `docs/operations/release-notes-v1.2.md`. Then Sprint 030.

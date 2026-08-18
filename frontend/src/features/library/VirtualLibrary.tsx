@@ -1,4 +1,4 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
@@ -6,6 +6,8 @@ import { CoverImage } from "@/components/CoverImage";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
 import type { LibraryEntry } from "@/api/library";
+import { formatLabels, statusesFor } from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import {
   gridColumnCount,
   gridLayout,
@@ -40,6 +42,8 @@ function EntryControls({
   entry: LibraryEntry;
   stretch?: boolean;
 }) {
+  // One cached request for the whole session, shared with every other row.
+  const itemTypes = useItemTypes();
   return (
     <div
       className="flex h-11 shrink-0 items-center gap-2"
@@ -50,6 +54,7 @@ function EntryControls({
         value={entry.status}
         onValueChange={(status) => onStatus(entry, status)}
         label={`Status for ${entry.item.title}`}
+        statuses={statusesFor(entry.item.type, itemTypes.data)}
         // In a card the select absorbs the free width so it can never push the
         // score control past the card edge.
         className={stretch ? "h-9 min-w-0 flex-1" : "h-9 w-auto"}
@@ -84,7 +89,7 @@ function EntryMetadata({
       <p
         className={`text-sm text-muted-foreground ${grid ? "mt-1 line-clamp-2" : "truncate"}`}
       >
-        {entry.item.sort_author ?? "Unknown author"}
+        {entry.item.creator ?? "Unknown creator"}
       </p>
       {/* A grid card is 260px wide and gives its metadata column 88px once the
           fixed cover and the padding are subtracted, so "Edition year: 2015 ·
@@ -111,7 +116,34 @@ function EntryMetadata({
           </>
         ) : null}
       </p>
+      <FormatBadges entry={entry} />
     </div>
+  );
+}
+
+/**
+ * How you hold this copy, read straight off the row.
+ *
+ * "Filter to owned and see how" is one filter plus this: without it the answer is
+ * on the detail page, one click per record, which is not an answer to "sort by
+ * owned and see where I own it" (DEC-059).
+ */
+function FormatBadges({ entry }: { entry: LibraryEntry }) {
+  const itemTypes = useItemTypes();
+  if (!entry.formats?.length) return null;
+  const labels = formatLabels(itemTypes.data);
+  return (
+    <p className="mt-1 flex flex-wrap gap-1" data-card-formats="">
+      <span className="sr-only">Formats: </span>
+      {entry.formats.map((format) => (
+        <span
+          key={format}
+          className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px] leading-4 text-muted-foreground"
+        >
+          {labels[format] ?? format}
+        </span>
+      ))}
+    </p>
   );
 }
 
@@ -120,29 +152,42 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   const navigate = useNavigate();
   const isGrid = props.view !== "table";
   const [containerWidth, setContainerWidth] = useState(0);
+  // How far down the document the list starts. The window virtualizer measures
+  // the viewport, so it needs to know what sits above the list — the header, the
+  // controls, the chips — or every row is placed that far too high.
+  const [scrollMargin, setScrollMargin] = useState(0);
 
   useLayoutEffect(() => {
     const element = parentRef.current;
     if (!element) return;
-    const measure = () => setContainerWidth(element.clientWidth);
+    const measure = () => {
+      setContainerWidth(element.clientWidth);
+      // Read against the document rather than the viewport: `offsetTop` walks a
+      // chain of offset parents that the motion wrapper can interrupt, and this
+      // number has to stay right while the page is scrolled.
+      setScrollMargin(element.getBoundingClientRect().top + window.scrollY);
+    };
     measure();
     if (typeof ResizeObserver === "undefined") return;
+    // The chips and the filter row above the list reflow, which moves the list's
+    // start without ever changing its own size — so the body is observed too.
     const observer = new ResizeObserver(measure);
     observer.observe(element);
+    observer.observe(document.body);
     return () => observer.disconnect();
   }, []);
 
   const columns = isGrid ? gridColumnCount(containerWidth) : 1;
   const rowHeight = isGrid ? gridRowHeight : tableRowHeight;
   const rowCount = Math.ceil(props.entries.length / columns);
-  const virtualizer = useVirtualizer({
+  const virtualizer = useWindowVirtualizer({
     count: rowCount,
-    getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
     // A grid row mounts `columns` cards, so it uses a smaller overscan to keep
     // the mounted-DOM budget comparable to the table.
     overscan: isGrid ? 2 : 4,
     getItemKey: (index) => props.entries[index * columns]?.id ?? index,
+    scrollMargin,
     initialRect: { width: 1000, height: 640 },
   });
   const virtualItems = virtualizer.getVirtualItems();
@@ -261,7 +306,11 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   return (
     <div
       ref={parentRef}
-      className="library-scroll mt-5 h-[min(70vh,760px)] overflow-y-auto overflow-x-hidden rounded-2xl bg-surface/40"
+      // No height and no overflow: the page scrolls, not the grid. The owner's
+      // report was that the primary surface was a window inside the page, and the
+      // fixed height was the whole of it. `overflow-x-hidden` stays, because a
+      // wide card must not push the document sideways.
+      className="library-scroll mt-5 overflow-x-hidden rounded-2xl bg-surface/40"
       role="feed"
       aria-label="Library"
       aria-busy={props.isFetchingNextPage}
@@ -288,7 +337,9 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               key={row.key}
               style={{
                 height: row.size,
-                transform: `translateY(${row.start}px)`,
+                // Positions from the window virtualizer are document-relative, so
+                // the list's own offset comes back off to place a row inside it.
+                transform: `translateY(${row.start - scrollMargin}px)`,
               }}
             >
               <div
@@ -316,7 +367,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
       </div>
       {props.isFetchingNextPage && (
         <p role="status" className="sr-only">
-          Loading more books
+          Loading more
         </p>
       )}
     </div>

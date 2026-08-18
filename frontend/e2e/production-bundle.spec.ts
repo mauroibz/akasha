@@ -31,8 +31,6 @@ test.describe("production bundle", () => {
     // already evaluated: that ordering is what a cyclic split breaks.
     await page.getByRole("link", { name: /add/i }).first().click();
 
-    await expect(
-      page.getByRole("searchbox", { name: /search books/i }),
-    ).toBeVisible();
+    await expect(page.getByLabel(/^title$/i)).toBeVisible();
   });
 });

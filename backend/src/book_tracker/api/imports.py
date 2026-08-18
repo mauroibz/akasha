@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field
 
 from book_tracker.application.imports import CalibreImportService, GoodreadsImportService
 from book_tracker.application.library import LibraryError
-from book_tracker.domain.calibre import CalibreError
-from book_tracker.domain.goodreads import GoodreadsCSVError
+from book_tracker.domains.book.calibre import CalibreError
+from book_tracker.domains.book.goodreads import GoodreadsCSVError
 
 router = APIRouter(prefix="/api/import", tags=["imports"])
 enrichment_router = APIRouter(prefix="/api/enrichment", tags=["enrichment"])
@@ -24,7 +24,7 @@ class ImportRecordResponse(BaseModel):
     calibre_book_id: str | None = None
     calibre_uuid: str | None = None
     title: str
-    authors: list[str]
+    creators: list[str]
     isbn: str | None
     suggested_status: str | None
     score: int | None

@@ -3,9 +3,11 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import type { FieldSpec } from "@/api/library";
 import {
   deleteEntry,
   getEntry,
+  getItemTypes,
   patchEntry,
   patchItem,
   refreshItem,
@@ -31,12 +33,102 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
-import { optionalInt, splitList } from "@/features/detail/schemas";
-import { statusLabels } from "@/features/library/labels";
+import { ShelfPicker } from "@/features/shelves/ShelfPicker";
+import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
+import {
+  choosesCovers,
+  entryPanelLabel,
+  formatLabels,
+  hasEntryField,
+  statusLabelFor,
+} from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
 /** One term/definition pair, addressable by name instead of by CSS adjacency. */
+/**
+ * A metadata value rendered from what its domain says it is, rather than from a
+ * branch on the item's type: an album has no page count and a book has no label,
+ * and neither screen should know the other's vocabulary (DEC-052 seam 3).
+ */
+function formatFact(value: unknown, field: FieldSpec): string {
+  if (field.multiplicity === "many")
+    return Array.isArray(value) && value.length ? value.join(", ") : "—";
+  if (value === null || value === undefined || value === "") return "—";
+  return String(value);
+}
+
+/** A duration in milliseconds as a listener reads it: 9:22, or 1:02:11.
+ *
+ * Truncated rather than rounded, which is what every player does: a 3:32.5 track
+ * reads 3:32 on the sleeve and on the display, and rounding it up to 3:33 would
+ * disagree with both.
+ */
+function duration(value: unknown): string {
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0)
+    return "";
+  const total = Math.floor(value / 1000);
+  const parts = [Math.floor(total / 60) % 60, total % 60];
+  if (total >= 3600) parts.unshift(Math.floor(total / 3600));
+  return parts
+    .map((part, index) =>
+      index ? String(part).padStart(2, "0") : String(part),
+    )
+    .join(":");
+}
+
+/**
+ * An ordered list of structured rows — a tracklist — rendered from the columns its
+ * domain declares rather than from anything this screen knows about music.
+ *
+ * A tracklist is metadata on the album, not a set of child entities: it is read,
+ * never opened, and nothing hangs off a track (Sprint 025 non-scope, still true).
+ */
+function RowsField({ field, value }: { field: FieldSpec; value: unknown }) {
+  const rows = Array.isArray(value) ? value : [];
+  // Absent and empty are the same thing, so a book gains no empty tracklist and
+  // neither does a release with no recordings.
+  if (!rows.length || !field.columns?.length) return null;
+  const columns = field.columns;
+  return (
+    <section
+      className="mt-6 rounded-xl border border-border p-5"
+      aria-label={field.label}
+    >
+      <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
+        {field.label}
+      </h2>
+      <ol className="mt-4 grid gap-1" data-rows={field.name}>
+        {rows.map((row, index) => {
+          const cells = (row ?? {}) as Record<string, unknown>;
+          return (
+            <li
+              key={index}
+              className="flex items-baseline gap-3 border-b border-border/40 py-1 last:border-0"
+            >
+              {columns.map((column) => (
+                <span
+                  key={column.name}
+                  data-column={column.name}
+                  className={
+                    column.name === "title"
+                      ? "min-w-0 flex-1 truncate text-foreground"
+                      : "shrink-0 tabular-nums text-sm text-muted-foreground"
+                  }
+                >
+                  {column.type === "duration"
+                    ? duration(cells[column.name])
+                    : String(cells[column.name] ?? "")}
+                </span>
+              ))}
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 function Fact({
   name,
   label,
@@ -74,6 +166,14 @@ export function DetailPage() {
     queryFn: getShelves,
     retry: false,
   });
+  // The fields belong to the item's domain and change with a deployment, not with
+  // an edit, so they are fetched once and shared by the facts panel and the dialog.
+  const itemTypes = useQuery({
+    queryKey: ["item-types"],
+    queryFn: getItemTypes,
+    retry: false,
+    staleTime: Infinity,
+  });
   const update = useMutation({
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => {
@@ -92,17 +192,32 @@ export function DetailPage() {
   // here. Radix Dialog owns them now, so the hand-rolled versions are gone
   // rather than left to fight it.
 
-  if (detail.isPending) return <p role="status">Loading book detail…</p>;
-  if (!detail.data) return <p role="alert">Book detail could not be loaded</p>;
+  if (detail.isPending) return <p role="status">Loading detail…</p>;
+  if (!detail.data) return <p role="alert">Detail could not be loaded</p>;
   const entry = detail.data;
   const item = entry.item;
+  const fields =
+    itemTypes.data?.find((type) => type.id === item.type)?.fields ?? [];
+  const inlineFields = fields.filter(
+    (field) =>
+      field.type !== "long_text" &&
+      field.type !== "rows" &&
+      field.name !== "creators",
+  );
+  const blockFields = fields.filter((field) => field.type === "long_text");
+  // An ordered list of structured rows is neither a fact nor a paragraph, so it
+  // gets its own region rather than being joined into one line (a tracklist).
+  const rowFields = fields.filter((field) => field.type === "rows");
+  const editableFields = fields.filter((field) => field.type !== "rows");
+  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+    hasEntryField(item.type, itemTypes.data, field);
 
   async function handleDelete() {
     setDeleteError("");
     try {
       await deleteEntry(entry.id);
       void cache.invalidateQueries({ queryKey: ["library"] });
-      toast.success("Book removed from your library");
+      toast.success("Removed from your library");
       navigate("/");
     } catch (e) {
       // Reported inside the dialog, which is still open and still covering the
@@ -113,13 +228,22 @@ export function DetailPage() {
     }
   }
 
+  /**
+   * Create a shelf and hand it back, so the caller can put this entry on it
+   * without a second trip through the UI.
+   *
+   * The error is re-thrown as well as reported: the picker has to know the shelf
+   * does not exist, or it would go on to assign an id it never received.
+   */
   async function handleCreateShelf(name: string) {
     try {
-      await createShelf(name);
+      const created = await createShelf(name);
       void cache.invalidateQueries({ queryKey: ["shelves"] });
       toast.success(`Shelf "${name}" created`);
+      return created;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Shelf could not be created");
+      throw e;
     }
   }
 
@@ -143,13 +267,18 @@ export function DetailPage() {
               aria-label="No cover"
             />
           )}
-          <Button
-            variant="secondary"
-            className="mt-3 w-full"
-            onClick={() => setDialog("cover")}
-          >
-            Choose a cover
-          </Button>
+          {/* Asked of the domain, not branched on the type: the chooser is Open
+              Library's work-editions path, and an album has no work and no
+              editions, so the control could only ever say no (DEC-067 row 7). */}
+          {choosesCovers(item.type, itemTypes.data) && (
+            <Button
+              variant="secondary"
+              className="mt-3 w-full"
+              onClick={() => setDialog("cover")}
+            >
+              Choose a cover
+            </Button>
+          )}
           <div className="mt-3 block text-sm">
             <Label htmlFor="replace-cover">Replace cover</Label>
             <Input
@@ -176,27 +305,29 @@ export function DetailPage() {
             <p className="text-lg text-muted-foreground">{item.subtitle}</p>
           )}
           <p className="mt-2 text-foreground">
-            {item.sort_author ?? "Unknown author"}
+            {item.creator ?? "Unknown creator"}
           </p>
           <p className="text-sm text-muted-foreground">
             Edition year: {item.year ?? "unknown"}
-            {item.metadata.original_year &&
+            {typeof item.metadata.original_year === "number" &&
             item.metadata.original_year !== item.year
               ? ` · Originally published: ${item.metadata.original_year}`
               : ""}
           </p>
 
-          {/* Personal reading region */}
+          {/* The personal region. Its heading is the domain's: an album's entry
+              records possession rather than reading, so "Your reading data" over a
+              record was seam 5a showing through (DEC-057). */}
           <section
             className="mt-6 rounded-xl border border-border p-5"
-            aria-label="Your reading data"
+            aria-label={entryPanelLabel(item.type, itemTypes.data)}
           >
             <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
-              Your reading data
+              {entryPanelLabel(item.type, itemTypes.data)}
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
               <Fact name="status" label="Status">
-                {statusLabels[entry.status]}
+                {statusLabelFor(item.type, itemTypes.data, entry.status)}
               </Fact>
               <Fact name="score" label="Score">
                 <span
@@ -216,17 +347,42 @@ export function DetailPage() {
                   </span>
                 )}
               </Fact>
-              <Fact name="started" label="Started">
-                {entry.date_started ?? "—"}
+              <Fact name="formats" label="Format">
+                {(entry.formats ?? [])
+                  .map(
+                    (format) => formatLabels(itemTypes.data)[format] ?? format,
+                  )
+                  .join(", ") || "—"}
               </Fact>
-              <Fact name="finished" label="Finished">
-                {entry.date_finished ?? "—"}
-              </Fact>
-              <Fact name="rereads" label="Rereads">
-                {entry.reread_count}
-              </Fact>
+              {has("date_started") && (
+                <Fact name="started" label="Started">
+                  {entry.date_started ?? "—"}
+                </Fact>
+              )}
+              {has("date_finished") && (
+                <Fact name="finished" label="Finished">
+                  {entry.date_finished ?? "—"}
+                </Fact>
+              )}
+              {has("reread_count") && (
+                <Fact name="rereads" label="Rereads">
+                  {entry.reread_count}
+                </Fact>
+              )}
+              {/* Editable where it is read. The owner's complaint was distance:
+                  shelf membership lived inside a dialog named after something
+                  else, and creating a shelf was a whole route. */}
               <Fact name="shelves" label="Shelves">
-                {entry.shelves.map((s) => s.name).join(", ") || "—"}
+                <ShelfPicker
+                  current={entry.shelves}
+                  available={shelves.data ?? []}
+                  onChange={async (shelfIds) => {
+                    await update.mutateAsync(() =>
+                      patchEntry(entry.id, { shelf_ids: shelfIds }),
+                    );
+                  }}
+                  onCreate={handleCreateShelf}
+                />
               </Fact>
             </dl>
             {entry.notes && (
@@ -254,6 +410,20 @@ export function DetailPage() {
             </div>
           </section>
 
+          {/* Files, at the weight of the thing it is.
+              It was a small outline button in the corner of Edition facts, which
+              is where a footnote goes, not where an attachment goes: what is
+              attached to an edition is the edition's, but *attaching* one is
+              something the reader does, like editing an opinion. Its own region,
+              between the two, keeps the control beside the list it produces --
+              which putting the button under the cover would not. */}
+          <section
+            className="mt-6 rounded-xl border border-border p-5"
+            aria-label="Files"
+          >
+            <Attachments itemId={item.id} />
+          </section>
+
           {/* Edition facts region */}
           <section
             className="mt-6 rounded-xl border border-border p-5"
@@ -263,18 +433,11 @@ export function DetailPage() {
               Edition facts
             </h2>
             <dl className="mt-4 grid grid-cols-2 gap-4">
-              <Fact name="publisher" label="Publisher">
-                {item.metadata.publisher || "—"}
-              </Fact>
-              <Fact name="language" label="Language">
-                {item.metadata.language || "—"}
-              </Fact>
-              <Fact name="pages" label="Pages">
-                {item.metadata.page_count ?? "—"}
-              </Fact>
-              <Fact name="series" label="Series">
-                {item.metadata.series || "—"}
-              </Fact>
+              {inlineFields.map((field) => (
+                <Fact key={field.name} name={field.name} label={field.label}>
+                  {formatFact(item.metadata[field.name], field)}
+                </Fact>
+              ))}
               <Fact name="identifiers" label="Identifiers">
                 {Object.entries(item.identifiers).map(([k, v]) => (
                   <span key={k} className="block text-sm">
@@ -296,32 +459,24 @@ export function DetailPage() {
                 {!item.sources.length && "—"}
               </Fact>
             </dl>
-            {item.metadata.subjects && item.metadata.subjects.length > 0 && (
-              <div className="mt-4">
-                <p className="text-xs text-muted-foreground">Subjects</p>
-                <p className="mt-1 text-foreground">
-                  {item.metadata.subjects.join(", ")}
-                </p>
-              </div>
-            )}
-            {item.metadata.description && (
-              <div className="mt-4">
-                <p className="text-xs text-muted-foreground">Description</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">
-                  {item.metadata.description}
-                </p>
-              </div>
-            )}
-            <div className="mt-5">
-              <Attachments itemId={item.id} />
-            </div>
+            {blockFields.map((field) => {
+              const value = formatFact(item.metadata[field.name], field);
+              return value === "—" ? null : (
+                <div key={field.name} className="mt-4">
+                  <p className="text-xs text-muted-foreground">{field.label}</p>
+                  <p className="mt-1 whitespace-pre-wrap text-foreground">
+                    {value}
+                  </p>
+                </div>
+              );
+            })}
             <div className="mt-5 flex flex-wrap gap-3">
               <Button
                 variant="outline"
                 className="rounded-full px-5"
                 onClick={() => setDialog("metadata")}
               >
-                Edit book metadata
+                Edit metadata
               </Button>
               <Button
                 variant="outline"
@@ -332,6 +487,14 @@ export function DetailPage() {
               </Button>
             </div>
           </section>
+
+          {rowFields.map((field) => (
+            <RowsField
+              key={field.name}
+              field={field}
+              value={item.metadata[field.name]}
+            />
+          ))}
         </section>
       </div>
 
@@ -339,7 +502,6 @@ export function DetailPage() {
         open={dialog === "opinion"}
         onOpenChange={(open) => setDialog(open ? "opinion" : null)}
         entry={entry}
-        shelves={shelves.data ?? []}
         onSave={(values) =>
           update
             .mutateAsync(() =>
@@ -347,15 +509,22 @@ export function DetailPage() {
                 status: values.status,
                 score: values.score,
                 notes: values.notes,
-                date_started: values.date_started || null,
-                date_finished: values.date_finished || null,
-                reread_count: Number(values.reread_count || 0),
-                shelf_ids: values.shelf_ids,
+                formats: values.formats,
+                // Sent only by a domain that has them. The server refuses a reread
+                // count on a record with a 422, and it is right to (DEC-057).
+                ...(has("date_started")
+                  ? { date_started: values.date_started || null }
+                  : {}),
+                ...(has("date_finished")
+                  ? { date_finished: values.date_finished || null }
+                  : {}),
+                ...(has("reread_count")
+                  ? { reread_count: Number(values.reread_count || 0) }
+                  : {}),
               }),
             )
             .then(() => undefined)
         }
-        onCreateShelf={handleCreateShelf}
       />
 
       <CoverDialog
@@ -373,6 +542,11 @@ export function DetailPage() {
         open={dialog === "metadata"}
         onOpenChange={(open) => setDialog(open ? "metadata" : null)}
         item={item}
+        // A `rows` field is read here and not edited: correcting a tracklist by
+        // hand is a table editor, and the sprint that added the field type
+        // deliberately did not also build one. `Refresh from provider` is the way
+        // a wrong tracklist gets fixed today.
+        fields={editableFields}
         onSave={(values) =>
           update
             .mutateAsync(() =>
@@ -382,17 +556,7 @@ export function DetailPage() {
                 year: optionalInt(values.year),
                 creator_sort_override:
                   values.creator_sort_override.trim() || null,
-                metadata: {
-                  ...item.metadata,
-                  authors: splitList(values.authors),
-                  publisher: values.publisher,
-                  language: values.language,
-                  page_count: optionalInt(values.page_count),
-                  description: values.description || null,
-                  subjects: splitList(values.subjects),
-                  series: values.series || null,
-                  original_year: optionalInt(values.original_year),
-                },
+                metadata: toMetadataPatch(values, fields),
               }),
             )
             .then(() => undefined)
@@ -434,12 +598,10 @@ export function DetailPage() {
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>
-              Remove this book from your library?
-            </AlertDialogTitle>
+            <AlertDialogTitle>Remove this from your library?</AlertDialogTitle>
             <AlertDialogDescription>
               Your score, status, notes, and shelf assignments will be deleted.
-              The book metadata and cover remain cached so re-adding is instant.
+              The metadata and cover remain cached so re-adding is instant.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (

@@ -58,7 +58,7 @@ def populated_data_dir(tmp_path: Path) -> Path:
             year=1963,
             cover_path="covers/1.jpg",
             identifiers="{}",
-            metadata_json=json.dumps({"authors": ["Julio Cortázar"]}),
+            metadata_json=json.dumps({"creators": ["Julio Cortázar"]}),
             created_at=NOW,
             updated_at=NOW,
         )
@@ -118,7 +118,7 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
         "covers": 1,
         "attachments": 0,
     }
-    assert result.manifest["alembic_revision"] == "0011_creator_sort_names"
+    assert result.manifest["alembic_revision"] == "0014_status_is_the_domains"
     verify_backup(result.path)
 
 

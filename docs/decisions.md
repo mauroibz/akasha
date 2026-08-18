@@ -1514,3 +1514,945 @@ Append-only record of material architecture choices, product-default resolutions
   what backups are for (DEC-039, DEC-040). Should a future sprint want a self-contained archive, it
   is an additive `?include=attachments` variant rather than a format change, because the reference
   block already names every blob it would need to carry.
+
+## DEC-055 — Every seam was cut where section 4 said, and the two that moved are named
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 025's eleventh acceptance criterion requires that a seam cut somewhere other
+  than `docs/domain-architecture-proposal.md` section 4 describes is written up — **and that a clean
+  run reports that too, because silence is not evidence.** This is that entry.
+- **Decision:** **The six seams landed where section 4 put them.** Albums are searched, added,
+  covered, listed, opened and edited beside books with no book vocabulary anywhere in the path, and
+  none of the three tripwires fired:
+
+  - `identity_key` lifted out of `merge_and_rank` without dragging the ranking signals with it. What
+    it needed beside it was the **source preference**: `_merge_group` picked the `openlibrary` row as
+    a group's primary by name, which is the same question — who wins a merge — and belongs to the
+    same strategy. That is a refinement of seam 2, not a relocation.
+  - **Keyset pagination, `CursorState`, the job runner, the import ledger, undo, backup, attachments
+    and shelves needed no change at all**, exactly as section 4 predicted. A mixed library was walked
+    one row at a time past page 1 on four sorts to prove it. The one adjacent question — a stale
+    `sort=sort_author` cursor after the rename — needed no version bump either, because
+    `decode_cursor` already rejects a cursor whose sort key does not match the query.
+  - No seventh seam was needed.
+
+  **Two things sat slightly wide of where section 4 drew them, and both are recorded here rather
+  than smoothed over:**
+
+  1. **Seam 4 reaches one hop further than "upgrade the scheme before validating".** The Cover Art
+     Archive answers `http://` in its JSON *and* in every redirect hop — measured live on
+     2026-08-14: `coverartarchive.org` 307s to an `http://archive.org` URL, which 302s to an
+     `http://dn710907.ca.archive.org` URL. Upgrading only the URL the JSON supplies fails on the
+     second hop, so the upgrade is applied at every hop, and the allowlist gained a `.archive.org`
+     subdomain rule rather than another literal host.
+  2. **Seam 3 reaches the detail page and the export, not only the dialog.** Section 4 said the field
+     spec drives "the metadata dialog, the detail page's display order, and the export's
+     human-readable half", and the walkthrough proved the last part is load-bearing: with two domains
+     present the Goodreads CSV was emitting albums as books. The CSV is one domain's export view and
+     is now restricted to it; the entity-shaped JSON beside it still carries every type.
+- **Consequences.** Sprint 027's falsifiable prediction stands: games should need no seam albums did
+  not. The seam model is now proved by two domains rather than argued from one, and the parts of it
+  that turned out to be under-specified were both *narrower* than expected rather than wider — which
+  is the failure direction DEC-052 chose deliberately when it rejected Strategy B.
+
+## DEC-056 — Metadata responses stopped inventing empty defaults
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** `ItemResponse.metadata` was a Pydantic model with `default_factory=list` on its list
+  fields, so an item with no subjects was served `"subjects": []` whether or not the row held one.
+  Seam 3 replaced that model with the opaque object the row actually stores.
+- **Decision:** **The API serves the metadata that exists and nothing else.** An absent field is
+  absent, not an empty list. Clients treat a missing key and an empty value the same way, which the
+  frontend already did.
+- **Consequences.** This matches the rule Sprint 024 set for the export — `metadata` passes through
+  untransformed — so the two surfaces no longer disagree about what an item holds. A client that
+  relied on the defaults would see a shape change; the only client is this repository's frontend, and
+  a test pins the behaviour.
+
+## DEC-057 — An album's status records possession, not consumption
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Context:** Sprint 026's first deliverable is the product question DEC-052 deferred until two
+  domains existed: whether `reread_count` and `date_finished` mean anything for an album. The owner
+  answered it while trying Sprint 025's albums in the running application, before the sprint was
+  activated.
+- **Decision, in the owner's words:** album statuses should be **wishlist / pending / owned** rather
+  than read/reading/read, and **a relisten counter makes no sense**.
+
+  This is a larger answer than the question asked, and worth naming as such: it says an album's
+  status is not a *consumption* state at all. A book moves to-read → reading → read, and that
+  progression is the thing being tracked. An album is played hundreds of times or twice, and the
+  interesting fact is whether you have it. So **status is a per-domain concept, not merely a
+  per-domain vocabulary** — which is what seam 5b was always for, and confirms the split DEC-052
+  made rather than complicating it.
+
+  Consequences that follow directly:
+
+  - `reread_count` is not shown or stored for albums, and `date_started` / `date_finished` go with
+    it: they date a passage through a book that an album does not have.
+  - The **score and the note carry the opinion** for an album, which they already do for books. The
+    entry model does not need a new field to express "I have listened to this and I think it is
+    an 8".
+  - `unsorted` stays universal, because imports land there whatever the domain.
+- **Open, and for Sprint 026 to settle with the owner rather than to assume:** the owner also wants
+  **format tags — CD / Digital / Vinyl for albums, physical / borrowed / digital for books.** Those
+  overlap with `owned`: a record of "I have this on vinyl" already asserts possession. Either
+  - **(a)** status is possession (`wishlist` / `pending` / `owned`) and format is a property of the
+    copy, which double-encodes ownership in two places that can disagree; or
+  - **(b)** format tags *are* the possession record — having one means you own it — and status keeps
+    a lighter consumption shape (`pending` / `listened`), which is fewer concepts but makes
+    "wishlist" mean "no format tag yet", an absence rather than a state.
+
+  **(a) is the recommendation**, because a status that can only be inferred from the absence of a tag
+  is not legible on a card, and the walkthrough showed the status control is the thing the eye lands
+  on. But this is a product judgement and the sprint must put it to the owner before building either.
+- **Consequences.** Sprint 026's deliverable 1 changes from *ask the question* to *settle the
+  ownership/format overlap*, which is a smaller and better-posed question. Books are untouched: their
+  statuses, rereads and dates keep their present meaning, and no existing entry is remapped.
+
+## DEC-058 — This plan line ends at the domain contract; further domains are epics
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Supersedes:** the sprint 027/028 assignments in DEC-052, which put games and series inside this
+  plan. It does not disturb DEC-052's architecture, which was validated exactly as intended.
+- **Context:** Sprint 025 existed to find out whether a second domain was affordable. It was: all six
+  seams landed where they were drawn and no tripwire fired (DEC-055). The owner's conclusion from
+  running it is that **the experiment answered its question, and the plan should now finish music,
+  polish what exists, and stop** — rather than spending its remaining sprints proving the same point
+  twice more with games and series.
+- **Decision.** **Plan revision 11.** The line ends with four sprints:
+
+  | Sprint | What it closes |
+  |---|---|
+  | 026 | Statuses, formats and tracklists — music finished as a domain |
+  | 027 | Library shell and shelves — the polish pass on the screen the owner actually uses |
+  | 028 | The domain contract: what a domain must supply, and a conformance suite that proves it |
+  | 029 | Per-domain imports: the pipeline stops being book-only |
+
+  **Sprints 028 and 029 are the gate.** Their purpose is that a third domain becomes an *epic on top
+  of a contract* rather than a sprint inside this plan: each domain encapsulated enough that
+  `calibre → books`, `spotify → music` and `steam → games` can be built in parallel by different
+  hands without touching each other or the core. `FINAL_SPRINT` moves 28 → 29 in
+  `scripts/validate_project.py`.
+
+  **Games and series leave the numbered plan** and become future epics. DEC-052's falsifiable
+  prediction — that games need no seam albums did not — is not abandoned; it becomes the first thing
+  the conformance suite in 028 is written to check, which is a better test of it than another
+  bespoke sprint would have been.
+- **Consequences.** The project reaches `complete` at the end of 029 rather than 028. Auth is
+  unaffected and remains unscheduled (product spec section 9): it gates *exposure*, not domains, and
+  nothing here changes that. A domain epic started after 029 inherits a written contract and a test
+  suite it must pass, instead of six seams it must infer from how albums happened to be built.
+
+## DEC-059 — Ownership is an entry-level format tag, not a status and not a shelf
+
+- **Date:** 2026-08-14
+- **Status:** accepted
+- **Answers:** the question DEC-057 left open.
+- **Context:** DEC-057 settled that an album's status records possession, and named one unresolved
+  overlap: if a record is tagged `Vinyl`, the tag has already asserted ownership. The owner wants
+  **both** readings supported: *"I can sort by owned and see where/how I own it"*, and *"mark
+  something as wishlist → vinyl, so I can schedule my next purchase."* They also drew a boundary
+  around shelves: those are **a higher tier of organization — "work", "fiction"** — and formats are
+  not that.
+- **Decision.** **Status and format are independent axes, and a format is a property of your copy.**
+
+  A wishlist entry can carry `Vinyl` — the format you *intend* to buy — and an owned entry carries
+  the format you actually have. Neither implies the other, so nothing is double-encoded and
+  "wishlist → vinyl" is expressible, which option (b) in DEC-057 could not do.
+
+  **It hangs on the entry, not the item.** An album's `format` from MusicBrainz describes *a release*
+  — that Kind of Blue was pressed on 12" vinyl in 1959. Your copy might be a reissue, a CD or a
+  stream. Those are different facts and the existing model already separates them: items hold shared
+  edition facts, entries hold what is true for you.
+
+  **Multi-valued**, because owning a record on vinyl *and* digital is ordinary — vinyl frequently
+  ships with a download code — and because turning one value into many later is a migration.
+
+  Costed against the alternatives:
+
+  | | Shape | For | Against | Verdict |
+  |---|---|---|---|---|
+  | **A** | A `format` column on `entries` | One migration, trivial to sort and filter | Single-valued; vinyl-plus-digital needs a migration later | Rejected — the limitation is the common case |
+  | **B** | Reuse shelves with a naming convention | No new machinery at all | Collapses the owner's explicit distinction: shelves are "work"/"fiction", not "vinyl" | Rejected on the owner's boundary |
+  | **C** | JSON array on the entry | No new table | Filtering and counting need a projection; the same problem `metadata` already has | Rejected |
+  | **D** | An `entry_formats` join table, vocabulary per domain from the registry | Multi-valued; filter and facet reuse the shelf query patterns exactly; the vocabulary is a domain's to declare, like its statuses | One migration and one new table | **Accepted** |
+
+  **Shelves' mechanism is reused; shelves' meaning is not.** The join, the slug, the facet count and
+  the bulk-assign path are proven and get copied. The control is its own, the vocabulary is closed
+  and per-domain (`Vinyl`/`CD`/`Digital` for albums, `Physical`/`Borrowed`/`Digital` for books)
+  rather than free text, and nothing renders a format as a shelf.
+- **Consequences.** Sprint 026 carries this. "Sort by owned and see how" is a status filter plus the
+  format on the card; "schedule my next purchase" is filtering `wishlist` by format. The closed
+  vocabulary lives on `Domain` beside `fields` and the statuses, so a future domain declares its own
+  — and the conformance suite in Sprint 028 gains one more thing to check.
+
+## DEC-060 — Seam 5b, as built: what a domain declares about its entries
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Implements:** DEC-057 and DEC-059. Records the three judgements Sprint 026 was told to surface
+  rather than settle silently, and the two things the build found that the plan did not.
+- **Decision.** `Domain` now declares what an *entry* on it can be, not only what an item is: an
+  ordered status vocabulary carrying its own labels and triage keys, the default a newly added entry
+  takes, which of `date_started` / `date_finished` / `reread_count` exist, its formats, and the
+  heading over the personal region of the detail page. `status_labels` is gone — a label lives on the
+  status it names.
+
+  The three open judgements, answered by the owner on 2026-08-15:
+
+  1. **Filter chips are one row per domain**, each under that domain's name, rather than a single
+     union row. A library holding books and records has no one status vocabulary, and "Read" beside
+     "Owned" with nothing saying which is which reads as one confused list. This survives Sprint
+     027's domain tabs, which scope the rows to one at a time.
+  2. **No status migration.** The album domain has never left this branch, so the only album entries
+     that existed were three walkthrough rows in the dev library. They were deleted and re-added
+     rather than remapped, and a test seeds one entry per book status *before* the change and reads
+     all six back (Sprint 026 AC3).
+  3. **A field a domain does not have is refused on write with a 422**, not merely hidden. Hiding
+     leaves the API, the importers and the export able to store a reread count on a record — a value
+     nothing can ever mean.
+
+- **What the build found that the plan did not:**
+
+  - **`entries` carried the six book statuses as a CHECK constraint.** Seam 5b was book-shaped one
+    layer *below* the API as well. Migration `0013_entry_formats` rebuilds the table with the
+    constraint widened to the union of every domain's vocabulary. It still catches a typo; it cannot
+    express the real rule, which depends on the joined item's type. SQLite cannot alter a CHECK in
+    place, and SQLAlchemy does not reflect SQLite CHECK constraints at all, so the rebuild spells the
+    table out rather than relying on reflection — a reflected rebuild would have silently dropped
+    every check.
+  - **The add path had one default status for every domain.** It asks the domain now: a book is
+    added `read`, a record `owned`.
+  - **A track carries two numbers.** `position` is the sequential index and `number` is what is
+    printed — `A1`, `A2` on a record. They are different strings in the same response, and the
+    printed one is what a person reads off the sleeve, so it is what is stored.
+  - **The walkthrough found two defects the suite could not**, which is the gate working as intended:
+    a status two domains share was counted once and shown in both rows, and `digital` — declared by
+    books and records both — appeared twice in the format filter under one value. `status_counts` is
+    now split by item type beside the whole-library total, and the format list is flat.
+
+- **Deliberately not built.** A `rows` field is not editable by hand: correcting a tracklist is a
+  table editor, and `Refresh from provider` is the repair path until somebody needs more. Sprint 028
+  inherits the `rows` field type as one more thing its conformance suite must describe.
+- **Consequences.** A third domain now declares its statuses, its default, its formats, its entry
+  fields and its panel copy, and no screen branches on which domain it is holding. `EntryStatus` and
+  `EntryFormat` remain published unions for the parameters that legitimately span domains — a filter,
+  a facet — and a test pins them to the registry so a domain cannot add a value the API surface
+  forgets.
+
+## DEC-061 — Sprint 026 ran on the Sprint 025 branch
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Amends:** DEC-053 for this sprint only.
+- **Context:** DEC-053 says a domain-line sprint cuts its branch from `main`. Sprint 025 closed on
+  `sprint-025-albums` and has not been merged, because merging is the owner's decision and the branch
+  exists precisely so that it is one.
+- **Decision.** The owner directed Sprint 026 to run on `sprint-025-albums`. Cutting from `main`
+  would have produced a branch with no album domain in it, and every acceptance criterion of this
+  sprint is about albums.
+- **Consequences.** Both sprints' work is on one branch and still unpushed. The merge decision is
+  unchanged and still the owner's; it now covers 025 and 026 together.
+
+## DEC-062 — The library selects a domain, and the tab remembers
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Answers:** the question Sprint 027 was told to put to the owner rather than settle silently,
+  plus the facet rule the build found underneath it.
+- **Context:** Sprint 025 left `GET /api/entries` with no `type` filter on purpose — its AC4 asked
+  only that a mixed library paginate correctly, which it does. The owner then reported the other
+  half from the running application: *"the main library should really have a tab selector to choose
+  between domains, there is no point in showing books and albums combined."* What needed deciding
+  was only the default: every domain, or the last one used.
+- **Decision.** **The last domain used**, remembered in `localStorage` under
+  `akasha.library.domain` beside the existing grid/table preference, starting at "All" until a tab
+  is chosen. The value is written into the URL once on mount and read from the URL from then on, so
+  the choice is an ordinary filter for every purpose after that: a reload, a return from a detail
+  page and a shared link all behave without the preference being consulted again, and an explicit
+  `?type=` beats what was remembered.
+
+  "All" was the alternative and it is not wrong — it keeps today's behaviour and makes the tabs
+  optional. It was rejected because a person with four hundred books and thirty records is
+  overwhelmingly in one of them at a time, and the cost of the wrong default is one click on every
+  visit forever.
+
+  **The strip renders from `GET /api/item-types`**, like every other domain-shaped control since
+  DEC-052 seam 3, and only when the build has more than one domain — a book-only build has no tab
+  strip rather than a strip with one tab.
+
+  **The chips keep DEC-060 judgement 1.** Under "All" they stay one row per domain under that
+  domain's name. With a tab chosen there is one row and the tab already carries the name, so the
+  heading comes off rather than being said twice. Switching tabs drops statuses the new domain has
+  no vocabulary for, which would otherwise leave the list filtered by a value none of the visible
+  chips can clear — a library that reads as empty for no reason the screen can explain.
+
+- **The facets treat `type` asymmetrically, and that is deliberate.** The existing rule is that each
+  facet clears its own dimension. `type` is not one dimension:
+
+  - `status_counts` and `status_counts_by_type` **clear** it. `status_counts` is the whole-library
+    total the inbox badge counts, and narrowing it would make the badge disagree with `/triage`,
+    which is domain-agnostic. `status_counts_by_type` is already split by type (DEC-060), so
+    clearing the filter is what lets a tab that is *not* selected still have a live count.
+  - `format_counts` **applies** it. That selector sits under the tab, so offering "Physical 312"
+    while the library is showing records is an answer to a question nobody asked.
+
+- **Consequences.** `type` is in `_filter_key`, so a cursor cut under one domain is refused under
+  another instead of silently skipping or repeating a page. `ItemTypeName` joins `EntryStatus` and
+  `EntryFormat` as a published union spelled out for the type checker and pinned to the registry by
+  a test. Sprint 028's conformance suite gains one more thing a domain gets for free by existing:
+  a tab, its chips, its formats and its counts.
+
+## DEC-063 — Sprint 027 ran on the Sprint 025 branch
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Amends:** DEC-053 for this sprint, as DEC-061 did for Sprint 026.
+- **Context:** DEC-053 says a domain-line sprint cuts its branch from `main`. Sprints 025 and 026
+  both closed on `sprint-025-albums` and neither has been merged, because merging is the owner's
+  decision and the branch exists precisely so that it is one.
+- **Decision.** The owner directed Sprint 027 to run on `sprint-025-albums`. A branch cut from
+  `main` would have no album domain in it, and a domain tab strip over one domain is not this
+  sprint.
+- **Consequences.** Three sprints' work is on one branch and still unpushed. The merge decision is
+  unchanged and still the owner's; it now covers 025, 026 and 027 together.
+
+## DEC-064 — The add screen shows what is already known, and asks before fetching more
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Extends:** DEC-045 (the provider quota and the rule that search is recorded but never blocked),
+  DEC-052 seam 3 (a screen renders from the field spec), DEC-059 (a format is not a shelf).
+- **Context:** the owner tried the closed Sprint 027 and reported the add flow: *"the search page,
+  after you clicked on an item, feels empty. If we have the data, we could show the metadata there
+  before confirming."* The question in it — *do we already have the data?* — was measured before
+  anything was designed, and the answer is **partly**, which is what shaped the decision.
+
+  A `SearchCandidate` carries `title`, `subtitle`, `creators`, `credit`, `year`, `original_year`,
+  `language`, `identifiers` and `cover_url`. The confirm screen rendered the cover, the title and
+  the credit, and discarded the rest. It does **not** carry `publisher`, `page_count`, `description`
+  or `subjects` for a book, or `label`, `catalog_number`, `format` or `tracklist` for a record:
+  those come from `provider.fetch`, which ran only at add time. There is no provider response cache
+  — Sprint 005's "cached add" caches the resulting *item*, not the HTTP call — so previewing them
+  costs one live request per candidate clicked.
+
+- **Decision.** **Free data immediately, the full record on demand.**
+
+  Everything the search already returned renders the instant a result is clicked, at no cost and
+  with nothing to wait for, from the domain's field spec rather than a book-shaped list.
+  `GET /api/search/preview` fetches one candidate's complete payload, writes nothing, and is reached
+  by a button rather than an effect — because it is a request, and a reader comparing four editions
+  should spend four requests only if they meant to.
+
+  Costed against the alternatives:
+
+  | | Shape | For | Against | Verdict |
+  |---|---|---|---|---|
+  | **A** | Free data only | No endpoint, no cost, no waiting | The description and the tracklist stay invisible until the thing is already in the library, which is the half of the complaint that motivated it | Rejected — solves the symptom, not the ask |
+  | **B** | Fetch the full record on every click | Richest possible screen | Browsing a result list spends a request per click against a rate-limited free API; MusicBrainz adds 1.1 s of pacing to each | Rejected — makes browsing expensive |
+  | **C** | Free data now, full record on a button | Instant by default, complete when asked, and the cost is visible and chosen | One more endpoint and one more piece of state | **Accepted** |
+
+  **The preview follows search's quota rule, not enrichment's.** The spend is recorded and never
+  blocked, because somebody is waiting for this one — the same reasoning DEC-045 applied to search:
+  the last request of a day belongs to a person, not to background work that can defer to tomorrow.
+
+- **And the opinion is set while adding.** `POST /api/entries` accepts `notes`, `formats`,
+  `date_started`, `date_finished` and `reread_count`, each validated against the item's own domain
+  and refused with a 422 naming it — the same rule `PATCH` follows (DEC-060 judgement 3), applied on
+  the way in and **before the write**, so a refusal leaves no half-added row. Adding a book you just
+  finished was previously an add followed immediately by an edit.
+
+- **One control per concept, shared across screens.** The create-on-type shelf control moved to
+  `features/shelves` and is used by the detail page and the add screen. Formats became one closed
+  multi-select control used by the add screen and the opinion dialog, replacing two checkbox rows.
+  **The two controls stay distinct, and that is DEC-059 and not styling**: the shelf control has a
+  text input and offers to create, because a shelf is a tier you invent; the format control has
+  neither, because a format is a closed vocabulary the domain declares. A single widget doing both
+  would erase the distinction the owner drew.
+
+- **Consequences.** The library and the add screen now render every domain-shaped thing from
+  `GET /api/item-types`, so Sprint 028's conformance suite covers one more surface a domain gets for
+  free. Two defects the suite could not see were found by the walkthrough and the axe gate
+  respectively: a fact declared both as a candidate column and as a domain field was named twice,
+  and the first pass's domain strip was a Radix `Tabs` whose triggers pointed `aria-controls` at a
+  panel that was never rendered — it is a radio group now, the pattern the add screen already used
+  for the same choice.
+
+## DEC-065 — One search bar on `/`, and the library always names a domain
+
+- **Date:** 2026-08-15
+- **Status:** accepted by the owner
+- **Accepts:** `docs/unified-search-proposal.md`, with two amendments the owner made to it.
+- **Context:** after Sprint 027's second pass the owner asked for the main page to carry both
+  jobs — *"1 large searchbar up top for both,"* with the domain selector to its left and an **Add**
+  button to its right, a local search that consults no provider when it hits, and a web search
+  below when it misses. The proposal measured the two searches before designing anything, because
+  they are not the same kind of thing: one is SQL and free, the other is up to 5 s per provider and
+  counted against a daily budget of 900 (DEC-045).
+
+- **Decision.** The proposal is accepted, with the owner's amendments:
+
+  1. **A web search fires on settled-and-empty, or on the button.** Not on every local miss. The
+     literal rule fires once per keystroke while typing any title not already owned — which is
+     every add — so `Kind of Blue` would cost twelve provider searches at a 5 s timeout each, and a
+     session of adding would breach the free tier that DEC-044 already measured and rejected for
+     enrichment. A search fires when the query has been still for ~800 ms, is at least 3 characters,
+     and returned **zero** library rows, and never twice for the same string. **Add** forces one at
+     any time.
+
+  2. **"All" is removed as a filter** — *the owner's amendment, overriding the proposal's
+     recommendation.* The proposal kept "All" and had the **Add** button ask which domain to search;
+     the owner chose to drop it instead. The tab strip now always names exactly one domain, which is
+     what makes one bar able to mean both things at once: the same choice picks the rows you filter
+     and the providers you would search, with nothing left to disambiguate at the moment of pressing
+     a button.
+
+     This overrides DEC-062's "starting at All until one is picked". The remembered-domain rule
+     survives unchanged; what changes is that the fallback when nothing is remembered is the first
+     declared domain rather than everything. The whole-library view is not lost — `/triage` and the
+     export both still span domains, and `status_counts_by_type` still carries a live count for the
+     tab you are not on, which is now the only way to see that the other domain has anything.
+
+  3. **The confirm step is a dialog over `/`** — accepted *"as long as we don't lose any
+     functionality"*, which the sprint turns into an enumerated acceptance criterion rather than an
+     intention. Eleven behaviours are listed there, and the near-match confirmation and the manual
+     fallback are the two most likely to be dropped by accident.
+
+- **`/add` survives** as the manual-entry route and a deep-link target. It is lazy-loaded, so
+  keeping it costs nothing in the bundle, and moving manual entry inline as well is what would push
+  this past one sprint.
+
+- **Consequences.** This is **Sprint 029, and it runs after Sprint 028** — reversing the proposal's
+  recommendation, which was written before the constraint was checked. The proposal argued this
+  should go first so the domain contract describes a settled shell, and treated the sprint numbers
+  as identities rather than a schedule. They are not: `scripts/validate_project.py` requires the
+  active sprint to be `len(completed) + 1`, so in this project the number *is* the order. Running
+  this first would therefore require renumbering, and renumbering would rewrite forward references
+  inside closed sprints' Outcome sections and inside accepted decisions (DEC-052, DEC-058, DEC-060,
+  DEC-062, DEC-064) — which `AGENTS.md` forbids and which is a much larger cost than the one being
+  avoided.
+
+  **What the original concern is worth, now that it is priced:** 028's conformance suite and its
+  account of the backend registry are untouched by this sprint. Only its description of what a
+  *screen* renders is exposed, and that is one section, which 029's close amends. 028's file now
+  says so. `FINAL_SPRINT` moves from 29 to 30 and per-domain imports becomes Sprint 030.
+
+## DEC-066 — Sprint 028's baseline, re-derived: a domain is not yet a unit of code
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** Sprint 028's file carried a baseline written at Sprint 027's close and marked
+  *"Re-derive at activation."* The owner asked for the next sprint to be planned with the state of
+  the repository stated explicitly against the epic goal — **each domain independent enough that
+  separate teams can add one, with its own imports and features, without breaking another** — so it
+  was re-derived from the code on 2026-08-15 rather than from the previous sprint's summary.
+- **What the measurement found.** The registry half of DEC-052 is real and holds: `Domain` carries
+  the whole per-domain contract, `GET /api/item-types` publishes it, every screen renders from it,
+  writes validate against the item's own domain, and there is no `type === "album"` branch anywhere.
+  `backend/tests/test_domain.py:140-179` already parametrizes over `DOMAINS`, so part of the
+  conformance suite exists.
+
+  **What does not hold is that a domain is a unit of code.** Adding a third one edits nine files that
+  books and albums live in — `domain/domains.py` (fields, statuses, formats, the registry and all
+  three published unions), `domain/providers.py`, `main.py` (including a `provider_health` that names
+  three providers as literals), `config.py`, `infrastructure/covers.py`, a migration,
+  `frontend/src/api/library.ts`, `features/library/labels.ts`, and three surviving
+  `itemType === "book"` branches in `pages/AddPage.tsx`. Two are worse than a file to edit:
+
+  - **`entries.ck_entries_status` is frozen.** `alembic/versions/0013_entry_formats.py:66` renders
+    the CHECK from `ALL_STATUSES` at migration-write time, so a domain declaring a status books and
+    albums lack passes `validate_status` and is refused by SQLite. **A new domain currently requires
+    a schema migration on a shared table** — the sharpest contradiction of the epic goal in the
+    repository.
+  - **Enrichment is book-shaped below its seam.** `_backfillable_items` filters on `domain.enriches`
+    correctly, but its SQL joins `item_identifiers.kind = 'isbn'` and `_fetch` takes an ISBN against
+    a hardcoded `PROVIDER_ORDER`. Albums declare `enriches=False`, so the second domain never tested
+    it.
+
+  Also recorded rather than rediscovered: the manual add path is a book form bound to
+  `DEFAULT_DOMAIN`; `cover_candidates` takes an Open Library provider as an argument, which is why
+  the cover chooser offers itself on an album and can only say no; the detail route is `/books/:id`
+  for every domain; and the import layer is book-only end to end, which is Sprint 030's outcome.
+- **Decision.** Three answers from the owner, so the executing agent does not re-litigate them:
+
+  1. **Sprint 028 runs on `sprint-025-albums`**, continuing DEC-053, DEC-061 and DEC-063. Sprints
+     025–027 stay unmerged; the contract is written against a codebase that holds two domains.
+  2. **The CHECK-constraint blocker is a Phase A finding with costed alternatives**, decided at the
+     gate — not pre-authorized Phase B work. The gate stays a gate.
+  3. **The contract prescribes a per-domain code home, and Phase B moves books and albums into it.**
+     A contract that only documented today's shared-file layout would describe the very thing the
+     epic exists to remove, and one that prescribed a layout no domain demonstrates would not be
+     evidence of anything.
+- **Consequences.** Sprint 028's baseline, deliverables and acceptance criteria are rewritten around
+  this: the conformance suite gains a check that every declared value is accepted by *the database*
+  and not only by the API, and a check that the frontend's hand-mirrored unions agree with the
+  registry; the measurement is delivered as a costed table of alternatives per finding rather than
+  one recommended path; and the IGDB paper walk additionally answers which shared files two parallel
+  domain teams would contend over, which is the falsifiable form of "developed in parallel". The
+  per-domain package move is named as the largest thing in the sprint and as the slice to hand
+  forward with the contract written, rather than to rush. Two documentation inconsistencies found
+  while planning are repaired under `AGENTS.md` §1: `ROADMAP.md` still headed the per-domain-imports
+  contract "Sprint 029" after DEC-065 renumbered it to 030, and `HANDOFF.md`'s "no `type === "album"`
+  branch anywhere" was true of albums and silent about books.
+
+## DEC-067 — What the conformance suite measured, and what each coupling costs to remove
+
+- **Date:** 2026-08-15
+- **Status:** accepted (the measurement); the Phase B selection below awaits the owner's go-ahead
+- **Context:** Sprint 028 Phase A deliverable 3. DEC-066 listed what a third domain must edit; this
+  prices each one. Every row is a fork with its options and costs rather than a single recommended
+  path, because a gate whose measurement recommends work in every row is not a gate. **Four of the
+  ten rows recommend doing nothing**, and that is the honest outcome rather than a smaller sprint.
+- **What the suite proved, before any of this was costed.** The conformance suite
+  (`backend/tests/test_domain_conformance.py`) is parametrized over `DOMAINS` and splits its checks
+  in two. A fixture domain that is registered nowhere satisfies **every** check about a domain's own
+  consistency — its vocabularies, fields, identity rule and recognizer. Give it a status of its own
+  and it fails both checks about whether the core can host it. **That is the finding in one
+  sentence: a domain can be written against the contract today, and cannot be added without editing
+  the core.**
+
+  The suite also found a live defect on its first run, which is repaired in this sprint rather than
+  costed: `urlsplit` raises on a malformed authority (`http://[`), `resolve_input` asks each
+  registered domain in turn, and the first recognizer to raise **denied every domain after it its
+  turn**. One domain breaking another's add box is precisely the failure mode this epic exists to
+  prevent, and it was reachable from the add box by pasting a typo. Both recognizers now parse
+  through a shared `split_url`, and the loop isolates a raising recognizer regardless.
+
+| # | Coupling | Options | Cost | Recommendation |
+|---|---|---|---|---|
+| 1 | `entries.ck_entries_status` is a list frozen at migration-write time, so a new domain's status passes the API and is refused by SQLite | (a) migration per domain; (b) drop the CHECK and let `validate_status` be the authority; (c) a `domain_statuses` table and a trigger | (a) a batch rebuild of `entries` per domain **and an alembic head collision between two teams**; (b) one batch rebuild, once, and the loss of a defence-in-depth the application is the only writer behind; (c) makes the registry partly data, contradicting "the registry is code" | **(b)**, as the one schema change that removes a per-domain migration forever. Owner's call at the gate |
+| 2 | The published unions `EntryStatus` / `EntryFormat` / `ItemTypeName` are spelled out by hand | (a) keep; (b) build the `StrEnum` from the registry; (c) generate the source | (a) three lines per domain, type-safe, and a test fails when it is forgotten; (b) opaque to mypy and loses the literal types in the API models — the reason it was written this way; (c) a build step for three lines | **(a) keep. Do nothing.** The coupling is real and cheaper than any of its removals |
+| 3 | Enrichment is keyed on ISBN below the `enriches` flag (`_backfillable_items`, `_fetch`, `PROVIDER_ORDER`) | (a) leave and document what the flag means; (b) declare an enrichment key and an incompleteness rule per domain; (c) move enrichment behind the adapter | (a) nothing now; a domain wanting enrichment discovers the gap late; (b) rewrite of one SQL query and the fetch loop, ~half a sprint; (c) reaches the job payload and the ledger | **(a) for now.** No domain needs it: albums declare `enriches=False`, and a game record arrives complete in one query. Build (b) when a domain actually asks |
+| 4 | The cover host allowlist is central | (a) keep; (b) let a domain declare its own hosts | (a) one line per domain; (b) a domain could widen the allowlist from its own package, which is what an allowlist exists to prevent | **(a) keep. Do nothing.** This one is central on purpose |
+| 5 | `provider_health` names `openlibrary` / `musicbrainz` / `googlebooks` as literals | (a) derive the rows from the registered providers; (b) leave | (a) ~15 lines, and the response gains a row per provider automatically; (b) a domain's provider is invisible to the health endpoint until someone remembers | **(a)**, in Phase B. Cheap, and shared infrastructure should not name a provider |
+| 6 | The manual add path is a book form bound to `DEFAULT_DOMAIN` | (a) leave; (b) render it from the field spec | (a) a new domain has no manual path — which matches the product decision that manual entry is a book fallback; (b) medium frontend work on the exact screen Sprint 029 rebuilds | **(a) now, named for Sprint 029.** Building it here would be built twice |
+| 7 | The cover chooser offers itself on an album and can only say no (`cover_candidates` takes an Open Library provider) | (a) hide it unless the domain declares it can choose covers; (b) a per-domain cover-candidate strategy; (c) leave a fourth time | (a) one declaration plus one condition, and it is user-visible so it re-arms the walkthrough; (b) a seam nothing needs yet; (c) the reader keeps meeting a control that cannot work | **(a)**, in Phase B. The sprint required this be decided rather than deferred again |
+| 8 | The detail route is `/books/:id` for every domain | (a) leave; (b) `/items/:id` with a redirect | (a) a cosmetically wrong URL; (b) every `navigate` call and seven e2e specs, on the screens 029 rebuilds | **(a) leave. Do nothing** — and revisit inside 029, which is already there |
+| 9 | The import layer is book-only end to end | — | Sprint 030's whole outcome | Named, not moved. Out of scope by the sprint's own boundary |
+| 10 | The frontend fallback vocabulary in `labels.ts` is the book vocabulary | (a) keep; (b) drop the fallback | (a) a row from an unknown domain renders under a book's label if the registry fetch fails; (b) an unreadable row instead | **(a) keep. Do nothing.** The registry must never be the reason a row is unreadable |
+
+- **Decision — what Phase B should be, if it runs.** In this order, each its own commit:
+
+  1. **The per-domain packages** the contract now prescribes (technical spec 6.6), with books and
+     albums moved into them. This is the row that is not in the table, because it is not a coupling
+     to remove but the layout that makes the remaining ones visible. It is also the largest piece,
+     and the one to hand forward with the contract already written if it runs long.
+  2. **`provider_health` derived from the registry** (row 5).
+  3. **The cover chooser declared per domain** (row 7), which re-arms the walkthrough gate.
+  4. **Dropping `ck_entries_status`** (row 1) — separately, because it is the only schema change and
+     the only irreversible one.
+
+- **Consequences.** Rows 2, 4, 8 and 10 are recorded as **deliberate couplings that stay**, so a
+  later reader finds a decision rather than an oversight. Row 3 is the one place the "second domain
+  never tested this" risk is real, and it is left with its trigger named: the first domain that
+  wants background enrichment on a non-ISBN key pays for (b) then, with a real case to design
+  against instead of a hypothetical one.
+
+## DEC-068 — IGDB on paper: no seventh seam, one new kind of infrastructure, six files two teams would fight over
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** Sprint 028 Phase A deliverable 4, and where DEC-052's falsifiable prediction —
+  *"games need no seam albums did not"* — is finally tested. A paper walk against the conformance
+  suite is cheaper and more honest than a third bespoke sprint, which is the whole reason the plan
+  stops at a contract rather than at a third domain (DEC-058).
+- **What this is and is not.** **Reasoned from IGDB's published API, not measured against it.** DEC-052
+  earned its conclusions from live probes on 2026-08-14; this one has not, and must not be read as
+  though it had. Every claim below that a real integration would depend on is marked as one to
+  verify first.
+- **Seam by seam, against the contract in technical spec 6.6.**
+
+  1. **Creators.** IGDB attributes a game to companies through `involved_companies`, flagged
+     developer / publisher / porting / supporting. A company is an organisation and its name never
+     inverts, so the adapter supplies `creator_sort` unchanged and the `creator_sort_name` heuristic
+     never runs — **exactly the rule MusicBrainz's `Group` already exercises** (DEC-051, DEC-052
+     seam 1). No new seam. *Verify:* that a developer is reliably distinguishable from a publisher,
+     because which one is "the creator" is a product decision, not an API one.
+  2. **Identity.** With one provider there is nothing to merge across, so `identity_key` returns
+     `None` — albums' answer, and a complete one. No new seam. *Verify:* if a second games provider
+     is ever added, whether `external_games` (Steam appids and the like) is unique enough to group
+     on; a barcode was not, which is the precedent for not assuming.
+  3. **Metadata.** Platforms and genres are lists of text, summary is long text, the release year is
+     a number, developer and publisher are text. Every one fits an existing `FieldSpec`; the only
+     candidate for the `rows` type the tracklist introduced is per-platform release dates, and
+     nothing requires it. No new seam.
+  4. **Covers.** Art is served from `images.igdb.com` at a template-sized path. **One allowlist
+     entry** — DEC-067 row 4 keeps that central deliberately. *Verify:* whether the URL arrives
+     protocol-relative (`//images.igdb.com/...`), which the seam-4 https upgrade already handles but
+     which decides whether the adapter normalises it or the pipeline does.
+  5. **Statuses and formats.** Games plainly want a vocabulary of their own — `playing` and a
+     backlog have no book or album equivalent — which is seam 5b working exactly as designed at the
+     domain level, and which lands squarely on **DEC-067 rows 1 and 2**: the published unions and
+     the frozen CHECK constraint. No new seam; two known couplings, and this is the domain that
+     makes row 1 unavoidable rather than theoretical.
+  6. **Enrichment and add-by-URL.** One IGDB query returns everything the field list asks for, so
+     `enriches=False` — albums' answer again, and the reason DEC-067 row 3 can wait. The recognizer
+     is an `igdb.com/games/{slug}` URL resolving through the adapter's own slug lookup. No new seam.
+
+- **Decision — the prediction holds, with one qualification.** Games need **no seventh seam**. What
+  they need that no domain has needed is **authentication with a lifetime**: IGDB requires Twitch
+  client credentials exchanged for a bearer token that expires and must be refreshed, where every
+  provider so far has needed at most a static key or a descriptive User-Agent. That is not a seam —
+  it fits inside the adapter, which already owns its own rate limit and headers — but it is the
+  first adapter to hold **mutable state and a secret pair**, and it adds a `config.py` entry, which
+  DEC-067 already counts as a coupling. *Verify before building:* the token lifetime and the refresh
+  failure mode, and whether a 401 mid-import is retryable without losing the batch.
+- **What two parallel domain teams would collide over.** The epic's actual question, answered by
+  listing the files an IGDB team and a `spotify → music` team would both edit today:
+  `domain/domains.py`, the three published unions inside it, `domain/providers.py`, `main.py`,
+  `config.py`, `infrastructure/covers.py` and `frontend/src/api/library.ts` — **six files and one
+  block of enums.**
+
+  **The sharp one is not a file, it is the migration.** Both teams need a status of their own, both
+  therefore write a migration widening `ck_entries_status`, and both point `down_revision` at the
+  same head. Whoever merges second rebases a schema change — the one class of conflict that cannot
+  be resolved by reading two diffs side by side. **That single fact is the strongest argument for
+  DEC-067 row 1(b)**, and it is worth more than the file count: after it, two domain teams contend
+  over declarations, which merge, rather than over a schema, which does not.
+- **Consequences.** DEC-052's prediction is recorded as **held**, tested the way DEC-058 said it
+  would be. Games remain an unnumbered future epic. Nothing here authorises building one, and the
+  verification list above is what that epic starts from rather than repeats.
+
+## DEC-069 — Phase B ran in full, and the move found three things the measurement could not
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** DEC-067 costed ten couplings and recommended four Phase B items. The owner authorized
+  **all four** at the gate. This records what changed against that plan and what the work itself
+  turned up, because DEC-067 was written from reading the code and Phase B was written by moving it.
+- **Decision — one deliberate departure from DEC-067's ordering.** It put the per-domain packages
+  first, on the reasoning that the layout makes the remaining couplings visible. They ran **last**
+  instead, smallest first, so the largest piece was the tail that could be handed forward intact if
+  it ran long — which the sprint's own risk note provides for and which costs nothing, since none of
+  the three smaller items depended on the layout. It did not run long.
+- **What the move found that reading could not.** All three are repaired in the same sprint, and all
+  three are the same species: **a shared thing quietly shaped like books.**
+
+  1. **`Domain`'s defaults were the book vocabulary.** `statuses`, `default_status`, `entry_fields`,
+     `formats` and `entry_panel_label` all defaulted to books' answers, so a third domain that
+     omitted one would inherit `read`/`reading`/`to_read` or "Your reading data" **silently** — the
+     precise failure the whole seam model exists to prevent, sitting in the shared type the model is
+     built on. It was invisible while books lived in the same file as the type. All five are required
+     now, and `chooses_covers` defaults to `False` rather than `True` on the same principle: a domain
+     that has not thought about covers offers no chooser.
+  2. **Both status migrations read the live registry.** `0013` rendered its CHECK from
+     `ALL_STATUSES` *when the migration ran*, so two installs applying the same revision a month
+     apart could end up with different constraints, and a migration's meaning changed whenever a
+     domain was added. A migration is history and must not read live code; both lists are frozen
+     literals now. This is a second, subtler form of the same coupling DEC-067 row 1 removed.
+  3. **The container smoke script imported an adapter by module path.** `make smoke-container` failed
+     on it after the move — no unit test, type check or e2e run could have, because the import
+     happens inside the running image. The DEC-025 gate earning its place again.
+- **Consequences.** Two couplings remain by decision (DEC-067 rows 2 and 4): the hand-spelled
+  published unions and the central cover-host allowlist. **A third domain now costs: its own package,
+  one entry in `DOMAINS`, its provider wired in the lifespan, three enum lines, one allowlist line if
+  its art is hosted somewhere new, and configuration if its provider needs credentials. No migration,
+  and no edit to another domain's files.** That is what DEC-058 asked the two gate sprints to
+  deliver, and it is the state Sprint 029 and Sprint 030 inherit.
+
+  Sprint 030 is unaffected in scope but its ground is better: `domains/book/goodreads.py` and
+  `domains/book/calibre.py` already sit in the domain they serve, so the boundary that sprint draws
+  is between the shared ledger and importers that already live in the right place.
+
+## DEC-070 — Sprint 028 reopened for the documentation pass, and the guide was proved by following it
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Context:** Sprint 028 closed having built the contract, the conformance suite and the per-domain
+  packages. The owner then asked, before considering it closed, that **the documentation convey the
+  new structure**: a contributor-facing guide to adding a module, old documents removed or updated,
+  diagrams welcome, and a general cleanup. The sprint was reopened rather than the work scheduled —
+  the same precedent Sprint 020 set for its Phase B and Sprint 027 for its add flow. A contract
+  nobody can find is not a contract.
+- **Decision.** Three new documents, and a rule for the old ones.
+
+  - **`docs/guides/adding-a-domain.md`** — the practical counterpart to technical spec 6.6. Three
+    diagrams (where a domain plugs into the layers, where its one declaration travels, and the nine
+    points a single add consults it), the whole job as a nine-row table, the step-by-step against
+    `domains/album/` as the worked example, what a domain gets for free, what it may never touch, the
+    two things that are not solved yet, and the IGDB verdict as a worked plan.
+  - **`CONTRIBUTING.md`** — the human entry point, which the repository did not have. Setup, the
+    gates and why each exists, the rules that are not style preferences, and a pointer to the domain
+    guide above everything else. `AGENTS.md` still governs agent sessions and says so.
+  - **`docs/README.md`** — the documentation map. **Every document is labelled `canonical`,
+    `historical` or `proposal`**, which is the rule that replaces deleting things: *a historical
+    document is not wrong, it is dated.* A path inside a closed sprint describes the repository on
+    the day it closed and is not an instruction. Nothing was deleted; four documents gained status
+    headers saying what they are and what supersedes them.
+
+- **The guide was verified by following it**, which is the documentation equivalent of the
+  walkthrough gate. A throwaway `game` domain — its own package, three fields, a status vocabulary
+  containing `playing` and `finished`, its own formats and identity strategy — was built from the
+  guide alone and registered. **The conformance suite and all 480 backend tests passed, with no
+  migration**, which is exactly what DEC-067 row 1 bought. The only gate that failed for a legitimate
+  reason was the OpenAPI drift check, which is a documented step.
+
+  **Three things broke that the guide had not predicted, and each was repaired rather than written
+  down as a gotcha** — a step a contributor must know about is a step the design failed to remove:
+
+  1. A conformance test used `playing` as its example of "a status no registered domain declares".
+     A real games domain would have broken its premise rather than its point; it derives an unclaimed
+     value now.
+  2. `test_item_types.py` asserted the published set was exactly `{"book", "album"}` — a closed-world
+     assertion a third domain fails. It asserts against `DOMAINS` now. (Four similar-looking
+     assertions elsewhere were checked and left: they assert over rows the test itself seeded, which
+     is correct.)
+  3. `statusLabels` in the frontend was an exhaustive `Record<EntryStatus, string>`, so a new status
+     was a **TypeScript error** until somebody wrote a fallback label. It is `Partial` now and the
+     lookup falls back to the stored value, which is legible. DEC-067 row 10 keeps the fallback
+     table; what changes is that a domain no longer has to edit it.
+
+- **Consequences.** The registration cost in DEC-069 is unchanged and now written where a contributor
+  will find it. Two documentation defects from earlier in this sprint were also repaired: technical
+  spec 6.6 still said the per-domain layout was "not yet inhabited" — a Phase B edit lost to a second
+  write in the same script — and product spec section 9 still said the registry would be extracted
+  when a second domain existed and that games and series were Sprints 027 and 028, both superseded by
+  DEC-058. `AGENTS.md` gains the domain boundary as a non-negotiable invariant and `docs/README.md`
+  as required reading.
+
+## DEC-071 — Depth is one level and provider-shaped; copy neutrality lands in 029; the music release is not gated on a third domain
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Supersedes:** section 6 of `docs/domain-expansion-assessment.md` where the two differ. The
+  assessment recommended deciding depth *before* a third domain and folding the chrome copy into
+  Sprint 029. The owner accepted the second, resequenced the first, and rejected a premise the
+  assessment had left implicit.
+- **Context:** the Sprint 028 assessment found one item that could force a redesign — an entry is
+  flat, which blocks television, anime, comics and podcasts — and separated it from six additive
+  comfort gaps. The owner answered the same day.
+- **Decision.**
+
+  **1. Copy neutrality is Sprint 029's sixth deliverable.** Eighteen user-visible strings across
+  eight files say "book" on screens that hold albums. Sprint 029 rebuilds most of those screens, so
+  doing it anywhere else means doing it twice. The rule is written into that sprint: copy that names
+  one domain comes from that domain's `label`, or is neutral. The `/books/:entryId` route stays out
+  of scope (DEC-067 row 8, reaffirmed).
+
+  **2. Entry depth is Sprint 030, Phase A only, and it runs after 029 rather than before it.** The
+  assessment argued for deciding it first; the owner scheduled it second, which is the right call for
+  a reason the assessment underweighted — 029 is already built and specified, and reordering settled
+  work to answer an open question costs more than the question does.
+
+  **The owner's hypothesis, which Phase A tests rather than assumes:**
+
+  > Most scenarios can be modelled by going **one level down only** — series into seasons, books into
+  > chapters if any, albums into songs, at most. The depth available is decided by **how the provider
+  > stores it**: if a TV provider returns one entry per season, no finer grain exists to model. In
+  > the other direction, items can be **grouped into sets** — the individual Harry Potter books as
+  > one set — and a set may be useful for fields other than depth.
+
+  **This hypothesis already has a precedent in the codebase, and Phase A must start from it.** A
+  tracklist is one level down and is modelled as *metadata rows on the item, not as entities*
+  (Sprint 026, DEC-057). It cost one `inc=recordings` parameter and nothing hangs off a track. So
+  representation is solved. The open question is narrower and sharper than "hierarchy":
+
+  **Does a child need state of its own?** A tracklist is read-only display. *"Watched through season
+  3, episode 7"* is a status on a child. That difference is the entire sprint, and "flat, with a
+  per-domain progress field" is a complete and correct Phase A outcome — on current evidence the
+  likeliest one.
+
+  Per-domain imports moves from Sprint 030 to **Sprint 031**; `FINAL_SPRINT` moves 30 → 31. This is
+  the same renumbering DEC-065 performed on an unbuilt, unfiled sprint, for the same reason: the
+  sprint has no file and no closed work depends on its number. The two forward references inside the
+  closed Sprint 028 file are corrected *visibly*, naming the old number and this decision, rather
+  than silently rewritten.
+
+  **3. The music release is not gated on a third domain.** The assessment recommended building a real
+  third domain to learn what two similar domains cannot teach, and the owner accepts the reasoning
+  without accepting the gate: **a release waits for a feature, not for a validation exercise.** Music
+  ships when music is ready. The only thing that would justify holding it is a specific feature going
+  in with it — depth being the named example.
+
+  This matters beyond scheduling, because it corrects a drift in how "gated" has been used. DEC-035
+  and DEC-042 introduced gates to stop *building* something whose cost was unknown. Nothing in that
+  pattern licenses withholding finished work until an unrelated experiment reports.
+
+- **Consequences.** Plan revision **12**. The line is 029 → 030 (entry depth, gated) → 031
+  (per-domain imports), and the project reaches `complete` at the end of 031. Sprint 029 gains a
+  deliverable, an acceptance criterion and a test requirement. The assessment's options B and E
+  (per-domain list mechanics; attachment level and per-domain caps) stay unscheduled and unbuilt,
+  waiting for a real domain to ask — which is the assessment's own recommendation and DEC-052's
+  standing rule against designing an abstraction from domains that agree with each other. Whether to
+  merge and release the album work is a separate owner action, now unblocked by this entry.
+
+## DEC-072 — The album work merges after Sprint 029, not before
+
+- **Date:** 2026-08-15
+- **Status:** accepted
+- **Completes:** DEC-071, which unblocked the release without scheduling it.
+- **Context:** DEC-071 established that a release waits for a feature rather than for a validation
+  exercise, leaving the timing an owner action. The timing is now settled, and the reason is the
+  sequencing consequence that entry named: Sprint 029 carries copy neutrality, so merging first would
+  ship a music release whose screens say *Import books* and *Book added* over albums.
+- **Decision.** **`sprint-025-albums` merges into `main` after Sprint 029 closes, and not before.**
+  Music's first release is the one where the interface stops calling everything a book.
+
+  Sprint 030 (entry depth) does **not** gate the merge. It is a Phase-A decision whose outcome may add
+  a feature later; it is not a prerequisite for shipping what is already built and verified.
+- **Consequences.** Sprints 025–029 all land on `main` in one merge. Two things must be done *with*
+  that merge rather than after it, because both describe the product to a user:
+
+  1. **`README.md`'s product copy** stops describing a book-only product. Its Development section
+     already documents the domain structure; the feature copy was deliberately left book-only until
+     albums could actually be run (DEC-066 era note in the handoff).
+  2. **`docs/operations/release-notes-v1.2.md`**, following the v1 and v1.1 precedent.
+
+  The branch keeps its DEC-053 property until then: a sprint may run on it, it ends clean, nothing is
+  pushed, and merging remains a deliberate act rather than a side effect.
+
+## DEC-073 — What Sprint 029 actually built: the firing rule, results below, `/add` without a chooser, and no new `Domain` field
+
+- **Date:** 2026-08-17
+- **Status:** accepted
+- **Implements:** DEC-065, whose two owner amendments this sprint carried out. **Amends:** DEC-062's
+  "starting at All" (already overridden by DEC-065) and DEC-064's account of where the confirm step
+  lives. **Narrows:** DEC-071's deliverable 6, which reserved the option of a new `Domain` field.
+- **Context:** DEC-065 accepted a design; it did not decide four things that only building it could
+  decide. Sprint 029 decided them, and they are recorded here rather than left in the code, because
+  each one is a promise a later sprint could break without noticing.
+
+- **1. The firing rule, as built and as verified.** A provider search fires when *all* of: the query
+  has been still for ~800 ms **measured from the last keystroke**, it is at least three characters,
+  the URL has caught up with the box, the library query has **succeeded and is not refetching**, and
+  it returned **zero** rows — and never twice for the same string within a domain. **Add** overrides
+  every clause and searches immediately, serving a repeat from cache.
+
+  Three of those clauses are not in DEC-065's sentence and each is load-bearing:
+
+  - **Measured from the last keystroke, not from the last condition becoming true.** The conditions
+    settle at their own pace; timing the wait from whichever settled last means a slow library
+    pushes the search out by however long the library took.
+  - **Succeeded and not fetching.** Pending or errored is *"we do not know yet"*, not *"the library
+    has nothing"*. Guessing there costs a request every time the library is slow.
+  - **Strictly zero rows.** Searching `dune` while owning *Dune* returns one row and may well be
+    somebody looking for *Dune Messiah* — but a threshold ("few enough rows") guesses on the
+    reader's behalf, and the strict rule never does.
+
+  **Verified by counting requests against live providers**, which is the acceptance criterion:
+  a title in the library costs 0, one not in it costs exactly 1, the same string retyped costs 0,
+  **Add** on a query with local hits costs 1, and a pasted ISBN takes `/api/search/resolve` instead.
+
+- **2. Results render *below* the library, not above.** Deliverable 3 and the accepted proposal both
+  say below; acceptance criterion 7 said *"with a web-results block above it"*. **Below shipped**,
+  because the deliverable is the specification and the AC's phrase was incidental — and the choice
+  is worth more than a tie-break. The library virtualizes against the **window**, so anything of
+  variable height above it moves the `scrollMargin` every row measures itself against, which is
+  precisely the Sprint 013 class of bug. Below means the offset never moves: the library's bounding
+  box is unchanged when results appear, measured. The Sprint 013 bug is avoided **by construction
+  rather than survived**, and a later sprint that moves the block above the list re-opens it.
+
+- **3. `/add` lost its domain chooser rather than keeping a decorative one.** `LibraryService.add`
+  types a manual item as `DEFAULT_DOMAIN.item_type` whatever the client sends (DEC-067 row 6). The
+  old screen offered the choice anyway, so picking Records showed a record's statuses and fields and
+  then wrote a book. **A control that cannot keep its promise is worse than its absence**, so the
+  screen now names the one domain it actually writes. Giving manual entry a real domain needs an API
+  change and stays unscheduled; this is the honest state until then, not the end state.
+
+  The same reasoning settled the copy the sprint file left open. Books offered *"You can still enter
+  this book manually"* on a failed provider search and albums offered *"Try again in a moment"* —
+  one arm promising a recovery path the other withheld. **Manual entry is offered to every domain**,
+  because the route exists and works for anyone; what it cannot yet do is honour the domain, and the
+  neutral copy does not claim it can.
+
+- **4. Deliverable 6 needed no new `Domain` field.** The sprint authorized one — a per-domain search
+  placeholder, with the conformance check such a field requires — and it was not taken. One neutral
+  placeholder naming title, creator, ISBN and link serves every domain, and the resolve path it
+  advertises is domain-neutral anyway (a MusicBrainz URL resolves as an Open Library one does). So
+  **the backend contract is untouched after all**, which is what the roadmap originally claimed for
+  this sprint before DEC-071 added the deliverable, and the narrowing that entry forced can be
+  narrowed back. Twenty-four strings across eleven files became registry labels or neutral copy;
+  `N books` on a shelf became `N items`, because a shelf spans domains and always did.
+
+  **The `Domain` field remains the right shape for the day a domain actually needs different copy.**
+  This decision is that no domain needs it yet — not that per-domain copy is disallowed.
+
+- **Consequences.**
+  - Product spec section 7 now describes `/` as the screen you search and add from, and `/add` as
+    manual entry; technical spec section 7.1 names the two searches and section 8 carries the firing
+    rule, the two-regions rule and the focus rule for shortcuts.
+  - **The quota rule is a counted test, permanently.** Any change to the firing conditions is
+    re-verified by counting requests, not by feel.
+  - `j`/`k` and the digit shortcuts address the surface that has focus: standing inside the results
+    region, neither reaches the library.
+  - A defect the walkthrough found is fixed and worth not re-introducing: a successful add from `/`
+    must clear the query, because the web search only ran when the library had nothing, so closing
+    the dialog onto that filtered view highlights a row nothing can see. The old flow got this free
+    by navigating to an unfiltered `/`.
+
+## DEC-074 — Sprint 029's second pass: five things the screen got wrong, and the two judgement calls in fixing them
+
+- **Date:** 2026-08-17
+- **Status:** accepted
+- **Context:** the owner used what Sprint 029 built, against the real library, and found five
+  defects in the small — four on the screens 029 rebuilt and one on the detail page. None is a
+  regression from the sprint; three are things the sprint's own rebuild made newly visible, and two
+  predate it. **Sprint 029 reopened for a second pass** rather than deferring them to a sprint that
+  is about something else, on the precedent of Sprint 028's third pass (DEC-070).
+- **Decision.** Five changes, all frontend, no API and no schema:
+
+  1. **A `long_text` field spans both columns of the confirm step.** The split is on the field's
+     declared type, the way the detail page already splits `inlineFields` from `blockFields` — not
+     on the name "description", which no shared layer may know.
+  2. **The search bar clears in one press.** The box, the URL's `q` and the web results go
+     together; the successful-add path already did exactly this and both now call one function.
+  3. **An empty result is not an empty library.**
+  4. **The status filter is a control, not a row.**
+  5. **Files is its own region on the detail page**, at the weight of *Edit opinion*.
+
+- **Two judgement calls a later sprint could otherwise reverse blind:**
+
+  **The status counts moved inside the panel.** The chips showed every status's count at all times,
+  which is real information the dropdown hides behind a click. The row was still the wrong trade:
+  it was a whole row of chrome, above the library, for the fourth of four filters — and for a
+  vocabulary the domain tab already names. The counts are in the panel rather than dropped, and the
+  trigger names the current selection, so what is *chosen* is still readable without opening it.
+  **If the counts turn out to be read constantly, the answer is to surface them in the trigger, not
+  to bring the row back.**
+
+  **The empty state is suppressed during an active query, not deleted.** "Your library is waiting"
+  is correct and worth its screen for somebody with no library. Shown to somebody mid-search it is
+  two hundred pixels of encouragement between the bar and the results that the miss is about to
+  produce — and a miss is the *ordinary* path, since settled-and-empty only reaches a provider when
+  the library came back with nothing (DEC-073). So the tall state is kept for the empty library and
+  replaced, for an active query, by one line naming the string that missed. **One line rather than
+  nothing** is deliberate: the settle rule waits ~800 ms before searching, and a page that goes
+  blank in that gap reads as broken.
+
+- **Consequences.**
+  - Product spec section 7 describes four filters in one row, the clear control, the two silences
+    and Files as its own region.
+  - `StatusFilter` is the second control built on the `FormatPicker` shape — popover, checkmark
+    column, list stays open. **The two must keep behaving identically**; a third multi-select on
+    this page should copy them rather than invent a third interaction.
+  - The `Attachments` component no longer owns its frame: the page wraps it in the labelled region.
+    A future screen hosting it supplies its own.
+- **A sixth item, found reviewing the five, repaired after the close** — recorded here rather than
+  by reopening the sprint a third time, because `WORKFLOW.md` has no `completed → in_progress`
+  transition and the repair is small, closed and tested. **The shell's *Library* link, pressed while
+  already on the library, produced a permanent *Loading your library…*.** It points at `/` with no
+  query, so it strips `type` from the URL; deliverable 2 made every list request name a domain, and
+  the restore that supplies one ran **once per mount**. Every other way of reaching the library
+  remounts the page, so the one that does not was the one nothing covered.
+
+  **The rule this establishes: the domain restore answers to the URL, not to the mount.** A URL
+  without a `type` is precisely the state the restore exists to fix, whenever it occurs — and
+  writing the value back is what stops it repeating, so the effect is its own guard and needs no
+  other. A future control that clears the domain from the URL will be caught by the same effect
+  rather than needing its own.
+
+  Held at two layers on purpose: a unit test that clicks a `Link` to `/` beside a mounted page, and
+  an e2e test through the real shell, because **this is an integration defect between the shell and
+  the page and the unit layer alone did not see it for a whole sprint.** The e2e test was shown to
+  fail against the old guard before being kept.
+
+  - **A trap the e2e suite has and does not announce:** the dev server proxies `/api` to
+    `localhost:8000`, so a container left running on that port answers every request an e2e test
+    forgot to stub, with the real dev library. It fails tests that look like regressions and are
+    not — `add-detail.spec.ts`'s stagger test clicks a real *Rayuela* card instead of the web
+    result. **Stop the container before running the suite.**

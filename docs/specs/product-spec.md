@@ -42,13 +42,14 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 |---|---|---|
 | Rating | Integer 1–10, no half points, nullable | The whole reason for not using Goodreads |
 | Shelves | Many-per-book (tags) | Confirmed |
-| Statuses | unsorted (inbox), read, reading, to_read, wishlist, dropped | Confirmed |
+| Statuses | Per domain (DEC-057). Books: unsorted (inbox), read, reading, to_read, wishlist, dropped. Albums: unsorted, wishlist, pending, owned | A book's status tracks consumption; an album's tracks possession |
+| Formats | Per domain, multi-valued, on the entry (DEC-059). Books: physical, borrowed, digital. Albums: vinyl, cd, digital | How *you* hold a copy; independent of status, so "wishlist → vinyl" is expressible |
 | Schema split | `items` (shared metadata) / `entries` (personal opinion) | Enables multiuser + sharing later without migration |
 | Backend | Python 3.12 + FastAPI + SQLite | Confirmed |
 | Frontend | React + Vite + TypeScript + Tailwind + shadcn/ui + Motion | Highest polish-per-unit-effort for someone without frontend experience |
 | Imports | Goodreads CSV + Calibre `metadata.db`, both in v1 | Existing libraries in both; hand-entry is not viable |
 | Metadata sources | Open Library + Google Books, manual fallback | Free, keyless (OL) / good Spanish coverage (GB) |
-| Domain generality | `items.type` present, provider interface defined, **no plugin runtime** | Extract the registry when a second domain actually exists |
+| Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
 | List rendering | TanStack Virtual + keyset pagination on `/` and `/triage` | Calibre libraries reach thousands of rows |
 | Auth | None. LAN-only; internal proxying allowed, no internet-reachable route | Deferred with sharing; see §9 |
@@ -97,7 +98,7 @@ make concurrent dedupe safe.
 
 ```json
 {
-  "authors": ["Julio Cortázar"],
+  "creators": ["Julio Cortázar"],
   "publisher": "Alfaguara",
   "language": "es",
   "page_count": 736,
@@ -108,13 +109,17 @@ make concurrent dedupe safe.
 }
 ```
 
-`authors` is an array of plain strings. **No author table in v1.** Author
-identity is its own resolution problem and buys nothing until you want an author
-page. Sorting by author uses `authors[0]`, exposed as a generated column:
+`creators` is an array of plain strings — an album's artists and a book's authors
+are the same neutral concept, and the key was renamed from `authors` in Sprint 025
+(DEC-052). **No creator table in v1.** Creator identity is its own resolution
+problem and buys nothing until you want a creator page. `credit` beside it is the
+credit as the source renders it, because `["Dean Blunt", "James Ferraro"]` joined
+by `", "` is not `Dean Blunt Meets James Ferraro`. Sorting and searching use
+`creators[0]`, exposed as a generated column:
 
 ```sql
-ALTER TABLE items ADD COLUMN sort_author TEXT
-    GENERATED ALWAYS AS (json_extract(metadata, '$.authors[0]')) VIRTUAL;
+ALTER TABLE items ADD COLUMN creator_primary TEXT
+    GENERATED ALWAYS AS (json_extract(metadata, '$.creators[0]')) VIRTUAL;
 ```
 
 ### 3.2 `entries` — the personal layer
@@ -138,11 +143,27 @@ CREATE TABLE entries (
 
 CREATE INDEX idx_entries_status ON entries(user_id, status);
 CREATE INDEX idx_entries_score  ON entries(user_id, score DESC);
+
+-- How you hold this copy (DEC-059). The value is stored rather than joined to a
+-- vocabulary table: unlike a shelf, which you invent, the vocabulary is closed and
+-- declared by the domain.
+CREATE TABLE entry_formats (
+    entry_id INTEGER NOT NULL REFERENCES entries(id) ON DELETE CASCADE,
+    format   TEXT NOT NULL,
+    PRIMARY KEY (entry_id, format)
+);
 ```
 
-**Status enum:** `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`
+`entries.status` carries a CHECK constraint listing the union of every domain's statuses.
+It catches a typo; it cannot express the real rule, which depends on the joined item's
+type and is enforced in the domain layer.
 
-Semantics worth writing down now so the UI doesn't drift:
+**Statuses belong to a domain, not to the application** (DEC-057, seam 5b). Each domain
+declares an ordered vocabulary, which of its statuses may be chosen directly, the triage
+key for each, and the status a newly added entry takes. `GET /api/item-types` publishes
+all of it, and a status outside the item's own domain is refused with a 422.
+
+**Books** — `unsorted`, `read`, `reading`, `to_read`, `wishlist`, `dropped`; default `read`:
 
 - `unsorted` = **the inbox.** Exists in the library, has metadata, has no opinion
   attached yet. Everything imported lands here. Hidden from the main list by
@@ -150,8 +171,25 @@ Semantics worth writing down now so the UI doesn't drift:
 - `to_read` = I own it or can get it, intent to read
 - `wishlist` = I don't have it, want to acquire it
 - `dropped` = started, abandoned; may still carry a score
+
+**Albums** — `unsorted`, `wishlist`, `pending`, `owned`; default `owned`. An album's status
+records **possession, not consumption**: a record is played hundreds of times or twice, and
+the interesting fact is whether you have it. `pending` is "on the way". There is no
+relisten counter, and `date_started` / `date_finished` / `reread_count` do not exist for an
+album — they are refused on write, not merely hidden. The score and the note carry the
+opinion, as they always did.
+
+`unsorted` is universal, because an import lands there whatever the domain.
+
 - Score is independent of status. A `dropped` book can be a 3. A `to_read` book
   has no score. Never block scoring on status.
+
+**Formats** (DEC-059) are a second, independent axis on the **entry**: how *you* hold this
+copy, multi-valued, from a closed vocabulary the domain declares — `physical`/`borrowed`/
+`digital` for a book, `vinyl`/`cd`/`digital` for a record. Legal on any status, so a
+`wishlist` record can be `vinyl`: the pressing you mean to buy. Not a shelf — shelves are
+the higher tier of organization ("work", "fiction") — and not the item's `format`, which
+describes the release rather than your copy.
 
 Dates are ISO-8601 strings (`YYYY-MM-DD` for dates, full timestamp for
 `date_added`). SQLite has no date type; be consistent and it sorts correctly as
@@ -483,7 +521,7 @@ fetches and dedupes, commits the item/entry relationally, then installs a prepar
 cover or queues retryable cover work. Cover failure never rolls back the valid
 entry. The 20-second add flow depends on this not being three client round trips.
 
-**Sort keys:** `date_added` (default, desc), `score`, `title`, `sort_author`,
+**Sort keys:** `date_added` (default, desc), `score`, `title`, `creator`,
 `year`, `date_finished`. NULL scores sort last regardless of direction.
 
 **Pagination.** `GET /api/entries` is keyset-paginated, not offset-paginated:
@@ -571,26 +609,94 @@ Respect `prefers-reduced-motion` throughout — Motion has a hook for it.
 
 ### Screens
 
-**`/` — My Books.** The primary screen and the one to get right.
+**`/` — The library.** The primary screen and the one to get right. Since Sprint 029 it is
+also **the screen you search from and the screen you add from** (DEC-065, DEC-073); adding
+something no provider lists is the only thing that still leaves it.
+
+- **One bar across the top: the domain selector, the search input, and *Add*.** One control
+  picks two things at once — the rows you see *and* the providers a search would reach — so
+  there is never a moment where the application has to ask which domain you meant. The input
+  carries a clear control while it holds anything, and clearing empties the box, the query and
+  any web results together, because they are one thing as far as the reader is concerned.
+- **The domain strip names exactly one domain**, one tab per domain, rendered from the
+  registry and present only when the build has more than one. **"All" is not a filter**
+  (DEC-065): the choice lives in the URL like every other filter and is remembered between
+  visits, and a visit with nothing remembered lands on the first declared domain (DEC-062,
+  amended). The whole-library view is not lost — `/triage` and the export both still span
+  domains, and the unselected tab still carries a live count.
+- **Typing searches your library, over SQL, and reaches no provider** — at any query length,
+  for as long as the library has a match. This is the invariant §4.5 buys and it survives
+  having one bar: rendering a library page never makes a network call.
+- **A provider is reached only when the library has nothing and the query has settled**, or
+  immediately when you press **Add**. The exact rule is in DEC-065 and technical spec §8;
+  the reason it is a rule rather than a feel is the quota (DEC-045, and the tier breach
+  DEC-044 measured).
+- **Web results render below the library, in their own labelled region** — *From the web* —
+  never inside it. Below rather than above is deliberate: the library virtualizes against
+  the window, and a variable-height block above it moves the offset every row measures
+  itself against (DEC-073).
+- **Selecting a web result opens the confirm step as a dialog over the library**, not as a
+  navigation: the same form `/add` used to host — what is already known about the result,
+  *Load full details*, status, score, shelves, notes, format and the domain's passage
+  fields — plus the near-match path and *None of these — enter manually*. On success the
+  dialog closes onto the library with the new entry highlighted, and the query is cleared,
+  because the filter that had just missed would otherwise hide the thing you added.
 - Grid (covers) / compact table toggle, persisted in localStorage
-- Filter chips: status, shelf. Free-text filter over cached title/author, local
-  SQL only, no network
+- **Four filters in one row: sort, shelf, format and status.** Status is a multi-select rather
+  than a single choice, because wanting *Read* and *Reading* at once is ordinary; it offers
+  **the chosen domain's vocabulary and only that domain's**, with each status's count beside
+  it, since a library holding two domains has no single status vocabulary and a shared status
+  ("wishlist") is counted per domain rather than once. The tab already names the domain, so the
+  control carries no heading of its own. The format list is narrowed to the domain on screen.
+  Status had a row of its own until Sprint 029's second pass, which is a whole row of chrome
+  for the fourth of four filters (DEC-074)
+- **The page scrolls, not the grid.** The library is the primary surface and uses the whole
+  page; the virtualizer measures the window rather than a fixed-height box of its own
 - Sort dropdown per §6
 - Inline score editing directly from the list — click the number, type, done.
   No modal, no navigation.
 - Counts per status somewhere unobtrusive
+- **An empty library and an empty result are different silences.** No library is news, and says
+  so with the screen it deserves. A search that matched nothing is the ordinary case — it is
+  what makes the web search fire — so it gets one line naming the string that missed, and the
+  results land where the encouragement would otherwise have pushed them (DEC-074)
 
-**`/add` — Search & add.**
-- Single input accepting free text, URL, or ISBN; detects which
-- Picker grid per §4.3
-- On select: a small form — status (default `read`), score, shelves — then save
-  returns to `/` with the new entry highlighted
+**`/add` — Enter by hand.** Searching moved to `/` in Sprint 029 (DEC-065); what is left
+here is the one thing no provider can do for you.
+
+- The full validated manual form: title, creator and the domain's fields, then status (the
+  domain's default), score, shelves, notes and format — the same confirm step the dialog on
+  `/` hosts, rendered from the registry rather than branching on the item type.
+- **Reached deliberately**, from *None of these — enter manually* in the web results, or as a
+  deep link. It stays a route rather than moving inline; it is lazy-loaded, so keeping it
+  costs nothing in the bundle.
+- **It offers no domain choice**, and that is honest rather than missing: a manual add is
+  typed as the default domain whatever the client sends (DEC-067 row 6, DEC-073). Naming a
+  domain here would show one domain's statuses and fields and then write another's row.
+  Giving manual entry a real domain needs an API change and is unscheduled.
+- On success it returns to `/` with the new entry highlighted.
+
+The confirm step itself — **what we already know** about the thing you clicked, everything
+the search returned rendered from the domain's field spec, at no cost and with nothing to
+wait for, plus *Load full details*, which fetches the complete record (the description, the
+page count, the tracklist) in one provider request when asked (DEC-064) — now lives in the
+dialog on `/`, so a book you just finished is one action rather than an add followed by an
+edit.
 
 **`/books/{entry_id}` — Detail.**
 - Cover, full metadata, description
-- Editable: status, score, notes, dates, shelves, reread count
+- Editable: status, score, notes, format, and — for a domain that has them — dates and
+  reread count, in one *Edit your opinion* dialog. A format is picked from one closed
+  multi-select control, the same one the add screen uses, and never from a control that
+  can invent a value (DEC-059, DEC-064)
+- **Shelves are edited inline, where they are read** — the entry's shelves as removable
+  chips plus one control that filters existing shelves as you type and offers to create
+  what does not exist yet, creating and assigning in one action. Not in the opinion dialog
+  and not a trip to `/shelves`; and never converged with the format control, because a
+  shelf is one you invent and a format is a closed per-domain vocabulary (DEC-059)
 - Link to edit underlying item metadata
-- **Files** — attachments on the edition: name, size, download, rename, remove.
+- **Files** — its own region, at the weight of *Edit opinion* rather than a corner of the
+  edition facts (DEC-074): attachments on the edition, with name, size, download, rename, remove.
   Loaded as its own request so a slow read never delays the page. Renaming is
   inline, since the name is metadata and changing it moves no bytes; removing
   confirms first, because once the removed row is the last reference the upload
@@ -627,7 +733,8 @@ unless you choose it.
   this list: `s` was specified here as a shelf-autocomplete shortcut and
   retired unbuilt in Sprint 019 (DEC-043), because the surface it needs is a
   feature rather than a shortcut. Shelves are assigned from a book's detail
-  page. The *Add shelves* bulk action listed above is also still unbuilt.
+  page — or, for a whole selection at once, from the *Add to shelf* control in the
+  bulk action bar.
 - **Conflicts** — rows with unresolved conflicts in their joined import audit
   records show a marker; clicking expands both values inline with one click to
   choose. Never a modal.
@@ -644,8 +751,14 @@ enrichment. "Undo last import" for 24 hours.
 
 ### Interaction notes
 
-- Keyboard: `/` focuses search, `a` opens add, digits `1`–`9` + `0` set score on
-  a focused row
+- Keyboard: `/` focuses search, `a` focuses the same bar — adding is no longer a
+  place to go, so there is nothing for it to open (DEC-073) — and digits `1`–`9` + `0`
+  set score on a focused row
+- **With web results on screen, focus decides which surface the shortcuts address.**
+  Standing inside the results region, `j`/`k` do not scroll the library and a digit does
+  not score a row you are not looking at; the results are reached by Tab, and the confirm
+  dialog is covered already, since shortcuts are off while a dialog owns focus
+  (technical spec §8)
 - Confirmation dialogs are limited to delete and explicit provider refresh overwrite.
 - Dark mode, since this runs next to Jellyfin at night
 
@@ -710,18 +823,29 @@ ever lives on a different machine than the tracker, Calibre's Content Server
 exposes `/ajax/search` and `/ajax/books` over HTTP. Direct `metadata.db` reads
 are simpler while both are on the ZimaBoard.
 
-**Scheduled — second domain (albums).** The `items`/`entries` split and the
-two-method provider shape are the entire preparation. The second domain is
-**albums, scheduled as Sprint 025** under plan revision 10, not wine as this
-section originally assumed: MusicBrainz needs no OAuth, release-group versus
-release maps onto the work-versus-edition problem already solved for books, and
-Cover Art Archive exercises the separate-image-provider case. Sprint 026 is the
-status vocabulary; games (027) and series (028) follow. DEC-052 replaced the
-"add a provider and see" shape with **six named seams**, validated against the
-live MusicBrainz API rather than assumed — and found that casting an album into
-book fields is lossy, because MusicBrainz only inverts a *person's* sort name and
-a barcode is not a unique edition key. Do **not** build the plugin runtime before
-two domains exist.
+**Built — the second domain (albums), and the contract behind it.** The
+`items`/`entries` split and the two-method provider shape were the entire
+preparation. Albums were chosen over wine, which this section originally assumed:
+MusicBrainz needs no OAuth, release-group versus release maps onto the
+work-versus-edition problem already solved for books, and Cover Art Archive
+exercises the separate-image-provider case. DEC-052 replaced the "add a provider
+and see" shape with **six named seams**, validated against the live MusicBrainz
+API rather than assumed — and found that casting an album into book fields is
+lossy, because MusicBrainz only inverts a *person's* sort name and a barcode is
+not a unique edition key.
+
+Sprints 025–027 built albums; **Sprint 028 wrote the contract and made a domain a
+unit of code**: each one lives in its own package, holds its own vocabulary and
+adapter, and is held to a conformance suite it passes by existing. A third domain
+is now an **epic on top of that contract** rather than a sprint inside this plan
+(DEC-058), and it costs its own package, one registry entry, provider wiring and
+three enum lines — no migration, and no edit to another domain's files (DEC-069).
+**Games and series are named as future epics and carry no sprint number.** The
+guide is `docs/guides/adding-a-domain.md`.
+
+The line that has not moved: **no plugin runtime.** The registry is code, built
+and shipped with the application. Nothing here proposes discovery, sandboxing or
+versioning between a domain and the core.
 
 Wine stays exploratory and unscheduled — see `docs/domain_metadata_roadmap_report.md`.
 Expect it to be manual-entry-first: there's no free equivalent of ISBN, identity

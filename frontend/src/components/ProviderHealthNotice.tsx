@@ -46,7 +46,7 @@ export function ProviderHealthNotice() {
           ))}
         </ul>
         <p className="mt-1 text-muted-foreground">
-          Results may be missing editions. You can still add a book manually.
+          Results may be missing editions. You can still enter it by hand.
         </p>
       </div>
     </div>

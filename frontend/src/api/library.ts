@@ -1,3 +1,8 @@
+/**
+ * The union of every domain's statuses, which is what a *filter* spans and what the
+ * API can return for any row. Which of them a given entry may hold is its domain's
+ * business, published per item type at `/api/item-types` (seam 5b, DEC-057).
+ */
 export const entryStatuses = [
   "unsorted",
   "read",
@@ -5,17 +10,97 @@ export const entryStatuses = [
   "to_read",
   "wishlist",
   "dropped",
+  "pending",
+  "owned",
+] as const;
+
+/** The union of every domain's formats, for the same reason (DEC-059). */
+export const entryFormats = [
+  "physical",
+  "borrowed",
+  "digital",
+  "vinyl",
+  "cd",
 ] as const;
 
 export type EntryStatus = (typeof entryStatuses)[number];
+export type EntryFormat = (typeof entryFormats)[number];
 export type SortKey =
-  "date_added" | "score" | "title" | "sort_author" | "year" | "date_finished";
+  "date_added" | "score" | "title" | "creator" | "year" | "date_finished";
 export type SortOrder = "asc" | "desc";
 
 export interface Shelf {
   id: number;
   name: string;
   slug: string;
+}
+
+/** One cell of a `rows` field — a tracklist's position, title or length. */
+export interface ColumnSpec {
+  name: string;
+  label: string;
+  type: "text" | "number" | "duration";
+}
+
+/** One metadata field, as the domain that owns it describes it. */
+export interface FieldSpec {
+  name: string;
+  label: string;
+  type: "text" | "long_text" | "number" | "rows";
+  multiplicity: "one" | "many";
+  minimum?: number | null;
+  maximum?: number | null;
+  /** Present only on a `rows` field: what one row of it holds. */
+  columns?: ColumnSpec[] | null;
+}
+
+/** One status a domain's entries can be in, with the key that sets it in triage. */
+export interface StatusSpec {
+  value: EntryStatus;
+  label: string;
+  choosable: boolean;
+  hotkey: string | null;
+}
+
+export interface FormatSpec {
+  value: EntryFormat;
+  label: string;
+}
+
+export interface ItemType {
+  id: string;
+  label: string;
+  fields: FieldSpec[];
+  /**
+   * The statuses this domain's entries can hold, in the order a control offers them.
+   * An album is not a book with different words: `read` is not a state it can be in.
+   */
+  statuses: StatusSpec[];
+  default_status: EntryStatus;
+  /** Which of `date_started`, `date_finished`, `reread_count` this domain has. */
+  entry_fields: string[];
+  formats: FormatSpec[];
+  /** The heading over the personal region of the detail page. */
+  entry_panel_label: string;
+  /**
+   * Whether to offer the cover chooser (DEC-067 row 7). The shared chooser is Open
+   * Library's work-editions path, so a domain it does not serve declares `false` and
+   * the control is not rendered rather than rendered and unable to answer.
+   */
+  chooses_covers: boolean;
+}
+
+/**
+ * What each domain says its metadata fields are. Fetched once and cached: it changes
+ * with a deployment, never with a library edit, so a screen renders whatever the
+ * server declares instead of hardcoding one domain's vocabulary (DEC-052 seam 3).
+ */
+export async function getItemTypes(): Promise<ItemType[]> {
+  const response = await fetch("/api/item-types", {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("Item types could not be loaded");
+  return response.json() as Promise<ItemType[]>;
 }
 
 /** The edition. Shared by everyone who owns it; never carries opinion data. */
@@ -25,23 +110,15 @@ export interface LibraryItem {
   title: string;
   subtitle: string | null;
   year: number | null;
-  sort_author: string | null;
+  creator: string | null;
   /** The name this edition sorts under: "García Márquez, Gabriel". */
   creator_sort?: string | null;
   /** Set only when the owner corrected it; absent means the automatic value. */
   creator_sort_override?: string | null;
   cover_url?: string | null;
   cover_path?: string | null;
-  metadata: {
-    authors?: string[];
-    publisher?: string | null;
-    language?: string | null;
-    page_count?: number | null;
-    description?: string | null;
-    subjects?: string[];
-    series?: string | null;
-    original_year?: number | null;
-  };
+  /** Opaque: what is in here is the domain's business, not this type's. */
+  metadata: Record<string, unknown>;
   identifiers: Record<string, string>;
   sources: Array<{ source: string; source_id: string; is_primary: boolean }>;
 }
@@ -60,18 +137,29 @@ export interface LibraryEntry {
   suggested_status: EntryStatus | null;
   item: LibraryItem;
   shelves: Shelf[];
+  /** How you hold this copy, in the domain's declared order (DEC-059). */
+  formats: EntryFormat[];
 }
 
 export interface LibraryPage {
   items: LibraryEntry[];
   next_cursor: string | null;
   total: number;
-  facets: { status_counts: Partial<Record<EntryStatus, number>> };
+  facets: {
+    /** Whole-library totals: what the inbox badge counts. */
+    status_counts: Partial<Record<EntryStatus, number>>;
+    /** The same counts per item type, for a screen that lists domains separately. */
+    status_counts_by_type: Record<string, Partial<Record<EntryStatus, number>>>;
+    format_counts: Partial<Record<EntryFormat, number>>;
+  };
 }
 
 export interface LibraryFilters {
   statuses: EntryStatus[];
   shelves: string[];
+  formats: EntryFormat[];
+  /** Which domains to show. Empty means every one of them. */
+  types: string[];
   query: string;
   sort: SortKey;
   order: SortOrder;
@@ -85,6 +173,8 @@ export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
   });
   filters.statuses.forEach((status) => params.append("status", status));
   filters.shelves.forEach((shelf) => params.append("shelf", shelf));
+  filters.formats.forEach((format) => params.append("format", format));
+  filters.types.forEach((type) => params.append("type", type));
   if (filters.query.trim()) params.set("q", filters.query.trim());
   if (cursor) params.set("after", cursor);
   return params.toString();
@@ -121,7 +211,7 @@ export async function patchEntry(
       | "date_finished"
       | "reread_count"
     >
-  > & { shelf_ids?: number[] },
+  > & { shelf_ids?: number[]; formats?: EntryFormat[] },
 ): Promise<LibraryEntry> {
   const response = await fetch(`/api/entries/${entryId}`, {
     method: "PATCH",
@@ -136,7 +226,7 @@ export async function getEntry(entryId: number): Promise<LibraryEntry> {
   const response = await fetch(`/api/entries/${entryId}`, {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Book detail could not be loaded");
+  if (!response.ok) throw new Error("Detail could not be loaded");
   return response.json() as Promise<LibraryEntry>;
 }
 
@@ -148,7 +238,7 @@ export async function patchItem(
     year?: number | null;
     /** Null drops the correction and goes back to the automatic sort name. */
     creator_sort_override?: string | null;
-    metadata?: Partial<LibraryEntry["item"]["metadata"]>;
+    metadata?: Record<string, unknown>;
   },
 ): Promise<LibraryEntry["item"]> {
   const response = await fetch(`/api/items/${itemId}`, {
@@ -156,7 +246,7 @@ export async function patchItem(
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(changes),
   });
-  if (!response.ok) throw new Error("Book metadata could not be saved");
+  if (!response.ok) throw new Error("Metadata could not be saved");
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
@@ -240,6 +330,8 @@ export interface BulkSet {
   score?: number;
   add_shelves?: number[];
   remove_shelves?: number[];
+  add_formats?: EntryFormat[];
+  remove_formats?: EntryFormat[];
   clear_provisional?: boolean;
 }
 

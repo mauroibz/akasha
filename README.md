@@ -7,7 +7,7 @@
 
 # Akasha
 
-**A self-hosted book tracker that records what you thought of a book.**
+**A self-hosted library that records what you thought of a book or a record.**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-fbbf24?style=flat-square)](LICENSE)
 [![Self-hosted](https://img.shields.io/badge/deploy-LAN%20only-a1a1aa?style=flat-square)](SECURITY.md)
@@ -25,11 +25,17 @@
 ## What it is
 
 Akasha is a personal library that runs on a small server in your house. One user,
-no accounts, no social layer, no sharing. You add a book, give it a score out of
-ten, write a note, put it on a shelf.
+no accounts, no social layer, no sharing. You add a book or a record, give it a score
+out of ten, write a note, put it on a shelf.
+
+It holds **two kinds of thing so far**, and each brings its own vocabulary rather than
+borrowing the other's: a book is *read*, *reading* or *to read* and has a page count; a
+record is *owned*, *on the way* or *wishlisted* and has a tracklist and a label. Nothing
+above the registry knows which is which, so a third kind is a package rather than a
+rewrite.
 
 It exists because reading trackers optimise for other people seeing your shelves.
-This one optimises for you remembering, three years later, whether a book was any
+This one optimises for you remembering, three years later, whether something was any
 good and why. No social media features, fully offline.
 
 > [!WARNING]
@@ -42,12 +48,21 @@ good and why. No social media features, fully offline.
 - **A library that stays fast.** Ten thousand entries scroll smoothly — a virtualized
   grid and a compact table, keyset pagination, six sorts. Search and sorting are
   accent-insensitive, so `avila` finds `Ávila`.
-- **Adding books.** Search Open Library and Google Books, or type a book in by hand.
-  Covers are fetched once and stored locally; providers are never called while
-  rendering a page you already have.
-- **Your opinions, protected.** Score, status, dates, reread count, notes and shelves.
-  Nothing you wrote is ever overwritten by a metadata refresh — that is an invariant
-  the test suite enforces, not a promise.
+- **One bar for finding and adding.** The same box searches your library as you type and
+  reaches the web only when your library has nothing and the query has settled — or when
+  you press **Add**. Books come from Open Library and Google Books, records from
+  MusicBrainz and the Cover Art Archive; paste a URL or an ISBN and it resolves that
+  instead of guessing. Covers are fetched once and stored locally, and **providers are
+  never called while rendering a page you already have**.
+- **Music, as its own domain.** Records are not books with different words on them: they
+  have their own statuses, their own formats (vinyl, CD, digital), their own fields and
+  their own provider. Adding one says *Album added*, and a shelf that holds both counts
+  *items*.
+- **Your opinions, protected.** Score, status, notes, shelves, and how you own your copy
+  — plus dates and a reread count for the kinds of thing that have them, and none for the
+  kinds that do not. Nothing you
+  wrote is ever overwritten by a metadata refresh — that is an invariant the test suite
+  enforces, not a promise.
 - **Keyboard triage.** Work through a backlog with `j`/`k` to move, digits to score,
   letters to set status, `Enter` to accept.
 - **Imports with a preview and an undo.** Goodreads CSV and a read-only Calibre
@@ -55,7 +70,7 @@ good and why. No social media features, fully offline.
   after.
 - **Background enrichment.** A durable job queue fills in metadata and covers, retries
   failures, and survives a restart.
-- **Files on a book.** Attach an epub or a PDF to an edition and download it again
+- **Files on an edition.** Attach an epub or a PDF to an edition and download it again
   later. Stored by content, so the same file attached twice takes the space of one,
   and seven nights of backups cost about one copy rather than seven. Files are served
   as downloads and never rendered, and nothing here parses them — this is a shelf, not
@@ -68,9 +83,9 @@ good and why. No social media features, fully offline.
   surfaces are proper ARIA feeds.
 
 <details>
-<summary><b>A book's detail page</b></summary>
+<summary><b>An entry's detail page</b></summary>
 
-![A book detail page](docs/brand/screenshots/detail.png)
+![An entry's detail page](docs/brand/screenshots/detail.png)
 
 </details>
 
@@ -176,6 +191,43 @@ FastAPI, SQLAlchemy, Alembic and SQLite on the backend. React 18, Vite, TypeScri
 Tailwind, shadcn/ui and TanStack Query on the frontend. One container, one process,
 one SQLite file.
 
+### Domains
+
+A **domain** is a kind of thing the library holds. Books ship; albums are built and
+waiting to be released. The point of the structure is that a third one — games, films,
+board games — is somebody else's afternoon rather than a fork.
+
+```text
+backend/src/book_tracker/
+├── api/             # thin FastAPI routers and error mapping
+├── application/     # use cases and transaction boundaries
+├── domain/          # spec.py: what a domain IS · registry.py: which ones EXIST
+├── domains/         # one package per domain
+│   ├── book/        #   declaration · Open Library + Google Books · Goodreads + Calibre
+│   └── album/       #   declaration · MusicBrainz + Cover Art Archive
+├── infrastructure/  # SQLAlchemy, provider HTTP, covers, jobs
+└── main.py
+```
+
+A domain declares its metadata fields, its status vocabulary, its formats, its identity
+rule and what it recognises in the add box. **That one declaration is served over the API
+and every screen renders from it** — tabs, chips, the metadata dialog, triage hotkeys, the
+detail page. There is no `if item_type == "book"` anywhere above the registry, and a
+conformance suite parametrised over the registry holds every domain to the same contract
+*by existing*.
+
+Adding one costs your own package, one registry entry, provider wiring and three enum
+lines. **No database migration, and no edit to another domain's files.**
+
+→ **[How to add a domain](docs/guides/adding-a-domain.md)** · the binding contract is
+[technical spec §6.6](docs/specs/technical-spec.md)
+
+### The documentation
+
+[`docs/README.md`](docs/README.md) is the map. Every document there says whether it is
+**canonical**, **historical** or a **proposal**, so a dated file is never mistaken for
+instructions.
+
 Architecture and contracts live in [the technical spec](docs/specs/technical-spec.md);
 product behaviour is canonical in [the product spec](docs/specs/product-spec.md).
 Every material decision, with its reasoning, is in [`docs/decisions.md`](docs/decisions.md).
@@ -197,10 +249,15 @@ icons as a sibling.
 
 ## Contributing
 
-Issues and pull requests are welcome. Two things worth knowing first:
+Issues and pull requests are welcome. **[`CONTRIBUTING.md`](CONTRIBUTING.md)** has the
+setup, the gates and the rules that are not style preferences. Three things worth knowing
+before you open it:
 
-- Read [`AGENTS.md`](AGENTS.md) — it governs how changes are made here, and the test
-  and verification gates are strict on purpose.
+- **Adding a domain has its own guide** —
+  [`docs/guides/adding-a-domain.md`](docs/guides/adding-a-domain.md). You should never
+  have to reverse-engineer how albums were built.
+- [`AGENTS.md`](AGENTS.md) governs how changes are made here, and the verification gates
+  are strict on purpose.
 - Provider fixtures in `backend/tests/fixtures/providers/` are pinned recordings of
   real API responses. **Never re-record one to make a test pass** — that turns a
   regression test into a rubber stamp.

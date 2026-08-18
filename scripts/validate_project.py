@@ -30,8 +30,9 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # The last sprint on `docs/sprints/ROADMAP.md`. A project may only be marked complete when
 # every sprint through this one is completed, which is what stops a session from declaring
 # the plan finished early. Move it whenever the roadmap is extended, and record the move in
-# the decision that extends it (DEC-035 moved it to 19, DEC-042 to 26, DEC-052 to 28).
-FINAL_SPRINT = 28
+# the decision that extends it (DEC-035 moved it to 19, DEC-042 to 26, DEC-052 to 28,
+# DEC-058 to 29, DEC-065 to 30, DEC-071 to 31).
+FINAL_SPRINT = 31
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

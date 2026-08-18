@@ -12,12 +12,23 @@ from sqlalchemy.orm import Session
 
 from book_tracker.domain.normalization import normalize_text, shelf_slug
 from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
+from book_tracker.domain.registry import DOMAINS
+from book_tracker.domain.spec import (
+    Domain,
+    InvalidEntryField,
+    InvalidFormat,
+    InvalidStatus,
+    validate_entry_fields,
+    validate_formats,
+    validate_status,
+)
 from book_tracker.infrastructure.attachments import (
     StoredBlob,
     delete_blob_if_unreferenced,
 )
 from book_tracker.infrastructure.models import (
     AttachmentRow,
+    EntryFormatRow,
     EntryRow,
     EntryShelfRow,
     ItemIdentifierRow,
@@ -102,6 +113,60 @@ class LibraryService:
             raise LibraryError("item_not_found", "Item was not found", status_code=404)
         return item
 
+    def _domain(self, session: Session, entry: EntryRow) -> Domain:
+        """The domain of the item this entry hangs on.
+
+        Every per-entry rule in this module is keyed on this rather than on a
+        parameter, so a caller cannot pass the wrong one and no path can forget to
+        ask (DEC-052 seam 5b).
+        """
+        item_type = str(self._item(session, entry.item_id).type)
+        domain = DOMAINS.get(item_type)
+        if domain is None:
+            raise LibraryError("unknown_item_type", f"No domain describes {item_type!r}")
+        return domain
+
+    def _validated(self, domain: Domain, changes: Mapping[str, Any]) -> dict[str, Any]:
+        """Check a set of entry changes against the domain that owns the item.
+
+        One place rather than three, because `update_entry`, `bulk_update` and the
+        add path all write the same fields and a rule enforced in two of them is a
+        rule the third quietly breaks.
+        """
+        try:
+            validated = validate_entry_fields(domain, changes)
+            if changes.get("status") is not None:
+                validate_status(domain, changes["status"])
+            if changes.get("formats") is not None:
+                validated["formats"] = validate_formats(domain, changes["formats"])
+            for key in ("add_formats", "remove_formats"):
+                if changes.get(key):
+                    validated[key] = validate_formats(domain, changes[key])
+        except InvalidStatus as error:
+            raise LibraryError("invalid_status", str(error), status_code=422) from error
+        except InvalidFormat as error:
+            raise LibraryError("invalid_format", str(error), status_code=422) from error
+        except InvalidEntryField as error:
+            raise LibraryError("invalid_entry_field", str(error), status_code=422) from error
+        return validated
+
+    def _formats_for_entry(self, session: Session, entry_id: int, domain: Domain) -> list[str]:
+        """The entry's formats in the domain's declared order, not the row order.
+
+        `Vinyl, Digital` reads the way the control offers them; alphabetical would
+        put "CD" first for no reason a reader could name.
+        """
+        held = set(
+            session.scalars(
+                select(EntryFormatRow.format).where(EntryFormatRow.entry_id == entry_id)
+            )
+        )
+        return [row.value for row in domain.formats if row.value in held]
+
+    def _set_formats(self, session: Session, entry_id: int, values: Sequence[str]) -> None:
+        session.execute(delete(EntryFormatRow).where(EntryFormatRow.entry_id == entry_id))
+        session.add_all(EntryFormatRow(entry_id=entry_id, format=value) for value in values)
+
     def _shelf(self, session: Session, shelf_id: int) -> ShelfRow:
         shelf = session.scalar(
             select(ShelfRow).where(ShelfRow.id == shelf_id, ShelfRow.user_id == self.user_id)
@@ -125,6 +190,7 @@ class LibraryService:
 
     def _entry_dict(self, session: Session, entry: EntryRow) -> dict[str, Any]:
         item = self._item(session, entry.item_id)
+        domain = self._domain(session, entry)
         return {
             "id": entry.id,
             "item_id": entry.item_id,
@@ -139,6 +205,7 @@ class LibraryService:
             "suggested_status": entry.suggested_status,
             "item": self._item_dict(session, item),
             "shelves": self._shelves_for_entry(session, entry.id),
+            "formats": self._formats_for_entry(session, entry.id, domain),
         }
 
     @staticmethod
@@ -167,7 +234,10 @@ class LibraryService:
             "title": item.title,
             "subtitle": item.subtitle,
             "year": item.year,
-            "sort_author": item.sort_author,
+            # The credit as the source rendered it, and the first creator's name when
+            # nobody rendered one: "Dean Blunt Meets James Ferraro" is not the join of
+            # the ordered list, and a book's single author is both.
+            "creator": metadata.get("credit") or item.creator_primary,
             "creator_sort": item.creator_sort,
             "creator_sort_override": item.creator_sort_override,
             "cover_url": f"/api/items/{item.id}/cover?v={cover_version}"
@@ -192,6 +262,7 @@ class LibraryService:
     def update_entry(self, entry_id: int, changes: Mapping[str, Any]) -> dict[str, Any]:
         with self._write() as session:
             entry = self._entry(session, entry_id)
+            changes = self._validated(self._domain(session, entry), changes)
             for field in (
                 "status",
                 "score",
@@ -204,6 +275,8 @@ class LibraryService:
                     setattr(entry, field, changes[field])
             if "score" in changes:
                 entry.score_provisional = 0
+            if "formats" in changes:
+                self._set_formats(session, entry.id, changes["formats"])
             if "shelf_ids" in changes:
                 shelf_ids = set(changes["shelf_ids"])
                 found = set(
@@ -490,22 +563,48 @@ class LibraryService:
             session.delete(self._shelf(session, shelf_id))
 
     @staticmethod
-    def _filter_key(statuses: Sequence[str] | None, shelves: Sequence[str], q: str | None) -> str:
+    def _filter_key(
+        statuses: Sequence[str] | None,
+        shelves: Sequence[str],
+        q: str | None,
+        formats: Sequence[str] = (),
+        types: Sequence[str] = (),
+    ) -> str:
+        """What a cursor is bound to. Every filter has to be in here.
+
+        A key that omits one lets a cursor cut for one filter be accepted under
+        another, which skips or repeats a page silently rather than failing.
+        """
         value = json.dumps(
-            {"q": q or "", "shelves": sorted(shelves), "statuses": sorted(statuses or [])},
+            {
+                "q": q or "",
+                "shelves": sorted(shelves),
+                "statuses": sorted(statuses or []),
+                "formats": sorted(formats),
+                "types": sorted(types),
+            },
             separators=(",", ":"),
             sort_keys=True,
         )
         return hashlib.sha256(value.encode()).hexdigest()[:16]
 
     def _filtered_entries(
-        self, statuses: Sequence[str] | None, shelves: Sequence[str], q: str | None
+        self,
+        statuses: Sequence[str] | None,
+        shelves: Sequence[str],
+        q: str | None,
+        formats: Sequence[str] = (),
+        types: Sequence[str] = (),
     ) -> Any:
         query = (
             select(EntryRow)
             .join(ItemRow, ItemRow.id == EntryRow.item_id)
             .where(EntryRow.user_id == self.user_id)
         )
+        if types:
+            # Unlike shelves and formats, repeating this *widens*: a row has exactly
+            # one type, so asking for two of them is a union rather than a narrowing.
+            query = query.where(ItemRow.type.in_(types))
         if statuses is None:
             query = query.where(EntryRow.status != "unsorted")
         elif statuses:
@@ -520,6 +619,17 @@ class LibraryService:
                     .having(func.count(func.distinct(ShelfRow.slug)) == len(set(shelves)))
                 )
             )
+        if formats:
+            # The shelf filter's shape: an entry must carry every value asked for,
+            # so two of them narrows rather than widens.
+            query = query.where(
+                EntryRow.id.in_(
+                    select(EntryFormatRow.entry_id)
+                    .where(EntryFormatRow.format.in_(formats))
+                    .group_by(EntryFormatRow.entry_id)
+                    .having(func.count(func.distinct(EntryFormatRow.format)) == len(set(formats)))
+                )
+            )
         if q:
             pattern = f"%{normalize_text(q)}%"
             # The stored projection holds exactly what `normalize_text` returns
@@ -528,7 +638,7 @@ class LibraryService:
             query = query.where(
                 or_(
                     ItemRow.title_normalized.like(pattern),
-                    ItemRow.sort_author_normalized.like(pattern),
+                    ItemRow.creator_primary_normalized.like(pattern),
                 )
             )
         return query
@@ -539,6 +649,8 @@ class LibraryService:
         statuses: Sequence[str] | None = None,
         shelves: Sequence[str] = (),
         q: str | None = None,
+        formats: Sequence[str] = (),
+        types: Sequence[str] = (),
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -549,15 +661,15 @@ class LibraryService:
             "score": EntryRow.score,
             "title": ItemRow.title_normalized,
             # Ordering reads the creator sort name; the `q` filter above stays on
-            # `sort_author_normalized`, because search matches the name as it is
+            # `creator_primary_normalized`, because search matches the name as it is
             # written and "gabriel garcia" must keep finding García Márquez.
-            "sort_author": ItemRow.creator_sort_normalized,
+            "creator": ItemRow.creator_sort_normalized,
             "year": ItemRow.year,
             "date_finished": EntryRow.date_finished,
         }
         expression = sort_expressions[sort]
         bucket = case((expression.is_(None), 1), else_=0)
-        filter_key = self._filter_key(statuses, shelves, q)
+        filter_key = self._filter_key(statuses, shelves, q, formats, types)
         state = None
         if after:
             try:
@@ -565,7 +677,7 @@ class LibraryService:
             except CursorError as error:
                 raise LibraryError("invalid_cursor", str(error), status_code=400) from error
 
-        query = self._filtered_entries(statuses, shelves, q)
+        query = self._filtered_entries(statuses, shelves, q, formats, types)
         if state is not None:
             id_comparison = (
                 EntryRow.id > state.entry_id if order == "asc" else EntryRow.id < state.entry_id
@@ -594,12 +706,43 @@ class LibraryService:
             has_more = len(entries) > limit
             entries = entries[:limit]
             total_query = select(func.count()).select_from(
-                self._filtered_entries(statuses, shelves, q).order_by(None).subquery()
+                self._filtered_entries(statuses, shelves, q, formats, types)
+                .order_by(None)
+                .subquery()
             )
             total = session.scalar(total_query) or 0
-            facet_base = self._filtered_entries([], shelves, q).subquery()
+            # Each facet clears its own dimension, so a count reads as "what you would
+            # get if you clicked this" rather than as a count of the current page.
+            # `type` is deliberately *cleared* here while every other filter is kept.
+            # The two consumers below both need to see across the selected domain:
+            # `status_counts` is the whole-library total the inbox badge means, and
+            # narrowing it would make the badge disagree with `/triage`, which is
+            # domain-agnostic; `status_counts_by_type` is already split by type, so a
+            # tab that is *not* selected still has a live count to show.
+            facet_base = self._filtered_entries([], shelves, q, formats).subquery()
+            # Grouped by the item's type as well as the status, because a status two
+            # domains share is not one number on a screen that lists them separately:
+            # a wishlisted record counted under "Book · Wishlist" is a wrong answer
+            # the walkthrough caught. `status_counts` stays the whole-library total,
+            # which is what the inbox badge means.
             facet_rows = session.execute(
-                select(facet_base.c.status, func.count()).group_by(facet_base.c.status)
+                select(facet_base.c.status, ItemRow.type, func.count())
+                .join(ItemRow, ItemRow.id == facet_base.c.item_id)
+                .group_by(facet_base.c.status, ItemRow.type)
+            ).all()
+            status_counts: dict[str, int] = {}
+            by_type: dict[str, dict[str, int]] = {}
+            for status_value, item_type, count in facet_rows:
+                status_counts[status_value] = status_counts.get(status_value, 0) + count
+                by_type.setdefault(item_type, {})[status_value] = count
+            # The format selector sits *under* the tab, so this one keeps the type
+            # filter: offering "Physical 312" while the library is showing records is
+            # an answer to a question nobody asked.
+            format_base = self._filtered_entries(statuses, shelves, q, (), types).subquery()
+            format_rows = session.execute(
+                select(EntryFormatRow.format, func.count())
+                .join(format_base, format_base.c.id == EntryFormatRow.entry_id)
+                .group_by(EntryFormatRow.format)
             ).all()
             next_cursor = None
             if has_more and entries:
@@ -613,7 +756,7 @@ class LibraryService:
                     # divergence between the two would silently skip or repeat a
                     # page.
                     "title": item.title_normalized,
-                    "sort_author": item.creator_sort_normalized,
+                    "creator": item.creator_sort_normalized,
                     "year": item.year,
                     "date_finished": last.date_finished,
                 }
@@ -632,7 +775,11 @@ class LibraryService:
                 "items": [self._entry_dict(session, entry) for entry in entries],
                 "next_cursor": next_cursor,
                 "total": total,
-                "facets": {"status_counts": {row[0]: row[1] for row in facet_rows}},
+                "facets": {
+                    "status_counts": status_counts,
+                    "status_counts_by_type": by_type,
+                    "format_counts": {row[0]: row[1] for row in format_rows},
+                },
             }
 
     def _selection(
@@ -658,7 +805,12 @@ class LibraryService:
             return entries
         assert filters is not None
         statuses = filters.get("status")
-        query = self._filtered_entries(statuses, filters.get("shelf", []), filters.get("q"))
+        query = self._filtered_entries(
+            statuses,
+            filters.get("shelf", []),
+            filters.get("q"),
+            filters.get("format", []),
+        )
         if excluded_entry_ids:
             query = query.where(EntryRow.id.not_in(excluded_entry_ids))
         return list(session.scalars(query))
@@ -673,6 +825,14 @@ class LibraryService:
     ) -> int:
         with self._write() as session:
             entries = self._selection(session, entry_ids, filters, excluded_entry_ids)
+            # Validated against every selected entry's own domain *before* anything is
+            # written: a selection can legitimately span domains, and half-applying a
+            # mixed write is worse than refusing it, because nothing shows which half
+            # landed and the undo ledger does not cover a manual edit.
+            per_entry = {
+                entry.id: self._validated(self._domain(session, entry), changes)
+                for entry in entries
+            }
             add_shelves = set(changes.get("add_shelves", []))
             remove_shelves = set(changes.get("remove_shelves", []))
             requested_shelves = add_shelves | remove_shelves
@@ -691,8 +851,20 @@ class LibraryService:
                     )
             now = _now()
             for entry in entries:
+                validated = per_entry[entry.id]
                 if changes.get("status") is not None:
                     entry.status = changes["status"]
+                if validated.get("add_formats"):
+                    for value in validated["add_formats"]:
+                        if session.get(EntryFormatRow, (entry.id, value)) is None:
+                            session.add(EntryFormatRow(entry_id=entry.id, format=value))
+                if validated.get("remove_formats"):
+                    session.execute(
+                        delete(EntryFormatRow).where(
+                            EntryFormatRow.entry_id == entry.id,
+                            EntryFormatRow.format.in_(validated["remove_formats"]),
+                        )
+                    )
                 if "score" in changes:
                     entry.score = changes["score"]
                     entry.score_provisional = 0

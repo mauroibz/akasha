@@ -8,6 +8,63 @@ import { Toaster } from "@/components/ui/sonner";
 import { findToast } from "@/test/toast";
 import { DetailPage } from "./DetailPage";
 
+/** What `GET /api/item-types` publishes for a book (DEC-052 seam 3). */
+const itemTypes = [
+  {
+    id: "book",
+    label: "Book",
+    fields: [
+      {
+        name: "creators",
+        label: "Creators",
+        type: "text",
+        multiplicity: "many",
+      },
+      {
+        name: "publisher",
+        label: "Publisher",
+        type: "text",
+        multiplicity: "one",
+      },
+      {
+        name: "language",
+        label: "Language",
+        type: "text",
+        multiplicity: "one",
+      },
+      {
+        name: "page_count",
+        label: "Page count",
+        type: "number",
+        multiplicity: "one",
+        minimum: 1,
+        maximum: 100000,
+      },
+      {
+        name: "description",
+        label: "Description",
+        type: "long_text",
+        multiplicity: "one",
+      },
+      {
+        name: "subjects",
+        label: "Subjects",
+        type: "text",
+        multiplicity: "many",
+      },
+      { name: "series", label: "Series", type: "text", multiplicity: "one" },
+      {
+        name: "original_year",
+        label: "Original publication year",
+        type: "number",
+        multiplicity: "one",
+        minimum: 0,
+        maximum: 9999,
+      },
+    ],
+  },
+];
+
 const entry = {
   id: 7,
   item_id: 3,
@@ -26,12 +83,12 @@ const entry = {
     title: "Rayuela",
     subtitle: null,
     year: 1963,
-    sort_author: "Julio Cortázar",
+    creator: "Julio Cortázar",
     creator_sort: "Cortázar, Julio",
     cover_path: null,
     cover_url: null,
     metadata: {
-      authors: ["Julio Cortázar"],
+      creators: ["Julio Cortázar"],
       publisher: "Sudamericana",
       language: "es",
       page_count: 736,
@@ -44,6 +101,7 @@ const entry = {
     sources: [{ source: "openlibrary", source_id: "OL1M", is_primary: true }],
   },
   shelves: [{ id: 1, name: "Favorites", slug: "favorites" }],
+  formats: ["physical"],
 };
 
 function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
@@ -90,6 +148,8 @@ describe("DetailPage", () => {
       .mockImplementation(async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
         if (url.includes("/cover-candidates"))
           return new Response(JSON.stringify(candidates));
         if (init?.method === "POST")
@@ -142,6 +202,8 @@ describe("DetailPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (url.includes("/cover-candidates"))
         return new Response(
           JSON.stringify({ candidates: [], reason: "no_provider_reference" }),
@@ -166,6 +228,8 @@ describe("DetailPage", () => {
       .mockImplementation(async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
         if (!init) return new Response(JSON.stringify(entry));
         if (url.includes("/entries/"))
           return new Response(JSON.stringify({ ...entry, notes: "Loved it" }));
@@ -182,9 +246,7 @@ describe("DetailPage", () => {
     await user.clear(screen.getByLabelText(/notes/i));
     await user.type(screen.getByLabelText(/notes/i), "Loved it");
     await user.click(screen.getByRole("button", { name: /save opinion/i }));
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/^title$/i));
     await user.type(screen.getByLabelText(/^title$/i), "Rayuela corregida");
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
@@ -201,6 +263,8 @@ describe("DetailPage", () => {
   it("renders all standard metadata fields", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -214,11 +278,195 @@ describe("DetailPage", () => {
     expect(screen.getByText("Favorites")).toBeVisible();
   });
 
+  it("renders the fields the server declares, not a hardcoded book form", async () => {
+    // The component is never edited for a new domain: the same code renders an
+    // album's fields because the spec says so (DEC-052 seam 3, AC7).
+    const albumTypes = [
+      {
+        id: "album",
+        label: "Album",
+        fields: [
+          {
+            name: "creators",
+            label: "Artists",
+            type: "text",
+            multiplicity: "many",
+          },
+          { name: "label", label: "Label", type: "text", multiplicity: "one" },
+          {
+            name: "track_count",
+            label: "Tracks",
+            type: "number",
+            multiplicity: "one",
+            minimum: 1,
+            maximum: 10000,
+          },
+        ],
+      },
+    ];
+    const album = {
+      ...entry,
+      item: {
+        ...entry.item,
+        type: "album",
+        title: "Discovery",
+        creator: "Daft Punk",
+        creator_sort: "Daft Punk",
+        metadata: {
+          creators: ["Daft Punk"],
+          label: "Virgin",
+          track_count: 14,
+        },
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(albumTypes));
+      return new Response(JSON.stringify(album));
+    });
+    renderPage();
+    const user = userEvent.setup();
+    await screen.findByRole("heading", { name: "Discovery" });
+
+    // The facts panel speaks the album's vocabulary and none of the book's.
+    expect(document.querySelector("[data-fact='label'] dd")).toHaveTextContent(
+      "Virgin",
+    );
+    expect(document.querySelector("[data-fact='page_count']")).toBeNull();
+
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
+    const dialog = await screen.findByRole("dialog");
+    expect(within(dialog).getByLabelText(/^label$/i)).toHaveValue("Virgin");
+    expect(within(dialog).getByLabelText(/^tracks$/i)).toHaveValue(14);
+    expect(
+      within(dialog).getByLabelText(/^artists, comma separated$/i),
+    ).toHaveValue("Daft Punk");
+    expect(within(dialog).queryByLabelText(/page count/i)).toBeNull();
+  });
+
+  it("gives an album its own statuses, formats and heading", async () => {
+    // Seam 5b (DEC-057): not the book vocabulary renamed. An album is `owned`, has
+    // no reread count and no dates, and its personal region is not "reading data".
+    const albumTypes = [
+      {
+        id: "album",
+        label: "Album",
+        fields: [],
+        statuses: [
+          { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+          {
+            value: "wishlist",
+            label: "Wishlist",
+            choosable: true,
+            hotkey: "w",
+          },
+          {
+            value: "pending",
+            label: "On the way",
+            choosable: true,
+            hotkey: "p",
+          },
+          { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+        ],
+        default_status: "owned",
+        entry_fields: [],
+        formats: [
+          { value: "vinyl", label: "Vinyl" },
+          { value: "cd", label: "CD" },
+        ],
+        entry_panel_label: "Your copy",
+        chooses_covers: false,
+      },
+    ];
+    const album = {
+      ...entry,
+      status: "owned",
+      formats: ["vinyl"],
+      item: { ...entry.item, type: "album", title: "Discovery", metadata: {} },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(albumTypes));
+      return new Response(JSON.stringify(album));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Discovery" });
+
+    expect(document.querySelector("[data-fact='status'] dd")).toHaveTextContent(
+      "Owned",
+    );
+    expect(
+      document.querySelector("[data-fact='formats'] dd"),
+    ).toHaveTextContent("Vinyl");
+    expect(screen.getByRole("heading", { name: "Your copy" })).toBeVisible();
+    // The three fields a record has no meaning for are gone, not blank.
+    expect(document.querySelector("[data-fact='rereads']")).toBeNull();
+    expect(document.querySelector("[data-fact='started']")).toBeNull();
+    expect(document.querySelector("[data-fact='finished']")).toBeNull();
+    // And the cover chooser, which is Open Library's work-editions path, is not
+    // offered where it could only ever say no (DEC-067 row 7).
+    expect(screen.queryByRole("button", { name: "Choose a cover" })).toBeNull();
+  });
+
+  it("still offers the cover chooser to a domain that declares it", async () => {
+    const bookTypes = [
+      {
+        id: "book",
+        label: "Book",
+        fields: [],
+        statuses: [
+          { value: "read", label: "Read", choosable: true, hotkey: "r" },
+        ],
+        default_status: "read",
+        entry_fields: ["date_started", "date_finished", "reread_count"],
+        formats: [],
+        entry_panel_label: "Your reading data",
+        chooses_covers: true,
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(bookTypes));
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    expect(
+      screen.getByRole("button", { name: "Choose a cover" }),
+    ).toBeVisible();
+  });
+
+  it("keeps a book's reading data, the half DEC-057 did not touch", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types") return new Response("[]");
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    expect(document.querySelector("[data-fact='rereads']")).not.toBeNull();
+    expect(document.querySelector("[data-fact='started']")).not.toBeNull();
+    expect(
+      screen.getByRole("heading", { name: "Your reading data" }),
+    ).toBeVisible();
+  });
+
   it("corrects the creator sort name and clears it back to the automatic value", async () => {
     const bodies: string[] = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") {
         bodies.push(String(init.body));
         return new Response(JSON.stringify(entry.item));
@@ -228,9 +476,7 @@ describe("DetailPage", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     // The automatic value is offered as the placeholder rather than prefilled, so
     // an untouched field stays empty and the row keeps following its authors.
     const field = screen.getByLabelText(/sorts as/i);
@@ -253,6 +499,8 @@ describe("DetailPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") {
         bodies.push(String(init.body));
         return new Response(JSON.stringify(corrected.item));
@@ -262,9 +510,7 @@ describe("DetailPage", () => {
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/sorts as/i));
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
     await waitFor(() => expect(bodies).toHaveLength(1));
@@ -277,6 +523,8 @@ describe("DetailPage", () => {
       const url = String(input);
       requests.push([url, init]);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "DELETE" && url === "/api/entries/7")
         return new Response(null, { status: 204 });
       return new Response(JSON.stringify(entry));
@@ -290,12 +538,12 @@ describe("DetailPage", () => {
     );
     // Confirmation dialog appears
     expect(
-      screen.getByRole("alertdialog", { name: /remove this book/i }),
+      screen.getByRole("alertdialog", { name: /remove this/i }),
     ).toBeVisible();
     // Click the confirm button inside the dialog
     await user.click(
       within(
-        screen.getByRole("alertdialog", { name: /remove this book/i }),
+        screen.getByRole("alertdialog", { name: /remove this/i }),
       ).getByRole("button", { name: /delete entry/i }),
     );
     // DELETE was called
@@ -307,9 +555,7 @@ describe("DetailPage", () => {
     await waitFor(() => expect(screen.getByText("Library page")).toBeVisible());
     // The confirmation is shown on the visible toast surface, not stashed in
     // storage for the next route to render into a hidden paragraph.
-    expect(
-      await findToast("Book removed from your library"),
-    ).toBeInTheDocument();
+    expect(await findToast("Removed from your library")).toBeInTheDocument();
   });
 
   it("cancel preserves the entry and does not call DELETE", async () => {
@@ -318,6 +564,8 @@ describe("DetailPage", () => {
       const url = String(input);
       requests.push([url, init]);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -337,6 +585,8 @@ describe("DetailPage", () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "DELETE" && url === "/api/entries/7")
         return new Response(
           JSON.stringify({ error: { code: "entry_not_found" } }),
@@ -352,13 +602,13 @@ describe("DetailPage", () => {
     );
     await user.click(
       within(
-        screen.getByRole("alertdialog", { name: /remove this book/i }),
+        screen.getByRole("alertdialog", { name: /remove this/i }),
       ).getByRole("button", { name: /delete entry/i }),
     );
     // The failure is reported inside the dialog, which is still open. An alert
     // rendered behind a modal is an alert nobody sees.
     const dialog = screen.getByRole("alertdialog", {
-      name: /remove this book/i,
+      name: /remove this/i,
     });
     expect(await within(dialog).findByRole("alert")).toBeVisible();
     // Nothing was deleted: dismissing the dialog reveals the entry again.
@@ -371,6 +621,8 @@ describe("DetailPage", () => {
   it("refuses an impossible date range and keeps the typed values", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") throw new Error("must not be reached");
       return new Response(JSON.stringify(entry));
     });
@@ -402,6 +654,8 @@ describe("DetailPage", () => {
   it("refuses an out-of-range reread count", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -420,6 +674,8 @@ describe("DetailPage", () => {
   it("keeps typed metadata when the write fails", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH")
         return new Response(JSON.stringify({ error: { code: "conflict" } }), {
           status: 409,
@@ -429,9 +685,7 @@ describe("DetailPage", () => {
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/^title$/i));
     await user.type(screen.getByLabelText(/^title$/i), "Rayuela corregida");
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
@@ -440,7 +694,7 @@ describe("DetailPage", () => {
     // silently loses input.
     expect(await screen.findByRole("alert")).toBeVisible();
     expect(
-      screen.getByRole("dialog", { name: /edit shared book metadata/i }),
+      screen.getByRole("dialog", { name: /edit shared metadata/i }),
     ).toBeVisible();
     expect(screen.getByLabelText(/^title$/i)).toHaveValue("Rayuela corregida");
   });
@@ -448,24 +702,26 @@ describe("DetailPage", () => {
   it("rejects an empty title on the metadata form", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
-    await user.click(
-      screen.getByRole("button", { name: /edit book metadata/i }),
-    );
+    await user.click(screen.getByRole("button", { name: /edit metadata/i }));
     await user.clear(screen.getByLabelText(/^title$/i));
     await user.click(screen.getByRole("button", { name: /save metadata/i }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      /a book needs a title/i,
+      /a title is required/i,
     );
   });
 
   it("Escape closes dialogs", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
       return new Response(JSON.stringify(entry));
     });
     renderPage();
@@ -473,26 +729,230 @@ describe("DetailPage", () => {
     await screen.findByRole("heading", { name: "Rayuela" });
     await user.click(screen.getByRole("button", { name: /delete entry/i }));
     expect(
-      screen.getByRole("alertdialog", { name: /remove this book/i }),
+      screen.getByRole("alertdialog", { name: /remove this/i }),
     ).toBeVisible();
     await user.keyboard("{Escape}");
     expect(
-      screen.queryByRole("alertdialog", { name: /remove this book/i }),
+      screen.queryByRole("alertdialog", { name: /remove this/i }),
     ).not.toBeInTheDocument();
   });
   it("shows the score as a filled chip, the same treatment as the library", () => {
     // DEC-026: the ramp means the same thing wherever the eye lands, so the
     // detail page carries the chip rather than the coloured text it used to.
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input) === "/api/shelves"
-        ? new Response("[]")
-        : new Response(JSON.stringify(entry)),
-    );
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves") return new Response("[]");
+      if (String(input) === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
+      return new Response(JSON.stringify(entry));
+    });
     renderPage();
     return waitFor(() => {
       const score = document.querySelector("[data-fact='score'] span");
       expect(score?.className).toContain("bg-score-high");
       expect(score?.className).toContain("text-background");
     });
+  });
+
+  /**
+   * The owner's words: "shelves kinda suck, having to create them by going on a
+   * new screen + having to click 'edit opinion' to be able to change them is not
+   * ideal." Both frictions are asserted here — one control, no dialog, no route.
+   */
+  function stubShelves(
+    existing = [
+      { id: 1, name: "Favorites", slug: "favorites", entry_count: 4 },
+    ],
+  ) {
+    return vi
+      .spyOn(globalThis, "fetch")
+      .mockImplementation(async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves" && init?.method === "POST") {
+          const body = JSON.parse(String(init.body)) as { name: string };
+          return new Response(
+            JSON.stringify({
+              id: 9,
+              name: body.name,
+              slug: body.name.toLowerCase(),
+              entry_count: 0,
+            }),
+          );
+        }
+        if (url === "/api/shelves")
+          return new Response(JSON.stringify(existing));
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (url.includes("/attachments"))
+          return new Response('{"attachments":[]}');
+        if (url === "/api/entries/7" && init?.method === "PATCH") {
+          const body = JSON.parse(String(init.body)) as { shelf_ids: number[] };
+          return new Response(
+            JSON.stringify({
+              ...entry,
+              shelves: body.shelf_ids.map((id) => ({
+                id,
+                name: id === 9 ? "Ensayo" : "Favorites",
+                slug: id === 9 ? "ensayo" : "favorites",
+              })),
+            }),
+          );
+        }
+        return new Response(JSON.stringify(entry));
+      });
+  }
+
+  it("gives files a region of their own rather than a corner of the edition facts", async () => {
+    // Attaching a file is a feature of the entry, not a footnote on its publisher.
+    // It was a small outline button inside Edition facts; it is its own region at
+    // the weight of Edit opinion now, with the list it produces still beside it.
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async (request: string | URL | Request) => {
+        const url = String(request);
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (url.startsWith("/api/shelves")) return new Response("[]");
+        if (url.includes("/attachments"))
+          return new Response('{"attachments":[]}');
+        return new Response(JSON.stringify(entry));
+      },
+    );
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    const files = screen.getByRole("region", { name: "Files" });
+    const attach = screen.getByRole("button", { name: "Attach a file" });
+    expect(files).toContainElement(attach);
+
+    // A peer of the other two regions, not inside either of them.
+    expect(
+      screen.getByRole("region", { name: "Edition facts" }),
+    ).not.toContainElement(files);
+    expect(
+      screen.getByRole("region", { name: "Your reading data" }),
+    ).not.toContainElement(files);
+  });
+
+  it("creates a shelf and puts the book on it in one control", async () => {
+    const request = stubShelves();
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Add to a shelf" }));
+    await user.type(
+      await screen.findByRole("combobox", { name: "Find or create a shelf" }),
+      "Ensayo",
+    );
+    await user.click(
+      await screen.findByRole("option", { name: /Create .Ensayo./ }),
+    );
+
+    // Created, then assigned, without the opinion dialog and without /shelves.
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/shelves",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/entries/7",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shelf_ids: [1, 9] }),
+        }),
+      ),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
+
+  it("adds an existing shelf from the same control", async () => {
+    const request = stubShelves([
+      { id: 1, name: "Favorites", slug: "favorites", entry_count: 4 },
+      { id: 9, name: "Ensayo", slug: "ensayo", entry_count: 2 },
+    ]);
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Add to a shelf" }));
+    await user.click(await screen.findByRole("option", { name: "Ensayo" }));
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/entries/7",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shelf_ids: [1, 9] }),
+        }),
+      ),
+    );
+    // Nothing was created: it already existed.
+    expect(
+      request.mock.calls.filter(
+        ([url, init]) =>
+          String(url) === "/api/shelves" &&
+          (init as RequestInit | undefined)?.method === "POST",
+      ),
+    ).toHaveLength(0);
+  });
+
+  it("takes the book off a shelf from the same place", async () => {
+    const request = stubShelves();
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(
+      screen.getByRole("button", { name: "Remove from Favorites" }),
+    );
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/entries/7",
+        expect.objectContaining({
+          method: "PATCH",
+          body: JSON.stringify({ shelf_ids: [] }),
+        }),
+      ),
+    );
+  });
+
+  it("does not offer shelves in the opinion dialog any more", async () => {
+    stubShelves();
+    // Re-stub with a domain that declares formats, so the assertion that the
+    // format control *stayed* is about the dialog and not about the fixture.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(
+          JSON.stringify([
+            {
+              ...itemTypes[0],
+              formats: [
+                { value: "physical", label: "Physical" },
+                { value: "digital", label: "Digital" },
+              ],
+            },
+          ]),
+        );
+      if (url.includes("/attachments"))
+        return new Response('{"attachments":[]}');
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "Edit opinion" }));
+    const dialog = await screen.findByRole("dialog");
+    // Shelf membership moved out; the format control did not, because a format is
+    // not a shelf and the two must not converge (DEC-059).
+    expect(within(dialog).queryByText("Shelves")).toBeNull();
+    expect(
+      within(dialog).queryByRole("textbox", { name: "New shelf name" }),
+    ).toBeNull();
+    expect(within(dialog).getByText("Format")).toBeVisible();
   });
 });

@@ -6,7 +6,7 @@ Run from `backend/` so Alembic resolves:
     cd backend && UV_CACHE_DIR=/tmp/akasha-uv-cache uv run python ../scripts/benchmark_library.py
 
 The point of this script is a verdict, not a number. `LibraryService.list_entries`
-orders `title` and `sort_author` through the connection-level `normalize_text`
+orders `title` and the creator name through the connection-level `normalize_text`
 function (DEC-015), which no index can serve; DEC-015 deferred a stored normalized
 projection "until measurement shows text sorting needs it". This is that
 measurement, so every scenario prints its SQLite query plan next to its latency.
@@ -72,7 +72,7 @@ PAGE_SIZE = 100
 FIRST_PAGE_BUDGET_MS = 500.0
 # Import sizes the metadata-completeness assessment has to price (Sprint 020, Phase A).
 IMPORT_SIZES = (500, 5_000)
-SORTS = ("date_added", "score", "title", "sort_author", "year", "date_finished")
+SORTS = ("date_added", "score", "title", "creator", "year", "date_finished")
 STATUSES = ("read", "reading", "to_read", "wishlist", "dropped", "unsorted")
 
 # Accented, mixed-script, and long titles, because `normalize_text` is a Unicode
@@ -117,7 +117,7 @@ def seed(engine: Engine, count: int) -> None:
     for index in range(1, count + 1):
         title = f"{TITLE_STEMS[index % len(TITLE_STEMS)]} {index:05d}"
         author = AUTHOR_STEMS[index % len(AUTHOR_STEMS)]
-        metadata = {"authors": [author], "publisher": f"Editorial {index % 97}"}
+        metadata = {"creators": [author], "publisher": f"Editorial {index % 97}"}
         items.append(
             {
                 "id": index,
@@ -282,7 +282,7 @@ def scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[[], objec
                     sort=sort, order=order, limit=PAGE_SIZE
                 ),
             )
-    for sort in ("date_added", "title", "sort_author"):
+    for sort in ("date_added", "title", "creator"):
         cursor = deep_cursor(service, sort, "desc", pages=25)
         yield (
             f"page 26      sort={sort:<13} order=desc",
@@ -295,8 +295,8 @@ def scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[[], objec
         lambda: service.list_entries(q="soledad", sort="date_added", limit=PAGE_SIZE),
     )
     yield (
-        "text filter  q=garcia      sort=sort_author",
-        lambda: service.list_entries(q="garcia", sort="sort_author", limit=PAGE_SIZE),
+        "text filter  q=garcia      sort=creator",
+        lambda: service.list_entries(q="garcia", sort="creator", limit=PAGE_SIZE),
     )
     yield (
         "shelf+status sort=title    order=asc",
@@ -321,7 +321,7 @@ def query_plans(engine: Engine, service: LibraryService) -> list[tuple[str, list
             "date_added": "entries.date_added",
             "score": "entries.score",
             "title": "items.title_normalized",
-            "sort_author": "items.creator_sort_normalized",
+            "creator": "items.creator_sort_normalized",
             "year": "items.year",
             "date_finished": "entries.date_finished",
         }[sort]

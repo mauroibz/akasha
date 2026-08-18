@@ -23,12 +23,11 @@ from book_tracker.backup import BackupError, create_backup, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
+from book_tracker.domain.registry import DOMAINS
+from book_tracker.domains.album.providers import MusicBrainzProvider
+from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
-from book_tracker.infrastructure.providers import (
-    GoogleBooksProvider,
-    OpenLibraryProvider,
-    create_provider_client,
-)
+from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.logging import configure_logging
 from book_tracker.migrations import pending_revisions, schema_is_current, upgrade
@@ -139,22 +138,40 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.data_dir = configured.data_dir
         app.state.attachment_max_bytes = configured.attachment_max_bytes
         app.state.calibre_dir = configured.calibre_dir
-        providers: list[Provider] = [
+        # Every provider this build knows how to construct, wired or not. Provider
+        # wiring is one of the three registration points a domain is allowed to share
+        # (technical spec 6.6); what must not be shared is any *other* layer knowing a
+        # provider's name, which is why `/api/health/providers` reads this catalog
+        # rather than a list of its own (DEC-067 row 5).
+        catalog: list[Provider] = [
             OpenLibraryProvider(
                 provider_client, configured.user_agent_contact or "local@example.invalid"
             )
         ]
         google = GoogleBooksProvider(provider_client, configured.google_books_api_key)
-        if google.enabled:
-            providers.append(google)
-        else:
+        catalog.append(google)
+        if not google.enabled:
             # Silently running on one provider is how search lost its Spanish-language
             # coverage without anyone noticing (product spec 4.2, DEC-024).
             logging.getLogger(__name__).warning(
                 "GOOGLE_BOOKS_API_KEY is not set; search and enrichment run on Open "
                 "Library alone and Spanish-language coverage will be poor"
             )
-        app.state.providers = {provider.name: provider for provider in providers}
+        # The album domain. MusicBrainz needs no key, only a descriptive User-Agent and
+        # ~1 request/second, both of which the adapter owns (DEC-052 seam 4/6).
+        catalog.append(
+            MusicBrainzProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
+        app.state.provider_catalog = {provider.name: provider for provider in catalog}
+        # What search, add and enrichment actually reach. A provider missing its
+        # configuration is disabled, not failed (technical spec 6.2).
+        app.state.providers = {
+            name: provider
+            for name, provider in app.state.provider_catalog.items()
+            if getattr(provider, "enabled", True)
+        }
         # Durable job runner for background enrichment (Sprint 011)
         rate_limiter = RateLimiter(min_interval_seconds=0.5)
         # Daily budgets, provider-agnostic (DEC-045). Enrichment is gated by them;
@@ -195,7 +212,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha Book Tracker", version="1.1.0", lifespan=lifespan)
+    app = FastAPI(title="Akasha Book Tracker", version="1.2.0", lifespan=lifespan)
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:
@@ -247,17 +264,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         application look down (technical spec 8).
         """
         configured_providers = getattr(app.state, "providers", {})
+        catalog = getattr(app.state, "provider_catalog", configured_providers)
+        # The order each domain prefers its own sources in, domains in registry order:
+        # Open Library before Google Books is books' preference (product spec 4.3), and
+        # a domain registered later lands after them without anything here changing.
+        # Anything in the catalog no domain names still gets a row, last.
+        preferred = [
+            name for domain in DOMAINS.values() for name in domain.identity.source_preference
+        ]
+        order = list(dict.fromkeys([*preferred, *catalog]))
         rows = [
-            ProviderStatus(name="openlibrary", available="openlibrary" in configured_providers),
             ProviderStatus(
-                name="googlebooks",
-                available="googlebooks" in configured_providers,
+                name=name,
+                available=name in configured_providers,
                 reason=(
                     None
-                    if "googlebooks" in configured_providers
-                    else "GOOGLE_BOOKS_API_KEY is not set"
+                    if name in configured_providers
+                    else getattr(catalog.get(name), "unavailable_reason", None) or "not configured"
                 ),
-            ),
+            )
+            for name in order
+            if name in catalog
         ]
         return ProviderHealth(providers=rows, degraded=not all(row.available for row in rows))
 

@@ -1,5 +1,6 @@
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
+import { stubItemTypes } from "./seed";
 
 const entry = {
   id: 7,
@@ -19,11 +20,11 @@ const entry = {
     title: "Rayuela",
     subtitle: null,
     year: 1963,
-    sort_author: "Julio Cortázar",
+    creator: "Julio Cortázar",
     cover_path: null,
     cover_url: null,
     metadata: {
-      authors: ["Julio Cortázar"],
+      creators: ["Julio Cortázar"],
       publisher: "Sudamericana",
       language: "es",
       page_count: 736,
@@ -44,10 +45,15 @@ async function stubEntry(page: Page) {
         items: [entry],
         next_cursor: null,
         total: 1,
-        facets: { status_counts: { reading: 1, unsorted: 5 } },
+        facets: {
+          status_counts: { reading: 1, unsorted: 5 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     }),
   );
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
@@ -135,16 +141,16 @@ test("confirmed deletion removes the entry and returns to library", async ({
     .first()
     .click();
   await expect(
-    page.getByRole("alertdialog", { name: /remove this book/i }),
+    page.getByRole("alertdialog", { name: /remove this/i }),
   ).toBeVisible();
   // The dialog states books remain
   await expect(page.getByText(/remain/i)).toBeVisible();
   // Confirm deletion
   await page
-    .getByRole("alertdialog", { name: /remove this book/i })
+    .getByRole("alertdialog", { name: /remove this/i })
     .getByRole("button", { name: /delete entry/i })
     .click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   expect(deleted).toBe(true);
 });
 
@@ -156,12 +162,12 @@ test("delete cancel preserves the entry", async ({ page }) => {
     .first()
     .click();
   await expect(
-    page.getByRole("alertdialog", { name: /remove this book/i }),
+    page.getByRole("alertdialog", { name: /remove this/i }),
   ).toBeVisible();
   // Press Escape to cancel
   await page.keyboard.press("Escape");
   await expect(
-    page.getByRole("alertdialog", { name: /remove this book/i }),
+    page.getByRole("alertdialog", { name: /remove this/i }),
   ).not.toBeVisible();
   await expect(page.getByRole("heading", { name: "Rayuela" })).toBeVisible();
 });
@@ -216,7 +222,7 @@ test("shelf management creates, renames, and deletes shelves", async ({
 
   await page.goto("/shelves");
   await expect(page.getByText("Favorites")).toBeVisible();
-  await expect(page.getByText("5 books")).toBeVisible();
+  await expect(page.getByText("5 items")).toBeVisible();
 
   // Create a new shelf
   await page.getByPlaceholder(/new shelf name/i).fill("Sci-fi");
@@ -246,7 +252,7 @@ test("unknown route shows a useful 404", async ({ page }) => {
     page.getByRole("button", { name: /go to library/i }),
   ).toBeVisible();
   await page.getByRole("button", { name: /go to library/i }).click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });
 
 test("navigation shell exposes all four destinations at desktop width", async ({
@@ -277,5 +283,5 @@ test("navigation shell exposes all four destinations at desktop width", async ({
     .getByRole("link", { name: /library/i })
     .first()
     .click();
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });

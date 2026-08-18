@@ -37,6 +37,10 @@ import { cn } from "@/lib/utils";
  *
  * Renaming is inline rather than a modal, matching how the rest of the app edits
  * (product spec §7: dialogs are for deletes, not for edits).
+ *
+ * The frame is the page's, not this component's: the detail page wraps it in the
+ * labelled region that makes it a peer of the personal and edition panels, so this
+ * renders its heading and its list and nothing about where it sits.
  */
 export function Attachments({ itemId }: { itemId: number }) {
   const cache = useQueryClient();
@@ -84,15 +88,14 @@ export function Attachments({ itemId }: { itemId: number }) {
   const attachments = data ?? [];
 
   return (
-    <section aria-labelledby="attachments-heading" data-testid="attachments">
+    <div data-testid="attachments">
       <div className="flex items-center justify-between gap-4">
-        <h2 id="attachments-heading" className="text-sm font-medium">
+        <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
           Files
         </h2>
         <Button
           type="button"
-          variant="outline"
-          size="sm"
+          className="rounded-full px-5"
           onClick={() => picker.current?.click()}
           disabled={upload.isPending}
         >
@@ -261,6 +264,6 @@ export function Attachments({ itemId }: { itemId: number }) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </section>
+    </div>
   );
 }

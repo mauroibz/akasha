@@ -13,7 +13,9 @@ from book_tracker.domain.identity import Identifier
 from book_tracker.domain.matching import MatchDecision, MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
 from book_tracker.domain.normalization import normalize_text, shelf_slug
+from book_tracker.domain.registry import DEFAULT_DOMAIN
 from book_tracker.infrastructure.models import (
+    EntryFormatRow,
     EntryRow,
     EntryShelfRow,
     ImportBatchRow,
@@ -125,7 +127,7 @@ class DomainRepository:
             suggestions: set[int] = set()
             if title and first_author:
                 for item_id, candidate_title, candidate_author in session.execute(
-                    select(ItemRow.id, ItemRow.title, ItemRow.sort_author)
+                    select(ItemRow.id, ItemRow.title, ItemRow.creator_primary)
                 ):
                     if (
                         candidate_author
@@ -140,7 +142,8 @@ class DomainRepository:
         *,
         title: str,
         subtitle: str | None = None,
-        authors: Sequence[str] = (),
+        creators: Sequence[str] = (),
+        item_type: str = DEFAULT_DOMAIN.item_type,
         identifiers: Sequence[Identifier] = (),
         sources: Sequence[SourceIdentity] = (),
         user_id: int = 1,
@@ -153,13 +156,13 @@ class DomainRepository:
             now = _now()
             if decision.item_id is None:
                 item = ItemRow(
-                    type="book",
+                    type=item_type,
                     title=title,
                     subtitle=subtitle,
                     year=None,
                     cover_path=None,
                     identifiers="{}",
-                    metadata_json=json.dumps({"authors": list(authors)}),
+                    metadata_json=json.dumps({"creators": list(creators)}),
                     created_at=now,
                     updated_at=now,
                 )
@@ -242,7 +245,13 @@ class DomainRepository:
         status: str,
         score: int | None,
         shelf_ids: Sequence[int] = (),
+        creator_sort: str | None = None,
+        item_type: str = DEFAULT_DOMAIN.item_type,
         user_id: int = 1,
+        #: The rest of the opinion, already validated against the item's own domain
+        #: by the caller. Absent keys leave the column at its default.
+        entry_values: Mapping[str, Any] | None = None,
+        formats: Sequence[str] = (),
     ) -> EntryResult:
         with self._write() as session:
             exact = self._exact_ids(session, identifiers, sources)
@@ -252,7 +261,7 @@ class DomainRepository:
             now = _now()
             if decision.item_id is None:
                 item = ItemRow(
-                    type="book",
+                    type=item_type,
                     title=title,
                     subtitle=subtitle,
                     year=year,
@@ -261,6 +270,10 @@ class DomainRepository:
                         {value.kind: value.normalized_value for value in identifiers}
                     ),
                     metadata_json=json.dumps(dict(metadata), ensure_ascii=False),
+                    # A source that knows the sort name seeds the owner's value, so the
+                    # heuristic never runs on a name somebody already answered — the
+                    # same rule Calibre's `authors.sort` follows (DEC-051, DEC-052).
+                    creator_sort_override=(creator_sort or None),
                     created_at=now,
                     updated_at=now,
                 )
@@ -307,16 +320,17 @@ class DomainRepository:
                 )
                 if found != shelves:
                     raise LookupError("shelf_not_found")
+            values = dict(entry_values or {})
             entry = EntryRow(
                 user_id=user_id,
                 item_id=item_id,
                 status=status,
                 score=score,
-                notes=None,
+                notes=values.get("notes"),
                 date_added=now,
-                date_started=None,
-                date_finished=None,
-                reread_count=0,
+                date_started=values.get("date_started"),
+                date_finished=values.get("date_finished"),
+                reread_count=values.get("reread_count") or 0,
                 score_provisional=0,
                 suggested_status=None,
                 created_at=now,
@@ -326,6 +340,9 @@ class DomainRepository:
             session.flush()
             session.add_all(
                 EntryShelfRow(entry_id=entry.id, shelf_id=shelf_id) for shelf_id in shelves
+            )
+            session.add_all(
+                EntryFormatRow(entry_id=entry.id, format=value) for value in dict.fromkeys(formats)
             )
             return EntryResult(item_id, entry.id, False)
 
@@ -564,7 +581,7 @@ class ImportRepository:
                     item_id = exact or item_id
                 if item_id is None:
                     metadata = {
-                        "authors": payload["authors"],
+                        "creators": payload["creators"],
                         **({"publisher": payload["publisher"]} if payload.get("publisher") else {}),
                         **(
                             {"page_count": payload["page_count"]}
@@ -584,7 +601,9 @@ class ImportRepository:
                         **({"series": payload["series"]} if payload.get("series") else {}),
                     }
                     item = ItemRow(
-                        type="book",
+                        # Goodreads and Calibre are book pipelines and stay that way;
+                        # the type still comes from the registry rather than a literal.
+                        type=DEFAULT_DOMAIN.item_type,
                         title=payload["title"],
                         subtitle=None,
                         year=payload.get("year"),
@@ -639,7 +658,7 @@ class ImportRepository:
                         after["year"] = existing_item.year
                     metadata = json.loads(existing_item.metadata_json)
                     incoming = {
-                        "authors": payload.get("authors"),
+                        "creators": payload.get("creators"),
                         "publisher": payload.get("publisher"),
                         "page_count": payload.get("page_count"),
                         "original_year": payload.get("original_year"),

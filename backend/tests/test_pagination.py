@@ -40,9 +40,9 @@ async def test_list_filters_facets_and_default_excludes_unsorted(tmp_path: Path)
     app = create_app(configured)
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        first = repository.create_or_get_entry(title="Álgebra", authors=("Ada",))
-        second = repository.create_or_get_entry(title="Biology", authors=("Bob",))
-        third = repository.create_or_get_entry(title="Chemistry", authors=("Cara",))
+        first = repository.create_or_get_entry(title="Álgebra", creators=("Ada",))
+        second = repository.create_or_get_entry(title="Biology", creators=("Bob",))
+        third = repository.create_or_get_entry(title="Chemistry", creators=("Cara",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE entries SET status='read', score=8 WHERE id=:id"),
@@ -142,7 +142,7 @@ def test_common_status_date_query_uses_composite_index(tmp_path: Path) -> None:
 
 @pytest.mark.anyio
 @pytest.mark.parametrize(
-    "sort", ["date_added", "score", "title", "sort_author", "year", "date_finished"]
+    "sort", ["date_added", "score", "title", "creator", "year", "date_finished"]
 )
 @pytest.mark.parametrize("order", ["asc", "desc"])
 async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
@@ -152,8 +152,8 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
         entries = [
-            repository.create_or_get_entry(title="Same", authors=("Zed",)),
-            repository.create_or_get_entry(title="same", authors=("Zed",)),
+            repository.create_or_get_entry(title="Same", creators=("Zed",)),
+            repository.create_or_get_entry(title="same", creators=("Zed",)),
             repository.create_or_get_entry(title="Other"),
         ]
         with app.state.engine.begin() as connection:
@@ -183,16 +183,76 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
                 if cursor is None:
                     break
             assert len({row["id"] for row in rows}) == len(rows) == 3
-            if sort in {"score", "sort_author", "year", "date_finished"}:
-                value = "item" if sort in {"sort_author", "year"} else None
+            if sort in {"score", "creator", "year", "date_finished"}:
+                value = "item" if sort in {"creator", "year"} else None
                 values = [row[value][sort] if value else row[sort] for row in rows]
                 assert values[-1] is None
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("sort", ["creator", "title", "date_added", "year"])
+async def test_a_mixed_library_pages_across_the_type_boundary(tmp_path: Path, sort: str) -> None:
+    """AC4, and the tripwire DEC-052 set.
+
+    Keyset pagination was predicted to need no change for a second domain. If a page
+    skipped a row, repeated one or dropped the cursor once albums sat beside books,
+    that prediction was wrong and the seam model with it — so this walks a mixed
+    library one row at a time, past page 1, with a cursor issued before the last page.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        seeded = [
+            ("book", "Rayuela", "Julio Cortázar", 1963),
+            ("album", "Kind of Blue", "Miles Davis", 1959),
+            ("book", "Ficciones", "Jorge Luis Borges", 1944),
+            ("album", "Discovery", "Daft Punk", 2001),
+            ("album", "Ávila", None, None),
+            ("book", "Pedro Páramo", "Juan Rulfo", 1955),
+        ]
+        for item_type, title, creator, year in seeded:
+            created = repository.create_or_get_entry(
+                title=title,
+                creators=(creator,) if creator else (),
+                item_type=item_type,
+            )
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    text("UPDATE entries SET status='read' WHERE id=:id"),
+                    {"id": created.entry_id},
+                )
+                if year is not None:
+                    connection.execute(
+                        text("UPDATE items SET year=:year WHERE id=:id"),
+                        {"year": year, "id": created.item_id},
+                    )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            cursor = None
+            rows: list[dict[str, object]] = []
+            pages = 0
+            while True:
+                params: dict[str, object] = {"sort": sort, "order": "asc", "limit": 2}
+                if cursor:
+                    params["after"] = cursor
+                page = (await client.get("/api/entries", params=params)).json()
+                rows.extend(page["items"])
+                pages += 1
+                cursor = page["next_cursor"]
+                if cursor is None:
+                    break
+
+    assert pages > 1
+    identifiers = [row["id"] for row in rows]
+    assert len(set(identifiers)) == len(identifiers) == len(seeded)
+    assert {row["item"]["type"] for row in rows} == {"book", "album"}
 
 
 def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
     """A pre-0011 cursor carries a value from the old projection.
 
-    `sort_author` used to order by the first author verbatim, so a stale cursor
+    The creator sort used to order by the first author verbatim, so a stale cursor
     holds "gabriel" where the column now holds "garcia marquez gabriel". Comparing
     the two would silently skip or repeat a page, which is worse than an error the
     library page already knows how to render.
@@ -201,7 +261,7 @@ def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
         base64.urlsafe_b64encode(
             json.dumps(
                 {
-                    "sort": "sort_author",
+                    "sort": "creator",
                     "order": "asc",
                     "filter_key": "abc",
                     "value": "gabriel",
@@ -215,7 +275,7 @@ def test_a_cursor_from_before_the_creator_sort_projection_is_rejected() -> None:
         .rstrip("=")
     )
     with pytest.raises(CursorError):
-        decode_cursor(stale, sort="sort_author", order="asc", filter_key="abc")
+        decode_cursor(stale, sort="creator", order="asc", filter_key="abc")
 
 
 @pytest.mark.anyio
@@ -236,14 +296,14 @@ async def test_author_sort_orders_by_the_creator_sort_name(tmp_path: Path) -> No
             ("Pedro Páramo", "Juan Rulfo"),
             ("Sangre azul", "Zoé Aguirre"),
         ]:
-            repository.create_or_get_entry(title=title, authors=(author,))
+            repository.create_or_get_entry(title=title, creators=(author,))
         with app.state.engine.begin() as connection:
             connection.execute(text("UPDATE entries SET status='read'"))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as client:
             page = (
-                await client.get("/api/entries", params={"sort": "sort_author", "order": "asc"})
+                await client.get("/api/entries", params={"sort": "creator", "order": "asc"})
             ).json()
     assert [row["item"]["title"] for row in page["items"]] == [
         "Sangre azul",
@@ -251,3 +311,45 @@ async def test_author_sort_orders_by_the_creator_sort_name(tmp_path: Path) -> No
         "Cien años de soledad",
         "Pedro Páramo",
     ]
+
+
+@pytest.mark.anyio
+async def test_a_cursor_cut_under_one_domain_is_refused_under_another(tmp_path: Path) -> None:
+    """The `_filter_key` guard, extended to the domain filter.
+
+    A cursor carries the filter it was cut under. If `type` were left out of that key,
+    paging a book-filtered list with an album-filtered request would be *accepted* and
+    would skip or repeat a page silently — a wrong answer rather than an error, which
+    is exactly what the key exists to prevent.
+    """
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    app = create_app(configured)
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        for index in range(4):
+            repository.create_or_get_entry(title=f"Book {index}")
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(text("UPDATE entries SET status='read'"))
+            connection.execute(
+                text("UPDATE items SET type='album' WHERE id=:id"), {"id": album.item_id}
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            first = (await client.get("/api/entries", params={"type": "book", "limit": 2})).json()
+            cursor = first["next_cursor"]
+            assert cursor is not None
+
+            same = await client.get(
+                "/api/entries", params={"type": "book", "limit": 2, "after": cursor}
+            )
+            unfiltered = await client.get("/api/entries", params={"limit": 2, "after": cursor})
+            other = await client.get(
+                "/api/entries", params={"type": "album", "limit": 2, "after": cursor}
+            )
+
+    assert same.status_code == 200
+    for refused in (unfiltered, other):
+        assert refused.status_code == 400
+        assert refused.json()["error"]["code"] == "invalid_cursor"

@@ -10,12 +10,9 @@ from book_tracker.application.providers import (
     search_providers,
 )
 from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
-from book_tracker.infrastructure.providers import (
-    MAX_PROVIDER_BYTES,
-    GoogleBooksProvider,
-    OpenLibraryProvider,
-    ProviderPayloadError,
-)
+from book_tracker.domains.book import BOOK_IDENTITY
+from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
+from book_tracker.infrastructure.providers import MAX_PROVIDER_BYTES, ProviderPayloadError
 
 
 @pytest.fixture
@@ -37,7 +34,7 @@ def candidate(
         source_refs=(SourceRef(source, source_id),),
         title=title,
         subtitle=None,
-        authors=("Julio Cortázar",),
+        creators=("Julio Cortázar",),
         year=None,
         cover_url=cover,
         identifiers={"isbn13": isbn} if isbn else {},
@@ -78,6 +75,7 @@ def test_merge_retains_sources_and_prefers_google_cover_without_losing_ol_primar
             candidate("googlebooks", "g1", isbn="9788437604572", cover="https://cover"),
             candidate("openlibrary", "OL1M", isbn="9788437604572"),
         ],
+        identity=BOOK_IDENTITY,
     )
     assert len(merged) == 1
     assert merged[0].source == "openlibrary"
@@ -199,9 +197,9 @@ async def test_openlibrary_selects_nested_edition_and_resolves_full_metadata() -
         search = await provider.search("Rayuela")
         payload = await provider.fetch(search[0].source_id)
     assert (search[0].source_id, search[0].year, search[0].original_year) == ("OL1M", 2019, 1963)
-    assert payload.authors == ("Julio Cortázar",)
+    assert payload.creators == ("Julio Cortázar",)
     assert payload.metadata == {
-        "authors": ["Julio Cortázar"],
+        "creators": ["Julio Cortázar"],
         "publisher": "Cátedra",
         "language": "es",
         "page_count": 736,

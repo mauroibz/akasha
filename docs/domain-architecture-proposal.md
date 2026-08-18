@@ -1,6 +1,13 @@
 # Domain architecture — proposal
 
-**Status:** **accepted** by the owner, 2026-08-14 — see DEC-052
+**Status:** **accepted** by the owner, 2026-08-14 (DEC-052) and **delivered** by Sprints 025–028.
+
+> **This is a proposal, not documentation of the current system.** All six seams were built and the
+> code has moved since: each domain now lives in its own package under `backend/src/book_tracker/domains/`.
+> For how domains work *today*, read [technical spec §6.6](specs/technical-spec.md) and
+> [`guides/adding-a-domain.md`](guides/adding-a-domain.md). This document is kept for the live
+> measurements against MusicBrainz and the Cover Art Archive that produced the design — DEC-055,
+> DEC-066 and DEC-069 record where reality then diverged from it.
 **Written:** 2026-08-14, against Sprint 023's close (024 not started)
 **Supersedes nothing.** `docs/domain_metadata_roadmap_report.md` assessed *which* domains are
 viable; this assesses *how* they attach to this codebase. It is the design input Sprint 025 was

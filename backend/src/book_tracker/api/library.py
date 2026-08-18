@@ -7,7 +7,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from book_tracker.application.add import AddService
 from book_tracker.application.library import (
@@ -17,7 +17,8 @@ from book_tracker.application.library import (
 )
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
-from book_tracker.domain.types import EntryStatus
+from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
+from book_tracker.domain.spec import InvalidMetadata, validate_metadata_patch
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
     AttachmentTooLarge,
@@ -77,28 +78,51 @@ class SourceResponse(BaseModel):
     is_primary: bool
 
 
-class BookMetadataResponse(BaseModel):
-    authors: list[str] = Field(default_factory=list)
-    publisher: str | None = None
-    language: str | None = None
-    page_count: int | None = None
-    description: str | None = None
-    subjects: list[str] = Field(default_factory=list)
-    series: str | None = None
-    original_year: int | None = None
+class ColumnSpecResponse(BaseModel):
+    name: str
+    label: str
+    type: str
 
 
-class BookMetadataPatch(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+class FieldSpecResponse(BaseModel):
+    name: str
+    label: str
+    type: str
+    multiplicity: str
+    minimum: int | None = None
+    maximum: int | None = None
+    #: Present only on a `rows` field: what one row of it holds.
+    columns: list[ColumnSpecResponse] | None = None
 
-    authors: list[str] | None = None
-    publisher: str | None = None
-    language: str | None = None
-    page_count: int | None = Field(default=None, ge=1)
-    description: str | None = None
-    subjects: list[str] | None = None
-    series: str | None = None
-    original_year: int | None = Field(default=None, ge=0, le=9999)
+
+class StatusSpecResponse(BaseModel):
+    value: str
+    label: str
+    choosable: bool
+    hotkey: str | None = None
+
+
+class FormatSpecResponse(BaseModel):
+    value: str
+    label: str
+
+
+class ItemTypeResponse(BaseModel):
+    """What a domain says about itself, so a screen can render it without branching."""
+
+    id: str
+    label: str
+    fields: list[FieldSpecResponse]
+    #: The statuses this domain's entries can hold, in the order a control offers them
+    #: (seam 5b). An album is not a book with different words: it has different states
+    #: entirely, and the passage fields below go with the ones it does not have.
+    statuses: list[StatusSpecResponse]
+    default_status: str
+    entry_fields: list[str]
+    formats: list[FormatSpecResponse]
+    entry_panel_label: str
+    #: Whether to offer the cover chooser at all (DEC-067 row 7).
+    chooses_covers: bool
 
 
 class ItemResponse(BaseModel):
@@ -107,14 +131,14 @@ class ItemResponse(BaseModel):
     title: str
     subtitle: str | None
     year: int | None
-    # The creator's name as written, then the name the library sorts it under.
-    # They are different strings: García Márquez displays first-name-first and
-    # sorts surname-first.
-    sort_author: str | None
+    # The creator as the record credits them, then the name the library sorts it
+    # under. They are different strings: García Márquez displays first-name-first
+    # and sorts surname-first.
+    creator: str | None
     creator_sort: str | None
     creator_sort_override: str | None
     cover_url: str | None
-    metadata: BookMetadataResponse
+    metadata: dict[str, Any]
     identifiers: dict[str, str]
     sources: list[SourceResponse]
 
@@ -133,10 +157,18 @@ class EntryResponse(BaseModel):
     suggested_status: EntryStatus | None
     item: ItemResponse
     shelves: list[ShelfResponse]
+    #: How you hold this copy, in the domain's declared order (DEC-059). Independent
+    #: of status: a `wishlist` entry carrying `vinyl` is the pressing you mean to buy.
+    formats: list[str]
 
 
 class FacetsResponse(BaseModel):
+    #: Whole-library totals per status, which is what the inbox badge counts.
     status_counts: dict[str, int]
+    #: The same counts split by item type, because a status two domains share is
+    #: not one number on a screen that lists each domain's statuses separately.
+    status_counts_by_type: dict[str, dict[str, int]]
+    format_counts: dict[str, int]
 
 
 class EntryListResponse(BaseModel):
@@ -158,7 +190,7 @@ class SourceRefBody(BaseModel):
 class ManualItemBody(BaseModel):
     title: str = Field(min_length=1, max_length=500)
     subtitle: str | None = Field(default=None, max_length=500)
-    authors: list[str] = Field(default_factory=list, max_length=50)
+    creators: list[str] = Field(default_factory=list, max_length=50)
     year: int | None = Field(default=None, ge=0, le=9999)
     publisher: str | None = Field(default=None, max_length=300)
     language: str | None = Field(default=None, max_length=20)
@@ -170,9 +202,19 @@ class EntryCreateBody(BaseModel):
     source_id: str | None = Field(default=None, max_length=200)
     source_refs: list[SourceRefBody] = Field(default_factory=list, max_length=10)
     manual: ManualItemBody | None = None
-    status: EntryStatus = EntryStatus.READ
+    #: Absent means "whatever this domain's default is" — `read` for a book, `owned`
+    #: for an album. The API cannot have one default, because the domains disagree.
+    status: EntryStatus | None = None
     score: int | None = Field(default=None, ge=1, le=10)
     shelf_ids: list[int] = Field(default_factory=list, max_length=100)
+    #: The rest of the opinion, so a book you just finished is one action rather
+    #: than an add followed by an edit. Each is validated against the item's own
+    #: domain, exactly as `PATCH` does — a record refuses a reread count.
+    notes: str | None = None
+    formats: list[str] = Field(default_factory=list, max_length=20)
+    date_started: date | None = None
+    date_finished: date | None = None
+    reread_count: int | None = Field(default=None, ge=0)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=100)
     confirm_near_match: bool = False
 
@@ -208,6 +250,8 @@ class EntryPatch(BaseModel):
     date_finished: date | None = None
     reread_count: int | None = Field(default=None, ge=0)
     shelf_ids: list[int] | None = None
+    #: Replaces the set, the way `shelf_ids` does; `[]` clears it.
+    formats: list[str] | None = Field(default=None, max_length=20)
 
     @model_validator(mode="after")
     def required_status_when_present(self) -> "EntryPatch":
@@ -222,7 +266,9 @@ class ItemPatch(BaseModel):
     year: int | None = None
     # Sent as "" or null to drop the correction and go back to the heuristic.
     creator_sort_override: str | None = Field(default=None, max_length=300)
-    metadata: BookMetadataPatch | None = None
+    # Validated against the field spec of the item's own type, not against a
+    # model that would have to know every domain's vocabulary (DEC-052 seam 3).
+    metadata: dict[str, Any] | None = None
 
     @model_validator(mode="after")
     def required_title_when_present(self) -> "ItemPatch":
@@ -244,6 +290,7 @@ class RefreshBody(BaseModel):
 class EntryFilter(BaseModel):
     status: list[EntryStatus] | None = None
     shelf: list[str] = Field(default_factory=list)
+    format: list[EntryFormat] = Field(default_factory=list)
     q: str | None = None
 
 
@@ -252,6 +299,8 @@ class BulkSet(BaseModel):
     score: int | None = Field(default=None, ge=1, le=10)
     add_shelves: list[int] = Field(default_factory=list)
     remove_shelves: list[int] = Field(default_factory=list)
+    add_formats: list[str] = Field(default_factory=list, max_length=20)
+    remove_formats: list[str] = Field(default_factory=list, max_length=20)
     clear_provisional: bool = False
 
     @model_validator(mode="after")
@@ -285,9 +334,12 @@ async def list_entries(
     library: Library,
     status: Annotated[list[EntryStatus] | None, Query()] = None,
     shelf: Annotated[list[str] | None, Query()] = None,
+    format: Annotated[list[EntryFormat] | None, Query()] = None,
+    #: Which domains to show. Repeated like `status`; absent means every domain.
+    type: Annotated[list[ItemTypeName] | None, Query()] = None,
     q: str | None = None,
     sort: Literal[
-        "date_added", "score", "title", "sort_author", "year", "date_finished"
+        "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
     order: Literal["asc", "desc"] = "desc",
     after: str | None = None,
@@ -297,6 +349,8 @@ async def list_entries(
         library.list_entries(
             statuses=[value.value for value in status] if status is not None else None,
             shelves=shelf or [],
+            formats=[value.value for value in format or []],
+            types=[value.value for value in type or []],
             q=q,
             sort=sort,
             order=order,
@@ -326,9 +380,22 @@ async def create_entry(
         source=body.source,
         source_id=body.source_id,
         supplied_refs=[SourceRef(value.source, value.source_id) for value in body.source_refs],
-        status=body.status.value,
+        status=body.status.value if body.status else None,
         score=body.score,
         shelf_ids=body.shelf_ids,
+        entry_values={
+            key: value
+            for key, value in (
+                ("notes", body.notes),
+                ("date_started", body.date_started.isoformat() if body.date_started else None),
+                ("date_finished", body.date_finished.isoformat() if body.date_finished else None),
+                ("reread_count", body.reread_count),
+            )
+            # Only what was actually sent: `validate_entry_fields` refuses a key the
+            # domain does not have, and a `None` nobody typed is not a key.
+            if value is not None
+        },
+        formats=body.formats,
         idempotency_key=body.idempotency_key,
         confirm_near_match=body.confirm_near_match,
     )
@@ -392,8 +459,42 @@ async def get_item(item_id: int, library: Library) -> ItemResponse:
 async def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
     changes = body.model_dump(exclude_unset=True)
     if body.metadata is not None:
-        changes["metadata"] = body.metadata.model_dump(exclude_unset=True)
+        item_type = str(library.get_item(item_id)["type"])
+        domain = DOMAINS.get(item_type)
+        if domain is None:
+            raise LibraryError("unknown_item_type", f"No domain describes {item_type!r}")
+        try:
+            changes["metadata"] = validate_metadata_patch(domain, body.metadata)
+        except InvalidMetadata as error:
+            raise LibraryError("invalid_metadata", str(error), status_code=422) from error
     return ItemResponse.model_validate(library.update_item(item_id, changes))
+
+
+@router.get("/item-types", response_model=list[ItemTypeResponse])
+async def list_item_types() -> list[ItemTypeResponse]:
+    """The domains this build knows, and the metadata fields each one declares."""
+    return [
+        ItemTypeResponse(
+            id=domain.item_type,
+            label=domain.label,
+            fields=[
+                FieldSpecResponse(
+                    **{key: value for key, value in vars(field).items() if key != "columns"},
+                    columns=[ColumnSpecResponse(**vars(column)) for column in field.columns]
+                    if field.columns
+                    else None,
+                )
+                for field in domain.fields
+            ],
+            statuses=[StatusSpecResponse(**vars(status)) for status in domain.statuses],
+            default_status=domain.default_status,
+            entry_fields=sorted(domain.entry_fields),
+            formats=[FormatSpecResponse(**vars(row)) for row in domain.formats],
+            entry_panel_label=domain.entry_panel_label,
+            chooses_covers=domain.chooses_covers,
+        )
+        for domain in DOMAINS.values()
+    ]
 
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
@@ -435,7 +536,13 @@ async def list_cover_candidates(item_id: int, request: Request) -> CoverCandidat
     page renders, which is the invariant that keeps cached pages provider-free.
     """
     library = LibraryService(request.app.state.engine)
-    library.get_item(item_id)
+    item = library.get_item(item_id)
+    domain = DOMAINS.get(str(item["type"]))
+    if domain is not None and not domain.chooses_covers:
+        # Asked of the domain rather than branched on the type. The screen already hides
+        # the control, and this is the same rule on the way in, so a client that asks
+        # anyway gets an answer instead of a provider request that cannot help.
+        return CoverCandidates(candidates=[], reason="not_supported")
     provider = request.app.state.providers.get("openlibrary")
     if provider is None:
         return CoverCandidates(candidates=[], reason="provider_disabled")
@@ -744,7 +851,7 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
             "provider_failure", "Metadata could not be fetched", status_code=502
         ) from error
     metadata = dict(payload.metadata)
-    metadata["authors"] = list(payload.authors)
+    metadata["creators"] = list(payload.creators)
     if payload.language is not None:
         metadata["language"] = payload.language
     prepared = None

@@ -158,7 +158,7 @@ class CalibreAdapter:
                     "calibre_book_id": str(book_id),
                     "calibre_uuid": str(book["uuid"] or "") if "uuid" in columns else "",
                     "title": str(book["title"] or "").strip(),
-                    "authors": authors,
+                    "creators": authors,
                     "author_sorts": author_sorts,
                     "isbn": isbn,
                     "publisher": None,

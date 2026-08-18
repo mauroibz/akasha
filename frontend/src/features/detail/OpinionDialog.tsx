@@ -3,11 +3,16 @@ import { useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 
 import type { LibraryEntry } from "@/api/library";
-import type { ShelfWithCount } from "@/api/shelves";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
+import {
+  formatsFor,
+  hasEntryField,
+  statusesFor,
+} from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
+import { FormatPicker } from "@/features/library/FormatPicker";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -17,7 +22,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Field } from "./Field";
 import { opinionSchema, type OpinionValues } from "./schemas";
@@ -26,20 +30,24 @@ interface OpinionDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   entry: LibraryEntry;
-  shelves: ShelfWithCount[];
   onSave: (values: OpinionValues) => Promise<void>;
-  onCreateShelf: (name: string) => Promise<void>;
 }
 
+/**
+ * Your opinion of this thing — and only that.
+ *
+ * Shelf membership used to live here, which is what made putting a book on a shelf
+ * mean opening a dialog named after something else. It is edited on the page now,
+ * beside the shelves it lists. Format stayed: a format is a fact about your copy,
+ * not an organizational tier, and it is not a shelf (DEC-059).
+ */
 export function OpinionDialog({
   open,
   onOpenChange,
   entry,
-  shelves,
   onSave,
-  onCreateShelf,
 }: OpinionDialogProps) {
-  const [newShelfName, setNewShelfName] = useState("");
+  const itemTypes = useItemTypes();
   const [saveError, setSaveError] = useState("");
   const form = useForm<OpinionValues>({
     resolver: zodResolver(opinionSchema),
@@ -50,10 +58,15 @@ export function OpinionDialog({
       date_started: entry.date_started ?? "",
       date_finished: entry.date_finished ?? "",
       reread_count: String(entry.reread_count),
-      shelf_ids: entry.shelves.map((shelf) => shelf.id),
+      formats: entry.formats ?? [],
     },
   });
   const errors = form.formState.errors;
+  // DEC-057: a record has no reread count and no started/finished dates, so this
+  // asks the domain rather than branching on the type.
+  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+    hasEntryField(entry.item.type, itemTypes.data, field);
+  const formats = formatsFor(entry.item.type, itemTypes.data);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -61,8 +74,8 @@ export function OpinionDialog({
         <DialogHeader>
           <DialogTitle>Edit your opinion</DialogTitle>
           <DialogDescription>
-            Your score, status, dates, notes, and shelves belong to you alone
-            and are never overwritten by a provider.
+            Your score, status, format and notes belong to you alone and are
+            never overwritten by a provider.
           </DialogDescription>
         </DialogHeader>
         <form
@@ -89,6 +102,7 @@ export function OpinionDialog({
               name="status"
               render={({ field }) => (
                 <StatusSelect
+                  statuses={statusesFor(entry.item.type, itemTypes.data)}
                   value={field.value}
                   onValueChange={field.onChange}
                   label="Status"
@@ -114,103 +128,76 @@ export function OpinionDialog({
           <Field id="opinion-notes" label="Notes" error={errors.notes?.message}>
             {(props) => <Textarea {...props} {...form.register("notes")} />}
           </Field>
-          <Field
-            id="opinion-started"
-            label="Started"
-            error={errors.date_started?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                className="h-11"
-                {...form.register("date_started")}
-              />
-            )}
-          </Field>
-          <Field
-            id="opinion-finished"
-            label="Finished"
-            error={errors.date_finished?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                type="date"
-                className="h-11"
-                {...form.register("date_finished")}
-              />
-            )}
-          </Field>
-          <Field
-            id="opinion-rereads"
-            label="Reread count"
-            error={errors.reread_count?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                type="number"
-                min="0"
-                className="h-11"
-                {...form.register("reread_count")}
-              />
-            )}
-          </Field>
-          {shelves.length > 0 && (
-            <fieldset>
-              <legend className="text-sm font-medium">Shelves</legend>
+          {formats.length > 0 && (
+            <div>
+              <span className="mb-1 block text-sm font-medium">Format</span>
+              {/* The same control as the add screen, and deliberately *not* the
+                  shelf control: a format is a closed per-domain vocabulary you
+                  pick from, a shelf is a tier you invent, and DEC-059 turns on
+                  that distinction. Legal on any status, which is what makes
+                  "wishlist → vinyl" expressible. */}
               <Controller
                 control={form.control}
-                name="shelf_ids"
+                name="formats"
                 render={({ field }) => (
-                  <div className="mt-2 flex flex-wrap gap-3">
-                    {shelves.map((shelf) => (
-                      <div key={shelf.id} className="flex items-center gap-2">
-                        <Checkbox
-                          id={`opinion-shelf-${shelf.id}`}
-                          checked={field.value.includes(shelf.id)}
-                          onCheckedChange={(checked) =>
-                            field.onChange(
-                              checked
-                                ? [...field.value, shelf.id]
-                                : field.value.filter(
-                                    (id: number) => id !== shelf.id,
-                                  ),
-                            )
-                          }
-                        />
-                        <Label htmlFor={`opinion-shelf-${shelf.id}`}>
-                          {shelf.name}
-                        </Label>
-                      </div>
-                    ))}
-                  </div>
+                  <FormatPicker
+                    formats={formats}
+                    value={field.value}
+                    onChange={field.onChange}
+                  />
                 )}
               />
-            </fieldset>
+            </div>
           )}
-          <div className="flex gap-2">
-            <Input
-              className="h-11 flex-1"
-              aria-label="New shelf name"
-              placeholder="New shelf name"
-              value={newShelfName}
-              onChange={(event) => setNewShelfName(event.target.value)}
-            />
-            <Button
-              type="button"
-              variant="outline"
-              className="rounded-full"
-              disabled={!newShelfName.trim()}
-              onClick={async () => {
-                await onCreateShelf(newShelfName.trim());
-                setNewShelfName("");
-              }}
+          {has("date_started") && (
+            <Field
+              id="opinion-started"
+              label="Started"
+              error={errors.date_started?.message}
             >
-              Create shelf
-            </Button>
-          </div>
+              {(props) => (
+                <Input
+                  {...props}
+                  type="date"
+                  className="h-11"
+                  {...form.register("date_started")}
+                />
+              )}
+            </Field>
+          )}
+          {has("date_finished") && (
+            <Field
+              id="opinion-finished"
+              label="Finished"
+              error={errors.date_finished?.message}
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="date"
+                  className="h-11"
+                  {...form.register("date_finished")}
+                />
+              )}
+            </Field>
+          )}
+          {has("reread_count") && (
+            <Field
+              id="opinion-rereads"
+              label="Reread count"
+              error={errors.reread_count?.message}
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  min="0"
+                  className="h-11"
+                  {...form.register("reread_count")}
+                />
+              )}
+            </Field>
+          )}
           {saveError && (
             <p role="alert" className="text-sm text-destructive">
               {saveError}

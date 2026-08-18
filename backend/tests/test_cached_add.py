@@ -35,13 +35,81 @@ class Provider:
             source_refs=(SourceRef(self.name, source_id),),
             title="Rayuela",
             subtitle="Edición crítica",
-            authors=("Julio Cortázar",),
+            creators=("Julio Cortázar",),
             year=2001,
             cover_url=None,
             identifiers={"isbn13": "9788437604572"},
             language="es",
-            metadata={"publisher": "Cátedra", "authors": ["Julio Cortázar"]},
+            metadata={"publisher": "Cátedra", "creators": ["Julio Cortázar"]},
         )
+
+
+class SortNameProvider:
+    """A provider that knows how its own creator sorts, the way MusicBrainz does."""
+
+    name = "openlibrary"
+    item_type = "book"
+
+    def __init__(self, creator: str, creator_sort: str | None) -> None:
+        self.creator = creator
+        self.creator_sort = creator_sort
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Discovery",
+            subtitle=None,
+            creators=(self.creator,),
+            year=2001,
+            cover_url=None,
+            identifiers={},
+            language="en",
+            metadata={"creators": [self.creator]},
+            creator_sort=self.creator_sort,
+        )
+
+
+@pytest.mark.anyio
+async def test_a_source_that_knows_the_sort_name_seeds_it_and_the_heuristic_stays_out(
+    tmp_path: Path,
+) -> None:
+    """The rule seam 1 generalizes from Calibre: a source that knows, seeds (DEC-051).
+
+    The heuristic assumes a person's name and would file `Daft Punk` under P, which is
+    the observation the whole architecture turns on (DEC-052). It must not run on a
+    name a source already answered — and it must still run when nothing knew.
+    """
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": SortNameProvider("Daft Punk", "Daft Punk")}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            known = await client.post(
+                "/api/entries",
+                json={"source": "openlibrary", "source_id": "known", "status": "read"},
+            )
+        app.state.providers = {"openlibrary": SortNameProvider("Miles Davis", None)}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            unknown = await client.post(
+                "/api/entries",
+                json={"source": "openlibrary", "source_id": "unknown", "status": "read"},
+            )
+
+    seeded = known.json()["entry"]["item"]
+    assert seeded["creator_sort_override"] == "Daft Punk"
+    assert seeded["creator_sort"] == "Daft Punk"
+    # Nothing knew, so the heuristic answers and stays correctable.
+    guessed = unknown.json()["entry"]["item"]
+    assert guessed["creator_sort_override"] is None
+    assert guessed["creator_sort"] == "Davis, Miles"
 
 
 @pytest.mark.anyio
@@ -56,7 +124,7 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
         body = {
             "manual": {
                 "title": "Rayuela",
-                "authors": ["Julio Cortázar"],
+                "creators": ["Julio Cortázar"],
                 "year": 1999,
                 "isbn": "978-84-376-0457-2",
             },
@@ -71,7 +139,7 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
             json={
                 "manual": {
                     "title": "Rayuela",
-                    "authors": ["Julio Cortázar"],
+                    "creators": ["Julio Cortázar"],
                     "year": 2005,
                     "isbn": "9780307474728",
                 },
@@ -84,7 +152,7 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
             json={
                 "manual": {
                     "title": "Rayuela",
-                    "authors": ["Julio Cortázar"],
+                    "creators": ["Julio Cortázar"],
                     "year": 2005,
                     "isbn": "9780307474728",
                 },
@@ -142,7 +210,7 @@ async def test_concurrent_double_submit_is_idempotent(tmp_path: Path) -> None:
                 response = await client.post(
                     "/api/entries",
                     json={
-                        "manual": {"title": "Concurrent", "authors": ["Ada"]},
+                        "manual": {"title": "Concurrent", "creators": ["Ada"]},
                         "status": "read",
                         "idempotency_key": "same-request",
                     },
@@ -188,7 +256,7 @@ async def test_provider_wait_does_not_hold_sqlite_write_lock(tmp_path: Path) -> 
                 manual = await client.post(
                     "/api/entries",
                     json={
-                        "manual": {"title": "No lock", "authors": ["Ada"]},
+                        "manual": {"title": "No lock", "creators": ["Ada"]},
                         "status": "read",
                         "idempotency_key": "no-lock",
                     },
@@ -320,3 +388,104 @@ async def test_contradictory_exact_identities_do_not_attach(tmp_path: Path) -> N
             )
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "identity_conflict"
+
+
+class AlbumProvider:
+    """A record, so the domain's refusals can be exercised on the way in."""
+
+    name = "musicbrainz"
+    item_type = "album"
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Kind of Blue",
+            subtitle=None,
+            creators=("Miles Davis",),
+            year=1959,
+            cover_url=None,
+            identifiers={},
+            language=None,
+            metadata={"creators": ["Miles Davis"]},
+        )
+
+
+@pytest.mark.anyio
+async def test_an_opinion_can_be_set_while_adding(tmp_path: Path) -> None:
+    """Adding a book you have just finished should not mean adding it and then
+    immediately opening the edit dialog on it."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"openlibrary": Provider()}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={
+                    "source": "openlibrary",
+                    "source_id": "OL1M",
+                    "status": "read",
+                    "score": 9,
+                    "notes": "Read it twice, in both orders.",
+                    "formats": ["physical", "digital"],
+                    "date_started": "2026-01-02",
+                    "date_finished": "2026-02-03",
+                    "reread_count": 2,
+                },
+            )
+            entry_id = created.json()["entry"]["id"]
+            stored = await client.get(f"/api/entries/{entry_id}")
+
+    assert created.status_code == 201
+    body = stored.json()
+    assert body["notes"] == "Read it twice, in both orders."
+    assert body["formats"] == ["physical", "digital"]
+    assert body["date_started"] == "2026-01-02"
+    assert body["date_finished"] == "2026-02-03"
+    assert body["reread_count"] == 2
+
+
+@pytest.mark.anyio
+async def test_adding_refuses_a_field_the_domain_does_not_have(tmp_path: Path) -> None:
+    """The same rule `PATCH` follows (DEC-060 judgement 3), on the way in: a value
+    nothing can ever mean is refused rather than stored. And the refusal happens
+    before anything is written."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {"musicbrainz": AlbumProvider()}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            rereads = await client.post(
+                "/api/entries",
+                json={
+                    "source": "musicbrainz",
+                    "source_id": "MB1",
+                    "status": "owned",
+                    "reread_count": 2,
+                },
+            )
+            wrong_format = await client.post(
+                "/api/entries",
+                json={
+                    "source": "musicbrainz",
+                    "source_id": "MB1",
+                    "status": "owned",
+                    "formats": ["borrowed"],
+                },
+            )
+            listed = await client.get("/api/entries", params={"status": "unsorted"})
+            everything = await client.get("/api/entries", params={"status": "owned"})
+
+    for refused in (rereads, wrong_format):
+        assert refused.status_code == 422
+        assert "Album" in refused.json()["error"]["message"]
+    # Refused before the write, so no half-added record is left behind.
+    assert listed.json()["total"] == 0
+    assert everything.json()["total"] == 0

@@ -77,6 +77,9 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0009_provider_usage",
         "0010_attachments",
         "0011_creator_sort_names",
+        "0012_creators",
+        "0013_entry_formats",
+        "0014_status_is_the_domains",
     ]
 
     upgrade(configured.database_url)
@@ -145,6 +148,9 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0009_provider_usage",
         "0010_attachments",
         "0011_creator_sort_names",
+        "0012_creators",
+        "0013_entry_formats",
+        "0014_status_is_the_domains",
     ]
 
 
@@ -218,14 +224,14 @@ async def test_accented_sorting_and_search_survive_the_projection_backfill(
         by_title = service.list_entries(sort="title", order="asc")
         unaccented_query = service.list_entries(q="avila")
         author_query = service.list_entries(q="sabato")
-        by_author = service.list_entries(sort="sort_author", order="asc")
+        by_author = service.list_entries(sort="creator", order="asc")
 
     # "Ávila" before "Ébano" before "Zurita": accent-folded, not code-point order,
     # which would put every accented capital after "Z".
     assert [row["item"]["title"] for row in by_title["items"]] == ["Ávila", "Ébano", "Zurita"]
     assert [row["item"]["title"] for row in unaccented_query["items"]] == ["Ávila"]
     assert [row["item"]["title"] for row in author_query["items"]] == ["Ébano"]
-    assert [row["item"]["sort_author"] for row in by_author["items"]] == [
+    assert [row["item"]["creator"] for row in by_author["items"]] == [
         "Ángela Ruiz",
         "Ernesto Sábato",
         "Zoé Valdés",
@@ -241,7 +247,7 @@ def test_the_backfill_reaches_rows_written_before_the_projection_existed(tmp_pat
 
     connection = sqlite3.connect(configured.data_dir / "books.db")
     projected = connection.execute(
-        "SELECT title, title_normalized, sort_author_normalized FROM items ORDER BY id"
+        "SELECT title, title_normalized, creator_primary_normalized FROM items ORDER BY id"
     ).fetchall()
     connection.close()
 
@@ -250,6 +256,98 @@ def test_the_backfill_reaches_rows_written_before_the_projection_existed(tmp_pat
         ("Zurita", "zurita", "zoe valdes"),
         ("Ébano", "ebano", "ernesto sabato"),
     ]
+
+
+def seed_library_at_creator_sort_names(database_path: Path) -> None:
+    """Rows as 0011 left them: `metadata.authors`, one of them hand-corrected."""
+    connection = sqlite3.connect(database_path)
+    # `creator_sort` is written the way 0011's backfill left it: the override when the
+    # owner supplied one, the heuristic's answer otherwise.
+    rows = [
+        (
+            "Cien años de soledad",
+            "Gabriel García Márquez",
+            "García Márquez, Gabriel José",
+            "García Márquez, Gabriel José",
+        ),
+        ("Ficciones", "Jorge Luis Borges", None, "Luis Borges, Jorge"),
+    ]
+    for index, (title, author, override, sort_name) in enumerate(rows, start=1):
+        connection.execute(
+            "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at,"
+            " creator_sort_override, creator_sort) VALUES (?, 'book', ?, '{}', ?, ?, ?, ?, ?)",
+            (
+                index,
+                title,
+                json.dumps({"authors": [author], "publisher": "Sudamericana"}),
+                NOW,
+                NOW,
+                override,
+                sort_name,
+            ),
+        )
+    connection.commit()
+    connection.close()
+
+
+def test_the_creators_rename_carries_the_owner_correction_rather_than_recomputing_it(
+    tmp_path: Path,
+) -> None:
+    """AC9: no row loses its creator sort name across `authors` -> `creators`.
+
+    The override is the only value here that is not derived, and the heuristic that
+    would replace it is known to be wrong on exactly the names it exists to fix —
+    "Jorge Luis Borges" becomes "Luis Borges, Jorge" (DEC-051). Recomputing it during
+    the rename would silently undo a hand correction.
+    """
+    configured = database_at(tmp_path / "data", "0011_creator_sort_names")
+    seed_library_at_creator_sort_names(configured.data_dir / "books.db")
+    assert configured.database_url is not None
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    migrated = connection.execute(
+        "SELECT metadata, creator_primary, creator_primary_normalized, creator_sort_override,"
+        " creator_sort FROM items ORDER BY id"
+    ).fetchall()
+    connection.close()
+
+    corrected, heuristic = migrated
+    assert json.loads(corrected[0]) == {
+        "creators": ["Gabriel García Márquez"],
+        "publisher": "Sudamericana",
+    }
+    assert corrected[1] == "Gabriel García Márquez"
+    assert corrected[2] == "gabriel garcia marquez"
+    # Carried verbatim, and still the value the library sorts under.
+    assert corrected[3] == "García Márquez, Gabriel José"
+    assert corrected[4] == "García Márquez, Gabriel José"
+    # A row nobody corrected keeps the heuristic's answer, wrong as it is.
+    assert json.loads(heuristic[0])["creators"] == ["Jorge Luis Borges"]
+    assert heuristic[3] is None
+    assert heuristic[4] == "Luis Borges, Jorge"
+
+
+def test_an_item_with_no_creators_survives_the_rename(tmp_path: Path) -> None:
+    """An album can credit nobody, and so can a hand-entered book."""
+    configured = database_at(tmp_path / "data", "0011_creator_sort_names")
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'book', 'Anonymous', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    connection.close()
+    assert configured.database_url is not None
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    row = connection.execute("SELECT metadata, creator_primary, creator_sort FROM items").fetchone()
+    connection.close()
+    assert row == ("{}", None, None)
 
 
 @pytest.mark.anyio
@@ -324,3 +422,130 @@ def test_stored_descriptions_are_reduced_to_plain_text(tmp_path: Path) -> None:
     # An all-markup description would otherwise read as "present, and blank".
     assert descriptions[4] is None
     assert descriptions[99] is None
+
+
+def test_every_book_status_survives_the_vocabulary_change(tmp_path: Path) -> None:
+    """Sprint 026 AC3: no data migration silently remaps a value.
+
+    `entries` is rebuilt by 0013 to widen a CHECK constraint that listed the six book
+    statuses, and a rebuild copies every row. This seeds one entry in each of those
+    six statuses *before* the change and reads them back after, because "the copy
+    preserved the data" is the kind of claim a schema test does not make on its own.
+    """
+    configured = database_at(tmp_path / "data", "0012_creators")
+    assert configured.database_url is not None
+    before = ["unsorted", "read", "reading", "to_read", "wishlist", "dropped"]
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    for index, status in enumerate(before, start=1):
+        connection.execute(
+            "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+            " VALUES (?, 'book', ?, '{}', '{}', ?, ?)",
+            (index, f"Book {index}", NOW, NOW),
+        )
+        connection.execute(
+            "INSERT INTO entries (id, user_id, item_id, status, suggested_status, score, notes,"
+            " date_added, date_started, date_finished, reread_count, score_provisional,"
+            " created_at, updated_at)"
+            " VALUES (?, 1, ?, ?, ?, 7, 'kept', ?, '2026-01-01', '2026-02-02', 3, 1, ?, ?)",
+            (index, index, status, status, NOW, NOW, NOW),
+        )
+    connection.commit()
+    connection.close()
+
+    upgrade(configured.database_url)
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    rows = connection.execute(
+        "SELECT id, status, suggested_status, score, notes, date_started, date_finished,"
+        " reread_count, score_provisional FROM entries ORDER BY id"
+    ).fetchall()
+    connection.close()
+    assert [row[1] for row in rows] == before
+    assert [row[2] for row in rows] == before
+    # The rest of the row rides along in the same copy, so it is asserted in the same
+    # place rather than trusted.
+    assert all(row[3:] == (7, "kept", "2026-01-01", "2026-02-02", 3, 1) for row in rows)
+
+
+def test_the_widened_constraint_admits_an_album_status_and_still_refuses_nonsense(
+    tmp_path: Path,
+) -> None:
+    configured = database_at(tmp_path / "data", "head")
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    connection.execute("PRAGMA foreign_keys=ON")
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'album', 'Discovery', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO entries (id, user_id, item_id, status, date_added, reread_count,"
+        " score_provisional, created_at, updated_at)"
+        " VALUES (1, 1, 1, 'owned', ?, 0, 0, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO entries (id, user_id, item_id, status, date_added, reread_count,"
+            " score_provisional, created_at, updated_at)"
+            " VALUES (2, 1, 1, 'listened', ?, 0, 0, ?, ?)",
+            (NOW, NOW, NOW),
+        )
+    connection.close()
+
+
+def test_the_status_check_is_gone_and_the_neutral_ones_are_not(tmp_path: Path) -> None:
+    """DEC-067 row 1, and the trap its own migration warns about.
+
+    `copy_from` skips reflection, and SQLAlchemy does not reflect SQLite CHECK
+    constraints at all — so a rebuild that dropped one constraint could silently drop
+    the other three with it. Score, reread count and provisionality are neutral facts
+    about an entry that no domain redefines, and they have to survive.
+    """
+    configured = database_at(tmp_path / "data", "head")
+    database_path = configured.data_dir / "books.db"
+    connection = sqlite3.connect(database_path)
+    schema = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+
+    assert "ck_entries_status" not in schema
+    assert "ck_entries_suggested_status" not in schema
+    for surviving in (
+        "ck_entries_score",
+        "ck_entries_reread_count",
+        "ck_entries_score_provisional",
+    ):
+        assert surviving in schema
+
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'game', 'Outer Wilds', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    # A status no registered domain declares is now the database's business no longer:
+    # `validate_status` is keyed on the item's own domain and is strictly stronger.
+    connection.execute(
+        "INSERT INTO entries (id, user_id, item_id, status, date_added, reread_count,"
+        " score_provisional, created_at, updated_at)"
+        " VALUES (1, 1, 1, 'playing', ?, 0, 0, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    # A score out of range is still refused, which is the half that must not have moved.
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute("UPDATE entries SET score = 11 WHERE id = 1")
+    connection.close()
+
+
+def test_the_status_check_comes_back_on_a_downgrade(tmp_path: Path) -> None:
+    """Down restores the snapshot, which is the honest inverse rather than a no-op."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", "head")
+    assert configured.database_url is not None
+    command.downgrade(alembic_config(configured.database_url), "0013_entry_formats")
+
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    schema = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+    connection.close()
+
+    assert "ck_entries_status" in schema
+    assert "'owned'" in schema

@@ -18,11 +18,8 @@ import httpx
 import pytest
 
 from book_tracker.config import Settings
-from book_tracker.infrastructure.providers import (
-    OpenLibraryProvider,
-    ProviderPayloadError,
-    create_provider_client,
-)
+from book_tracker.domains.book.providers import OpenLibraryProvider
+from book_tracker.infrastructure.providers import ProviderPayloadError, create_provider_client
 from book_tracker.logging import REDACTION, configure_logging
 from book_tracker.main import create_app
 

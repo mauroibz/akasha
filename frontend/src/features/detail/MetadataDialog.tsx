@@ -2,7 +2,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
-import type { LibraryItem } from "@/api/library";
+import type { FieldSpec, LibraryItem } from "@/api/library";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -21,6 +21,8 @@ interface MetadataDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   item: LibraryItem;
+  /** What this item's domain says its metadata fields are (DEC-052 seam 3). */
+  fields: FieldSpec[];
   onSave: (values: MetadataValues) => Promise<void>;
 }
 
@@ -28,33 +30,37 @@ function asText(value: unknown): string {
   return value === null || value === undefined ? "" : String(value);
 }
 
+/** A stored value as the form edits it: a list becomes a comma-separated line. */
+function asFormValue(value: unknown, field: FieldSpec): string {
+  if (field.multiplicity === "many")
+    return Array.isArray(value) ? value.join(", ") : "";
+  return asText(value);
+}
+
 export function MetadataDialog({
   open,
   onOpenChange,
   item,
+  fields,
   onSave,
 }: MetadataDialogProps) {
   const [saveError, setSaveError] = useState("");
   const form = useForm<MetadataValues>({
-    resolver: zodResolver(metadataSchema),
+    resolver: zodResolver(metadataSchema(fields)),
     defaultValues: {
       title: item.title,
       subtitle: item.subtitle ?? "",
       year: asText(item.year),
-      authors: Array.isArray(item.metadata.authors)
-        ? item.metadata.authors.join(", ")
-        : "",
       // Left empty rather than prefilled with `creator_sort`: an untouched field
-      // must keep following the authors above, and the automatic value is shown
+      // must keep following the creators above, and the automatic value is shown
       // as the placeholder instead.
       creator_sort_override: item.creator_sort_override ?? "",
-      publisher: asText(item.metadata.publisher),
-      language: asText(item.metadata.language),
-      page_count: asText(item.metadata.page_count),
-      description: asText(item.metadata.description),
-      subjects: (item.metadata.subjects ?? []).join(", "),
-      series: asText(item.metadata.series),
-      original_year: asText(item.metadata.original_year),
+      ...Object.fromEntries(
+        fields.map((field) => [
+          field.name,
+          asFormValue(item.metadata[field.name], field),
+        ]),
+      ),
     },
   });
   const errors = form.formState.errors;
@@ -63,7 +69,7 @@ export function MetadataDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Edit shared book metadata</DialogTitle>
+          <DialogTitle>Edit shared metadata</DialogTitle>
           <DialogDescription>
             These facts describe the edition and are shared by everyone who owns
             it. Your score, status, dates, notes, and shelves are separate.
@@ -81,7 +87,7 @@ export function MetadataDialog({
               setSaveError(
                 error instanceof Error
                   ? error.message
-                  : "Book metadata could not be saved",
+                  : "Metadata could not be saved",
               );
             }
           })}
@@ -124,19 +130,6 @@ export function MetadataDialog({
             )}
           </Field>
           <Field
-            id="metadata-authors"
-            label="Authors"
-            error={errors.authors?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                className="h-11"
-                {...form.register("authors")}
-              />
-            )}
-          </Field>
-          <Field
             id="metadata-creator-sort"
             label="Sorts as"
             error={errors.creator_sort_override?.message}
@@ -156,98 +149,43 @@ export function MetadataDialog({
                   id="metadata-creator-sort-hint"
                   className="mt-1 text-xs text-muted-foreground"
                 >
-                  Where this sits in an author-sorted list. Leave it empty to
-                  follow the authors above.
+                  Where this sits in a creator-sorted list. Leave it empty to
+                  follow the creators above.
                 </p>
               </>
             )}
           </Field>
-          <Field
-            id="metadata-publisher"
-            label="Publisher"
-            error={errors.publisher?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                className="h-11"
-                {...form.register("publisher")}
-              />
-            )}
-          </Field>
-          <Field
-            id="metadata-language"
-            label="Language"
-            error={errors.language?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                className="h-11"
-                {...form.register("language")}
-              />
-            )}
-          </Field>
-          <Field
-            id="metadata-pages"
-            label="Page count"
-            error={errors.page_count?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                type="number"
-                min="1"
-                className="h-11"
-                {...form.register("page_count")}
-              />
-            )}
-          </Field>
-          <Field
-            id="metadata-description"
-            label="Description"
-            error={errors.description?.message}
-          >
-            {(props) => (
-              <Textarea {...props} {...form.register("description")} />
-            )}
-          </Field>
-          <Field
-            id="metadata-subjects"
-            label="Subjects, comma separated"
-            error={errors.subjects?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                className="h-11"
-                {...form.register("subjects")}
-              />
-            )}
-          </Field>
-          <Field
-            id="metadata-series"
-            label="Series"
-            error={errors.series?.message}
-          >
-            {(props) => (
-              <Input {...props} className="h-11" {...form.register("series")} />
-            )}
-          </Field>
-          <Field
-            id="metadata-original-year"
-            label="Original publication year"
-            error={errors.original_year?.message}
-          >
-            {(props) => (
-              <Input
-                {...props}
-                type="number"
-                className="h-11"
-                {...form.register("original_year")}
-              />
-            )}
-          </Field>
+          {fields.map((field) => (
+            <Field
+              key={field.name}
+              id={`metadata-${field.name}`}
+              label={
+                field.multiplicity === "many"
+                  ? `${field.label}, comma separated`
+                  : field.label
+              }
+              error={errors[field.name]?.message}
+            >
+              {(props) =>
+                field.type === "long_text" ? (
+                  <Textarea {...props} {...form.register(field.name)} />
+                ) : (
+                  <Input
+                    {...props}
+                    className="h-11"
+                    {...(field.type === "number"
+                      ? {
+                          type: "number",
+                          min: field.minimum ?? undefined,
+                          max: field.maximum ?? undefined,
+                        }
+                      : {})}
+                    {...form.register(field.name)}
+                  />
+                )
+              }
+            </Field>
+          ))}
           {saveError && (
             <p role="alert" className="text-sm text-destructive">
               {saveError}

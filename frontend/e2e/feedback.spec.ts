@@ -2,6 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { stillDurations } from "./motion";
+import { stubItemTypes } from "./seed";
 
 /**
  * Product spec section 4.3 and technical spec section 8 require that every user
@@ -58,7 +59,7 @@ const entry = {
     title: "Rayuela",
     subtitle: null,
     year: 1963,
-    sort_author: "Julio Cortázar",
+    creator: "Julio Cortázar",
     cover_url: null,
     cover_path: null,
     metadata: {},
@@ -66,19 +67,21 @@ const entry = {
     sources: [],
   },
   shelves: [],
+  formats: [],
 };
 
 const emptyLibrary = {
   items: [],
   next_cursor: null,
   total: 0,
-  facets: { status_counts: {} },
+  facets: { status_counts: {}, status_counts_by_type: {}, format_counts: {} },
 };
 
 async function stubLibrary(page: Page) {
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({ json: emptyLibrary }),
   );
+  await stubItemTypes(page);
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
@@ -109,11 +112,11 @@ for (const size of widths) {
           json: { entry, already_exists: false, near_matches: [] },
         }),
       );
+      // /add is the manual form itself now; searching moved to the library bar.
       await page.goto("/add");
-      await page.getByRole("button", { name: /enter manually/i }).click();
       await page.getByLabel(/^title$/i).fill("Rayuela");
       await page.getByRole("button", { name: /add to library/i }).click();
-      await expect(page).toHaveURL("/");
+      await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
       await expectVisibleToast(page, "Book added");
     });
 
@@ -131,7 +134,6 @@ for (const size of widths) {
         }),
       );
       await page.goto("/add");
-      await page.getByRole("button", { name: /enter manually/i }).click();
       await page.getByLabel(/^title$/i).fill("Rayuela");
       await page.getByRole("button", { name: /add to library/i }).click();
       await expect(page).toHaveURL(/\/books\/7/);
@@ -156,11 +158,11 @@ for (const size of widths) {
         .first()
         .click();
       await page
-        .getByRole("alertdialog", { name: /remove this book/i })
+        .getByRole("alertdialog", { name: /remove this/i })
         .getByRole("button", { name: /delete entry/i })
         .click();
-      await expect(page).toHaveURL("/");
-      await expectVisibleToast(page, "Book removed from your library");
+      await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
+      await expectVisibleToast(page, "Removed from your library");
     });
 
     test("renaming a shelf confirms on the toast surface", async ({ page }) => {
@@ -202,7 +204,7 @@ for (const size of widths) {
                 record_id: 1,
                 row_number: 2,
                 title: "Rayuela",
-                authors: ["Julio Cortázar"],
+                creators: ["Julio Cortázar"],
                 score: null,
                 score_provisional: false,
                 suggested_status: "read",
@@ -234,7 +236,7 @@ for (const size of widths) {
       });
       await page.getByRole("button", { name: /preview import/i }).click();
       await page.getByRole("button", { name: /^Import 1 ready row$/ }).click();
-      await expectVisibleToast(page, /Import complete: 1 book added/);
+      await expectVisibleToast(page, /Import complete: 1 entry added/);
     });
   });
 }
@@ -251,7 +253,11 @@ test.describe("a rejected write", () => {
           items: [entry],
           next_cursor: null,
           total: 1,
-          facets: { status_counts: { reading: 1 } },
+          facets: {
+            status_counts: { reading: 1 },
+            status_counts_by_type: {},
+            format_counts: {},
+          },
         },
       }),
     );

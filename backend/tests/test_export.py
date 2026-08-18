@@ -23,10 +23,10 @@ from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 
 DERIVED_COLUMNS = (
-    "sort_author",
+    "creator",
     "creator_sort",
     "title_normalized",
-    "sort_author_normalized",
+    "creator_primary_normalized",
     "creator_sort_normalized",
 )
 
@@ -45,7 +45,7 @@ async def test_export_carries_owner_data_and_omits_derived_columns(tmp_path: Pat
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE items SET creator_sort_override=:sort WHERE id=:id"),
@@ -72,7 +72,7 @@ async def test_export_carries_owner_data_and_omits_derived_columns(tmp_path: Pat
     # The override is the one creator field no algorithm can reconstruct (DEC-051).
     assert item["creator_sort_override"] == "Cortázar, Julio"
     assert item["type"] == "book"
-    assert item["metadata"]["authors"] == ["Julio Cortázar"]
+    assert item["metadata"]["creators"] == ["Julio Cortázar"]
     for column in DERIVED_COLUMNS:
         assert column not in item, f"{column} is derived and must not be exported"
 
@@ -109,13 +109,23 @@ async def test_export_does_not_special_case_the_item_type(tmp_path: Path) -> Non
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Kind of Blue", authors=("Miles Davis",))
+        book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        album = repository.create_or_get_entry(
+            title="Kind of Blue", creators=("Miles Davis",), item_type="album"
+        )
         with app.state.engine.begin() as connection:
             connection.execute(
-                text("UPDATE items SET type='album', metadata=:meta WHERE id=:id"),
+                text("UPDATE items SET metadata=:meta WHERE id=:id"),
                 {
                     "meta": '{"creators": ["Miles Davis"], "label": "Columbia"}',
-                    "id": created.item_id,
+                    "id": album.item_id,
+                },
+            )
+            connection.execute(
+                text("UPDATE items SET metadata=:meta WHERE id=:id"),
+                {
+                    "meta": '{"creators": ["Julio Cortázar"], "page_count": 736}',
+                    "id": book.item_id,
                 },
             )
         async with httpx.AsyncClient(
@@ -123,10 +133,18 @@ async def test_export_does_not_special_case_the_item_type(tmp_path: Path) -> Non
         ) as client:
             response = await client.get("/api/export")
 
-    item = response.json()["items"][0]
-    assert item["type"] == "album"
-    # Opaque: the album's own vocabulary survives untranslated.
-    assert item["metadata"] == {"creators": ["Miles Davis"], "label": "Columbia"}
+    exported = {row["title"]: row for row in response.json()["items"]}
+    assert {row["type"] for row in exported.values()} == {"book", "album"}
+    # Opaque both ways: each domain's own vocabulary survives untranslated, and the
+    # album needs no branch of its own to get there.
+    assert exported["Kind of Blue"]["metadata"] == {
+        "creators": ["Miles Davis"],
+        "label": "Columbia",
+    }
+    assert exported["Rayuela"]["metadata"] == {
+        "creators": ["Julio Cortázar"],
+        "page_count": 736,
+    }
 
 
 @pytest.mark.anyio
@@ -140,7 +158,7 @@ async def test_export_carries_attachment_references_with_their_digest(tmp_path: 
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Rayuela", authors=("Julio Cortázar",))
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as client:
@@ -200,7 +218,7 @@ async def test_csv_export_has_the_goodreads_columns_and_survives_hostile_text(
         repository = DomainRepository(app.state.engine)
         created = repository.create_or_get_entry(
             title="Rayuela, o el libro de los libros",
-            authors=("Julio Cortázar", "Jorge Luis Borges"),
+            creators=("Julio Cortázar", "Jorge Luis Borges"),
         )
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -248,7 +266,7 @@ async def test_csv_export_neutralizes_spreadsheet_formulas(tmp_path: Path) -> No
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         repository = DomainRepository(app.state.engine)
-        created = repository.create_or_get_entry(title="Ledger", authors=("A. Nobody",))
+        created = repository.create_or_get_entry(title="Ledger", creators=("A. Nobody",))
         with app.state.engine.begin() as connection:
             connection.execute(
                 text("UPDATE entries SET notes=:notes WHERE id=:id"),
@@ -281,7 +299,7 @@ def _seed(engine, count: int) -> int:
                 {
                     "title": f"Title {index}",
                     "metadata": json.dumps(
-                        {"authors": [f"Author {index}"], "description": padding}
+                        {"creators": [f"Author {index}"], "description": padding}
                     ),
                 },
             )
@@ -345,3 +363,62 @@ def test_export_memory_is_flat_against_library_size(tmp_path: Path, exporter: st
         f"peak grew with library size: {small_peak} -> {large_peak} bytes "
         f"while output grew {small_total} -> {large_total}"
     )
+
+
+@pytest.mark.anyio
+async def test_the_goodreads_csv_carries_books_and_leaves_the_other_domains_to_the_json(
+    tmp_path: Path,
+) -> None:
+    """Found on the Sprint 025 walkthrough: the CSV was emitting albums as books.
+
+    The CSV is one domain's export view — a Goodreads import would read an album as a
+    book with no author and no ISBN. The JSON beside it is the lossless artifact and
+    carries every type, so nothing is lost by leaving the CSV book-shaped.
+    """
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        repository.create_or_get_entry(
+            title="Kind of Blue", creators=("Miles Davis",), item_type="album"
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            csv_body = (await client.get("/api/export", params={"format": "csv"})).text
+            everything = (await client.get("/api/export")).json()
+
+    titles = [row.split(",")[1] for row in csv_body.strip().splitlines()[1:]]
+    assert titles == ["Rayuela"]
+    assert {row["title"] for row in everything["items"]} == {"Rayuela", "Kind of Blue"}
+
+
+@pytest.mark.anyio
+async def test_export_carries_the_format_of_a_copy(tmp_path: Path) -> None:
+    """DEC-059 formats are owner data in DEC-054's sense: nothing derives them.
+
+    The item says a release was pressed on vinyl in 1959. The entry says *you* have
+    it on vinyl and digital — a different fact, unreconstructable from the item, so an
+    export that dropped it would lose something only the owner knew.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET type='album' WHERE id=:id"), {"id": album.item_id}
+            )
+        await client.patch(
+            f"/api/entries/{album.entry_id}",
+            json={"status": "wishlist", "formats": ["vinyl", "digital"]},
+        )
+        document = json.loads("".join(export_json(app.state.engine)))
+
+    entry = document["entries"][0]
+    assert entry["formats"] == ["digital", "vinyl"]
+    # Independent axes: the export carries both without one implying the other.
+    assert entry["status"] == "wishlist"

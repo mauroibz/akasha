@@ -38,9 +38,11 @@ describe("ShelvesPage", () => {
     });
     renderPage();
     expect(await screen.findByText("Favorites")).toBeVisible();
-    expect(screen.getByText("5 books")).toBeVisible();
+    // A shelf spans domains and always did, so it counts items rather than
+    // naming one domain's noun (Sprint 029 deliverable 6).
+    expect(screen.getByText("5 items")).toBeVisible();
     expect(screen.getByText("Sci-fi")).toBeVisible();
-    expect(screen.getByText("3 books")).toBeVisible();
+    expect(screen.getByText("3 items")).toBeVisible();
   });
 
   it("creates a shelf and refreshes the list", async () => {
@@ -110,7 +112,7 @@ describe("ShelvesPage", () => {
     expect(await findToast('Shelf renamed to "Best"')).toBeInTheDocument();
   });
 
-  it("confirms deletion and states books are retained", async () => {
+  it("confirms deletion and states the entries are retained", async () => {
     let deleted = false;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
@@ -128,8 +130,8 @@ describe("ShelvesPage", () => {
     const user = userEvent.setup();
     await screen.findByText("Favorites");
     await user.click(screen.getByRole("button", { name: /delete favorites/i }));
-    // Confirmation dialog states books are retained
-    expect(screen.getByText(/books.*retained/i)).toBeInTheDocument();
+    // Confirmation dialog states the entries are retained
+    expect(screen.getByText(/entries.*retained/i)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: /delete shelf/i }));
     await waitFor(() => expect(deleted).toBe(true));
     expect(screen.queryByText("Favorites")).not.toBeInTheDocument();

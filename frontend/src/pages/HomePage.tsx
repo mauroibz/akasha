@@ -10,9 +10,9 @@ import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
-  entryStatuses,
   getLibraryPage,
   patchEntry,
+  type EntryFormat,
   type EntryStatus,
   type LibraryEntry,
   type LibraryFilters,
@@ -31,12 +31,27 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { StatusFilter } from "@/features/library/StatusFilter";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
-import { sortLabels, statusLabels } from "@/features/library/labels";
+import { domainsFrom, labelFor, sortLabels } from "@/features/library/labels";
+import { AddForm } from "@/features/add/AddForm";
+import { ResultsGrid } from "@/features/add/ResultsGrid";
+import { useWebSearch } from "@/features/add/useWebSearch";
+import { ProviderHealthNotice } from "@/components/ProviderHealthNotice";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { SearchCandidate } from "@/api/add";
+import { useItemTypes } from "@/features/library/useItemTypes";
+import {
+  domainPreferenceKey,
   isEditableTarget,
   libraryMotionKey,
   mergeUniqueEntries,
+  readDomainPreference,
   readViewPreference,
   viewPreferenceKey,
   type LibraryView,
@@ -44,12 +59,15 @@ import {
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
+const allFormats = "__all_formats__";
 
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
   return {
     statuses,
     shelves: params.getAll("shelf"),
+    formats: params.getAll("format") as EntryFormat[],
+    types: params.getAll("type"),
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
@@ -60,6 +78,8 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   const params = new URLSearchParams();
   filters.statuses.forEach((s) => params.append("status", s));
   filters.shelves.forEach((s) => params.append("shelf", s));
+  filters.formats.forEach((s) => params.append("format", s));
+  filters.types.forEach((s) => params.append("type", s));
   if (filters.query.trim()) params.set("q", filters.query.trim());
   params.set("sort", filters.sort);
   params.set("order", filters.order);
@@ -77,7 +97,19 @@ export function HomePage() {
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [rollbackId, setRollbackId] = useState<number | null>(null);
+  const [selectedCandidate, setSelectedCandidate] =
+    useState<SearchCandidate | null>(null);
   const searchRef = useRef<HTMLInputElement>(null);
+  /**
+   * When the reader last touched the box.
+   *
+   * The settle rule is "still for ~800 ms", and the conditions that let a search
+   * fire — the URL caught up, the library answered, it answered with nothing —
+   * become true at their own pace. Measuring the wait from the last keystroke rather
+   * than from the last of those means a slow library does not push the search out by
+   * however long it took.
+   */
+  const lastTypedAt = useRef(0);
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
   const navigate = useNavigate();
@@ -128,12 +160,28 @@ export function HomePage() {
     return () => window.clearTimeout(timer);
   }, [search, filters.query, setSearchParams]);
 
+  const itemTypes = useItemTypes();
+  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
+  /**
+   * Whether the library can be asked for rows yet.
+   *
+   * Every list request names a domain now, and on a cold visit the domain is not
+   * known until the registry answers — so firing before that spends a request on an
+   * unfiltered page that is replaced a moment later, and flashes another domain's
+   * rows on the way. Waiting is one condition; the two ways of being ready are a
+   * `type` already resolved into the URL, and a build whose registry declares nothing
+   * to filter by, which includes the registry having failed. A registry outage must
+   * not be the reason the library is blank.
+   */
+  const domainReady =
+    filters.types.length > 0 || (!itemTypes.isPending && domains.length === 0);
   const library = useInfiniteQuery({
     queryKey: ["library", filters],
     queryFn: ({ pageParam, signal }) =>
       getLibraryPage(filters, pageParam, signal),
     initialPageParam: undefined as string | undefined,
     getNextPageParam: (page) => page.next_cursor ?? undefined,
+    enabled: domainReady,
     retry: false,
   });
   const entries = useMemo(
@@ -155,6 +203,71 @@ export function HomePage() {
     if (!Array.isArray(rows)) return [];
     return [...rows].sort((a, b) => a.name.localeCompare(b.name));
   }, [shelfQuery.data]);
+  /**
+   * A fresh visit lands on the domain last used, and always on exactly one.
+   *
+   * It writes the value into the URL — from there the choice is an ordinary filter,
+   * so a reload, the back button and a shared link all behave without this effect
+   * being involved again. A `type` already in the URL wins, because that is somebody
+   * being explicit.
+   *
+   * The fallback is the **first declared domain**, not "everything" (DEC-065). Three
+   * cases reach it and they are deliberately one branch: never having chosen, the
+   * literal `""` Sprint 027 stored as its way of saying "All", and a remembered domain
+   * this build no longer declares. None of them can be honoured as a filter now, and
+   * a library filtered by no domain is exactly the state this sprint removes.
+   *
+   * It waits for the registry, because the fallback is a value only the registry has.
+   *
+   * **It answers to the URL, not to the mount.** It used to run once per mount, which
+   * is right for every way of arriving that remounts the page and wrong for the one
+   * that does not: the shell's *Library* link points at `/` with no query, so pressing
+   * it while already here strips `type` and leaves a mounted page whose restore has
+   * already fired. Every list request names a domain, so the library then waits for a
+   * domain nothing was going to give it and says "Loading your library…" forever. A
+   * URL without a `type` is exactly the state this effect exists to fix, whenever it
+   * occurs; writing the value back makes the effect its own guard against repeating.
+   */
+  useEffect(() => {
+    if (searchParams.has("type")) return;
+    if (itemTypes.isPending) return;
+    if (!domains.length) return;
+    const remembered = readDomainPreference();
+    const chosen = domains.some((type) => type.id === remembered)
+      ? remembered
+      : domains[0].id;
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("type", chosen);
+        return next;
+      },
+      { replace: true },
+    );
+  }, [searchParams, setSearchParams, domains, itemTypes.isPending]);
+  // One domain at a time is the whole point of the strip, so the filter carries at
+  // most one value even though the API accepts a repeated parameter.
+  const selectedDomain = filters.types[0] ?? "";
+  // The domain the chips and the format list describe. Always exactly one once the
+  // registry has loaded, which is what lets one control mean both "these rows" and
+  // "these providers" (DEC-065). It is a list only because the registry may not have
+  // answered yet, and because `.map` over nothing is the whole empty case.
+  const shownDomains = useMemo(
+    () => domains.filter((type) => type.id === selectedDomain),
+    [domains, selectedDomain],
+  );
+  // Every format the shown domains declare, once. The filter spans domains — an
+  // entry carries formats, not a domain — so this is a flat list rather than a group
+  // per domain, which offered `Digital` twice with one meaning.
+  const formatChoices = useMemo(() => {
+    const seen = new Map<string, { value: EntryFormat; label: string }>();
+    for (const type of shownDomains) {
+      for (const format of type.formats ?? []) {
+        if (!seen.has(format.value)) seen.set(format.value, format);
+      }
+    }
+    return Array.from(seen.values());
+  }, [shownDomains]);
   const firstPage = library.data?.pages[0];
 
   const mutation = useMutation({
@@ -235,6 +348,22 @@ export function HomePage() {
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (isEditableTarget(event.target)) return;
+      /**
+       * The shortcuts belong to the surface the reader is in.
+       *
+       * `j`/`k` and the digits address library rows. With web results on screen
+       * there are two lists on one page, and the rule this sprint adopts is that
+       * focus decides: standing on a provider result, `j` must not scroll a
+       * different list and `7` must not score a row the reader is not looking at.
+       * Nothing else changes — the results are reached by Tab, and the confirm
+       * dialog is covered already, since `isEditableTarget` refuses anything
+       * inside `[role="dialog"]`.
+       */
+      if (
+        event.target instanceof HTMLElement &&
+        event.target.closest("[data-web-results]")
+      )
+        return;
       if (event.key === "/") {
         event.preventDefault();
         searchRef.current?.focus();
@@ -242,7 +371,7 @@ export function HomePage() {
       }
       if (event.key === "a") {
         event.preventDefault();
-        void navigate("/add");
+        searchRef.current?.focus();
         return;
       }
       if (
@@ -276,12 +405,108 @@ export function HomePage() {
     const next = { ...filters, ...changes };
     setSearchParams(paramsFromFilters(next), { replace: true });
   };
+  /**
+   * Choosing a domain, which is a filter change plus one piece of bookkeeping.
+   *
+   * Statuses that belong to the domain being left are dropped: keeping `reading`
+   * while switching to records leaves the list filtered by a value none of the
+   * visible chips can clear, so the library reads as empty for no reason the screen
+   * can explain.
+   */
+  const chooseDomain = (id: string) => {
+    const kept = new Set(
+      domains
+        .filter((type) => type.id === id)
+        .flatMap((type) => type.statuses.map((status) => status.value)),
+    );
+    localStorage.setItem(domainPreferenceKey, id);
+    updateFilters({
+      types: [id],
+      statuses: filters.statuses.filter((value) => kept.has(value)),
+    });
+  };
   const setLibraryView = (next: LibraryView) => {
     setView(next);
     localStorage.setItem(viewPreferenceKey, next);
   };
 
   const inboxCount = firstPage?.facets.status_counts.unsorted ?? 0;
+  const domainLabel = labelFor(selectedDomain, domains);
+  const web = useWebSearch(selectedDomain);
+
+  /**
+   * Settled and empty: the only way typing reaches a provider (DEC-065).
+   *
+   * Every condition here is load-bearing. Three characters, because two is a
+   * fragment of a word. The URL caught up with the box, because until it has, the
+   * library on screen answers a different question. The library actually answered —
+   * pending or errored is not "the library has nothing", it is "we do not know yet",
+   * and guessing costs a request. Zero rows, strictly: searching `dune` while owning
+   * *Dune* returns one row and may well be somebody looking for *Dune Messiah*, and a
+   * strict rule is the only one that never guesses on the reader's behalf.
+   *
+   * The literal reading of the ask — search whenever the library misses — fires once
+   * per keystroke while typing any title not already owned, which is every add.
+   * `Kind of Blue` would cost twelve searches at a five-second timeout each.
+   */
+  useEffect(() => {
+    const trimmed = search.trim();
+    if (trimmed.length < 3) return;
+    if (trimmed !== filters.query) return;
+    if (!library.isSuccess || library.isFetching) return;
+    if ((firstPage?.items.length ?? 0) > 0) return;
+    if (web.hasSearched(trimmed)) return;
+    const wait = Math.max(0, 800 - (Date.now() - lastTypedAt.current));
+    const timer = window.setTimeout(() => web.search(trimmed), wait);
+    return () => window.clearTimeout(timer);
+  }, [
+    search,
+    filters.query,
+    library.isSuccess,
+    library.isFetching,
+    firstPage,
+    web,
+  ]);
+
+  /**
+   * The override: search now, whatever the library holds.
+   *
+   * Cached when the string has already been searched, because pressing a button is
+   * not new information about the world — it is the reader saying "show me the web
+   * for this", and the web for this is already here.
+   */
+  const searchTheWeb = () => {
+    const trimmed = search.trim();
+    if (!trimmed) {
+      searchRef.current?.focus();
+      return;
+    }
+    web.search(trimmed);
+  };
+
+  /**
+   * Empty the bar, the query and the results together.
+   *
+   * The three are one state as far as the reader is concerned: what they asked. A
+   * clear that left any of them behind would leave the library filtered by a string
+   * no longer on screen. The URL is written directly rather than left to the 250 ms
+   * debounce, because a button press should not have a quarter second of lag on it.
+   */
+  const clearSearch = ({ refocus }: { refocus: boolean }) => {
+    setSearch("");
+    web.clear();
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete("q");
+        return next;
+      },
+      { replace: true },
+    );
+    // The button hands focus back to the box it just emptied. The add path does
+    // not: there the reader's attention is the row that just appeared.
+    if (refocus) searchRef.current?.focus();
+  };
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
@@ -315,27 +540,95 @@ export function HomePage() {
           </Button>
           <Button
             className="rounded-full px-5"
-            onClick={() => void navigate("/add")}
+            onClick={() => searchRef.current?.focus()}
           >
-            Add book
+            Add to library
           </Button>
         </div>
       </header>
+      {/* One bar, one row: which domain, the query, and the override.
+          The domain strip sits inside it rather than under the filters, because it
+          now picks two things at once — the rows shown and the providers a search
+          would reach — and a control that means both belongs beside the thing it
+          means them about. */}
       <section
-        aria-label="Library controls"
+        aria-label="Search and add"
         className="mt-6 flex flex-wrap items-center gap-3"
       >
+        {domains.length > 1 && (
+          <div
+            role="radiogroup"
+            aria-label="Choose a domain"
+            className="inline-flex shrink-0 rounded-full bg-surface p-1"
+          >
+            {domains.map((choice) => (
+              <button
+                key={choice.id}
+                type="button"
+                role="radio"
+                aria-checked={selectedDomain === choice.id}
+                className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+                  selectedDomain === choice.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                } focus-ring`}
+                onClick={() => chooseDomain(choice.id)}
+              >
+                {choice.label}
+              </button>
+            ))}
+          </div>
+        )}
         <label className="relative min-w-60 flex-1">
-          <span className="sr-only">Search library</span>
+          <span className="sr-only">
+            Search your library, or add something new
+          </span>
           <Input
             ref={searchRef}
             type="search"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder="Search title or author  /"
-            className="h-11 rounded-full bg-surface"
+            onChange={(event) => {
+              lastTypedAt.current = Date.now();
+              setSearch(event.target.value);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") {
+                event.preventDefault();
+                searchTheWeb();
+              }
+            }}
+            placeholder="Title, creator, ISBN or link  /"
+            // The trailing padding is the button's room: without it a long query
+            // runs underneath it. `appearance-none` removes WebKit's own tiny
+            // cancel glyph, which would otherwise sit beside this one saying the
+            // same thing in a style nothing else here uses -- and which Firefox
+            // does not render at all, so it could never have been the control.
+            className="h-11 rounded-full bg-surface pr-12 [&::-webkit-search-cancel-button]:appearance-none"
           />
+          {search && (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => clearSearch({ refocus: true })}
+              className="focus-ring absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+            >
+              <span aria-hidden="true" className="text-lg leading-none">
+                ×
+              </span>
+            </button>
+          )}
         </label>
+        <Button
+          className="h-11 shrink-0 rounded-full px-6"
+          onClick={searchTheWeb}
+        >
+          Add
+        </Button>
+      </section>
+      <section
+        aria-label="Library controls"
+        className="mt-3 flex flex-wrap items-center gap-3"
+      >
         <Select
           value={`${filters.sort}:${filters.order}`}
           onValueChange={(value) => {
@@ -381,6 +674,48 @@ export function HomePage() {
             ))}
           </SelectContent>
         </Select>
+        <Select
+          value={filters.formats[0] ?? allFormats}
+          onValueChange={(value) =>
+            updateFilters({
+              formats: value === allFormats ? [] : [value as EntryFormat],
+            })
+          }
+        >
+          <SelectTrigger
+            aria-label="Filter by format"
+            className="h-11 w-auto gap-2 rounded-full bg-surface"
+          >
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={allFormats}>All formats</SelectItem>
+            {/* One entry per distinct format, not one per domain that declares it:
+                `digital` belongs to books and records both, and listing it twice
+                gave two options with the same value and the same count. The filter
+                itself spans domains, so a flat list is what it actually does. */}
+            {formatChoices.map((format) => (
+              <SelectItem key={format.value} value={format.value}>
+                {format.label}{" "}
+                {firstPage?.facets.format_counts[format.value] ?? 0}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {/* The fourth filter, in the row of filters.
+            It was a row of chips of its own -- one whole row of chrome above the
+            library for the vocabulary the tab already names. `shownDomains` is at
+            most one domain, and empty only until the registry answers, so this
+            renders exactly when there is a vocabulary to render. */}
+        {shownDomains.map((type) => (
+          <StatusFilter
+            key={type.id}
+            statuses={type.statuses}
+            counts={firstPage?.facets.status_counts_by_type?.[type.id] ?? {}}
+            value={filters.statuses}
+            onChange={(statuses) => updateFilters({ statuses })}
+          />
+        ))}
         <div
           className="flex rounded-full bg-surface p-1"
           aria-label="Library view"
@@ -407,28 +742,6 @@ export function HomePage() {
           </Button>
         </div>
       </section>
-      <div className="mt-4 flex flex-wrap gap-2" aria-label="Filter by status">
-        {entryStatuses.map((status) => {
-          const active = filters.statuses.includes(status);
-          return (
-            <button
-              key={status}
-              aria-pressed={active}
-              className="min-h-11 rounded-full border border-border px-4 text-sm aria-pressed:border-primary aria-pressed:text-primary focus-ring"
-              onClick={() =>
-                updateFilters({
-                  statuses: active
-                    ? filters.statuses.filter((value) => value !== status)
-                    : [...filters.statuses, status],
-                })
-              }
-            >
-              {statusLabels[status]}{" "}
-              {firstPage?.facets.status_counts[status] ?? 0}
-            </button>
-          );
-        })}
-      </div>
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole
@@ -454,14 +767,25 @@ export function HomePage() {
           </Button>
         </div>
       )}
-      {firstPage?.items.length === 0 && (
-        <section className="py-24 text-center">
-          <h2 className="text-2xl font-semibold">Your library is waiting</h2>
-          <p className="mt-2 text-muted-foreground">
-            Add a book or visit the inbox to get started.
+      {/* Two different silences, and only one of them is worth a screen.
+          An empty library is news: there is nothing here and here is what to do
+          about it. An empty *result* is the ordinary case of looking something up
+          before adding it -- the settled-and-empty rule is about to search the web
+          for exactly this string -- so it gets one line, and the results land where
+          the screenful of encouragement used to push them. */}
+      {firstPage?.items.length === 0 &&
+        (filters.query ? (
+          <p className="py-6 text-center text-muted-foreground">
+            Nothing in your library matches “{filters.query}”.
           </p>
-        </section>
-      )}
+        ) : (
+          <section className="py-24 text-center">
+            <h2 className="text-2xl font-semibold">Your library is waiting</h2>
+            <p className="mt-2 text-muted-foreground">
+              Search above to add something, or visit the inbox to get started.
+            </p>
+          </section>
+        ))}
       {/* The crossfade is on the container and nowhere else. `mode="wait"` is
           not a stylistic choice: with the default, moving to a filter TanStack
           already has cached mounts the old and new lists in the same commit,
@@ -498,6 +822,96 @@ export function HomePage() {
           </m.div>
         )}
       </AnimatePresence>
+      {/* Below the library, and a region of its own.
+          The library is a `role="feed"` carrying server-side `aria-posinset` and
+          `aria-setsize` (DEC-038); these are not feed items and must never be
+          counted as some. A plain labelled section is what keeps the two apart, and
+          below rather than above is also what keeps the virtualizer's `scrollMargin`
+          still — a variable-height block over a window-virtualized list is the
+          Sprint 013 class of bug. */}
+      {web.query && (
+        <section
+          aria-labelledby="web-results-title"
+          data-web-results=""
+          className="mt-12"
+        >
+          <h2 id="web-results-title" className="text-xl font-semibold">
+            From the web
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Not in your library. Results for “{web.query}”.
+          </p>
+          <ProviderHealthNotice />
+          {web.pending && <p role="status">Searching metadata providers…</p>}
+          {web.error && <p role="alert">{web.error}</p>}
+          {web.warning && <p role="status">{web.warning}</p>}
+          {!web.pending && (
+            <ResultsGrid
+              results={web.results}
+              onSelect={setSelectedCandidate}
+              onManual={() => void navigate("/add")}
+            />
+          )}
+        </section>
+      )}
+      {/* The confirm step, over the library rather than instead of it. Escape is
+          already the way out of every other dialog here, and the library staying
+          behind it is what makes adding stop being a place you go. */}
+      <Dialog
+        open={selectedCandidate !== null}
+        onOpenChange={(open) => {
+          if (!open) setSelectedCandidate(null);
+        }}
+      >
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Add to your library</DialogTitle>
+          </DialogHeader>
+          {selectedCandidate && (
+            <AddForm
+              itemType={selectedDomain}
+              itemTypes={domains}
+              candidate={selectedCandidate}
+              manual={false}
+              onAdded={(entryId, alreadyExists) => {
+                setSelectedCandidate(null);
+                if (alreadyExists) {
+                  toast("Already in your library", {
+                    description: "Opened the entry you already have.",
+                  });
+                  void navigate(`/books/${entryId}`);
+                  return;
+                }
+                toast.success(`${domainLabel} added`);
+                /**
+                 * Clearing the query is what makes the highlight mean anything.
+                 *
+                 * The web search only ran because the library had nothing for this
+                 * string, so the library behind the dialog is showing an empty
+                 * filtered view. Closing the dialog onto it and highlighting a row
+                 * that the filter excludes shows the reader nothing at all — which
+                 * is what the walkthrough found. The old flow got this for free by
+                 * navigating to an unfiltered `/`; here it has to be done.
+                 *
+                 * The domain filter stays: that is a choice the reader made, and the
+                 * thing just added is in it.
+                 */
+                clearSearch({ refocus: false });
+                // On `/` the handoff is a dialog closing rather than a
+                // navigation, so the highlight is set directly instead of
+                // travelling as router state.
+                setHighlightId(entryId);
+                setFocusedId(entryId);
+                void queryClient.invalidateQueries({ queryKey: ["library"] });
+              }}
+              onOpenExisting={(entryId) => {
+                setSelectedCandidate(null);
+                void navigate(`/books/${entryId}`);
+              }}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </main>
   );
 }

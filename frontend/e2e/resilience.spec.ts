@@ -56,7 +56,11 @@ test("a failed library load says so and can be retried", async ({ page }) => {
         items: [],
         next_cursor: null,
         total: 0,
-        facets: { status_counts: {} },
+        facets: {
+          status_counts: {},
+          status_counts_by_type: {},
+          format_counts: {},
+        },
       },
     });
   });
@@ -90,7 +94,12 @@ test("a degraded provider is named on the add screen", async ({ page }) => {
       },
     }),
   );
-  await page.goto("/add");
+  // The notice sits with the web results: a library page reaches no provider, so
+  // a degraded one is only the reader's problem once they are adding.
+  await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
+  await page.goto("/");
+  await page.getByRole("searchbox").fill("rayuela");
+  await page.getByRole("button", { name: "Add", exact: true }).click();
   const notice = page
     .getByRole("status")
     .filter({ hasText: /fewer providers/i });
@@ -99,7 +108,7 @@ test("a degraded provider is named on the add screen", async ({ page }) => {
   // a shrug.
   await expect(notice).toContainText("googlebooks");
   await expect(notice).toContainText("no API key configured");
-  await expect(notice).toContainText(/add a book manually/i);
+  await expect(notice).toContainText(/enter it by hand/i);
 });
 
 test("library to detail and back is possible without a pointer", async ({
@@ -126,7 +135,7 @@ test("library to detail and back is possible without a pointer", async ({
           title: "Seeded book 0003",
           subtitle: null,
           year: 1903,
-          sort_author: "Author 3",
+          creator: "Author 3",
           cover_path: null,
           cover_url: null,
           metadata: {},
@@ -134,6 +143,7 @@ test("library to detail and back is possible without a pointer", async ({
           sources: [],
         },
         shelves: [],
+        formats: [],
       },
     }),
   );
@@ -158,7 +168,7 @@ test("library to detail and back is possible without a pointer", async ({
     .first()
     .focus();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL("/");
+  await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();

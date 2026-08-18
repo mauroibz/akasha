@@ -75,7 +75,7 @@ export function ShelvesPage() {
     onSuccess: () => {
       setDeletingShelf(null);
       toast.success("Shelf deleted", {
-        description: "Your books are retained.",
+        description: "Your entries are retained.",
       });
       void cache.invalidateQueries({ queryKey: ["shelves"] });
     },
@@ -96,7 +96,7 @@ export function ShelvesPage() {
       </h1>
       <p className="mt-2 text-muted-foreground">
         Organize your library with custom shelves. Deleting a shelf removes the
-        tag from your books but never deletes the books themselves.
+        tag from what is on it, but never deletes anything itself.
       </p>
 
       {/* Create shelf */}
@@ -193,7 +193,7 @@ export function ShelvesPage() {
                     <p className="font-semibold">{shelf.name}</p>
                     <p className="text-sm text-muted-foreground">
                       {shelf.entry_count}{" "}
-                      {shelf.entry_count === 1 ? "book" : "books"}
+                      {shelf.entry_count === 1 ? "item" : "items"}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -238,7 +238,7 @@ export function ShelvesPage() {
               Delete &ldquo;{deletingShelf?.name}&rdquo;?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This shelf will be removed from all your books. The books
+              This shelf will be removed from everything on it. The entries
               themselves are retained and remain in your library.
             </AlertDialogDescription>
           </AlertDialogHeader>
