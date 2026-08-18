@@ -212,7 +212,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha Book Tracker", version="1.1.0", lifespan=lifespan)
+    app = FastAPI(title="Akasha Book Tracker", version="1.2.0", lifespan=lifespan)
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:

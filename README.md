@@ -7,7 +7,7 @@
 
 # Akasha
 
-**A self-hosted book tracker that records what you thought of a book.**
+**A self-hosted library that records what you thought of a book or a record.**
 
 [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-fbbf24?style=flat-square)](LICENSE)
 [![Self-hosted](https://img.shields.io/badge/deploy-LAN%20only-a1a1aa?style=flat-square)](SECURITY.md)
@@ -25,11 +25,17 @@
 ## What it is
 
 Akasha is a personal library that runs on a small server in your house. One user,
-no accounts, no social layer, no sharing. You add a book, give it a score out of
-ten, write a note, put it on a shelf.
+no accounts, no social layer, no sharing. You add a book or a record, give it a score
+out of ten, write a note, put it on a shelf.
+
+It holds **two kinds of thing so far**, and each brings its own vocabulary rather than
+borrowing the other's: a book is *read*, *reading* or *to read* and has a page count; a
+record is *owned*, *on the way* or *wishlisted* and has a tracklist and a label. Nothing
+above the registry knows which is which, so a third kind is a package rather than a
+rewrite.
 
 It exists because reading trackers optimise for other people seeing your shelves.
-This one optimises for you remembering, three years later, whether a book was any
+This one optimises for you remembering, three years later, whether something was any
 good and why. No social media features, fully offline.
 
 > [!WARNING]
@@ -42,11 +48,19 @@ good and why. No social media features, fully offline.
 - **A library that stays fast.** Ten thousand entries scroll smoothly — a virtualized
   grid and a compact table, keyset pagination, six sorts. Search and sorting are
   accent-insensitive, so `avila` finds `Ávila`.
-- **Adding books.** Search Open Library and Google Books, or type a book in by hand.
-  Covers are fetched once and stored locally; providers are never called while
-  rendering a page you already have.
+- **One bar for finding and adding.** The same box searches your library as you type and
+  reaches the web only when your library has nothing and the query has settled — or when
+  you press **Add**. Books come from Open Library and Google Books, records from
+  MusicBrainz and the Cover Art Archive; paste a URL or an ISBN and it resolves that
+  instead of guessing. Covers are fetched once and stored locally, and **providers are
+  never called while rendering a page you already have**.
+- **Music, as its own domain.** Records are not books with different words on them: they
+  have their own statuses, their own formats (vinyl, CD, digital), their own fields and
+  their own provider. Adding one says *Album added*, and a shelf that holds both counts
+  *items*.
 - **Your opinions, protected.** Score, status, notes, shelves, and how you own your copy
-  — plus dates and a reread count for the kinds of thing that have them. Nothing you
+  — plus dates and a reread count for the kinds of thing that have them, and none for the
+  kinds that do not. Nothing you
   wrote is ever overwritten by a metadata refresh — that is an invariant the test suite
   enforces, not a promise.
 - **Keyboard triage.** Work through a backlog with `j`/`k` to move, digits to score,
@@ -56,7 +70,7 @@ good and why. No social media features, fully offline.
   after.
 - **Background enrichment.** A durable job queue fills in metadata and covers, retries
   failures, and survives a restart.
-- **Files on a book.** Attach an epub or a PDF to an edition and download it again
+- **Files on an edition.** Attach an epub or a PDF to an edition and download it again
   later. Stored by content, so the same file attached twice takes the space of one,
   and seven nights of backups cost about one copy rather than seven. Files are served
   as downloads and never rendered, and nothing here parses them — this is a shelf, not
@@ -69,9 +83,9 @@ good and why. No social media features, fully offline.
   surfaces are proper ARIA feeds.
 
 <details>
-<summary><b>A book's detail page</b></summary>
+<summary><b>An entry's detail page</b></summary>
 
-![A book detail page](docs/brand/screenshots/detail.png)
+![An entry's detail page](docs/brand/screenshots/detail.png)
 
 </details>
 
