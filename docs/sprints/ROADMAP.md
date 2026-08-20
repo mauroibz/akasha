@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 12
+**Plan revision:** 13
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [Sprint 030](030-entry-depth.md)
 
@@ -463,11 +463,52 @@ throughout, while the ledger, the preview and undo are genuinely shared and must
 boundary this sprint draws is therefore between the shared pipeline and importers that already live
 in the right place (DEC-069).
 
+**The coupling was measured on 2026-08-20 (DEC-076), and it is five specific places, not a
+feeling.** `api/imports.py` exposes routes named after the two book sources and types the preview
+record with book fields (`goodreads_book_id`, `calibre_book_id`, `isbn`, `page_count`, `series`).
+`application/imports.py` is two service classes with copy-pasted preview/match/plan logic whose
+match call passes `first_author=` and whose identity is ISBN/`calibre_uuid` only.
+`ImportRepository.commit` is the worst spot: a *shared* layer that reads `payload["isbn"]` for
+identity, builds item metadata from a fixed book key list, sets `type=DEFAULT_DOMAIN.item_type` on
+created items, and writes entry fields (`date_finished`, `reread_count`, `review`) that a domain
+without those passage fields refuses — the exact shared-layer branching technical spec §6.6
+forbids everywhere else. `ImportPage.tsx` and `api/imports.ts` hardcode the two sources as tabs and
+typed fields. What is already neutral and must survive the refactor untouched: the batch/record/
+effect tables keyed by an opaque `normalized_payload` and a `kind` string, undo, fingerprint
+idempotency, and triage — which is domain-agnostic end to end and needs no per-domain expansion at
+all, a finding worth stating because it halves the imagined scope.
+
 The outcome is a pipeline where `calibre → books` is one importer among several rather than the
 shape of importing itself, so that `spotify → music` and `steam → games` are **epics somebody else
-can build in parallel** without touching the core (DEC-058). Calibre and Goodreads are re-expressed
-against that boundary; no second importer is built here, because building one would be the epic this
-sprint exists to make possible.
+can build in parallel** without touching the core (DEC-058). Concretely: an `Importer` contract
+living beside the `Provider` protocol, registered per domain; one generic preview/commit service
+and `/api/import/{importer}/...` routes replacing the per-source ones, with the set of available
+importers published over the API the way `GET /api/item-types` publishes domains, so
+`ImportPage.tsx` renders its tabs from data rather than literals; normalized records validated
+against the target domain's own declaration (metadata against `fields`, entry values against
+`entry_fields` — the validators `AddService` already uses); and conformance checks in
+`test_domain_conformance.py` so an importer is held to the contract by existing. Calibre and
+Goodreads are re-expressed against that boundary with **no behavior change** — their existing
+suites (`test_goodreads_import.py`, `test_calibre_import.py`) are the regression net. No second
+importer is built here, because building one would be the epic this sprint exists to make possible.
+
+**This sprint also absorbs DEC-067 row 6** (DEC-076): manual entry honours the domain. The row was
+parked for Sprint 029's rebuild of the add screens and 029 deliberately left it unbuilt
+(`/add` names the one domain it can actually make rather than promise one it cannot — DEC-073).
+031 is where it lands: `AddService.add` takes the manual payload's domain from the client and
+validates it against that domain's field spec instead of binding every manual item to
+`DEFAULT_DOMAIN`, and `/add` gains the chooser back — truthfully this time. That is what makes the
++Add surface indicate the domain on *every* path, not only provider adds, and it is what gives a
+future third domain a manual fallback from day one.
+
+**And it owns the user-facing account of these flows** (DEC-076): the README names import as
+supported and extensible in one bullet and never says what triage is, when a re-run is relevant
+(Calibre re-sync fills empty fields only; your edits always win), or that committed rows land
+`unsorted` and the default library hides them — the thing that made a successful import look like
+a no-op until Sprint 019's copy fix. A real *Importing and triage* section is part of this sprint's
+documentation deliverable, and `docs/guides/adding-a-domain.md` gains the importer half of the
+story beside the provider steps, so a contributor can build a connector from the guide alone the
+way the throwaway game domain proved the domain half.
 
 When this closes, the project state goes `complete` per `WORKFLOW.md`'s final-sprint rule.
 
@@ -487,7 +528,12 @@ contract and Sprint 031's import boundary, developed in parallel without interfe
   operations and every count in the UI. Note the vocabulary collision before it causes confusion —
   book-series already exists as a free-text `metadata` field, and product spec section 11 item 4
   records the deliberate choice not to model it.
-- **Music imports — `spotify → music`.** The natural first exercise of Sprint 031's boundary.
+- **Music imports — `spotify → music`.** The natural first exercise of Sprint 031's boundary, and
+  deliberately **an architecture goal, not a commitment** (DEC-076): the owner is in no hurry to
+  build it and wants the ground stable underneath first. Its design constraint is real, though —
+  Spotify imports are playlist/saved-*track* shaped, so whether it rolls tracks up to albums or
+  models songs directly is a Sprint 030 question, and the epic is shaped by that verdict whenever
+  it is picked up.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 

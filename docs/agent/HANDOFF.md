@@ -1,7 +1,19 @@
 # Handoff — current reality
 
-**The album line is merged and released as v1.2.0. Sprint 030 is `ready`.** Plan revision **12**.
+**The album line is merged and released as v1.2.0. Sprint 030 is `ready`.** Plan revision **13**.
 The worktree is clean, every gate is green, and nothing is half-built.
+
+**Revision 13 (DEC-076, 2026-08-20) re-scoped Sprint 031 without moving it.** Owner feedback after
+the release: the +Add surface cannot indicate the domain on the manual path, the README never
+explains triage/import, and the underlying question is whether a contributor can build a connector
+in its own module. The measurement is in DEC-076 — triage, the ledger, undo and the readers are
+already neutral; the book shape lives in five named places (`api/imports.py`,
+`application/imports.py`, `ImportRepository.commit`, `ImportPage.tsx`/`api/imports.ts`, and
+`AddService.add`'s `DEFAULT_DOMAIN` binding). Sprint 031's roadmap contract now carries: the
+`Importer` boundary, **DEC-067 row 6 (manual entry honours the domain)**, and **the README's
+*Importing and triage* section plus the importer half of `docs/guides/adding-a-domain.md`**.
+`spotify → music` stays a *Future epic* as an architecture goal, not a commitment — its track-vs-
+album shape is a Sprint 030 question. Sprint 030 is unchanged and stays first.
 
 ## Do this first
 

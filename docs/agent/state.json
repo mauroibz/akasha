@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_revision": 12,
+  "plan_revision": 13,
   "project_status": "ready",
   "active_sprint": "030",
   "active_sprint_file": "docs/sprints/030-entry-depth.md",

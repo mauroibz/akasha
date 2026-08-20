@@ -1764,3 +1764,27 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: claim **Sprint 030** — Phase A only, gated, a verdict rather than an
   implementation. It needs no branch by default: DEC-053's arrangement covered the
   album line and is discharged. Taking one is a deliberate choice to record.
+
+## 2026-08-20 — Plan revision 13: Sprint 031 absorbs the import boundary, row 6, and the README story
+- Done: documentation-only re-plan from owner feedback after v1.2.0. Measured the ingest/import
+  layer against the domain contract (DEC-076): triage, the import ledger, undo, fingerprint
+  idempotency and the two readers are already domain-neutral; the book shape is five named places
+  (`api/imports.py`, `application/imports.py`, `ImportRepository.commit`,
+  `ImportPage.tsx`/`api/imports.ts`, and `AddService.add`'s `DEFAULT_DOMAIN` binding). Expanded
+  Sprint 031's contract in `docs/sprints/ROADMAP.md` to carry the measurement, the `Importer`
+  boundary's concrete shape, DEC-067 row 6 (manual entry honours the domain — the +Add gap), and
+  the README *Importing and triage* section plus the importer half of
+  `docs/guides/adding-a-domain.md`. `spotify → music` stays a Future epic as an architecture goal,
+  not a commitment; its track-vs-album shape is recorded as a Sprint 030 question. Plan revision
+  12 → 13 in the roadmap and `state.json`; `FINAL_SPRINT` unmoved (31) with the validator comment
+  updated. No sprint file for 031 yet — the closing agent for 030 expands it from `TEMPLATE.md`,
+  per the roadmap's rule.
+- Verified: `python scripts/validate_project.py` (pass), `make check` (format, lint, types,
+  OpenAPI drift — all green). No application code changed, so no test suite run was owed; docs and
+  one comment in `scripts/validate_project.py` only.
+- Deviations: none. No sprint is active beyond 030 (`ready`); this session changed planning
+  documents only, which AGENTS.md §1 permits as an unambiguous documentation repair — the change
+  was owner-directed.
+- Blocked/open: none.
+- Next: unchanged — claim **Sprint 030** (Phase A only, gated, a verdict). Its AC7 impact-review
+  of 031 now runs against the expanded contract.

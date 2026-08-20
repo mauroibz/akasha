@@ -2511,3 +2511,68 @@ Append-only record of material architecture choices, product-default resolutions
   - `README.md`'s Quick Start, Configuration table and `docs/specs/technical-spec.md`'s Compose
     mounts list move to the named-volume defaults, each pointing at `compose.bind-mounts.yaml` for
     the host-path alternative. `.gitignore`'s `data/`/`backups/` entries are now tier-2-only.
+
+## DEC-076 — Sprint 031 absorbs the import boundary, manual entry's domain, and the README's import story
+
+- **Date:** 2026-08-20
+- **Status:** accepted
+- **Context:** Owner feedback after the v1.2.0 release, before committing to any new connector work:
+  the +Add surface has no clear way to indicate the domain; the README does not describe when
+  triage and import are relevant or why; and the real question underneath both — can a contributor
+  build a connector (a reworked Calibre importer, a future `spotify → music`) in its own module,
+  plug-and-play with its domain, without touching the rest of the repo? The owner is in no hurry to
+  build any specific importer and wants the ground stable underneath first, so the answer is
+  scheduled rather than attempted in the margins. This entry records the measurement behind the
+  plan revision 13 changes to Sprint 031's contract.
+- **What the code actually says, measured 2026-08-20.** Three of the four things the feedback
+  worried about are already fine, and saying so is part of the decision because it halves the
+  imagined scope: **triage is domain-agnostic end to end** (statuses, hotkeys and the bulk
+  vocabulary all render from `GET /api/item-types`; a mixed selection intersects; the inbox
+  deliberately has no domain tab) and needs no per-domain expansion; **the import ledger, preview
+  storage, undo and fingerprint idempotency are already neutral** — `import_batches` /
+  `import_records` / `import_effects` key on an opaque `normalized_payload` and a `kind` string and
+  know nothing about books; **the readers already live in the right place** since Sprint 028
+  (`domains/book/goodreads.py`, `domains/book/calibre.py`, and Calibre is a clean read-only
+  adapter). What is book-shaped is five specific places: `api/imports.py` (per-source routes and a
+  preview record typed with book fields), `application/imports.py` (two copy-pasted service
+  classes, ISBN/`calibre_uuid` identity, `first_author=` matching), `ImportRepository.commit` (a
+  *shared* layer that reads `payload["isbn"]`, builds metadata from a fixed book key list, types
+  created items as `DEFAULT_DOMAIN.item_type`, and writes entry fields a domain without those
+  passage fields refuses — the shared-layer branching technical spec §6.6 forbids everywhere
+  else), `ImportPage.tsx` and `api/imports.ts` (sources as literal tabs and typed fields). The
+  manual add path is the fifth: `AddService.add` binds every manual item to
+  `DEFAULT_DOMAIN.item_type` whatever the client sends, which is why `/add` names no domain —
+  honestly, per DEC-073, rather than by oversight.
+- **Decision.** Plan revision **13**; `FINAL_SPRINT` stays 31. Sprint 031's contract in
+  `docs/sprints/ROADMAP.md` is expanded to carry the measured coupling, the boundary's concrete
+  shape (an `Importer` contract beside the `Provider` protocol, generic preview/commit routes
+  `/api/import/{importer}/...`, the importer set published over the API like `GET /api/item-types`,
+  records validated against the target domain's own declaration, conformance checks in
+  `test_domain_conformance.py`), and two absorbed scopes:
+  1. **DEC-067 row 6 lands here.** Manual entry honours the domain: `AddService.add` takes the
+     manual payload's domain from the client and validates against that domain's field spec, and
+     `/add` regains the chooser — truthfully this time. The row was parked for Sprint 029's rebuild
+     of the add screens ("named for Sprint 029"); 029 scoped it out (DEC-073), and 031 is the first
+     sprint that both touches the add path's validation and benefits from it — a third domain gets
+     a manual fallback from day one instead of never.
+  2. **The user-facing account of these flows.** The README gains a real *Importing and triage*
+     section — what the `unsorted` inbox is, that every import lands there and the default library
+     hides it, when a re-run is relevant (Calibre re-sync fills empty fields only; owner edits
+     always win) — and `docs/guides/adding-a-domain.md` gains the importer half of the story beside
+     the provider steps, so a connector can be built from the guide alone the way the throwaway
+     game domain proved the domain half.
+- **Consequences.**
+  - **No importer is built in 031**, re-stated: the boundary is the deliverable, and the first
+    connector built against it is a separate epic, because an importer built in the same sprint as
+    its boundary contaminates the boundary with one case's needs. `spotify → music` stays in
+    *Future epics* as an architecture goal rather than a commitment, with its real constraint
+    recorded: Spotify imports are playlist/saved-*track* shaped, so whether it rolls tracks up to
+    albums or models songs directly is a Sprint 030 question, and the epic is shaped by that
+    verdict whenever it is picked up.
+  - **Sprint 030 is unaffected and stays first.** Its Phase A verdict determines what an import
+    record may carry (flat entry, progress field, or child entities), which is why 031 follows it;
+    nothing in this revision weakens that dependency, and 030's acceptance criterion 7 (impact-
+    review 031 against the verdict) now has a richer contract to review against.
+  - The expanded contract is what the closing agent for Sprint 030 expands into
+    `docs/sprints/031-*.md` from `TEMPLATE.md`; until then the roadmap paragraph is the binding
+    boundary, per the roadmap's own rule for planned sprints.
