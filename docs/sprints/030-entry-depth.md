@@ -1,6 +1,6 @@
 # Sprint 030 — Entry depth: the decision
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 029
 **Roadmap revision:** 12
 
@@ -201,3 +201,53 @@ summarized in the verdict and the recording committed.
   already do this" answer "does a child need a status".
 - **TMDB and IGDB both need credentials** to measure. If either is unobtainable, that arm is a paper
   walk and must be labelled one (DEC-068), and the verdict must say what it would take to close it.
+
+## Outcome
+
+**Delivered and closed 2026-08-20.** The verdict is **flat, and nothing is built** — the outcome
+the sprint file itself named as complete and correct, and on current evidence the likeliest. The
+full document is `docs/entry-depth-verdict.md`, adopted as **DEC-077**; this section summarizes
+and does not reproduce it.
+
+**Commits:** `6eeb00f` (the measurement: two MusicBrainz re-captures, fixture provenance, the
+control test), `1416dc0` (the sprint claim, held to its own commit per the no-bookkeeping rule),
+`84e53d9` (the costed table), `8e94771` (the verdict, DEC-077, the §11.4 pointer, the ROADMAP
+impact-review, the flat-contract guard).
+
+**Acceptance criteria, one line each:**
+
+1. `docs/entry-depth-verdict.md` exists, is linked from `docs/README.md`'s canonical table, and
+   answers all four questions in order. ✓
+2. Every provider claim is labelled **measured** or **reasoned**. Measured: MusicBrainz (request
+   quoted, response summarized, two fixtures committed, control test pinning them). Reasoned:
+   TMDB and IGDB — both probed live to 401, both without credentials (owner asked, none
+   supplied), both labelled paper walks with the closing cost named. The TMDB arm's first draft
+   was model memory; challenged by the owner, it was re-grounded against the published API
+   reference the same day, and the document says so. ✓
+3. The three shapes are costed over all nine listed dimensions; no cell is blank. ✓
+4. The set question is answered: a set is **not** depth — an ordered shelf, additive, deferred.
+   Product spec §11 item 4 points at the verdict. ✓
+5. DEC-077 adopts the verdict, names three reopen conditions, cross-references DEC-071. ✓
+6. Nothing user-visible changed: no migration, no API change, no frontend change. The only code
+   touched is tests. ✓
+7. Sprint 031's contract is impact-reviewed: the verdict means an importer creates flat entries
+   and provider `rows` metadata, never child entities — so 031's boundary is **unaffected**, and
+   the ROADMAP's TMDB and Spotify epic entries (not 031's contract) carry the consequences. ✓
+
+**Verification:** `python scripts/validate_project.py` (pass), `make format` (no drift),
+`make check` (lint, types, OpenAPI, validator — green), `make test` (frontend 154/154; backend
+472 passed, including the new control and flat-contract tests), `git diff --check` (clean).
+E2e, build and container gates not required for a Phase A that changes no application code, per
+the sprint's own Verification section.
+
+**Deviations:** two, both recorded in place. (a) TMDB and IGDB are paper walks — the sprint's
+risk note anticipated exactly this and the fallback was taken and labelled. (b) The TMDB arm was
+first written from model memory; the owner challenged it, and it was re-grounded against the
+published reference. The verdict's provenance table carries both facts.
+
+**The gate.** Phase A ends with a question to the owner, surfaced with the verdict: **Phase B
+go/no-go — recommendation NO.** Build nothing; let Sprint 031 proceed as the plan's final sprint.
+The reopen conditions in DEC-077 stand: a measured provider returning children with their own
+user-facing state (TMDB is the standing candidate, and its epic now inherits the measurement),
+the owner stating the Malazan sentence as a need, or two domains' `progress` vocabularies
+drifting.

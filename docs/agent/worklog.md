@@ -1788,3 +1788,30 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Blocked/open: none.
 - Next: unchanged — claim **Sprint 030** (Phase A only, gated, a verdict). Its AC7 impact-review
   of 031 now runs against the expanded contract.
+
+## 2026-08-20 — Sprint 030 (complete)
+- Done: executed Phase A end to end and closed the sprint. Claimed 030 (state + sprint file);
+  re-derived the implementation baseline from code; measured MusicBrainz live as the control
+  (two re-captures committed, tracklist identical to 2026-08-15, third 503-throttling
+  observation); probed TMDB and IGDB (both 401, no credentials — owner asked via clarify, no
+  answer, fallback rule applied); wrote `docs/entry-depth-verdict.md` (four questions, the
+  nine-surface cost table, the verdict: flat holds, build nothing); adopted it as DEC-077;
+  pointed product spec §11.4 at it; impact-reviewed 031 (unaffected — importers create flat
+  entries and provider `rows`); answered the Spotify shape question in the ROADMAP (tracks roll
+  up to albums); added `test_sprint030_control.py` and `test_flat_entry_contract.py`; expanded
+  the 031 contract into `docs/sprints/031-per-domain-imports.md` from TEMPLATE.md per the
+  roadmap rule. Commits: `6eeb00f`, `1416dc0`, `84e53d9`, `8e94771`.
+- Verified: `python scripts/validate_project.py` (pass), `make format` (no drift), `make check`
+  (green), `make test` (frontend 154/154; backend 472 passed incl. the two new tests),
+  `git diff --check` (clean). E2e/build/container not owed — no application code changed, per
+  the sprint's Verification section. No walkthrough owed for the same reason; nothing
+  user-visible exists to walk through.
+- Deviations: two, both recorded in the verdict. (a) TMDB/IGDB are labelled paper walks — the
+  sprint risk note's anticipated fallback. (b) The TMDB arm's first draft was model memory;
+  the owner challenged it mid-session and it was re-grounded against the published API
+  reference the same day (verdict §1, DEC-077, and the provenance table all carry this).
+- Blocked/open: the Phase B gate question is with the owner (recommendation: NO). TMDB/IGDB
+  arms stay paper walks until credentials exist; the TMDB epic inherits the measurement.
+- Next: owner answers the gate; then claim **Sprint 031** — file exists
+  (`docs/sprints/031-per-domain-imports.md`), status `ready`, state points at it. Closing 031
+  sets the project `complete` per WORKFLOW.md's final-sprint rule.

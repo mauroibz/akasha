@@ -1,36 +1,47 @@
 # Handoff — current reality
 
-**The album line is merged and released as v1.2.0. Sprint 030 is `ready`.** Plan revision **13**.
-The worktree is clean, every gate is green, and nothing is half-built.
+**Sprint 030 is closed: the entry-depth verdict is flat, and nothing was built.** Plan revision
+**13**. The worktree is clean, every gate is green, and **Sprint 031 — the plan's last sprint — is
+`ready`** with its file expanded (`docs/sprints/031-per-domain-imports.md`).
 
-**Revision 13 (DEC-076, 2026-08-20) re-scoped Sprint 031 without moving it.** Owner feedback after
-the release: the +Add surface cannot indicate the domain on the manual path, the README never
-explains triage/import, and the underlying question is whether a contributor can build a connector
-in its own module. The measurement is in DEC-076 — triage, the ledger, undo and the readers are
-already neutral; the book shape lives in five named places (`api/imports.py`,
-`application/imports.py`, `ImportRepository.commit`, `ImportPage.tsx`/`api/imports.ts`, and
-`AddService.add`'s `DEFAULT_DOMAIN` binding). Sprint 031's roadmap contract now carries: the
-`Importer` boundary, **DEC-067 row 6 (manual entry honours the domain)**, and **the README's
-*Importing and triage* section plus the importer half of `docs/guides/adding-a-domain.md`**.
-`spotify → music` stays a *Future epic* as an architecture goal, not a commitment — its track-vs-
-album shape is a Sprint 030 question. Sprint 030 is unchanged and stays first.
+**DEC-077, in one paragraph.** A child of an entry does not need state of its own. MusicBrainz
+hands depth over as metadata on the parent (re-measured live 2026-08-20: one `inc=recordings`
+parameter, no extra request, tracklist identical to the 2026-08-15 capture); IGDB's would-be
+children are siblings with typed edges. Shape (c) — real child entities — is rejected on evidence:
+the only shape that taxes all nine shared surfaces, asked for by no measured provider. Depth, when
+a domain needs it, is a per-domain `progress` field or a marker in provider `rows`. **A set is not
+depth**: Harry Potter / Malazan are ordered shelves, deferred alongside product spec §11 item 4,
+which now points at `docs/entry-depth-verdict.md`. The flat-entry contract is guarded by
+`backend/tests/test_flat_entry_contract.py` — a parent pointer on `entries` fails CI.
+
+**Two honest gaps, carried in the verdict and DEC-077.** TMDB and IGDB are **paper walks**: both
+probed live to 401, no credentials available (owner asked, none supplied). The TMDB arm's first
+draft was model memory; the owner challenged it and it was re-grounded against the published API
+reference the same day — still documented, not observed. Closing each arm is a token plus two
+requests; the TMDB future epic inherits that measurement as its first task. The Spotify epic got
+the verdict's answer: saved tracks roll up to albums, never touch the entry model.
+
+**The Phase B gate question is with the owner** (recommendation: NO — build nothing, proceed to
+031). DEC-077's reopen conditions: a measured provider returning children with their own
+user-facing state; the owner stating the Malazan sentence as a need; two domains' `progress`
+vocabularies drifting.
 
 ## Do this first
 
-**Claim Sprint 030** (`docs/sprints/030-entry-depth.md`). The merge that stood in front of it is
-done: `sprint-025-albums` went into `main` on 2026-08-17 as one `--no-ff` merge carrying Sprints
-025–029, tagged **`v1.2.0`**, with `README.md`'s feature copy and
-`docs/operations/release-notes-v1.2.md` in the same commit as DEC-072 required. **`main` is pushed
-to `origin`** — the first push since v1.1.0.
+**Claim Sprint 031** (`docs/sprints/031-per-domain-imports.md`). Its contract carries three jobs:
+the `Importer` boundary beside the `Provider` protocol (generic `/api/import/{importer}/...`
+routes, importers published over the API, validation against the target domain's own declaration,
+conformance checks), **DEC-067 row 6** (manual entry honours the domain; `/add` gains the chooser
+back truthfully), and **the user-facing account** (README *Importing and triage* section, importer
+half of `docs/guides/adding-a-domain.md`). Calibre and Goodreads are re-expressed with **no
+behavior change** — their existing suites are the regression net. **Closing it sets the project
+`complete`** per `WORKFLOW.md`'s final-sprint rule; no tag, push or deploy without the owner
+asking.
 
-**You are on `main` now, not on a sprint branch.** DEC-053's arrangement covered the album line and
-has been discharged; nothing says the next sprint needs a branch of its own, and nothing says it
-does not. Decide deliberately and record it if you take one.
-
-**Sprint 030 is Phase A only and gated**: it produces a written verdict on whether a child of an entry needs state of its own, with
-provider measurements behind it, and ends with a question to the owner rather than an
-implementation. **"Flat, with a per-domain progress field" is a complete and correct outcome**, and
-on current evidence the likeliest one. A Phase A that ships a schema change has failed.
+**You are on `main`**, ahead of `origin` by the Sprint 030 commits (measurement, claim, table,
+verdict, close-out). DEC-053's branch arrangement was discharged at v1.2.0; 030 ran on `main` and
+nothing says 031 needs a branch — decide deliberately and record it if you take one. Pushing is
+the owner's call.
 
 ## What Sprint 029 left behind
 
@@ -47,9 +58,9 @@ the window, so a variable-height block *above* it moves the `scrollMargin` every
 against — the Sprint 013 class of bug. Below avoids it by construction. Moving the block above
 re-opens it.
 
-**`/add` is manual entry with no domain chooser**, and that is honest rather than missing:
+**`/add` is manual entry with no domain chooser**, honest rather than missing today:
 `LibraryService.add` types a manual item as `DEFAULT_DOMAIN.item_type` whatever the client sends
-(DEC-067 row 6). Giving manual entry a real domain needs an API change and is unscheduled.
+(DEC-067 row 6). **Sprint 031 is where that lands** — its deliverable 4.
 
 **The chrome no longer says "book"** (DEC-071). Twenty-four strings across eleven files. **AC9 is a
 runnable command**, in the sprint file: grep `book` under `frontend/src`, excluding tests, comments,
@@ -163,9 +174,9 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
   It reproduces against older source, which is how to tell it apart from one (DEC-074).
 - **The dev library at `data/` is 16 entries**, up from 13. The Sprint 029 walkthrough added *The
   Left Hand of Darkness* (19), *Selected Ambient Works 85–92* (20), *Kid A* (21) and *OK Computer*
-  (22), two of them carrying a `Walkthrough, sprint 029.` note, and created a shelf named
-  **Walkthrough** (id 5). Left in place rather than deleted; the pre-walkthrough database is at
-  `backups/pre-sprint029-20260816T042730Z/books.db`. Migration head is still `0014`.
+  (22), tagged **`v1.2.0`**, two of them carrying a `Walkthrough, sprint 029.` note, and created a
+  shelf named **Walkthrough** (id 5). Left in place rather than deleted; the pre-walkthrough
+  database is at `backups/pre-sprint029-20260816T042730Z/books.db`. Migration head is still `0014`.
 - **`data/` has been made group/other-writable and the container has been run against it.** Files the
   container creates are owned by uid 10001; hand ownership back with
   `docker run --rm --user 0 -v "$PWD/data:/data" akasha:local chown -R 1000:1000 /data`.
@@ -196,6 +207,6 @@ declared inside the file for exactly that. **Adding a field to `Domain` without 
 
 ## State
 
-Migration head `0014_status_is_the_domains`. Released **v1.2.0**; `main` is merged, tagged and
-pushed to `origin`, and the worktree is clean. `sprint-025-albums` is kept as history rather than
-deleted.
+Migration head `0014_status_is_the_domains`. Released **v1.2.0**; `main` carries the Sprint 030
+close-out commits, not yet pushed to `origin` — pushing is the owner's call. The worktree is clean.
+`sprint-025-albums` is kept as history rather than deleted.

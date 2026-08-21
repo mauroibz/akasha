@@ -82,14 +82,14 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [027](027-library-shell-and-shelves.md) | Library shell and shelves | 026 | completed |
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
 | [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
-| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | **ready** |
-| 031 | Per-domain imports | 030 | planned |
+| [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
+| [031](031-per-domain-imports.md) | Per-domain imports | 030 | **ready** |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 030 have files; 031 does not.
+incorporating actual deviations. Sprints 019 through 031 have files.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
