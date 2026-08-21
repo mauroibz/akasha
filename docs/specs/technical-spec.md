@@ -301,7 +301,7 @@ Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the
 
 An importer is a domain-owned connector implementing the `Importer` protocol in
 `domain/importers.py`. It declares a permanent `name`, user-facing `label`, target `item_type`, an
-`ImportInputSpec` (`upload` or `path`), the exact `identity_kinds` it trusts, and the closed set of
+`ImportInputSpec` (`upload`, `path` or `directory`), the exact `identity_kinds` it trusts, and the closed set of
 `error_codes` its reader may raise. Its `read` method normalizes the source into an
 `ImportSnapshot`; `stage` archives the source or prepares local assets after fingerprint replay has
 been ruled out; and `match` applies its source-specific identity and near-match strategy through the
@@ -333,7 +333,8 @@ streams each part to disk — Starlette spools a part only past 1 MiB and a cove
 that, so `MultiPartParser.spool_max_size` is overridden to 1 and peak memory tracks one member rather
 than the library (measured: a 60 MiB bundle at a 1.8 MiB Python peak). Member paths come from the
 client and are validated before a byte is written: absolute paths, `..`, any segment beginning with
-`.`, and anything that is neither `metadata.db` nor `*/cover.jpg` are refused. The surviving members
+`.`, and anything outside the connector's `members` (`PurePosixPath.match` patterns) are refused.
+Absolute patterns and patterns containing `..` are conformance failures. The surviving members
 are materialized at `<bundle>/library/...` and the connector points its **ordinary adapter** at that
 directory, so an uploaded library and a mounted one normalize through identical code. The route owns
 the bundle and removes it once preview has staged what it needs, including when the read failed.
@@ -347,9 +348,10 @@ addressing dedupes *storage*, not *transfer* — the server only recognises byte
 so without this an unchanged re-sync pays full price. **The client cannot hash instead:**
 `crypto.subtle` requires a secure context, and while `localhost` is one, a reverse-proxied
 `http://host.lan` is not, so a digest negotiation would work from the box and fail silently from the
-rest of the LAN (DEC-082). The connector reaches storage only through `ImportInventory`, whose two
-questions — `existing` and `with_cover` — are batched in chunks of 500 so a large shelf is a constant
-number of round trips. `planned_upload` refuses a plan naming a path the client never offered.
+rest of the LAN (DEC-082). The connector reaches storage only through `ImportInventory`, whose three
+questions — `existing`, `with_cover` and attachment filenames through `attached` — are batched in
+chunks of 500 so a large shelf is a constant number of round trips. `planned_upload` refuses a plan
+naming a path the client never offered.
 `metadata.db` therefore travels twice, once to plan and once to preview; that is a stated cost, not
 an oversight. Planning by identity means a changed file under an unchanged identity is not detected,
 and the escape hatch is that an item without a cover is always wanted. **The plan is never
@@ -367,7 +369,9 @@ refused, the last after resolution.
 A `NormalizedImportRecord` has a neutral item (`title`, `subtitle`, `year`, identifiers, opaque
 metadata and optional curated creator sort), a neutral entry (score, notes, date added, the target
 domain's declared entry values, provisional flag and suggested status), shelves, row errors and
-opaque source fields. Before matching, the shared service validates metadata against the target
+opaque source fields. Its `source_files` are connector-declared relative paths under the source root,
+persisted beside `cover_stage`; every path must match the input's declared members. Before matching,
+the shared service validates metadata against the target
 domain's `fields`, entry values against `entry_fields`, suggested status against `statuses`, and
 identifiers against the importer's declared kinds. An invalid connector row is refused with
 `invalid_import_record`; it is never smuggled into another domain's vocabulary.
@@ -381,6 +385,15 @@ and preview counts. Calibre requests identify only a path relative to configured
 rereads a changing source DB.
 
 Commit accepts a preview batch ID, rejects stale/missing/mismatched previews or unresolved ambiguities, and applies the persisted plan in one bounded `BEGIN IMMEDIATE` transaction. Revalidate authoritative identifiers because the library may have changed since preview. If exact keys now resolve to different items, mark the record `identity_conflict` and abort that record rather than choosing a winner. Otherwise create/reuse items and entries, fill empty item fields, attach shelves only to newly created entries, record audit conflicts/effects, and persist enrichment jobs before commit. Existing entries are never reset to `unsorted` or modified. All parsing, Calibre reads, cover copies, image work, and provider calls stay outside the write transaction. A uniqueness race may reload and reuse a winner only when every exact identity agrees on that item.
+
+A committed, unexpired batch may accept one `source_file` per request. The route resolves the path
+to its persisted record and `matched_item_id`, streams it through the ordinary content-addressed
+`BlobWriter` under `attachment_max_bytes`, inserts the attachment and appends an `attachment` import
+effect carrying row id, filename and digest. One request per file keeps the request bound independent
+of library size and isolates failures. Undo reverses that effect before its item's earlier create
+effect, deleting the blob only after the row is gone and no other row references it. It retains a
+row whose filename or digest no longer matches, and the existing attachment guard still retains an
+item carrying any file the ledger does not claim.
 
 Enrichment is enqueued after commit and limited to about two provider requests per second. Every metadata or cover fill performed for an import appends its `import_effect` in the same short transaction as the mutation, so undo includes asynchronous effects. Triage is immediately usable. Job progress is polled from the API.
 
@@ -539,7 +552,7 @@ The product-spec route list is authoritative, with these refinements:
   somebody is waiting for it.
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
-- `GET /importers` publishes `{id, label, item_type, input}` from the importer registry, where
+- `GET /importers` publishes `{id, label, item_type, input, attachment_max_bytes}` from the importer registry, where
   `input` carries the connector's declared `guide`, `empty_state`, `help_url`, `browsable`,
   `incremental`, `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternate`, alongside
   `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
@@ -556,6 +569,11 @@ The product-spec route list is authoritative, with these refinements:
   is a 404 `importer_not_incremental`. It applies the same member validation the upload route does,
   so a manifest cannot smuggle a path the upload would refuse, and it removes its bundle on every
   path. See §6.5.
+- `POST /import/{importer}/batches/{batch_id}/files` takes multipart `path` and exactly one `file`
+  after commit. The path must be both connector-declared and named by one persisted record's
+  `source_files`. Unknown importer/batch/path is 404; a non-committed, undone or expired batch is
+  409; an over-cap body is 413 with no attachment row or orphaned blob; an undeclared path is 422.
+  Repeating identical bytes is idempotent through the item/digest uniqueness constraint.
 - `GET /import/{importer}/browse?path=` exists only for a connector that declares `browsable`; any
   other importer, and any unknown one, is a 404 `importer_not_browsable`. It is read-only, returns
   directory names and nothing else, and refuses an absolute path, a `..` segment or a symlink out of

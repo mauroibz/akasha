@@ -290,6 +290,9 @@ class SteamImporter:
         # anything.
         max_bytes=None,
         max_files=None,
+        # Required for a directory input: the relative members its bundle may
+        # contain. Absolute patterns and `..` are rejected by conformance.
+        members=(),
         # Whether `read` can take `ImportSource.directory`. Required by
         # `kind="directory"`; conformance refuses the kind without it.
         accepts_files=False,
@@ -325,8 +328,8 @@ records use only the neutral shapes:
   and an optional curated creator sort;
 - `ImportEntry`: score, notes, date added, values declared by `DOMAIN.entry_fields`, an optional
   provisional score flag and suggested status;
-- `NormalizedImportRecord`: those two halves plus shelves, row errors, opaque source fields and an
-  optional cover source.
+- `NormalizedImportRecord`: those two halves plus shelves, row errors, opaque source fields, an
+  optional cover source, and `source_files` containing relative paths this record owns.
 
 Raise `ImportReadError(code, message, details)` for an invalid source, with the code drawn from your
 declared `error_codes`. Give it `user_message` and `action` too: `code` is what the client branches
@@ -339,7 +342,9 @@ Do not return a raw provider row or put domain metadata in `source_fields`: the 
 validates `metadata`, entry values, status and identity kinds before it calls `match`.
 
 If your source is a **folder on the reader's own machine**, use `kind="directory"` and set
-`accepts_files=True`. The screen renders a folder chooser, the client filters the selection to the
+`accepts_files=True`. Declare `members` as the exact `PurePosixPath.match` patterns the folder may
+send; traversal and dot-segments are always refused by the shared route, while this declaration
+keeps source-specific shape out of it. The screen renders a folder chooser, the client filters the selection to the
 members you want and uploads only those, and the route streams them to disk, validates every
 client-supplied relative path, and materializes them at `<bundle>/library/...`. Your `read` then
 receives `ImportSource.directory` and should point its **ordinary adapter** at that folder — the
@@ -350,7 +355,8 @@ better than a timeout.
 
 **If a re-import would resend what the library already has**, implement `IncrementalImporter` and set
 `input.incremental = True`. `plan` receives the cheap half of the source, the client's `{path, size}`
-offer, and an `ImportInventory` with two batched questions — `existing` and `with_cover` — and
+offer, and an `ImportInventory` with three batched questions — `existing`, `with_cover` and
+`attached` (attachment filenames keyed by identity) — and
 answers with the subset worth uploading. Plan by a **durable identity** in the source, never by a
 digest: the client cannot hash, because `crypto.subtle` is undefined outside a secure context and
 this application is served over plain HTTP on a LAN. A source with no stable identity should leave
@@ -371,6 +377,13 @@ available for automation.
 `data_dir`. Remove raw bytes and host paths from the returned snapshot. Commit never opens the
 source again.
 
+If records name `source_files`, the client may offer those paths during planning and, after commit,
+send each wanted file to `POST /api/import/<name>/batches/<batch_id>/files`. The shared route resolves
+the path to the record's committed item, applies the published attachment cap, stores it through the
+content-addressed attachment pipeline and records an undo effect. The connector never writes an
+attachment row or blob itself. A client may offer none of these files, so they cannot be required for
+`read`, preview or commit correctness.
+
 `match` receives the one narrow library operation it may use. Normalize only identifiers listed in
 `identity_kinds`, then call `matcher.match(...)`; never query storage directly. Finally register the
 connector:
@@ -389,7 +402,9 @@ That one entry publishes the tab — with your guide, your empty state and your 
 `GET /api/importers`, and serves preview/commit at
 `POST /api/import/steam/preview` and `POST /api/import/steam/commit`. The shared service supplies
 durable preview, ambiguity choices, one bounded commit, `unsorted` triage, fingerprint idempotency,
-the 24-hour undo window and enrichment only when the target domain declares it.
+the 24-hour undo window, optional post-commit source files, and enrichment only when the target
+domain declares it. The registry response publishes the application's attachment cap for clients
+that can refuse an oversize file before sending it.
 
 Add parser/adapter fixtures for the source itself and a generic route round-trip. Do not edit the
 shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
@@ -397,7 +412,8 @@ will reject a missing protocol member, an unknown target domain, empty identity 
 registration, a malformed guide, a non-https `help_url`, browsing declared without a `browse`
 method, an empty or shouted error vocabulary, a nested `alternate`, an `alternate` reusing the
 primary's `field`, a non-positive `max_bytes`/`max_files`, `kind="directory"` without
-`accepts_files`, or `incremental` without a `plan` method.
+`accepts_files` or `members`, an invalid member pattern, a record whose `source_files` fall outside
+those members, or `incremental` without a `plan` method.
 
 ### Step 6 — Prove it
 

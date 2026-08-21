@@ -70,9 +70,11 @@ a snapshot rather than a sync, and what happens to your ratings; drop the CSV on
 tab or choose it.
 
 **Calibre needs no setup at all: choose your library folder and your browser reads it.**
-There is nothing to mount, no `CALIBRE_DIR`, and no restart. Only `metadata.db` and the
-covers are sent — your ebooks never leave your machine, which is why a 174 MB library is
-about 10 MB of upload — and the screen counts what it will send before it sends anything.
+There is nothing to mount, no `CALIBRE_DIR`, and no restart. By default only `metadata.db`
+and the covers are sent — your ebooks stay on your machine, which is why a 174 MB library is
+about 10 MB of upload. If you turn on **Also attach the ebook files**, the screen selects one
+file per book (epub first, then azw3, mobi, pdf, cbz, cbr or txt), counts and sizes them before
+anything moves, and attaches them after you commit the preview. The toggle is off by default.
 
 **Re-syncing is cheap.** Before uploading, Akasha asks itself which books it already
 holds and sends only what is missing, so importing the same folder again moves about a
@@ -81,6 +83,14 @@ megabyte instead of the whole thing — measured at 10.55 MB for a first import 
 book's cover travels. If the check fails for any reason, everything is sent and the
 screen says so, so a re-sync is never worse than it used to be. Nothing is written back to Calibre and nothing holds the library open, so it
 is safe to do while Calibre or calibre-web is running.
+
+Ebook uploads are one request per book, with visible progress. A file above the 25 MiB
+attachment cap is named and left on your machine; a failed file is named without failing the
+rest of the import. A second sync sends no ebook Akasha already holds, and deleting one imported
+attachment makes only that file eligible again. Undo removes files that batch attached but
+retains anything you renamed, replaced or attached by hand. The measured disk cost is 95 MB for
+this 18-book library, or roughly 3.2 GB for 600 books at the same mean; nightly backups reuse blob
+inodes only while the backup and data directories share a filesystem.
 
 If instead the library is somewhere the server can already see, the same tab offers
 that underneath: mount it, browse to the folder that holds `metadata.db`, and the screen

@@ -18,6 +18,10 @@ recency to remember what was good.
 Explicitly *not* a social network, not a library manager, not an ebook server.
 Kavita already handles files; this handles opinions.
 
+An importer may place an opaque file where the owner could already attach one by hand. That does
+not make the file surface an ebook server: there is still no reader, format parsing, reading
+progress, device sync or format-aware file UI.
+
 ### Success criteria
 
 Adding a finished book — search, pick the right edition, set status, set score,
@@ -398,11 +402,20 @@ container-level setting, and a library served by calibre-web-automated is held o
 where concurrent readers are not supported.
 
 **A re-import sends only what is missing** (DEC-082). Before uploading, the client
-asks the server which books it already holds with a cover, and sends the rest.
+asks the server which books it already holds with a cover or an attachment of the offered name,
+and sends the rest.
 Measured on an 18-book library: 10.55 MB for a first import, 0.99 MB for an
 unchanged re-sync, and one new book costs only that book's cover. The check is an
 optimisation and never a gate — if it fails, everything is sent and the screen
 says so.
+
+**Ebook files are optional attachments** (DEC-083). The folder input offers an off-by-default
+toggle. When enabled, the client chooses one file per book in `epub`, `azw3`, `mobi`, `pdf`, `cbz`,
+`cbr`, `txt` preference order, states the count and size before uploading, and leaves any preferred
+file above the published 25 MiB attachment cap on the source machine with its name visible. Ebook
+bytes do not join the preview bundle: after commit the client sends each wanted file in its own
+request, reports progress, and names a failure without failing the import. An unchanged re-sync
+sends none; deleting one attachment makes that file wanted again.
 
 **Secondarily, a mounted library** the server can already see: mounted read-only into
 the container and opened with `sqlite3.connect("file:metadata.db?mode=ro", uri=True)`.
@@ -466,7 +479,10 @@ They do **not** reuse the interactive provider `SearchCandidate` shape:
 4. In one bounded transaction, create absent entries as `unsorted`, fill only
    empty item fields, preserve all existing entries, record effects/conflicts,
    and enqueue enrichment jobs
-5. Background enrichment: for rows with an ISBN but no cover, queue Open
+5. After commit, send each optional source file in its own size-capped request and record its
+   attachment in the same import ledger. Undo removes it only while its id, filename and digest
+   still match; a renamed/replaced file and any hand-attached file are retained with their item.
+6. Background enrichment: for rows with an ISBN but no cover, queue Open
    Library/Google Books lookups at ~2 req/s. Runs for minutes on a large
    library; never inside the request. Triage is usable while it runs
 
@@ -781,11 +797,11 @@ that shelves become tags; its input takes a dropped file as well as a chosen one
 **Calibre needs no setup at all** (DEC-081): you choose your library folder and the
 browser reads it, so there is nothing to mount, no `CALIBRE_DIR` and no restart —
 and nothing holds the library open while Calibre or calibre-web is using it, which
-is what made the mount painful in practice. Only `metadata.db` and the covers are
-sent; ebooks never leave the machine, and the screen counts and sizes what it will
-send before sending it, because "choose a folder" and "upload your ebook collection"
-are otherwise indistinguishable. A re-import sends only what is missing, and says how
-much it skipped. Choosing a folder with no `metadata.db` is refused
+is what made the mount painful in practice. Only `metadata.db` and the covers are sent by default.
+An off-by-default toggle may additionally attach one preferred ebook per book after commit; the
+screen counts and sizes them first, names anything over the cap, shows per-file progress and names
+individual failures. A re-import sends only what is missing, including no ebook already attached,
+and says how much it skipped. Choosing a folder with no `metadata.db` is refused
 in the browser, before any request.
 
 Beneath it, the same tab offers **a library the server can already see**: mount it and
