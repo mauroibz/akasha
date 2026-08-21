@@ -1,5 +1,5 @@
-import { useVirtualizer } from "@tanstack/react-virtual";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useWindowVirtualizer } from "@tanstack/react-virtual";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { m } from "motion/react";
 import { toast } from "sonner";
@@ -79,6 +79,9 @@ export function TriagePage() {
   const [excludedIds, setExcludedIds] = useState<Set<number>>(new Set());
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [lastShiftIndex, setLastShiftIndex] = useState<number | null>(null);
+  const [pendingStatuses, setPendingStatuses] = useState<
+    Map<number, EntryStatus>
+  >(new Map());
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
@@ -143,8 +146,16 @@ export function TriagePage() {
   const bulkMutation = useMutation({
     mutationFn: (body: Parameters<typeof bulkUpdateEntries>[0]) =>
       bulkUpdateEntries(body),
-    onSuccess: (affected) => {
+    onSuccess: (affected, body) => {
       toast.success(`${affected} entries updated`);
+      if (body.set.status !== undefined) {
+        setPendingStatuses((current) => {
+          if (body.filter) return new Map();
+          const next = new Map(current);
+          for (const id of body.entry_ids ?? []) next.delete(id);
+          return next;
+        });
+      }
       setSelectedIds(new Set());
       setAllMatching(false);
       setExcludedIds(new Set());
@@ -197,6 +208,53 @@ export function TriagePage() {
       });
     },
     onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["triage"] });
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+
+  const pendingStatusMutation = useMutation({
+    mutationFn: async (drafts: Map<number, EntryStatus>) => {
+      const groups = new Map<EntryStatus, number[]>();
+      for (const [id, status] of drafts) {
+        const ids = groups.get(status) ?? [];
+        ids.push(id);
+        groups.set(status, ids);
+      }
+      const results = await Promise.allSettled(
+        Array.from(groups, async ([status, entryIds]) => {
+          await bulkUpdateEntries({
+            entry_ids: entryIds,
+            set: { status },
+          });
+          return entryIds;
+        }),
+      );
+      const successfulIds = results.flatMap((result) =>
+        result.status === "fulfilled" ? result.value : [],
+      );
+      const failedIds = results.flatMap((result, index) =>
+        result.status === "rejected"
+          ? (Array.from(groups.values())[index] ?? [])
+          : [],
+      );
+      return { successfulIds, failedIds };
+    },
+    onSuccess: ({ successfulIds, failedIds }) => {
+      const failed = new Set(failedIds);
+      setPendingStatuses(
+        (current) =>
+          new Map(Array.from(current).filter(([id]) => failed.has(id))),
+      );
+      if (failedIds.length > 0) {
+        toast.error("Some status changes could not be applied", {
+          description: `${failedIds.length} ${failedIds.length === 1 ? "change remains" : "changes remain"} ready to retry.`,
+        });
+      } else {
+        toast.success(
+          `${successfulIds.length} ${successfulIds.length === 1 ? "status change" : "status changes"} applied`,
+        );
+      }
       void queryClient.invalidateQueries({ queryKey: ["triage"] });
       void queryClient.invalidateQueries({ queryKey: ["library"] });
     },
@@ -262,18 +320,43 @@ export function TriagePage() {
     };
   };
 
-  // Virtualizer
+  // Triage is a primary reading surface, so the page owns its scroll just as it
+  // does for the library. A nested 70vh scroller wastes the rest of the viewport
+  // and makes two vertical positions compete for the wheel and keyboard.
   const parentRef = useRef<HTMLDivElement>(null);
+  const [scrollMargin, setScrollMargin] = useState(0);
+  useLayoutEffect(() => {
+    const element = parentRef.current;
+    if (!element) return;
+    const measure = () =>
+      setScrollMargin(element.getBoundingClientRect().top + window.scrollY);
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    observer.observe(document.body);
+    return () => observer.disconnect();
+  }, []);
   const rowHeight = 64;
-  const virtualizer = useVirtualizer({
+  const virtualizer = useWindowVirtualizer({
     count: entries.length,
-    getScrollElement: () => parentRef.current,
     estimateSize: () => rowHeight,
     overscan: 6,
     getItemKey: (index) => entries[index]?.id ?? index,
+    scrollMargin,
     initialRect: { width: 1000, height: 640 },
   });
   const virtualItems = virtualizer.getVirtualItems();
+  const mountedRows = virtualItems.length
+    ? virtualItems
+    : Array.from({ length: Math.min(7, entries.length) }, (_, index) => ({
+        index,
+        key: entries[index]?.id ?? index,
+        size: rowHeight,
+        start: index * rowHeight,
+        end: (index + 1) * rowHeight,
+        lane: 0,
+      }));
 
   // Load next page near bottom
   useEffect(() => {
@@ -367,10 +450,14 @@ export function TriagePage() {
       if (statusKey) {
         event.preventDefault();
         if (selectionCount === 0) {
-          // Single-row update via bulk API
-          bulkMutation.mutate({
-            entry_ids: [focused!.id],
-            set: { status: statusKey },
+          // One-row status decisions are drafts. Keeping the row in place is
+          // what lets the owner read steadily down the inbox; the visible apply
+          // action is the commit boundary.
+          setPendingStatuses((current) => {
+            const next = new Map(current);
+            if (statusKey === focused!.status) next.delete(focused!.id);
+            else next.set(focused!.id, statusKey);
+            return next;
           });
         } else if (fromSelection) {
           bulkMutation.mutate(buildBulkBody({ status: statusKey }));
@@ -568,6 +655,42 @@ export function TriagePage() {
 
       {entries.length > 0 && (
         <>
+          {pendingStatuses.size > 0 && (
+            <m.div
+              className="sticky top-3 z-20 mt-4 flex flex-wrap items-center gap-3 rounded-2xl border border-primary/25 bg-surface-raised p-3 shadow-lg"
+              role="toolbar"
+              aria-label="Pending status changes"
+              initial={presets.actionBar.initial}
+              animate={presets.actionBar.animate}
+            >
+              <span className="mr-auto px-2 text-sm text-foreground">
+                {pendingStatuses.size}{" "}
+                {pendingStatuses.size === 1
+                  ? "status change ready"
+                  : "status changes ready"}
+              </span>
+              <Button
+                className="rounded-full text-sm"
+                disabled={pendingStatusMutation.isPending}
+                onClick={() =>
+                  pendingStatusMutation.mutate(new Map(pendingStatuses))
+                }
+              >
+                {pendingStatusMutation.isPending
+                  ? "Applying…"
+                  : "Apply status changes"}
+              </Button>
+              <Button
+                variant="secondary"
+                className="rounded-full text-sm"
+                disabled={pendingStatusMutation.isPending}
+                onClick={() => setPendingStatuses(new Map())}
+              >
+                Discard status changes
+              </Button>
+            </m.div>
+          )}
+
           {/* Bulk action bar */}
           {selectionCount > 0 && (
             // Transform and opacity only. The bar sits in normal flow, so
@@ -686,8 +809,7 @@ export function TriagePage() {
           {/* Virtualized table */}
           <div
             ref={parentRef}
-            className="triage-scroll mt-4 max-h-[min(70vh,760px)] overflow-auto rounded-2xl bg-surface/40"
-            style={{ height: virtualizer.getTotalSize() }}
+            className="triage-list mt-4 rounded-2xl bg-surface/40"
             // A feed, not a table: these rows carry no column headers and no
             // cells, so `role="table"` promised a structure that was not there
             // and axe reported the missing children as critical (DEC-038).
@@ -698,7 +820,7 @@ export function TriagePage() {
               className="relative w-full"
               style={{ height: virtualizer.getTotalSize() }}
             >
-              {virtualItems.map((row) => {
+              {mountedRows.map((row) => {
                 const entry = entries[row.index];
                 const selected = isRowSelected(entry.id);
                 const hasConflict = entry.suggested_status !== null;
@@ -715,7 +837,7 @@ export function TriagePage() {
                     className={`absolute left-0 top-0 flex w-full items-center gap-3 border-b border-border px-3 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring ${selected ? "bg-primary/10" : ""}`}
                     style={{
                       height: rowHeight,
-                      transform: `translateY(${row.start}px)`,
+                      transform: `translateY(${row.start - scrollMargin}px)`,
                     }}
                     onClick={(e) => {
                       if (
@@ -790,17 +912,26 @@ export function TriagePage() {
                       onClick={(event) => event.stopPropagation()}
                     >
                       <select
-                        value={entry.status}
-                        onChange={(event) =>
-                          rowMutation.mutate({
-                            entry,
-                            changes: {
-                              status: event.target.value as EntryStatus,
-                            },
-                          })
-                        }
-                        aria-label={`Status for ${entry.item.title}`}
-                        className="h-9 w-24 shrink-0 rounded-md border border-input bg-surface-raised px-2 text-xs focus-ring sm:w-28"
+                        value={pendingStatuses.get(entry.id) ?? entry.status}
+                        disabled={pendingStatusMutation.isPending}
+                        onChange={(event) => {
+                          const status = event.target.value as EntryStatus;
+                          setPendingStatuses((current) => {
+                            const next = new Map(current);
+                            if (status === entry.status) next.delete(entry.id);
+                            else next.set(entry.id, status);
+                            return next;
+                          });
+                        }}
+                        aria-label={`Status for ${entry.item.title}${
+                          pendingStatuses.has(entry.id) ? " (not saved)" : ""
+                        }`}
+                        className={cn(
+                          "h-9 w-24 shrink-0 rounded-md border bg-surface-raised px-2 text-xs focus-ring sm:w-28",
+                          pendingStatuses.has(entry.id)
+                            ? "border-primary ring-1 ring-primary/40"
+                            : "border-input",
+                        )}
                       >
                         {statusesFor(entry.item.type, itemTypes.data).map(
                           (status) => (

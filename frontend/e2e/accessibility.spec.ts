@@ -300,6 +300,24 @@ test("triage has no serious accessibility violations", async ({ page }) => {
   await expectNoSeriousViolations(page, "triage");
 });
 
+test("triage pending status actions have no serious accessibility violations", async ({
+  page,
+}) => {
+  await stubImporters(page);
+  await stubItemTypes(page);
+  await stubTriage(page);
+  await stubShelves(page);
+  await page.goto("/import?tab=triage");
+  await page
+    .locator('[data-entry-id="1"]')
+    .getByRole("combobox", { name: "Status for Book 1" })
+    .selectOption("read");
+  await expect(
+    page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toBeVisible();
+  await expectNoSeriousViolations(page, "triage (pending statuses)");
+});
+
 test("triage with a selection and its action bar has no serious violations", async ({
   page,
 }) => {

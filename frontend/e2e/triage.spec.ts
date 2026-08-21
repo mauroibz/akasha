@@ -129,11 +129,11 @@ test("triage page renders and bulk-accepts suggested statuses", async ({
   await expect(page.getByText("20 suggested statuses accepted")).toBeVisible();
 });
 
-test("triage keyboard shortcuts set status on focused row", async ({
+test("triage keyboard shortcuts stage status on a focused row until apply", async ({
   page,
 }) => {
   const entries = makeEntries(5);
-  let bulkBody: unknown = null;
+  const bulkBodies: unknown[] = [];
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({
       json: {
@@ -149,7 +149,7 @@ test("triage keyboard shortcuts set status on focused row", async ({
     }),
   );
   await page.route("**/api/entries/bulk", (route) => {
-    bulkBody = route.request().postDataJSON();
+    bulkBodies.push(route.request().postDataJSON());
     return route.fulfill({ json: { affected: 1 } });
   });
 
@@ -160,12 +160,19 @@ test("triage keyboard shortcuts set status on focused row", async ({
   await page.locator('[data-entry-id="1"]').focus();
   await page.keyboard.press("r");
 
+  expect(bulkBodies).toEqual([]);
+  await expect(
+    page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toContainText("1 status change ready");
+  await page.getByRole("button", { name: "Apply status changes" }).click();
   await expect
-    .poll(() => bulkBody)
-    .toEqual({
-      entry_ids: [1],
-      set: { status: "read" },
-    });
+    .poll(() => bulkBodies)
+    .toEqual([
+      {
+        entry_ids: [1],
+        set: { status: "read" },
+      },
+    ]);
 });
 
 test("row controls edit one entry while only checkboxes select for bulk", async ({
@@ -174,6 +181,7 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
   await page.setViewportSize({ width: 390, height: 844 });
   const entries = makeEntries(3);
   const writes: unknown[] = [];
+  const bulkWrites: unknown[] = [];
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({
       json: {
@@ -195,6 +203,10 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
     writes.push(route.request().postDataJSON());
     return route.fulfill({ json: { ...entries[0], ...changes } });
   });
+  await page.route("**/api/entries/bulk", (route) => {
+    bulkWrites.push(route.request().postDataJSON());
+    return route.fulfill({ json: { affected: 1 } });
+  });
 
   await page.goto("/import?tab=triage");
   const row = page.locator('[data-entry-id="1"]');
@@ -204,7 +216,7 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
   ).toBe(true);
   expect(
     await page
-      .locator(".triage-scroll")
+      .locator(".triage-list")
       .evaluate((element) => element.getBoundingClientRect().height),
   ).toBeLessThanOrEqual(entries.length * 64 + 1);
 
@@ -215,15 +227,103 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
     .getByRole("combobox", { name: "Status for Book 1" })
     .selectOption("read");
 
-  await expect.poll(() => writes).toEqual([{ score: 7 }, { status: "read" }]);
+  await expect.poll(() => writes).toEqual([{ score: 7 }]);
+  expect(bulkWrites).toEqual([]);
+  await expect(
+    row.getByRole("combobox", { name: /status for book 1.*not saved/i }),
+  ).toHaveValue("read");
+  await expect(
+    page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toBeVisible();
   await expect(page.getByRole("toolbar", { name: "Bulk actions" })).toHaveCount(
     0,
   );
+
+  await page.getByRole("button", { name: "Discard status changes" }).click();
+  await expect(
+    row.getByRole("combobox", { name: "Status for Book 1" }),
+  ).toHaveValue("unsorted");
+  expect(bulkWrites).toEqual([]);
 
   await row.getByRole("checkbox", { name: "Select Book 1" }).click();
   await expect(
     page.getByRole("toolbar", { name: "Bulk actions" }),
   ).toBeVisible();
+});
+
+test("status apply keeps failed drafts and clears successful groups", async ({
+  page,
+}) => {
+  let storedEntries = makeEntries(3);
+  const bulkWrites: unknown[] = [];
+  await page.route("**/api/entries?**", (route) => {
+    const unsorted = storedEntries.filter(
+      (entry) => entry.status === "unsorted",
+    );
+    return route.fulfill({
+      json: {
+        items: unsorted,
+        next_cursor: null,
+        total: unsorted.length,
+        facets: {
+          status_counts: { unsorted: unsorted.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    });
+  });
+  await page.route("**/api/entries/bulk", (route) => {
+    const body = route.request().postDataJSON() as {
+      entry_ids: number[];
+      set: { status: string };
+    };
+    bulkWrites.push(body);
+    if (body.set.status === "to_read")
+      return route.fulfill({ status: 500, json: { detail: "write failed" } });
+    storedEntries = storedEntries.map((entry) =>
+      body.entry_ids.includes(entry.id)
+        ? { ...entry, status: body.set.status }
+        : entry,
+    );
+    return route.fulfill({ json: { affected: body.entry_ids.length } });
+  });
+
+  await page.goto("/import?tab=triage");
+  await page
+    .locator('[data-entry-id="1"]')
+    .getByRole("combobox", { name: "Status for Book 1" })
+    .selectOption("read");
+  await page
+    .locator('[data-entry-id="2"]')
+    .getByRole("combobox", { name: "Status for Book 2" })
+    .selectOption("read");
+  await page
+    .locator('[data-entry-id="3"]')
+    .getByRole("combobox", { name: "Status for Book 3" })
+    .selectOption("to_read");
+
+  expect(bulkWrites).toEqual([]);
+  await page.getByRole("button", { name: "Apply status changes" }).click();
+
+  await expect.poll(() => bulkWrites).toHaveLength(2);
+  expect(bulkWrites).toContainEqual({
+    entry_ids: [1, 2],
+    set: { status: "read" },
+  });
+  await expect(page.locator('[data-entry-id="1"]')).toHaveCount(0);
+  await expect(page.locator('[data-entry-id="2"]')).toHaveCount(0);
+  await expect(
+    page
+      .locator('[data-entry-id="3"]')
+      .getByRole("combobox", { name: /status for book 3.*not saved/i }),
+  ).toHaveValue("to_read");
+  await expect(
+    page.getByText("Some status changes could not be applied", { exact: true }),
+  ).toHaveCount(1);
+  await expect(
+    page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toContainText("1 status change ready");
 });
 
 test("a failed row edit restores the previous score once", async ({ page }) => {
@@ -452,6 +552,18 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
 
   await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+
+  const feed = page.getByRole("feed", { name: "Triage inbox" });
+  expect(
+    await feed.evaluate((element) => getComputedStyle(element).overflowY),
+  ).toBe("visible");
+  expect(
+    await feed.evaluate(
+      (element) => element.querySelectorAll('[role="article"]').length,
+    ),
+  ).toBeLessThan(30);
+  await page.evaluate(() => window.scrollTo(0, document.body.scrollHeight));
+  await expect(page.getByText("Book 200", { exact: true })).toBeVisible();
 
   // Ctrl+A to select all, then set status via keyboard
   await page.keyboard.press("Control+a");

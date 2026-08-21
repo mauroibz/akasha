@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 18,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 19,
+  "project_status": "in_progress",
+  "active_sprint": "037",
+  "active_sprint_file": "docs/sprints/037-triage-page-flow.md",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "036",
   "completed_sprints": [
     "001",
@@ -44,6 +44,6 @@
     "035",
     "036"
   ],
-  "started_at": null,
-  "updated_at": "2026-08-21T20:33:41-03:00"
+  "started_at": "2026-08-21T20:49:55-03:00",
+  "updated_at": "2026-08-21T20:49:55-03:00"
 }

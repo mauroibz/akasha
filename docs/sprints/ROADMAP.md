@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 18
+**Plan revision:** 19
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — numbered plan complete through Sprint 036
+**Active sprint:** [037 — Triage page flow and staged statuses](037-triage-page-flow.md)
 
 ## Shape of the plan
 
@@ -31,10 +31,11 @@ Post-v1 work branches:
                                    └─ 033 Calibre without a mount
                                       └─ 034 Incremental import
                                          └─ 035 Ebook attachments on a toggle
-                                            └─ 036 Import and triage flow  [complete]
+                                            └─ 036 Import and triage flow
+                                               └─ 037 Triage page flow and staged statuses  ← active
 ```
 
-**The numbered plan now stops at 036 (DEC-058, extended through DEC-086).** Sprint 025 asked whether a second domain
+**The numbered plan now stops at 037 (DEC-058, extended through the owner-directed Sprint 037).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -94,11 +95,12 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [034](034-incremental-import.md) | Incremental import | 033 | completed |
 | [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | completed |
 | [036](036-import-triage-flow.md) | Import and triage flow | 035 | completed |
+| [037](037-triage-page-flow.md) | Triage page flow and staged statuses | 036 | in_progress |
 
 ## Sprint contracts
 
 These are the binding outcome boundaries for the post-v1 line. Sprints 019 through 036 are closed;
-no numbered sprint is active. Their individual Outcome sections record delivered reality.
+Sprint 037 is active. Their individual Outcome sections record delivered reality.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -631,6 +633,17 @@ with source tabs nested under Import. A row's status and score edit that row dir
 checkbox selects, while Shift ranges, Ctrl/Cmd+A, the bulk toolbar and keyboard shortcuts remain.
 Row-body clicks open detail. Native selects stay in the row's tree, mobile rows do not overflow,
 and a short inbox no longer reserves an empty 70vh panel (DEC-085, DEC-086).
+
+### [Sprint 037 — Triage page flow and staged statuses](037-triage-page-flow.md)
+
+Added at plan revision 19 from the owner's first sustained use of row-local Triage controls. The
+fixed-height virtual inbox still nested a 70vh scroll surface inside a page, wasting the document's
+vertical space. More importantly, changing status immediately invalidated the Inbox-only query, so
+the row blinked back or left before the owner could finish reading its neighbors.
+
+Move Triage to the same window-virtualization contract as the Library. Keep row status choices as
+visible drafts until an explicit apply, with discard and retryable partial failure; scores and
+explicit bulk actions keep saving immediately.
 
 ## Future epics, after this plan
 
