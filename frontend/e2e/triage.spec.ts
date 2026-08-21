@@ -580,5 +580,8 @@ test("the import screen reaches triage and comes back without leaving", async ({
   await page.getByRole("tab", { name: "Triage" }).click();
   await expect(page.getByText("2 unsorted")).toBeVisible();
   await page.getByRole("tab", { name: "Calibre" }).click();
-  await expect(page.getByLabel(/calibre library path/i)).toBeVisible();
+  // Calibre leads with the folder chooser; the mount is its alternate (DEC-081).
+  await expect(
+    page.getByLabel("Calibre folder", { exact: true }),
+  ).toBeVisible();
 });

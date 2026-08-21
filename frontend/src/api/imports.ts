@@ -1,3 +1,5 @@
+import type { BundleMember } from "@/features/import/bundle";
+
 export interface ImportRecord {
   record_id: number;
   row_number: number;
@@ -30,24 +32,31 @@ export interface ImportRecord {
   source_fields: Record<string, unknown>;
   cover_staged?: boolean;
 }
+export interface ImportInputSpec {
+  kind: "upload" | "path" | "directory";
+  label: string;
+  field: string;
+  accept: string | null;
+  placeholder: string | null;
+  help: string | null;
+  /** How to obtain the source, one step per string, rendered in order. */
+  guide: string[];
+  /** What the input says while nothing has been chosen. */
+  empty_state: string | null;
+  help_url: string | null;
+  browsable: boolean;
+  accepts_files: boolean;
+  max_bytes: number | null;
+  max_files: number | null;
+  /** A second way into the same connector, rendered beneath the primary. One deep. */
+  alternate: ImportInputSpec | null;
+}
+
 export interface ImporterDefinition {
   id: string;
   label: string;
   item_type: string;
-  input: {
-    kind: "upload" | "path";
-    label: string;
-    field: string;
-    accept: string | null;
-    placeholder: string | null;
-    help: string | null;
-    /** How to obtain the source, one step per string, rendered in order. */
-    guide: string[];
-    /** What the input says while nothing has been chosen. */
-    empty_state: string | null;
-    help_url: string | null;
-    browsable: boolean;
-  };
+  input: ImportInputSpec;
 }
 
 /** One level of a browsable connector's source. Relative names, never host paths. */
@@ -147,22 +156,41 @@ export function browseImportSource(importerId: string, path: string) {
   ).then((response) => responseJson<ImportBrowseListing>(response));
 }
 
+/**
+ * Preview a source through whichever of the connector's inputs it belongs to.
+ *
+ * A connector may declare two (DEC-081), and the request itself says which is in
+ * use: a body of parts is the file or folder input, a JSON body is the path one.
+ * `spec` is the input the screen actually collected, not necessarily the primary.
+ */
 export function previewImport(
   importer: ImporterDefinition,
-  source: File | string,
+  spec: ImportInputSpec,
+  source: File | string | BundleMember[],
 ) {
-  if (importer.input.kind === "upload") {
+  const url = `/api/import/${encodeURIComponent(importer.id)}/preview`;
+  if (spec.kind === "directory") {
     const form = new FormData();
-    form.append(importer.input.field, source as File);
-    return fetch(`/api/import/${encodeURIComponent(importer.id)}/preview`, {
-      method: "POST",
-      body: form,
-    }).then((response) => responseJson<ImportPreview>(response));
+    for (const member of source as BundleMember[]) {
+      // The relative path travels as the part filename; the server validates it
+      // and refuses anything outside the shape it asked for.
+      form.append(spec.field, member.file, member.path);
+    }
+    return fetch(url, { method: "POST", body: form }).then((response) =>
+      responseJson<ImportPreview>(response),
+    );
   }
-  return fetch(`/api/import/${encodeURIComponent(importer.id)}/preview`, {
+  if (spec.kind === "upload") {
+    const form = new FormData();
+    form.append(spec.field, source as File);
+    return fetch(url, { method: "POST", body: form }).then((response) =>
+      responseJson<ImportPreview>(response),
+    );
+  }
+  return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ [importer.input.field]: source }),
+    body: JSON.stringify({ [spec.field]: source }),
   }).then((response) => responseJson<ImportPreview>(response));
 }
 

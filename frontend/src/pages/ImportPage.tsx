@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   commitImport,
   getImporters,
+  type ImportInputSpec,
   ImportRequestError,
   previewImport,
   type ImporterDefinition,
@@ -24,7 +25,9 @@ import {
   type ImportResult,
   type UndoResult,
 } from "@/api/imports";
+import type { BundleMember, CalibreBundle } from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
+import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
 import { TriagePage } from "@/pages/TriagePage";
@@ -69,6 +72,8 @@ export function ImportPage() {
   const [fallbackSource, setFallbackSource] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [libraryPath, setLibraryPath] = useState("");
+  const [bundle, setBundle] = useState<CalibreBundle | null>(null);
+  const [showAlternate, setShowAlternate] = useState(false);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [choices, setChoices] = useState<Record<number, number | "new">>({});
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -133,6 +138,8 @@ export function ImportPage() {
     belongsTo.current = source;
     setFile(null);
     setLibraryPath("");
+    setBundle(null);
+    setShowAlternate(false);
     setPreview(null);
     setResult(null);
     setUndoResult(null);
@@ -166,6 +173,85 @@ export function ImportPage() {
   const ready =
     (preview?.summary.ready ?? 0) + (preview?.summary.ambiguous ?? 0);
   const activeImporter = importers.find((importer) => importer.id === source);
+
+  /**
+   * Which of a connector's inputs the reader actually filled in, if any.
+   *
+   * A connector may offer two (DEC-081), so "is this ready to preview" is a
+   * question about the whole tab rather than about one field. The folder wins
+   * when both are filled, because it is the one the tab leads with.
+   */
+  const readyInput = (
+    importer: ImporterDefinition | undefined,
+  ): {
+    spec: ImportInputSpec;
+    source: File | string | BundleMember[];
+  } | null => {
+    if (!importer) return null;
+    for (const spec of [importer.input, importer.input.alternate]) {
+      if (!spec) continue;
+      if (
+        spec.kind === "directory" &&
+        bundle?.database &&
+        bundle.members.length
+      )
+        return { spec, source: bundle.members };
+      if (spec.kind === "upload" && file) return { spec, source: file };
+      if (spec.kind === "path" && libraryPath.trim())
+        return { spec, source: libraryPath.trim() };
+    }
+    return null;
+  };
+
+  const renderInput = (
+    importer: ImporterDefinition,
+    spec: ImportInputSpec,
+    suffix: string,
+  ) => {
+    const inputId = `${importer.id}-source${suffix}`;
+    if (spec.kind === "directory")
+      return (
+        <DirectoryPicker
+          spec={spec}
+          importerLabel={importer.label}
+          inputId={inputId}
+          bundle={bundle}
+          onBundle={setBundle}
+        />
+      );
+    if (spec.kind === "upload")
+      return (
+        <SourceDropZone
+          importer={importer}
+          inputId={inputId}
+          file={file}
+          onFile={setFile}
+        />
+      );
+    return (
+      <div className="space-y-3">
+        {spec.browsable && (
+          <FolderPicker
+            importerId={importer.id}
+            importerLabel={importer.label}
+            emptyState={spec.empty_state}
+            selected={libraryPath}
+            onSelect={setLibraryPath}
+          />
+        )}
+        <div className="block">
+          <Label htmlFor={inputId}>{spec.label}</Label>
+          <Input
+            id={inputId}
+            className="mt-1 h-11"
+            value={libraryPath}
+            placeholder={spec.placeholder ?? undefined}
+            onChange={(event) => setLibraryPath(event.target.value)}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const tabStrip = (
     <TabsList aria-label="Import source">
@@ -219,85 +305,66 @@ export function ImportPage() {
               className="mt-8 space-y-5 rounded-2xl bg-surface p-5"
               onSubmit={(event) => {
                 event.preventDefault();
-                if (!activeImporter) return;
-                if (activeImporter.input.kind === "upload" && !file) return;
-                if (activeImporter.input.kind === "path" && !libraryPath.trim())
-                  return;
+                const submission = readyInput(activeImporter);
+                if (!submission) return;
                 setPending(true);
                 setError(null);
                 void previewImport(
-                  activeImporter,
-                  activeImporter.input.kind === "upload"
-                    ? (file as File)
-                    : libraryPath.trim(),
+                  activeImporter as ImporterDefinition,
+                  submission.spec,
+                  submission.source,
                 )
                   .then(setPreview)
                   .catch((reason: Error) => setError(asFailure(reason)))
                   .finally(() => setPending(false));
               }}
             >
-              {importers.map((importer) => {
-                const inputId = `${importer.id}-source`;
-                return (
-                  <TabsContent
-                    key={importer.id}
-                    value={importer.id}
-                    className="mt-0 space-y-5"
-                  >
-                    <ConnectorGuide importer={importer} />
-                    {importer.input.kind === "upload" ? (
-                      <SourceDropZone
-                        importer={importer}
-                        inputId={inputId}
-                        file={file}
-                        onFile={setFile}
-                      />
-                    ) : (
-                      <div className="space-y-3">
-                        {importer.input.browsable && (
-                          <FolderPicker
-                            importerId={importer.id}
-                            importerLabel={importer.label}
-                            emptyState={importer.input.empty_state}
-                            selected={libraryPath}
-                            onSelect={setLibraryPath}
-                          />
-                        )}
-                        <div className="block">
-                          <Label htmlFor={inputId}>
-                            {importer.input.label}
-                          </Label>
-                          <Input
-                            id={inputId}
-                            autoFocus
-                            className="mt-1 h-11"
-                            value={libraryPath}
-                            placeholder={
-                              importer.input.placeholder ?? undefined
-                            }
-                            onChange={(event) =>
-                              setLibraryPath(event.target.value)
-                            }
-                          />
+              {importers.map((importer) => (
+                <TabsContent
+                  key={importer.id}
+                  value={importer.id}
+                  className="mt-0 space-y-5"
+                >
+                  <ConnectorGuide importer={importer} />
+                  {renderInput(importer, importer.input, "")}
+                  {/* The second way in, beneath the first. One deep by contract,
+                      so this never recurses further (DEC-081). */}
+                  {importer.input.alternate && (
+                    // A controlled disclosure rather than `<details>`: this is the
+                    // second way in, so it needs an explicit expanded state that a
+                    // screen reader announces and a test can drive.
+                    <div className="rounded-2xl border border-border px-4 py-3">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        aria-expanded={showAlternate}
+                        aria-controls={`${importer.id}-alternate`}
+                        className="h-8 w-full justify-start rounded-lg px-2 text-sm font-normal text-muted-foreground"
+                        onClick={() => setShowAlternate((open) => !open)}
+                      >
+                        {importer.input.alternate.help ??
+                          `Or use a ${importer.label} library the server can already see`}
+                      </Button>
+                      {showAlternate && (
+                        <div id={`${importer.id}-alternate`} className="mt-4">
+                          {renderInput(
+                            importer,
+                            importer.input.alternate,
+                            "-alt",
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </TabsContent>
-                );
-              })}
+                      )}
+                    </div>
+                  )}
+                </TabsContent>
+              ))}
               <Button
                 className="rounded-full px-5"
-                disabled={
-                  pending ||
-                  !activeImporter ||
-                  (activeImporter.input.kind === "upload"
-                    ? !file
-                    : !libraryPath.trim())
-                }
+                disabled={pending || readyInput(activeImporter) === null}
               >
                 {pending
                   ? "Reading source…"
-                  : activeImporter?.input.kind === "path"
+                  : activeImporter && activeImporter.input.kind !== "upload"
                     ? `Preview ${activeImporter.label} library`
                     : "Preview import"}
               </Button>

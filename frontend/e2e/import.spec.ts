@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { expect, test } from "./console";
 
 import { chooseOption } from "./radix";
@@ -151,7 +153,10 @@ test("Calibre preview and re-sync are keyboard-complete at mobile width", async 
   });
   await page.goto("/import");
   await page.getByRole("tab", { name: "Calibre" }).press("Enter");
-  await expect(page.getByLabel(/calibre library path/i)).toBeFocused();
+  // The mount is the alternate now; reaching it is part of the keyboard path.
+  await page
+    .getByRole("button", { name: /server can already see/i })
+    .press("Enter");
   await page.getByLabel(/calibre library path/i).fill("Library");
   await page.getByRole("button", { name: /preview calibre/i }).press("Enter");
   await expect(page.getByText(/local cover staged/i)).toBeVisible();
@@ -407,10 +412,11 @@ test("the Calibre tab is browsed into rather than typed blind", async ({
   });
 
   await page.goto("/import?tab=calibre");
+  await page.getByRole("button", { name: /server can already see/i }).click();
 
   // Guidance the connector published, not copy this screen owns.
   await expect(
-    page.getByText(/pick the folder that holds metadata\.db/i),
+    page.getByText(/choose your calibre library folder/i).first(),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: /preview calibre library/i }),
@@ -459,10 +465,62 @@ test("a refused read says what to do about it", async ({ page }) => {
   );
 
   await page.goto("/import?tab=calibre");
+  await page.getByRole("button", { name: /server can already see/i }).click();
   await page.getByRole("button", { name: "Locked" }).click();
   await page.getByRole("button", { name: /preview calibre library/i }).click();
 
   const alert = page.getByRole("alert");
   await expect(alert).toContainText("could not read this library");
   await expect(alert).toContainText("Close Calibre and try again");
+});
+
+test("a Calibre folder is chosen in the browser, with no mount involved", async ({
+  page,
+}) => {
+  // The flow only a real browser can prove: `webkitdirectory` hands the page the
+  // whole tree, and what the client sends is the small part of it (DEC-081).
+  let members: string[] = [];
+  await page.route("**/api/import/calibre/preview", async (route) => {
+    const body = route.request().postData() ?? "";
+    members = [...body.matchAll(/filename="([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "folder-1",
+        fingerprint: "db",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [{ ...record, title: "Mistborn" }],
+      },
+    });
+  });
+
+  await page.goto("/import?tab=calibre");
+  await page
+    .getByLabel("Calibre folder", { exact: true })
+    .setInputFiles(
+      fileURLToPath(new URL("fixtures/Calibre Library", import.meta.url)),
+    );
+
+  // Counted and sized before anything leaves the machine.
+  await expect(
+    page.getByText(/sending metadata\.db and 1 cover/i),
+  ).toBeVisible();
+  // Four left behind: the ebook, the opf, the prefs backup and the trash cover.
+  await expect(
+    page.getByText(/4 other files stay on your machine/i),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: /preview calibre library/i }).click();
+  await expect(
+    page.getByRole("heading", { name: /preview: 1 row/i }),
+  ).toBeVisible();
+
+  // The ebook, the opf, the prefs backup and the trash cover all stayed behind.
+  expect(members).toEqual([
+    "metadata.db",
+    "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg",
+  ]);
 });

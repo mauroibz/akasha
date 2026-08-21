@@ -41,6 +41,10 @@ const importers = [
       empty_state: "Drop goodreads_library_export.csv here, or choose a file.",
       help_url: "https://www.goodreads.com/review/import",
       browsable: false,
+      accepts_files: false,
+      max_bytes: null,
+      max_files: null,
+      alternate: null,
     },
   },
   {
@@ -48,22 +52,48 @@ const importers = [
     label: "Calibre",
     item_type: "book",
     input: {
-      kind: "path",
-      label: "Calibre library path",
-      field: "library_path",
+      kind: "directory",
+      label: "Calibre folder",
+      field: "files",
       accept: null,
-      placeholder: "Library",
-      help: "Akasha opens this library read-only inside the configured Calibre mount.",
+      placeholder: null,
+      help: "Akasha reads the library you choose and copies nothing but metadata and covers.",
       guide: [
-        "Pick the folder that holds metadata.db.",
-        "Calibre is opened read-only and never written to.",
+        "Choose your Calibre library folder — the one that holds metadata.db.",
+        "Only metadata.db and the covers are sent; your ebooks are never uploaded.",
       ],
-      empty_state: "No folders here. Mount your Calibre library and reload.",
+      empty_state: "Choose your Calibre library folder.",
       help_url: "https://manual.calibre-ebook.com/gui.html",
-      browsable: true,
+      browsable: false,
+      accepts_files: true,
+      max_bytes: 256 * 1024 * 1024,
+      max_files: 10000,
+      alternate: {
+        kind: "path",
+        label: "Calibre library path",
+        field: "library_path",
+        accept: null,
+        placeholder: "Library",
+        help: "Or read a library the server can already see.",
+        guide: [],
+        empty_state: "No folders here. Mount your Calibre library and reload.",
+        help_url: null,
+        browsable: true,
+        accepts_files: false,
+        max_bytes: null,
+        max_files: null,
+        alternate: null,
+      },
     },
   },
 ];
+
+/** A File carrying the relative path a directory pick would give it. */
+function pick(path: string, size = 1024): File {
+  const file = new File([new Uint8Array(size)], path.split("/").pop() ?? path);
+  Object.defineProperty(file, "webkitRelativePath", { value: path });
+  return file;
+}
 
 /** Everything the folded screen asks for that a given test does not care about. */
 function stubRegistry(
@@ -99,6 +129,10 @@ describe("ImportPage", () => {
               empty_state: "Drop the StoryGraph export here.",
               help_url: null,
               browsable: false,
+              accepts_files: false,
+              max_bytes: null,
+              max_files: null,
+              alternate: null,
             },
           },
         ]),
@@ -170,7 +204,10 @@ describe("ImportPage", () => {
     });
     renderImportPage();
     await userEvent.click(await screen.findByRole("tab", { name: /calibre/i }));
-    expect(screen.getByText(/read-only/i)).toBeVisible();
+    // The mount is the alternate now, behind a disclosure (DEC-081).
+    await userEvent.click(
+      screen.getByRole("button", { name: /server can already see/i }),
+    );
     await userEvent.type(screen.getByLabelText(/library path/i), "My Books");
     await userEvent.click(
       screen.getByRole("button", { name: /preview calibre/i }),
@@ -557,6 +594,9 @@ describe("ImportPage", () => {
       );
     });
     renderImportPage("/import?tab=calibre");
+    await userEvent.click(
+      await screen.findByRole("button", { name: /server can already see/i }),
+    );
 
     expect(
       await screen.findByRole("button", { name: "Fiction" }),
@@ -596,10 +636,10 @@ describe("ImportPage", () => {
     });
     renderImportPage("/import?tab=calibre");
 
-    await userEvent.type(
-      await screen.findByLabelText(/library path/i),
-      "Locked",
+    await userEvent.click(
+      await screen.findByRole("button", { name: /server can already see/i }),
     );
+    await userEvent.type(screen.getByLabelText(/library path/i), "Locked");
     await userEvent.click(
       screen.getByRole("button", { name: /preview calibre library/i }),
     );
@@ -678,7 +718,83 @@ describe("ImportPage", () => {
     expect(
       screen.queryByRole("heading", { name: /preview: 1 row/i }),
     ).toBeNull();
-    expect(await screen.findByLabelText(/library path/i)).toHaveValue("");
+    expect(await screen.findByLabelText("Calibre folder")).toBeVisible();
+    // And the alternate is collapsed again rather than left open from before.
+    expect(
+      screen.getByRole("button", { name: /server can already see/i }),
+    ).toHaveAttribute("aria-expanded", "false");
+  });
+
+  it("imports a Calibre folder and sends only the database and the covers", async () => {
+    // The point of DEC-081: no mount, no restart, and a 32 MB library becomes a
+    // 2.4 MB upload because the ebooks never leave the machine.
+    let sent: FormData | null = null;
+    stubRegistry((url) => {
+      if (!url.endsWith("calibre/preview")) return undefined;
+      return new Response(
+        JSON.stringify({
+          batch_id: "folder-1",
+          fingerprint: "db",
+          state: "previewed",
+          summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+          records: [],
+        }),
+        { status: 201 },
+      );
+    });
+    const inner = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (init?.body instanceof FormData) sent = init.body;
+      return inner(input, init);
+    });
+    renderImportPage("/import?tab=calibre");
+
+    await userEvent.upload(await screen.findByLabelText("Calibre folder"), [
+      pick("Calibre Library/metadata.db", 416 * 1024),
+      pick("Calibre Library/Sanderson/Mistborn (2)/cover.jpg", 1200),
+      pick("Calibre Library/Sanderson/Mistborn (2)/book.epub", 9_000_000),
+      pick("Calibre Library/.caltrash/b/1/cover.jpg"),
+    ]);
+
+    // Said before anything is sent, because "choose a folder" and "upload your
+    // whole ebook collection" are otherwise indistinguishable.
+    expect(
+      await screen.findByText(/sending metadata\.db and 1 cover/i),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/2 other files stay on your machine/i),
+    ).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    );
+    await screen.findByRole("heading", { name: /preview: 1 row/i });
+
+    const parts = [...(sent as unknown as FormData).getAll("files")] as File[];
+    expect(parts).toHaveLength(2);
+    expect(parts.map((part) => part.name)).toEqual([
+      "metadata.db",
+      "Sanderson/Mistborn (2)/cover.jpg",
+    ]);
+  });
+
+  it("refuses the wrong folder in the browser, before any request", async () => {
+    const calls: string[] = [];
+    stubRegistry((url) => {
+      calls.push(url);
+      return undefined;
+    });
+    renderImportPage("/import?tab=calibre");
+
+    await userEvent.upload(await screen.findByLabelText("Calibre folder"), [
+      pick("Documents/notes.txt"),
+    ]);
+
+    expect(await screen.findByText(/holds no metadata\.db/i)).toBeVisible();
+    expect(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    ).toBeDisabled();
+    expect(calls.some((url) => url.includes("/preview"))).toBe(false);
   });
 
   it("opens on the importer used last", async () => {
@@ -691,6 +807,6 @@ describe("ImportPage", () => {
     );
     renderImportPage();
 
-    expect(await screen.findByLabelText(/library path/i)).toBeVisible();
+    expect(await screen.findByLabelText("Calibre folder")).toBeVisible();
   });
 });
