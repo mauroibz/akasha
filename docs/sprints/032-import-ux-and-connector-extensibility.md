@@ -1,6 +1,6 @@
 # Sprint 032 — Import UX and connector extensibility
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 031
 **Roadmap revision:** 14
 

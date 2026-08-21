@@ -3,6 +3,34 @@ import { expect, test } from "./console";
 import { sampleAnimations } from "./motion";
 import { chooseOption } from "./radix";
 
+// Triage lives on `/import` now (DEC-079), so the screen around it asks the
+// registry which connectors exist. Stubbed here so the folded tab strip is the
+// real one rather than a lone Triage tab.
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/importers", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "goodreads",
+          label: "Goodreads",
+          item_type: "book",
+          input: { kind: "upload", label: "Goodreads CSV", field: "file" },
+        },
+        {
+          id: "calibre",
+          label: "Calibre",
+          item_type: "book",
+          input: {
+            kind: "path",
+            label: "Calibre library path",
+            field: "library_path",
+          },
+        },
+      ],
+    }),
+  );
+});
+
 function makeEntries(count: number) {
   const entries = Array.from({ length: count }, (_, i) => ({
     id: i + 1,
@@ -58,7 +86,7 @@ test("a provisional score is marked and the marker is explained", async ({
       },
     }),
   );
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
 
   const marked = page.locator("[data-entry-id='1'][data-provisional='true']");
@@ -106,7 +134,7 @@ test("triage page renders and bulk-accepts suggested statuses", async ({
     route.fulfill({ json: { affected: 20 } }),
   );
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
   await expect(page.getByText("30 unsorted")).toBeVisible();
 
@@ -142,7 +170,7 @@ test("triage keyboard shortcuts set status on focused row", async ({
     return route.fulfill({ json: { affected: 1 } });
   });
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Focus first row and press "r" for read
@@ -179,7 +207,7 @@ test("triage bulk status update with selection", async ({ page }) => {
     return route.fulfill({ json: { affected: 3 } });
   });
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Select rows 1-3 via checkboxes
@@ -230,7 +258,7 @@ test("triage Ctrl+A selects all matching with server-side exclusions", async ({
     return route.fulfill({ json: { affected: 199 } });
   });
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Ctrl/Cmd+A selects all matching
@@ -279,7 +307,7 @@ test("triage j/k navigation moves focus between rows", async ({ page }) => {
     }),
   );
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Focus first row and press j to move down
@@ -321,7 +349,7 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
     return route.fulfill({ json: { affected: 200 } });
   });
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Ctrl+A to select all, then set status via keyboard
@@ -353,7 +381,7 @@ test("the bulk action bar enters without animating a single row", async ({
       },
     }),
   );
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   const samples = await sampleAnimations(page, async () => {
@@ -398,7 +426,7 @@ test("digits score the focused row and Enter opens it", async ({ page }) => {
     route.fulfill({ json: { ...entries[1], item: entries[1].item } }),
   );
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   await page.locator('[data-entry-id="1"]').focus();
 
@@ -440,7 +468,7 @@ test("triage animates its action bar but not under reduced motion", async ({
     }),
   );
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   const moving = await sampleAnimations(page, async () => {
     await page.locator('[data-entry-id="1"]').click();
@@ -499,7 +527,7 @@ test("triage puts a selection on a shelf in bulk", async ({ page }) => {
     return route.fulfill({ json: { affected: 2 } });
   });
 
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
   await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
@@ -518,4 +546,60 @@ test("triage puts a selection on a shelf in bulk", async ({ page }) => {
       set: { add_shelves: [7] },
     });
   await expect(page.getByText("2 entries updated")).toBeVisible();
+});
+
+test("the retired /triage address still lands on the folded tab", async ({
+  page,
+}) => {
+  // It was a top-level nav item for thirty sprints, so it is in bookmarks and
+  // in history. Folding the screen is not a reason to break those (DEC-079).
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: makeEntries(3),
+        next_cursor: null,
+        total: 3,
+        facets: {
+          status_counts: { unsorted: 3 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+
+  await page.goto("/triage");
+
+  await expect(page).toHaveURL(/\/import\?tab=triage/);
+  await expect(page.getByRole("tab", { name: "Triage" })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
+  await expect(page.getByText("3 unsorted")).toBeVisible();
+});
+
+test("the import screen reaches triage and comes back without leaving", async ({
+  page,
+}) => {
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: makeEntries(2),
+        next_cursor: null,
+        total: 2,
+        facets: {
+          status_counts: { unsorted: 2 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+
+  await page.goto("/import");
+  await expect(page.getByRole("tab", { name: "Goodreads" })).toBeVisible();
+  await page.getByRole("tab", { name: "Triage" }).click();
+  await expect(page.getByText("2 unsorted")).toBeVisible();
+  await page.getByRole("tab", { name: "Calibre" }).click();
+  await expect(page.getByLabel(/calibre library path/i)).toBeVisible();
 });

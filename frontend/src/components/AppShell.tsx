@@ -1,4 +1,4 @@
-import { Bookmark, Inbox, LibraryBig, Plus, Upload } from "lucide-react";
+import { Bookmark, LibraryBig, Plus, Upload } from "lucide-react";
 import { LazyMotion, domAnimation } from "motion/react";
 import { type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -13,10 +13,12 @@ interface NavItem {
   readonly icon: ReactNode;
 }
 
+// Triage is not here on purpose: it is the tail of the import flow, not a
+// destination of its own, and as a top-level item it was a dead page unless an
+// import had just run (DEC-079). It is a tab on `/import`.
 const navItems: readonly NavItem[] = [
   { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
   { to: "/add", label: "Add", icon: <Plus aria-hidden="true" /> },
-  { to: "/triage", label: "Triage", icon: <Inbox aria-hidden="true" /> },
   { to: "/import", label: "Import", icon: <Upload aria-hidden="true" /> },
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
 ];

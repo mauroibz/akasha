@@ -18,13 +18,13 @@ test(
     // The dev server serves each lazy route as its own module request; in a
     // built deployment this is the hashed chunk. Either way the browser is
     // asking for code that does not arrive.
-    await page.route("**/TriagePage.tsx*", (route) => route.abort());
+    await page.route("**/ImportPage.tsx*", (route) => route.abort());
     await page.goto("/");
     await expect(
       page.getByRole("heading", { name: "Seeded book 0003" }),
     ).toBeVisible();
 
-    await page.getByRole("link", { name: "Triage", exact: true }).click();
+    await page.getByRole("link", { name: "Import", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: /went wrong/i }),
     ).toBeVisible();

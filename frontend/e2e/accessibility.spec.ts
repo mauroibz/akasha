@@ -293,7 +293,7 @@ test("the expanded score picker overlay is accessible inside its card", async ({
 test("triage has no serious accessibility violations", async ({ page }) => {
   await stubTriage(page);
   await stubShelves(page);
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
   await expectNoSeriousViolations(page, "triage");
 });
@@ -303,7 +303,7 @@ test("triage with a selection and its action bar has no serious violations", asy
 }) => {
   await stubTriage(page);
   await stubShelves(page);
-  await page.goto("/triage");
+  await page.goto("/import?tab=triage");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
   await page.getByRole("checkbox").nth(1).click();
   await expect(

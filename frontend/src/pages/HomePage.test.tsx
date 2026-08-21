@@ -19,7 +19,7 @@ function renderPage(initialEntry = "/", client = makeClient()) {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
-          <Route path="/triage" element={<h1>Triage</h1>} />
+          <Route path="/import" element={<h1>Import</h1>} />
           <Route path="/add" element={<h1>Add page</h1>} />
         </Routes>
         <Toaster />
@@ -359,7 +359,8 @@ test("Inbox count applies the unsorted filter", async () => {
   await screen.findByText("Rayuela");
   const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
   await user.click(inboxButtons[0]);
-  await screen.findByText("Triage");
+  // Triage is a tab on Import now, not a destination of its own (DEC-079).
+  await screen.findByText("Import");
 });
 
 test("the shelf filter lists every shelf, not only those on loaded pages", async () => {

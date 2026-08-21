@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
@@ -5,7 +6,20 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ImportPage } from "./ImportPage";
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
+
+function renderImportPage(path = "/import") {
+  return render(
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={[path]}>
+        <ImportPage />
+      </MemoryRouter>
+    </QueryClientProvider>,
+  );
+}
 
 const importers = [
   {
@@ -57,11 +71,7 @@ describe("ImportPage", () => {
         ]),
       ),
     );
-    render(
-      <MemoryRouter>
-        <ImportPage />
-      </MemoryRouter>,
-    );
+    renderImportPage();
 
     expect(
       await screen.findByRole("tab", { name: "StoryGraph" }),
@@ -116,11 +126,7 @@ describe("ImportPage", () => {
         }),
       );
     });
-    render(
-      <MemoryRouter>
-        <ImportPage />
-      </MemoryRouter>,
-    );
+    renderImportPage();
     await userEvent.click(await screen.findByRole("tab", { name: /calibre/i }));
     expect(screen.getByText(/read-only/i)).toBeVisible();
     await userEvent.type(screen.getByLabelText(/library path/i), "My Books");
@@ -209,11 +215,7 @@ describe("ImportPage", () => {
         }),
       );
     });
-    render(
-      <MemoryRouter>
-        <ImportPage />
-      </MemoryRouter>,
-    );
+    renderImportPage();
     const file = new File(["csv"], "library.csv", { type: "text/csv" });
     await userEvent.upload(
       await screen.findByLabelText(/goodreads csv/i),
@@ -275,11 +277,7 @@ describe("ImportPage", () => {
           { status: 201 },
         ),
       );
-    render(
-      <MemoryRouter>
-        <ImportPage />
-      </MemoryRouter>,
-    );
+    renderImportPage();
     await userEvent.upload(
       await screen.findByLabelText(/goodreads csv/i),
       new File(["x"], "x.csv", { type: "text/csv" }),
@@ -351,11 +349,7 @@ describe("ImportPage", () => {
               }),
             ),
     );
-    render(
-      <MemoryRouter>
-        <ImportPage />
-      </MemoryRouter>,
-    );
+    renderImportPage();
     await userEvent.upload(
       await screen.findByLabelText(/goodreads csv/i),
       new File(["csv"], "library.csv", { type: "text/csv" }),
@@ -370,7 +364,84 @@ describe("ImportPage", () => {
     expect(result).toHaveTextContent(/7 entries are waiting in triage/i);
     expect(screen.getByRole("link", { name: /triage/i })).toHaveAttribute(
       "href",
-      "/triage",
+      "/import?tab=triage",
     );
+  });
+
+  it("folds triage into the import screen as a tab", async () => {
+    // Triage was a top-level destination that is empty unless an import just
+    // ran, so most visits met a dead page. It is the tail of this flow, and it
+    // lives here now (DEC-079).
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/importers"
+        ? new Response(JSON.stringify(importers))
+        : String(input).startsWith("/api/item-types")
+          ? new Response(JSON.stringify({ item_types: [] }))
+          : String(input).startsWith("/api/shelves")
+            ? new Response(JSON.stringify({ shelves: [] }))
+            : new Response(
+                JSON.stringify({
+                  items: [],
+                  next_cursor: null,
+                  total: 0,
+                  facets: {
+                    status_counts: {},
+                    status_counts_by_type: {},
+                    format_counts: {},
+                  },
+                }),
+              ),
+    );
+    renderImportPage();
+
+    await userEvent.click(await screen.findByRole("tab", { name: /triage/i }));
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /inbox/i }),
+    ).toBeVisible();
+    // One landmark, still: the triage surface brings its own <main> and the
+    // import one is not rendered beside it.
+    expect(screen.getAllByRole("main")).toHaveLength(1);
+  });
+
+  it("opens on the triage tab when the URL asks for it", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/importers"
+        ? new Response(JSON.stringify(importers))
+        : String(input).startsWith("/api/item-types")
+          ? new Response(JSON.stringify({ item_types: [] }))
+          : String(input).startsWith("/api/shelves")
+            ? new Response(JSON.stringify({ shelves: [] }))
+            : new Response(
+                JSON.stringify({
+                  items: [],
+                  next_cursor: null,
+                  total: 0,
+                  facets: {
+                    status_counts: {},
+                    status_counts_by_type: {},
+                    format_counts: {},
+                  },
+                }),
+              ),
+    );
+    renderImportPage("/import?tab=triage");
+
+    expect(
+      await screen.findByRole("heading", { level: 1, name: /inbox/i }),
+    ).toBeVisible();
+    expect(screen.queryByLabelText(/goodreads csv/i)).toBeNull();
+  });
+
+  it("opens on the importer used last", async () => {
+    // The same rule the library tab follows (DEC-062): the default is what you
+    // did last, because a person importing a Calibre library does it more than
+    // once and the wrong default costs a click every time.
+    localStorage.setItem("akasha.import.source", "calibre");
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(JSON.stringify(importers)),
+    );
+    renderImportPage();
+
+    expect(await screen.findByLabelText(/library path/i)).toBeVisible();
   });
 });

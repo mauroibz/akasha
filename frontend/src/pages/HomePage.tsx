@@ -534,7 +534,7 @@ export function HomePage() {
             variant="outline"
             className="rounded-full aria-pressed:border-primary aria-pressed:text-primary"
             aria-pressed={filters.statuses.includes("unsorted")}
-            onClick={() => void navigate("/triage")}
+            onClick={() => void navigate("/import?tab=triage")}
           >
             Inbox {inboxCount}
           </Button>

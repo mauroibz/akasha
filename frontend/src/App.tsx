@@ -1,6 +1,6 @@
 import { lazy, Suspense } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes } from "react-router-dom";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 
 import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
@@ -22,9 +22,6 @@ const ImportPage = lazy(async () => ({
 }));
 const ShelvesPage = lazy(async () => ({
   default: (await import("@/pages/ShelvesPage")).ShelvesPage,
-}));
-const TriagePage = lazy(async () => ({
-  default: (await import("@/pages/TriagePage")).TriagePage,
 }));
 
 /**
@@ -61,7 +58,14 @@ export function App() {
                 <Route path="/books/:entryId" element={<DetailPage />} />
                 <Route path="/import" element={<ImportPage />} />
                 <Route path="/shelves" element={<ShelvesPage />} />
-                <Route path="/triage" element={<TriagePage />} />
+                {/* Triage folded into Import as a tab (DEC-079). The old
+                    address stays live rather than 404ing: it was a top-level
+                    nav item for thirty sprints, so it is in bookmarks and in
+                    the history of anyone who used it. */}
+                <Route
+                  path="/triage"
+                  element={<Navigate to="/import?tab=triage" replace />}
+                />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>

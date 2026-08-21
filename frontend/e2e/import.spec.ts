@@ -127,7 +127,7 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
     "3 entries are waiting in Triage",
   );
   await page.getByRole("link", { name: /open triage/i }).click();
-  await expect(page).toHaveURL(/\/triage/);
+  await expect(page).toHaveURL(/\/import\?tab=triage/);
   await expect(
     page.getByRole("heading", { level: 1, name: /inbox/i }),
   ).toContainText("3 unsorted");

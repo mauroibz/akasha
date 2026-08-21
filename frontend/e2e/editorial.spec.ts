@@ -97,7 +97,7 @@ test("URL-backed filters are reload-stable", async ({ page }) => {
   await expect(page).toHaveURL(/order=asc/);
 });
 
-test("Inbox button navigates to the triage page", async ({ page }) => {
+test("Inbox button opens the triage tab on Import", async ({ page }) => {
   await stubEntry(page);
   await page.goto("/");
   await expect(page.getByText(/Inbox 5/).first()).toBeVisible();
@@ -105,7 +105,7 @@ test("Inbox button navigates to the triage page", async ({ page }) => {
     .getByText(/Inbox 5/)
     .first()
     .click();
-  await expect(page).toHaveURL(/\/triage/);
+  await expect(page).toHaveURL(/\/import\?tab=triage/);
 });
 
 test("detail renders all metadata regions", async ({ page }) => {
@@ -255,17 +255,18 @@ test("unknown route shows a useful 404", async ({ page }) => {
   await expect(page).toHaveURL(/\/(\?type=[a-z]+)?$/);
 });
 
-test("navigation shell exposes all four destinations at desktop width", async ({
+test("navigation shell exposes every destination at desktop width", async ({
   page,
 }) => {
   await stubEntry(page);
   await page.goto("/");
-  // Desktop nav is visible at default width
-  for (const label of ["Library", "Add", "Triage", "Import", "Shelves"]) {
+  // Triage is absent on purpose: it folded into Import as a tab (DEC-079).
+  for (const label of ["Library", "Add", "Import", "Shelves"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();
   }
+  await expect(page.getByRole("link", { name: /^triage$/i })).toHaveCount(0);
   // Navigate to each
   await page
     .getByRole("link", { name: /shelves/i })
