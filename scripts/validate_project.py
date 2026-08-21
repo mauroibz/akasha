@@ -31,8 +31,9 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # every sprint through this one is completed, which is what stops a session from declaring
 # the plan finished early. Move it whenever the roadmap is extended, and record the move in
 # the decision that extends it (DEC-035 moved it to 19, DEC-042 to 26, DEC-052 to 28,
-# DEC-058 to 29, DEC-065 to 30, DEC-071 to 31, DEC-076 revised 31's scope without moving it).
-FINAL_SPRINT = 31
+# DEC-058 to 29, DEC-065 to 30, DEC-071 to 31, DEC-076 revised 31's scope without moving it,
+# DEC-079 to 32).
+FINAL_SPRINT = 32
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

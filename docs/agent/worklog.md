@@ -1842,3 +1842,22 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Blocked/open: none. No tag, push, release, or deployment was requested or performed.
 - Next: none scheduled. The numbered plan is complete; the owner may choose a future epic and a
   new plan, or separately authorize release operations.
+
+
+## 2026-08-21 — Sprint 032 planned (docs-only)
+- Done: owner-directed planning session; no implementation. Read the live importer code
+  (`domain/importers.py`, `application/imports.py`, `api/imports.py`, both book connectors,
+  `ImportPage.tsx`, `TriagePage.tsx`, `AppShell.tsx`, e2e/component fixtures) rather than
+  DEC-076/078's summaries. Wrote `docs/sprints/032-import-ux-and-connector-extensibility.md`
+  from TEMPLATE.md; extended ROADMAP to plan revision 14 (sprint index, tree, closing
+  contract paragraph); state.json -> `ready`/032; FINAL_SPRINT 31 -> 32 in
+  `scripts/validate_project.py`; appended DEC-079; rewrote HANDOFF.
+- Verified: `python scripts/validate_project.py` (pass), `make check` (green). `make test`
+  not run — docs-only session, no application code changed.
+- Deviations: none. AGENTS.md §1 permits documentation-only changes when owner-directed.
+- Blocked/open: the sprint file's risks section carries four implementation-time decisions
+  (`/triage` redirect vs 404 — redirect recommended; browse endpoint returns names only;
+  guide as ordered steps vs markdown — steps recommended; default import tab remembers last
+  source, mirroring DEC-062).
+- Next: claim **Sprint 032** per the normal protocol (state.json + sprint file to
+  `in_progress`, TDD the acceptance criteria in listed order).

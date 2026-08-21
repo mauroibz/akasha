@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 13
+**Plan revision:** 14
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the plan is complete
+**Active sprint:** 032 — Import UX and connector extensibility (planned)
 
 ## Shape of the plan
 
@@ -26,10 +26,11 @@ Post-v1 work branches:
                      └─ 028 The domain contract  [GATED]
                          └─ 029 One search bar
                              └─ 030 Entry depth  [GATED, Phase A only]
-                                 └─ 031 Per-domain imports   ← the plan ends here
+                                 └─ 031 Per-domain imports
+                                └─ 032 Import UX and connector extensibility  ← the plan ends here
 ```
 
-**The plan stops at 031, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
+**The plan stops at 032, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -83,7 +84,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
 | [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
 | [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
-| [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
+│ [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
+| [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | planned |
 
 ## Contracts for planned sprints
 
@@ -513,6 +515,12 @@ way the throwaway game domain proved the domain half.
 Closed 2026-08-21. The importer protocol, generic pipeline and routes, registry-driven import UI,
 domain-aware manual entry, and contributor/user documentation shipped. The project state is
 `complete` per `WORKFLOW.md`'s final-sprint rule; future work begins as a separately scheduled epic.
+
+### [Sprint 032 — Import UX and connector extensibility](032-import-ux-and-connector-extensibility.md)
+
+The last sprint in the plan. Sprint 031 shipped the `Importer` contract and generic routes, but left two owner-visible defects and one architectural gap. Triage is a dead tab unless Import is run first; the Goodreads tab is a bare file input with no guidance on obtaining the CSV; the Calibre tab says only "relative folder only" with no anchor to the filesystem. And the contract has no declarative way for a connector to publish its own help copy, a drag-and-drop affordance, a browsable path picker, or a typed error with a user-actionable message — so the next importer would be a package plus a screen patch, not a package.
+
+The outcome is an import flow that explains itself and a contract that lets a connector guide its own users. Concretely: Triage folded into Import as a tab; Goodreads guidance and drag-and-drop; Calibre guidance and a browsable folder picker rooted at the configured mount; `ImportInputSpec` extended with optional `guide`, `empty_state`, `help_url`; `ImportReadError` extended with `user_message` and `action`; conformance checks so a malformed declaration fails by existing. The existing reader suites are the no-behavior-change net. Documentation follows: README, the domain guide, technical spec §6.5/§7.1, product spec §7.
 
 ## Future epics, after this plan
 

@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 13,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 14,
+  "project_status": "ready",
+  "active_sprint": "032",
+  "active_sprint_file": "docs/sprints/032-import-ux-and-connector-extensibility.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "031",
   "completed_sprints": [
     "001",
