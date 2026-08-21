@@ -35,14 +35,18 @@ export function ConnectorGuide({ importer }: { importer: ImporterDefinition }) {
       )}
       {helpUrl && (
         // The one place this application sends you off the LAN, so it is marked
-        // as leaving and opens beside the import rather than replacing it.
+        // as leaving and opens beside the import rather than replacing it. The
+        // wording follows the kind: Calibre has no export page, it has a manual.
         <a
           className="focus-ring mt-3 inline-block text-sm text-primary"
           href={helpUrl}
           target="_blank"
           rel="noreferrer noopener"
         >
-          Open the {importer.label} export page ↗
+          {kind === "upload"
+            ? `Open the ${importer.label} export page`
+            : `${importer.label} documentation`}{" "}
+          ↗
         </a>
       )}
     </section>

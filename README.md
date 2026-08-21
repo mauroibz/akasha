@@ -60,11 +60,23 @@ in case you need a safe place to store that PDF.
 
 ## Importing and triage
 
-Use **Import** when you already have a book library in Goodreads or Calibre. Every
-import starts with a preview: you can inspect errors and settle ambiguous matches
-before Akasha changes the library. A committed row enters **Triage** as `unsorted`.
-The ordinary library view deliberately hides unsorted entries, so open Triage after
-an import and choose the status that reflects what each book means to you.
+Use **Import** when you already have a book library in Goodreads or Calibre. The
+screen has one tab per connector plus **Triage**, because triage is where an import
+ends rather than a separate destination: it is empty until something lands in it.
+
+Each connector explains itself on its own tab. Goodreads tells you where the export
+lives (`goodreads.com/review/import` → Export Library, desktop web only), that it is
+a snapshot rather than a sync, and what happens to your ratings; drop the CSV on the
+tab or choose it. Calibre lets you **browse the mounted library** instead of typing a
+path — pick the folder that holds `metadata.db` and the screen confirms it found one.
+Typing a relative path still works, for scripts.
+
+Every import starts with a preview: you can inspect errors and settle ambiguous
+matches before Akasha changes anything. A committed row enters Triage as `unsorted`,
+and the ordinary library view deliberately hides unsorted entries, so the Triage tab
+is where an import actually shows up. When a source cannot be read, the connector
+says what to do about it — a locked Calibre database asks you to close Calibre and
+try again.
 
 Re-running a source is useful when that source has changed. The source fingerprint
 makes an unchanged replay harmless. A Calibre re-sync can fill metadata that is still
@@ -72,10 +84,11 @@ empty, but it never overwrites a value you have edited in Akasha; your correctio
 always win. A committed batch can be undone from the completion screen for 24 hours,
 while its audit record remains durable after that window.
 
-Import connectors are domain-owned and registry-driven. Goodreads and Calibre ship
-for books today; contributors can add another connector without changing the shared
-preview, commit, triage, or undo pipeline. See
-[how to add a domain and importer](docs/guides/adding-a-domain.md).
+Import connectors are domain-owned and registry-driven, and a connector publishes its
+own guidance, its own input affordances and its own error vocabulary. Goodreads and
+Calibre ship for books today; contributors can add another connector without changing
+the shared preview, commit, triage or undo pipeline — and without editing this screen.
+See [how to add a domain and importer](docs/guides/adding-a-domain.md).
 
 ## Quick start
 

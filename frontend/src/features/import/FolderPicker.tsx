@@ -96,24 +96,28 @@ export function FolderPicker({
         </p>
       ) : (
         <>
-          {listing.path === selected.trim() && (
-            <p
-              className={
-                listing.importable
-                  ? "border-b border-border px-4 py-2 text-sm text-score-top"
-                  : "border-b border-border px-4 py-2 text-sm text-muted-foreground"
-              }
-            >
-              {listing.importable
-                ? `This folder holds a ${importerLabel} library.`
-                : `No ${importerLabel} library in this folder — open one below.`}
-            </p>
-          )}
-          {listing.directories.length === 0 ? (
-            <p className="px-4 py-5 text-sm text-muted-foreground">
-              {emptyState ?? "Nothing here."}
-            </p>
-          ) : (
+          {/* One sentence, derived once. Two independent ones contradicted each
+              other in the walkthrough: an empty leaf folder said "open one
+              below" directly above "no folders here". */}
+          <p
+            className={
+              listing.importable
+                ? "border-b border-border px-4 py-2 text-sm text-score-top"
+                : "border-b border-border px-4 py-2 text-sm text-muted-foreground"
+            }
+          >
+            {listing.importable
+              ? `This folder holds a ${importerLabel} library.`
+              : listing.directories.length > 0
+                ? `No ${importerLabel} library in this folder — open one below.`
+                : listing.path === ""
+                  ? // The connector's own copy for "your source is not mounted",
+                    // which is only true at the root. Deeper down, an empty
+                    // folder is just an empty folder.
+                    (emptyState ?? `No ${importerLabel} library is mounted.`)
+                  : `Nothing inside this folder, and no ${importerLabel} library here.`}
+          </p>
+          {listing.directories.length > 0 && (
             <ul className="max-h-64 overflow-y-auto p-2">
               {listing.directories.map((name) => (
                 <li key={name}>

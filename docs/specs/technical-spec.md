@@ -301,12 +301,31 @@ Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the
 
 An importer is a domain-owned connector implementing the `Importer` protocol in
 `domain/importers.py`. It declares a permanent `name`, user-facing `label`, target `item_type`, an
-`ImportInputSpec` (`upload` or `path`), and the exact `identity_kinds` it trusts. Its `read` method
-normalizes the source into an `ImportSnapshot`; `stage` archives the source or prepares local
-assets after fingerprint replay has been ruled out; and `match` applies its source-specific
-identity and near-match strategy through the narrow `ImportMatcher` view. Importers live under
-`domains/<item_type>/` and are registered in `IMPORTERS_BY_DOMAIN`; the shared pipeline never
-imports or branches on one.
+`ImportInputSpec` (`upload` or `path`), the exact `identity_kinds` it trusts, and the closed set of
+`error_codes` its reader may raise. Its `read` method normalizes the source into an
+`ImportSnapshot`; `stage` archives the source or prepares local assets after fingerprint replay has
+been ruled out; and `match` applies its source-specific identity and near-match strategy through the
+narrow `ImportMatcher` view. Importers live under `domains/<item_type>/` and are registered in
+`IMPORTERS_BY_DOMAIN`; the shared pipeline never imports or branches on one.
+
+**A connector guides its own users.** `ImportInputSpec` also carries `guide` (ordered steps, plain
+strings — deliberately not markdown, so the screen needs no renderer and a connector cannot ship
+markup into a shared surface), `empty_state`, an https `help_url`, and `browsable`. `ImportReadError`
+carries `user_message` and `action` beside `code`/`message`/`details`: `code` is what the client
+branches on, `message` is what the log keeps, and **`action` is the one imperative sentence a person
+can act on**, which only the connector knows. `declared_read_error` republishes any code outside a
+connector's declaration as `undeclared_import_error`, so an unknown vocabulary never leaves the
+boundary. The conformance suite rejects a malformed guide, a non-https `help_url`, an empty or
+malformed error vocabulary, and `browsable` declared without a `browse` method (DEC-080).
+
+**A `path` connector may be browsed.** Setting `input.browsable` and implementing `BrowsableImporter`
+publishes `GET /api/import/{importer}/browse?path=`, which returns one level of the source as an
+`ImportBrowseResult`: the relative path, its parent, the **names** of immediate subdirectories, and
+whether that folder is itself importable. Names only — an absolute path would publish the
+deployment's filesystem layout to anyone on the LAN. Confinement is resolved by the connector using
+the same code its reader uses (`CalibreAdapter.confine`), so the picker cannot reach anywhere a
+preview could not open: an absolute path, a `..` segment and a symlink out of the mount are all
+refused, the last after resolution.
 
 A `NormalizedImportRecord` has a neutral item (`title`, `subtitle`, `year`, identifiers, opaque
 metadata and optional curated creator sort), a neutral entry (score, notes, date added, the target
@@ -440,6 +459,9 @@ All routes are under `/api`. JSON uses snake_case. Validation errors follow Fast
 {"error":{"code":"stable_machine_code","message":"human readable","details":{}}}
 ```
 
+An import connector may add `user_message` and `action` to that object; both are omitted when it
+did not supply them, so every other refusal keeps exactly the shape above (§6.5, §7.1).
+
 Never expose tracebacks, host filesystem paths, provider keys, or raw SQL.
 
 ### 7.1 Routes
@@ -448,7 +470,7 @@ The product-spec route list is authoritative, with these refinements:
 
 - Define static routes such as `/entries/bulk` before `/entries/{entry_id}`.
 - Bulk mutation accepts either explicit `entry_ids` or a validated server-side filter plus `excluded_entry_ids`; never both. This supports select-all across unloaded virtual rows without sending thousands of IDs. Return affected count and apply in one transaction.
-- `GET /entries` accepts repeated `status`, `shelf`, `format`, `type`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. `type` selects domains and is validated against the registry; unlike `shelf` and `format`, repeating it *widens*, because a row has exactly one type. The response is `{items, next_cursor, total, facets}`. `facets.status_counts` is the whole-library total per status — what the inbox badge counts — `facets.status_counts_by_type` splits the same counts by item type, because a status two domains share is not one number on a screen that lists each domain's statuses separately, and `facets.format_counts` does the same for formats. Each facet clears its own dimension, so a count reads as "what you would get if you clicked this". **`type` is the exception and is not one dimension** (DEC-062): both status facets clear it, so the inbox badge keeps agreeing with the domain-agnostic `/triage` and an unselected tab still has a count to show, while `format_counts` applies it, because that selector sits under the tab.
+- `GET /entries` accepts repeated `status`, `shelf`, `format`, `type`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. `type` selects domains and is validated against the registry; unlike `shelf` and `format`, repeating it *widens*, because a row has exactly one type. The response is `{items, next_cursor, total, facets}`. `facets.status_counts` is the whole-library total per status — what the inbox badge counts — `facets.status_counts_by_type` splits the same counts by item type, because a status two domains share is not one number on a screen that lists each domain's statuses separately, and `facets.format_counts` does the same for formats. Each facet clears its own dimension, so a count reads as "what you would get if you clicked this". **`type` is the exception and is not one dimension** (DEC-062): both status facets clear it, so the inbox badge keeps agreeing with the domain-agnostic triage surface and an unselected tab still has a count to show, while `format_counts` applies it, because that selector sits under the tab.
 - `GET /item-types` publishes each domain's metadata fields, its ordered status vocabulary (value, label, whether it is directly choosable, triage key), its default status, which entry fields it has, its formats, and the heading for the personal region of the detail page. Every screen renders from it rather than branching on the item type (seam 5b).
 - Writes validate `status`, `formats` and the passage fields (`date_started`, `date_finished`, `reread_count`) against **the item's own domain**, returning 422 with a message naming the domain. A bulk write spanning domains is refused whole rather than half-applied.
 - `POST /entries/accept-suggested` returns affected count and operates in one transaction over the server-side filter, not client-loaded IDs.
@@ -480,12 +502,22 @@ The product-spec route list is authoritative, with these refinements:
   somebody is waiting for it.
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
-- `GET /importers` publishes `{id, label, item_type, input}` from the importer registry.
+- `GET /importers` publishes `{id, label, item_type, input}` from the importer registry, where
+  `input` carries the connector's declared `guide`, `empty_state`, `help_url` and `browsable`
+  alongside `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
   `POST /import/{importer}/preview` accepts the declared upload field or path field;
   `POST /import/{importer}/commit` accepts only the durable preview batch ID and ambiguity choices,
   never client-controlled normalized records. Calibre's path is relative to the configured mount;
   preview responses may expose its normalized UUID/book identity and whether a local cover was
   staged, never a source filesystem path.
+- `GET /import/{importer}/browse?path=` exists only for a connector that declares `browsable`; any
+  other importer, and any unknown one, is a 404 `importer_not_browsable`. It is read-only, returns
+  directory names and nothing else, and refuses an absolute path, a `..` segment or a symlink out of
+  the mount with the connector's own 422. See §6.5.
+- **A refused read carries what the reader can do about it.** The error envelope is
+  `{error: {code, message, details}}`, plus `user_message` and `action` **when the connector supplied
+  them** — omitted otherwise, so every other error keeps the shape it has always had. The client
+  prefers `user_message` over `message` for display and renders `action` beside it.
 - Cover files are served from a controlled route or static mount with immutable cache headers; database paths are relative and never accepted from clients.
 - `GET /api/export` streams the whole library rather than buffering it: rows are walked in keyset
   batches of 200 and each is serialized and yielded on its own, so peak memory tracks the batch and
@@ -557,7 +589,7 @@ Cross-cutting behavior:
 - Virtual rows have stable keys and fixed measured sizes. Sort/filter changes crossfade the container; rows do not use layout animations.
 - Both list densities are `role="feed"` with `article` children carrying `aria-posinset`/`aria-setsize` from the server-side total, and the feed sets `aria-busy` while a page is loading. Neither is an ARIA table: they have no column headers and no cells, and claiming otherwise produced a structure screen readers could not navigate (DEC-038).
 - The library grid virtualizes rows of cards, not single entries. The column count is derived from the measured container width so no card falls below its minimum width; a virtual row is one fixed-height band of that many fixed-height cards. Mounted DOM is therefore bounded per row and per card, and both bounds are asserted.
-- **The library virtualizes against the window, not against a scroll container of its own.** The primary surface uses the whole page, so the list element has no height and no overflow, and the virtualizer is given a `scroll margin` for what sits above it. The mounted-DOM bounds are unchanged by this and are re-asserted at 10,000 entries against the window; `/triage` keeps its own fixed-height container, where a dense working table inside a page is the intent.
+- **The library virtualizes against the window, not against a scroll container of its own.** The primary surface uses the whole page, so the list element has no height and no overflow, and the virtualizer is given a `scroll margin` for what sits above it. The mounted-DOM bounds are unchanged by this and are re-asserted at 10,000 entries against the window; triage keeps its own fixed-height container, where a dense working table inside a page is the intent.
 - A library card is a fixed box: fixed-size cover, clamped metadata, and a control row that never wraps. Controls that expand (the compact score picker) render as an overlay anchored inside the card, so expanding a control never changes a card's layout box or paints into a neighbor.
 - Two components are deliberately bespoke rather than library primitives, and must stay that way (DEC-026). The score picker may not become a portalled primitive, because its expanded panel is required to remain geometrically inside its card; portalling to `document.body` breaks that by construction. The library card box may not adopt a primitive carrying its own intrinsic padding, because the card height is pinned for fixed-size virtualization and the column calculation subtracts a matched row padding.
 - Every user action produces visible feedback. Feedback rendered only into a visually hidden element is a defect, not an implementation. The visible surface carries the accessible announcement rather than sitting beside a second, duplicate live region (DEC-028): a confirmation is announced once and seen once.

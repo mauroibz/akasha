@@ -270,8 +270,22 @@ class SteamImporter:
         label="Steam export",
         field="file",
         accept="application/json",
+        # Guidance the shared screen renders without knowing who wrote it.
+        # Ordered steps, not markdown: the screen has no markdown renderer and
+        # a connector has no business shipping markup into it.
+        guide=(
+            "Open steamcommunity.com and request your data export.",
+            "Download the JSON and drop it below. This is a snapshot, not a sync.",
+            "Everything lands in Triage rather than in the library.",
+        ),
+        empty_state="Drop your Steam export here, or choose a file.",
+        help_url="https://help.steampowered.com/",   # https, or leave it out
+        browsable=False,            # `path` connectors may set this; see below
     )
     identity_kinds = frozenset({"steam_app"})
+    # Closed. An undeclared code is republished as `undeclared_import_error`
+    # rather than reaching the client, because no screen has copy for it.
+    error_codes = frozenset({"invalid_steam_export", "unsupported_export_version"})
 
     def read(
         self, source: ImportSource, context: ImportReadContext
@@ -298,9 +312,24 @@ records use only the neutral shapes:
 - `NormalizedImportRecord`: those two halves plus shelves, row errors, opaque source fields and an
   optional cover source.
 
-Raise `ImportReadError(code, message, details)` for an invalid source. Do not return a raw provider
-row or put domain metadata in `source_fields`: the shared service validates `metadata`, entry values,
-status and identity kinds before it calls `match`.
+Raise `ImportReadError(code, message, details)` for an invalid source, with the code drawn from your
+declared `error_codes`. Give it `user_message` and `action` too: `code` is what the client branches
+on and `message` is what the log keeps, but **`action` is the only part a person can act on** — one
+imperative sentence naming the next move ("Close Calibre and try again; it locks the database while
+it is writing"). Only your connector knows that sentence, which is why the shared layer cannot write
+it. Both reach the client in the 422 payload and the screen renders the action beside the message.
+
+Do not return a raw provider row or put domain metadata in `source_fields`: the shared service
+validates `metadata`, entry values, status and identity kinds before it calls `match`.
+
+If your source is a place rather than a file, implement `BrowsableImporter` as well and set
+`input.browsable = True`. `browse(path, context)` returns an `ImportBrowseResult` with the relative
+path, its parent, the **names** of the immediate subdirectories and whether that folder is itself
+importable. Names only: an absolute path publishes the deployment's filesystem layout to anyone on
+the LAN. Resolve confinement with the same code your reader uses, so the picker can never walk
+somewhere a preview could not open — `CalibreAdapter.confine` is the worked example. The screen then
+renders a breadcrumb and a folder list at `GET /api/import/<name>/browse`, and the typed path stays
+available for automation.
 
 `stage` runs only after fingerprint replay has been checked. Copy an uploaded source into
 `directory`, or prepare covers there and return records whose `cover_stage` paths are relative to
@@ -321,15 +350,17 @@ IMPORTERS_BY_DOMAIN = {
 }
 ```
 
-That one entry publishes the tab through `GET /api/importers` and serves preview/commit at
+That one entry publishes the tab — with your guide, your empty state and your help link — through
+`GET /api/importers`, and serves preview/commit at
 `POST /api/import/steam/preview` and `POST /api/import/steam/commit`. The shared service supplies
 durable preview, ambiguity choices, one bounded commit, `unsorted` triage, fingerprint idempotency,
 the 24-hour undo window and enrichment only when the target domain declares it.
 
 Add parser/adapter fixtures for the source itself and a generic route round-trip. Do not edit the
 shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
-will reject a missing protocol member, an unknown target domain, empty identity kinds, or a
-misplaced registration.
+will reject a missing protocol member, an unknown target domain, empty identity kinds, a misplaced
+registration, a malformed guide, a non-https `help_url`, browsing declared without a `browse`
+method, or an empty or shouted error vocabulary.
 
 ### Step 6 — Prove it
 
@@ -388,7 +419,7 @@ writing any of it, stop — you are about to duplicate something:
 | The detail page | your metadata fields in your order, your status vocabulary, your panel heading |
 | Triage | your hotkeys, bulk operations, selection across pages |
 | The add flow | search, add-by-URL, manual entry and the confirm screen rendered from your field spec |
-| Import | registry-driven source tab, preview/commit, validation, triage and undo for a registered importer |
+| Import | registry-driven source tab rendering your declared guidance, preview/commit, validation, the folder picker for a browsable source, triage as a tab, and undo |
 | Shelves | the owner's own tier of organisation, across every domain |
 | Import ledger and undo | 24-hour reversal of anything an import did |
 | Export | entity-shaped JSON carrying `type`, identifiers and your opaque metadata |

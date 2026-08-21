@@ -51,7 +51,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Metadata sources | Open Library + Google Books, manual fallback | Free, keyless (OL) / good Spanish coverage (GB) |
 | Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
-| List rendering | TanStack Virtual + keyset pagination on `/` and `/triage` | Calibre libraries reach thousands of rows |
+| List rendering | TanStack Virtual + keyset pagination on `/` and the triage surface | Calibre libraries reach thousands of rows |
 | Auth | None. LAN-only; internal proxying allowed, no internet-reachable route | Deferred with sharing; see §9 |
 | Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
 
@@ -505,6 +505,7 @@ POST   /api/import/goodreads/preview   → CSV upload, returns dry-run report
 POST   /api/import/goodreads/commit    → {batch_id, options}
 POST   /api/import/calibre/preview     → {library_path}, returns dry-run report
 POST   /api/import/calibre/commit      → {batch_id, options}
+GET    /api/import/calibre/browse      → ?path=, folder names under the mount
 GET    /api/import/jobs/{id}           → progress for background enrichment
 DELETE /api/import/batches/{id}        → undo an import batch
 
@@ -565,10 +566,10 @@ dashboard" looks like.
 
 ### Rendering at scale
 
-A Calibre import can produce several thousand rows, and `/triage` is a dense
+A Calibre import can produce several thousand rows, and triage is a dense
 table of exactly those. Plain React rendering will visibly stutter past ~500.
 
-- **TanStack Virtual** on both `/` and `/triage`. Only visible rows mount.
+- **TanStack Virtual** on both `/` and triage. Only visible rows mount.
 - **TanStack Query with `infiniteQuery`** against the keyset cursor (§6), page
   size 100, prefetch the next page when the user scrolls within 200px of the
   bottom.
@@ -622,7 +623,7 @@ something no provider lists is the only thing that still leaves it.
   registry and present only when the build has more than one. **"All" is not a filter**
   (DEC-065): the choice lives in the URL like every other filter and is remembered between
   visits, and a visit with nothing remembered lands on the first declared domain (DEC-062,
-  amended). The whole-library view is not lost — `/triage` and the export both still span
+  amended). The whole-library view is not lost — triage and the export both still span
   domains, and the unselected tab still carries a live count.
 - **Typing searches your library, over SQL, and reaches no provider** — at any query length,
   for as long as the library has a match. This is the invariant §4.5 buys and it survives
@@ -706,8 +707,12 @@ edit.
   in-browser reading, no reading progress, no device sync (DEC-048).
 - Delete entry
 
-**`/triage` — The inbox.** The screen that makes bulk import viable, and the
-second-most-important in the app after `/`. Everything `unsorted` lives here.
+**Triage — the inbox, a tab on `/import`.** The surface that makes bulk import
+viable, and the second-most-important in the app after `/`. Everything `unsorted`
+lives here. It is **not a top-level destination**: it is empty until an import
+lands rows in it, so as a nav item it was a dead page most of the time (DEC-079).
+It reaches `/import?tab=triage`, the old `/triage` address redirects there, and
+the Inbox button on `/` and the post-commit link both land on it.
 
 Design goal: clear several hundred books in one sitting without it feeling like
 data entry. That means bulk-first, keyboard-first, and never one-book-at-a-time
@@ -744,10 +749,27 @@ unless you choose it.
 
 **`/shelves` — Shelf management.** List, rename, delete, counts.
 
-**`/import` — Import.** Two tabs, Goodreads CSV (file drop) and Calibre
-(library path + "re-sync" button). Both show the dry-run preview before any
-write, with the unmatched/ambiguous rows called out. Progress bar for background
-enrichment. "Undo last import" for 24 hours.
+**`/import` — Import.** One tab per registered connector, plus **Triage** (above).
+The tab lives in the URL and an unnamed one falls back to the connector used
+last, the same rule the library's domain tab follows (DEC-062). A staged source
+and its preview belong to the connector that produced them: moving to another
+connector starts clean, moving through Triage and back does not.
+
+**Each connector explains itself, and the screen renders the declaration rather
+than copy of its own** (DEC-080). Goodreads states where the export lives
+(`goodreads.com/review/import` → Export Library, desktop web only), that it is a
+snapshot rather than a sync, that ratings are doubled and marked provisional, and
+that shelves become tags; its input takes a dropped file as well as a chosen one.
+Calibre states that it is opened read-only, that only empty fields are filled and
+your edits win, and that covers are copied during preview — and it is **browsed
+rather than typed**: a breadcrumb and a folder list rooted at the mounted library,
+which says whether the folder you are standing in holds a library. Typing a
+relative path still works, for automation.
+
+Both show the dry-run preview before any write, with the unmatched/ambiguous rows
+called out. A refused read says what to do about it in the connector's own words
+— a locked Calibre database asks you to close Calibre and try again. Progress bar
+for background enrichment. "Undo last import" for 24 hours.
 
 ### Interaction notes
 

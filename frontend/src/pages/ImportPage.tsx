@@ -120,6 +120,26 @@ export function ImportPage() {
 
   useEffect(() => setError(null), [source]);
 
+  // A staged source, its preview and its undo window belong to the connector
+  // that produced them. Moving to another connector starts clean; moving to
+  // Triage and back does not, because Triage is not a connector — and the undo
+  // window is only reachable from the result panel it would otherwise discard.
+  // The walkthrough found this: after a Goodreads commit, the Calibre tab
+  // showed the Goodreads result and no Calibre form at all.
+  const belongsTo = useRef("");
+  useEffect(() => {
+    if (!source || source === TRIAGE_TAB || belongsTo.current === source)
+      return;
+    belongsTo.current = source;
+    setFile(null);
+    setLibraryPath("");
+    setPreview(null);
+    setResult(null);
+    setUndoResult(null);
+    setChoices({});
+    setConfirmUndo(false);
+  }, [source]);
+
   const selectTab = (value: string) => {
     if (value !== TRIAGE_TAB) {
       try {
@@ -163,12 +183,10 @@ export function ImportPage() {
   if (triageActive)
     return (
       <Tabs value={source} onValueChange={selectTab}>
-        <div className="mx-auto max-w-7xl px-5 pt-7 sm:px-8">
-          <Link className="focus-ring" to="/">
-            ← Library
-          </Link>
-          <div className="mt-4">{tabStrip}</div>
-        </div>
+        {/* No "← Library" here: the triage surface carries its own, and the
+            walkthrough showed the two side by side, announcing one destination
+            twice. */}
+        <div className="mx-auto max-w-7xl px-5 pt-7 sm:px-8">{tabStrip}</div>
         {/* The inbox is the surface it has always been: this renders the
             component, it does not restate it. Its own `<main>` is the only
             landmark on screen, because the import side is not mounted beside

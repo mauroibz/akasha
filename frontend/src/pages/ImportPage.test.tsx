@@ -609,6 +609,78 @@ describe("ImportPage", () => {
     expect(alert).toHaveTextContent(/close calibre and try again/i);
   });
 
+  it("keeps a preview with its connector, and through Triage", async () => {
+    // Found in the walkthrough: after a Goodreads commit, switching to the
+    // Calibre tab showed the Goodreads result and no Calibre form. A staged
+    // source belongs to the connector that produced it — but Triage is not a
+    // connector, so a trip through it must not discard the undo window.
+    stubRegistry((url) => {
+      if (url.includes("/browse"))
+        return new Response(
+          JSON.stringify({
+            path: "",
+            parent: null,
+            directories: ["Fiction"],
+            importable: false,
+          }),
+        );
+      if (url.endsWith("/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "batch-3",
+            fingerprint: "abc",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [],
+          }),
+          { status: 201 },
+        );
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify({ item_types: [] }));
+      if (url.startsWith("/api/shelves"))
+        return new Response(JSON.stringify({ shelves: [] }));
+      if (url.startsWith("/api/entries"))
+        return new Response(
+          JSON.stringify({
+            items: [],
+            next_cursor: null,
+            total: 0,
+            facets: {
+              status_counts: {},
+              status_counts_by_type: {},
+              format_counts: {},
+            },
+          }),
+        );
+      return undefined;
+    });
+    renderImportPage();
+
+    await userEvent.upload(
+      await screen.findByLabelText("Goodreads CSV"),
+      new File(["csv"], "library.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview import/i }),
+    );
+    await screen.findByRole("heading", { name: /preview: 1 row/i });
+
+    // Through Triage and back: the preview survives.
+    await userEvent.click(screen.getByRole("tab", { name: /triage/i }));
+    await screen.findByRole("heading", { level: 1, name: /inbox/i });
+    await userEvent.click(screen.getByRole("tab", { name: /goodreads/i }));
+    expect(
+      await screen.findByRole("heading", { name: /preview: 1 row/i }),
+    ).toBeVisible();
+
+    // Another connector: a clean form, not somebody else's preview.
+    await userEvent.click(screen.getByRole("tab", { name: /calibre/i }));
+    expect(
+      screen.queryByRole("heading", { name: /preview: 1 row/i }),
+    ).toBeNull();
+    expect(await screen.findByLabelText(/library path/i)).toHaveValue("");
+  });
+
   it("opens on the importer used last", async () => {
     // The same rule the library tab follows (DEC-062): the default is what you
     // did last, because a person importing a Calibre library does it more than
