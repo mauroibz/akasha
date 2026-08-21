@@ -39,3 +39,4 @@ calibre/
 
 # Agent scratch files
 .hermes/
+frontend/e2e/scratchpad/

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 17,
-  "project_status": "in_progress",
-  "active_sprint": "035",
-  "active_sprint_file": "docs/sprints/035-ebook-attachments.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "034",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "035",
   "completed_sprints": [
     "001",
     "002",
@@ -40,8 +40,9 @@
     "031",
     "032",
     "033",
-    "034"
+    "034",
+    "035"
   ],
-  "started_at": "2026-08-21T17:40:00-03:00",
-  "updated_at": "2026-08-21T17:40:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-21T17:50:00-03:00"
 }

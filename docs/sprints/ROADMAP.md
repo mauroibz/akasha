@@ -2,7 +2,7 @@
 
 **Plan revision:** 17
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 035 — Ebook attachments on a toggle (planned)
+**Active sprint:** none — the numbered plan is complete through 035
 
 ## Shape of the plan
 
@@ -33,7 +33,7 @@ Post-v1 work branches:
                                          └─ 035 Ebook attachments on a toggle  ← the plan ends here
 ```
 
-**The plan stops at 032, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
+**The numbered plan stops at 035, and that is the point (DEC-058, extended through DEC-083).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -91,13 +91,12 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
 | [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
 | [034](034-incremental-import.md) | Incremental import | 033 | completed |
-| [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | planned |
+| [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | completed |
 
-## Contracts for planned sprints
+## Sprint contracts
 
-These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
-the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 035 have files; 019 through 034 are closed.
+These were the binding outcome boundaries for the post-v1 line. Sprints 019 through 035 all have
+dedicated files and are closed; their individual Outcome sections record delivered reality.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -608,10 +607,14 @@ ledger can tell the two apart, so it gains a sixth entity type and reverses an a
 the row still matches what the import recorded. Wrong in one direction it destroys an owner's file;
 wrong in the other every imported book becomes permanently un-undoable.
 
-**Planned, not started (DEC-083).** The disk cost is stated rather than bounded: 95 MB here, roughly
-3.2 GB for a 600-book library at the measured mean, with backups holding ~1.0 effective copies only
-while `BACKUP_DIR` shares a filesystem with the data directory. No disk budget exists anywhere in
-this repository and this sprint does not invent one.
+**Delivered 2026-08-21 (DEC-083).** The off-by-default toggle attaches one preferred ebook per
+book after commit, one bounded request per file. Planning skips files already present, deleting one
+makes only it return, over-cap files are named and skipped, and the undo ledger distinguishes
+import-created attachments from owner-created or later-edited ones. The owner-library walkthrough
+attached and downloaded 18 epubs (95.4 MB), sent none on an unchanged re-sync, returned one deleted
+file, and removed all attachment rows and blobs on undo. The disk cost remains stated rather than
+bounded: roughly 3.2 GB for 600 books at the measured mean, with backups holding ~1.0 effective
+copies only while `BACKUP_DIR` shares a filesystem with the data directory.
 
 ## Future epics, after this plan
 

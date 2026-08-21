@@ -2094,3 +2094,37 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   shares a filesystem with the data directory) and the honest scope of the value, since
   calibre-web-automated already holds and reads these files.
 - Next: execute Sprint 035 in deliverable order, taking the undo ledger before the toggle.
+
+## 2026-08-21 — Sprint 035 (complete; project complete)
+- Done: delivered the connector-declared bundle/source-file/inventory contract (`11b2d42`), the
+  committed-batch one-file attachment route (`978a2d5`), attachment-aware undo (`102eeb2`), the
+  off-by-default ebook toggle with preferred-file selection, cap reporting, sequential progress and
+  named failures (`c1cf940`), and synchronized canonical docs (`3095239`). The optional real-data
+  Playwright walkthrough now remains locally in ignored `frontend/e2e/scratchpad/`, parameterized
+  by library and isolated-data environment variables, rather than being rebuilt and deleted.
+- Verified: project validator passed; `make format` made no product-code changes; `make check`
+  passed Ruff, Prettier, ESLint, mypy, TypeScript, OpenAPI and project validation; `make test`
+  passed 559 backend and 179 frontend tests; full Playwright at one worker passed 98 with 3 skipped;
+  focused `import.spec.ts` passed all 11; `git diff --check` passed. A sandbox-only TestClient futex
+  deadlock interrupted an earlier run at the export memory case; the same two cases passed in 3.79s
+  and the complete backend suite passed in 59.86s outside that PID/network namespace.
+- Walkthrough: ran the UI at 1440px against `/home/ibz/Calibre Library` and a clean isolated backend
+  data directory, never live `data/`. The toggle began off; when enabled the summary named 18
+  ebooks / 95.4 MB. Commit produced 18 entries, items, attachment rows and blobs, all epubs, and
+  exactly 18 post-commit file requests. Downloaded one file from its detail page. An unchanged
+  re-sync reported 18 held files and made zero ebook requests. Removed one attachment in detail;
+  the next re-sync reported 17 held and requested exactly that one file. Replayed the committed
+  batch, used the UI undo, and confirmed 0 entries, 0 items, 0 attachment rows and 0 attachment
+  blobs by API/SQLite/filesystem. Isolated disk use was 97 MB populated and 2.3 MB after undo.
+- Deviations: no product or architecture deviation from DEC-083. Reusing the ignored walkthrough
+  is a local workflow improvement requested by the owner; only the ignore rule is committed.
+- Observed and left: `_bundle`'s root `metadata.db` refusal remains connector-specific even though
+  member patterns are declared; generalising required files was out of scope. One asynchronous Open
+  Library enrichment attempt raced local-cover installation and logged `provider_unreachable`
+  after undo; covers and attachments were correct. The successful walkthrough needed two selector
+  corrections first: an import-complete regex matched both panel and toast, and an unescaped `(` in
+  a filename made a dynamic regex invalid.
+- Blocked/open: none. No accounts, keys, payments, irreversible choices, tag, push, deployment or
+  release action is needed or was performed.
+- Next: none scheduled. The numbered plan is complete through Sprint 035; future work begins by
+  planning one of the unnumbered roadmap epics or a remediation sprint.

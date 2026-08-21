@@ -1,6 +1,6 @@
 # Sprint 035 — Ebook attachments on a toggle
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 034
 **Roadmap revision:** 17
 
@@ -242,5 +242,59 @@ and after so the disk cost is a number in the worklog rather than an estimate.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-08-21. Calibre's folder import now offers an off-by-default ebook toggle. When it is
+enabled the browser offers one preferred file per book (`epub`, `azw3`, `mobi`, `pdf`, `cbz`,
+`cbr`, `txt`), names preferred files above the published 25 MiB cap, commits the metadata import,
+and then attaches each wanted file in its own bounded request with visible per-file progress and a
+named failure list. An unchanged re-sync offers no ebook bytes, while deleting one attachment makes
+exactly that file wanted again.
+
+The supporting contract is connector-owned rather than Calibre-shaped in shared code: input specs
+declare allowed member patterns, normalized records declare `source_files`, inventory answers the
+filenames already attached for a set of identities in bounded queries, and the importer registry
+publishes `attachment_max_bytes`. The committed-batch file route validates the connector, batch,
+window, member and record before streaming to the content-addressed store. Its attachment effect is
+reversed before the item effect; undo removes a still-matching imported row and unreferenced blob,
+but retains renamed, replaced and hand-attached files and therefore retains their items.
+
+Acceptance evidence:
+
+- AC1–5: backend route/plan/member tests and frontend unit/E2E tests pin the unchanged toggle-off
+  body, one preferred file per book, unchanged re-sync, selective return after delete, and a named
+  over-cap skip while the rest completes.
+- AC6–8: undo and route tests cover row/blob removal, shared blobs, renamed/replaced/hand-attached
+  retention, repeat undo, every refused batch state and path, and no partial row/blob on failure.
+- AC9–11: the inventory statement-count test runs over 1,200 identities; backup/restore still
+  round-trips and hardlinks attachment blobs; reclaim collects abandoned bytes and preserves every
+  referenced blob.
+- AC12: the browser walkthrough used `/home/ibz/Calibre Library` against isolated data. It showed
+  18 ebooks / 95.4 MB before commit, attached 18 epubs to 18 items, downloaded one from its detail
+  page, moved zero ebooks on an unchanged re-sync, moved exactly one after that attachment was
+  deleted, and then undid the import. SQLite and the filesystem finished at 0 entries, 0 items,
+  0 attachment rows and 0 attachment blobs. The isolated data directory measured 97 MB populated
+  and 2.3 MB after undo; the live `data/` directory was not used.
+
+Verification at closure: `python scripts/validate_project.py`; `make format`; `make check` (Ruff,
+Prettier, ESLint, mypy, TypeScript, OpenAPI and project validation); `make test` (559 backend and
+179 frontend tests passed); `npx playwright test --workers=1` (98 passed, 3 skipped, including the
+optional local walkthrough with no paths supplied); the focused import E2E (11 passed); the
+real-library walkthrough (1 passed); and `git diff --check`.
+
+Commits: `11b2d42` (record/member/inventory contract), `978a2d5` (committed-batch file route),
+`102eeb2` (attachment-aware undo), `c1cf940` (toggle, progress and client selection), `3095239`
+(canonical documentation), plus the final closure commit.
+
+Deviations: no product or architecture deviation from DEC-083. The successful owner-library
+walkthrough is retained locally as an environment-parameterized Playwright test under the ignored
+`frontend/e2e/scratchpad/` directory, instead of being deleted after every run.
+
+Observed and left, neither blocking this sprint:
+
+- `_bundle` still has a one-line `metadata.db` presence refusal even though allowed members are now
+  connector-declared. Generalising that required-file concept was not part of DEC-083.
+- One Open Library enrichment attempt raced the imported local-cover work during the walkthrough
+  and later logged `provider_unreachable` after undo. The imported covers and ebook behavior were
+  correct; this is pre-existing asynchronous enrichment behavior, not an attachment failure.
+
+There are no later numbered sprints to reconcile. The future epics in the roadmap inherit the
+connector-owned import contract and need no acceptance-criteria or dependency changes.
