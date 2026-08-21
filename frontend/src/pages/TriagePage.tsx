@@ -14,8 +14,11 @@ import {
   acceptSuggestedStatuses,
   bulkUpdateEntries,
   getLibraryPage,
+  patchEntry,
   type EntryStatus,
   type LibraryFilters,
+  type LibraryEntry,
+  type LibraryPage,
   type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
@@ -151,6 +154,54 @@ export function TriagePage() {
     onError: () => toast.error("Bulk update failed"),
   });
 
+  const rowMutation = useMutation({
+    mutationFn: ({
+      entry,
+      changes,
+    }: {
+      entry: LibraryEntry;
+      changes: Partial<Pick<LibraryEntry, "score" | "status">>;
+    }) => patchEntry(entry.id, changes),
+    onMutate: async ({ entry, changes }) => {
+      const key = ["triage", filters] as const;
+      await queryClient.cancelQueries({ queryKey: key });
+      const snapshot = queryClient.getQueryData(key);
+      queryClient.setQueryData<{ pages: LibraryPage[]; pageParams: unknown[] }>(
+        key,
+        (old) =>
+          old && {
+            ...old,
+            pages: old.pages.map((page) => ({
+              ...page,
+              items: page.items.map((row) =>
+                row.id === entry.id
+                  ? {
+                      ...row,
+                      ...changes,
+                      score_provisional:
+                        changes.score === undefined
+                          ? row.score_provisional
+                          : false,
+                    }
+                  : row,
+              ),
+            })),
+          },
+      );
+      return { key, snapshot };
+    },
+    onError: (_error, _variables, context) => {
+      if (context) queryClient.setQueryData(context.key, context.snapshot);
+      toast.error("Your change could not be saved", {
+        description: "The previous value was restored.",
+      });
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["triage"] });
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+  });
+
   const acceptMutation = useMutation({
     mutationFn: () => acceptSuggestedStatuses({ status: filters.statuses }),
     onSuccess: (affected) => {
@@ -213,7 +264,7 @@ export function TriagePage() {
 
   // Virtualizer
   const parentRef = useRef<HTMLDivElement>(null);
-  const rowHeight = 56;
+  const rowHeight = 64;
   const virtualizer = useVirtualizer({
     count: entries.length,
     getScrollElement: () => parentRef.current,
@@ -674,7 +725,7 @@ export function TriagePage() {
                       )
                         return;
                       setFocusedId(entry.id);
-                      toggleSelect(entry.id, row.index, e.shiftKey);
+                      void navigate(`/books/${entry.id}`);
                     }}
                     onFocus={() => setFocusedId(entry.id)}
                   >
@@ -716,27 +767,80 @@ export function TriagePage() {
                         )}
                       </span>
                     )}
-                    <span
-                      className={cn(
-                        scoreChipShape,
-                        scoreChipClass(entry.score),
-                        "shrink-0 text-xs",
-                        entry.score === null && "px-0",
-                      )}
-                      title={
-                        entry.score_provisional
-                          ? "Provisional score, carried from the import"
-                          : undefined
-                      }
+                    <div
+                      className="flex shrink-0 items-center gap-2"
+                      data-row-controls=""
+                      // Radix options live in a portal but still bubble through
+                      // the React tree. Stop them here as well as ignoring the
+                      // visible trigger in the row click guard.
+                      onClick={(event) => event.stopPropagation()}
                     >
-                      {entry.score ?? "—"}
-                      {entry.score_provisional ? (
-                        <>
-                          <span aria-hidden="true">*</span>
-                          <span className="sr-only"> (provisional)</span>
-                        </>
-                      ) : null}
-                    </span>
+                      <select
+                        value={entry.status}
+                        onChange={(event) =>
+                          rowMutation.mutate({
+                            entry,
+                            changes: {
+                              status: event.target.value as EntryStatus,
+                            },
+                          })
+                        }
+                        aria-label={`Status for ${entry.item.title}`}
+                        className="h-9 w-28 shrink-0 rounded-md border border-input bg-surface-raised px-2 text-xs focus-ring"
+                      >
+                        {statusesFor(entry.item.type, itemTypes.data).map(
+                          (status) => (
+                            <option key={status.value} value={status.value}>
+                              {status.label}
+                            </option>
+                          ),
+                        )}
+                      </select>
+                      <select
+                        value={
+                          entry.score === null ? "none" : String(entry.score)
+                        }
+                        onChange={(event) =>
+                          rowMutation.mutate({
+                            entry,
+                            changes: {
+                              score:
+                                event.target.value === "none"
+                                  ? null
+                                  : Number(event.target.value),
+                            },
+                          })
+                        }
+                        aria-label={`Score for ${entry.item.title}: ${entry.score ?? "unscored"}${
+                          entry.score_provisional ? " (provisional)" : ""
+                        }`}
+                        className={cn(
+                          scoreChipShape,
+                          entry.score === null
+                            ? "bg-surface-raised text-foreground"
+                            : scoreChipClass(entry.score),
+                          "h-9 w-[4.5rem] shrink-0 border border-border text-xs focus-ring",
+                        )}
+                        title={
+                          entry.score_provisional
+                            ? "Provisional score, carried from the import"
+                            : undefined
+                        }
+                      >
+                        <option value="none">—</option>
+                        {Array.from(
+                          { length: 10 },
+                          (_, index) => index + 1,
+                        ).map((score) => (
+                          <option key={score} value={String(score)}>
+                            {score}
+                            {entry.score_provisional && entry.score === score
+                              ? "*"
+                              : ""}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
                     <Button
                       variant="ghost"
                       size="sm"

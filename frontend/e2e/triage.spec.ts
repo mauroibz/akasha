@@ -2,12 +2,14 @@ import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
 import { chooseOption } from "./radix";
-import { stubImporters } from "./seed";
+import { stubImporters, stubItemTypes } from "./seed";
 
 // Triage lives on `/import` now (DEC-079), so the screen around it asks the
 // registry which connectors exist.
 test.beforeEach(async ({ page }) => {
   await stubImporters(page);
+  await stubItemTypes(page);
+  await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
 });
 
 function makeEntries(count: number) {
@@ -72,7 +74,9 @@ test("a provisional score is marked and the marker is explained", async ({
   await expect(marked).toHaveCount(1);
   await expect(marked).toContainText("6*");
   // Screen readers get the word, not the glyph.
-  await expect(marked.getByText("(provisional)")).toHaveCount(1);
+  await expect(
+    marked.getByRole("combobox", { name: /score for book 1/i }),
+  ).toHaveAccessibleName(/provisional/i);
   await expect(
     page.getByText(/converted from an imported rating/i),
   ).toBeVisible();
@@ -85,7 +89,7 @@ test("a provisional score is marked and the marker is explained", async ({
   // ramp, one treatment, whichever screen the eye lands on (DEC-026). Asserted
   // as painted colour rather than as a class name, because the class only
   // matters if Tailwind emitted it.
-  const chip = plain.locator("span", { hasText: /^6$/ }).first();
+  const chip = plain.getByRole("combobox", { name: /score for book 2:/i });
   // Amber, the 4-6 band -- not the lime of 7-8.
   await expect(chip).toHaveCSS("background-color", "rgb(251, 189, 35)");
   await expect(chip).toHaveCSS("color", "rgb(9, 9, 11)");
@@ -162,6 +166,115 @@ test("triage keyboard shortcuts set status on focused row", async ({
       entry_ids: [1],
       set: { status: "read" },
     });
+});
+
+test("row controls edit one entry while only checkboxes select for bulk", async ({
+  page,
+}) => {
+  const entries = makeEntries(3);
+  const writes: unknown[] = [];
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.route("**/api/entries/1", (route) => {
+    const changes = route.request().postDataJSON() as Partial<
+      (typeof entries)[number]
+    >;
+    writes.push(route.request().postDataJSON());
+    return route.fulfill({ json: { ...entries[0], ...changes } });
+  });
+
+  await page.goto("/import?tab=triage");
+  const row = page.locator('[data-entry-id="1"]');
+  await expect(row).toBeVisible();
+
+  await row
+    .getByRole("combobox", { name: /score for book 1: unscored/i })
+    .selectOption("7");
+  await row
+    .getByRole("combobox", { name: "Status for Book 1" })
+    .selectOption("read");
+
+  await expect.poll(() => writes).toEqual([{ score: 7 }, { status: "read" }]);
+  await expect(page.getByRole("toolbar", { name: "Bulk actions" })).toHaveCount(
+    0,
+  );
+
+  await row.getByRole("checkbox", { name: "Select Book 1" }).click();
+  await expect(
+    page.getByRole("toolbar", { name: "Bulk actions" }),
+  ).toBeVisible();
+});
+
+test("a failed row edit restores the previous score once", async ({ page }) => {
+  const entries = makeEntries(2);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.route("**/api/entries/1", (route) =>
+    route.fulfill({ status: 500, json: { detail: "write failed" } }),
+  );
+
+  await page.goto("/import?tab=triage");
+  const score = page
+    .locator('[data-entry-id="1"]')
+    .getByRole("combobox", { name: /score for book 1/i });
+  await score.selectOption("7");
+
+  await expect(
+    page.getByText("Your change could not be saved", { exact: true }),
+  ).toHaveCount(1);
+  await expect(score).toHaveAccessibleName("Score for Book 1: unscored");
+});
+
+test("clicking a triage row opens it instead of selecting it", async ({
+  page,
+}) => {
+  const entries = makeEntries(2);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+
+  await page.goto("/import?tab=triage");
+  await page.getByText("Book 1", { exact: true }).click();
+
+  await expect(page).toHaveURL(/\/books\/1$/);
+  await expect(page.getByRole("toolbar", { name: "Bulk actions" })).toHaveCount(
+    0,
+  );
 });
 
 test("triage bulk status update with selection", async ({ page }) => {
@@ -450,7 +563,7 @@ test("triage animates its action bar but not under reduced motion", async ({
   await page.goto("/import?tab=triage");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   const moving = await sampleAnimations(page, async () => {
-    await page.locator('[data-entry-id="1"]').click();
+    await page.locator('[data-entry-id="1"]').getByRole("checkbox").click();
     await expect(
       page.getByRole("combobox", { name: "Set status for selected" }),
     ).toBeVisible();
@@ -464,7 +577,7 @@ test("triage animates its action bar but not under reduced motion", async ({
   await page.reload();
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   const still = await sampleAnimations(page, async () => {
-    await page.locator('[data-entry-id="1"]').click();
+    await page.locator('[data-entry-id="1"]').getByRole("checkbox").click();
     await expect(
       page.getByRole("combobox", { name: "Set status for selected" }),
     ).toBeVisible();
@@ -550,7 +663,7 @@ test("the retired /triage address still lands on the folded tab", async ({
   await page.goto("/triage");
 
   await expect(page).toHaveURL(/\/import\?tab=triage/);
-  await expect(page.getByRole("tab", { name: "Triage" })).toHaveAttribute(
+  await expect(page.getByRole("tab", { name: /triage/i })).toHaveAttribute(
     "aria-selected",
     "true",
   );
@@ -577,8 +690,9 @@ test("the import screen reaches triage and comes back without leaving", async ({
 
   await page.goto("/import");
   await expect(page.getByRole("tab", { name: "Goodreads" })).toBeVisible();
-  await page.getByRole("tab", { name: "Triage" }).click();
+  await page.getByRole("tab", { name: /triage/i }).click();
   await expect(page.getByText("2 unsorted")).toBeVisible();
+  await page.getByRole("tab", { name: /import/i }).click();
   await page.getByRole("tab", { name: "Calibre" }).click();
   // Calibre leads with the folder chooser; the mount is its alternate (DEC-081).
   await expect(

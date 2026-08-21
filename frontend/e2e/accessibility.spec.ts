@@ -89,7 +89,7 @@ async function stubTriage(page: Page) {
     id: index + 1,
     item_id: index + 1,
     status: "unsorted",
-    score: index % 4 === 0 ? index % 10 : null,
+    score: index % 4 === 0 ? (index % 10) + 1 : null,
     notes: null,
     date_added: "2026-01-01",
     date_started: null,
@@ -292,6 +292,7 @@ test("the expanded score picker overlay is accessible inside its card", async ({
 
 test("triage has no serious accessibility violations", async ({ page }) => {
   await stubImporters(page);
+  await stubItemTypes(page);
   await stubTriage(page);
   await stubShelves(page);
   await page.goto("/import?tab=triage");
@@ -303,6 +304,7 @@ test("triage with a selection and its action bar has no serious violations", asy
   page,
 }) => {
   await stubImporters(page);
+  await stubItemTypes(page);
   await stubTriage(page);
   await stubShelves(page);
   await page.goto("/import?tab=triage");
@@ -420,6 +422,7 @@ test("the cover chooser has no serious accessibility violations", async ({
 });
 
 test("add has no serious accessibility violations", async ({ page }) => {
+  await stubItemTypes(page);
   await stubShelves(page);
   await stubProviderHealth(page);
   await page.goto("/add");
@@ -432,6 +435,7 @@ test("add has no serious accessibility violations", async ({ page }) => {
 test("the add manual form has no serious accessibility violations", async ({
   page,
 }) => {
+  await stubItemTypes(page);
   await stubShelves(page);
   await stubProviderHealth(page);
   // The manual form is the whole of /add now, reached directly.
