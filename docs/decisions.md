@@ -2740,3 +2740,27 @@ Append-only record of material architecture choices, product-default resolutions
   optimization backlog: isolate the two serial Playwright cases so the rest can parallelize, remove
   known Vitest warning noise, build a one-command realistic-data launcher and add bounded phase
   timeouts. Those are future implementation work, not claims about the current suite.
+
+## DEC-085 — Import is a two-step flow; triage is row-local until a checkbox says bulk
+
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Extends:** DEC-079 (Triage folded into Import), DEC-026 (shared row controls), DEC-028
+  (optimistic rollback), and DEC-084 (verification cadence).
+- **Context:** After successfully importing the real library with Sprint 035, the owner found two
+  interaction mismatches. Connector choice and Triage appeared as peers in one tab strip even
+  though they are different levels: choose a connector to import, then triage what arrived. Inside
+  Triage, a row click implicitly selected the entry, so changing one score took three actions —
+  select the row, open the bulk score menu, choose a value — and ordinary reading was forced through
+  a bulk mental model. The existing checkbox already communicates selection and should be the
+  pointer boundary for bulk work.
+- **Decision:** Schedule Sprint 036 (plan revision 18; FINAL_SPRINT 35 → 36). `/import` keeps one
+  route and its existing `?tab=` addresses, but presents a prominent main switch between **1.
+  Import** and **2. Triage**; connector tabs appear only inside the Import step. Triage reuses the
+  shared compact `ScorePicker` and domain-aware `StatusSelect` on each virtual row. Those controls
+  always patch one entry. Row-body clicks open detail. Only checkboxes select by pointer, while
+  Shift ranges, Ctrl/Cmd+A, the bulk toolbar and keyboard-first actions remain supported.
+- **Consequences:** “Bulk-first” no longer means every pointer edit begins by selecting a row; it
+  means the bulk path stays fast once the owner explicitly selects. The fixed-height row becomes
+  denser and must be checked at narrow widths. Status changes naturally remove a row from the
+  unsorted inbox after success; optimistic failure restores the prior row and announces one error.

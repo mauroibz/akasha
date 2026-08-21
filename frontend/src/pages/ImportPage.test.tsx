@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -475,7 +475,27 @@ describe("ImportPage", () => {
     );
     renderImportPage();
 
-    await userEvent.click(await screen.findByRole("tab", { name: /triage/i }));
+    const workflow = await screen.findByRole("tablist", {
+      name: /import workflow/i,
+    });
+    expect(
+      within(workflow).getByRole("tab", { name: /1 import/i }),
+    ).toBeVisible();
+    expect(
+      within(workflow).getByRole("tab", { name: /2 triage/i }),
+    ).toBeVisible();
+    const sources = screen.getByRole("tablist", { name: /import source/i });
+    expect(
+      within(sources).getByRole("tab", { name: /goodreads/i }),
+    ).toBeVisible();
+    expect(
+      within(sources).getByRole("tab", { name: /calibre/i }),
+    ).toBeVisible();
+    expect(within(sources).queryByRole("tab", { name: /triage/i })).toBeNull();
+
+    await userEvent.click(
+      within(workflow).getByRole("tab", { name: /2 triage/i }),
+    );
     expect(
       await screen.findByRole("heading", { level: 1, name: /inbox/i }),
     ).toBeVisible();
@@ -713,6 +733,7 @@ describe("ImportPage", () => {
     // Through Triage and back: the preview survives.
     await userEvent.click(screen.getByRole("tab", { name: /triage/i }));
     await screen.findByRole("heading", { level: 1, name: /inbox/i });
+    await userEvent.click(screen.getByRole("tab", { name: /import/i }));
     await userEvent.click(screen.getByRole("tab", { name: /goodreads/i }));
     expect(
       await screen.findByRole("heading", { name: /preview: 1 row/i }),

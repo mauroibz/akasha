@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 17
+**Plan revision:** 18
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the numbered plan is complete through 035
+**Active sprint:** [036 — Import and triage flow](036-import-triage-flow.md)
 
 ## Shape of the plan
 
@@ -30,10 +30,11 @@ Post-v1 work branches:
                                 └─ 032 Import UX and connector extensibility
                                    └─ 033 Calibre without a mount
                                       └─ 034 Incremental import
-                                         └─ 035 Ebook attachments on a toggle  ← the plan ends here
+                                         └─ 035 Ebook attachments on a toggle
+                                            └─ 036 Import and triage flow  ← active
 ```
 
-**The numbered plan stops at 035, and that is the point (DEC-058, extended through DEC-083).** Sprint 025 asked whether a second domain
+**The numbered plan now stops at 036 (DEC-058, extended through DEC-085).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -92,11 +93,12 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
 | [034](034-incremental-import.md) | Incremental import | 033 | completed |
 | [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | completed |
+| [036](036-import-triage-flow.md) | Import and triage flow | 035 | in_progress |
 
 ## Sprint contracts
 
-These were the binding outcome boundaries for the post-v1 line. Sprints 019 through 035 all have
-dedicated files and are closed; their individual Outcome sections record delivered reality.
+These are the binding outcome boundaries for the post-v1 line. Sprints 019 through 035 are closed;
+Sprint 036 is active. Their individual Outcome sections record delivered reality.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
