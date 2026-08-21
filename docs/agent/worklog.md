@@ -1944,3 +1944,53 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   whether Starlette's multipart handling can stream parts at the granularity AC5 requires, or
   whether the honest answer is a lower declared `max_bytes`.
 - Next: execute **Sprint 033** per the normal protocol.
+
+## 2026-08-21 — Sprint 033 (complete; project complete)
+- Done: claimed and executed 033. Extended `ImportInputSpec` with `kind="directory"`, a one-deep
+  `alternate`, `accepts_files`, and per-input `max_bytes`/`max_files`; `ImportSource` with
+  `directory`. Added the streaming bundle branch to `_source` (validating every client-supplied
+  member path before writing), made `_chosen_input` pick between a connector's two inputs by
+  content type, and taught the browse endpoint to consult the alternate. Calibre now leads with a
+  folder chooser and keeps the mount picker plus typed path as its alternate. Frontend: a pure
+  `bundle.ts` filter, `DirectoryPicker.tsx`, and a controlled disclosure for the alternate.
+  Docs across README, the domain guide, technical spec §6.5/§7.1 and product spec §5.2/§7.
+  Commits: `1f5ad81`, `a0ea09b`, `18105c4`, plus closing.
+- Verified: validator (pass), `make format` (no drift), `make check` (green), `make test`
+  (backend 522, frontend 171), `npx playwright test` (96 passed, 2 skipped), `git diff --check`.
+- Evidence gathered before designing, which changed the design twice:
+  - Nothing syncs Calibre automatically — there is no scheduler in the codebase at all — so the
+    mount buys file access at one instant, and what it really buys is covers.
+  - Only 19% of the NAS library carries an ISBN, so "upload metadata.db alone and let enrichment
+    refill covers" would have left most books blank. That killed the cheap option.
+  - `.caltrash/b/1/cover.jpg` is a deleted book's cover, so the filter cannot be a `cover.jpg`
+    glob; and `webkitRelativePath` prefixes the picked folder's own name, so the leading segment
+    must be stripped. Both found by looking at real files.
+  - Starlette spools a part to disk only past 1 MiB and covers are smaller, so `request.form()`
+    would hold a whole library in memory. `SpooledTemporaryFile(max_size=0)` means *never roll*,
+    not "roll immediately" — 1 is the value that works. Measured after: 60 MiB bundle, 1.8 MiB peak.
+- Walkthrough (both arms, headless at 1440x950, isolated backend and temp data dir, screenshots):
+  - **No mount.** `CALIBRE_DIR` pointed at an empty directory; the alternate correctly said "No
+    Calibre library is mounted." Chose `/home/ibz/Calibre Library` in the browser: 71 files offered,
+    2 sent (metadata.db + 18 covers, 10.0 MB), 52 left behind. Preview 18 ready / 0 errors, all 18
+    covers staged, committed, landed in Triage as 18 unsorted. Re-imported the same folder: the
+    fingerprint returned the same batch rather than a second copy (verified in the DB: one batch,
+    18 items, 18 entries), and undo reverted 36 effects leaving 0 items and 0 entries.
+  - **With a mount.** Restarted against a mount holding the same library: the alternate browsed to
+    `Estantería/Calibre Library`, confirmed it held a library, previewed 18 rows, staged 18 covers.
+  - No console errors or page errors in either arm.
+- Observed and left, none blocking:
+  - The native file input renders "71 files" beside a summary saying 2 will be sent. The summary
+    directly below corrects it, and hiding the input would cost the keyboard and assistive path.
+  - The connector guide sits above both affordances and its first step is written for the folder
+    flow, so it reads slightly off when the reader is using the mount. Steps 2-5 apply to both and
+    the alternate carries its own help line.
+  - A fingerprint replay reports "18 entries added" when it added nothing — pre-existing behavior
+    from the replay returning the prior batch's summary, not a 033 regression. Worth a copy fix if
+    anyone touches that panel.
+  - My first cover check read 7/18 decoded; that was the script measuring before images finished
+    loading. Re-checked properly: 18/18 decode, no failed cover responses.
+- Deviations: four, in the sprint Outcome and DEC-081. The material one is that `ImportSource`
+  carries a bundle directory rather than `Mapping[str, bytes]` — the planned shape contradicted
+  the plan's own memory bound, and the plan text was corrected in place.
+- Blocked/open: none. No tag, push, release or deployment was requested or performed.
+- Next: none scheduled. The numbered plan is complete through 033.

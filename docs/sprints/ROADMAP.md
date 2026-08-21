@@ -2,7 +2,7 @@
 
 **Plan revision:** 15
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 033 — Calibre without a mount (planned)
+**Active sprint:** none — 033 closed on 2026-08-21 and the numbered plan is complete.
 
 ## Shape of the plan
 
@@ -87,13 +87,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
 │ [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
 | [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
-| [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | planned |
+| [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 033 have files; 019 through 032 are closed.
+incorporating actual deviations. Sprints 019 through 033 have files, and every one of them is closed.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -547,6 +547,11 @@ deleted). The uploaded bundle is materialized into a temporary directory and rea
 `CalibreAdapter`, so both paths normalize through identical code and `test_calibre_import.py` remains
 the net.
 
+**Delivered 2026-08-21 (DEC-081).** All of it, plus `accepts_files` and one correction the plan
+needed: `ImportSource` carries a materialized bundle directory rather than a mapping of bytes, which
+the plan's own memory bound ruled out. Measured on the owner's library with the mount empty: 71 files
+offered by the browser, 2 sent, 18 covers staged, 10.0 MB. See the sprint file's Outcome.
+
 ## Future epics, after this plan
 
 Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
@@ -581,9 +586,10 @@ its `action` sentences beside its reader, and the shared screen renders them wit
   it is picked up. **The verdict (DEC-077) answers it:** a track is metadata on the album (the
   `rows` precedent), not a child entity — so a Spotify importer rolls saved tracks up to their
   albums and never touches the entry model. That is precisely the "plug and play with the music
-  system" outcome the boundary exists to make possible. Spotify is an OAuth `upload`-less source
-  rather than a file or a mount, so it is also the first test of whether `ImportInputSpec`'s two
-  kinds are enough — an authorization handshake is neither.
+  system" outcome the boundary exists to make possible. Spotify is an OAuth source rather than a file, a
+  folder or a mount, so it is the first test of whether `ImportInputSpec`'s kinds are enough —
+  `upload | path | directory` are all still things you hand over, and an authorization handshake is
+  none of them.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 
