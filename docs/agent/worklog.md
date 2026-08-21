@@ -1815,3 +1815,30 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: owner answers the gate; then claim **Sprint 031** — file exists
   (`docs/sprints/031-per-domain-imports.md`), status `ready`, state points at it. Closing 031
   sets the project `complete` per WORKFLOW.md's final-sprint rule.
+
+## 2026-08-21 — Sprint 031 (complete; project complete)
+- Done: confirmed Sprint 030's closure was internally consistent before claiming 031. Added the
+  importer protocol and conformance checks; registered Goodreads and Calibre through the book
+  domain; replaced duplicate application paths with one domain-validated pipeline; published the
+  importer registry and rendered import tabs from it; removed book/default-domain assumptions
+  from the repository; made manual entry require and honour its selected domain; documented the
+  importing/triage and connector stories. DEC-078 records the chosen boundary. Commits:
+  `5d908bb`, `a6666c8`, `4877447`, `aeb19f0`, `a9f10f0`.
+- Verified: validator, format/static/type/OpenAPI checks, and diff checks passed. Focused backend
+  import/conformance/jobs: 97 passed; manual-add neighbourhood: 43 passed; frontend Import/Add:
+  16 passed; targeted Playwright import/add flows: 12 passed. The realistic isolated walkthrough
+  passed (1 test): Goodreads and a read-only synthetic Calibre library previewed and committed
+  through the generic routes, one batch was undone, remaining rows were bulk-triaged until the
+  inbox was clear, and the UI added an owned Album with album-specific metadata. The first
+  walkthrough assertion expected a numeric empty count; it was corrected after observing the
+  product's truthful “Inbox is clear” state. A queued Calibre enrichment logged an expected,
+  non-blocking Open Library `provider_unreachable` warning in the isolated environment.
+- Verification deviation authorized by owner: the final combined `make test` was interrupted
+  after collecting 482 backend tests and progressing through `test_export.py`; its frontend stage
+  was not reached. The owner explicitly asked to skip the remainder and wrap up. It is recorded as
+  **not completed**, not green. The sprint's referenced `test_undo.py` does not exist; unchanged
+  undo coverage is distributed across existing suites, principally `test_jobs.py`, which passed
+  in the focused 97-test run.
+- Blocked/open: none. No tag, push, release, or deployment was requested or performed.
+- Next: none scheduled. The numbered plan is complete; the owner may choose a future epic and a
+  new plan, or separately authorize release operations.

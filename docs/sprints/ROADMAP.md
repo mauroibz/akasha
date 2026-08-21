@@ -2,7 +2,7 @@
 
 **Plan revision:** 13
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 031](031-per-domain-imports.md)
+**Active sprint:** none — the plan is complete
 
 ## Shape of the plan
 
@@ -83,7 +83,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
 | [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
 | [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
-| [031](031-per-domain-imports.md) | Per-domain imports | 030 | **in_progress** |
+| [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
 
 ## Contracts for planned sprints
 
@@ -510,7 +510,9 @@ documentation deliverable, and `docs/guides/adding-a-domain.md` gains the import
 story beside the provider steps, so a contributor can build a connector from the guide alone the
 way the throwaway game domain proved the domain half.
 
-When this closes, the project state goes `complete` per `WORKFLOW.md`'s final-sprint rule.
+Closed 2026-08-21. The importer protocol, generic pipeline and routes, registry-driven import UI,
+domain-aware manual entry, and contributor/user documentation shipped. The project state is
+`complete` per `WORKFLOW.md`'s final-sprint rule; future work begins as a separately scheduled epic.
 
 ## Future epics, after this plan
 

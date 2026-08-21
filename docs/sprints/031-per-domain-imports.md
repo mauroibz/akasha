@@ -1,6 +1,6 @@
 # Sprint 031 — Per-domain imports
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 030
 **Roadmap revision:** 13
 
@@ -137,5 +137,35 @@ record what was exercised and observed in the worklog. Add a manual album throug
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-08-21. The shared import layer now depends on an `Importer` protocol declaring
+`name`, `label`, `item_type`, `input`, `identity_kinds`, `read`, `stage`, and `match`. Goodreads
+and Calibre register through the book domain; one neutral service validates their normalized
+metadata and entry values against the target domain and commits through a repository with no book
+key list or default-domain binding. The generic routes are `/api/import/{importer}/preview` and
+`/commit`, with `GET /api/importers` driving the UI. The existing source URLs remain those generic
+URLs instantiated with `goodreads` and `calibre`, so compatibility was preserved.
+
+Manual entry now requires `item_type`, renders the selected domain's declared fields, validates
+them server-side, and creates the selected type; an album was exercised end to end. README and the
+domain guide now explain importing, triage, resync semantics, and connector registration. DEC-078
+records the boundary and payload decision. Commits: `5d908bb` (contract), `a6666c8` (pipeline),
+`4877447` (manual entry), `aeb19f0` (documentation), and `a9f10f0` (isolated browser flows).
+
+Verification evidence: validator, formatting, static checks, OpenAPI drift, and `git diff --check`
+passed. Focused backend import/conformance/job coverage passed (97 tests), the manual-add
+neighbourhood passed (43), frontend Import/Add component coverage passed (16), and the two changed
+Playwright flows passed (12). The realistic-data walkthrough passed: both readers previewed and
+committed through the generic routes, one batch was undone, the remainder was triaged until the
+inbox was clear, and `/add` created an owned Album with album metadata. The isolated walkthrough
+also surfaced an expected non-blocking Open Library `provider_unreachable` warning after Calibre
+queued enrichment. The sprint named `test_undo.py`, but that file does not exist; the unchanged
+undo regression coverage is distributed through `test_jobs.py` and `test_enrichment.py`, with
+`test_jobs.py` included in the green focused run.
+
+The final combined `make test` was **not completed**: its backend run collected 482 tests and was
+interrupted while progressing through `test_export.py`; the frontend portion was not reached. The
+owner explicitly waived that remaining slow run on 2026-08-21 and asked for close-out. This is a
+verification deviation, not a claimed pass; all focused, static, browser, and walkthrough gates
+above were green before closure. No future numbered sprint is affected: the plan ends here, and
+the Games, Series, Spotify, and Steam work remains in unnumbered future epics on top of this
+boundary. No tag, push, or deployment was performed.
