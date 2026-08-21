@@ -202,6 +202,11 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
   expect(
     await row.evaluate((element) => element.scrollWidth <= element.clientWidth),
   ).toBe(true);
+  expect(
+    await page
+      .locator(".triage-scroll")
+      .evaluate((element) => element.getBoundingClientRect().height),
+  ).toBeLessThanOrEqual(entries.length * 64 + 1);
 
   await row
     .getByRole("combobox", { name: /score for book 1: unscored/i })

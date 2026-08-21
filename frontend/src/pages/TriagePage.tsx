@@ -686,7 +686,8 @@ export function TriagePage() {
           {/* Virtualized table */}
           <div
             ref={parentRef}
-            className="triage-scroll mt-4 h-[min(70vh,760px)] overflow-auto rounded-2xl bg-surface/40"
+            className="triage-scroll mt-4 max-h-[min(70vh,760px)] overflow-auto rounded-2xl bg-surface/40"
+            style={{ height: virtualizer.getTotalSize() }}
             // A feed, not a table: these rows carry no column headers and no
             // cells, so `role="table"` promised a structure that was not there
             // and axe reported the missing children as critical (DEC-038).
