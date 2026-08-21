@@ -40,8 +40,55 @@ afterEach(() => vi.restoreAllMocks());
 
 /** The two domains `GET /api/item-types` publishes (DEC-052 seam 3). */
 const itemTypes = [
-  { id: "book", label: "Book", fields: [] },
-  { id: "album", label: "Album", fields: [] },
+  {
+    id: "book",
+    label: "Book",
+    fields: [
+      {
+        name: "creators",
+        label: "Creators",
+        type: "text",
+        multiplicity: "many",
+      },
+      {
+        name: "publisher",
+        label: "Publisher",
+        type: "text",
+        multiplicity: "one",
+      },
+    ],
+    statuses: [
+      { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+      { value: "read", label: "Read", choosable: true, hotkey: "r" },
+    ],
+    default_status: "read",
+    entry_fields: ["date_started", "date_finished", "reread_count"],
+    formats: [],
+    entry_panel_label: "Your reading data",
+    chooses_covers: true,
+  },
+  {
+    id: "album",
+    label: "Album",
+    fields: [
+      {
+        name: "creators",
+        label: "Artists",
+        type: "text",
+        multiplicity: "many",
+      },
+      { name: "label", label: "Label", type: "text", multiplicity: "one" },
+    ],
+    statuses: [
+      { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+      { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+    ],
+    default_status: "owned",
+    entry_fields: [],
+    formats: [],
+    entry_panel_label: "Your copy",
+    chooses_covers: false,
+  },
 ];
 
 function stubApi(onCreate?: () => Response) {
@@ -92,6 +139,43 @@ describe("AddPage", () => {
     await waitFor(() =>
       expect(screen.getByLabelText(/^title$/i)).toHaveFocus(),
     );
+  });
+
+  it("chooses a domain and sends that domain's declared manual fields", async () => {
+    const request = stubApi();
+    renderPage();
+
+    const domain = await screen.findByRole("combobox", { name: /domain/i });
+    await userEvent.click(domain);
+    await userEvent.click(screen.getByRole("option", { name: "Album" }));
+    expect(screen.getByLabelText(/artists, comma separated/i)).toBeVisible();
+    expect(screen.getByLabelText(/^label$/i)).toBeVisible();
+    expect(screen.queryByLabelText(/^publisher$/i)).toBeNull();
+
+    await userEvent.type(screen.getByLabelText(/^title$/i), "Ágætis byrjun");
+    await userEvent.type(
+      screen.getByLabelText(/artists, comma separated/i),
+      "Sigur Rós",
+    );
+    await userEvent.type(screen.getByLabelText(/^label$/i), "FatCat Records");
+    await userEvent.click(
+      screen.getByRole("button", { name: /add to library/i }),
+    );
+
+    const write = request.mock.calls.find(
+      ([, init]) => init?.method === "POST",
+    );
+    expect(JSON.parse(String(write?.[1]?.body))).toMatchObject({
+      manual: {
+        item_type: "album",
+        title: "Ágætis byrjun",
+        metadata: {
+          creators: ["Sigur Rós"],
+          label: "FatCat Records",
+        },
+      },
+      status: "owned",
+    });
   });
 
   it("submits a manual entry once and announces exact duplicates", async () => {
@@ -166,17 +250,17 @@ describe("AddPage", () => {
     expect(screen.getByLabelText(/^year$/i)).toHaveValue(1963);
   });
 
-  it("refuses a malformed ISBN without discarding the rest of the form", async () => {
+  it("refuses an invalid declared number without discarding the rest of the form", async () => {
     stubApi();
     renderPage();
 
     await userEvent.type(await screen.findByLabelText(/^title$/i), "Rayuela");
-    await userEvent.type(screen.getByLabelText(/^isbn$/i), "not-an-isbn");
+    await userEvent.type(screen.getByLabelText(/^year$/i), "10000");
     await userEvent.click(
       screen.getByRole("button", { name: /add to library/i }),
     );
-    expect(await screen.findByRole("alert")).toHaveTextContent(/isbn/i);
+    expect(await screen.findByRole("alert")).toHaveTextContent(/year/i);
     expect(screen.getByLabelText(/^title$/i)).toHaveValue("Rayuela");
-    expect(screen.getByLabelText(/^isbn$/i)).toHaveValue("not-an-isbn");
+    expect(screen.getByLabelText(/^year$/i)).toHaveValue(10000);
   });
 });

@@ -1617,49 +1617,22 @@
       },
       "ManualItemBody": {
         "properties": {
-          "creators": {
-            "items": {
+          "identifiers": {
+            "additionalProperties": {
               "type": "string"
             },
-            "maxItems": 50,
-            "title": "Creators",
-            "type": "array"
+            "maxProperties": 20,
+            "title": "Identifiers",
+            "type": "object"
           },
-          "isbn": {
-            "anyOf": [
-              {
-                "maxLength": 40,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Isbn"
+          "item_type": {
+            "$ref": "#/components/schemas/ItemTypeName"
           },
-          "language": {
-            "anyOf": [
-              {
-                "maxLength": 20,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Language"
-          },
-          "publisher": {
-            "anyOf": [
-              {
-                "maxLength": 300,
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Publisher"
+          "metadata": {
+            "additionalProperties": true,
+            "maxProperties": 100,
+            "title": "Metadata",
+            "type": "object"
           },
           "subtitle": {
             "anyOf": [
@@ -1694,6 +1667,7 @@
           }
         },
         "required": [
+          "item_type",
           "title"
         ],
         "title": "ManualItemBody",

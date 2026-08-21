@@ -5,6 +5,14 @@ import { toast } from "sonner";
 import type { ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { AddForm } from "@/features/add/AddForm";
 import { domainsFrom, labelFor } from "@/features/library/labels";
 
@@ -17,26 +25,25 @@ import { domainsFrom, labelFor } from "@/features/library/labels";
  * compromise that it stayed a route: moving the form inline as well is a second
  * sprint's worth of work, and lazy-loading means keeping it costs nothing.
  *
- * **It has no domain chooser, and that is not an omission.** `LibraryService.add`
- * types a manual item as `DEFAULT_DOMAIN.item_type` regardless of what the client
- * sends (DEC-067 row 6). The old screen offered the choice anyway, which meant
- * picking Records here showed a record's statuses and fields and then wrote a book.
- * Until the manual path can honour a domain, naming one would be a promise this
- * screen cannot keep, so it names the one it actually makes.
+ * The domain chooser is authoritative: it changes both the fields rendered from the
+ * registry and the domain named in the write. The server validates the same field
+ * declaration before storing anything (DEC-067 row 6).
  */
 export function AddPage() {
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
+  const [itemType, setItemType] = useState("");
   const navigate = useNavigate();
 
   useEffect(() => {
     void getItemTypes()
-      .then((types) => setItemTypes(domainsFrom(types)))
+      .then((types) => {
+        const domains = domainsFrom(types);
+        setItemTypes(domains);
+        setItemType((current) => current || domains[0]?.id || "");
+      })
       .catch(() => undefined);
   }, []);
 
-  // The registry publishes its domains in the order the backend declares them, and
-  // the backend's default is the first of those. One place, one assumption, named.
-  const itemType = itemTypes[0]?.id ?? "";
   const label = labelFor(itemType, itemTypes);
 
   return (
@@ -49,30 +56,54 @@ export function AddPage() {
         For something no provider lists. To add from a provider, search from the
         library.
       </p>
-      <div className="mt-8">
-        <AddForm
-          itemType={itemType}
-          itemTypes={itemTypes}
-          candidate={null}
-          manual
-          onAdded={(entryId, alreadyExists) => {
-            if (alreadyExists) {
-              toast("Already in your library", {
-                description: "Opened the entry you already have.",
-              });
-              navigate(`/books/${entryId}`);
-              return;
-            }
-            toast.success(`${label} added`);
-            // The destination highlights the new row. This travels as router
-            // state rather than sessionStorage so a reload does not resurrect a
-            // stale highlight, and so the handoff is visible in the navigation
-            // itself.
-            navigate("/", { state: { newEntryId: entryId } });
-          }}
-          onOpenExisting={(entryId) => navigate(`/books/${entryId}`)}
-        />
-      </div>
+      {itemTypes.length > 0 && (
+        <div className="mt-7 max-w-xs">
+          <Label htmlFor="manual-domain">Domain</Label>
+          <Select value={itemType} onValueChange={setItemType}>
+            <SelectTrigger
+              id="manual-domain"
+              aria-label="Domain"
+              className="mt-1 h-11"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {itemTypes.map((type) => (
+                <SelectItem key={type.id} value={type.id}>
+                  {type.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+      {itemType && (
+        <div className="mt-8">
+          <AddForm
+            key={itemType}
+            itemType={itemType}
+            itemTypes={itemTypes}
+            candidate={null}
+            manual
+            onAdded={(entryId, alreadyExists) => {
+              if (alreadyExists) {
+                toast("Already in your library", {
+                  description: "Opened the entry you already have.",
+                });
+                navigate(`/books/${entryId}`);
+                return;
+              }
+              toast.success(`${label} added`);
+              // The destination highlights the new row. This travels as router
+              // state rather than sessionStorage so a reload does not resurrect a
+              // stale highlight, and so the handoff is visible in the navigation
+              // itself.
+              navigate("/", { state: { newEntryId: entryId } });
+            }}
+            onOpenExisting={(entryId) => navigate(`/books/${entryId}`)}
+          />
+        </div>
+      )}
     </main>
   );
 }

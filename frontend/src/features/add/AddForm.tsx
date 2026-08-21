@@ -23,10 +23,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { CandidateFacts } from "@/features/add/CandidateFacts";
 import { Field } from "@/features/detail/Field";
 import {
-  manualBookSchema,
+  metadataSchema,
   optionalInt,
-  splitList,
-  type ManualBookValues,
+  toMetadataPatch,
+  type MetadataValues,
 } from "@/features/detail/schemas";
 import { FormatPicker } from "@/features/library/FormatPicker";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
@@ -93,6 +93,11 @@ export function AddForm(props: AddFormProps) {
   const has = (field: "date_started" | "date_finished" | "reread_count") =>
     hasEntryField(itemType, itemTypes, field);
   const domainFormats = formatsFor(itemType, itemTypes);
+  const manualFields =
+    itemTypes.find((type) => type.id === itemType)?.fields ?? [];
+  const editableManualFields = manualFields.filter(
+    (field) => field.type !== "rows",
+  );
 
   useEffect(() => {
     void getShelves()
@@ -118,17 +123,25 @@ export function AddForm(props: AddFormProps) {
     if (near.length) nearRef.current?.focus();
   }, [near]);
 
-  async function submit(values: ManualBookValues, confirmed = false) {
+  async function submit(values: MetadataValues, confirmed = false) {
     if (near.length && !confirmed) return;
     setPending(true);
     setError("");
+    const metadata = Object.fromEntries(
+      Object.entries(toMetadataPatch(values, manualFields)).filter(
+        ([, value]) =>
+          value !== null &&
+          value !== "" &&
+          (!Array.isArray(value) || value.length > 0),
+      ),
+    );
     const item: ManualItem | undefined = manual
       ? {
+          item_type: itemType,
           title: values.title.trim(),
           subtitle: values.subtitle || undefined,
-          creators: splitList(values.creators),
           year: optionalInt(values.year) ?? undefined,
-          isbn: values.isbn || undefined,
+          metadata,
         }
       : undefined;
     try {
@@ -180,14 +193,14 @@ export function AddForm(props: AddFormProps) {
     }
   }
 
-  const form = useForm<ManualBookValues>({
-    resolver: zodResolver(manualBookSchema),
+  const form = useForm<MetadataValues>({
+    resolver: zodResolver(metadataSchema(manualFields)),
     defaultValues: {
       title: "",
-      creators: "",
       subtitle: "",
       year: "",
-      isbn: "",
+      creator_sort_override: "",
+      ...Object.fromEntries(manualFields.map((field) => [field.name, ""])),
     },
   });
   const errors = form.formState.errors;
@@ -228,19 +241,6 @@ export function AddForm(props: AddFormProps) {
             )}
           </Field>
           <Field
-            id="manual-creators"
-            label="Creators, comma separated"
-            error={errors.creators?.message}
-          >
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                className="h-11"
-                {...form.register("creators")}
-              />
-            )}
-          </Field>
-          <Field
             id="manual-subtitle"
             label="Subtitle"
             error={errors.subtitle?.message}
@@ -263,15 +263,37 @@ export function AddForm(props: AddFormProps) {
               />
             )}
           </Field>
-          <Field id="manual-isbn" label="ISBN" error={errors.isbn?.message}>
-            {(fieldProps) => (
-              <Input
-                {...fieldProps}
-                className="h-11"
-                {...form.register("isbn")}
-              />
-            )}
-          </Field>
+          {editableManualFields.map((field) => (
+            <Field
+              key={field.name}
+              id={`manual-${field.name}`}
+              label={
+                field.multiplicity === "many"
+                  ? `${field.label}, comma separated`
+                  : field.label
+              }
+              error={errors[field.name]?.message}
+            >
+              {(fieldProps) =>
+                field.type === "long_text" ? (
+                  <Textarea {...fieldProps} {...form.register(field.name)} />
+                ) : (
+                  <Input
+                    {...fieldProps}
+                    className="h-11"
+                    {...(field.type === "number"
+                      ? {
+                          type: "number",
+                          min: field.minimum ?? undefined,
+                          max: field.maximum ?? undefined,
+                        }
+                      : {})}
+                    {...form.register(field.name)}
+                  />
+                )
+              }
+            </Field>
+          ))}
         </div>
       ) : (
         // The card the reader just clicked, carried to the top of the

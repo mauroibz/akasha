@@ -132,19 +132,3 @@ export function splitList(value: string): string[] {
 export function optionalInt(value: string): number | null {
   return value.trim() === "" ? null : Number(value);
 }
-
-/** The manual-entry form on /add: the same rules as the metadata dialog. */
-export const manualBookSchema = z.object({
-  title: z.string().trim().min(1, "A title is required"),
-  creators: z.string(),
-  subtitle: z.string(),
-  year: optionalNumber("Use a year between 0 and 9999", 0, 9999),
-  isbn: z
-    .string()
-    .trim()
-    .refine((value) => value === "" || /^[0-9Xx-]{10,17}$/.test(value), {
-      message: "An ISBN is 10 or 13 digits",
-    }),
-});
-
-export type ManualBookValues = z.infer<typeof manualBookSchema>;

@@ -28,7 +28,8 @@ def anyio_backend() -> str:
 
 async def make_item(client: httpx.AsyncClient, title: str = "Rayuela") -> int:
     created = await client.post(
-        "/api/entries", json={"manual": {"title": title}, "idempotency_key": title}
+        "/api/entries",
+        json={"manual": {"item_type": "book", "title": title}, "idempotency_key": title},
     )
     assert created.status_code in {200, 201}, created.text
     return int(created.json()["entry"]["item_id"])

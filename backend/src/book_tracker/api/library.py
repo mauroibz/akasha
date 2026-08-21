@@ -188,13 +188,12 @@ class SourceRefBody(BaseModel):
 
 
 class ManualItemBody(BaseModel):
+    item_type: ItemTypeName
     title: str = Field(min_length=1, max_length=500)
     subtitle: str | None = Field(default=None, max_length=500)
-    creators: list[str] = Field(default_factory=list, max_length=50)
     year: int | None = Field(default=None, ge=0, le=9999)
-    publisher: str | None = Field(default=None, max_length=300)
-    language: str | None = Field(default=None, max_length=20)
-    isbn: str | None = Field(default=None, max_length=40)
+    metadata: dict[str, Any] = Field(default_factory=dict, max_length=100)
+    identifiers: dict[str, str] = Field(default_factory=dict, max_length=20)
 
 
 class EntryCreateBody(BaseModel):
@@ -225,8 +224,8 @@ class EntryCreateBody(BaseModel):
             raise ValueError("source and source_id must be provided together")
         if (self.manual is None) == (not provider_selected):
             raise ValueError("provide exactly one of manual or provider source")
-        if self.manual is not None and not (self.idempotency_key or self.manual.isbn):
-            raise ValueError("manual add requires idempotency_key or ISBN")
+        if self.manual is not None and not (self.idempotency_key or self.manual.identifiers):
+            raise ValueError("manual add requires idempotency_key or an identifier")
         return self
 
 

@@ -45,13 +45,12 @@ export async function previewCandidate(
 }
 
 export interface ManualItem {
+  item_type: string;
   title: string;
   subtitle?: string;
-  creators: string[];
   year?: number;
-  publisher?: string;
-  language?: string;
-  isbn?: string;
+  metadata: Record<string, unknown>;
+  identifiers?: Record<string, string>;
 }
 export interface CreateEntryResponse {
   entry: LibraryEntry;

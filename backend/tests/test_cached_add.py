@@ -123,10 +123,11 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
     ):
         body = {
             "manual": {
+                "item_type": "book",
                 "title": "Rayuela",
-                "creators": ["Julio Cortázar"],
                 "year": 1999,
-                "isbn": "978-84-376-0457-2",
+                "metadata": {"creators": ["Julio Cortázar"]},
+                "identifiers": {"isbn": "978-84-376-0457-2"},
             },
             "status": "read",
             "score": 9,
@@ -138,10 +139,11 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
             "/api/entries",
             json={
                 "manual": {
+                    "item_type": "book",
                     "title": "Rayuela",
-                    "creators": ["Julio Cortázar"],
                     "year": 2005,
-                    "isbn": "9780307474728",
+                    "metadata": {"creators": ["Julio Cortázar"]},
+                    "identifiers": {"isbn": "9780307474728"},
                 },
                 "status": "to_read",
                 "idempotency_key": "manual-rayuela-2",
@@ -151,10 +153,11 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
             "/api/entries",
             json={
                 "manual": {
+                    "item_type": "book",
                     "title": "Rayuela",
-                    "creators": ["Julio Cortázar"],
                     "year": 2005,
-                    "isbn": "9780307474728",
+                    "metadata": {"creators": ["Julio Cortázar"]},
+                    "identifiers": {"isbn": "9780307474728"},
                 },
                 "status": "to_read",
                 "idempotency_key": "manual-rayuela-2",
@@ -172,6 +175,69 @@ async def test_manual_add_is_cached_and_idempotent_and_near_editions_only_warn(
     assert near.json()["error"]["details"]["entry_ids"] == [created.json()["entry"]["id"]]
     assert confirmed.status_code == 201
     assert confirmed.json()["near_matches"] == [created.json()["entry"]["id"]]
+
+
+@pytest.mark.anyio
+async def test_manual_add_uses_and_validates_the_named_domain(tmp_path: Path) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        created = await client.post(
+            "/api/entries",
+            json={
+                "manual": {
+                    "item_type": "album",
+                    "title": "Ágætis byrjun",
+                    "year": 1999,
+                    "metadata": {
+                        "creators": ["Sigur Rós"],
+                        "label": "FatCat Records",
+                    },
+                },
+                "idempotency_key": "manual-album-1",
+            },
+        )
+        refused = await client.post(
+            "/api/entries",
+            json={
+                "manual": {
+                    "item_type": "album",
+                    "title": "Wrong shape",
+                    "metadata": {"publisher": "A book field"},
+                },
+                "idempotency_key": "manual-album-2",
+            },
+        )
+
+    assert created.status_code == 201
+    assert created.json()["entry"]["item"]["type"] == "album"
+    assert created.json()["entry"]["item"]["metadata"] == {
+        "creators": ["Sigur Rós"],
+        "label": "FatCat Records",
+    }
+    assert created.json()["entry"]["status"] == "owned"
+    assert refused.status_code == 422
+    assert refused.json()["error"]["code"] == "invalid_metadata"
+
+
+@pytest.mark.anyio
+async def test_manual_add_without_a_domain_is_refused(tmp_path: Path) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post(
+            "/api/entries",
+            json={
+                "manual": {"title": "Typeless"},
+                "idempotency_key": "manual-no-domain",
+            },
+        )
+
+    assert response.status_code == 422
 
 
 @pytest.mark.anyio
@@ -210,7 +276,11 @@ async def test_concurrent_double_submit_is_idempotent(tmp_path: Path) -> None:
                 response = await client.post(
                     "/api/entries",
                     json={
-                        "manual": {"title": "Concurrent", "creators": ["Ada"]},
+                        "manual": {
+                            "item_type": "book",
+                            "title": "Concurrent",
+                            "metadata": {"creators": ["Ada"]},
+                        },
                         "status": "read",
                         "idempotency_key": "same-request",
                     },
@@ -256,7 +326,11 @@ async def test_provider_wait_does_not_hold_sqlite_write_lock(tmp_path: Path) -> 
                 manual = await client.post(
                     "/api/entries",
                     json={
-                        "manual": {"title": "No lock", "creators": ["Ada"]},
+                        "manual": {
+                            "item_type": "book",
+                            "title": "No lock",
+                            "metadata": {"creators": ["Ada"]},
+                        },
                         "status": "read",
                         "idempotency_key": "no-lock",
                     },

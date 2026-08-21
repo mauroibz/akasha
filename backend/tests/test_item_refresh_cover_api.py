@@ -57,7 +57,11 @@ async def test_typed_partial_metadata_patch_migrates_legacy_publisher_and_clears
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
         created = await client.post(
-            "/api/entries", json={"manual": {"title": "Legacy"}, "idempotency_key": "legacy"}
+            "/api/entries",
+            json={
+                "manual": {"item_type": "book", "title": "Legacy"},
+                "idempotency_key": "legacy",
+            },
         )
         item_id = created.json()["entry"]["item_id"]
         with app.state.engine.begin() as connection:
@@ -96,7 +100,10 @@ async def test_cover_replacement_is_bounded_and_preserves_previous_on_failure(
     ):
         created = await client.post(
             "/api/entries",
-            json={"manual": {"title": "Rayuela"}, "idempotency_key": "cover-item"},
+            json={
+                "manual": {"item_type": "book", "title": "Rayuela"},
+                "idempotency_key": "cover-item",
+            },
         )
         item_id = created.json()["entry"]["item_id"]
         good = await client.post(

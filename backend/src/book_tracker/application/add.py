@@ -9,13 +9,15 @@ from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
-from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
+from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import (
     InvalidEntryField,
     InvalidFormat,
+    InvalidMetadata,
     InvalidStatus,
     validate_entry_fields,
     validate_formats,
+    validate_metadata_patch,
     validate_status,
 )
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
@@ -122,24 +124,14 @@ class AddService:
         formats: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         creator_sort: str | None = None
-        # Manual entry is a book form; a provider add is whatever domain that provider
-        # serves. Either way the type comes from the registry or the adapter, never
-        # from a literal at the call site.
-        item_type = DEFAULT_DOMAIN.item_type
         if manual is not None:
+            item_type = str(manual["item_type"])
             cover_url = None
             cover_fallback_urls: Sequence[str] = ()
             title = str(manual["title"]).strip()
-            creators = tuple(
-                str(value).strip() for value in manual.get("creators", []) if str(value).strip()
-            )
-            metadata = {
-                "creators": list(creators),
-                **{key: manual[key] for key in ("publisher", "language") if manual.get(key)},
-            }
-            identifiers = self._identifiers(
-                {"isbn": str(manual["isbn"])} if manual.get("isbn") else {}
-            )
+            metadata = dict(manual.get("metadata", {}))
+            creators: Sequence[str] = ()
+            identifiers = self._identifiers(manual.get("identifiers", {}))
             sources = [SourceIdentity("manual", idempotency_key, True)] if idempotency_key else []
             subtitle = str(manual["subtitle"]) if manual.get("subtitle") else None
             year = int(manual["year"]) if manual.get("year") is not None else None
@@ -147,7 +139,12 @@ class AddService:
             assert source is not None and source_id is not None
             payload = await self._provider_payload(source, source_id, supplied_refs)
             provider = self.providers.get(source)
-            item_type = getattr(provider, "item_type", item_type)
+            provider_item_type = getattr(provider, "item_type", None)
+            if not isinstance(provider_item_type, str):
+                raise LibraryError(
+                    "unknown_item_type", "Provider has no registered domain", status_code=422
+                )
+            item_type = provider_item_type
             cover_url = payload.cover_url
             cover_fallback_urls = payload.cover_fallback_urls
             title = payload.title
@@ -163,26 +160,18 @@ class AddService:
                 SourceIdentity(ref.source, ref.source_id, ref.source == payload.source)
                 for ref in payload.source_refs
             ]
-        prepared_cover: Path | None = None
-        cover_urls = ([cover_url] if cover_url else []) + list(cover_fallback_urls)
-        if self.cover_client is not None and self.data_dir is not None:
-            for candidate_url in cover_urls:
-                try:
-                    prepared_cover = await prepare_cover(
-                        self.cover_client, candidate_url, self.data_dir
-                    )
-                    break
-                except CoverError:
-                    prepared_cover = None
-        near_matches = self.repository.near_entry_ids(title, creators[0] if creators else "")
-        exact = self.repository.match(identifiers=identifiers, sources=sources)
-        if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
+        domain = DOMAINS.get(item_type)
+        if domain is None:
             raise LibraryError(
-                "near_match_confirmation_required",
-                "A similar edition is already in your library",
-                details={"entry_ids": near_matches},
+                "unknown_item_type", f"No domain named {item_type!r}", status_code=422
             )
-        domain = DOMAINS.get(item_type, DEFAULT_DOMAIN)
+        try:
+            metadata = validate_metadata_patch(domain, metadata)
+        except InvalidMetadata as error:
+            raise LibraryError("invalid_metadata", str(error), status_code=422) from error
+        if manual is not None:
+            creator_values = metadata.get("creators", [])
+            creators = tuple(creator_values) if isinstance(creator_values, list) else ()
         if status is None:
             status = domain.default_status
         else:
@@ -200,6 +189,25 @@ class AddService:
             checked_formats = validate_formats(domain, formats or ())
         except InvalidFormat as error:
             raise LibraryError("invalid_format", str(error), status_code=422) from error
+        near_matches = self.repository.near_entry_ids(title, creators[0] if creators else "")
+        exact = self.repository.match(identifiers=identifiers, sources=sources)
+        if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
+            raise LibraryError(
+                "near_match_confirmation_required",
+                "A similar edition is already in your library",
+                details={"entry_ids": near_matches},
+            )
+        prepared_cover: Path | None = None
+        cover_urls = ([cover_url] if cover_url else []) + list(cover_fallback_urls)
+        if self.cover_client is not None and self.data_dir is not None:
+            for candidate_url in cover_urls:
+                try:
+                    prepared_cover = await prepare_cover(
+                        self.cover_client, candidate_url, self.data_dir
+                    )
+                    break
+                except CoverError:
+                    prepared_cover = None
         try:
             result = self.repository.create_cached_entry(
                 title=title,
