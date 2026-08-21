@@ -45,9 +45,19 @@ contract. Three things a new connector will meet:
 - The folder picker issues its listing request twice on mount under the dev server. That is React
   StrictMode double-invoking the effect; a production build does one. The e2e assertion is written
   not to depend on the sequence.
-- `frontend/e2e/accessibility.spec.ts` and `feedback.spec.ts` previously reached the developer's
-  live backend on :8000 for `/api/importers` by accident. They stub it through `stubImporters` in
-  `e2e/seed.ts` now. If you add a spec that opens `/import`, use that helper rather than a fourth
-  copy of the fixture.
+- **The e2e suite proxies unstubbed `/api` calls to whatever is listening on :8000**, which on this
+  machine is the running Compose container holding the real library
+  (`frontend/vite.config.ts` → `BOOK_TRACKER_E2E_BACKEND ?? "http://localhost:8000"`). It was found
+  the honest way: `accessibility.spec.ts` and `feedback.spec.ts` were reading the container's
+  `/api/importers` by accident, which is why they broke when the contract changed. They stub it
+  through `stubImporters` in `e2e/seed.ts` now, and if you add a spec that opens `/import` use that
+  helper rather than a fourth copy of the fixture. **Stub every route a spec touches, or set
+  `BOOK_TRACKER_E2E_BACKEND` at a throwaway backend** — the suite contains delete, bulk-update and
+  import-commit flows, and a gap in a stub points them at real data.
+- **This deployment runs on bind mounts, not the default named volumes.** `./data` and `./backups`
+  are the real storage, so it must be started as
+  `docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d`. A plain `docker compose up -d`
+  silently starts it against the empty `akasha_data` volume instead, and the library looks wiped
+  while the actual database sits untouched in `./data/books.db`.
 - Triage is unchanged as a surface; 032 moved it and redesigned nothing. Its filters, grouping and
   conflict expansion are still what product spec §7 describes as intent rather than as built.
