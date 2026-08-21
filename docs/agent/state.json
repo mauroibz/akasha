@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 18,
-  "project_status": "in_progress",
-  "active_sprint": "036",
-  "active_sprint_file": "docs/sprints/036-import-triage-flow.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "035",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "036",
   "completed_sprints": [
     "001",
     "002",
@@ -41,8 +41,9 @@
     "032",
     "033",
     "034",
-    "035"
+    "035",
+    "036"
   ],
-  "started_at": "2026-08-21T18:25:32-03:00",
-  "updated_at": "2026-08-21T18:25:32-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-21T20:33:41-03:00"
 }

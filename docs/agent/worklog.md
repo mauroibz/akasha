@@ -2145,3 +2145,40 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   launcher and bounded phase timeouts remain explicit future work rather than hidden scope growth.
 - Next: use the new ladder when the owner schedules the next sprint; if optimizing test
   infrastructure itself is chosen, plan a remediation sprint around the measured backlog.
+
+## 2026-08-21 — Sprint 036 (complete; project complete)
+
+- Done: turned `/import` into two clear workflow steps with source tabs nested under Import
+  (`142d422`); made triage row bodies open detail while checkbox clicks alone enter pointer bulk
+  selection; added optimistic row-local domain status and score editing (`e7dfe05`); repaired mobile
+  row geometry and made short inboxes fit their content (`4e8f151`, `cbdf7e4`); then closed the axe
+  suggestion-badge gap and isolated reusable scratchpads from the ordinary browser gate (`87d73cc`).
+  README, product and technical specifications, domain guidance, roadmap and decisions now match.
+- Verified: focused Vitest passed 31 tests; focused Triage Playwright passed all 16 cases; focused
+  Triage axe and production-bundle checks passed 2 each. `make check` passed every static, type,
+  generated-contract and project-validation gate. `make test` passed 559 backend and 179 frontend
+  tests before the final accessibility-only JSX fix; its affected frontend gate then passed all 179
+  again. Full Playwright at one worker passed 101 with 2 intentional skips in 1.6 minutes, and no
+  scratchpad specs were collected. Closure validator and `git diff --check` passed.
+- Walkthrough: ran against a disposable copy of realistic owner data at 390 px, with four entries
+  temporarily made unsorted. Confirmed the `1. Import` / `2. Triage` hierarchy and nested source
+  tabs; changed Harry Potter's score 8 -> 7; changed The Shadow of the Wind to `read` and watched
+  only it leave the inbox; opened Cien años de soledad from the row body; checked Tokio blues and
+  saw the bulk toolbar appear; returned to Import without losing source state. The first visual pass
+  exposed a 70vh blank panel under four rows, which was fixed; the repeat showed a fitted list with
+  no mobile overflow, console errors or page errors. Live `data/` was untouched.
+- Testing retrospective applied: the parameterized runner remains in ignored
+  `frontend/e2e/scratchpad/`, but Playwright now excludes that directory by default. Future sessions
+  opt in with `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1`, so owner-data walkthroughs are reusable without
+  polluting the deterministic gate. DEC-084 remains the canonical record for the freeze-once ladder,
+  duration baselines, warning cleanup backlog and sandbox deadlock signature.
+- Deviations: native status/score selects replace the planned shared controls because an expanding
+  picker clips at a fixed virtual-row edge and a portalled select failed `aria-hidden-focus`.
+  DEC-086 records the geometry-specific decision. No backend, API or schema change was needed.
+- Observed and left: `_bundle` still has Calibre-specific wording for a missing root `metadata.db`;
+  it remains outside this UI sprint. Existing optional-request proxy chatter in Playwright and
+  JSDOM warnings in Vitest remain explicit DEC-084 cleanup work, not hidden failures.
+- Blocked/open: none. No account, key, payment, irreversible choice, push, tag, deployment or release
+  action is needed or was performed.
+- Next: none scheduled. The numbered plan is complete through Sprint 036; future product work starts
+  by planning a new sprint from an unnumbered roadmap epic or a remediation need.

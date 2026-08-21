@@ -1,61 +1,54 @@
-# Handoff — numbered plan complete through Sprint 035
+# Handoff — numbered plan complete through Sprint 036
 
-Plan revision 17. **Sprint 035 closed on 2026-08-21 and the project state is `complete`.** Sprints
-001–035 are in `completed_sprints`; active sprint fields are null; `FINAL_SPRINT` is 35. Nothing was
-tagged, pushed, released or deployed.
+Plan revision 18. **Sprint 036 closed on 2026-08-21 and project state is `complete`.** Sprints
+001–036 are completed; active sprint fields are null; `FINAL_SPRINT` is 36. Nothing was tagged,
+pushed, released or deployed.
 
 ## What now ships
 
-The Calibre folder flow needs no mount, plans incrementally, and has an off-by-default **Also attach
-the ebook files** toggle. With it enabled the browser selects one file per book in epub-first
-preference order, names anything over the 25 MiB per-file cap, commits metadata first, then attaches
-each wanted ebook in its own bounded request with visible progress. Re-sync sends no ebook already
-held; deleting an attachment makes only that file return. Undo removes unchanged import-created
-attachments and their unreferenced blobs before deleting their items, while preserving renamed,
-replaced and hand-uploaded files.
+The existing `/import` route reads as two independent steps: **1. Import** contains the registered
+source tabs, and **2. Triage** contains review. Connector URLs, remembered source, staged previews,
+undo and the old `/triage` redirect retain their behavior.
 
-The shared import layer does not branch on Calibre for that behavior: connectors declare bundle
-member patterns and records declare their source files; inventory, route and ledger behavior are
-generic. The file UI remains opaque and file-type agnostic—Akasha still has no ebook reader.
+In Triage, status and score are editable directly on every row. Each control writes only that entry
+with optimistic rollback. Clicking the row body opens detail; only the checkbox enters pointer bulk
+selection. Shift ranges, Ctrl/Cmd+A, bulk actions, keyboard shortcuts and bounded virtualization
+remain. The controls fit a 390 px viewport, and a short inbox uses only the height its rows need.
 
 ## Closure evidence
 
-- `make check` passed all static, type, OpenAPI and project-validation gates.
-- `make test`: 559 backend and 179 frontend tests passed.
-- Full Playwright at `--workers=1`: 98 passed, 3 skipped. The third skip is the optional ignored
-  real-library walkthrough when its environment paths are absent.
-- Real-library walkthrough: 18 epubs / 95.4 MB attached and downloadable; unchanged re-sync sent
-  zero ebooks; deleting one caused exactly one to return; UI undo left 0 entries, items,
-  attachment rows and attachment blobs. Live `data/` was untouched.
-- The worktree was clean after the final closure commit.
+- `make check` passed Ruff, Prettier, ESLint, mypy, TypeScript, OpenAPI and project validation.
+- `make test` passed 559 backend and 179 frontend tests; the affected frontend gate passed all 179
+  again after the final accessibility-only JSX correction.
+- Full Playwright at one worker passed 101 with 2 intentional skips. Focused Triage (16), Triage axe
+  (2) and production-bundle (2) checks passed.
+- Realistic-data mobile walkthrough exercised both steps, two row-local edits, row navigation and
+  checkbox-only bulk selection. It found and drove the short-inbox height repair; the repeat had no
+  overflow, console error or page error. Live owner data was never mutated.
 
-The reusable walkthrough is local at
-`frontend/e2e/scratchpad/sprint35-walkthrough.spec.ts`; `frontend/e2e/scratchpad/` is gitignored.
-It requires `AKASHA_WALKTHROUGH_LIBRARY`, `AKASHA_WALKTHROUGH_DATA_DIR`, and an isolated backend
-using the same data directory. This keeps owner-specific paths and destructive test data out of Git
-while avoiding a rewrite next time.
+## Testing next time
+
+Follow `docs/agent/TESTING.md` and DEC-084: stabilize focused checks, freeze implementation, run each
+affected exhaustive gate once, then classify closure-only diffs. Do not automatically repeat backend
+tests after frontend- or documentation-only changes.
+
+Reusable owner-data flows live locally under ignored `frontend/e2e/scratchpad/` and are excluded from
+ordinary Playwright discovery. Opt into one explicitly from `frontend/` with
+`BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 npm run test:e2e -- --project=chromium --workers=1
+e2e/scratchpad/<file>.spec.ts`. Adapt the closest runner rather than recreating and deleting it.
 
 ## Known and left
 
-- `_bundle` still checks for a root `metadata.db` with connector-specific wording. Allowed bundle
-  members are declarative now, but required root members are not. This was observed and left out of
-  DEC-083 scope.
-- The walkthrough logged one Open Library `provider_unreachable` after undo when asynchronous
-  enrichment raced local-cover installation. Imported covers and attachment behavior were correct.
-- The two heavy `library.spec.ts` cases remain load-sensitive with parallel Playwright workers;
-  `--workers=1` is the established green gate. Do not loosen their DOM/keyboard invariants.
-- `_DiskSpooledMultiPart.spool_max_size` must remain 1, not 0; zero means never roll to disk.
-- The deployed bind-mount installation still needs
-  `docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d`.
+- `_bundle` still refuses a missing root `metadata.db` with Calibre-specific wording even though
+  allowed members are connector-declared. Generalizing required root files needs a scoped follow-up.
+- Playwright still emits proxy errors for optional endpoints that some isolated specs do not stub,
+  and Vitest still emits JSDOM/reduced-motion warnings. They are noisy but green; DEC-084 records
+  fixture centralization and warning cleanup as optimization work.
+- The two heavy library browser cases remain load-sensitive with parallel workers. One worker is the
+  established exhaustive gate; do not weaken their DOM or keyboard invariants.
 
 ## Next
 
-No numbered sprint is active. A future session should first plan a new remediation sprint or choose
-one of ROADMAP's unnumbered epics, update `FINAL_SPRINT`, and move state from `complete` according to
-the normal planning protocol. Do not push, tag, deploy or release unless the owner asks.
-
-Before executing that sprint, read `docs/agent/TESTING.md` and DEC-084. Verification now uses one
-exhaustive gate after implementation freezes, followed by diff-classified closure checks; pure
-Outcome/roadmap/worklog/handoff/state edits do not trigger a second product-suite run. The playbook
-also records the Codex sandbox/TestClient deadlock signature, current gate durations, walkthrough
-reuse rules and the unimplemented test-infrastructure optimization backlog.
+No numbered sprint is active. A future session must first plan a new remediation sprint or select an
+unnumbered roadmap epic, update `FINAL_SPRINT`, and move state from `complete` through the normal
+planning protocol. Do not push, tag, deploy or release unless the owner asks.

@@ -472,7 +472,7 @@ writing any of it, stop — you are about to duplicate something:
 | The detail page | your metadata fields in your order, your status vocabulary, your panel heading |
 | Triage | your hotkeys, bulk operations, selection across pages |
 | The add flow | search, add-by-URL, manual entry and the confirm screen rendered from your field spec |
-| Import | registry-driven source tab rendering your declared guidance, preview/commit, validation, a folder chooser for a directory source and a picker for a browsable one, your alternate beneath your primary, triage as a tab, and undo |
+| Import | registry-driven source tab nested under the **1. Import** step, rendering your declared guidance, preview/commit, validation, a folder chooser for a directory source and a picker for a browsable one, your alternate beneath your primary, the shared **2. Triage** step, and undo |
 | Shelves | the owner's own tier of organisation, across every domain |
 | Import ledger and undo | 24-hour reversal of anything an import did |
 | Export | entity-shaped JSON carrying `type`, identifiers and your opaque metadata |

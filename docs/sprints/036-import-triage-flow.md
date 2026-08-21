@@ -1,6 +1,6 @@
 # Sprint 036 — Import and triage flow
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 035
 **Roadmap revision:** 18
 
@@ -72,8 +72,8 @@ and must remain available.
 
 ## Verification
 
-- `npm test -- --run src/pages/ImportPage.test.tsx src/components/ScorePicker.test.tsx src/components/StatusSelect.test.tsx`
-- `npm run test:e2e -- --project=chromium e2e/triage.spec.ts e2e/import.spec.ts e2e/accessibility.spec.ts`
+- `npm test -- --run src/pages/ImportPage.test.tsx src/components/ScorePicker.test.tsx`
+- Focused TDD checks in `e2e/triage.spec.ts`, then the full Playwright gate after code freeze.
 - Realistic browser walkthrough recorded in `docs/agent/worklog.md`.
 - After code freeze: `python scripts/validate_project.py`, `make check`, `make test`, and
   `npm run test:e2e` once, following `docs/agent/TESTING.md` for closure reruns.
@@ -98,4 +98,54 @@ and must remain available.
 
 ## Outcome
 
-_In progress._
+Completed 2026-08-21.
+
+- `/import` now presents one prominent `1. Import` / `2. Triage` workflow switch. Connector tabs
+  exist only inside Import; connector URLs, last-source memory, staged previews, undo history and
+  the legacy `/triage` redirect retain their contracts (`142d422`).
+- A triage row now opens detail when its body is clicked. Only its checkbox enters pointer
+  selection, so the existing Shift range, select-all, keyboard and bulk workflows remain available
+  without making one-entry decisions feel like bulk work (`e7dfe05`).
+- Every mounted row has named, domain-aware status and score selects. They patch exactly one entry,
+  update optimistically, preserve any bulk selection, clear provisional score state on success and
+  restore the prior cached row with one announcement on failure. Narrow rows hide redundant
+  imagery, and short inboxes fit their content instead of reserving a mostly empty panel
+  (`4e8f151`, `cbdf7e4`).
+- The final browser gate repaired a suggestion badge's accessibility text, isolated ignored reusable
+  walkthroughs from ordinary Playwright discovery, and made the production-bundle test declare its
+  item-type boundary (`87d73cc`). Canonical product, technical, owner and domain-extension docs now
+  describe the delivered hierarchy and editing behavior.
+
+Acceptance criteria 1–8 passed. Component tests cover the two tab levels, URL transitions, single
+main landmark and staged-preview survival. Sixteen Triage Playwright cases cover row-local success
+and rollback, row navigation, checkbox-only selection, bulk actions, keyboard shortcuts,
+virtualization, motion and mobile geometry; axe covers both unselected and selected Triage states.
+
+Verification after implementation freeze:
+
+- focused Vitest: 31 passed (`ImportPage` and `ScorePicker`);
+- `make check`: Ruff, Prettier, ESLint, mypy, TypeScript, OpenAPI and project validation passed;
+- `make test`: 559 backend and 179 frontend tests passed; after the final JSX-only accessibility
+  correction, the affected frontend gate passed again with 179 tests;
+- focused browser checks: 16 Triage cases, 2 Triage accessibility cases and 2 production-bundle
+  cases passed;
+- full Playwright at one worker: 101 passed, 2 intentionally skipped; scratchpad walkthroughs were
+  not collected;
+- `python scripts/validate_project.py` and `git diff --check` passed before closure.
+
+The realistic walkthrough used a disposable copy of the owner's real application data at 390 px,
+with four entries temporarily placed in the unsorted inbox. It switched between both workflow steps
+and connector tabs, changed one score from 8 to 7, changed another row's status to `read` and saw
+only that row leave Triage, opened a third row's detail page, and selected a fourth only through its
+checkbox to reveal the bulk toolbar. The first visual pass exposed excess blank space under the
+short inbox; the corrected pass showed four fitted rows with no horizontal overflow, console error
+or page error. The parameterized runner remains locally under ignored `frontend/e2e/scratchpad/`
+and is now explicitly opt-in, so future sprints can adapt it without making the normal gate depend
+on owner data.
+
+One planned implementation detail changed: the shared expanding score picker cannot fit at a fixed
+virtual-row edge, and a portalled Radix select failed `aria-hidden-focus`. DEC-086 records the use of
+native selects for this geometry. No API, schema or backend behavior changed. The shared import
+route's Calibre-specific missing-`metadata.db` refusal remains observed and out of scope. Existing
+Playwright proxy-error chatter from intentionally unstubbed optional requests and Vitest/JSDOM
+warnings remain recorded in DEC-084's optimization backlog; they did not hide a failed assertion.

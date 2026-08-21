@@ -2,7 +2,7 @@
 
 **Plan revision:** 18
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [036 — Import and triage flow](036-import-triage-flow.md)
+**Active sprint:** none — numbered plan complete through Sprint 036
 
 ## Shape of the plan
 
@@ -31,10 +31,10 @@ Post-v1 work branches:
                                    └─ 033 Calibre without a mount
                                       └─ 034 Incremental import
                                          └─ 035 Ebook attachments on a toggle
-                                            └─ 036 Import and triage flow  ← active
+                                            └─ 036 Import and triage flow  [complete]
 ```
 
-**The numbered plan now stops at 036 (DEC-058, extended through DEC-085).** Sprint 025 asked whether a second domain
+**The numbered plan now stops at 036 (DEC-058, extended through DEC-086).** Sprint 025 asked whether a second domain
 was affordable and answered yes. Proving the same thing twice more with games and series would spend
 the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
 music, polishes the screen the owner actually uses, and then builds the contract that makes a third
@@ -93,12 +93,12 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
 | [034](034-incremental-import.md) | Incremental import | 033 | completed |
 | [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | completed |
-| [036](036-import-triage-flow.md) | Import and triage flow | 035 | in_progress |
+| [036](036-import-triage-flow.md) | Import and triage flow | 035 | completed |
 
 ## Sprint contracts
 
-These are the binding outcome boundaries for the post-v1 line. Sprints 019 through 035 are closed;
-Sprint 036 is active. Their individual Outcome sections record delivered reality.
+These are the binding outcome boundaries for the post-v1 line. Sprints 019 through 036 are closed;
+no numbered sprint is active. Their individual Outcome sections record delivered reality.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -617,6 +617,20 @@ attached and downloaded 18 epubs (95.4 MB), sent none on an unchanged re-sync, r
 file, and removed all attachment rows and blobs on undo. The disk cost remains stated rather than
 bounded: roughly 3.2 GB for 600 books at the measured mean, with backups holding ~1.0 effective
 copies only while `BACKUP_DIR` shares a filesystem with the data directory.
+
+### [Sprint 036 — Import and triage flow](036-import-triage-flow.md)
+
+Added at plan revision 18 from the owner's first use of the completed Calibre import. Connector tabs
+and Triage were peers even though they answer different questions: which source to import, then how
+to review what arrived. Triage also made every pointer edit pretend to be bulk work — click the row
+to select, open a bulk menu, choose one score — when the common action is reading down a list and
+deciding each entry independently.
+
+**Delivered.** The route and high-volume workflow remain. `/import` has a visible two-step hierarchy
+with source tabs nested under Import. A row's status and score edit that row directly; only its
+checkbox selects, while Shift ranges, Ctrl/Cmd+A, the bulk toolbar and keyboard shortcuts remain.
+Row-body clicks open detail. Native selects stay in the row's tree, mobile rows do not overflow,
+and a short inbox no longer reserves an empty 70vh panel (DEC-085, DEC-086).
 
 ## Future epics, after this plan
 

@@ -61,8 +61,9 @@ in case you need a safe place to store that PDF.
 ## Importing and triage
 
 Use **Import** when you already have a book library in Goodreads or Calibre. The
-screen has one tab per connector plus **Triage**, because triage is where an import
-ends rather than a separate destination: it is empty until something lands in it.
+screen presents two steps: **1. Import** and **2. Triage**. Connector tabs live inside
+the first step; Triage is the independent review step where an import ends, not another
+source and not a separate top-level destination.
 
 Each connector explains itself on its own tab. Goodreads tells you where the export
 lives (`goodreads.com/review/import` → Export Library, desktop web only), that it is
@@ -99,10 +100,11 @@ upload ceiling, which is what a library too large for a browser should use.
 
 Every import starts with a preview: you can inspect errors and settle ambiguous
 matches before Akasha changes anything. A committed row enters Triage as `unsorted`,
-and the ordinary library view deliberately hides unsorted entries, so the Triage tab
-is where an import actually shows up. When a source cannot be read, the connector
-says what to do about it — a locked Calibre database asks you to close Calibre and
-try again.
+and the ordinary library view deliberately hides unsorted entries, so the Triage step
+is where an import actually shows up. Score and status can be changed directly on each
+row as you read down the list. Check a row only when you want bulk actions; clicking the
+rest of the row opens its detail page. When a source cannot be read, the connector says
+what to do about it — a locked Calibre database asks you to close Calibre and try again.
 
 Re-running a source is useful when that source has changed. The source fingerprint
 makes an unchanged replay harmless. A Calibre re-sync can fill metadata that is still

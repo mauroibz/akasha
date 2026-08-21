@@ -749,14 +749,20 @@ It reaches `/import?tab=triage`, the old `/triage` address redirects there, and
 the Inbox button on `/` and the post-commit link both land on it.
 
 Design goal: clear several hundred books in one sitting without it feeling like
-data entry. That means bulk-first, keyboard-first, and never one-book-at-a-time
-unless you choose it.
+data entry. That means row-local for ordinary decisions, bulk-first once a selection
+is explicit, and keyboard-first throughout.
 
-- **Dense table by default** — small cover thumb, title, author, year, suggested
-  status, score, shelves. Compact rows, ~25 visible at once. Grid view optional
-  but the table is the working surface.
-- **Selection model** — checkbox column, click-drag to range-select,
-  shift-click, `Ctrl/Cmd+A`. A persistent action bar appears when anything is
+- **Dense table by default** — small cover thumb, title, author, suggested status,
+  and directly editable current status and score. Compact rows, ~25 visible at once;
+  on a narrow screen the redundant cover and detail chevron hide so the controls do
+  not create horizontal scroll. A short inbox fits its rows; a long one scrolls at the
+  existing viewport cap.
+- **Row-local editing** — changing the status or score control always patches that
+  one entry, optimistically. A successful status change removes the row from the
+  `unsorted` inbox; a failed write restores its previous value and announces once.
+  Clicking anywhere else on the row opens detail and never selects it.
+- **Selection model** — the checkbox is the pointer boundary for selection, with
+  shift-click range selection and `Ctrl/Cmd+A`. A persistent action bar appears when anything is
   selected: *Set status · Add shelves · Set score · Clear provisional · Delete*.
   All apply to the whole selection in one request.
 - **Grouping and filters** — by import batch, by suggested status, by author, by
@@ -783,11 +789,13 @@ unless you choose it.
 
 **`/shelves` — Shelf management.** List, rename, delete, counts.
 
-**`/import` — Import.** One tab per registered connector, plus **Triage** (above).
-The tab lives in the URL and an unnamed one falls back to the connector used
-last, the same rule the library's domain tab follows (DEC-062). A staged source
-and its preview belong to the connector that produced them: moving to another
-connector starts clean, moving through Triage and back does not.
+**`/import` — Import.** One prominent workflow tablist separates **1. Import** from
+**2. Triage** (above). The registered connector tabs are visibly subordinate to the
+Import step and are absent from Triage. The chosen connector or Triage still lives in
+the URL and an unnamed connector falls back to the one used last, the same rule the
+library's domain tab follows (DEC-062). A staged source and its preview belong to the
+connector that produced them: moving to another connector starts clean, moving through
+Triage and back does not.
 
 **Each connector explains itself, and the screen renders the declaration rather
 than copy of its own** (DEC-080). Goodreads states where the export lives
