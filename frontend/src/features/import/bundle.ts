@@ -73,3 +73,23 @@ export function formatBytes(bytes: number): string {
     ? `${megabytes.toFixed(1)} MB`
     : `${Math.round(bytes / 1024)} KB`;
 }
+
+/**
+ * The members cheap enough to send before knowing whether they are wanted.
+ *
+ * For Calibre that is `metadata.db` alone: a few hundred kilobytes, always changed
+ * because Calibre rewrites it constantly, and the thing the server needs in order to
+ * answer at all.
+ */
+export function cheapMembers(bundle: CalibreBundle): BundleMember[] {
+  return bundle.members.filter((member) => member.path === "metadata.db");
+}
+
+/** The bundle narrowed to what a plan asked for, keeping the original order. */
+export function narrowedTo(
+  bundle: CalibreBundle,
+  wanted: readonly string[],
+): BundleMember[] {
+  const keep = new Set(wanted);
+  return bundle.members.filter((member) => keep.has(member.path));
+}

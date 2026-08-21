@@ -480,6 +480,21 @@ test("a Calibre folder is chosen in the browser, with no mount involved", async 
   // The flow only a real browser can prove: `webkitdirectory` hands the page the
   // whole tree, and what the client sends is the small part of it (DEC-081).
   let members: string[] = [];
+  // The folder flow plans before it previews; this spec is about the filter, so the
+  // plan simply wants everything it was offered.
+  await page.route("**/api/import/calibre/plan", async (route) => {
+    const body = route.request().postData() ?? "";
+    const manifest = /name="manifest"\r?\n\r?\n([\s\S]*?)\r?\n--/.exec(body);
+    await route.fulfill({
+      json: {
+        wanted: JSON.parse(manifest?.[1] ?? "[]").map(
+          (row: { path: string }) => row.path,
+        ),
+        holding: 0,
+        reason: null,
+      },
+    });
+  });
   await page.route("**/api/import/calibre/preview", async (route) => {
     const body = route.request().postData() ?? "";
     members = [...body.matchAll(/filename="([^"]+)"/g)].map(
@@ -523,4 +538,53 @@ test("a Calibre folder is chosen in the browser, with no mount involved", async 
     "metadata.db",
     "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg",
   ]);
+});
+
+test("a second import of the same folder sends the database and nothing else", async ({
+  page,
+}) => {
+  // The point of DEC-082: an unchanged re-sync is a 416 KB round trip, not the
+  // whole bundle. The server answers from identities it already holds.
+  const previews: string[][] = [];
+  await page.route("**/api/import/calibre/plan", (route) =>
+    // Second time round, the library already holds the book with its cover.
+    route.fulfill({
+      json: {
+        wanted: ["metadata.db"],
+        holding: 1,
+        reason: "1 already in your library with a cover",
+      },
+    }),
+  );
+  await page.route("**/api/import/calibre/preview", async (route) => {
+    const body = route.request().postData() ?? "";
+    previews.push([...body.matchAll(/filename="([^"]+)"/g)].map((m) => m[1]));
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "resync",
+        fingerprint: "db",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [{ ...record, title: "Mistborn" }],
+      },
+    });
+  });
+
+  await page.goto("/import?tab=calibre");
+  await page
+    .getByLabel("Calibre folder", { exact: true })
+    .setInputFiles(
+      fileURLToPath(new URL("fixtures/Calibre Library", import.meta.url)),
+    );
+  await page.getByRole("button", { name: /preview calibre library/i }).click();
+  await expect(
+    page.getByRole("heading", { name: /preview: 1 row/i }),
+  ).toBeVisible();
+
+  await expect(
+    page.getByText(/skipped 1 file .* already in your library/i),
+  ).toBeVisible();
+  // The cover stayed home even though the reader chose the same folder.
+  expect(previews.at(-1)).toEqual(["metadata.db"]);
 });

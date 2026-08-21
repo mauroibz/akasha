@@ -45,6 +45,8 @@ export interface ImportInputSpec {
   empty_state: string | null;
   help_url: string | null;
   browsable: boolean;
+  /** Whether the connector can say what is worth uploading before it is sent. */
+  incremental: boolean;
   accepts_files: boolean;
   max_bytes: number | null;
   max_files: number | null;
@@ -163,6 +165,44 @@ export function browseImportSource(importerId: string, path: string) {
  * use: a body of parts is the file or folder input, a JSON body is the path one.
  * `spec` is the input the screen actually collected, not necessarily the primary.
  */
+/** Which of the offered members the server actually wants (DEC-082). */
+export interface ImportPlanResult {
+  wanted: string[];
+  holding: number;
+  reason: string | null;
+}
+
+/**
+ * Ask before sending.
+ *
+ * The cheap half of the source goes up with a manifest of what is being held back,
+ * and the server answers with the subset worth uploading. It answers rather than the
+ * client hashing because `crypto.subtle` is undefined on a plain-HTTP LAN origin,
+ * which is how this application is actually served.
+ */
+export function planImport(
+  importer: ImporterDefinition,
+  spec: ImportInputSpec,
+  cheap: BundleMember[],
+  candidates: BundleMember[],
+) {
+  const form = new FormData();
+  for (const member of cheap) form.append(spec.field, member.file, member.path);
+  form.append(
+    "manifest",
+    JSON.stringify(
+      candidates.map((member) => ({
+        path: member.path,
+        size: member.file.size,
+      })),
+    ),
+  );
+  return fetch(`/api/import/${encodeURIComponent(importer.id)}/plan`, {
+    method: "POST",
+    body: form,
+  }).then((response) => responseJson<ImportPlanResult>(response));
+}
+
 export function previewImport(
   importer: ImporterDefinition,
   spec: ImportInputSpec,

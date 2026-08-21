@@ -65,6 +65,7 @@ const importers = [
       empty_state: "Choose your Calibre library folder.",
       help_url: "https://manual.calibre-ebook.com/gui.html",
       browsable: false,
+      incremental: true,
       accepts_files: true,
       max_bytes: 256 * 1024 * 1024,
       max_files: 10000,
@@ -79,6 +80,7 @@ const importers = [
         empty_state: "No folders here. Mount your Calibre library and reload.",
         help_url: null,
         browsable: true,
+        incremental: false,
         accepts_files: false,
         max_bytes: null,
         max_files: null,
@@ -129,6 +131,7 @@ describe("ImportPage", () => {
               empty_state: "Drop the StoryGraph export here.",
               help_url: null,
               browsable: false,
+              incremental: false,
               accepts_files: false,
               max_bytes: null,
               max_files: null,
@@ -795,6 +798,114 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /preview calibre library/i }),
     ).toBeDisabled();
     expect(calls.some((url) => url.includes("/preview"))).toBe(false);
+  });
+
+  it("asks what is already imported and sends only the rest", async () => {
+    // Content-addressing dedupes storage but not transfer, so an unchanged
+    // re-sync would otherwise pay full price every time (DEC-082).
+    const sent: FormData[] = [];
+    stubRegistry((url) => {
+      if (url.endsWith("calibre/plan"))
+        return new Response(
+          JSON.stringify({
+            wanted: ["metadata.db"],
+            holding: 1,
+            reason: "1 already in your library with a cover",
+          }),
+        );
+      if (url.endsWith("calibre/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "inc-1",
+            fingerprint: "db",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [],
+          }),
+          { status: 201 },
+        );
+      return undefined;
+    });
+    const inner = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (init?.body instanceof FormData) sent.push(init.body);
+      return inner(input, init);
+    });
+    renderImportPage("/import?tab=calibre");
+
+    await userEvent.upload(await screen.findByLabelText("Calibre folder"), [
+      pick("Calibre Library/metadata.db", 416 * 1024),
+      pick("Calibre Library/A/One (1)/cover.jpg", 1200),
+    ]);
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    );
+    await screen.findByRole("heading", { name: /preview: 1 row/i });
+
+    // Two requests: the plan carries only the database plus the manifest, and
+    // the preview carries only what the plan asked for.
+    const [plan, preview] = sent;
+    expect((plan.getAll("files") as File[]).map((f) => f.name)).toEqual([
+      "metadata.db",
+    ]);
+    expect(JSON.parse(String(plan.get("manifest")))).toEqual([
+      { path: "metadata.db", size: 416 * 1024 },
+      { path: "A/One (1)/cover.jpg", size: 1200 },
+    ]);
+    expect((preview.getAll("files") as File[]).map((f) => f.name)).toEqual([
+      "metadata.db",
+    ]);
+
+    expect(
+      await screen.findByText(/skipped 1 file .* already in your library/i),
+    ).toBeVisible();
+  });
+
+  it("sends everything and says so when the plan fails", async () => {
+    // An optimisation that can fail closed turns a working import into a broken
+    // one, so a rejected plan degrades rather than stopping (DEC-082).
+    const sent: FormData[] = [];
+    stubRegistry((url) => {
+      if (url.endsWith("calibre/plan"))
+        return new Response(JSON.stringify({ error: { code: "boom" } }), {
+          status: 500,
+        });
+      if (url.endsWith("calibre/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "inc-2",
+            fingerprint: "db",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [],
+          }),
+          { status: 201 },
+        );
+      return undefined;
+    });
+    const inner = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (init?.body instanceof FormData) sent.push(init.body);
+      return inner(input, init);
+    });
+    renderImportPage("/import?tab=calibre");
+
+    await userEvent.upload(await screen.findByLabelText("Calibre folder"), [
+      pick("Calibre Library/metadata.db", 416 * 1024),
+      pick("Calibre Library/A/One (1)/cover.jpg", 1200),
+    ]);
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    );
+
+    // The import still completed, with everything.
+    await screen.findByRole("heading", { name: /preview: 1 row/i });
+    expect((sent.at(-1)?.getAll("files") as File[]).map((f) => f.name)).toEqual(
+      ["metadata.db", "A/One (1)/cover.jpg"],
+    );
+    expect(
+      await screen.findByText(/could not check what is already imported/i),
+    ).toBeVisible();
   });
 
   it("opens on the importer used last", async () => {

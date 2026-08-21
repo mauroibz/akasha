@@ -1193,6 +1193,11 @@
             ],
             "title": "Help Url"
           },
+          "incremental": {
+            "default": false,
+            "title": "Incremental",
+            "type": "boolean"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"

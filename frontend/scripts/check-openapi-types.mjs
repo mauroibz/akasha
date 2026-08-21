@@ -48,7 +48,9 @@ const expected = {
     "empty_state",
     "help_url",
     "browsable",
+    "incremental",
   ],
+  ImportPlanResponse: ["wanted", "holding", "reason"],
   ImportBrowseResponse: ["path", "parent", "directories", "importable"],
 };
 

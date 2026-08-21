@@ -92,6 +92,7 @@ class ImportInputResponse(BaseModel):
     empty_state: str | None = None
     help_url: str | None = None
     browsable: bool = False
+    incremental: bool = False
     accepts_files: bool = False
     max_bytes: int | None = None
     max_files: int | None = None

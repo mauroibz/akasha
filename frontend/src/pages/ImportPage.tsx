@@ -18,6 +18,7 @@ import {
   getImporters,
   type ImportInputSpec,
   ImportRequestError,
+  planImport,
   previewImport,
   type ImporterDefinition,
   undoBatch,
@@ -26,6 +27,7 @@ import {
   type UndoResult,
 } from "@/api/imports";
 import type { BundleMember, CalibreBundle } from "@/features/import/bundle";
+import { cheapMembers, narrowedTo } from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
@@ -74,6 +76,10 @@ export function ImportPage() {
   const [libraryPath, setLibraryPath] = useState("");
   const [bundle, setBundle] = useState<CalibreBundle | null>(null);
   const [showAlternate, setShowAlternate] = useState(false);
+  const [skipped, setSkipped] = useState<{
+    held: number;
+    reason: string | null;
+  } | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [choices, setChoices] = useState<Record<number, number | "new">>({});
   const [result, setResult] = useState<ImportResult | null>(null);
@@ -140,6 +146,7 @@ export function ImportPage() {
     setLibraryPath("");
     setBundle(null);
     setShowAlternate(false);
+    setSkipped(null);
     setPreview(null);
     setResult(null);
     setUndoResult(null);
@@ -201,6 +208,42 @@ export function ImportPage() {
         return { spec, source: libraryPath.trim() };
     }
     return null;
+  };
+
+  /**
+   * The bytes to actually send, after asking the server what it wants.
+   *
+   * The plan is an optimisation and is never load-bearing: if it fails for any
+   * reason the whole bundle goes, and the screen says so. A broken optimisation
+   * must not turn a working import into a broken one (DEC-082).
+   */
+  const sendable = async (
+    importer: ImporterDefinition,
+    submission: {
+      spec: ImportInputSpec;
+      source: File | string | BundleMember[];
+    },
+  ): Promise<File | string | BundleMember[]> => {
+    if (submission.spec.kind !== "directory" || !submission.spec.incremental)
+      return submission.source;
+    if (!bundle) return submission.source;
+    try {
+      const plan = await planImport(
+        importer,
+        submission.spec,
+        cheapMembers(bundle),
+        bundle.members,
+      );
+      setSkipped({ held: plan.holding, reason: plan.reason });
+      return narrowedTo(bundle, plan.wanted);
+    } catch {
+      setSkipped({
+        held: 0,
+        reason:
+          "Could not check what is already imported, so everything was sent.",
+      });
+      return submission.source;
+    }
   };
 
   const renderInput = (
@@ -309,11 +352,12 @@ export function ImportPage() {
                 if (!submission) return;
                 setPending(true);
                 setError(null);
-                void previewImport(
-                  activeImporter as ImporterDefinition,
-                  submission.spec,
-                  submission.source,
-                )
+                setSkipped(null);
+                const importer = activeImporter as ImporterDefinition;
+                void sendable(importer, submission)
+                  .then((source) =>
+                    previewImport(importer, submission.spec, source),
+                  )
                   .then(setPreview)
                   .catch((reason: Error) => setError(asFailure(reason)))
                   .finally(() => setPending(false));
@@ -370,6 +414,13 @@ export function ImportPage() {
               </Button>
             </form>
           </>
+        )}
+        {skipped && (
+          <p className="mt-4 text-sm text-muted-foreground" role="status">
+            {skipped.held > 0
+              ? `Skipped ${skipped.held} ${skipped.held === 1 ? "file" : "files"} — ${skipped.reason}.`
+              : skipped.reason}
+          </p>
         )}
         {error && (
           // The action is the connector's, not this screen's: only Calibre knows

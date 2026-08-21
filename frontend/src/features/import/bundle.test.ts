@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calibreBundle, formatBytes } from "./bundle";
+import { calibreBundle, cheapMembers, formatBytes, narrowedTo } from "./bundle";
 
 /** A File carrying the relative path a directory pick would give it. */
 function pick(path: string, size = 1024): File {
@@ -65,5 +65,30 @@ describe("formatBytes", () => {
     expect(formatBytes(900)).toBe("900 B");
     expect(formatBytes(416 * 1024)).toBe("416 KB");
     expect(formatBytes(2_516_582)).toBe("2.4 MB");
+  });
+});
+
+describe("planning helpers", () => {
+  const bundle = calibreBundle([
+    pick("Lib/metadata.db", 416 * 1024),
+    pick("Lib/A/One (1)/cover.jpg", 1000),
+    pick("Lib/B/Two (2)/cover.jpg", 2000),
+  ]);
+
+  it("sends only the database while asking what is wanted", () => {
+    // Cheap, always changed, and the only thing the server can answer from.
+    expect(cheapMembers(bundle).map((m) => m.path)).toEqual(["metadata.db"]);
+  });
+
+  it("narrows the bundle to what the plan asked for", () => {
+    const narrowed = narrowedTo(bundle, ["metadata.db", "B/Two (2)/cover.jpg"]);
+    expect(narrowed.map((m) => m.path)).toEqual([
+      "metadata.db",
+      "B/Two (2)/cover.jpg",
+    ]);
+  });
+
+  it("ignores a path the plan names that the bundle does not hold", () => {
+    expect(narrowedTo(bundle, ["nonsense.jpg"])).toEqual([]);
   });
 });
