@@ -13,11 +13,25 @@ Nothing in this module knows what a book or an album *is*. That lives in
 from collections.abc import Sequence
 from enum import StrEnum
 
+from book_tracker.domain.importers import Importer
 from book_tracker.domain.spec import Domain
 from book_tracker.domains.album import DOMAIN as ALBUM
 from book_tracker.domains.book import DOMAIN as BOOK
+from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
+from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 
 DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM)}
+
+# The same code-owned registration model as domains and providers: no discovery or
+# plugin runtime.  Connectors live in the package of the domain they target; the shared
+# registry only builds the two indexes it needs to publish and dispatch them.
+IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
+    BOOK.item_type: (GOODREADS_IMPORTER, CALIBRE_IMPORTER),
+    ALBUM.item_type: (),
+}
+IMPORTERS: dict[str, Importer] = {
+    importer.name: importer for importers in IMPORTERS_BY_DOMAIN.values() for importer in importers
+}
 
 # Every route, importer and repository that predates the second domain works on books;
 # naming that here keeps `"book"` out of those call sites as a literal.

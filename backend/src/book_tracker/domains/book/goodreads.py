@@ -1,9 +1,23 @@
 import csv
+import hashlib
 import io
+from dataclasses import replace
 from datetime import datetime
+from pathlib import Path
 from typing import Any
 
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
+from book_tracker.domain.importers import (
+    ImportEntry,
+    ImportInputSpec,
+    ImportItem,
+    ImportMatcher,
+    ImportReadContext,
+    ImportSnapshot,
+    ImportSource,
+    NormalizedImportRecord,
+)
+from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
 from book_tracker.domains.book import DOMAIN as BOOK
 
@@ -152,3 +166,82 @@ def parse_goodreads(data: bytes) -> list[dict[str, Any]]:
             }
         )
     return records
+
+
+class GoodreadsImporter:
+    name = "goodreads"
+    label = "Goodreads"
+    item_type = DOMAIN.item_type
+    input = ImportInputSpec(kind="upload", label="Goodreads CSV", accept=".csv,text/csv")
+    identity_kinds = frozenset({"isbn"})
+
+    def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
+        if source.data is None:
+            raise GoodreadsCSVError("invalid_csv", "A Goodreads CSV file is required")
+        records = []
+        for payload in parse_goodreads(source.data):
+            metadata = {
+                "creators": payload["creators"],
+                **{
+                    key: payload[key]
+                    for key in ("publisher", "page_count", "original_year")
+                    if payload.get(key) not in (None, "", [], {})
+                },
+            }
+            records.append(
+                NormalizedImportRecord(
+                    row_number=payload["row_number"],
+                    item=ImportItem(
+                        title=payload["title"],
+                        subtitle=None,
+                        year=payload.get("year"),
+                        identifiers={"isbn": payload["isbn"]} if payload.get("isbn") else {},
+                        metadata=metadata,
+                    ),
+                    entry=ImportEntry(
+                        score=payload.get("score"),
+                        notes=payload.get("review"),
+                        date_added=payload.get("date_added"),
+                        values={
+                            "date_finished": payload.get("date_finished"),
+                            "reread_count": payload.get("reread_count", 0),
+                        },
+                        score_provisional=bool(payload.get("score_provisional")),
+                        suggested_status=payload.get("suggested_status"),
+                    ),
+                    shelves=tuple(payload.get("shelves", ())),
+                    errors=tuple(payload.get("errors", ())),
+                    source_fields={"goodreads_book_id": payload["goodreads_book_id"]},
+                )
+            )
+        return ImportSnapshot(
+            fingerprint=hashlib.sha256(source.data).hexdigest(),
+            filename=source.filename or "goodreads.csv",
+            source_descriptor={"filename": source.filename or "goodreads.csv"},
+            records=tuple(records),
+            archive_name="source.csv",
+            archive_data=source.data,
+        )
+
+    def stage(self, snapshot: ImportSnapshot, directory: Path, _data_dir: Path) -> ImportSnapshot:
+        if snapshot.archive_name and snapshot.archive_data is not None:
+            directory.mkdir(parents=True, exist_ok=True)
+            (directory / snapshot.archive_name).write_bytes(snapshot.archive_data)
+        return replace(snapshot, archive_data=None)
+
+    def match(self, record: NormalizedImportRecord, matcher: ImportMatcher) -> MatchDecision:
+        identifiers = [
+            normalize_identifier(kind, value)
+            for kind, value in record.item.identifiers.items()
+            if kind in self.identity_kinds
+        ]
+        creators = record.item.metadata.get("creators", ())
+        first_creator = str(creators[0]) if isinstance(creators, list) and creators else ""
+        return matcher.match(
+            identifiers=identifiers,
+            title=record.item.title,
+            first_author=first_creator,
+        )
+
+
+IMPORTER = GoodreadsImporter()

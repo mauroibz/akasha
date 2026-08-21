@@ -32,10 +32,13 @@ from sqlalchemy.exc import IntegrityError
 from book_tracker.application.providers import resolve_input
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
+from book_tracker.domain.importers import Importer, ImportInputSpec
 from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
 from book_tracker.domain.registry import (
     ALL_STATUSES,
     DOMAINS,
+    IMPORTERS,
+    IMPORTERS_BY_DOMAIN,
     EntryFormat,
     EntryStatus,
     ItemTypeName,
@@ -58,6 +61,20 @@ CoreCheck = Callable[[Domain, Engine], None]
 
 REGISTRY_CHECKS: dict[str, RegistryCheck] = {}
 CORE_CHECKS: dict[str, CoreCheck] = {}
+
+
+def assert_importer_contract(importer: object) -> None:
+    """An importer is complete enough for the generic pipeline to host it."""
+    assert isinstance(importer, Importer)
+    assert importer.name and importer.name.isidentifier() and importer.name.islower()
+    assert importer.label
+    assert importer.item_type in DOMAINS
+    assert isinstance(importer.input, ImportInputSpec)
+    assert importer.identity_kinds, f"{importer.name} declares no authoritative identity kinds"
+    assert all(kind for kind in importer.identity_kinds)
+    assert callable(importer.read), f"{importer.name} declares no reader"
+    assert callable(importer.stage), f"{importer.name} declares no staging strategy"
+    assert callable(importer.match), f"{importer.name} declares no match strategy"
 
 
 def registry_check(function: RegistryCheck) -> RegistryCheck:
@@ -359,6 +376,42 @@ def test_a_registered_domain_satisfies_the_contract(name: str, domain: Domain) -
 @pytest.mark.parametrize("domain", list(DOMAINS.values()), ids=lambda row: str(row.item_type))
 def test_the_core_can_host_a_registered_domain(name: str, domain: Domain, migrated: Engine) -> None:
     CORE_CHECKS[name](domain, migrated)
+
+
+@pytest.mark.parametrize("importer", list(IMPORTERS.values()), ids=lambda row: str(row.name))
+def test_a_registered_importer_satisfies_the_contract(importer: object) -> None:
+    """A connector is held to the import contract merely by being registered."""
+    assert_importer_contract(importer)
+
+
+def test_importers_are_registered_under_the_domain_they_target() -> None:
+    registered = {
+        importer.name: item_type
+        for item_type, importers in IMPORTERS_BY_DOMAIN.items()
+        for importer in importers
+    }
+    assert registered == {name: importer.item_type for name, importer in IMPORTERS.items()}
+    assert {importer.name for importer in IMPORTERS_BY_DOMAIN["book"]} == {
+        "goodreads",
+        "calibre",
+    }
+
+
+def test_the_importer_suite_rejects_a_missing_contract_member() -> None:
+    """The contract can fail: a connector with no match strategy is incomplete."""
+
+    class MissingMatch:
+        name = "missing"
+        label = "Missing"
+        item_type = "book"
+        input = ImportInputSpec(kind="upload", label="File")
+        identity_kinds = frozenset({"isbn"})
+
+        def read(self) -> None:
+            return None
+
+    with pytest.raises(AssertionError):
+        assert_importer_contract(MissingMatch())
 
 
 def test_the_suite_covers_every_field_of_the_contract() -> None:

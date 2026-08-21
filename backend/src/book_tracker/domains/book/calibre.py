@@ -1,12 +1,25 @@
 import hashlib
 import sqlite3
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 from urllib.parse import quote
 
 from book_tracker.domain.identity import normalize_identifier
+from book_tracker.domain.importers import (
+    ImportEntry,
+    ImportInputSpec,
+    ImportItem,
+    ImportMatcher,
+    ImportReadContext,
+    ImportSnapshot,
+    ImportSource,
+    NormalizedImportRecord,
+)
+from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
+from book_tracker.domains.book import DOMAIN
+from book_tracker.infrastructure.covers import CoverError, prepare_uploaded_cover
 
 
 class CalibreError(ValueError):
@@ -192,3 +205,134 @@ class CalibreAdapter:
         except OSError:
             return None
         return cover if cover.is_relative_to(library) and cover.is_file() else None
+
+
+class CalibreImporter:
+    name = "calibre"
+    label = "Calibre"
+    item_type = DOMAIN.item_type
+    input = ImportInputSpec(
+        kind="path",
+        label="Calibre library path",
+        placeholder="Library",
+        help=(
+            "Akasha opens this library read-only inside the configured Calibre mount. "
+            "Enter a relative folder only; covers are copied during preview."
+        ),
+    )
+    identity_kinds = frozenset({"isbn", "calibre_uuid"})
+
+    def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
+        if source.library_path is None:
+            raise CalibreError("invalid_calibre_path", "A Calibre library path is required")
+        snapshot = CalibreAdapter(context.calibre_dir).read(source.library_path)
+        records = []
+        for payload in snapshot.records:
+            metadata = {
+                "creators": payload["creators"],
+                **{
+                    key: payload[key]
+                    for key in (
+                        "publisher",
+                        "page_count",
+                        "original_year",
+                        "description",
+                        "series",
+                    )
+                    if payload.get(key) not in (None, "", [], {})
+                },
+            }
+            identifiers = {
+                key: str(payload[key]) for key in self.identity_kinds if payload.get(key)
+            }
+            records.append(
+                NormalizedImportRecord(
+                    row_number=payload["row_number"],
+                    item=ImportItem(
+                        title=payload["title"],
+                        subtitle=None,
+                        year=payload.get("year"),
+                        identifiers=identifiers,
+                        metadata=metadata,
+                        creator_sort=next(
+                            (
+                                value.strip()
+                                for value in payload.get("author_sorts", ())
+                                if isinstance(value, str) and value.strip()
+                            ),
+                            None,
+                        ),
+                    ),
+                    entry=ImportEntry(
+                        score=payload.get("score"),
+                        notes=payload.get("review"),
+                        date_added=payload.get("date_added"),
+                        values={
+                            "date_finished": payload.get("date_finished"),
+                            "reread_count": payload.get("reread_count", 0),
+                        },
+                        score_provisional=bool(payload.get("score_provisional")),
+                        suggested_status=payload.get("suggested_status"),
+                    ),
+                    shelves=tuple(payload.get("shelves", ())),
+                    errors=tuple(payload.get("errors", ())),
+                    source_fields={
+                        key: payload.get(key)
+                        for key in (
+                            "calibre_book_id",
+                            "calibre_uuid",
+                            "connection_mode",
+                            "query_only",
+                        )
+                    },
+                    cover_source=payload.get("cover_source"),
+                )
+            )
+        return ImportSnapshot(
+            fingerprint=snapshot.fingerprint,
+            filename="metadata.db",
+            source_descriptor={"library_path": source.library_path},
+            records=tuple(records),
+        )
+
+    def stage(self, snapshot: ImportSnapshot, directory: Path, data_dir: Path) -> ImportSnapshot:
+        records = []
+        for record in snapshot.records:
+            relative = None
+            if record.cover_source:
+                try:
+                    prepared = prepare_uploaded_cover(
+                        Path(record.cover_source).read_bytes(), "image/jpeg", data_dir
+                    )
+                    staged = directory / "covers" / f"{record.row_number}.jpg"
+                    staged.parent.mkdir(parents=True, exist_ok=True)
+                    prepared.replace(staged)
+                    relative = str(staged.relative_to(data_dir))
+                except (CoverError, OSError):
+                    pass
+            records.append(
+                replace(
+                    record,
+                    cover_source=None,
+                    cover_stage=relative,
+                    source_fields={**record.source_fields, "cover_staged": relative is not None},
+                )
+            )
+        return replace(snapshot, records=tuple(records))
+
+    def match(self, record: NormalizedImportRecord, matcher: ImportMatcher) -> MatchDecision:
+        identifiers = [
+            normalize_identifier(kind, value)
+            for kind, value in record.item.identifiers.items()
+            if kind in self.identity_kinds
+        ]
+        creators = record.item.metadata.get("creators", ())
+        first_creator = str(creators[0]) if isinstance(creators, list) and creators else ""
+        return matcher.match(
+            identifiers=identifiers,
+            title=record.item.title,
+            first_author=first_creator,
+        )
+
+
+IMPORTER = CalibreImporter()

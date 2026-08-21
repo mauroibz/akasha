@@ -1,6 +1,6 @@
 # Sprint 031 — Per-domain imports
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 030
 **Roadmap revision:** 13
 
