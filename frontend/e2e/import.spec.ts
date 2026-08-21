@@ -540,6 +540,117 @@ test("a Calibre folder is chosen in the browser, with no mount involved", async 
   ]);
 });
 
+test("Calibre attaches one ebook after commit and sends none on re-sync", async ({
+  page,
+}) => {
+  const previews: string[][] = [];
+  const attachments: string[] = [];
+  let plans = 0;
+  let batches = 0;
+  await page.route("**/api/import/calibre/plan", async (route) => {
+    plans += 1;
+    const body = route.request().postData() ?? "";
+    const manifest = /name="manifest"\r?\n\r?\n([\s\S]*?)\r?\n--/.exec(body);
+    const offered = JSON.parse(manifest?.[1] ?? "[]") as Array<{
+      path: string;
+    }>;
+    await route.fulfill({
+      json:
+        plans === 1
+          ? {
+              wanted: offered.map((row) => row.path),
+              holding: 0,
+              reason: null,
+            }
+          : {
+              wanted: ["metadata.db"],
+              holding: 2,
+              reason:
+                "1 already in your library with a cover and 1 whose file you already have",
+            },
+    });
+  });
+  await page.route("**/api/import/calibre/preview", async (route) => {
+    batches += 1;
+    const body = route.request().postData() ?? "";
+    previews.push(
+      [...body.matchAll(/filename="([^"]+)"/g)].map((match) => match[1]),
+    );
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: `ebooks-${batches}`,
+        fingerprint: `db-${batches}`,
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [{ ...record, title: "Mistborn" }],
+      },
+    });
+  });
+  await page.route("**/api/import/calibre/commit", (route) =>
+    route.fulfill({
+      json: {
+        batch_id: `ebooks-${batches}`,
+        state: "committed",
+        created_items: batches === 1 ? 1 : 0,
+        created_entries: batches === 1 ? 1 : 0,
+        unchanged_entries: batches === 1 ? 0 : 1,
+        unsorted_entries: 1,
+      },
+    }),
+  );
+  await page.route("**/api/import/calibre/batches/*/files", async (route) => {
+    const body = route.request().postData() ?? "";
+    const path = /name="path"\r?\n\r?\n([\s\S]*?)\r?\n--/.exec(body);
+    attachments.push(path?.[1] ?? "");
+    // The request remains open while the screen names the file in flight; a final
+    // success count alone would not prove visible per-file progress.
+    await expect(page.getByText(/attaching ebook 1 of 1/i)).toBeVisible();
+    await route.fulfill({
+      status: 201,
+      json: {
+        id: 1,
+        item_id: 1,
+        filename: "book.epub",
+        byte_size: 40_000,
+        sha256: "a".repeat(64),
+      },
+    });
+  });
+
+  const selectAndAttach = async () => {
+    await page
+      .getByLabel("Calibre folder", { exact: true })
+      .setInputFiles(
+        fileURLToPath(new URL("fixtures/Calibre Library", import.meta.url)),
+      );
+    await page
+      .getByRole("checkbox", { name: /also attach the ebook files/i })
+      .check();
+    await page
+      .getByRole("button", { name: /preview calibre library/i })
+      .click();
+    await page.getByRole("button", { name: /import 1 ready row/i }).click();
+  };
+
+  await page.goto("/import?tab=calibre");
+  await selectAndAttach();
+  await expect(page.getByText(/attached 1 of 1 ebook/i)).toBeVisible();
+  expect(previews[0]).toEqual([
+    "metadata.db",
+    "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg",
+  ]);
+  expect(attachments).toEqual([
+    "Brandon Sanderson/Mistborn_ The Final Empire (2)/book.epub",
+  ]);
+
+  await page.reload();
+  await selectAndAttach();
+  await expect(page.getByText(/1 whose file you already have/i)).toBeVisible();
+  expect(previews[1]).toEqual(["metadata.db"]);
+  expect(attachments).toHaveLength(1);
+});
+
 test("a second import of the same folder sends the database and nothing else", async ({
   page,
 }) => {

@@ -356,14 +356,14 @@ class CalibreImporter:
         accepts_files=True,
         placeholder=None,
         help=(
-            "Akasha reads the library you choose and copies nothing but its metadata "
-            "and its covers. Your files stay where they are."
+            "Akasha reads the library you choose and sends its metadata and covers. "
+            "Ebook files stay where they are unless you opt in below."
         ),
         guide=(
             "Choose your Calibre library folder — the one that holds metadata.db. "
             "Your browser reads it directly; nothing needs to be mounted or configured.",
-            "Only metadata.db and the covers are sent. Your ebooks are never uploaded, "
-            "which is why this is a few megabytes rather than a few gigabytes.",
+            "Only metadata.db and the covers are sent by default. You can opt in to "
+            "attach one preferred ebook file per book after reviewing the size.",
             "Nothing is written back to Calibre, and nothing holds the library open, so "
             "it is safe to do while Calibre or calibre-web is running.",
             "Only empty fields are filled. Anything you have edited in Akasha wins, and "

@@ -26,6 +26,7 @@ const importers = [
     id: "goodreads",
     label: "Goodreads",
     item_type: "book",
+    attachment_max_bytes: 25 * 1024 * 1024,
     input: {
       kind: "upload",
       label: "Goodreads CSV",
@@ -51,6 +52,7 @@ const importers = [
     id: "calibre",
     label: "Calibre",
     item_type: "book",
+    attachment_max_bytes: 25 * 1024 * 1024,
     input: {
       kind: "directory",
       label: "Calibre folder",
@@ -759,6 +761,10 @@ describe("ImportPage", () => {
       pick("Calibre Library/.caltrash/b/1/cover.jpg"),
     ]);
 
+    expect(
+      screen.getByRole("checkbox", { name: /also attach the ebook files/i }),
+    ).not.toBeChecked();
+
     // Said before anything is sent, because "choose a folder" and "upload your
     // whole ebook collection" are otherwise indistinguishable.
     expect(
@@ -778,6 +784,124 @@ describe("ImportPage", () => {
     expect(parts.map((part) => part.name)).toEqual([
       "metadata.db",
       "Sanderson/Mistborn (2)/cover.jpg",
+    ]);
+  });
+
+  it("counts preferred ebooks, skips over-cap files, and attaches after commit", async () => {
+    const requests: Array<{ url: string; body: FormData | null }> = [];
+    let fileRequest = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      requests.push({
+        url,
+        body: init?.body instanceof FormData ? init.body : null,
+      });
+      if (url === "/api/importers") {
+        const registry = structuredClone(importers);
+        registry[1].attachment_max_bytes = 1_000_000;
+        return new Response(JSON.stringify(registry));
+      }
+      if (url.endsWith("calibre/plan")) {
+        const manifest = JSON.parse(
+          String((init?.body as FormData).get("manifest")),
+        ) as Array<{ path: string }>;
+        return new Response(
+          JSON.stringify({
+            wanted: manifest.map((row) => row.path),
+            holding: 0,
+            reason: null,
+          }),
+        );
+      }
+      if (url.endsWith("calibre/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "files-1",
+            fingerprint: "db",
+            state: "previewed",
+            summary: { total: 3, ready: 3, errors: 0, ambiguous: 0 },
+            records: [],
+          }),
+          { status: 201 },
+        );
+      if (url.endsWith("calibre/commit"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "files-1",
+            state: "committed",
+            created_items: 3,
+            created_entries: 3,
+            unchanged_entries: 0,
+            unsorted_entries: 3,
+          }),
+        );
+      if (url.endsWith("/batches/files-1/files")) {
+        fileRequest += 1;
+        return fileRequest === 1
+          ? new Response(
+              JSON.stringify({
+                id: 1,
+                item_id: 1,
+                filename: "one.epub",
+                byte_size: 700_000,
+                sha256: "a".repeat(64),
+              }),
+              { status: 201 },
+            )
+          : new Response(
+              JSON.stringify({
+                error: {
+                  code: "invalid_attachment",
+                  user_message: "That file could not be stored.",
+                },
+              }),
+              { status: 422 },
+            );
+      }
+      return new Response(JSON.stringify({}), { status: 404 });
+    });
+    renderImportPage("/import?tab=calibre");
+
+    await userEvent.upload(await screen.findByLabelText("Calibre folder"), [
+      pick("Lib/metadata.db", 100),
+      pick("Lib/A/One (1)/cover.jpg", 10),
+      pick("Lib/A/One (1)/one.azw3", 600_000),
+      pick("Lib/A/One (1)/one.epub", 700_000),
+      pick("Lib/B/Two (2)/two.pdf", 800_000),
+      pick("Lib/C/Three (3)/three.epub", 1_100_000),
+    ]);
+    await userEvent.click(
+      screen.getByRole("checkbox", { name: /also attach the ebook files/i }),
+    );
+
+    expect(await screen.findByText(/attaching 2 ebooks/i)).toBeVisible();
+    expect(screen.getByText(/attaching 2 ebooks.*1\.4 MB/i)).toBeVisible();
+    expect(screen.getByText(/three\.epub.*1\.0 MB/i)).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /import 3 ready rows/i }),
+    );
+
+    expect(await screen.findByText(/attached 1 of 2 ebooks/i)).toBeVisible();
+    expect(screen.getByText(/B\/Two \(2\)\/two\.pdf/)).toBeVisible();
+    expect(screen.getByText(/import complete: 3 entries added/i)).toBeVisible();
+
+    const preview = requests.find((request) =>
+      request.url.endsWith("calibre/preview"),
+    );
+    expect(
+      (preview?.body?.getAll("files") as File[]).map((file) => file.name),
+    ).toEqual(["metadata.db", "A/One (1)/cover.jpg"]);
+    const uploads = requests.filter((request) =>
+      request.url.endsWith("/batches/files-1/files"),
+    );
+    expect(uploads).toHaveLength(2);
+    expect(uploads.map((request) => request.body?.get("path"))).toEqual([
+      "A/One (1)/one.epub",
+      "B/Two (2)/two.pdf",
     ]);
   });
 

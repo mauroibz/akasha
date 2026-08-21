@@ -59,6 +59,8 @@ export interface ImporterDefinition {
   label: string;
   item_type: string;
   input: ImportInputSpec;
+  /** Per-file ceiling for attachments created by an import. */
+  attachment_max_bytes: number;
 }
 
 /** One level of a browsable connector's source. Relative names, never host paths. */
@@ -244,6 +246,29 @@ export function commitImport(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ batch_id: batchId, choices }),
   }).then((response) => responseJson<ImportResult>(response));
+}
+
+export interface ImportFileResult {
+  id: number;
+  item_id: number;
+  filename: string;
+  byte_size: number;
+  sha256: string;
+}
+
+/** Attach one planned source member after its batch has committed. */
+export function uploadImportFile(
+  importerId: string,
+  batchId: string,
+  member: BundleMember,
+) {
+  const form = new FormData();
+  form.append("path", member.path);
+  form.append("file", member.file, member.path);
+  return fetch(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/files`,
+    { method: "POST", body: form },
+  ).then((response) => responseJson<ImportFileResult>(response));
 }
 
 export function getJobProgress(jobId: string) {

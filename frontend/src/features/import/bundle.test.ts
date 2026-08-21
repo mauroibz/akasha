@@ -58,6 +58,64 @@ describe("calibreBundle", () => {
     expect(bundle.database).toBeNull();
     expect(bundle.members).toHaveLength(0);
   });
+
+  it("adds one ebook per book in preference order only when asked", () => {
+    const files = [
+      pick("Lib/metadata.db", 100),
+      pick("Lib/A/One (1)/cover.jpg", 10),
+      pick("Lib/A/One (1)/one.azw3", 300),
+      pick("Lib/A/One (1)/one.epub", 200),
+      pick("Lib/B/Two (2)/two.pdf", 400),
+      pick("Lib/B/Two (2)/two.txt", 50),
+    ];
+
+    const off = calibreBundle(files);
+    expect(off.members.map((member) => member.path)).toEqual([
+      "metadata.db",
+      "A/One (1)/cover.jpg",
+    ]);
+    expect(off.ebooks).toEqual([]);
+
+    const on = calibreBundle(files, {
+      attachEbooks: true,
+      attachmentMaxBytes: 1_000,
+    });
+    expect(on.ebooks.map((member) => member.path)).toEqual([
+      "A/One (1)/one.epub",
+      "B/Two (2)/two.pdf",
+    ]);
+    expect(on.members.map((member) => member.path)).toEqual([
+      "metadata.db",
+      "A/One (1)/cover.jpg",
+      "A/One (1)/one.epub",
+      "B/Two (2)/two.pdf",
+    ]);
+    expect(on.ebookBytes).toBe(600);
+    expect(on.bytes).toBe(710);
+  });
+
+  it("names a preferred ebook over the cap and does not fall back or send it", () => {
+    const bundle = calibreBundle(
+      [
+        pick("Lib/metadata.db", 100),
+        pick("Lib/A/One (1)/one.epub", 2_000),
+        pick("Lib/A/One (1)/one.azw3", 500),
+        pick("Lib/B/Two (2)/two.mobi", 400),
+      ],
+      { attachEbooks: true, attachmentMaxBytes: 1_000 },
+    );
+
+    expect(bundle.ebooks.map((member) => member.path)).toEqual([
+      "B/Two (2)/two.mobi",
+    ]);
+    expect(bundle.overCap.map((member) => member.path)).toEqual([
+      "A/One (1)/one.epub",
+    ]);
+    expect(bundle.members.map((member) => member.path)).toEqual([
+      "metadata.db",
+      "B/Two (2)/two.mobi",
+    ]);
+  });
 });
 
 describe("formatBytes", () => {

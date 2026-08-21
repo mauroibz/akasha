@@ -16,9 +16,45 @@ export interface CalibreBundle {
   readonly members: BundleMember[];
   readonly database: BundleMember | null;
   readonly covers: number;
+  /** Preferred, under-cap ebooks that will be attached after commit. */
+  readonly ebooks: BundleMember[];
+  readonly ebookBytes: number;
+  /** Preferred ebooks that were deliberately left behind because of the cap. */
+  readonly overCap: BundleMember[];
   readonly bytes: number;
   /** Everything the filter left behind, for the "and nothing else" line. */
   readonly skipped: number;
+}
+
+export interface CalibreBundleOptions {
+  readonly attachEbooks?: boolean;
+  readonly attachmentMaxBytes?: number;
+}
+
+const EBOOK_FORMATS = [
+  "epub",
+  "azw3",
+  "mobi",
+  "pdf",
+  "cbz",
+  "cbr",
+  "txt",
+] as const;
+
+function ebookRank(path: string): number | null {
+  const filename = path.split("/").at(-1) ?? "";
+  const extension = filename.includes(".")
+    ? filename.split(".").at(-1)?.toLowerCase()
+    : undefined;
+  const rank = EBOOK_FORMATS.indexOf(
+    extension as (typeof EBOOK_FORMATS)[number],
+  );
+  return rank === -1 ? null : rank;
+}
+
+/** Whether this member belongs to the post-commit attachment phase. */
+export function isEbookMember(member: BundleMember): boolean {
+  return ebookRank(member.path) !== null;
 }
 
 /**
@@ -40,29 +76,56 @@ function relativePath(file: File): string {
  * away. The server refuses the same set again — this filter is for the reader's
  * bandwidth, not for their safety.
  */
-export function calibreBundle(files: readonly File[]): CalibreBundle {
-  const members: BundleMember[] = [];
-  let skipped = 0;
+export function calibreBundle(
+  files: readonly File[],
+  options: CalibreBundleOptions = {},
+): CalibreBundle {
+  const sourceMembers: BundleMember[] = [];
+  const preferredByDirectory = new Map<
+    string,
+    { member: BundleMember; rank: number }
+  >();
   for (const file of files) {
     const path = relativePath(file);
     const segments = path.split("/");
     const hidden = segments.some((segment) => segment.startsWith("."));
-    const wanted =
-      !hidden &&
-      (path === "metadata.db" ||
-        (segments.length >= 2 &&
-          segments[segments.length - 1] === "cover.jpg"));
-    if (wanted) members.push({ path, file });
-    else skipped += 1;
+    if (hidden) continue;
+    const member = { path, file };
+    if (
+      path === "metadata.db" ||
+      (segments.length >= 2 && segments[segments.length - 1] === "cover.jpg")
+    ) {
+      sourceMembers.push(member);
+      continue;
+    }
+    if (!options.attachEbooks || segments.length < 2) continue;
+    const rank = ebookRank(path);
+    if (rank === null) continue;
+    const directory = segments.slice(0, -1).join("/");
+    const previous = preferredByDirectory.get(directory);
+    if (!previous || rank < previous.rank)
+      preferredByDirectory.set(directory, { member, rank });
   }
+
+  const cap = options.attachmentMaxBytes ?? Number.POSITIVE_INFINITY;
+  const preferred = [...preferredByDirectory.values()].map(
+    ({ member }) => member,
+  );
+  const ebooks = preferred.filter((member) => member.file.size <= cap);
+  const overCap = preferred.filter((member) => member.file.size > cap);
+  const members = [...sourceMembers, ...ebooks];
   const database =
     members.find((member) => member.path === "metadata.db") ?? null;
   return {
     members,
     database,
-    covers: members.filter((member) => member.path !== "metadata.db").length,
+    covers: sourceMembers.filter((member) => member.path !== "metadata.db")
+      .length,
+    ebooks,
+    ebookBytes: ebooks.reduce((total, member) => total + member.file.size, 0),
+    overCap,
     bytes: members.reduce((total, member) => total + member.file.size, 0),
-    skipped,
+    skipped: files.length - members.length,
   };
 }
 

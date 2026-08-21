@@ -25,9 +25,14 @@ import {
   type ImportPreview,
   type ImportResult,
   type UndoResult,
+  uploadImportFile,
 } from "@/api/imports";
 import type { BundleMember, CalibreBundle } from "@/features/import/bundle";
-import { cheapMembers, narrowedTo } from "@/features/import/bundle";
+import {
+  cheapMembers,
+  isEbookMember,
+  narrowedTo,
+} from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
@@ -38,6 +43,18 @@ import { TriagePage } from "@/pages/TriagePage";
 interface ImportFailure {
   readonly message: string;
   readonly action: string | null;
+}
+
+interface AttachmentFailure {
+  readonly path: string;
+  readonly message: string;
+}
+
+interface AttachmentProgress {
+  readonly total: number;
+  readonly completed: number;
+  readonly current: string | null;
+  readonly failures: AttachmentFailure[];
 }
 
 function asFailure(reason: Error): ImportFailure {
@@ -75,6 +92,9 @@ export function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [libraryPath, setLibraryPath] = useState("");
   const [bundle, setBundle] = useState<CalibreBundle | null>(null);
+  const [filesToAttach, setFilesToAttach] = useState<BundleMember[]>([]);
+  const [attachmentProgress, setAttachmentProgress] =
+    useState<AttachmentProgress | null>(null);
   const [showAlternate, setShowAlternate] = useState(false);
   const [skipped, setSkipped] = useState<{
     held: number;
@@ -145,6 +165,8 @@ export function ImportPage() {
     setFile(null);
     setLibraryPath("");
     setBundle(null);
+    setFilesToAttach([]);
+    setAttachmentProgress(null);
     setShowAlternate(false);
     setSkipped(null);
     setPreview(null);
@@ -224,26 +246,40 @@ export function ImportPage() {
       source: File | string | BundleMember[];
     },
   ): Promise<File | string | BundleMember[]> => {
-    if (submission.spec.kind !== "directory" || !submission.spec.incremental)
+    if (submission.spec.kind !== "directory") {
+      setFilesToAttach([]);
       return submission.source;
+    }
     if (!bundle) return submission.source;
+    let wanted = bundle.members.map((member) => member.path);
     try {
-      const plan = await planImport(
-        importer,
-        submission.spec,
-        cheapMembers(bundle),
-        bundle.members,
-      );
-      setSkipped({ held: plan.holding, reason: plan.reason });
-      return narrowedTo(bundle, plan.wanted);
+      if (submission.spec.incremental) {
+        const plan = await planImport(
+          importer,
+          submission.spec,
+          cheapMembers(bundle),
+          bundle.members,
+        );
+        setSkipped(
+          plan.holding > 0 || plan.reason
+            ? { held: plan.holding, reason: plan.reason }
+            : null,
+        );
+        wanted = plan.wanted;
+      }
     } catch {
       setSkipped({
         held: 0,
         reason:
-          "Could not check what is already imported, so everything was sent.",
+          "Could not check what is already imported, so every selected file will be sent.",
       });
-      return submission.source;
     }
+    const selected = narrowedTo(bundle, wanted);
+    setFilesToAttach(selected.filter(isEbookMember));
+    // Ebooks are offered to the planner now, but their bytes travel one at a time
+    // only after commit. This keeps the preview request bounded by the source cap
+    // and each attachment request bounded by the attachment cap (DEC-083).
+    return selected.filter((member) => !isEbookMember(member));
   };
 
   const renderInput = (
@@ -259,7 +295,12 @@ export function ImportPage() {
           importerLabel={importer.label}
           inputId={inputId}
           bundle={bundle}
-          onBundle={setBundle}
+          onBundle={(next) => {
+            setBundle(next);
+            setFilesToAttach([]);
+            setAttachmentProgress(null);
+          }}
+          attachmentMaxBytes={importer.attachment_max_bytes}
         />
       );
     if (spec.kind === "upload")
@@ -516,27 +557,65 @@ export function ImportPage() {
               onClick={() => {
                 setPending(true);
                 setError(null);
-                void commitImport(
-                  source,
-                  preview.batch_id,
-                  Object.entries(choices).map(([recordId, value]) => ({
-                    record_id: Number(recordId),
-                    item_id: value === "new" ? null : value,
-                  })),
-                )
-                  .then((committed) => {
-                    setResult(committed);
-                    toast.success(
-                      `Import complete: ${committed.created_entries} ${
-                        committed.created_entries === 1 ? "entry" : "entries"
-                      } added`,
-                      {
-                        description: committed.unsorted_entries
-                          ? `${committed.unsorted_entries} waiting in Triage. Undo stays available for 24 hours.`
-                          : "Undo stays available for 24 hours.",
-                      },
-                    );
-                  })
+                void (async () => {
+                  const committed = await commitImport(
+                    source,
+                    preview.batch_id,
+                    Object.entries(choices).map(([recordId, value]) => ({
+                      record_id: Number(recordId),
+                      item_id: value === "new" ? null : value,
+                    })),
+                  );
+                  setResult(committed);
+                  if (filesToAttach.length > 0) {
+                    const failures: AttachmentFailure[] = [];
+                    setAttachmentProgress({
+                      total: filesToAttach.length,
+                      completed: 0,
+                      current: filesToAttach[0].path,
+                      failures,
+                    });
+                    for (const [index, member] of filesToAttach.entries()) {
+                      setAttachmentProgress({
+                        total: filesToAttach.length,
+                        completed: index,
+                        current: member.path,
+                        failures: [...failures],
+                      });
+                      try {
+                        await uploadImportFile(
+                          source,
+                          committed.batch_id,
+                          member,
+                        );
+                      } catch (reason) {
+                        failures.push({
+                          path: member.path,
+                          message:
+                            reason instanceof Error
+                              ? reason.message
+                              : "That file could not be stored.",
+                        });
+                      }
+                      setAttachmentProgress({
+                        total: filesToAttach.length,
+                        completed: index + 1,
+                        current: null,
+                        failures: [...failures],
+                      });
+                    }
+                  }
+                  toast.success(
+                    `Import complete: ${committed.created_entries} ${
+                      committed.created_entries === 1 ? "entry" : "entries"
+                    } added`,
+                    {
+                      description: committed.unsorted_entries
+                        ? `${committed.unsorted_entries} waiting in Triage. Undo stays available for 24 hours.`
+                        : "Undo stays available for 24 hours.",
+                    },
+                  );
+                })()
                   .catch((reason: Error) => setError(asFailure(reason)))
                   .finally(() => setPending(false));
               }}
@@ -554,6 +633,27 @@ export function ImportPage() {
               {result.created_entries === 1 ? "entry" : "entries"} added;{" "}
               {result.unchanged_entries} already present.
             </p>
+            {attachmentProgress && (
+              <div className="mt-3 text-sm" aria-live="polite">
+                <p>
+                  {attachmentProgress.current
+                    ? `Attaching ebook ${attachmentProgress.completed + 1} of ${attachmentProgress.total}: ${attachmentProgress.current}`
+                    : `Attached ${attachmentProgress.total - attachmentProgress.failures.length} of ${attachmentProgress.total} ${attachmentProgress.total === 1 ? "ebook" : "ebooks"}.`}
+                </p>
+                {attachmentProgress.failures.length > 0 && (
+                  <div className="mt-2 text-destructive">
+                    <p>These files could not be attached:</p>
+                    <ul className="mt-1 list-disc pl-5">
+                      {attachmentProgress.failures.map((failure) => (
+                        <li key={failure.path}>
+                          {failure.path} — {failure.message}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
             {/* Imported rows land `unsorted`, and the library's default view
               excludes `unsorted`, so a successful import used to look like a
               no-op: the count went up and the shelf stayed empty. Say where the
@@ -575,7 +675,7 @@ export function ImportPage() {
             )}
           </div>
         )}
-        {result && !undoResult && (
+        {result && !undoResult && !pending && (
           <div className="mt-5 rounded-2xl bg-surface p-4">
             <p className="text-sm text-muted-foreground">
               You can undo this import for 24 hours after commit. The undo
