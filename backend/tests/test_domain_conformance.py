@@ -70,6 +70,7 @@ def assert_importer_contract(importer: object) -> None:
     assert importer.label
     assert importer.item_type in DOMAINS
     assert isinstance(importer.input, ImportInputSpec)
+    assert importer.input.field and importer.input.field.isidentifier()
     assert importer.identity_kinds, f"{importer.name} declares no authoritative identity kinds"
     assert all(kind for kind in importer.identity_kinds)
     assert callable(importer.read), f"{importer.name} declares no reader"
@@ -404,7 +405,7 @@ def test_the_importer_suite_rejects_a_missing_contract_member() -> None:
         name = "missing"
         label = "Missing"
         item_type = "book"
-        input = ImportInputSpec(kind="upload", label="File")
+        input = ImportInputSpec(kind="upload", label="File", field="file")
         identity_kinds = frozenset({"isbn"})
 
         def read(self) -> None:

@@ -1,14 +1,16 @@
-from typing import Annotated, Any
+from typing import Any
 
-from fastapi import APIRouter, File, Request, UploadFile
-from pydantic import BaseModel, Field
+from fastapi import APIRouter, Request
+from pydantic import BaseModel, ConfigDict, Field
+from starlette.datastructures import UploadFile
 
-from book_tracker.application.imports import CalibreImportService, GoodreadsImportService
+from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError
-from book_tracker.domains.book.calibre import CalibreError
-from book_tracker.domains.book.goodreads import GoodreadsCSVError
+from book_tracker.domain.importers import ImportReadError, ImportSource
+from book_tracker.domain.registry import IMPORTERS
 
 router = APIRouter(prefix="/api/import", tags=["imports"])
+catalog_router = APIRouter(prefix="/api/importers", tags=["imports"])
 enrichment_router = APIRouter(prefix="/api/enrichment", tags=["enrichment"])
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
 
@@ -17,36 +19,54 @@ class BackfillResponse(BaseModel):
     queued: int
 
 
+class ImportInputResponse(BaseModel):
+    kind: str
+    label: str
+    field: str
+    accept: str | None = None
+    placeholder: str | None = None
+    help: str | None = None
+
+
+class ImporterResponse(BaseModel):
+    id: str
+    label: str
+    item_type: str
+    input: ImportInputResponse
+
+
+@catalog_router.get("", response_model=list[ImporterResponse])
+async def available_importers() -> list[ImporterResponse]:
+    return [
+        ImporterResponse(
+            id=importer.name,
+            label=importer.label,
+            item_type=importer.item_type,
+            input=ImportInputResponse.model_validate(importer.input.__dict__),
+        )
+        for importer in IMPORTERS.values()
+    ]
+
+
 class ImportRecordResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
     record_id: int
     row_number: int
-    goodreads_book_id: str | None = None
-    calibre_book_id: str | None = None
-    calibre_uuid: str | None = None
     title: str
     creators: list[str]
-    isbn: str | None
-    suggested_status: str | None
-    score: int | None
-    score_provisional: bool
-    shelves: list[str]
-    errors: list[dict[str, Any]]
+    suggested_status: str | None = None
+    score: int | None = None
+    score_provisional: bool = False
+    shelves: list[str] = Field(default_factory=list)
+    errors: list[dict[str, Any]] = Field(default_factory=list)
     planned_action: str
     match_kind: str
     candidates: list[int]
-    publisher: str | None = None
-    page_count: int | None = None
-    year: int | None = None
-    original_year: int | None = None
-    date_finished: str | None = None
-    date_added: str | None = None
-    review: str | None = None
-    reread_count: int = 0
-    description: str | None = None
-    series: str | None = None
+    item: dict[str, Any]
+    entry: dict[str, Any]
+    source_fields: dict[str, Any]
     cover_staged: bool = False
-    connection_mode: str | None = None
-    query_only: bool | None = None
 
 
 class PreviewSummary(BaseModel):
@@ -108,68 +128,67 @@ class UndoEffectSummary(BaseModel):
     retained_items: int = 0
 
 
-def service(request: Request) -> GoodreadsImportService:
-    return GoodreadsImportService(request.app.state.engine, request.app.state.data_dir)
+def service(request: Request, importer_name: str) -> ImportService:
+    importer = IMPORTERS.get(importer_name)
+    if importer is None:
+        raise LibraryError("importer_not_found", "Importer was not found", status_code=404)
+    return ImportService(
+        request.app.state.engine,
+        request.app.state.data_dir,
+        request.app.state.calibre_dir,
+        importer,
+    )
 
 
-@router.post("/goodreads/preview", status_code=201, response_model=PreviewResponse)
-async def preview(request: Request, file: Annotated[UploadFile, File()]) -> PreviewResponse:
-    chunks: list[bytes] = []
-    size = 0
-    while chunk := await file.read(64 * 1024):
-        size += len(chunk)
-        if size > MAX_IMPORT_BYTES:
-            raise LibraryError("import_too_large", "Goodreads CSV exceeds 5 MiB", status_code=413)
-        chunks.append(chunk)
+async def _source(request: Request, importer_name: str) -> ImportSource:
+    importer = IMPORTERS[importer_name]
+    if importer.input.kind == "upload":
+        form = await request.form()
+        upload = form.get(importer.input.field)
+        if not isinstance(upload, UploadFile):
+            raise LibraryError(
+                "invalid_import_source", "An import file is required", status_code=422
+            )
+        chunks: list[bytes] = []
+        size = 0
+        while chunk := await upload.read(64 * 1024):
+            size += len(chunk)
+            if size > MAX_IMPORT_BYTES:
+                raise LibraryError(
+                    "import_too_large",
+                    f"{importer.label} source exceeds 5 MiB",
+                    status_code=413,
+                )
+            chunks.append(chunk)
+        return ImportSource(data=b"".join(chunks), filename=upload.filename)
     try:
-        result = service(request).preview(b"".join(chunks), file.filename or "goodreads.csv")
-    except GoodreadsCSVError as error:
+        body = await request.json()
+        value = body.get(importer.input.field) if isinstance(body, dict) else None
+        if not isinstance(value, str) or not value.strip() or len(value) > 500:
+            raise ValueError("invalid path")
+    except (ValueError, TypeError) as error:
+        raise LibraryError(
+            "invalid_import_source", "A library path is required", status_code=422
+        ) from error
+    return ImportSource(path=value)
+
+
+@router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)
+async def preview(importer_name: str, request: Request) -> PreviewResponse:
+    import_service = service(request, importer_name)
+    try:
+        result = import_service.preview(await _source(request, importer_name))
+    except ImportReadError as error:
         raise LibraryError(
             error.code, str(error), status_code=422, details=error.details
         ) from error
     return PreviewResponse.model_validate(result)
 
 
-@router.post("/goodreads/commit", response_model=CommitResponse)
-async def commit(body: CommitBody, request: Request) -> CommitResponse:
+@router.post("/{importer_name}/commit", response_model=CommitResponse)
+async def commit(importer_name: str, body: CommitBody, request: Request) -> CommitResponse:
     try:
-        result = service(request).commit(
-            body.batch_id,
-            {choice.record_id: choice.model_dump(exclude={"record_id"}) for choice in body.choices},
-        )
-    except LookupError as error:
-        raise LibraryError(
-            "import_batch_not_found", "Import preview was not found", status_code=404
-        ) from error
-    except ValueError as error:
-        code = "unresolved_ambiguities" if str(error).startswith("[") else str(error)
-        raise LibraryError(code, "Import preview cannot be committed", status_code=409) from error
-    return CommitResponse.model_validate(result)
-
-
-class CalibrePreviewBody(BaseModel):
-    library_path: str = Field(min_length=1, max_length=500)
-
-
-def calibre_service(request: Request) -> CalibreImportService:
-    return CalibreImportService(
-        request.app.state.engine, request.app.state.data_dir, request.app.state.calibre_dir
-    )
-
-
-@router.post("/calibre/preview", status_code=201, response_model=PreviewResponse)
-async def calibre_preview(body: CalibrePreviewBody, request: Request) -> PreviewResponse:
-    try:
-        result = calibre_service(request).preview(body.library_path)
-    except CalibreError as error:
-        raise LibraryError(error.code, str(error), status_code=422) from error
-    return PreviewResponse.model_validate(result)
-
-
-@router.post("/calibre/commit", response_model=CommitResponse)
-async def calibre_commit(body: CommitBody, request: Request) -> CommitResponse:
-    try:
-        result = calibre_service(request).commit(
+        result = service(request, importer_name).commit(
             body.batch_id,
             {choice.record_id: choice.model_dump(exclude={"record_id"}) for choice in body.choices},
         )

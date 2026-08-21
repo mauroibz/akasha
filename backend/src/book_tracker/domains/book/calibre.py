@@ -12,6 +12,7 @@ from book_tracker.domain.importers import (
     ImportItem,
     ImportMatcher,
     ImportReadContext,
+    ImportReadError,
     ImportSnapshot,
     ImportSource,
     NormalizedImportRecord,
@@ -22,10 +23,9 @@ from book_tracker.domains.book import DOMAIN
 from book_tracker.infrastructure.covers import CoverError, prepare_uploaded_cover
 
 
-class CalibreError(ValueError):
+class CalibreError(ImportReadError):
     def __init__(self, code: str, message: str) -> None:
-        self.code = code
-        super().__init__(message)
+        super().__init__(code, message)
 
 
 @dataclass(frozen=True)
@@ -214,6 +214,7 @@ class CalibreImporter:
     input = ImportInputSpec(
         kind="path",
         label="Calibre library path",
+        field="library_path",
         placeholder="Library",
         help=(
             "Akasha opens this library read-only inside the configured Calibre mount. "
@@ -223,9 +224,9 @@ class CalibreImporter:
     identity_kinds = frozenset({"isbn", "calibre_uuid"})
 
     def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
-        if source.library_path is None:
+        if source.path is None:
             raise CalibreError("invalid_calibre_path", "A Calibre library path is required")
-        snapshot = CalibreAdapter(context.calibre_dir).read(source.library_path)
+        snapshot = CalibreAdapter(context.path_root).read(source.path)
         records = []
         for payload in snapshot.records:
             metadata = {
@@ -291,7 +292,7 @@ class CalibreImporter:
         return ImportSnapshot(
             fingerprint=snapshot.fingerprint,
             filename="metadata.db",
-            source_descriptor={"library_path": source.library_path},
+            source_descriptor={"library_path": source.path},
             records=tuple(records),
         )
 

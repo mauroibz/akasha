@@ -139,20 +139,6 @@
         "title": "Body_add_attachment_api_items__item_id__attachments_post",
         "type": "object"
       },
-      "Body_preview_api_import_goodreads_preview_post": {
-        "properties": {
-          "file": {
-            "format": "binary",
-            "title": "File",
-            "type": "string"
-          }
-        },
-        "required": [
-          "file"
-        ],
-        "title": "Body_preview_api_import_goodreads_preview_post",
-        "type": "object"
-      },
       "Body_replace_cover_api_items__item_id__cover_post": {
         "properties": {
           "cover": {
@@ -276,21 +262,6 @@
           }
         },
         "title": "BulkSet",
-        "type": "object"
-      },
-      "CalibrePreviewBody": {
-        "properties": {
-          "library_path": {
-            "maxLength": 500,
-            "minLength": 1,
-            "title": "Library Path",
-            "type": "string"
-          }
-        },
-        "required": [
-          "library_path"
-        ],
-        "title": "CalibrePreviewBody",
         "type": "object"
       },
       "ColumnSpecResponse": {
@@ -1108,9 +1079,9 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
-      "ImportRecordResponse": {
+      "ImportInputResponse": {
         "properties": {
-          "calibre_book_id": {
+          "accept": {
             "anyOf": [
               {
                 "type": "string"
@@ -1119,9 +1090,13 @@
                 "type": "null"
               }
             ],
-            "title": "Calibre Book Id"
+            "title": "Accept"
           },
-          "calibre_uuid": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "help": {
             "anyOf": [
               {
                 "type": "string"
@@ -1130,25 +1105,45 @@
                 "type": "null"
               }
             ],
-            "title": "Calibre Uuid"
+            "title": "Help"
           },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "placeholder": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Placeholder"
+          }
+        },
+        "required": [
+          "kind",
+          "label",
+          "field"
+        ],
+        "title": "ImportInputResponse",
+        "type": "object"
+      },
+      "ImportRecordResponse": {
+        "additionalProperties": true,
+        "properties": {
           "candidates": {
             "items": {
               "type": "integer"
             },
             "title": "Candidates",
             "type": "array"
-          },
-          "connection_mode": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Connection Mode"
           },
           "cover_staged": {
             "default": false,
@@ -1162,38 +1157,10 @@
             "title": "Creators",
             "type": "array"
           },
-          "date_added": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Date Added"
-          },
-          "date_finished": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Date Finished"
-          },
-          "description": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Description"
+          "entry": {
+            "additionalProperties": true,
+            "title": "Entry",
+            "type": "object"
           },
           "errors": {
             "items": {
@@ -1203,99 +1170,22 @@
             "title": "Errors",
             "type": "array"
           },
-          "goodreads_book_id": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Goodreads Book Id"
-          },
-          "isbn": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Isbn"
+          "item": {
+            "additionalProperties": true,
+            "title": "Item",
+            "type": "object"
           },
           "match_kind": {
             "title": "Match Kind",
             "type": "string"
           },
-          "original_year": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Original Year"
-          },
-          "page_count": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Page Count"
-          },
           "planned_action": {
             "title": "Planned Action",
             "type": "string"
           },
-          "publisher": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Publisher"
-          },
-          "query_only": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Query Only"
-          },
           "record_id": {
             "title": "Record Id",
             "type": "integer"
-          },
-          "reread_count": {
-            "default": 0,
-            "title": "Reread Count",
-            "type": "integer"
-          },
-          "review": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Review"
           },
           "row_number": {
             "title": "Row Number",
@@ -1313,19 +1203,9 @@
             "title": "Score"
           },
           "score_provisional": {
+            "default": false,
             "title": "Score Provisional",
             "type": "boolean"
-          },
-          "series": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Series"
           },
           "shelves": {
             "items": {
@@ -1333,6 +1213,11 @@
             },
             "title": "Shelves",
             "type": "array"
+          },
+          "source_fields": {
+            "additionalProperties": true,
+            "title": "Source Fields",
+            "type": "object"
           },
           "suggested_status": {
             "anyOf": [
@@ -1348,17 +1233,6 @@
           "title": {
             "title": "Title",
             "type": "string"
-          },
-          "year": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Year"
           }
         },
         "required": [
@@ -1366,17 +1240,41 @@
           "row_number",
           "title",
           "creators",
-          "isbn",
-          "suggested_status",
-          "score",
-          "score_provisional",
-          "shelves",
-          "errors",
           "planned_action",
           "match_kind",
-          "candidates"
+          "candidates",
+          "item",
+          "entry",
+          "source_fields"
         ],
         "title": "ImportRecordResponse",
+        "type": "object"
+      },
+      "ImporterResponse": {
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "input": {
+            "$ref": "#/components/schemas/ImportInputResponse"
+          },
+          "item_type": {
+            "title": "Item Type",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "item_type",
+          "input"
+        ],
+        "title": "ImporterResponse",
         "type": "object"
       },
       "ItemPatch": {
@@ -2954,25 +2852,26 @@
         ]
       }
     },
-    "/api/import/calibre/commit": {
-      "post": {
-        "operationId": "calibre_commit_api_import_calibre_commit_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CommitBody"
-              }
+    "/api/import/jobs/{job_id}": {
+      "get": {
+        "operationId": "get_job_progress_api_import_jobs__job_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/CommitResponse"
+                  "$ref": "#/components/schemas/JobProgressResponse"
                 }
               }
             },
@@ -2989,56 +2888,26 @@
             "description": "Validation Error"
           }
         },
-        "summary": "Calibre Commit",
+        "summary": "Get Job Progress",
         "tags": [
           "imports"
         ]
       }
     },
-    "/api/import/calibre/preview": {
+    "/api/import/{importer_name}/commit": {
       "post": {
-        "operationId": "calibre_preview_api_import_calibre_preview_post",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CalibrePreviewBody"
-              }
+        "operationId": "commit_api_import__importer_name__commit_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
             }
-          },
-          "required": true
-        },
-        "responses": {
-          "201": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PreviewResponse"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
-        },
-        "summary": "Calibre Preview",
-        "tags": [
-          "imports"
-        ]
-      }
-    },
-    "/api/import/goodreads/commit": {
-      "post": {
-        "operationId": "commit_api_import_goodreads_commit_post",
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -3077,19 +2946,20 @@
         ]
       }
     },
-    "/api/import/goodreads/preview": {
+    "/api/import/{importer_name}/preview": {
       "post": {
-        "operationId": "preview_api_import_goodreads_preview_post",
-        "requestBody": {
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "$ref": "#/components/schemas/Body_preview_api_import_goodreads_preview_post"
-              }
+        "operationId": "preview_api_import__importer_name__preview_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
             }
-          },
-          "required": true
-        },
+          }
+        ],
         "responses": {
           "201": {
             "content": {
@@ -3118,43 +2988,26 @@
         ]
       }
     },
-    "/api/import/jobs/{job_id}": {
+    "/api/importers": {
       "get": {
-        "operationId": "get_job_progress_api_import_jobs__job_id__get",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "job_id",
-            "required": true,
-            "schema": {
-              "title": "Job Id",
-              "type": "string"
-            }
-          }
-        ],
+        "operationId": "available_importers_api_importers_get",
         "responses": {
           "200": {
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/JobProgressResponse"
+                  "items": {
+                    "$ref": "#/components/schemas/ImporterResponse"
+                  },
+                  "title": "Response Available Importers Api Importers Get",
+                  "type": "array"
                 }
               }
             },
             "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
           }
         },
-        "summary": "Get Job Progress",
+        "summary": "Available Importers",
         "tags": [
           "imports"
         ]

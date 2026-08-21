@@ -13,6 +13,7 @@ from book_tracker.domain.importers import (
     ImportItem,
     ImportMatcher,
     ImportReadContext,
+    ImportReadError,
     ImportSnapshot,
     ImportSource,
     NormalizedImportRecord,
@@ -46,11 +47,9 @@ DOMAIN = BOOK
 SUGGESTED_STATUS = {"read": "read", "currently-reading": "reading", "to-read": "to_read"}
 
 
-class GoodreadsCSVError(ValueError):
+class GoodreadsCSVError(ImportReadError):
     def __init__(self, code: str, message: str, details: dict[str, Any] | None = None) -> None:
-        self.code = code
-        self.details = details or {}
-        super().__init__(message)
+        super().__init__(code, message, details)
 
 
 def _unarmor(value: str) -> str:
@@ -172,7 +171,9 @@ class GoodreadsImporter:
     name = "goodreads"
     label = "Goodreads"
     item_type = DOMAIN.item_type
-    input = ImportInputSpec(kind="upload", label="Goodreads CSV", accept=".csv,text/csv")
+    input = ImportInputSpec(
+        kind="upload", label="Goodreads CSV", field="file", accept=".csv,text/csv"
+    )
     identity_kinds = frozenset({"isbn"})
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:

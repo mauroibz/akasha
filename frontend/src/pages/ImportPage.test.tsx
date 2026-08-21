@@ -7,11 +7,74 @@ import { ImportPage } from "./ImportPage";
 
 afterEach(() => vi.restoreAllMocks());
 
+const importers = [
+  {
+    id: "goodreads",
+    label: "Goodreads",
+    item_type: "book",
+    input: {
+      kind: "upload",
+      label: "Goodreads CSV",
+      field: "file",
+      accept: ".csv,text/csv",
+      placeholder: null,
+      help: null,
+    },
+  },
+  {
+    id: "calibre",
+    label: "Calibre",
+    item_type: "book",
+    input: {
+      kind: "path",
+      label: "Calibre library path",
+      field: "library_path",
+      accept: null,
+      placeholder: "Library",
+      help: "Akasha opens this library read-only inside the configured Calibre mount.",
+    },
+  },
+];
+
 describe("ImportPage", () => {
+  it("renders importer tabs from the published registry instead of literals", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            id: "storygraph",
+            label: "StoryGraph",
+            item_type: "book",
+            input: {
+              kind: "upload",
+              label: "StoryGraph CSV",
+              field: "file",
+              accept: ".csv,text/csv",
+              placeholder: null,
+              help: null,
+            },
+          },
+        ]),
+      ),
+    );
+    render(
+      <MemoryRouter>
+        <ImportPage />
+      </MemoryRouter>,
+    );
+
+    expect(
+      await screen.findByRole("tab", { name: "StoryGraph" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("tab", { name: "Goodreads" })).toBeNull();
+  });
+
   it("previews and commits a confined Calibre library without asking for a file", async () => {
     const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       requests.push([input, init]);
+      if (String(input) === "/api/importers")
+        return new Response(JSON.stringify(importers));
       if (String(input).endsWith("calibre/preview"))
         return new Response(
           JSON.stringify({
@@ -58,7 +121,7 @@ describe("ImportPage", () => {
         <ImportPage />
       </MemoryRouter>,
     );
-    await userEvent.click(screen.getByRole("tab", { name: /calibre/i }));
+    await userEvent.click(await screen.findByRole("tab", { name: /calibre/i }));
     expect(screen.getByText(/read-only/i)).toBeVisible();
     await userEvent.type(screen.getByLabelText(/library path/i), "My Books");
     await userEvent.click(
@@ -69,19 +132,27 @@ describe("ImportPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
-    expect(requests[0]).toEqual([
+    expect(
+      requests.find(([input]) => String(input).endsWith("calibre/preview")),
+    ).toEqual([
       "/api/import/calibre/preview",
       expect.objectContaining({
         body: JSON.stringify({ library_path: "My Books" }),
       }),
     ]);
-    expect(String(requests[1][0])).toContain("/api/import/calibre/commit");
+    expect(
+      requests.some(([input]) =>
+        String(input).includes("/api/import/calibre/commit"),
+      ),
+    ).toBe(true);
   });
 
   it("previews once, exposes errors and commits only the recorded batch", async () => {
     const requests: Array<[RequestInfo | URL, RequestInit | undefined]> = [];
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       requests.push([input, init]);
+      if (String(input) === "/api/importers")
+        return new Response(JSON.stringify(importers));
       if (String(input).endsWith("preview"))
         return new Response(
           JSON.stringify({
@@ -144,7 +215,10 @@ describe("ImportPage", () => {
       </MemoryRouter>,
     );
     const file = new File(["csv"], "library.csv", { type: "text/csv" });
-    await userEvent.upload(screen.getByLabelText(/goodreads csv/i), file);
+    await userEvent.upload(
+      await screen.findByLabelText(/goodreads csv/i),
+      file,
+    );
     await userEvent.click(
       screen.getByRole("button", { name: /preview import/i }),
     );
@@ -169,43 +243,45 @@ describe("ImportPage", () => {
   });
 
   it("requires an explicit choice for ambiguous rows", async () => {
-    vi.spyOn(globalThis, "fetch").mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          batch_id: "batch-2",
-          fingerprint: "x",
-          state: "previewed",
-          summary: { total: 1, ready: 0, errors: 0, ambiguous: 1 },
-          records: [
-            {
-              record_id: 4,
-              row_number: 2,
-              goodreads_book_id: "4",
-              title: "Ficciones",
-              creators: ["Borges"],
-              isbn: null,
-              suggested_status: null,
-              score: null,
-              score_provisional: false,
-              shelves: [],
-              formats: [],
-              errors: [],
-              planned_action: "ambiguous",
-              match_kind: "ambiguous",
-              candidates: [7],
-            },
-          ],
-        }),
-        { status: 201 },
-      ),
-    );
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce(new Response(JSON.stringify(importers)))
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            batch_id: "batch-2",
+            fingerprint: "x",
+            state: "previewed",
+            summary: { total: 1, ready: 0, errors: 0, ambiguous: 1 },
+            records: [
+              {
+                record_id: 4,
+                row_number: 2,
+                goodreads_book_id: "4",
+                title: "Ficciones",
+                creators: ["Borges"],
+                isbn: null,
+                suggested_status: null,
+                score: null,
+                score_provisional: false,
+                shelves: [],
+                formats: [],
+                errors: [],
+                planned_action: "ambiguous",
+                match_kind: "ambiguous",
+                candidates: [7],
+              },
+            ],
+          }),
+          { status: 201 },
+        ),
+      );
     render(
       <MemoryRouter>
         <ImportPage />
       </MemoryRouter>,
     );
     await userEvent.upload(
-      screen.getByLabelText(/goodreads csv/i),
+      await screen.findByLabelText(/goodreads csv/i),
       new File(["x"], "x.csv", { type: "text/csv" }),
     );
     await userEvent.click(
@@ -231,47 +307,49 @@ describe("ImportPage", () => {
     // nothing, because imports land `unsorted` and the default view hides
     // exactly that. The result panel now says where the rows went.
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input).endsWith("/preview")
-        ? new Response(
-            JSON.stringify({
-              batch_id: "batch-9",
-              fingerprint: "abc",
-              state: "previewed",
-              summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
-              records: [
-                {
-                  record_id: 1,
-                  row_number: 2,
-                  goodreads_book_id: "101",
-                  title: "Rayuela",
-                  creators: ["Julio Cort\u00e1zar"],
-                  isbn: "9788437604572",
-                  suggested_status: "read",
-                  score: 8,
-                  score_provisional: true,
-                  shelves: [],
-                  formats: [],
-                  errors: [],
-                  planned_action: "create_item",
-                  match_kind: "new",
-                  candidates: [],
-                },
-              ],
-            }),
-            { status: 201 },
-          )
-        : new Response(
-            JSON.stringify({
-              batch_id: "batch-9",
-              state: "committed",
-              created_items: 1,
-              created_entries: 1,
-              unchanged_entries: 0,
-              // More than this batch created: an earlier import left rows there
-              // too, and the whole waiting pile is what the reader needs.
-              unsorted_entries: 7,
-            }),
-          ),
+      String(input) === "/api/importers"
+        ? new Response(JSON.stringify(importers))
+        : String(input).endsWith("/preview")
+          ? new Response(
+              JSON.stringify({
+                batch_id: "batch-9",
+                fingerprint: "abc",
+                state: "previewed",
+                summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+                records: [
+                  {
+                    record_id: 1,
+                    row_number: 2,
+                    goodreads_book_id: "101",
+                    title: "Rayuela",
+                    creators: ["Julio Cort\u00e1zar"],
+                    isbn: "9788437604572",
+                    suggested_status: "read",
+                    score: 8,
+                    score_provisional: true,
+                    shelves: [],
+                    formats: [],
+                    errors: [],
+                    planned_action: "create_item",
+                    match_kind: "new",
+                    candidates: [],
+                  },
+                ],
+              }),
+              { status: 201 },
+            )
+          : new Response(
+              JSON.stringify({
+                batch_id: "batch-9",
+                state: "committed",
+                created_items: 1,
+                created_entries: 1,
+                unchanged_entries: 0,
+                // More than this batch created: an earlier import left rows there
+                // too, and the whole waiting pile is what the reader needs.
+                unsorted_entries: 7,
+              }),
+            ),
     );
     render(
       <MemoryRouter>
@@ -279,7 +357,7 @@ describe("ImportPage", () => {
       </MemoryRouter>,
     );
     await userEvent.upload(
-      screen.getByLabelText(/goodreads csv/i),
+      await screen.findByLabelText(/goodreads csv/i),
       new File(["csv"], "library.csv", { type: "text/csv" }),
     );
     await userEvent.click(

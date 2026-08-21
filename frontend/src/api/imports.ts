@@ -1,12 +1,8 @@
 export interface ImportRecord {
   record_id: number;
   row_number: number;
-  goodreads_book_id?: string | null;
-  calibre_book_id?: string | null;
-  calibre_uuid?: string | null;
   title: string;
   creators: string[];
-  isbn: string | null;
   suggested_status: string | null;
   score: number | null;
   score_provisional: boolean;
@@ -15,7 +11,37 @@ export interface ImportRecord {
   planned_action: string;
   match_kind: string;
   candidates: number[];
+  item: {
+    title: string;
+    subtitle: string | null;
+    year: number | null;
+    identifiers: Record<string, string>;
+    metadata: Record<string, unknown>;
+    creator_sort: string | null;
+  };
+  entry: {
+    score: number | null;
+    notes: string | null;
+    date_added: string | null;
+    values: Record<string, unknown>;
+    score_provisional: boolean;
+    suggested_status: string | null;
+  };
+  source_fields: Record<string, unknown>;
   cover_staged?: boolean;
+}
+export interface ImporterDefinition {
+  id: string;
+  label: string;
+  item_type: string;
+  input: {
+    kind: "upload" | "path";
+    label: string;
+    field: string;
+    accept: string | null;
+    placeholder: string | null;
+    help: string | null;
+  };
 }
 export interface ImportPreview {
   batch_id: string;
@@ -65,39 +91,37 @@ async function responseJson<T>(response: Response): Promise<T> {
   return response.json() as Promise<T>;
 }
 
-export function previewGoodreads(file: File) {
-  const form = new FormData();
-  form.append("file", file);
-  return fetch("/api/import/goodreads/preview", {
+export function getImporters() {
+  return fetch("/api/importers").then((response) =>
+    responseJson<ImporterDefinition[]>(response),
+  );
+}
+
+export function previewImport(
+  importer: ImporterDefinition,
+  source: File | string,
+) {
+  if (importer.input.kind === "upload") {
+    const form = new FormData();
+    form.append(importer.input.field, source as File);
+    return fetch(`/api/import/${encodeURIComponent(importer.id)}/preview`, {
+      method: "POST",
+      body: form,
+    }).then((response) => responseJson<ImportPreview>(response));
+  }
+  return fetch(`/api/import/${encodeURIComponent(importer.id)}/preview`, {
     method: "POST",
-    body: form,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ [importer.input.field]: source }),
   }).then((response) => responseJson<ImportPreview>(response));
 }
 
-export function commitGoodreads(
+export function commitImport(
+  importerId: string,
   batchId: string,
   choices: Array<{ record_id: number; item_id: number | null }>,
 ) {
-  return fetch("/api/import/goodreads/commit", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ batch_id: batchId, choices }),
-  }).then((response) => responseJson<ImportResult>(response));
-}
-
-export function previewCalibre(libraryPath: string) {
-  return fetch("/api/import/calibre/preview", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ library_path: libraryPath }),
-  }).then((response) => responseJson<ImportPreview>(response));
-}
-
-export function commitCalibre(
-  batchId: string,
-  choices: Array<{ record_id: number; item_id: number | null }>,
-) {
-  return fetch("/api/import/calibre/commit", {
+  return fetch(`/api/import/${encodeURIComponent(importerId)}/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ batch_id: batchId, choices }),

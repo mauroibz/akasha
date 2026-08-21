@@ -14,6 +14,7 @@ from book_tracker.domain.matching import MatchDecision, MatchKind, decide_match
 from book_tracker.domain.merge import fill_empty
 from book_tracker.domain.normalization import normalize_text, shelf_slug
 from book_tracker.domain.registry import DEFAULT_DOMAIN
+from book_tracker.domain.spec import Domain
 from book_tracker.infrastructure.models import (
     EntryFormatRow,
     EntryRow,
@@ -30,22 +31,6 @@ from book_tracker.infrastructure.models import (
 
 def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _curated_sort_name(payload: Mapping[str, Any]) -> str | None:
-    """The first author's sort name as a human curated it, if the source had one.
-
-    Only Calibre carries this — `authors.sort` — and it beats the heuristic on
-    exactly the names the heuristic has no signal for, which is why it is stored
-    as the owner's value rather than recomputed on every write. A Goodreads
-    payload has no such field and falls through to the heuristic.
-    """
-    sorts = payload.get("author_sorts")
-    if not isinstance(sorts, list):
-        return None
-    return next(
-        (value.strip() for value in sorts if isinstance(value, str) and value.strip()), None
-    )
 
 
 @dataclass(frozen=True)
@@ -466,7 +451,7 @@ class ImportRepository:
         summary: Mapping[str, Any],
         records: Sequence[Mapping[str, Any]],
         *,
-        kind: str = "goodreads",
+        kind: str,
         source_descriptor: Mapping[str, Any] | None = None,
     ) -> None:
         now = _now()
@@ -517,7 +502,9 @@ class ImportRepository:
         choices: Mapping[int, Mapping[str, Any]],
         user_id: int = 1,
         *,
-        kind: str = "goodreads",
+        kind: str,
+        domain: Domain,
+        identity_kinds: frozenset[str],
     ) -> dict[str, Any]:
         with DomainRepository(self.engine)._write() as session:
             batch = session.get(ImportBatchRow, batch_id)
@@ -565,10 +552,14 @@ class ImportRepository:
                         if item_id is not None
                         else {"action": "create_new"}
                     )
+                item_payload = payload["item"]
+                entry_payload = payload["entry"]
+                entry_values = entry_payload["values"]
                 identity_values = {
-                    key: payload.get(key) for key in ("isbn", "calibre_uuid") if payload.get(key)
+                    key: value
+                    for key, value in item_payload["identifiers"].items()
+                    if key in identity_kinds and value
                 }
-                isbn = identity_values.get("isbn")
                 for identity_kind, identity_value in identity_values.items():
                     exact = session.scalar(
                         select(ItemIdentifierRow.item_id).where(
@@ -580,39 +571,18 @@ class ImportRepository:
                         raise ValueError("identity_conflict")
                     item_id = exact or item_id
                 if item_id is None:
-                    metadata = {
-                        "creators": payload["creators"],
-                        **({"publisher": payload["publisher"]} if payload.get("publisher") else {}),
-                        **(
-                            {"page_count": payload["page_count"]}
-                            if payload.get("page_count")
-                            else {}
-                        ),
-                        **(
-                            {"original_year": payload["original_year"]}
-                            if payload.get("original_year")
-                            else {}
-                        ),
-                        **(
-                            {"description": payload["description"]}
-                            if payload.get("description")
-                            else {}
-                        ),
-                        **({"series": payload["series"]} if payload.get("series") else {}),
-                    }
+                    metadata = item_payload["metadata"]
                     item = ItemRow(
-                        # Goodreads and Calibre are book pipelines and stay that way;
-                        # the type still comes from the registry rather than a literal.
-                        type=DEFAULT_DOMAIN.item_type,
-                        title=payload["title"],
-                        subtitle=None,
-                        year=payload.get("year"),
+                        type=domain.item_type,
+                        title=item_payload["title"],
+                        subtitle=item_payload.get("subtitle"),
+                        year=item_payload.get("year"),
                         cover_path=None,
-                        identifiers=json.dumps({"isbn": isbn} if isbn else {}),
+                        identifiers=json.dumps(identity_values),
                         metadata_json=json.dumps(metadata, ensure_ascii=False),
                         created_at=now,
                         updated_at=now,
-                        creator_sort_override=_curated_sort_name(payload),
+                        creator_sort_override=item_payload.get("creator_sort"),
                     )
                     session.add(item)
                     session.flush()
@@ -645,25 +615,23 @@ class ImportRepository:
                     assert existing_item is not None
                     before: dict[str, Any] = {}
                     after: dict[str, Any] = {}
-                    curated = _curated_sort_name(payload)
+                    curated = item_payload.get("creator_sort")
                     if curated and existing_item.creator_sort_override is None:
                         # Filling an empty field, the same rule the metadata merge
                         # below follows: a correction already on the row wins.
                         before["creator_sort_override"] = None
                         existing_item.creator_sort_override = curated
                         after["creator_sort_override"] = curated
-                    if existing_item.year is None and payload.get("year") is not None:
+                    if existing_item.year is None and item_payload.get("year") is not None:
                         before["year"] = None
-                        existing_item.year = payload["year"]
+                        existing_item.year = item_payload["year"]
                         after["year"] = existing_item.year
                     metadata = json.loads(existing_item.metadata_json)
+                    declared_metadata = {field.name for field in domain.fields}
                     incoming = {
-                        "creators": payload.get("creators"),
-                        "publisher": payload.get("publisher"),
-                        "page_count": payload.get("page_count"),
-                        "original_year": payload.get("original_year"),
-                        "description": payload.get("description"),
-                        "series": payload.get("series"),
+                        key: value
+                        for key, value in item_payload["metadata"].items()
+                        if key in declared_metadata
                     }
                     for key, value in incoming.items():
                         if value not in (None, "", [], {}) and metadata.get(key) in (
@@ -733,14 +701,14 @@ class ImportRepository:
                     user_id=user_id,
                     item_id=item_id,
                     status="unsorted",
-                    score=payload.get("score"),
-                    notes=payload.get("review"),
-                    date_added=payload.get("date_added") or now,
-                    date_started=None,
-                    date_finished=payload.get("date_finished"),
-                    reread_count=payload.get("reread_count", 0),
-                    score_provisional=int(payload.get("score_provisional", False)),
-                    suggested_status=payload.get("suggested_status"),
+                    score=entry_payload.get("score"),
+                    notes=entry_payload.get("notes"),
+                    date_added=entry_payload.get("date_added") or now,
+                    date_started=entry_values.get("date_started"),
+                    date_finished=entry_values.get("date_finished"),
+                    reread_count=entry_values.get("reread_count", 0),
+                    score_provisional=int(entry_payload.get("score_provisional", False)),
+                    suggested_status=entry_payload.get("suggested_status"),
                     created_at=now,
                     updated_at=now,
                 )

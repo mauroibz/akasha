@@ -15,12 +15,22 @@ from book_tracker.domain.identity import Identifier
 from book_tracker.domain.matching import MatchDecision
 
 
+class ImportReadError(ValueError):
+    """A source a registered reader cannot safely normalize."""
+
+    def __init__(self, code: str, message: str, details: Mapping[str, Any] | None = None) -> None:
+        self.code = code
+        self.details = details or {}
+        super().__init__(message)
+
+
 @dataclass(frozen=True)
 class ImportInputSpec:
     """How the generic import screen asks for this connector's source."""
 
     kind: Literal["upload", "path"]
     label: str
+    field: str
     accept: str | None = None
     placeholder: str | None = None
     help: str | None = None
@@ -32,14 +42,14 @@ class ImportSource:
 
     data: bytes | None = None
     filename: str | None = None
-    library_path: str | None = None
+    path: str | None = None
 
 
 @dataclass(frozen=True)
 class ImportReadContext:
     """Host paths a reader may consult without learning about the application."""
 
-    calibre_dir: Path
+    path_root: Path
 
 
 @dataclass(frozen=True)

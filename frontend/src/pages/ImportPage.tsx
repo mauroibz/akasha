@@ -14,10 +14,10 @@ import {
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  commitGoodreads,
-  commitCalibre,
-  previewCalibre,
-  previewGoodreads,
+  commitImport,
+  getImporters,
+  previewImport,
+  type ImporterDefinition,
   undoBatch,
   type ImportPreview,
   type ImportResult,
@@ -25,7 +25,8 @@ import {
 } from "@/api/imports";
 
 export function ImportPage() {
-  const [source, setSource] = useState<"goodreads" | "calibre">("goodreads");
+  const [importers, setImporters] = useState<ImporterDefinition[]>([]);
+  const [source, setSource] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [libraryPath, setLibraryPath] = useState("");
   const [preview, setPreview] = useState<ImportPreview | null>(null);
@@ -39,6 +40,15 @@ export function ImportPage() {
   const heading = useRef<HTMLHeadingElement>(null);
   const resultRef = useRef<HTMLDivElement>(null);
   const undoRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    void getImporters()
+      .then((available) => {
+        setImporters(available);
+        setSource((current) => current || available[0]?.id || "");
+      })
+      .catch((reason: Error) => setError(reason.message));
+  }, []);
 
   useEffect(() => {
     if (preview) heading.current?.focus();
@@ -57,6 +67,7 @@ export function ImportPage() {
     ).length ?? 0;
   const ready =
     (preview?.summary.ready ?? 0) + (preview?.summary.ambiguous ?? 0);
+  const activeImporter = importers.find((importer) => importer.id === source);
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
@@ -68,22 +79,21 @@ export function ImportPage() {
         Preview a source before anything enters your library. Existing values
         are preserved when a re-sync only supplies missing metadata.
       </p>
-      {!preview && (
+      {!preview && importers.length > 0 && (
         <Tabs
           className="mt-7"
           value={source}
           onValueChange={(value) => {
-            setSource(value as "goodreads" | "calibre");
+            setSource(value);
             setError("");
           }}
         >
           <TabsList aria-label="Import source">
-            <TabsTrigger value="goodreads" className="capitalize">
-              goodreads
-            </TabsTrigger>
-            <TabsTrigger value="calibre" className="capitalize">
-              calibre
-            </TabsTrigger>
+            {importers.map((importer) => (
+              <TabsTrigger key={importer.id} value={importer.id}>
+                {importer.label}
+              </TabsTrigger>
+            ))}
           </TabsList>
           {/* The panel each trigger names has to exist. Without it Radix still
               writes `aria-controls` pointing at nothing, which axe reports as a
@@ -93,63 +103,77 @@ export function ImportPage() {
             className="mt-8 space-y-5 rounded-2xl bg-surface p-5"
             onSubmit={(event) => {
               event.preventDefault();
-              if (source === "goodreads" && !file) return;
-              if (source === "calibre" && !libraryPath.trim()) return;
+              if (!activeImporter) return;
+              if (activeImporter.input.kind === "upload" && !file) return;
+              if (activeImporter.input.kind === "path" && !libraryPath.trim())
+                return;
               setPending(true);
               setError("");
-              const request =
-                source === "goodreads"
-                  ? previewGoodreads(file as File)
-                  : previewCalibre(libraryPath.trim());
-              void request
+              void previewImport(
+                activeImporter,
+                activeImporter.input.kind === "upload"
+                  ? (file as File)
+                  : libraryPath.trim(),
+              )
                 .then(setPreview)
                 .catch((reason: Error) => setError(reason.message))
                 .finally(() => setPending(false));
             }}
           >
-            <TabsContent value="goodreads" className="mt-0">
-              <div className="block">
-                <Label htmlFor="goodreads-csv">Goodreads CSV</Label>
-                <Input
-                  id="goodreads-csv"
-                  autoFocus
-                  className="mt-1 h-11 py-2"
-                  type="file"
-                  accept=".csv,text/csv"
-                  onChange={(event) => setFile(event.target.files?.[0] ?? null)}
-                />
-              </div>
-            </TabsContent>
-            <TabsContent value="calibre" className="mt-0 space-y-5">
-              <p className="rounded-xl bg-surface-raised p-4 text-sm text-foreground">
-                Akasha opens this library read-only inside the configured
-                Calibre mount. Enter a relative folder only; absolute paths and
-                parent traversal are rejected. Covers are copied during preview
-                so the source is never needed during commit.
-              </p>
-              <div className="block">
-                <Label htmlFor="calibre-path">Calibre library path</Label>
-                <Input
-                  id="calibre-path"
-                  autoFocus
-                  className="mt-1 h-11"
-                  value={libraryPath}
-                  placeholder="Library"
-                  onChange={(event) => setLibraryPath(event.target.value)}
-                />
-              </div>
-            </TabsContent>
+            {importers.map((importer) => {
+              const inputId = `${importer.id}-source`;
+              return (
+                <TabsContent
+                  key={importer.id}
+                  value={importer.id}
+                  className="mt-0 space-y-5"
+                >
+                  {importer.input.help && (
+                    <p className="rounded-xl bg-surface-raised p-4 text-sm text-foreground">
+                      {importer.input.help}
+                    </p>
+                  )}
+                  <div className="block">
+                    <Label htmlFor={inputId}>{importer.input.label}</Label>
+                    {importer.input.kind === "upload" ? (
+                      <Input
+                        id={inputId}
+                        autoFocus
+                        className="mt-1 h-11 py-2"
+                        type="file"
+                        accept={importer.input.accept ?? undefined}
+                        onChange={(event) =>
+                          setFile(event.target.files?.[0] ?? null)
+                        }
+                      />
+                    ) : (
+                      <Input
+                        id={inputId}
+                        autoFocus
+                        className="mt-1 h-11"
+                        value={libraryPath}
+                        placeholder={importer.input.placeholder ?? undefined}
+                        onChange={(event) => setLibraryPath(event.target.value)}
+                      />
+                    )}
+                  </div>
+                </TabsContent>
+              );
+            })}
             <Button
               className="rounded-full px-5"
               disabled={
                 pending ||
-                (source === "goodreads" ? !file : !libraryPath.trim())
+                !activeImporter ||
+                (activeImporter.input.kind === "upload"
+                  ? !file
+                  : !libraryPath.trim())
               }
             >
               {pending
                 ? "Reading source…"
-                : source === "calibre"
-                  ? "Preview Calibre library"
+                : activeImporter?.input.kind === "path"
+                  ? `Preview ${activeImporter.label} library`
                   : "Preview import"}
             </Button>
           </form>
@@ -244,9 +268,8 @@ export function ImportPage() {
             onClick={() => {
               setPending(true);
               setError("");
-              const commit =
-                source === "calibre" ? commitCalibre : commitGoodreads;
-              void commit(
+              void commitImport(
+                source,
                 preview.batch_id,
                 Object.entries(choices).map(([recordId, value]) => ({
                   record_id: Number(recordId),
