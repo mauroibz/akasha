@@ -1,53 +1,57 @@
 # Handoff — the numbered plan is complete
 
-Plan revision 15. **Sprint 033 closed on 2026-08-21 and no sprint is active.** `state.json` reads
-`complete` with null active fields and 001–033 in `completed_sprints`; `FINAL_SPRINT` in
-`scripts/validate_project.py` is 33. Nothing has been tagged, pushed, released or deployed.
+Plan revision 16. **Sprint 034 closed on 2026-08-21 and no sprint is active.** `state.json` reads
+`complete` with null active fields and 001–034 in `completed_sprints`; `FINAL_SPRINT` in
+`scripts/validate_project.py` is 34. Nothing has been tagged, pushed, released or deployed.
 
-## What the last two sprints changed
+## What the import flow looks like now
 
-**032** folded Triage into `/import` as a tab and made a connector publish its own guidance, its own
-error vocabulary and its own actionable failure sentences (DEC-080).
-
-**033** removed the mount from the Calibre path (DEC-081). You choose your library folder, the
-browser reads it, and the client uploads `metadata.db` plus the covers and nothing else — no
-`CALIBRE_DIR`, no restart, and no handle held on a library calibre-web is already using. The mount
-picker and the typed path survive as the connector's declared `alternate`, on the same tab, for
-automation and for a library too large to upload.
+Triage is a tab on `/import` (032). Calibre needs no mount: you choose your library folder and the
+browser reads it, sending `metadata.db` and the covers and nothing else (033). And a re-import sends
+only what is missing, because the client asks the server what it already holds first (034) —
+measured at 10.55 MB for a first import and 0.99 MB for an unchanged re-sync of an 18-book library.
+The mount survives beneath it all as the connector's declared `alternate`.
 
 ## Where things stand
 
-- Gates green at closure: validator, `make check`, `make test` (backend 522, frontend 171),
-  `npx playwright test` (96 passed, 2 skipped), `git diff --check`.
-- Both walkthrough arms passed against the owner's real library. Read that worklog entry before
-  touching the import screen — it records four observations left deliberately unfixed.
+- Gates green at closure: validator, `make check`, `make test` (backend 531, frontend 176),
+  `npx playwright test` (97 passed, 2 skipped at `--workers=1`), `git diff --check`.
+- The walkthrough ran four phases against the owner's real library. Read that worklog entry before
+  touching the import flow.
 
-## If you pick up the import boundary next
+## The next thing the owner wants
 
-`docs/guides/adding-a-domain.md` is the instruction; technical spec §6.5 is the contract.
+**Sprint 035 — ebook attachments on a toggle.** Deliberately after 034, because with the plan step
+in place, turning it on costs one large first sync and near-nothing after, instead of 163 MB every
+time. What it needs:
 
-1. **`kind` is `upload | path | directory`.** All three are things the reader hands over. Spotify is
-   an OAuth source and is none of them — that is the first design question the music epic hits.
-2. **`alternate` is exactly one level deep.** A source with three ways in needs a different shape,
-   not a longer chain. Conformance refuses nesting and a reused `field`.
-3. **`accepts_files` is a promise about `read`**, not about the screen. `kind="directory"` without
-   it is refused.
-4. **A directory reader should point its ordinary adapter at `ImportSource.directory`.** The route
-   has already streamed, validated and materialized the bundle at `<directory>/library`, so an
-   uploaded source and a local one must normalize through the same code. `CalibreImporter.read` is
-   the worked example, and it is nine lines.
+1. **A sixth entity type in the undo ledger.** It currently knows `entry`, `entry_shelf`, `item`,
+   `item_identifier`, `shelf` — no `attachment`. Without it, undoing an import would drop rows via
+   `ON DELETE CASCADE`, leave the bytes for `reclaim`, and undercount what it reverted.
+2. **A format decision.** 14 of the owner's books exist as both `.epub` and `.azw3` — 163 MB for
+   both, 95 MB for epub only.
+3. **Skip-and-report above the 25 MiB attachment cap**, rather than failing the whole import.
+
+The scope boundary is settled: **attaching files is a feature of the importer.** Akasha's own file
+UI stays simple and file-type agnostic rather than growing toward an ebook manager. Product spec §1's
+"not an ebook server" non-goal stands as written.
 
 ## Known and left
 
-- **`_DiskSpooledMultiPart.spool_max_size` is 1, and must not become 0.** `SpooledTemporaryFile`
-  rolls over only when `max_size > 0`, so 0 means *never roll* — the opposite of what it looks like.
-  Setting it to 0 would silently restore holding an entire library in memory. A test pins it.
-- **The e2e suite proxies unstubbed `/api` calls to whatever is on :8000**, which on this machine is
-  the running Compose container with the real library. Stub every route a spec touches, or set
-  `BOOK_TRACKER_E2E_BACKEND`. `stubImporters` in `e2e/seed.ts` is the shared registry fixture.
-- **This deployment runs on bind mounts, not named volumes.** Start it as
-  `docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d`. A plain `docker compose up -d`
-  silently runs against the empty `akasha_data` volume and the library looks wiped while the real
-  database sits untouched in `./data/books.db`.
-- A fingerprint replay still reports "N entries added" when it added nothing. Pre-existing, cosmetic,
-  and worth fixing if anyone edits that result panel.
+- **Playwright reports a large multipart body as zero bytes.** `request.postDataBuffer()` and
+  `request.sizes().requestBodySize` both return 0 for a 10 MB upload, which silently turns an upload
+  measurement into "0.00 MB". `scratchpad/w34/counter.mjs` is a counting TCP proxy that works; start
+  there if you need wire sizes.
+- **Two heavy `library.spec.ts` specs flake under parallel workers** — the 10,000-row DOM budget and
+  the keyboard guards. Which one fails varies per run and `--workers=1` is green. They guard real
+  invariants; do not loosen them.
+- **`_DiskSpooledMultiPart.spool_max_size` is 1 and must not become 0.** `SpooledTemporaryFile` rolls
+  over only when `max_size > 0`, so 0 means *never roll* and would restore holding a whole library in
+  memory. A test pins it.
+- **An unchanged re-sync shows "Local cover staged" without uploading covers.** Correct — the
+  fingerprint matches, so Sprint 031's replay returns the stored batch.
+- **The e2e suite proxies unstubbed `/api` calls to whatever is on :8000**, which here is the running
+  container with the real library. Stub every route a spec touches or set `BOOK_TRACKER_E2E_BACKEND`.
+- **This deployment runs on bind mounts.** Start it as
+  `docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d`; a plain `docker compose up -d`
+  runs against the empty named volume and the library looks wiped.

@@ -2018,3 +2018,46 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   not detected, with "an item without a cover is always wanted" as the escape hatch; and the plan
   must degrade to a full upload rather than fail closed.
 - Next: execute **Sprint 034**, then plan 035 (ebook attachments on a toggle).
+
+## 2026-08-21 — Sprint 034 (complete; project complete)
+- Done: claimed and executed 034. Added `ImportCandidate`, `ImportPlan`, `ImportInventory`,
+  `IncrementalImporter`, `planned_upload` and `ImportInputSpec.incremental`; implemented the
+  inventory on `DomainRepository` (two batched questions, chunked at 500); added
+  `POST /api/import/{importer}/plan` reusing `_bundle`'s streaming and `_bundle_member`'s
+  validation; taught `CalibreImporter` to plan by `calibre_uuid`; made the client plan before it
+  previews, with a fallback that sends everything. Docs across README, the domain guide, technical
+  spec §6.5/§7.1 and product spec §5.2. Commits: `fce12fe`, `8fcb0fc`, `1d0e027`, plus closing.
+- Verified: validator (pass), `make format` (no drift), `make check` (green), `make test`
+  (backend 531, frontend 176), `npx playwright test` (97 passed, 2 skipped at `--workers=1`),
+  `git diff --check`.
+- Walkthrough (four phases, isolated backend, clean data dir, the owner's real library copied so
+  it could be modified mid-run):
+  1. first import — 10.55 MB on the wire, 18 rows, nothing skipped
+  2. unchanged re-sync — 0.99 MB, 18 skipped ("18 already in your library with a cover")
+  3. one book added to metadata.db plus its cover — 0.99 MB, 19 rows previewed, 18 skipped, so
+     only the new cover travelled
+  4. plan route aborted — 10.06 MB, "Could not check what is already imported, so everything was
+     sent", and the import still completed
+  No console errors or page errors in any phase.
+- Measurement dead end worth not repeating: **Playwright reports a large multipart body as zero
+  bytes.** Both `request.postDataBuffer()` and `request.sizes().requestBodySize` returned 0 for a
+  10 MB upload, and two walkthrough attempts produced "0.00 MB -> 0.00 MB" that looked like a
+  perfect saving and measured nothing. The third attempt put a counting TCP proxy between the dev
+  server and the backend (`scratchpad/w34/counter.mjs`) and produced the real figures above. If a
+  future sprint needs upload sizes, start there.
+- Observed and left: an unchanged re-sync shows "Local cover staged" on all rows despite uploading
+  no covers. Correct rather than wrong — the fingerprint of an unchanged `metadata.db` matches, so
+  Sprint 031's replay returns the stored batch, which did stage them. Recorded because it looks
+  like a bug until you know why.
+- Also observed: two heavy specs in `library.spec.ts` (the 10,000-row DOM budget and the keyboard
+  guards) fail intermittently under parallel workers and pass alone; which of the two fails varies
+  per run, and `--workers=1` is green. Load sensitivity in assertions that guard real invariants
+  (offset stability, DOM budget), not a regression from this sprint, and not worth loosening.
+- Deviations: three small ones in the sprint Outcome — `ImportSource.manifest` and
+  `_bundle(form_extras=)` so the plan route reuses one streaming implementation, and keeping
+  `book_path` on the reader payload because the planner needs it.
+- Blocked/open: none. No tag, push, release or deployment was requested or performed.
+- Next: **Sprint 035 — ebook attachments on a toggle**, which this sprint exists to make
+  affordable. It still needs a sixth `attachment` entity type in the undo ledger, a decision on
+  `.epub` vs `.azw3` where a book has both (14 of the owner's do), and skip-and-report above the
+  25 MiB attachment cap.

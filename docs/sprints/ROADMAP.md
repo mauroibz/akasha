@@ -2,7 +2,7 @@
 
 **Plan revision:** 16
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 034 — Incremental import (planned)
+**Active sprint:** none — 034 closed on 2026-08-21 and the numbered plan is complete.
 
 ## Shape of the plan
 
@@ -89,13 +89,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 │ [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
 | [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
 | [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
-| [034](034-incremental-import.md) | Incremental import | 033 | planned |
+| [034](034-incremental-import.md) | Incremental import | 033 | completed |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 034 have files; 019 through 033 are closed.
+incorporating actual deviations. Sprints 019 through 034 have files, and every one of them is closed.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -573,6 +573,11 @@ connector answers which files it actually wants by comparing identities it alrea
 unchanged library that is a 416 KB round trip instead of the whole bundle. `ImportInputSpec` gains
 `incremental`, matching the `browsable`/`BrowsableImporter` shape, and the plan is never load-bearing:
 if it fails, the client sends everything and says so.
+
+**Delivered 2026-08-21 (DEC-082).** Measured through a counting proxy, because Playwright reports a
+multipart body of this size as zero bytes: a first import moves 10.55 MB and an unchanged re-sync
+0.99 MB — 90.6% less, the gap from 96% being `metadata.db` travelling twice exactly as the plan
+predicted. See the sprint file's Outcome.
 
 This is deliberately **before** ebook attachments, which is the next thing the owner wants. Shipping
 attachments first would mean 163 MB on every sync — exactly the problem this sprint removes.

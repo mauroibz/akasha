@@ -1,6 +1,6 @@
 # Sprint 034 — Incremental import
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 033
 **Roadmap revision:** 16
 
@@ -84,4 +84,67 @@ Plus the walkthrough gate in AC8, recorded in `docs/agent/worklog.md`.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+**Completed 2026-08-21.** Commits: `fce12fe` (contract, inventory, plan route, Calibre's planner),
+`8fcb0fc` (the two-phase client), `1d0e027` (documentation), and the closing state commit.
+
+### Measured on the wire
+
+A counting TCP proxy between the dev server and the backend, because neither
+`request.postDataBuffer()` nor `request.sizes()` reports a multipart body of this size — both
+returned zero, and the first two walkthrough attempts produced numbers that looked like a 100%
+saving because nothing was being measured at all.
+
+| Phase | On the wire | Result |
+|---|---|---|
+| First import | plan 0.49 + preview 10.05 = **10.55 MB** | 18 rows, nothing skipped |
+| Unchanged re-sync | plan 0.49 + preview 0.49 = **0.99 MB** | 18 skipped, **90.6% less** |
+| One book added | plan 0.49 + preview 0.50 = **0.99 MB** | 19 rows, 18 skipped |
+| Plan broken | plan 0.00 + preview 10.06 = **10.06 MB** | fell back, said so, import completed |
+
+90.6% rather than ~96% because `metadata.db` travels twice, which is exactly the cost the plan's
+risk section predicted and declined to engineer around.
+
+### Acceptance criteria
+
+1. **A second import sends the database and nothing else** — measured above, and asserted on the
+   request body in `import.spec.ts` and on the `FormData` in `ImportPage.test.tsx`.
+2. **A new book is the only cover that moves.** Phase 3 previewed 19 rows and skipped 18.
+3. **An item without a cover is wanted again**, so a failed first attempt heals rather than being
+   skipped forever — `test_an_item_without_a_cover_is_offered_one_again`.
+4. **The plan route refuses what the upload route refuses**, 404s for `goodreads`, and leaves no
+   bundle behind on either the success or the failure path.
+5. **Bounded queries:** 1200 identity values resolve in 3 statements, chunked at 500.
+6. **A failing plan degrades**, verified in the walkthrough by aborting the route and in a
+   component test.
+7. **Conformance rejects** `incremental` without `IncrementalImporter`, and `planned_upload`
+   rejects a plan naming a path that was never offered.
+8. **Walkthrough passed**, four phases, recorded in `docs/agent/worklog.md`.
+
+### Verification
+
+`python scripts/validate_project.py` (pass), `make format` (no drift), `make check` (green),
+`make test` (**backend 531 passed**, **frontend 176 passed**), `npx playwright test`
+(**97 passed, 2 skipped** at `--workers=1`), `git diff --check` (clean).
+
+### Deviations and decisions
+
+- **`ImportSource` gained `manifest`**, so the plan route can carry the client's offer through the
+  same `_bundle` streaming path the upload uses rather than parsing the multipart body twice.
+- **`_bundle` gained `form_extras`** for the same reason — one streaming implementation, not two.
+- **`book_path` is now kept on the reader's payload.** `_records` computed it and discarded it; the
+  planner needs it to know where a book's cover would live.
+- **No deviation on the two-phase cost.** `metadata.db` uploads twice, as planned and as measured.
+
+### Observed and left
+
+An unchanged re-sync shows "Local cover staged" on every row despite uploading no covers. That is
+correct: the fingerprint of an unchanged `metadata.db` matches, so Sprint 031's replay returns the
+**stored** batch, which did stage those covers. It looks alarming and is not — noted here because
+the next person to see it will wonder.
+
+### Impact on future work
+
+Sprint 035 (ebook attachments on a toggle) is what this unblocks: with the plan in place, turning
+attachments on costs one large first sync and near-nothing after, instead of 163 MB every time. It
+still needs a sixth `attachment` entity type in the undo ledger, a decision about `.epub` versus
+`.azw3` where a book has both, and skip-and-report for anything over the 25 MiB attachment cap.
