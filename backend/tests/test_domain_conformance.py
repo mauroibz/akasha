@@ -109,6 +109,29 @@ def assert_declared_guidance(importer: Importer) -> None:
     assert not spec.browsable or isinstance(importer, BrowsableImporter), (
         f"{importer.name} declares browsing but has no browse method"
     )
+    assert_declared_envelope(importer, spec)
+    if spec.alternate is not None:
+        assert spec.alternate.alternate is None, (
+            f"{importer.name} nests an alternate inside an alternate"
+        )
+        assert spec.alternate.field != spec.field, (
+            f"{importer.name} gives its alternate the same field as its primary"
+        )
+        assert spec.alternate.field and spec.alternate.field.isidentifier()
+        assert spec.alternate.label
+        assert_declared_envelope(importer, spec.alternate)
+
+
+def assert_declared_envelope(importer: Importer, spec: ImportInputSpec) -> None:
+    """What this input will accept, when the shared default is the wrong size."""
+    for name in ("max_bytes", "max_files"):
+        cap = getattr(spec, name)
+        assert cap is None or cap > 0, f"{importer.name} declares {name}={cap!r}"
+    # A directory is a set of files, and a reader that cannot take one would accept
+    # the upload and then find nothing it understands.
+    assert spec.kind != "directory" or spec.accepts_files, (
+        f"{importer.name} offers a directory its reader cannot read"
+    )
     # The vocabulary is closed so a screen can decide what to say about a
     # failure, and so an undeclared code cannot reach a reader as itself.
     assert importer.error_codes, f"{importer.name} declares no error vocabulary"
@@ -485,6 +508,64 @@ def test_a_well_formed_declaration_passes() -> None:
     assert_declared_guidance(_DeclaringImporter())
 
 
+def test_a_connector_may_declare_a_second_way_in() -> None:
+    """One connector, two affordances, one tab (DEC-081)."""
+
+    class TwoWays(_DeclaringImporter):
+        input = replace(
+            _DeclaringImporter.input,
+            alternate=ImportInputSpec(kind="path", label="Path", field="library_path"),
+        )
+
+    assert_declared_guidance(TwoWays())
+
+
+@pytest.mark.parametrize(
+    ("name", "alternate"),
+    [
+        # Depth is exactly one. A chain of alternates is a screen nobody designed.
+        (
+            "nested",
+            ImportInputSpec(
+                kind="path",
+                label="Path",
+                field="library_path",
+                alternate=ImportInputSpec(kind="upload", label="Deeper", field="deeper"),
+            ),
+        ),
+        # Two inputs that post the same field are one input with a bug.
+        ("colliding_field", ImportInputSpec(kind="path", label="Path", field="file")),
+    ],
+)
+def test_the_suite_rejects_a_malformed_alternate(name: str, alternate: ImportInputSpec) -> None:
+    class Malformed(_DeclaringImporter):
+        input = replace(_DeclaringImporter.input, alternate=alternate)
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(Malformed())
+
+
+@pytest.mark.parametrize(("field", "value"), [("max_bytes", 0), ("max_files", -1)])
+def test_the_suite_rejects_a_nonsense_envelope(field: str, value: int) -> None:
+    """A cap of zero refuses everything; a negative one is a typo, not a policy."""
+
+    class Malformed(_DeclaringImporter):
+        input = replace(_DeclaringImporter.input, **{field: value})
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(Malformed())
+
+
+def test_a_directory_connector_must_be_able_to_read_a_set_of_files() -> None:
+    """`kind="directory"` is a promise about `read`, not only about the screen."""
+
+    class NoFileSupport(_DeclaringImporter):
+        input = replace(_DeclaringImporter.input, kind="directory", accepts_files=False)
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(NoFileSupport())
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -545,8 +626,13 @@ def test_every_registered_importer_declares_its_error_vocabulary() -> None:
     assert IMPORTERS["goodreads"].error_codes
     assert IMPORTERS["calibre"].error_codes
     assert "calibre_library_not_found" in IMPORTERS["calibre"].error_codes
-    assert IMPORTERS["calibre"].input.browsable is True
+    # Calibre leads with the folder chooser; the mount is its alternate (DEC-081).
+    assert IMPORTERS["calibre"].input.kind == "directory"
+    assert IMPORTERS["calibre"].input.accepts_files is True
+    assert IMPORTERS["calibre"].input.alternate is not None
+    assert IMPORTERS["calibre"].input.alternate.browsable is True
     assert IMPORTERS["goodreads"].input.browsable is False
+    assert IMPORTERS["goodreads"].input.alternate is None
 
 
 def test_the_suite_covers_every_field_of_the_contract() -> None:

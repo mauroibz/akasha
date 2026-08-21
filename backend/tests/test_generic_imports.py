@@ -1,9 +1,14 @@
 import sqlite3
+import tempfile
+import tracemalloc
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
+from PIL import Image
 
+from book_tracker.api.imports import MAX_IMPORT_BYTES, _DiskSpooledMultiPart
 from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError
 from book_tracker.config import Settings
@@ -17,6 +22,7 @@ from book_tracker.domain.importers import (
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchDecision
+from book_tracker.domain.registry import IMPORTERS
 from book_tracker.main import create_app
 
 FIXTURES = Path(__file__).parent / "fixtures"
@@ -110,8 +116,18 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
     assert goodreads["input"]["kind"] == "upload"
     assert goodreads["input"]["accept"] == ".csv,text/csv"
     assert goodreads["input"]["browsable"] is False
-    assert calibre["input"]["kind"] == "path"
-    assert calibre["input"]["browsable"] is True
+    assert goodreads["input"]["alternate"] is None
+
+    # Calibre leads with the folder chooser and keeps the mount beneath it, published
+    # as one input with an alternate rather than as two connectors (DEC-081).
+    assert calibre["input"]["kind"] == "directory"
+    assert calibre["input"]["accepts_files"] is True
+    assert calibre["input"]["max_bytes"] > 5 * 1024 * 1024
+    assert calibre["input"]["max_files"] > 0
+    assert calibre["input"]["alternate"]["kind"] == "path"
+    assert calibre["input"]["alternate"]["browsable"] is True
+    # One deep, so the screen never has to recurse.
+    assert calibre["input"]["alternate"]["alternate"] is None
 
     # The screen renders what the connector declares, so what it declares has to
     # arrive intact: ordered steps, an empty state and an https help address.
@@ -122,7 +138,7 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
         assert spec["help_url"].startswith("https://")
     assert any("review/import" in step for step in goodreads["input"]["guide"])
     assert any("provisional" in step.lower() for step in goodreads["input"]["guide"])
-    assert any("read-only" in step for step in calibre["input"]["guide"])
+    assert any("metadata.db" in step for step in calibre["input"]["guide"])
 
 
 @pytest.mark.anyio
@@ -385,3 +401,242 @@ async def test_an_ordinary_error_payload_keeps_its_shape(tmp_path: Path) -> None
 
     assert response.status_code == 422
     assert set(response.json()["error"]) == {"code", "message", "details"}
+
+
+def _bundle_library(root: Path) -> Path:
+    """A Calibre library with a real book path, so it has a cover to carry."""
+    root.mkdir(parents=True, exist_ok=True)
+    book_path = "Brandon Sanderson/Mistborn_ The Final Empire (2)"
+    connection = sqlite3.connect(root / "metadata.db")
+    connection.executescript(
+        f"""
+        CREATE TABLE books (id INTEGER PRIMARY KEY, title TEXT, pubdate TEXT, path TEXT, uuid TEXT);
+        CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT);
+        CREATE TABLE books_authors_link (book INTEGER, author INTEGER);
+        CREATE TABLE identifiers (book INTEGER, type TEXT, val TEXT);
+        INSERT INTO books VALUES (1, 'Mistborn', '2006-01-01', '{book_path}', 'uuid-m1');
+        INSERT INTO authors VALUES (1, 'Brandon Sanderson');
+        INSERT INTO books_authors_link VALUES (1, 1);
+        """
+    )
+    connection.commit()
+    connection.close()
+    cover = root / book_path / "cover.jpg"
+    cover.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (300, 450), "navy").save(cover, "JPEG")
+    # The noise a real library carries and a bundle must not.
+    (root / book_path / "book.epub").write_bytes(b"epub bytes")
+    (root / ".caltrash" / "b" / "1").mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (10, 10), "red").save(root / ".caltrash/b/1/cover.jpg", "JPEG")
+    return root
+
+
+def _parts(root: Path) -> list[tuple[str, tuple[str, bytes, str]]]:
+    """The multipart body the client builds: relative path as the part filename."""
+    cover = "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg"
+    return [
+        ("files", ("metadata.db", (root / "metadata.db").read_bytes(), "application/x-sqlite3")),
+        ("files", (cover, (root / cover).read_bytes(), "image/jpeg")),
+    ]
+
+
+def _no_mount_app(tmp_path: Path) -> Any:
+    """Deliberately no mount that exists: the point is importing without one."""
+    return create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=tmp_path / "absent",
+            user_agent_contact="test@example.invalid",
+        )
+    )
+
+
+@pytest.mark.anyio
+async def test_a_calibre_library_imports_with_no_mount_at_all(tmp_path: Path) -> None:
+    """The point of DEC-081: no CALIBRE_DIR, no restart, cover intact."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post("/api/import/calibre/preview", files=_parts(library))
+
+    assert response.status_code == 201, response.text
+    body = response.json()
+    assert body["summary"]["total"] == 1
+    record = body["records"][0]
+    assert record["title"] == "Mistborn"
+    # The cover came from the bundle: no mount and no provider was involved.
+    assert record["cover_staged"] is True
+
+
+@pytest.mark.anyio
+async def test_the_bundle_is_read_by_the_same_adapter_as_a_mount(tmp_path: Path) -> None:
+    """An uploaded library and a mounted one normalize identically (deliverable 3)."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+
+    mounted = create_app(
+        Settings(
+            data_dir=tmp_path / "mounted-data",
+            calibre_dir=tmp_path,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        mounted.router.lifespan_context(mounted),
+        httpx.AsyncClient(transport=httpx.ASGITransport(mounted), base_url="http://test") as c,
+    ):
+        via_mount = await c.post(
+            "/api/import/calibre/preview", json={"library_path": "Calibre Library"}
+        )
+
+    uploaded = _no_mount_app(tmp_path)
+    async with (
+        uploaded.router.lifespan_context(uploaded),
+        httpx.AsyncClient(transport=httpx.ASGITransport(uploaded), base_url="http://test") as c,
+    ):
+        via_upload = await c.post("/api/import/calibre/preview", files=_parts(library))
+
+    assert via_mount.status_code == 201, via_mount.text
+    assert via_upload.status_code == 201, via_upload.text
+
+    def comparable(payload: dict[str, Any]) -> Any:
+        return [
+            {key: value for key, value in row.items() if key != "record_id"}
+            for row in payload["records"]
+        ]
+
+    assert comparable(via_upload.json()) == comparable(via_mount.json())
+    # The fingerprint is the database's digest, so one library fingerprints the same
+    # however it arrived — which is what makes a replay across both paths idempotent.
+    assert via_upload.json()["fingerprint"] == via_mount.json()["fingerprint"]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "member",
+    [
+        "/etc/passwd",
+        "../../etc/passwd",
+        "books/../../escape/cover.jpg",
+        ".caltrash/b/1/cover.jpg",
+        ".secret",
+        "Author/Book/book.epub",
+        "Author/Book/metadata.opf",
+        "Author/metadata.db",
+    ],
+)
+async def test_a_bundle_member_the_connector_did_not_ask_for_is_refused(
+    tmp_path: Path, member: str
+) -> None:
+    """Member paths come from the client, so they are checked before a byte is written."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    parts = [*_parts(library), ("files", (member, b"payload", "application/octet-stream"))]
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post("/api/import/calibre/preview", files=parts)
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "invalid_import_source"
+    assert not (tmp_path / "escape").exists()
+    assert not (tmp_path / "passwd").exists()
+
+
+@pytest.mark.anyio
+async def test_a_bundle_without_a_database_is_refused_with_something_to_do(
+    tmp_path: Path,
+) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post("/api/import/calibre/preview", files=[_parts(library)[1]])
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_import_source"
+    assert response.json()["error"]["action"]
+
+
+@pytest.mark.anyio
+async def test_a_bundle_over_the_declared_caps_is_refused(tmp_path: Path) -> None:
+    """The caps are the connector's, not the shared route's 5 MiB (deliverable 1)."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    calibre = IMPORTERS["calibre"]
+    assert calibre.input.max_bytes and calibre.input.max_bytes > MAX_IMPORT_BYTES
+    assert calibre.input.max_files
+
+    oversize = [
+        *_parts(library),
+        ("files", ("Author/Big (1)/cover.jpg", b"x" * (calibre.input.max_bytes + 1), "image/jpeg")),
+    ]
+    too_many = [
+        _parts(library)[0],
+        *[
+            ("files", (f"Author/Book {index} (1)/cover.jpg", b"x", "image/jpeg"))
+            for index in range(calibre.input.max_files + 1)
+        ],
+    ]
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        big = await client.post("/api/import/calibre/preview", files=oversize)
+        many = await client.post("/api/import/calibre/preview", files=too_many)
+
+    assert big.status_code == 413, big.text
+    assert many.status_code == 413, many.text
+
+
+@pytest.mark.anyio
+async def test_a_large_bundle_is_streamed_rather_than_held_in_memory(tmp_path: Path) -> None:
+    """AC5: peak tracks one member, not the shelf.
+
+    Starlette spools a part to disk only past 1 MiB, and a cover is smaller than that,
+    so the default parser would hold an entire library of covers in memory at once.
+    `_DiskSpooledMultiPart` is what makes this bound hold; without it this test fails by
+    roughly the size of the bundle.
+    """
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    cover = b"\xff\xd8" + b"z" * (1024 * 1024)
+    parts = [_parts(library)[0]]
+    parts += [
+        ("files", (f"Author/Book {index} (1)/cover.jpg", cover, "image/jpeg"))
+        for index in range(60)
+    ]
+    bundle_bytes = sum(len(part[1][1]) for part in parts)
+    assert bundle_bytes > 10 * MAX_IMPORT_BYTES
+
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        tracemalloc.start()
+        response = await client.post("/api/import/calibre/preview", files=parts)
+        _, peak = tracemalloc.get_traced_memory()
+        tracemalloc.stop()
+
+    assert response.status_code == 201, response.text
+    # Measured at ~1.8 MiB for a 60 MiB bundle. The bound is generous against noise
+    # and still an order of magnitude below the payload, which is the property.
+    assert peak < 8 * 1024 * 1024, f"peak {peak / 1048576:.1f} MiB for {bundle_bytes} bytes"
+
+
+def test_every_uploaded_part_is_spooled_to_disk() -> None:
+    """The mechanism the bound above rests on, asserted directly.
+
+    `SpooledTemporaryFile` rolls over only when `max_size > 0` and a write exceeds it,
+    so 0 would mean *never* roll. 1 means roll on first write. This is easy to "tidy"
+    into 0 later and silently lose the property, so it is pinned.
+    """
+    assert _DiskSpooledMultiPart.spool_max_size == 1
+    with tempfile.SpooledTemporaryFile(max_size=_DiskSpooledMultiPart.spool_max_size) as spooled:
+        spooled.write(b"x" * 4096)
+        assert spooled._rolled, "parts must reach disk, not stay in memory"

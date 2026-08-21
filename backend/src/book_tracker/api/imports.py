@@ -1,13 +1,18 @@
+import shutil
+import tempfile
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
+from starlette.formparsers import MultiPartException, MultiPartParser
 
 from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.importers import (
     BrowsableImporter,
+    ImportInputSpec,
     ImportReadContext,
     ImportReadError,
     ImportSource,
@@ -19,6 +24,51 @@ router = APIRouter(prefix="/api/import", tags=["imports"])
 catalog_router = APIRouter(prefix="/api/importers", tags=["imports"])
 enrichment_router = APIRouter(prefix="/api/enrichment", tags=["enrichment"])
 MAX_IMPORT_BYTES = 5 * 1024 * 1024
+MAX_IMPORT_FILES = 1000
+
+
+class _DiskSpooledMultiPart(MultiPartParser):
+    """Every uploaded part on disk, whatever its size.
+
+    Starlette spools a part to disk only past 1 MiB, which is the wrong shape for a
+    folder: a cover averages a few hundred kilobytes, so an entire library of them
+    would sit in memory at once and peak would track the shelf rather than the file.
+    `SpooledTemporaryFile` rolls over when `max_size > 0` and the write exceeds it, so
+    1 is "roll immediately" — 0 means *never* roll, which is the trap here.
+    """
+
+    spool_max_size = 1
+
+
+#: What a Calibre bundle is allowed to contain. Anything else is refused before a byte
+#: is written: these paths come from the client, and `.caltrash/b/1/cover.jpg` is a real
+#: file in a real library — a deleted book's cover, which must not be imported.
+def _bundle_member(name: str) -> str:
+    """The validated relative path of one uploaded member, or a refusal."""
+    if not name or name.startswith(("/", "\\")) or "\\" in name:
+        raise _bad_member(name)
+    relative = PurePosixPath(name)
+    if relative.is_absolute():
+        raise _bad_member(name)
+    parts = relative.parts
+    if any(part in ("..", ".") or part.startswith(".") for part in parts):
+        raise _bad_member(name)
+    if parts == ("metadata.db",):
+        return "metadata.db"
+    if len(parts) >= 2 and parts[-1] == "cover.jpg":
+        return str(relative)
+    raise _bad_member(name)
+
+
+def _bad_member(name: str) -> "LibraryError":
+    return LibraryError(
+        "invalid_import_source",
+        f"Uploaded member {name!r} is not part of a Calibre library",
+        status_code=422,
+        details={"member": name},
+        user_message="That folder contains something Akasha did not expect.",
+        action="Choose the Calibre library folder itself — the one that holds metadata.db.",
+    )
 
 
 class BackfillResponse(BaseModel):
@@ -37,6 +87,11 @@ class ImportInputResponse(BaseModel):
     empty_state: str | None = None
     help_url: str | None = None
     browsable: bool = False
+    accepts_files: bool = False
+    max_bytes: int | None = None
+    max_files: int | None = None
+    #: A second way into the same connector, rendered beneath the primary. One deep.
+    alternate: "ImportInputResponse | None" = None
 
 
 class ImportBrowseResponse(BaseModel):
@@ -55,6 +110,14 @@ class ImporterResponse(BaseModel):
     input: ImportInputResponse
 
 
+def _published_input(spec: ImportInputSpec) -> ImportInputResponse:
+    published = dict(spec.__dict__)
+    published["alternate"] = (
+        _published_input(spec.alternate) if spec.alternate is not None else None
+    )
+    return ImportInputResponse.model_validate(published)
+
+
 @catalog_router.get("", response_model=list[ImporterResponse])
 async def available_importers() -> list[ImporterResponse]:
     return [
@@ -62,7 +125,7 @@ async def available_importers() -> list[ImporterResponse]:
             id=importer.name,
             label=importer.label,
             item_type=importer.item_type,
-            input=ImportInputResponse.model_validate(importer.input.__dict__),
+            input=_published_input(importer.input),
         )
         for importer in IMPORTERS.values()
     ]
@@ -178,11 +241,39 @@ def service(request: Request, importer_name: str) -> ImportService:
     )
 
 
+def _inputs(importer: object) -> tuple[ImportInputSpec, ...]:
+    """The ways into this connector: its primary, then its alternate if it has one."""
+    spec: ImportInputSpec = importer.input  # type: ignore[attr-defined]
+    return (spec,) if spec.alternate is None else (spec, spec.alternate)
+
+
+def _chosen_input(importer: object, request: Request) -> ImportInputSpec:
+    """Which declared input this request is using.
+
+    A connector with an alternate is reached two ways on one route, so the content type
+    decides rather than the declaration: a body of parts is the file or folder input, a
+    JSON body is the path one (DEC-081).
+    """
+    posted_parts = request.headers.get("content-type", "").startswith("multipart/form-data")
+    wanted = ("upload", "directory") if posted_parts else ("path",)
+    for spec in _inputs(importer):
+        if spec.kind in wanted:
+            return spec
+    raise LibraryError(
+        "invalid_import_source",
+        "This importer does not accept a source submitted that way",
+        status_code=422,
+    )
+
+
 async def _source(request: Request, importer_name: str) -> ImportSource:
     importer = IMPORTERS[importer_name]
-    if importer.input.kind == "upload":
+    spec = _chosen_input(importer, request)
+    if spec.kind == "directory":
+        return await _bundle(request, spec)
+    if spec.kind == "upload":
         form = await request.form()
-        upload = form.get(importer.input.field)
+        upload = form.get(spec.field)
         if not isinstance(upload, UploadFile):
             raise LibraryError(
                 "invalid_import_source", "An import file is required", status_code=422
@@ -201,7 +292,7 @@ async def _source(request: Request, importer_name: str) -> ImportSource:
         return ImportSource(data=b"".join(chunks), filename=upload.filename)
     try:
         body = await request.json()
-        value = body.get(importer.input.field) if isinstance(body, dict) else None
+        value = body.get(spec.field) if isinstance(body, dict) else None
         if not isinstance(value, str) or not value.strip() or len(value) > 500:
             raise ValueError("invalid path")
     except (ValueError, TypeError) as error:
@@ -211,13 +302,90 @@ async def _source(request: Request, importer_name: str) -> ImportSource:
     return ImportSource(path=value)
 
 
+async def _bundle(request: Request, spec: ImportInputSpec) -> ImportSource:
+    """Stream an uploaded folder to disk as a library the reader already understands.
+
+    Members land under `<bundle>/library/...` rather than at the root so the connector
+    can point the ordinary adapter at the parent and reuse its confinement unchanged.
+    The caller owns the returned directory and removes it.
+    """
+    max_bytes = spec.max_bytes or MAX_IMPORT_BYTES
+    max_files = spec.max_files or MAX_IMPORT_FILES
+    parser = _DiskSpooledMultiPart(
+        request.headers,
+        request.stream(),
+        max_files=max_files + 1,
+        max_fields=8,
+        max_part_size=max_bytes,
+    )
+    try:
+        form = await parser.parse()
+    except MultiPartException as error:
+        raise _too_large(spec) from error
+
+    bundle = Path(tempfile.mkdtemp(prefix="akasha-import-"))
+    try:
+        total = 0
+        written = 0
+        for upload in form.getlist(spec.field):
+            if not isinstance(upload, UploadFile):
+                continue
+            relative = _bundle_member(upload.filename or "")
+            written += 1
+            if written > max_files:
+                raise _too_large(spec)
+            target = bundle / "library" / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("wb") as sink:
+                while chunk := await upload.read(64 * 1024):
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise _too_large(spec)
+                    sink.write(chunk)
+        if not (bundle / "library" / "metadata.db").is_file():
+            raise LibraryError(
+                "invalid_import_source",
+                "The uploaded folder holds no metadata.db",
+                status_code=422,
+                user_message="That folder is not a Calibre library.",
+                action=(
+                    "Choose the folder that holds metadata.db — usually the one Calibre "
+                    "calls your Calibre Library."
+                ),
+            )
+        return ImportSource(directory=bundle)
+    except BaseException:
+        shutil.rmtree(bundle, ignore_errors=True)
+        raise
+    finally:
+        await form.close()
+
+
+def _too_large(spec: ImportInputSpec) -> LibraryError:
+    megabytes = (spec.max_bytes or MAX_IMPORT_BYTES) // (1024 * 1024)
+    return LibraryError(
+        "import_too_large",
+        f"Upload exceeds {megabytes} MiB or {spec.max_files or MAX_IMPORT_FILES} files",
+        status_code=413,
+        user_message=f"That library is larger than the {megabytes} MiB this accepts.",
+        action="Import it from a mounted path instead, using the option below the folder chooser.",
+    )
+
+
 @router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)
 async def preview(importer_name: str, request: Request) -> PreviewResponse:
     import_service = service(request, importer_name)
+    source = await _source(request, importer_name)
     try:
-        result = import_service.preview(await _source(request, importer_name))
+        result = import_service.preview(source)
     except ImportReadError as error:
         raise read_failure(IMPORTERS[importer_name], error) from error
+    finally:
+        # Staging has already copied whatever the batch needs into `/data/imports`,
+        # so an uploaded bundle has no reason to outlive the request — including when
+        # the read failed, where leaving it behind would be a slow disk leak.
+        if source.directory is not None:
+            shutil.rmtree(source.directory, ignore_errors=True)
     return PreviewResponse.model_validate(result)
 
 
@@ -233,11 +401,10 @@ async def browse(
     as its reader would — the picker cannot walk anywhere a preview could not open.
     """
     importer = IMPORTERS.get(importer_name)
-    if (
-        importer is None
-        or not importer.input.browsable
-        or not isinstance(importer, BrowsableImporter)
-    ):
+    # Browsing may be declared by the alternate rather than the primary: Calibre leads
+    # with a folder chooser and keeps the mount picker underneath it (DEC-081).
+    browsable = importer is not None and any(spec.browsable for spec in _inputs(importer))
+    if importer is None or not browsable or not isinstance(importer, BrowsableImporter):
         raise LibraryError(
             "importer_not_browsable", "This importer has no browsable source", status_code=404
         )

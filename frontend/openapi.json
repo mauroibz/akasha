@@ -1129,6 +1129,21 @@
             ],
             "title": "Accept"
           },
+          "accepts_files": {
+            "default": false,
+            "title": "Accepts Files",
+            "type": "boolean"
+          },
+          "alternate": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImportInputResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "browsable": {
             "default": false,
             "title": "Browsable",
@@ -1185,6 +1200,28 @@
           "label": {
             "title": "Label",
             "type": "string"
+          },
+          "max_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Bytes"
+          },
+          "max_files": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Files"
           },
           "placeholder": {
             "anyOf": [

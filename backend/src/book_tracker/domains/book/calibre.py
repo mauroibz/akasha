@@ -284,31 +284,52 @@ class CalibreImporter:
     label = "Calibre"
     item_type = DOMAIN.item_type
     input = ImportInputSpec(
-        kind="path",
-        label="Calibre library path",
-        field="library_path",
-        placeholder="Library",
+        # The folder on your own machine, chosen in the browser. No mount, no
+        # CALIBRE_DIR, no restart, and nothing holds your library open while
+        # Calibre or calibre-web is using it (DEC-081).
+        kind="directory",
+        label="Calibre folder",
+        field="files",
+        accepts_files=True,
+        placeholder=None,
         help=(
-            "Akasha opens this library read-only inside the configured Calibre mount. "
-            "Enter a relative folder only; covers are copied during preview."
+            "Akasha reads the library you choose and copies nothing but its metadata "
+            "and its covers. Your files stay where they are."
         ),
-        # What the import does to your library, in the order a reader worries about
-        # it: is my Calibre safe, will it overwrite my notes, what arrives.
         guide=(
-            "Pick the folder that holds metadata.db. Browsing starts at the Calibre "
-            "library mounted into Akasha, so there is no path to guess.",
-            "Calibre is opened read-only and is never written to. Close Calibre first "
-            "anyway — it locks the database while it saves.",
-            "Only empty fields are filled. Anything you have edited in Akasha wins, "
-            "and a re-sync of the same library changes nothing you have touched.",
-            "Covers already in Calibre are copied during preview, so the import needs "
-            "no network for them.",
+            "Choose your Calibre library folder — the one that holds metadata.db. "
+            "Your browser reads it directly; nothing needs to be mounted or configured.",
+            "Only metadata.db and the covers are sent. Your ebooks are never uploaded, "
+            "which is why this is a few megabytes rather than a few gigabytes.",
+            "Nothing is written back to Calibre, and nothing holds the library open, so "
+            "it is safe to do while Calibre or calibre-web is running.",
+            "Only empty fields are filled. Anything you have edited in Akasha wins, and "
+            "a re-import of the same library changes nothing you have touched.",
             "Everything lands in Triage rather than in the library, so nothing appears "
             "until you have looked at it.",
         ),
-        empty_state="No folders here. Mount your Calibre library and reload.",
+        empty_state="Choose your Calibre library folder.",
         help_url="https://manual.calibre-ebook.com/gui.html#the-calibre-library",
-        browsable=True,
+        # A shelf of covers is legitimately far bigger than a CSV. Measured: 21 books
+        # is 8.2 MB, so this is roughly a 600-book library at those cover sizes and
+        # several thousand at ordinary ones. Past it the refusal names the alternate
+        # below, which has no such ceiling.
+        max_bytes=256 * 1024 * 1024,
+        max_files=10_000,
+        # The mount, kept: automation has no browser, and a library too large to
+        # upload still has a way in.
+        alternate=ImportInputSpec(
+            kind="path",
+            label="Calibre library path",
+            field="library_path",
+            placeholder="Library",
+            browsable=True,
+            help=(
+                "Or read a library the server can already see. Akasha opens it "
+                "read-only inside the configured Calibre mount; covers are copied "
+                "during preview."
+            ),
+        ),
     )
     identity_kinds = frozenset({"isbn", "calibre_uuid"})
     error_codes = frozenset(
@@ -319,9 +340,16 @@ class CalibreImporter:
         return CalibreAdapter(context.path_root).browse(path)
 
     def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
-        if source.path is None:
+        # Two ways in, one reader. An uploaded bundle has already been materialized by
+        # the route at `<directory>/library`, so it is a Calibre library on disk like
+        # any other and `CalibreAdapter` cannot tell the difference (DEC-081).
+        if source.directory is not None:
+            root, library_path = source.directory, "library"
+        elif source.path is not None:
+            root, library_path = context.path_root, source.path
+        else:
             raise CalibreError("invalid_calibre_path", "A Calibre library path is required")
-        snapshot = CalibreAdapter(context.path_root).read(source.path)
+        snapshot = CalibreAdapter(root).read(library_path)
         records = []
         for payload in snapshot.records:
             metadata = {
@@ -387,7 +415,13 @@ class CalibreImporter:
         return ImportSnapshot(
             fingerprint=snapshot.fingerprint,
             filename="metadata.db",
-            source_descriptor={"library_path": source.path},
+            # Never the bundle's temporary location: a host path is not the reader's
+            # business and outlives nothing useful.
+            source_descriptor=(
+                {"source": "upload"}
+                if source.directory is not None
+                else {"library_path": source.path}
+            ),
             records=tuple(records),
         )
 

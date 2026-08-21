@@ -52,7 +52,7 @@ class ImportInputSpec:
     shipping arbitrary markup into it (DEC-080).
     """
 
-    kind: Literal["upload", "path"]
+    kind: Literal["upload", "path", "directory"]
     label: str
     field: str
     accept: str | None = None
@@ -66,6 +66,21 @@ class ImportInputSpec:
     help_url: str | None = None
     #: Whether the connector can list what a `path` source holds. See `BrowsableImporter`.
     browsable: bool = False
+    #: Whether this connector's `read` can take `ImportSource.files`. Required by
+    #: `kind="directory"`, which would otherwise accept an upload it cannot use.
+    accepts_files: bool = False
+    #: A second way into the same connector, rendered beneath the primary on the same
+    #: tab. Exactly one level deep: an alternate may not carry its own (DEC-081). It
+    #: exists because a Calibre library is one source you may reach two ways — the
+    #: folder on your machine, or a mount the server can already see — and splitting
+    #: that across two tabs would name one thing twice.
+    alternate: "ImportInputSpec | None" = None
+    #: What this input will accept, when the shared route's defaults are the wrong
+    #: size. `None` means the shared default. A folder of covers is legitimately far
+    #: larger than a CSV, and raising the global ceiling for every connector to suit
+    #: one of them is how a limit stops meaning anything.
+    max_bytes: int | None = None
+    max_files: int | None = None
 
 
 @dataclass(frozen=True)
@@ -87,11 +102,24 @@ class ImportBrowseResult:
 
 @dataclass(frozen=True)
 class ImportSource:
-    """One source submitted through the generic route."""
+    """One source submitted through the generic route.
+
+    Exactly one of `data`, `path` or `directory` is set, matching the input's `kind`.
+
+    `directory` is a **materialized bundle**: the route has already streamed each
+    uploaded member to disk under `<directory>/library/<relative path>`, having refused
+    anything absolute, anything containing `..`, anything with a hidden segment, and
+    anything the connector did not ask for. It is a directory rather than a mapping of
+    bytes on purpose — a folder of covers is far larger than any single file in it, and
+    holding the whole bundle in memory to hand it over would put the peak at the size of
+    the library instead of the size of one cover. The route owns its lifetime and
+    removes it once preview has staged what it needs.
+    """
 
     data: bytes | None = None
     filename: str | None = None
     path: str | None = None
+    directory: Path | None = None
 
 
 @dataclass(frozen=True)

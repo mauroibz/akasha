@@ -1,6 +1,6 @@
 # Sprint 033 — Calibre without a mount
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 032
 **Roadmap revision:** 15
 
@@ -27,7 +27,7 @@ Verified in Chromium via Playwright before planning: `<input webkitdirectory>` i
 ## Deliverables
 
 1. **A connector may declare a second way in.** `ImportInputSpec` gains `kind="directory"` and `alternate: ImportInputSpec | None`, rendered below the primary. Depth is exactly one — an `alternate` may not itself carry an `alternate` — and the two specs must use different `field` names. `ImportInputSpec` also gains `max_bytes: int | None` and `max_files: int | None`, defaulting to today's global limits, so a connector that needs a bigger envelope declares it instead of the shared route raising the ceiling for everyone.
-2. **A source may be a set of files.** `ImportSource` gains `files: Mapping[str, bytes] | None` — relative path to bytes. `_source()` in `api/imports.py` grows a `directory` branch that **streams parts to a temporary file rather than buffering them in memory** (a 256 MiB ceiling buffered on a ZimaBoard is not acceptable), enforces the declared byte and file caps, and refuses any relative path that is absolute, contains `..`, starts a segment with `.`, or is not `metadata.db` or `*/cover.jpg`.
+2. **A source may be a folder.** `ImportSource` gains `directory: Path | None`, a materialized bundle at `<directory>/library/<relative path>` — **not** a `Mapping[str, bytes]`, which would put peak memory at the size of the library rather than of one cover and contradict AC5. `_source()` in `api/imports.py` grows a `directory` branch that **streams parts to a temporary file rather than buffering them in memory** (a 256 MiB ceiling buffered on a ZimaBoard is not acceptable), enforces the declared byte and file caps, and refuses any relative path that is absolute, contains `..`, starts a segment with `.`, or is not `metadata.db` or `*/cover.jpg`.
 3. **The reader does not learn a second way to read.** `CalibreImporter.read` materializes an uploaded bundle into a temporary directory at its declared relative paths and points the **existing** `CalibreAdapter` at it. `confine`, `_records`, `_cover` and `stage` are untouched, so an uploaded library and a mounted one normalize through exactly the same code and `test_calibre_import.py` stays the net. The temporary directory is removed after `stage` has copied what it needs.
 4. **The Calibre tab leads with the folder.** A new `features/import/DirectoryPicker.tsx`: an `<input webkitdirectory>`, a client filter that strips the leading path segment, drops any path with a dot-segment and keeps only `metadata.db` plus `*/cover.jpg`, and a summary of what will be sent (`"2 books · 2 covers · 2.4 MB"`) before anything uploads. Below it, the 032 mount picker and typed path render from `input.alternate` unchanged. A library whose selection has no `metadata.db` is refused in the browser with the connector's own copy, before any request.
 5. **Conformance and documentation.** The suite rejects a nested `alternate`, an `alternate` sharing the primary's `field`, `max_bytes`/`max_files` that are not positive, and `kind="directory"` on a connector whose reader cannot take `files`. README's *Importing and triage*, `docs/guides/adding-a-domain.md`, technical spec §6.5/§7.1 and product spec §5.2/§7 all follow.
