@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 15
+**Plan revision:** 16
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — 033 closed on 2026-08-21 and the numbered plan is complete.
+**Active sprint:** 034 — Incremental import (planned)
 
 ## Shape of the plan
 
@@ -28,7 +28,8 @@ Post-v1 work branches:
                              └─ 030 Entry depth  [GATED, Phase A only]
                                  └─ 031 Per-domain imports
                                 └─ 032 Import UX and connector extensibility
-                                   └─ 033 Calibre without a mount  ← the plan ends here
+                                   └─ 033 Calibre without a mount
+                                      └─ 034 Incremental import  ← the plan ends here
 ```
 
 **The plan stops at 032, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
@@ -88,12 +89,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 │ [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
 | [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
 | [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
+| [034](034-incremental-import.md) | Incremental import | 033 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 033 have files, and every one of them is closed.
+incorporating actual deviations. Sprints 019 through 034 have files; 019 through 033 are closed.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -551,6 +553,29 @@ the net.
 needed: `ImportSource` carries a materialized bundle directory rather than a mapping of bytes, which
 the plan's own memory bound ruled out. Measured on the owner's library with the mount empty: 71 files
 offered by the browser, 2 sent, 18 covers staged, 10.0 MB. See the sprint file's Outcome.
+
+### [Sprint 034 — Incremental import](034-incremental-import.md)
+
+Added at plan revision 16, from the owner's question about Sprint 033's result: is it reasonable to
+drag a 600 MB folder into a browser every time you sync? It is not, and the reason is that
+content-addressing dedupes *storage* but not *transfer* — the server can only recognise bytes it has
+already received, so an unchanged re-sync pays full price. Measured today: re-importing an unchanged
+library still uploads 10.0 MB of covers.
+
+The obvious fix, hashing in the client and asking which digests are missing, was ruled out by
+measurement rather than taste: `crypto.subtle` needs a secure context, and while `localhost:8000` is
+one, the reverse-proxied `http://books.home.lan` in the runbook is not — `crypto.subtle` is
+`undefined` there. It would work when the owner browses the box directly and fail silently from
+anywhere else on the LAN.
+
+So the server decides. The client uploads `metadata.db` plus a manifest of `{path, size}`, and the
+connector answers which files it actually wants by comparing identities it already holds. On an
+unchanged library that is a 416 KB round trip instead of the whole bundle. `ImportInputSpec` gains
+`incremental`, matching the `browsable`/`BrowsableImporter` shape, and the plan is never load-bearing:
+if it fails, the client sends everything and says so.
+
+This is deliberately **before** ebook attachments, which is the next thing the owner wants. Shipping
+attachments first would mean 163 MB on every sync — exactly the problem this sprint removes.
 
 ## Future epics, after this plan
 

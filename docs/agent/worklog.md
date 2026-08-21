@@ -1994,3 +1994,27 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   the plan's own memory bound, and the plan text was corrected in place.
 - Blocked/open: none. No tag, push, release or deployment was requested or performed.
 - Next: none scheduled. The numbered plan is complete through 033.
+
+## 2026-08-21 — Sprint 034 planned (docs-only)
+- Done: owner-directed planning session, prompted by their question about 033's result — is it
+  reasonable to drag a 600 MB folder into a browser on every sync? Established that it is not, and
+  why: content-addressing dedupes storage but not transfer, so an unchanged re-sync still uploads
+  10.0 MB of covers today and would upload 163 MB once ebooks are attachable. Measured the obvious
+  fix out of the running: `crypto.subtle` needs a secure context, and Chromium reports
+  `isSecureContext=true` with `crypto.subtle.digest` present on `http://localhost:8000` and
+  `http://127.0.0.1:8000` but `isSecureContext=false` with `crypto.subtle` **undefined** on
+  `http://books.home.lan`, which is the reverse-proxied deployment the runbook describes — so a
+  digest negotiation would work from the box and fail silently from the rest of the LAN. Wrote
+  `docs/sprints/034-incremental-import.md` from TEMPLATE.md; ROADMAP to revision 16; state.json ->
+  `ready`/034; FINAL_SPRINT 33 -> 34; appended DEC-082.
+- Verified: `python scripts/validate_project.py` (pass). No `make test` — docs-only session.
+- Owner decisions taken during planning: (a) attaching files is a feature of the **importer**;
+  Akasha's own file UI stays simple and file-type agnostic rather than growing toward an ebook
+  manager, which settles the product-spec §1 tension raised earlier without amending the non-goal;
+  (b) ebook attachments come **after** incremental sync, since shipping them first would mean
+  163 MB on every sync.
+- Blocked/open: three implementation-time risks are recorded in the sprint file — `metadata.db` is
+  uploaded twice (stated, not engineered around); a changed file under an unchanged identity is
+  not detected, with "an item without a cover is always wanted" as the escape hatch; and the plan
+  must degrade to a full upload rather than fail closed.
+- Next: execute **Sprint 034**, then plan 035 (ebook attachments on a toggle).
