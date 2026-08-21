@@ -2764,3 +2764,26 @@ Append-only record of material architecture choices, product-default resolutions
   means the bulk path stays fast once the owner explicitly selects. The fixed-height row becomes
   denser and must be checked at narrow widths. Status changes naturally remove a row from the
   unsorted inbox after success; optimistic failure restores the prior row and announces one error.
+
+## DEC-086 — Fixed virtual rows use native selects for row-local triage edits
+
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Refines:** DEC-085's row-control implementation; preserves DEC-026's score color language and
+  DEC-028's optimistic rollback contract.
+- **Context:** The planned reuse of the library card's compact `ScorePicker` does not fit a triage
+  row: its panel is anchored above a fixed-height card, so the first visible row clips it at the
+  scroll edge. Replacing it with the shared Radix select avoided the geometry problem but the open
+  portal applied modal `aria-hidden` behavior to the route containing its own focused trigger; axe
+  correctly failed `aria-hidden-focus`. A fixed working row needs controls that neither expand its
+  box nor leave its accessibility tree.
+- **Decision:** Triage uses named native `<select>` controls for row-local status and score. The
+  status options still come from `statusesFor(entry.item.type, registry)`, and the score uses the
+  same DEC-026 fill ramp and provisional marker. Both patch one entry optimistically and restore the
+  cached page on failure. The library cards, add form and detail form keep their established shared
+  controls; this is a geometry-specific choice, not a replacement design system.
+- **Consequences:** The controls are keyboard-native, do not portal, cannot resize the row and work
+  at the first and last scroll positions. At 390 px the cover and redundant chevron hide, status and
+  score narrow, and the row is asserted not to overflow. The realistic walkthrough also exposed the
+  old fixed 70vh blank panel under a short inbox; triage now sizes to its virtual content until the
+  same 70vh/760px scroll cap is reached.

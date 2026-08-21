@@ -755,17 +755,20 @@ export function TriagePage() {
                     {hasConflict && (
                       <span
                         className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
-                        aria-label={`Suggested status: ${statusLabelFor(
-                          entry.item.type,
-                          itemTypes.data,
-                          entry.suggested_status!,
-                        )}`}
                         title={`Suggested: ${statusLabelFor(
                           entry.item.type,
                           itemTypes.data,
                           entry.suggested_status!,
                         )}`}
                       >
+                        <span className="sr-only">
+                          Suggested status:{" "}
+                          {statusLabelFor(
+                            entry.item.type,
+                            itemTypes.data,
+                            entry.suggested_status!,
+                          )}
+                        </span>
                         <span className="hidden lg:inline" aria-hidden="true">
                           {statusLabelFor(
                             entry.item.type,

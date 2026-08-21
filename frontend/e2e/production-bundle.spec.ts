@@ -1,5 +1,5 @@
 import { expect, test } from "./console";
-import { seedLibrary } from "./seed";
+import { seedLibrary, stubItemTypes } from "./seed";
 
 /**
  * The production bundle, loaded the way a browser loads it.
@@ -19,6 +19,7 @@ import { seedLibrary } from "./seed";
 test.describe("production bundle", () => {
   test("the entry chunk boots and renders the library", async ({ page }) => {
     await seedLibrary(page, 3);
+    await stubItemTypes(page);
     await page.goto("/");
 
     await expect(page.getByRole("feed")).toBeVisible();
@@ -26,6 +27,7 @@ test.describe("production bundle", () => {
 
   test("a lazily loaded route chunk initialises too", async ({ page }) => {
     await seedLibrary(page, 1);
+    await stubItemTypes(page);
     await page.goto("/");
     // Navigate rather than deep-link, so the chunk arrives after the entry has
     // already evaluated: that ordering is what a cyclic split breaks.

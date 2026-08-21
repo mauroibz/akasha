@@ -2,9 +2,13 @@ import { defineConfig, devices } from "@playwright/test";
 
 const DEV_PORT = 4173;
 const PREVIEW_PORT = 4174;
+const PRODUCTION_BUNDLE = /production-bundle\.spec\.ts/;
+const SCRATCHPAD = /scratchpad/;
+const INCLUDE_SCRATCHPAD = process.env.BOOK_TRACKER_INCLUDE_SCRATCHPAD === "1";
 
 export default defineConfig({
   testDir: "./e2e",
+  testIgnore: INCLUDE_SCRATCHPAD ? [] : [SCRATCHPAD],
   fullyParallel: false,
   outputDir: "/tmp/akasha-playwright-results",
   reporter: "line",
@@ -29,12 +33,14 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      testIgnore: /production-bundle\.spec\.ts/,
+      testIgnore: INCLUDE_SCRATCHPAD
+        ? [PRODUCTION_BUNDLE]
+        : [PRODUCTION_BUNDLE, SCRATCHPAD],
       use: { ...devices["Desktop Chrome"] },
     },
     {
       name: "production-bundle",
-      testMatch: /production-bundle\.spec\.ts/,
+      testMatch: PRODUCTION_BUNDLE,
       use: {
         ...devices["Desktop Chrome"],
         baseURL: `http://127.0.0.1:${PREVIEW_PORT}`,

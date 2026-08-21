@@ -88,6 +88,9 @@ Before writing a walkthrough, search the active sprint, `frontend/e2e/`,
 - Preserve useful local walkthroughs under the ignored `frontend/e2e/scratchpad/` directory. When a
   flow becomes generally reusable and contains no private paths or data, promote a sanitized runner
   or fixture to tracked test infrastructure in a scoped sprint.
+- Scratchpad specs are excluded from the normal Playwright gate. Run one explicitly with
+  `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 npm run test:e2e -- --project=chromium --workers=1
+  e2e/scratchpad/<file>.spec.ts` from `frontend/`.
 
 The walkthrough remains a manual acceptance gate even when expressed as Playwright: a skipped local
 walkthrough does not count as having exercised the flow.
