@@ -2,7 +2,7 @@
 
 **Plan revision:** 14
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 032 — Import UX and connector extensibility (planned)
+**Active sprint:** none — 032 closed on 2026-08-21 and the numbered plan is complete.
 
 ## Shape of the plan
 
@@ -85,13 +85,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
 | [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
 │ [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
-| [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | planned |
+| [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 031 have files.
+incorporating actual deviations. Sprints 019 through 032 have files, and every one of them is closed.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -522,10 +522,17 @@ The last sprint in the plan. Sprint 031 shipped the `Importer` contract and gene
 
 The outcome is an import flow that explains itself and a contract that lets a connector guide its own users. Concretely: Triage folded into Import as a tab; Goodreads guidance and drag-and-drop; Calibre guidance and a browsable folder picker rooted at the configured mount; `ImportInputSpec` extended with optional `guide`, `empty_state`, `help_url`; `ImportReadError` extended with `user_message` and `action`; conformance checks so a malformed declaration fails by existing. The existing reader suites are the no-behavior-change net. Documentation follows: README, the domain guide, technical spec §6.5/§7.1, product spec §7.
 
+**Delivered 2026-08-21 (DEC-080).** All of the above, plus one field the contract needed and the plan did not name: `ImportInputSpec.browsable` with a separate `BrowsableImporter` protocol, because an upload has nothing to browse and every future connector would otherwise implement a method it has no use for. `error_codes` became a required member rather than a convention, so the closed set is enforced at the boundary and not merely asserted. `/triage` redirects rather than 404s. The walkthrough gate produced three fixes no test would have: a preview belongs to the connector that produced it, the folder picker states its situation once, and the triage tab does not repeat the surface's own back link. See the sprint file's Outcome.
+
 ## Future epics, after this plan
 
 Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
 contract and Sprint 031's import boundary, developed in parallel without interfering with the others.
+
+Each of these inherits the **extended** import contract (DEC-080): a connector declares its own
+guide, empty state, help link, browsability and error vocabulary, so it is a package rather than a
+package plus a patch to `ImportPage.tsx`. A Steam or Spotify connector writes its guidance steps and
+its `action` sentences beside its reader, and the shared screen renders them without being told.
 
 - **Games — IGDB.** Carries DEC-052's prediction that games need no seam albums did not; Sprint 028's
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
@@ -551,7 +558,9 @@ contract and Sprint 031's import boundary, developed in parallel without interfe
   it is picked up. **The verdict (DEC-077) answers it:** a track is metadata on the album (the
   `rows` precedent), not a child entity — so a Spotify importer rolls saved tracks up to their
   albums and never touches the entry model. That is precisely the "plug and play with the music
-  system" outcome the boundary exists to make possible.
+  system" outcome the boundary exists to make possible. Spotify is an OAuth `upload`-less source
+  rather than a file or a mount, so it is also the first test of whether `ImportInputSpec`'s two
+  kinds are enough — an authorization handshake is neither.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 

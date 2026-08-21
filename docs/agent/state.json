@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 14,
-  "project_status": "in_progress",
-  "active_sprint": "032",
-  "active_sprint_file": "docs/sprints/032-import-ux-and-connector-extensibility.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "031",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "032",
   "completed_sprints": [
     "001",
     "002",
@@ -37,8 +37,9 @@
     "028",
     "029",
     "030",
-    "031"
+    "031",
+    "032"
   ],
-  "started_at": "2026-08-21T09:45:00-03:00",
-  "updated_at": "2026-08-21T09:45:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-21T13:40:00-03:00"
 }

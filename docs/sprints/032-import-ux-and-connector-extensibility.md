@@ -1,6 +1,6 @@
 # Sprint 032 — Import UX and connector extensibility
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 031
 **Roadmap revision:** 14
 
@@ -77,4 +77,77 @@ Plus the walkthrough gate: run the app against realistic data, import from both 
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+**Completed 2026-08-21.** Commits: `a0bd8d1` (fold triage into import), `711fe65` (connector-declared
+guidance, drag-and-drop, folder browse), `57422c8` (documentation plus the three walkthrough fixes),
+and the closing state commit.
+
+### Acceptance criteria
+
+1. **`/triage` is gone as a route and a nav item; Triage is a tab on `/import`.** `App.tsx` redirects
+   `/triage` → `/import?tab=triage` (`Navigate replace`) rather than 404ing — it was a top-level item
+   for thirty sprints and is in bookmarks. `AppShell` lists four destinations. `HomePage`'s Inbox
+   button and the post-commit link both target the folded tab. `TriagePage` is unchanged apart from
+   its wrapper: its keyboard map, bulk bar and virtualized table were exercised in the walkthrough.
+   The tab lives in the URL, so a pasted address and the post-commit `<Link>` both work. Verified by
+   `ImportPage.test.tsx` (folded tab, URL-addressed tab, one `<main>` landmark), by
+   `triage.spec.ts`'s redirect and round-trip specs, by all eleven relocated `goto` calls, and in the
+   walkthrough.
+2. **Goodreads explains itself and takes a dropped file.** Five declared steps: where the export
+   lives (`goodreads.com/review/import`, desktop web only), that it is a snapshot not a sync, that
+   ratings are doubled and marked provisional, that shelves become tags and everything lands in
+   Triage. The screen renders the declaration; it holds no Goodreads copy of its own.
+   `SourceDropZone` accepts a drop and keeps a real visible file input for the keyboard and
+   assistive path.
+3. **Calibre is browsed, not typed.** `GET /api/import/{importer}/browse?path=` returns one level as
+   `{path, parent, directories, importable}` — names only. Confinement runs through
+   `CalibreAdapter.confine`, which `read` now uses too, so the picker cannot reach anywhere a preview
+   could not open. Refusals are covered for `..`, absolute paths, an escaping symlink (caught after
+   resolution) and a non-browsable connector. The typed path stays for automation.
+4. **The declaration is enforced, not trusted.** `ImportInputSpec` gained `guide`/`empty_state`/
+   `help_url`/`browsable`; `ImportReadError` gained `user_message`/`action`; `Importer` gained a
+   required `error_codes`. `declared_read_error` republishes anything outside the declared set as
+   `undeclared_import_error`. Conformance rejects prose-instead-of-steps, a blank step, a blank empty
+   state, `http://` and `javascript:` help URLs, browsing on an upload connector, browsing without a
+   `browse` method, an empty vocabulary and a shouted code. The frontend renders the guide, the
+   empty state, the external link and the action beside the message.
+5. **The readers did not change.** `test_goodreads_import.py` and `test_calibre_import.py` pass
+   unmodified. New coverage: browse listing/confinement/symlink/404, the extended 422 payload for
+   both connectors, an assertion that an ordinary error keeps exactly `{code, message, details}`, and
+   the conformance checks above.
+6. **The walkthrough gate passed.** Recorded in the worklog.
+
+### Verification
+
+`python scripts/validate_project.py` (pass), `make format` (no drift), `make check` (lint, mypy on 47
+files, OpenAPI drift, frontend types, validator — all green), `make test` (**backend 502 passed**,
+**frontend 164 passed**), `npx playwright test` (**95 passed, 2 skipped**), `git diff --check` (clean).
+
+Walkthrough: an isolated backend on a temporary data dir with a synthetic Calibre mount
+(`Estanterías/{Calibre Library, Comics, Sin biblioteca}` plus a loose file) and a 120-row Goodreads
+export with armoured ISBNs, unrated rows and one malformed date. Driven headless at 1440×900 with
+screenshots at every step; zero console errors or page errors.
+
+### Deviations and decisions
+
+Four, all recorded in **DEC-080**.
+
+- **`browsable` and `BrowsableImporter` were added beyond the planned three fields.** Browsing had to
+  be declarative for the shared screen to render a picker without naming Calibre, and a separate
+  protocol keeps every future upload connector from implementing a method it has no use for.
+- **`error_codes` became a required contract member.** The sprint asked that "its error codes are a
+  closed set"; a set nothing enforces is a comment, so the boundary republishes an undeclared code
+  instead of passing it through.
+- **A guide is ordered steps, not markdown** (the sprint's recommended option), and **`/triage`
+  redirects** (likewise).
+- **A staged source belongs to its connector.** Not planned, and found by the walkthrough: after a
+  Goodreads commit, the Calibre tab rendered the Goodreads result and no Calibre form at all, because
+  the tab strip is now visible during a preview. Moving between connectors clears; moving through
+  Triage and back does not, because Triage is not a connector and the undo window is only reachable
+  from the result panel. Covered by a test.
+
+### Impact on future work
+
+The numbered plan ends here. The unnumbered epics (Games/IGDB, Series/TMDB, Music/Spotify, Steam)
+inherit the extended contract and are noted in `ROADMAP.md`: a connector is now a package rather than
+a package plus a screen patch. One thing the extension did not solve and the Spotify epic will meet
+first: `ImportInputSpec.kind` is still `upload | path`, and an OAuth handshake is neither.

@@ -1,16 +1,53 @@
-# Handoff — Sprint 032 planned and ready
+# Handoff — the numbered plan is complete
 
-Plan revision 14. Sprint 031 closed the per-domain import boundary on 2026-08-21; the owner used it and reported two UX defects plus one architectural gap, all scheduled as **Sprint 032 — Import UX and connector extensibility** (DEC-079). The sprint file exists at `docs/sprints/032-import-ux-and-connector-extensibility.md`, status `planned`; state.json points at it as `ready`. The project is no longer `complete`; FINAL_SPRINT in `scripts/validate_project.py` moved 31 → 32.
+Plan revision 14. **Sprint 032 closed on 2026-08-21 and no sprint is active.** `state.json` reads
+`complete` with null active fields and 001–032 in `completed_sprints`; `FINAL_SPRINT` in
+`scripts/validate_project.py` is 32. Nothing has been tagged, pushed, released or deployed.
 
-What 032 delivers: Triage folded into Import as a tab (the `TriagePage` component moves unchanged; `/triage` stops being a top-level route, with a redirect recommended); Goodreads guidance plus drag-and-drop; Calibre guidance plus a browsable folder picker backed by a new read-only, mount-confined `GET /api/import/calibre/browse` endpoint; and declarative extensions to the importer contract (`ImportInputSpec.guide`/`empty_state`/`help_url`, `ImportReadError.user_message`/`action`) with conformance checks. The reader suites are the no-behavior-change net. The walkthrough gate applies.
+## What 032 changed, in one paragraph
 
-Open decisions recorded in the sprint file's risks section: whether `/triage` redirects or 404s (redirect recommended); the browse endpoint returns names only, never absolute paths; guide rendering as plain ordered steps vs markdown (steps recommended); the Import screen's default tab should remember the last source used, mirroring DEC-062.
+Triage stopped being a top-level destination. It is a tab on `/import` beside one tab per registered
+connector; `/triage` redirects there rather than 404ing, the nav item is gone, and the Inbox button
+and the post-commit link both land on it. The tab lives in the URL (`?tab=`), and an unnamed one
+falls back to the connector used last. Alongside that, a connector now guides its own users: it
+publishes ordered `guide` steps, an `empty_state`, an https `help_url`, whether its source is
+`browsable`, and a closed `error_codes` set whose errors carry `user_message` and `action` — one
+imperative sentence a reader can act on. The import screen renders all of it without knowing which
+connector wrote it. Calibre is browsed through `GET /api/import/{importer}/browse`, which returns
+directory names only and resolves confinement with the same code the reader uses. DEC-080 is the
+record; the sprint file's Outcome carries the evidence.
 
-Known and left, in the order they are likely to bite:
+## Where things stand
 
-1. Sprint 031's final combined `make test` was waived by the owner mid-run (482 backend tests collected, interrupted in `test_export.py`; frontend stage not reached). It is recorded as **not completed**, not green. 032's Verification section requires the full run.
-2. `ImportPage.test.tsx` and the e2e specs stub `/api/importers` with the current `ImportInputSpec` shape; extending the spec means extending those fixtures.
-3. The e2e specs `goto("/triage")` in eleven places (`frontend/e2e/triage.spec.ts`, `accessibility.spec.ts`, `import.spec.ts`, `editorial.spec.ts`) and must move to the folded path.
-4. `frontend/src/pages/HomePage.tsx:537` (Inbox button) and `ImportPage.tsx:320` (post-commit link) navigate to `/triage` and must follow.
+- Gates green as of closure: validator, `make check`, `make test` (backend 502, frontend 164),
+  `npx playwright test` (95 passed, 2 skipped), `git diff --check`. The full `make test` that
+  Sprint 031 left waived was run to completion.
+- The walkthrough gate ran against realistic data and produced three fixes, all recorded in the
+  worklog. Read that entry before touching the import screen: two of the three were copy defects
+  that no test would have caught and that a later edit could reintroduce.
 
-No tag, push, release, or deployment has been performed for this work.
+## If you pick up the import boundary next
+
+`docs/guides/adding-a-domain.md` is the instruction; `docs/specs/technical-spec.md` §6.5 is the
+contract. Three things a new connector will meet:
+
+1. **`ImportInputSpec.kind` is still `upload | path`.** A Spotify connector authorizes rather than
+   uploading or pointing at a mount, and neither kind fits. That is the first design question the
+   music epic hits, and nothing in 032 pre-empted it.
+2. **`error_codes` is required.** An undeclared code is republished as `undeclared_import_error`
+   rather than reaching the client, so a connector that forgets to list one will see that instead of
+   its own code.
+3. **`browsable` implies `BrowsableImporter`.** The conformance suite refuses one without the other,
+   and it refuses `browsable` on an upload connector.
+
+## Known and left
+
+- The folder picker issues its listing request twice on mount under the dev server. That is React
+  StrictMode double-invoking the effect; a production build does one. The e2e assertion is written
+  not to depend on the sequence.
+- `frontend/e2e/accessibility.spec.ts` and `feedback.spec.ts` previously reached the developer's
+  live backend on :8000 for `/api/importers` by accident. They stub it through `stubImporters` in
+  `e2e/seed.ts` now. If you add a spec that opens `/import`, use that helper rather than a fourth
+  copy of the fixture.
+- Triage is unchanged as a surface; 032 moved it and redesigned nothing. Its filters, grouping and
+  conflict expansion are still what product spec §7 describes as intent rather than as built.

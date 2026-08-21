@@ -1861,3 +1861,59 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   source, mirroring DEC-062).
 - Next: claim **Sprint 032** per the normal protocol (state.json + sprint file to
   `in_progress`, TDD the acceptance criteria in listed order).
+
+## 2026-08-21 — Sprint 032 (complete; project complete)
+- Done: claimed 032 and executed it end to end. Folded Triage into `/import` as a tab (the
+  `TriagePage` component unchanged, only its wrapper), with the tab in the URL, a `/triage`
+  redirect, the nav item removed, and the Inbox button plus the post-commit link retargeted.
+  Extended the importer contract declaratively: `ImportInputSpec.guide`/`empty_state`/`help_url`/
+  `browsable`, `ImportReadError.user_message`/`action`, a required `Importer.error_codes` with
+  `declared_read_error` enforcing the closed set at the boundary, and a separate
+  `BrowsableImporter` protocol. Added `GET /api/import/{importer}/browse`, confined through the
+  new shared `CalibreAdapter.confine` that `read` also uses. Built `ConnectorGuide`,
+  `SourceDropZone` and `FolderPicker`; both connectors now publish their own guidance and their
+  own actionable error sentences. Rewrote README's importing section, the domain guide's importer
+  half, technical spec §6.5/§7.1 and product spec §7; appended DEC-080; impact-reviewed the
+  roadmap. Commits: `a0bd8d1`, `711fe65`, `57422c8`, plus the closing commit.
+- Verified: `python scripts/validate_project.py` (pass), `make format` (no drift), `make check`
+  (green), `make test` (backend 502 passed, frontend 164 passed), `npx playwright test`
+  (95 passed, 2 skipped), `git diff --check` (clean). The full `make test` that Sprint 031 left
+  waived was run to completion here.
+- Walkthrough (the gate, run headless at 1440×900 against an isolated backend on a temporary data
+  dir, screenshots at every step, zero console/page errors):
+  - **Data.** A synthetic Calibre mount `Estanterías/{Calibre Library (5 books), Comics (1),
+    Sin biblioteca (empty)}` with a loose `leeme.txt` beside it, and a 120-row Goodreads export
+    with Excel-armoured ISBNs, unrated rows, blank dates and one malformed date.
+  - **Exercised.** Nav shows four destinations, no Triage. `/triage` redirected to
+    `/import?tab=triage`. The Goodreads tab rendered its five declared steps and the external
+    link; the export previewed as 119 ready / 1 with errors (the malformed date, correctly) and
+    committed 119 entries. The post-commit link landed on the Triage tab inside the Import screen;
+    the inbox read "Inbox 119 unsorted"; `j` then `r` set a status on the focused row; "Accept all
+    suggested" cleared 118 and emptied the inbox. The Calibre tab listed the mount root
+    (`Estanterías` only — the loose file was correctly absent), walked one level down to the three
+    folders, and on selecting `Calibre Library` said "This folder holds a Calibre library" and
+    filled the path field; preview read 5 rows, commit landed them, undo inside the window reverted
+    10 changes. Previewing `Sin biblioteca` produced the connector's own refusal: "No Calibre
+    library sits at that folder. Choose the folder that contains metadata.db — usually the one
+    Calibre calls your Calibre Library."
+  - **Observed and fixed, all three invisible to tests.** (a) After the Goodreads commit, the
+    Calibre tab rendered the Goodreads result and no Calibre form: the tab strip is now visible
+    during a preview, and staged state was global. A staged source now belongs to its connector,
+    and a trip through Triage does not discard it. (b) The picker printed "No Calibre library in
+    this folder — open one below" directly above "No folders here", which contradict each other in
+    an empty leaf folder; it is one derived sentence now, and the connector's `empty_state` renders
+    only at the mount root, where "your library is not mounted" is the true reading. (c) The
+    triage tab carried a second "← Library" beside the one the triage surface already has;
+    removed.
+  - **Observed and left.** The picker fires its listing request twice on mount in dev, which is
+    React StrictMode double-invoking the effect and does not happen in a production build; the
+    e2e assertion is written not to depend on the sequence. Nothing else looked wrong.
+- Deviations: four, all in DEC-080 and the sprint Outcome — `browsable`/`BrowsableImporter` beyond
+  the three planned fields; `error_codes` promoted from convention to required contract member;
+  guide-as-ordered-steps and the `/triage` redirect (both the sprint's recommended options); and
+  the connector-scoped preview found by the walkthrough.
+- Blocked/open: none. No tag, push, release or deployment was requested or performed.
+- Next: none scheduled. The numbered plan is complete through 032. The unnumbered epics (Games/
+  IGDB, Series/TMDB, Music/Spotify, Steam) inherit the extended contract; the first thing Spotify
+  will hit is that `ImportInputSpec.kind` is still `upload | path` and an OAuth handshake is
+  neither.
