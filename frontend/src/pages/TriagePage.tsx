@@ -741,7 +741,7 @@ export function TriagePage() {
                     <CoverImage
                       src={entry.item.cover_url}
                       alt=""
-                      className="h-9 w-7 shrink-0 rounded"
+                      className="hidden h-9 w-7 shrink-0 rounded sm:block"
                     />
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-medium">
@@ -754,17 +754,27 @@ export function TriagePage() {
                     {hasConflict && (
                       <span
                         className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
+                        aria-label={`Suggested status: ${statusLabelFor(
+                          entry.item.type,
+                          itemTypes.data,
+                          entry.suggested_status!,
+                        )}`}
                         title={`Suggested: ${statusLabelFor(
                           entry.item.type,
                           itemTypes.data,
                           entry.suggested_status!,
                         )}`}
                       >
-                        {statusLabelFor(
-                          entry.item.type,
-                          itemTypes.data,
-                          entry.suggested_status!,
-                        )}
+                        <span className="hidden lg:inline" aria-hidden="true">
+                          {statusLabelFor(
+                            entry.item.type,
+                            itemTypes.data,
+                            entry.suggested_status!,
+                          )}
+                        </span>
+                        <span className="lg:hidden" aria-hidden="true">
+                          !
+                        </span>
                       </span>
                     )}
                     <div
@@ -786,7 +796,7 @@ export function TriagePage() {
                           })
                         }
                         aria-label={`Status for ${entry.item.title}`}
-                        className="h-9 w-28 shrink-0 rounded-md border border-input bg-surface-raised px-2 text-xs focus-ring"
+                        className="h-9 w-24 shrink-0 rounded-md border border-input bg-surface-raised px-2 text-xs focus-ring sm:w-28"
                       >
                         {statusesFor(entry.item.type, itemTypes.data).map(
                           (status) => (
@@ -819,7 +829,7 @@ export function TriagePage() {
                           entry.score === null
                             ? "bg-surface-raised text-foreground"
                             : scoreChipClass(entry.score),
-                          "h-9 w-[4.5rem] shrink-0 border border-border text-xs focus-ring",
+                          "h-9 w-16 shrink-0 border border-border text-xs focus-ring sm:w-[4.5rem]",
                         )}
                         title={
                           entry.score_provisional
@@ -844,7 +854,7 @@ export function TriagePage() {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground"
+                      className="hidden h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground sm:inline-flex"
                       aria-label={`Open ${entry.item.title}`}
                       onClick={() => void navigate(`/books/${entry.id}`)}
                     >

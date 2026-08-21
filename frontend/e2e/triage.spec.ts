@@ -171,6 +171,7 @@ test("triage keyboard shortcuts set status on focused row", async ({
 test("row controls edit one entry while only checkboxes select for bulk", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   const entries = makeEntries(3);
   const writes: unknown[] = [];
   await page.route("**/api/entries?**", (route) =>
@@ -198,6 +199,9 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
   await page.goto("/import?tab=triage");
   const row = page.locator('[data-entry-id="1"]');
   await expect(row).toBeVisible();
+  expect(
+    await row.evaluate((element) => element.scrollWidth <= element.clientWidth),
+  ).toBe(true);
 
   await row
     .getByRole("combobox", { name: /score for book 1: unscored/i })
