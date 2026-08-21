@@ -6,6 +6,7 @@ triage and undo; a connector owns only how its source is read and which identiti
 trusts.  This is the import analogue of :mod:`book_tracker.domain.providers`.
 """
 
+import fnmatch
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -39,6 +40,11 @@ class ImportReadError(ValueError):
         self.user_message = user_message
         self.action = action
         super().__init__(message)
+
+
+#: The only multi-segment wildcard a member pattern may use, and only as its first
+#: segment: "this name at any depth below the root".
+MEMBER_WILDCARD = "**"
 
 
 @dataclass(frozen=True)
@@ -85,6 +91,53 @@ class ImportInputSpec:
     #: one of them is how a limit stops meaning anything.
     max_bytes: int | None = None
     max_files: int | None = None
+    #: What a bundle from this input may contain, as anchored glob patterns over the
+    #: relative path of each member: `"metadata.db"` is that file at the root and
+    #: nothing else, `"**/cover.jpg"` is that name at any depth below the root. `**`
+    #: is only meaningful as the first segment. Required by `kind="directory"`,
+    #: because the shared route has to refuse a member before it writes a byte and
+    #: only the connector knows what its source is shaped like.
+    members: tuple[str, ...] = ()
+
+
+def valid_member_pattern(pattern: str) -> bool:
+    """Whether a connector's declared bundle member is a pattern this can match.
+
+    Deliberately strict, because a pattern that never matches looks exactly like a
+    connector refusing its own files. A segment may glob, `**` may lead and nothing
+    else, and nothing may point outside the source root — a declaration is not a
+    place to discover that traversal was possible.
+    """
+    if not pattern or pattern != pattern.strip() or pattern.startswith("/"):
+        return False
+    segments = pattern.split("/")
+    if not all(segments) or any(part in ("..", ".") or part.startswith(".") for part in segments):
+        return False
+    if MEMBER_WILDCARD in segments[1:]:
+        return False
+    return segments != [MEMBER_WILDCARD]
+
+
+def member_allowed(parts: Sequence[str], members: Sequence[str]) -> bool:
+    """Whether a member's relative path is one this input declared it may contain.
+
+    Anchored at the root, unlike `PurePosixPath.match`, which matches from the right
+    and would let `anywhere/metadata.db` pass a declaration of `metadata.db`.
+    """
+    for pattern in members:
+        segments = pattern.split("/")
+        if segments[0] == MEMBER_WILDCARD:
+            tail = segments[1:]
+            if len(parts) > len(tail) and all(
+                fnmatch.fnmatchcase(part, want)
+                for part, want in zip(parts[-len(tail) :], tail, strict=True)
+            ):
+                return True
+        elif len(parts) == len(segments) and all(
+            fnmatch.fnmatchcase(part, want) for part, want in zip(parts, segments, strict=True)
+        ):
+            return True
+    return False
 
 
 @dataclass(frozen=True)
@@ -116,14 +169,20 @@ class ImportPlan:
 class ImportInventory(Protocol):
     """The narrow library view a planning connector may consult.
 
-    Two questions, batched, and nothing else — the same containment `ImportMatcher`
-    established. "Do you have this?" and "does it have a picture?" are different
-    questions, and conflating them would skip a cover for an item that never got one.
+    Three questions, batched, and nothing else — the same containment `ImportMatcher`
+    established. They are kept apart because they have different answers: "do you have
+    this?", "does it have a picture?" and "which files does it already hold?" would,
+    conflated, skip a cover for an item that never got one or a file for an item that
+    only ever got a cover.
     """
 
     def existing(self, kind: str, values: Sequence[str]) -> frozenset[str]: ...
 
     def with_cover(self, kind: str, values: Sequence[str]) -> frozenset[str]: ...
+
+    def attached(self, kind: str, values: Sequence[str]) -> Mapping[str, frozenset[str]]:
+        """For each identity value, the attachment filenames its item already holds."""
+        ...
 
 
 @dataclass(frozen=True)
@@ -214,6 +273,11 @@ class NormalizedImportRecord:
     source_fields: Mapping[str, Any]
     cover_source: str | None = None
     cover_stage: str | None = None
+    #: The files that belong to this record, by relative path under the source root.
+    #: A connector declares them at read time so a shared route can resolve an
+    #: uploaded path back to the record it belongs to without knowing what any
+    #: particular source looks like on disk.
+    source_files: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

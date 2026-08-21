@@ -69,6 +69,9 @@ def _stored_record(record: NormalizedImportRecord) -> dict[str, Any]:
         "shelves": list(record.shelves),
         "source_fields": dict(record.source_fields),
         "cover_stage": record.cover_stage,
+        # Kept so a file arriving after the commit can be resolved back to the record
+        # it belongs to, without the route knowing what any source looks like on disk.
+        "source_files": list(record.source_files),
     }
 
 

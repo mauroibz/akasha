@@ -2,7 +2,7 @@ import hashlib
 import sqlite3
 from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 from urllib.parse import quote
 
@@ -26,6 +26,12 @@ from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
 from book_tracker.domains.book import DOMAIN
 from book_tracker.infrastructure.covers import CoverError, prepare_uploaded_cover
+
+#: The ebook formats a Calibre library may hand over, in the order one file per book
+#: is picked when a book has several. Epub leads because it is the open one and,
+#: measured on the owner's library, the cheaper one: 95.4 MB against 163 MB for every
+#: format of the same 18 books (DEC-083).
+EBOOK_FORMATS = ("epub", "azw3", "mobi", "pdf", "cbz", "cbr", "txt")
 
 
 class CalibreError(ImportReadError):
@@ -241,6 +247,7 @@ class CalibreAdapter:
             year = int(str(pubdate)[:4]) if pubdate and str(pubdate)[:4].isdigit() else None
             book_path = str(book["path"] or "") if "path" in columns else ""
             cover_source = self._cover(library, book_path)
+            formats = self._formats(connection, tables, book_id, book_path)
             records.append(
                 {
                     "row_number": row_number,
@@ -271,9 +278,44 @@ class CalibreAdapter:
                     # Kept for the planner: where this book's cover lives relative to
                     # the library root, which is what a client offers by path.
                     "book_path": book_path,
+                    # Every file Calibre says this book has, by the relative path a
+                    # client would offer it under. Read from `data` rather than from
+                    # the disk, so it is known from `metadata.db` alone — which is all
+                    # the plan route ever receives.
+                    "formats": formats,
                 }
             )
         return records
+
+    @staticmethod
+    def _formats(
+        connection: sqlite3.Connection, tables: set[str], book_id: int, book_path: str
+    ) -> list[dict[str, Any]]:
+        """This book's files, in the order one of them would be picked.
+
+        Calibre's `data` table holds the format, the stem and the uncompressed size of
+        every file it manages, so the whole file list — and what it would cost to send
+        — is derivable from `metadata.db` without touching a single one of them.
+        `REQUIRED_TABLES` does not guarantee `data`, so a hand-built database simply
+        has no formats and no files to offer.
+        """
+        if not book_path or "data" not in tables:
+            return []
+        rows = [
+            {
+                "path": f"{book_path}/{name}.{str(row['format']).lower()}",
+                "size": int(row["uncompressed_size"] or 0),
+                "format": str(row["format"]).lower(),
+            }
+            for row in connection.execute(
+                "SELECT format, name, uncompressed_size FROM data WHERE book=? ORDER BY format",
+                (book_id,),
+            )
+            if (name := str(row["name"] or "").strip()) and row["format"]
+        ]
+        order = {extension: index for index, extension in enumerate(EBOOK_FORMATS)}
+        rows.sort(key=lambda row: (order.get(str(row["format"]), len(order)), row["path"]))
+        return rows
 
     @staticmethod
     def _cover(library: Path, book_path: str) -> Path | None:
@@ -284,6 +326,20 @@ class CalibreAdapter:
         except OSError:
             return None
         return cover if cover.is_relative_to(library) and cover.is_file() else None
+
+
+def _holding_reason(covers: int, files: int) -> str | None:
+    """What the screen says it is skipping, naming the two kinds separately.
+
+    A reader who sees "19 already in your library" while watching an ebook upload
+    start should be able to tell which 19.
+    """
+    parts = []
+    if covers:
+        parts.append(f"{covers} already in your library with a cover")
+    if files:
+        parts.append(f"{files} whose file you already have")
+    return " and ".join(parts) or None
 
 
 class CalibreImporter:
@@ -317,6 +373,17 @@ class CalibreImporter:
         ),
         empty_state="Choose your Calibre library folder.",
         help_url="https://manual.calibre-ebook.com/gui.html#the-calibre-library",
+        # What a Calibre library may send. `metadata.db` is that file at the root and
+        # nothing else; everything else lives one directory per book, at whatever depth
+        # the author/title layout puts it. The ebook formats are declared here because
+        # the shared route must be able to refuse an undeclared one before writing a
+        # byte — whether any of them are *offered* is the reader's toggle, not this
+        # list (DEC-083).
+        members=(
+            "metadata.db",
+            "**/cover.jpg",
+            *(f"**/*.{extension}" for extension in EBOOK_FORMATS),
+        ),
         # A shelf of covers is legitimately far bigger than a CSV. Measured: 21 books
         # is 8.2 MB, so this is roughly a 600-book library at those cover sizes and
         # several thousand at ordinary ones. Past it the refusal names the alternate
@@ -370,6 +437,7 @@ class CalibreImporter:
         snapshot = CalibreAdapter(source.directory).read("library")
 
         covers: dict[str, str] = {}
+        files: dict[str, tuple[str, str]] = {}
         for payload in snapshot.records:
             uuid = str(payload.get("calibre_uuid") or "")
             book_path = str(payload.get("book_path") or "")
@@ -378,15 +446,26 @@ class CalibreImporter:
             relative = f"{book_path}/cover.jpg"
             if relative in offered:
                 covers[relative] = uuid
+            for entry in payload.get("formats") or ():
+                path = str(entry["path"])
+                if path in offered:
+                    files[path] = (uuid, PurePosixPath(path).name)
 
         held = inventory.with_cover("calibre_uuid", sorted(set(covers.values())))
-        wanted = [path for path in offered if path not in covers]
+        attached = inventory.attached("calibre_uuid", sorted({uuid for uuid, _ in files.values()}))
+
+        def wanted_file(uuid: str, filename: str) -> bool:
+            return filename not in attached.get(uuid, frozenset())
+
+        wanted = [path for path in offered if path not in covers and path not in files]
         wanted += [path for path, uuid in covers.items() if uuid not in held]
-        skipped = len(covers) - sum(1 for uuid in covers.values() if uuid not in held)
+        wanted += [path for path, (uuid, name) in files.items() if wanted_file(uuid, name)]
+        skipped_covers = sum(1 for uuid in covers.values() if uuid in held)
+        skipped_files = sum(1 for uuid, name in files.values() if not wanted_file(uuid, name))
         return ImportPlan(
             wanted=tuple(sorted(wanted)),
-            holding=skipped,
-            reason=(f"{skipped} already in your library with a cover" if skipped else None),
+            holding=skipped_covers + skipped_files,
+            reason=_holding_reason(skipped_covers, skipped_files),
         )
 
     def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
@@ -460,6 +539,9 @@ class CalibreImporter:
                         )
                     },
                     cover_source=payload.get("cover_source"),
+                    source_files=tuple(
+                        str(entry["path"]) for entry in payload.get("formats") or ()
+                    ),
                 )
             )
         return ImportSnapshot(

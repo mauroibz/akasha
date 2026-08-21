@@ -16,6 +16,7 @@ from book_tracker.domain.normalization import normalize_text, shelf_slug
 from book_tracker.domain.registry import DEFAULT_DOMAIN
 from book_tracker.domain.spec import Domain
 from book_tracker.infrastructure.models import (
+    AttachmentRow,
     EntryFormatRow,
     EntryRow,
     EntryShelfRow,
@@ -137,6 +138,32 @@ class DomainRepository:
         be offered one again; conflating the two would skip it forever.
         """
         return self._identities(kind, values, cover_only=True)
+
+    def attached(self, kind: str, values: Sequence[str]) -> Mapping[str, frozenset[str]]:
+        """For each identity value, the attachment filenames its item already holds.
+
+        Returns names rather than a yes/no, because "does this book have a file?" is
+        the wrong question once a book can have several: a library holding the epub
+        must still be offered the pdf, and must not be offered the epub again.
+        """
+        wanted = [value for value in dict.fromkeys(values) if value]
+        if not wanted:
+            return {}
+        found: dict[str, set[str]] = {}
+        with Session(self.engine) as session:
+            for start in range(0, len(wanted), 500):
+                chunk = wanted[start : start + 500]
+                rows = session.execute(
+                    select(ItemIdentifierRow.normalized_value, AttachmentRow.filename)
+                    .join(AttachmentRow, AttachmentRow.item_id == ItemIdentifierRow.item_id)
+                    .where(
+                        ItemIdentifierRow.kind == kind,
+                        ItemIdentifierRow.normalized_value.in_(chunk),
+                    )
+                )
+                for value, filename in rows:
+                    found.setdefault(value, set()).add(filename)
+        return {value: frozenset(names) for value, names in found.items()}
 
     def _identities(self, kind: str, values: Sequence[str], *, cover_only: bool) -> frozenset[str]:
         """One query per chunk, never one per book.

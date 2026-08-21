@@ -417,9 +417,13 @@ def _bundle_library(root: Path) -> Path:
         CREATE TABLE authors (id INTEGER PRIMARY KEY, name TEXT);
         CREATE TABLE books_authors_link (book INTEGER, author INTEGER);
         CREATE TABLE identifiers (book INTEGER, type TEXT, val TEXT);
+        CREATE TABLE data (id INTEGER PRIMARY KEY, book INTEGER NOT NULL,
+                           format TEXT NOT NULL, uncompressed_size INTEGER NOT NULL,
+                           name TEXT NOT NULL);
         INSERT INTO books VALUES (1, 'Mistborn', '2006-01-01', '{book_path}', 'uuid-m1');
         INSERT INTO authors VALUES (1, 'Brandon Sanderson');
         INSERT INTO books_authors_link VALUES (1, 1);
+        INSERT INTO data VALUES (1, 1, 'EPUB', 10, 'book');
         """
     )
     connection.commit()
@@ -525,7 +529,9 @@ async def test_the_bundle_is_read_by_the_same_adapter_as_a_mount(tmp_path: Path)
         "books/../../escape/cover.jpg",
         ".caltrash/b/1/cover.jpg",
         ".secret",
-        "Author/Book/book.epub",
+        # Declared formats are accepted now (DEC-083); an undeclared one is not.
+        "Author/Book/book.mp3",
+        "Author/Book/notes.docx",
         "Author/Book/metadata.opf",
         "Author/metadata.db",
     ],
@@ -776,6 +782,93 @@ async def test_planning_leaves_no_bundle_behind(tmp_path: Path) -> None:
     assert set(Path(tempfile.gettempdir()).glob("akasha-import-*")) == before
 
 
+EBOOK = "Brandon Sanderson/Mistborn_ The Final Empire (2)/book.epub"
+
+
+def _manifest_with_files(root: Path) -> str:
+    """What the client offers with the ebook toggle on: covers *and* the files."""
+    rows = json.loads(_manifest(root))
+    rows.append({"path": EBOOK, "size": (root / EBOOK).stat().st_size})
+    return json.dumps(rows)
+
+
+async def _plan_with_files(client: httpx.AsyncClient, root: Path) -> Any:
+    return await client.post(
+        "/api/import/calibre/plan",
+        files=_parts(root),
+        data={"manifest": _manifest_with_files(root)},
+    )
+
+
+@pytest.mark.anyio
+async def test_an_offered_ebook_is_wanted_when_the_library_holds_no_file(tmp_path: Path) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await _plan_with_files(client, library)
+
+    assert response.status_code == 200, response.text
+    assert EBOOK in response.json()["wanted"]
+
+
+@pytest.mark.anyio
+async def test_an_ebook_the_library_already_holds_is_not_wanted(tmp_path: Path) -> None:
+    """Planned by identity and filename, so a re-sync sends no file it already has."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", files=_parts(library))
+        await client.post(
+            "/api/import/calibre/commit", json={"batch_id": preview.json()["batch_id"]}
+        )
+        item_id = _only_item(app)
+        attached = await client.post(
+            f"/api/items/{item_id}/attachments",
+            files={"file": ("book.epub", b"epub bytes", "application/epub+zip")},
+        )
+        assert attached.status_code == 201, attached.text
+        response = await _plan_with_files(client, library)
+
+        assert EBOOK not in response.json()["wanted"], response.text
+
+        # AC4: deleting it in Akasha makes the next import want that one file again.
+        await client.delete(f"/api/items/{item_id}/attachments/{attached.json()['id']}")
+        again = await _plan_with_files(client, library)
+
+    assert EBOOK in again.json()["wanted"]
+
+
+@pytest.mark.anyio
+async def test_an_item_with_a_cover_but_no_file_still_wants_its_file(tmp_path: Path) -> None:
+    """ "Already imported", "has a picture" and "holds the file" are three questions."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", files=_parts(library))
+        await client.post(
+            "/api/import/calibre/commit", json={"batch_id": preview.json()["batch_id"]}
+        )
+        response = await _plan_with_files(client, library)
+
+    body = response.json()
+    assert sorted(body["wanted"]) == sorted([EBOOK, "metadata.db"]), body
+    assert body["holding"] == 1
+
+
+def _only_item(app: Any) -> int:
+    with Session(app.state.engine) as session:
+        return int(session.execute(text("SELECT id FROM items")).scalars().one())
+
+
 def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) -> None:
     """AC5: a bigger shelf must not mean a query per book."""
     from sqlalchemy import event
@@ -796,4 +889,9 @@ def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) ->
     values = [f"uuid-{index}" for index in range(1200)]
     repository.with_cover("calibre_uuid", values)
     # 1200 values, chunked at 500: three statements, not twelve hundred.
+    assert len(statements) == 3, statements
+
+    # The third question is bounded the same way, for the same reason (AC9).
+    statements.clear()
+    assert repository.attached("calibre_uuid", values) == {}
     assert len(statements) == 3, statements

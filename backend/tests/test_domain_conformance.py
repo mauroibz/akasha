@@ -43,6 +43,7 @@ from book_tracker.domain.importers import (
     IncrementalImporter,
     declared_read_error,
     planned_upload,
+    valid_member_pattern,
 )
 from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
 from book_tracker.domain.registry import (
@@ -140,6 +141,14 @@ def assert_declared_envelope(importer: Importer, spec: ImportInputSpec) -> None:
     # the upload and then find nothing it understands.
     assert spec.kind != "directory" or spec.accepts_files, (
         f"{importer.name} offers a directory its reader cannot read"
+    )
+    # The shared route has to refuse a member before it writes a byte, and only the
+    # connector knows what its source is shaped like (DEC-083).
+    assert spec.kind != "directory" or spec.members, (
+        f"{importer.name} offers a directory without saying what it may contain"
+    )
+    assert all(valid_member_pattern(pattern) for pattern in spec.members), (
+        f"{importer.name} declares a bundle member pattern that cannot be matched safely"
     )
     # The vocabulary is closed so a screen can decide what to say about a
     # failure, and so an undeclared code cannot reach a reader as itself.
@@ -573,6 +582,62 @@ def test_a_directory_connector_must_be_able_to_read_a_set_of_files() -> None:
 
     with pytest.raises(AssertionError):
         assert_declared_guidance(NoFileSupport())
+
+
+def test_a_directory_connector_declares_what_its_bundle_may_contain() -> None:
+    """The shared route refuses a member before writing a byte, and only the
+    connector knows what its source is shaped like (DEC-083)."""
+
+    class NoMembers(_DeclaringImporter):
+        input = replace(_DeclaringImporter.input, kind="directory", accepts_files=True, members=())
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(NoMembers())
+
+
+@pytest.mark.parametrize(
+    "pattern",
+    [
+        "/etc/passwd",
+        "../escape/cover.jpg",
+        "books/../cover.jpg",
+        ".caltrash/**/cover.jpg",
+        "**",
+        "books/**/cover.jpg",
+        "",
+        "   ",
+    ],
+)
+def test_the_suite_rejects_a_malformed_bundle_member_pattern(pattern: str) -> None:
+    """A pattern that can escape, or that matches everything, is not a declaration.
+
+    `**` is meaningful only as the leading segment: anywhere else it is a wildcard
+    the matcher does not implement, and silently never matching would look like a
+    connector that simply refuses its own files.
+    """
+
+    class Malformed(_DeclaringImporter):
+        input = replace(
+            _DeclaringImporter.input,
+            kind="directory",
+            accepts_files=True,
+            members=(pattern,),
+        )
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(Malformed())
+
+
+def test_a_well_formed_member_declaration_passes() -> None:
+    class Declared(_DeclaringImporter):
+        input = replace(
+            _DeclaringImporter.input,
+            kind="directory",
+            accepts_files=True,
+            members=("metadata.db", "**/cover.jpg", "**/*.epub"),
+        )
+
+    assert_declared_guidance(Declared())
 
 
 @pytest.mark.parametrize(

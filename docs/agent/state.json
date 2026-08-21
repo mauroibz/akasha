@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 17,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "035",
   "active_sprint_file": "docs/sprints/035-ebook-attachments.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "034",
   "completed_sprints": [
     "001",
@@ -42,6 +42,6 @@
     "033",
     "034"
   ],
-  "started_at": null,
-  "updated_at": "2026-08-21T17:20:00-03:00"
+  "started_at": "2026-08-21T17:40:00-03:00",
+  "updated_at": "2026-08-21T17:40:00-03:00"
 }

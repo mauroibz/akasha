@@ -20,6 +20,7 @@ from book_tracker.domain.importers import (
     ImportSource,
     IncrementalImporter,
     declared_read_error,
+    member_allowed,
     planned_upload,
 )
 from book_tracker.domain.registry import IMPORTERS
@@ -45,34 +46,38 @@ class _DiskSpooledMultiPart(MultiPartParser):
     spool_max_size = 1
 
 
-#: What a Calibre bundle is allowed to contain. Anything else is refused before a byte
-#: is written: these paths come from the client, and `.caltrash/b/1/cover.jpg` is a real
-#: file in a real library — a deleted book's cover, which must not be imported.
-def _bundle_member(name: str) -> str:
-    """The validated relative path of one uploaded member, or a refusal."""
+def _bundle_member(name: str, spec: ImportInputSpec) -> str:
+    """The validated relative path of one uploaded member, or a refusal.
+
+    Two checks, and they answer different questions. **Shape** is universal and is
+    never delegated: these paths come from the client, so an absolute path, a
+    backslash, a `..` or a dot-prefixed segment is refused for every connector that
+    will ever exist — `.caltrash/b/1/cover.jpg` is a real file in a real library, a
+    deleted book's cover that must not be imported. **Content** is the connector's,
+    declared as `members`, because what belongs in a source is a fact about that
+    source and not about this route (DEC-083).
+    """
     if not name or name.startswith(("/", "\\")) or "\\" in name:
-        raise _bad_member(name)
+        raise _bad_member(name, spec)
     relative = PurePosixPath(name)
     if relative.is_absolute():
-        raise _bad_member(name)
+        raise _bad_member(name, spec)
     parts = relative.parts
     if any(part in ("..", ".") or part.startswith(".") for part in parts):
-        raise _bad_member(name)
-    if parts == ("metadata.db",):
-        return "metadata.db"
-    if len(parts) >= 2 and parts[-1] == "cover.jpg":
-        return str(relative)
-    raise _bad_member(name)
+        raise _bad_member(name, spec)
+    if not member_allowed(parts, spec.members):
+        raise _bad_member(name, spec)
+    return str(relative)
 
 
-def _bad_member(name: str) -> "LibraryError":
+def _bad_member(name: str, spec: ImportInputSpec) -> "LibraryError":
     return LibraryError(
         "invalid_import_source",
-        f"Uploaded member {name!r} is not part of a Calibre library",
+        f"Uploaded member {name!r} is not something this source may contain",
         status_code=422,
         details={"member": name},
         user_message="That folder contains something Akasha did not expect.",
-        action="Choose the Calibre library folder itself — the one that holds metadata.db.",
+        action=spec.empty_state or "Choose the source folder again.",
     )
 
 
@@ -346,7 +351,7 @@ async def _bundle(
         for upload in form.getlist(spec.field):
             if not isinstance(upload, UploadFile):
                 continue
-            relative = _bundle_member(upload.filename or "")
+            relative = _bundle_member(upload.filename or "", spec)
             written += 1
             if written > max_files:
                 raise _too_large(spec)
@@ -429,7 +434,7 @@ async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
     spec = _chosen_input(importer, request)
     source = await _bundle(request, spec, form_extras=("manifest",))
     try:
-        candidates = _candidates(source.manifest)
+        candidates = _candidates(source.manifest, spec)
         result = planned_upload(
             candidates,
             importer.plan(
@@ -451,14 +456,14 @@ async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
     )
 
 
-def _candidates(manifest: str | None) -> tuple[ImportCandidate, ...]:
+def _candidates(manifest: str | None, spec: ImportInputSpec) -> tuple[ImportCandidate, ...]:
     """The client's offer, validated by the same rule the upload route applies."""
     try:
         rows = json.loads(manifest or "[]")
         if not isinstance(rows, list) or len(rows) > 100_000:
             raise ValueError("manifest must be a list")
         return tuple(
-            ImportCandidate(path=_bundle_member(str(row["path"])), size=int(row["size"]))
+            ImportCandidate(path=_bundle_member(str(row["path"]), spec), size=int(row["size"]))
             for row in rows
         )
     except (TypeError, KeyError, ValueError, json.JSONDecodeError) as error:
