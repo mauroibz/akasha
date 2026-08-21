@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   commitImport,
   getImporters,
+  ImportRequestError,
   previewImport,
   type ImporterDefinition,
   undoBatch,
@@ -23,7 +24,23 @@ import {
   type ImportResult,
   type UndoResult,
 } from "@/api/imports";
+import { ConnectorGuide } from "@/features/import/ConnectorGuide";
+import { FolderPicker } from "@/features/import/FolderPicker";
+import { SourceDropZone } from "@/features/import/SourceDropZone";
 import { TriagePage } from "@/pages/TriagePage";
+
+/** A refusal as the screen shows it: what happened, and what to do about it. */
+interface ImportFailure {
+  readonly message: string;
+  readonly action: string | null;
+}
+
+function asFailure(reason: Error): ImportFailure {
+  return {
+    message: reason.message,
+    action: reason instanceof ImportRequestError ? reason.action : null,
+  };
+}
 
 /**
  * The tab that holds the inbox rather than an importer.
@@ -56,7 +73,7 @@ export function ImportPage() {
   const [choices, setChoices] = useState<Record<number, number | "new">>({});
   const [result, setResult] = useState<ImportResult | null>(null);
   const [undoResult, setUndoResult] = useState<UndoResult | null>(null);
-  const [error, setError] = useState("");
+  const [error, setError] = useState<ImportFailure | null>(null);
   const [pending, setPending] = useState(false);
   const [undoPending, setUndoPending] = useState(false);
   const [confirmUndo, setConfirmUndo] = useState(false);
@@ -78,7 +95,7 @@ export function ImportPage() {
             : (available[0]?.id ?? ""),
         );
       })
-      .catch((reason: Error) => setError(reason.message));
+      .catch((reason: Error) => setError(asFailure(reason)));
   }, []);
 
   useEffect(() => {
@@ -101,7 +118,7 @@ export function ImportPage() {
       : fallbackSource;
   const triageActive = source === TRIAGE_TAB;
 
-  useEffect(() => setError(""), [source]);
+  useEffect(() => setError(null), [source]);
 
   const selectTab = (value: string) => {
     if (value !== TRIAGE_TAB) {
@@ -189,7 +206,7 @@ export function ImportPage() {
                 if (activeImporter.input.kind === "path" && !libraryPath.trim())
                   return;
                 setPending(true);
-                setError("");
+                setError(null);
                 void previewImport(
                   activeImporter,
                   activeImporter.input.kind === "upload"
@@ -197,7 +214,7 @@ export function ImportPage() {
                     : libraryPath.trim(),
                 )
                   .then(setPreview)
-                  .catch((reason: Error) => setError(reason.message))
+                  .catch((reason: Error) => setError(asFailure(reason)))
                   .finally(() => setPending(false));
               }}
             >
@@ -209,37 +226,44 @@ export function ImportPage() {
                     value={importer.id}
                     className="mt-0 space-y-5"
                   >
-                    {importer.input.help && (
-                      <p className="rounded-xl bg-surface-raised p-4 text-sm text-foreground">
-                        {importer.input.help}
-                      </p>
+                    <ConnectorGuide importer={importer} />
+                    {importer.input.kind === "upload" ? (
+                      <SourceDropZone
+                        importer={importer}
+                        inputId={inputId}
+                        file={file}
+                        onFile={setFile}
+                      />
+                    ) : (
+                      <div className="space-y-3">
+                        {importer.input.browsable && (
+                          <FolderPicker
+                            importerId={importer.id}
+                            importerLabel={importer.label}
+                            emptyState={importer.input.empty_state}
+                            selected={libraryPath}
+                            onSelect={setLibraryPath}
+                          />
+                        )}
+                        <div className="block">
+                          <Label htmlFor={inputId}>
+                            {importer.input.label}
+                          </Label>
+                          <Input
+                            id={inputId}
+                            autoFocus
+                            className="mt-1 h-11"
+                            value={libraryPath}
+                            placeholder={
+                              importer.input.placeholder ?? undefined
+                            }
+                            onChange={(event) =>
+                              setLibraryPath(event.target.value)
+                            }
+                          />
+                        </div>
+                      </div>
                     )}
-                    <div className="block">
-                      <Label htmlFor={inputId}>{importer.input.label}</Label>
-                      {importer.input.kind === "upload" ? (
-                        <Input
-                          id={inputId}
-                          autoFocus
-                          className="mt-1 h-11 py-2"
-                          type="file"
-                          accept={importer.input.accept ?? undefined}
-                          onChange={(event) =>
-                            setFile(event.target.files?.[0] ?? null)
-                          }
-                        />
-                      ) : (
-                        <Input
-                          id={inputId}
-                          autoFocus
-                          className="mt-1 h-11"
-                          value={libraryPath}
-                          placeholder={importer.input.placeholder ?? undefined}
-                          onChange={(event) =>
-                            setLibraryPath(event.target.value)
-                          }
-                        />
-                      )}
-                    </div>
                   </TabsContent>
                 );
               })}
@@ -263,9 +287,14 @@ export function ImportPage() {
           </>
         )}
         {error && (
-          <p className="mt-4 text-destructive" role="alert">
-            {error}
-          </p>
+          // The action is the connector's, not this screen's: only Calibre knows
+          // that a locked database means "close Calibre and try again" (DEC-080).
+          <div className="mt-4 rounded-xl bg-destructive/10 p-4" role="alert">
+            <p className="text-destructive">{error.message}</p>
+            {error.action && (
+              <p className="mt-1 text-sm text-foreground">{error.action}</p>
+            )}
+          </div>
         )}
         {preview && !result && (
           <section className="mt-8">
@@ -350,7 +379,7 @@ export function ImportPage() {
               disabled={pending || unresolved > 0 || ready === 0}
               onClick={() => {
                 setPending(true);
-                setError("");
+                setError(null);
                 void commitImport(
                   source,
                   preview.batch_id,
@@ -372,7 +401,7 @@ export function ImportPage() {
                       },
                     );
                   })
-                  .catch((reason: Error) => setError(reason.message))
+                  .catch((reason: Error) => setError(asFailure(reason)))
                   .finally(() => setPending(false));
               }}
             >
@@ -433,7 +462,7 @@ export function ImportPage() {
                   disabled={undoPending}
                   onClick={() => {
                     setUndoPending(true);
-                    setError("");
+                    setError(null);
                     void undoBatch(result.batch_id)
                       .then((res) => {
                         setUndoResult(res);
@@ -444,7 +473,7 @@ export function ImportPage() {
                           } reverted`,
                         );
                       })
-                      .catch((reason: Error) => setError(reason.message))
+                      .catch((reason: Error) => setError(asFailure(reason)))
                       .finally(() => setUndoPending(false));
                   }}
                 >

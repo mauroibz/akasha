@@ -1,7 +1,7 @@
 import { expect, test } from "./console";
 
 import { chooseOption } from "./radix";
-import { entry } from "./seed";
+import { entry, stubImporters } from "./seed";
 
 const record = {
   record_id: 1,
@@ -21,38 +21,7 @@ const record = {
 };
 
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/importers", (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: "goodreads",
-          label: "Goodreads",
-          item_type: "book",
-          input: {
-            kind: "upload",
-            label: "Goodreads CSV",
-            field: "file",
-            accept: ".csv,text/csv",
-            placeholder: null,
-            help: null,
-          },
-        },
-        {
-          id: "calibre",
-          label: "Calibre",
-          item_type: "book",
-          input: {
-            kind: "path",
-            label: "Calibre library path",
-            field: "library_path",
-            accept: null,
-            placeholder: "Library",
-            help: "Opened read-only inside the configured Calibre mount.",
-          },
-        },
-      ],
-    }),
-  );
+  await stubImporters(page);
 });
 
 test("Goodreads preview and commit stay keyboard-complete at mobile width", async ({
@@ -107,8 +76,8 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
     });
   });
   await page.goto("/import");
-  await expect(page.getByLabel(/goodreads csv/i)).toBeFocused();
-  await page.getByLabel(/goodreads csv/i).setInputFiles({
+  await expect(page.getByLabel("Goodreads CSV", { exact: true })).toBeFocused();
+  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -224,7 +193,7 @@ test("row errors and ambiguity require an explicit choice", async ({
     }),
   );
   await page.goto("/import");
-  await page.getByLabel(/goodreads csv/i).setInputFiles({
+  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -260,7 +229,7 @@ test("malformed and oversized uploads remain recoverable", async ({ page }) => {
     });
   });
   await page.goto("/import");
-  const upload = page.getByLabel(/goodreads csv/i);
+  const upload = page.getByLabel("Goodreads CSV", { exact: true });
   await upload.setInputFiles({
     name: "bad.csv",
     mimeType: "text/csv",
@@ -320,7 +289,7 @@ test("undo flow from import history", async ({ page }) => {
     }),
   );
   await page.goto("/import");
-  await page.getByLabel(/goodreads csv/i).setInputFiles({
+  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -389,7 +358,7 @@ test("undo expired batch shows error", async ({ page }) => {
     }),
   );
   await page.goto("/import");
-  await page.getByLabel(/goodreads csv/i).setInputFiles({
+  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -399,4 +368,101 @@ test("undo expired batch shows error", async ({ page }) => {
   await page.getByRole("button", { name: /undo this import/i }).click();
   await page.getByRole("button", { name: /confirm undo/i }).click();
   await expect(page.getByRole("alert")).toContainText("expired");
+});
+
+test("the Calibre tab is browsed into rather than typed blind", async ({
+  page,
+}) => {
+  // The old guidance was "Enter a relative folder only", which nobody can act on
+  // without seeing the mount. The picker is the answer (DEC-079).
+  const browsed: string[] = [];
+  await page.route("**/api/import/calibre/browse**", (route) => {
+    const path = new URL(route.request().url()).searchParams.get("path") ?? "";
+    browsed.push(path);
+    route.fulfill({
+      json:
+        path === ""
+          ? {
+              path: "",
+              parent: null,
+              directories: ["Comics", "Fiction"],
+              importable: false,
+            }
+          : { path, parent: "", directories: [], importable: true },
+    });
+  });
+  let previewed: unknown = null;
+  await page.route("**/api/import/calibre/preview", async (route) => {
+    previewed = route.request().postDataJSON();
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "calibre-browse",
+        fingerprint: "db",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [{ ...record, title: "Ficciones" }],
+      },
+    });
+  });
+
+  await page.goto("/import?tab=calibre");
+
+  // Guidance the connector published, not copy this screen owns.
+  await expect(
+    page.getByText(/pick the folder that holds metadata\.db/i),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /preview calibre library/i }),
+  ).toBeDisabled();
+
+  await page.getByRole("button", { name: "Fiction" }).click();
+  await expect(
+    page.getByText(/this folder holds a calibre library/i),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /preview calibre library/i }).click();
+
+  await expect(
+    page.getByRole("heading", { name: /preview: 1 row/i }),
+  ).toBeVisible();
+  expect(previewed).toEqual({ library_path: "Fiction" });
+  // The mount root first, then the folder that was opened. Not an exact
+  // sequence: StrictMode runs the effect twice in dev, which is the point of it.
+  expect(browsed).toContain("");
+  expect(browsed.at(-1)).toBe("Fiction");
+});
+
+test("a refused read says what to do about it", async ({ page }) => {
+  await page.route("**/api/import/calibre/browse**", (route) =>
+    route.fulfill({
+      json: {
+        path: "",
+        parent: null,
+        directories: ["Locked"],
+        importable: false,
+      },
+    }),
+  );
+  await page.route("**/api/import/calibre/preview", (route) =>
+    route.fulfill({
+      status: 422,
+      json: {
+        error: {
+          code: "invalid_calibre_database",
+          message: "Calibre database could not be read",
+          user_message: "Akasha could not read this library's metadata.db.",
+          action:
+            "Close Calibre and try again; it locks the database while it is writing.",
+        },
+      },
+    }),
+  );
+
+  await page.goto("/import?tab=calibre");
+  await page.getByRole("button", { name: "Locked" }).click();
+  await page.getByRole("button", { name: /preview calibre library/i }).click();
+
+  const alert = page.getByRole("alert");
+  await expect(alert).toContainText("could not read this library");
+  await expect(alert).toContainText("Close Calibre and try again");
 });

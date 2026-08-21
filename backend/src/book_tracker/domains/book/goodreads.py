@@ -48,8 +48,27 @@ SUGGESTED_STATUS = {"read": "read", "currently-reading": "reading", "to-read": "
 
 
 class GoodreadsCSVError(ImportReadError):
+    """Every way a Goodreads export can be unreadable, with the way out of each.
+
+    The vocabulary is closed and declared on `GoodreadsImporter.error_codes`. The
+    `action` is the point: "the CSV structure is malformed" tells a reader nothing they
+    can do, and "export again from goodreads.com" does (DEC-080).
+    """
+
+    ACTIONS = {
+        "invalid_csv": (
+            "This file is not a Goodreads export.",
+            "Export again from goodreads.com/review/import and upload the file unchanged.",
+        ),
+        "missing_columns": (
+            "This export is missing columns Akasha needs.",
+            "Use Export Library on goodreads.com rather than a spreadsheet you edited.",
+        ),
+    }
+
     def __init__(self, code: str, message: str, details: dict[str, Any] | None = None) -> None:
-        super().__init__(code, message, details)
+        user_message, action = self.ACTIONS.get(code, (None, None))
+        super().__init__(code, message, details, user_message=user_message, action=action)
 
 
 def _unarmor(value: str) -> str:
@@ -172,9 +191,30 @@ class GoodreadsImporter:
     label = "Goodreads"
     item_type = DOMAIN.item_type
     input = ImportInputSpec(
-        kind="upload", label="Goodreads CSV", field="file", accept=".csv,text/csv"
+        kind="upload",
+        label="Goodreads CSV",
+        field="file",
+        accept=".csv,text/csv",
+        # Where the file comes from, and what happens to it. Product spec §5.1 is
+        # the source of every claim here; a reader should not have to find that
+        # document to know why their four-star book arrived as an 8.
+        guide=(
+            "On goodreads.com, open My Books → Import and export "
+            "(goodreads.com/review/import). Desktop web only — the apps cannot export.",
+            "Press Export Library, wait for the file to be generated, and download "
+            "goodreads_library_export.csv.",
+            "Drop it below. This is a snapshot, not a sync: Goodreads stops being "
+            "authoritative the moment it lands.",
+            "Ratings are doubled onto Akasha's 1–10 scale and marked provisional, "
+            "because a 3\u2605 is not a 6 you chose. Editing a score clears the mark.",
+            "Your shelves become tags, and every row lands in Triage rather than in "
+            "the library, so nothing appears until you have looked at it.",
+        ),
+        empty_state="Drop goodreads_library_export.csv here, or choose a file.",
+        help_url="https://www.goodreads.com/review/import",
     )
     identity_kinds = frozenset({"isbn"})
+    error_codes = frozenset({"invalid_csv", "missing_columns"})
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

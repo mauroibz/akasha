@@ -169,3 +169,73 @@ export async function stubItemTypes(page: Page, types = [bookItemType]) {
     route.fulfill({ json: types }),
   );
 }
+
+/**
+ * The importer registry the folded import screen renders from.
+ *
+ * Shared rather than copied per spec: the screen renders whatever a connector
+ * declares (DEC-080), so every spec that opens `/import` — including the ones
+ * that only want the triage tab behind it — needs the same declaration, and four
+ * near-copies would drift the first time a field is added.
+ */
+export async function stubImporters(page: Page) {
+  await page.route("**/api/importers", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "goodreads",
+          label: "Goodreads",
+          item_type: "book",
+          input: {
+            kind: "upload",
+            label: "Goodreads CSV",
+            field: "file",
+            accept: ".csv,text/csv",
+            placeholder: null,
+            help: null,
+            guide: [
+              "Open goodreads.com/review/import on desktop web.",
+              "Press Export Library and download the file.",
+            ],
+            empty_state:
+              "Drop goodreads_library_export.csv here, or choose a file.",
+            help_url: "https://www.goodreads.com/review/import",
+            browsable: false,
+          },
+        },
+        {
+          id: "calibre",
+          label: "Calibre",
+          item_type: "book",
+          input: {
+            kind: "path",
+            label: "Calibre library path",
+            field: "library_path",
+            accept: null,
+            placeholder: "Library",
+            help: "Opened read-only inside the configured Calibre mount.",
+            guide: ["Pick the folder that holds metadata.db."],
+            empty_state:
+              "No folders here. Mount your Calibre library and reload.",
+            help_url: "https://manual.calibre-ebook.com/gui.html",
+            browsable: true,
+          },
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/import/calibre/browse**", (route) => {
+    const path = new URL(route.request().url()).searchParams.get("path") ?? "";
+    route.fulfill({
+      json:
+        path === ""
+          ? {
+              path: "",
+              parent: null,
+              directories: ["Comics", "Fiction"],
+              importable: false,
+            }
+          : { path, parent: "", directories: [], importable: true },
+    });
+  });
+}

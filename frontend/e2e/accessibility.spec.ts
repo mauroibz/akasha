@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
-import { seedLibrary, stubItemTypes } from "./seed";
+import { seedLibrary, stubImporters, stubItemTypes } from "./seed";
 
 /**
  * Automated WCAG 2.1 A/AA checks on every screen a user can reach.
@@ -291,6 +291,7 @@ test("the expanded score picker overlay is accessible inside its card", async ({
 });
 
 test("triage has no serious accessibility violations", async ({ page }) => {
+  await stubImporters(page);
   await stubTriage(page);
   await stubShelves(page);
   await page.goto("/import?tab=triage");
@@ -301,6 +302,7 @@ test("triage has no serious accessibility violations", async ({ page }) => {
 test("triage with a selection and its action bar has no serious violations", async ({
   page,
 }) => {
+  await stubImporters(page);
   await stubTriage(page);
   await stubShelves(page);
   await page.goto("/import?tab=triage");
@@ -455,8 +457,9 @@ test("the degraded provider notice has no serious accessibility violations", asy
 });
 
 test("import has no serious accessibility violations", async ({ page }) => {
+  await stubImporters(page);
   await page.goto("/import");
-  await expect(page.getByLabel(/goodreads csv/i)).toBeVisible();
+  await expect(page.getByLabel("Goodreads CSV", { exact: true })).toBeVisible();
   await expectNoSeriousViolations(page, "import");
 });
 

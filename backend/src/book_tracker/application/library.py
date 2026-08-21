@@ -64,6 +64,14 @@ def clean_attachment_filename(raw: str) -> str | None:
 
 
 class LibraryError(Exception):
+    """A refusal with a code the client branches on.
+
+    `user_message` and `action` are optional and are omitted from the payload when
+    absent, so an ordinary error keeps the shape it has always had. They exist for the
+    import boundary, where a connector knows something the shared layer cannot: which
+    sentence tells this reader what to do next (DEC-080).
+    """
+
     def __init__(
         self,
         code: str,
@@ -71,12 +79,28 @@ class LibraryError(Exception):
         *,
         status_code: int = 409,
         details: Mapping[str, Any] | None = None,
+        user_message: str | None = None,
+        action: str | None = None,
     ) -> None:
         self.code = code
         self.message = message
         self.status_code = status_code
         self.details = dict(details or {})
+        self.user_message = user_message
+        self.action = action
         super().__init__(message)
+
+    def payload(self) -> dict[str, Any]:
+        body: dict[str, Any] = {
+            "code": self.code,
+            "message": self.message,
+            "details": self.details,
+        }
+        if self.user_message is not None:
+            body["user_message"] = self.user_message
+        if self.action is not None:
+            body["action"] = self.action
+        return body
 
 
 class LibraryService:

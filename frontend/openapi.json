@@ -1079,6 +1079,43 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "ImportBrowseResponse": {
+        "description": "One level of a browsable connector's source. Relative names only.",
+        "properties": {
+          "directories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Directories",
+            "type": "array"
+          },
+          "importable": {
+            "default": false,
+            "title": "Importable",
+            "type": "boolean"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path"
+        ],
+        "title": "ImportBrowseResponse",
+        "type": "object"
+      },
       "ImportInputResponse": {
         "properties": {
           "accept": {
@@ -1092,9 +1129,32 @@
             ],
             "title": "Accept"
           },
+          "browsable": {
+            "default": false,
+            "title": "Browsable",
+            "type": "boolean"
+          },
+          "empty_state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Empty State"
+          },
           "field": {
             "title": "Field",
             "type": "string"
+          },
+          "guide": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guide",
+            "type": "array"
           },
           "help": {
             "anyOf": [
@@ -1106,6 +1166,17 @@
               }
             ],
             "title": "Help"
+          },
+          "help_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help Url"
           },
           "kind": {
             "title": "Kind",
@@ -2863,6 +2934,60 @@
           }
         },
         "summary": "Get Job Progress",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/browse": {
+      "get": {
+        "description": "List what one folder under a browsable connector's source holds.\n\nRead-only and confined by the connector itself, which resolves the request exactly\nas its reader would \u2014 the picker cannot walk anywhere a preview could not open.",
+        "operationId": "browse_api_import__importer_name__browse_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "path",
+            "required": false,
+            "schema": {
+              "default": "",
+              "maxLength": 500,
+              "title": "Path",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportBrowseResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Browse",
         "tags": [
           "imports"
         ]

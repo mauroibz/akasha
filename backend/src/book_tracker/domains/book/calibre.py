@@ -7,6 +7,7 @@ from urllib.parse import quote
 
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.importers import (
+    ImportBrowseResult,
     ImportEntry,
     ImportInputSpec,
     ImportItem,
@@ -24,8 +25,32 @@ from book_tracker.infrastructure.covers import CoverError, prepare_uploaded_cove
 
 
 class CalibreError(ImportReadError):
+    """Every way a Calibre mount can refuse, with what the reader can do about it.
+
+    The vocabulary is closed and declared on `CalibreImporter.error_codes`. Each code
+    carries the sentence a person can act on, because "Calibre database could not be
+    read" is true and useless on its own (DEC-080).
+    """
+
+    ACTIONS = {
+        "invalid_calibre_path": (
+            "That folder is not inside the Calibre library Akasha can see.",
+            "Pick a folder from the list rather than typing a path.",
+        ),
+        "calibre_library_not_found": (
+            "No Calibre library sits at that folder.",
+            "Choose the folder that contains metadata.db — usually the one Calibre "
+            "calls your Calibre Library.",
+        ),
+        "invalid_calibre_database": (
+            "Akasha could not read this library's metadata.db.",
+            "Close Calibre and try again; it locks the database while it is writing.",
+        ),
+    }
+
     def __init__(self, code: str, message: str) -> None:
-        super().__init__(code, message)
+        user_message, action = self.ACTIONS.get(code, (None, None))
+        super().__init__(code, message, user_message=user_message, action=action)
 
 
 @dataclass(frozen=True)
@@ -41,24 +66,71 @@ class CalibreAdapter:
     def __init__(self, root: Path) -> None:
         self.root = root
 
-    def read(self, library_path: str) -> CalibreSnapshot:
+    def confine(self, library_path: str, *, allow_root: bool = False) -> Path:
+        """The absolute folder a relative request names, or a refusal.
+
+        The one place confinement is decided, so browsing and reading cannot drift
+        apart: a path that `browse` would walk into is exactly a path `read` would
+        open. Rejected before touching the filesystem when it is absolute or contains
+        `..`, and again after resolution, which is what catches a symlink inside the
+        mount pointing out of it.
+        """
         relative = Path(library_path)
-        if not library_path.strip() or relative.is_absolute() or ".." in relative.parts:
+        if (
+            (not library_path.strip() and not allow_root)
+            or relative.is_absolute()
+            or ".." in relative.parts
+        ):
             raise CalibreError("invalid_calibre_path", "Calibre library path must be relative")
         try:
             root = self.root.resolve(strict=True)
             library = (root / relative).resolve(strict=True)
+        except OSError as error:
+            raise CalibreError(
+                "calibre_library_not_found", "Calibre library was not found"
+            ) from error
+        if not library.is_relative_to(root) or not library.is_dir():
+            raise CalibreError("invalid_calibre_path", "Calibre library path is not allowed")
+        return library
+
+    def browse(self, library_path: str) -> ImportBrowseResult:
+        """What one folder under the mount holds — subfolder names, and nothing else.
+
+        No file names, no absolute paths, no sizes: the reader is choosing a library,
+        and everything past that would publish the deployment's filesystem layout to
+        anyone who can reach the LAN. An unreadable folder lists as empty rather than
+        failing the whole request; one directory the server cannot stat is not a reason
+        to refuse the ones it can.
+        """
+        library = self.confine(library_path, allow_root=True)
+        relative = str(Path(library_path)) if library_path.strip() else ""
+        try:
+            names = sorted(
+                child.name
+                for child in library.iterdir()
+                if child.is_dir() and not child.is_symlink()
+            )
+        except OSError:
+            names = []
+        # Only the mount root has no parent. A first-level folder's parent is the
+        # root, which is "" — the same empty string the client sends to list it.
+        above = str(Path(relative).parent) if relative else None
+        return ImportBrowseResult(
+            path=relative,
+            parent=None if above is None else ("" if above == "." else above),
+            directories=tuple(names),
+            importable=(library / "metadata.db").is_file() and bool(relative),
+        )
+
+    def read(self, library_path: str) -> CalibreSnapshot:
+        library = self.confine(library_path)
+        try:
             database = (library / "metadata.db").resolve(strict=True)
         except OSError as error:
             raise CalibreError(
                 "calibre_library_not_found", "Calibre library was not found"
             ) from error
-        if (
-            not library.is_relative_to(root)
-            or not database.is_relative_to(library)
-            or not library.is_dir()
-            or not database.is_file()
-        ):
+        if not database.is_relative_to(library) or not database.is_file():
             raise CalibreError("invalid_calibre_path", "Calibre library path is not allowed")
         data = database.read_bytes()
         try:
@@ -220,8 +292,31 @@ class CalibreImporter:
             "Akasha opens this library read-only inside the configured Calibre mount. "
             "Enter a relative folder only; covers are copied during preview."
         ),
+        # What the import does to your library, in the order a reader worries about
+        # it: is my Calibre safe, will it overwrite my notes, what arrives.
+        guide=(
+            "Pick the folder that holds metadata.db. Browsing starts at the Calibre "
+            "library mounted into Akasha, so there is no path to guess.",
+            "Calibre is opened read-only and is never written to. Close Calibre first "
+            "anyway — it locks the database while it saves.",
+            "Only empty fields are filled. Anything you have edited in Akasha wins, "
+            "and a re-sync of the same library changes nothing you have touched.",
+            "Covers already in Calibre are copied during preview, so the import needs "
+            "no network for them.",
+            "Everything lands in Triage rather than in the library, so nothing appears "
+            "until you have looked at it.",
+        ),
+        empty_state="No folders here. Mount your Calibre library and reload.",
+        help_url="https://manual.calibre-ebook.com/gui.html#the-calibre-library",
+        browsable=True,
     )
     identity_kinds = frozenset({"isbn", "calibre_uuid"})
+    error_codes = frozenset(
+        {"invalid_calibre_path", "calibre_library_not_found", "invalid_calibre_database"}
+    )
+
+    def browse(self, path: str, context: ImportReadContext) -> ImportBrowseResult:
+        return CalibreAdapter(context.path_root).browse(path)
 
     def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
         if source.path is None:

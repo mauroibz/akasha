@@ -216,12 +216,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:
-        return JSONResponse(
-            status_code=error.status_code,
-            content={
-                "error": {"code": error.code, "message": error.message, "details": error.details}
-            },
-        )
+        return JSONResponse(status_code=error.status_code, content={"error": error.payload()})
 
     @app.get("/api/health/live")
     async def live() -> dict[str, str]:

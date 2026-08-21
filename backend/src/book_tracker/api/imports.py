@@ -1,12 +1,18 @@
 from typing import Any
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
 
 from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError
-from book_tracker.domain.importers import ImportReadError, ImportSource
+from book_tracker.domain.importers import (
+    BrowsableImporter,
+    ImportReadContext,
+    ImportReadError,
+    ImportSource,
+    declared_read_error,
+)
 from book_tracker.domain.registry import IMPORTERS
 
 router = APIRouter(prefix="/api/import", tags=["imports"])
@@ -26,6 +32,20 @@ class ImportInputResponse(BaseModel):
     accept: str | None = None
     placeholder: str | None = None
     help: str | None = None
+    #: Ordered steps, rendered as a list. Never markup: see `ImportInputSpec`.
+    guide: list[str] = Field(default_factory=list)
+    empty_state: str | None = None
+    help_url: str | None = None
+    browsable: bool = False
+
+
+class ImportBrowseResponse(BaseModel):
+    """One level of a browsable connector's source. Relative names only."""
+
+    path: str
+    parent: str | None = None
+    directories: list[str] = Field(default_factory=list)
+    importable: bool = False
 
 
 class ImporterResponse(BaseModel):
@@ -128,6 +148,24 @@ class UndoEffectSummary(BaseModel):
     retained_items: int = 0
 
 
+def read_failure(importer: object, error: ImportReadError) -> LibraryError:
+    """Publish a reader's refusal, with whatever the reader can act on.
+
+    Routed through `declared_read_error` so a code outside the connector's declared
+    vocabulary is republished under one stable code instead of leaking an unknown
+    vocabulary to the client (DEC-080).
+    """
+    published = declared_read_error(importer, error)  # type: ignore[arg-type]
+    return LibraryError(
+        published.code,
+        str(published),
+        status_code=422,
+        details=published.details,
+        user_message=published.user_message,
+        action=published.action,
+    )
+
+
 def service(request: Request, importer_name: str) -> ImportService:
     importer = IMPORTERS.get(importer_name)
     if importer is None:
@@ -179,10 +217,35 @@ async def preview(importer_name: str, request: Request) -> PreviewResponse:
     try:
         result = import_service.preview(await _source(request, importer_name))
     except ImportReadError as error:
-        raise LibraryError(
-            error.code, str(error), status_code=422, details=error.details
-        ) from error
+        raise read_failure(IMPORTERS[importer_name], error) from error
     return PreviewResponse.model_validate(result)
+
+
+@router.get("/{importer_name}/browse", response_model=ImportBrowseResponse)
+async def browse(
+    importer_name: str,
+    request: Request,
+    path: str = Query("", max_length=500),
+) -> ImportBrowseResponse:
+    """List what one folder under a browsable connector's source holds.
+
+    Read-only and confined by the connector itself, which resolves the request exactly
+    as its reader would — the picker cannot walk anywhere a preview could not open.
+    """
+    importer = IMPORTERS.get(importer_name)
+    if (
+        importer is None
+        or not importer.input.browsable
+        or not isinstance(importer, BrowsableImporter)
+    ):
+        raise LibraryError(
+            "importer_not_browsable", "This importer has no browsable source", status_code=404
+        )
+    try:
+        result = importer.browse(path, ImportReadContext(path_root=request.app.state.calibre_dir))
+    except ImportReadError as error:
+        raise read_failure(importer, error) from error
+    return ImportBrowseResponse.model_validate(result.__dict__)
 
 
 @router.post("/{importer_name}/commit", response_model=CommitResponse)

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -33,6 +33,14 @@ const importers = [
       accept: ".csv,text/csv",
       placeholder: null,
       help: null,
+      guide: [
+        "Open goodreads.com/review/import on desktop web.",
+        "Press Export Library and download the file.",
+        "Ratings are doubled and marked provisional.",
+      ],
+      empty_state: "Drop goodreads_library_export.csv here, or choose a file.",
+      help_url: "https://www.goodreads.com/review/import",
+      browsable: false,
     },
   },
   {
@@ -46,9 +54,30 @@ const importers = [
       accept: null,
       placeholder: "Library",
       help: "Akasha opens this library read-only inside the configured Calibre mount.",
+      guide: [
+        "Pick the folder that holds metadata.db.",
+        "Calibre is opened read-only and never written to.",
+      ],
+      empty_state: "No folders here. Mount your Calibre library and reload.",
+      help_url: "https://manual.calibre-ebook.com/gui.html",
+      browsable: true,
     },
   },
 ];
+
+/** Everything the folded screen asks for that a given test does not care about. */
+function stubRegistry(
+  handler: (input: string) => Response | undefined = () => undefined,
+) {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    const url = String(input);
+    const answered = handler(url);
+    if (answered) return answered;
+    if (url === "/api/importers")
+      return new Response(JSON.stringify(importers));
+    return new Response(JSON.stringify({}), { status: 404 });
+  });
+}
 
 describe("ImportPage", () => {
   it("renders importer tabs from the published registry instead of literals", async () => {
@@ -66,6 +95,10 @@ describe("ImportPage", () => {
               accept: ".csv,text/csv",
               placeholder: null,
               help: null,
+              guide: ["Export from thestorygraph.com."],
+              empty_state: "Drop the StoryGraph export here.",
+              help_url: null,
+              browsable: false,
             },
           },
         ]),
@@ -85,6 +118,15 @@ describe("ImportPage", () => {
       requests.push([input, init]);
       if (String(input) === "/api/importers")
         return new Response(JSON.stringify(importers));
+      if (String(input).includes("/browse"))
+        return new Response(
+          JSON.stringify({
+            path: "",
+            parent: null,
+            directories: ["My Books"],
+            importable: false,
+          }),
+        );
       if (String(input).endsWith("calibre/preview"))
         return new Response(
           JSON.stringify({
@@ -217,10 +259,7 @@ describe("ImportPage", () => {
     });
     renderImportPage();
     const file = new File(["csv"], "library.csv", { type: "text/csv" });
-    await userEvent.upload(
-      await screen.findByLabelText(/goodreads csv/i),
-      file,
-    );
+    await userEvent.upload(await screen.findByLabelText("Goodreads CSV"), file);
     await userEvent.click(
       screen.getByRole("button", { name: /preview import/i }),
     );
@@ -279,7 +318,7 @@ describe("ImportPage", () => {
       );
     renderImportPage();
     await userEvent.upload(
-      await screen.findByLabelText(/goodreads csv/i),
+      await screen.findByLabelText("Goodreads CSV"),
       new File(["x"], "x.csv", { type: "text/csv" }),
     );
     await userEvent.click(
@@ -351,7 +390,7 @@ describe("ImportPage", () => {
     );
     renderImportPage();
     await userEvent.upload(
-      await screen.findByLabelText(/goodreads csv/i),
+      await screen.findByLabelText("Goodreads CSV"),
       new File(["csv"], "library.csv", { type: "text/csv" }),
     );
     await userEvent.click(
@@ -429,7 +468,145 @@ describe("ImportPage", () => {
     expect(
       await screen.findByRole("heading", { level: 1, name: /inbox/i }),
     ).toBeVisible();
-    expect(screen.queryByLabelText(/goodreads csv/i)).toBeNull();
+    expect(screen.queryByLabelText("Goodreads CSV")).toBeNull();
+  });
+
+  it("renders the guidance the connector publishes, not copy of its own", async () => {
+    // The Goodreads tab was a bare file input: nothing said where the export
+    // lives or why a four-star book arrives as an 8 (DEC-079). The steps come
+    // from the connector's declaration, so the next one guides its own users
+    // without editing this screen.
+    stubRegistry();
+    renderImportPage();
+
+    const steps = await screen.findByRole("list", {
+      name: /how to get a goodreads csv/i,
+    });
+    expect(steps).toHaveTextContent(/goodreads.com\/review\/import/i);
+    expect(steps).toHaveTextContent(/provisional/i);
+    expect(
+      screen.getByRole("link", { name: /goodreads export page/i }),
+    ).toHaveAttribute("href", "https://www.goodreads.com/review/import");
+    expect(
+      screen.getByText(/drop goodreads_library_export\.csv here/i),
+    ).toBeVisible();
+  });
+
+  it("accepts a dropped CSV as well as a chosen one", async () => {
+    const bodies: FormData[] = [];
+    stubRegistry((url) => {
+      if (!url.endsWith("goodreads/preview")) return undefined;
+      return new Response(
+        JSON.stringify({
+          batch_id: "dropped",
+          fingerprint: "abc",
+          state: "previewed",
+          summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+          records: [],
+        }),
+        { status: 201 },
+      );
+    });
+    const original = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (init?.body instanceof FormData) bodies.push(init.body);
+      return original(input, init);
+    });
+    renderImportPage();
+
+    const zone = await screen.findByTestId("goodreads-drop-zone");
+    const file = new File(["csv"], "goodreads_library_export.csv", {
+      type: "text/csv",
+    });
+    fireEvent.drop(zone, { dataTransfer: { files: [file], types: ["Files"] } });
+
+    expect(
+      await screen.findByText(/goodreads_library_export\.csv/i),
+    ).toBeVisible();
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview import/i }),
+    );
+    await screen.findByRole("heading", { name: /preview: 1 row/i });
+    expect(bodies.at(-1)?.get("file")).toBe(file);
+  });
+
+  it("browses the Calibre mount instead of asking for a path", async () => {
+    // "Enter a relative folder only" is unanswerable without knowing what
+    // folders exist under the mount. The picker answers it (DEC-079).
+    const requests: string[] = [];
+    stubRegistry((url) => {
+      if (!url.includes("/browse")) return undefined;
+      requests.push(url);
+      const path = new URL(url, "http://test").searchParams.get("path") ?? "";
+      if (path === "")
+        return new Response(
+          JSON.stringify({
+            path: "",
+            parent: null,
+            directories: ["Comics", "Fiction"],
+            importable: false,
+          }),
+        );
+      return new Response(
+        JSON.stringify({
+          path,
+          parent: "",
+          directories: [],
+          importable: true,
+        }),
+      );
+    });
+    renderImportPage("/import?tab=calibre");
+
+    expect(
+      await screen.findByRole("button", { name: "Fiction" }),
+    ).toBeVisible();
+    // Nothing is importable at the mount root, so there is nothing to preview.
+    expect(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    ).toBeDisabled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Fiction" }));
+
+    expect(
+      await screen.findByRole("button", { name: /preview calibre library/i }),
+    ).toBeEnabled();
+    expect(screen.getByLabelText(/library path/i)).toHaveValue("Fiction");
+    // A breadcrumb back to the mount, so the picker is not a one-way trip.
+    expect(
+      screen.getByRole("button", { name: /calibre library root/i }),
+    ).toBeVisible();
+    expect(requests.some((url) => url.includes("path=Fiction"))).toBe(true);
+  });
+
+  it("renders what the connector says to do about a failure", async () => {
+    stubRegistry((url) => {
+      if (!url.endsWith("calibre/preview")) return undefined;
+      return new Response(
+        JSON.stringify({
+          error: {
+            code: "invalid_calibre_database",
+            message: "Calibre database could not be read",
+            user_message: "Akasha could not read this library's metadata.db.",
+            action: "Close Calibre and try again.",
+          },
+        }),
+        { status: 422 },
+      );
+    });
+    renderImportPage("/import?tab=calibre");
+
+    await userEvent.type(
+      await screen.findByLabelText(/library path/i),
+      "Locked",
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    );
+
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent(/could not read this library/i);
+    expect(alert).toHaveTextContent(/close calibre and try again/i);
   });
 
   it("opens on the importer used last", async () => {

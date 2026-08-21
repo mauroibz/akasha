@@ -22,6 +22,7 @@ They come in two groups, and the split is the finding of Sprint 028's measuremen
 """
 
 from collections.abc import Callable
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -32,7 +33,13 @@ from sqlalchemy.exc import IntegrityError
 from book_tracker.application.providers import resolve_input
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
-from book_tracker.domain.importers import Importer, ImportInputSpec
+from book_tracker.domain.importers import (
+    BrowsableImporter,
+    Importer,
+    ImportInputSpec,
+    ImportReadError,
+    declared_read_error,
+)
 from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
 from book_tracker.domain.registry import (
     ALL_STATUSES,
@@ -76,6 +83,38 @@ def assert_importer_contract(importer: object) -> None:
     assert callable(importer.read), f"{importer.name} declares no reader"
     assert callable(importer.stage), f"{importer.name} declares no staging strategy"
     assert callable(importer.match), f"{importer.name} declares no match strategy"
+    assert_declared_guidance(importer)
+
+
+def assert_declared_guidance(importer: Importer) -> None:
+    """What a connector publishes about itself is well formed.
+
+    The point of these fields is that a connector guides its own users without
+    anybody editing the shared import screen (DEC-080). That only holds if the
+    screen can render a declaration without inspecting which connector wrote it,
+    so the shapes are checked here rather than trusted.
+    """
+    spec = importer.input
+    assert isinstance(spec.guide, tuple), f"{importer.name} guide must be ordered steps"
+    assert all(isinstance(step, str) and step.strip() for step in spec.guide), (
+        f"{importer.name} guide has an empty step"
+    )
+    assert spec.empty_state is None or spec.empty_state.strip()
+    assert spec.help_url is None or spec.help_url.startswith("https://"), (
+        f"{importer.name} help_url is not an https address"
+    )
+    assert not spec.browsable or spec.kind == "path", (
+        f"{importer.name} offers browsing for a source that is not a place"
+    )
+    assert not spec.browsable or isinstance(importer, BrowsableImporter), (
+        f"{importer.name} declares browsing but has no browse method"
+    )
+    # The vocabulary is closed so a screen can decide what to say about a
+    # failure, and so an undeclared code cannot reach a reader as itself.
+    assert importer.error_codes, f"{importer.name} declares no error vocabulary"
+    assert all(code and code.isidentifier() and code.islower() for code in importer.error_codes), (
+        f"{importer.name} declares a malformed error code"
+    )
 
 
 def registry_check(function: RegistryCheck) -> RegistryCheck:
@@ -413,6 +452,101 @@ def test_the_importer_suite_rejects_a_missing_contract_member() -> None:
 
     with pytest.raises(AssertionError):
         assert_importer_contract(MissingMatch())
+
+
+class _DeclaringImporter:
+    """A well-formed declaration, used as the control for the malformed ones."""
+
+    name = "declaring"
+    label = "Declaring"
+    item_type = "book"
+    input = ImportInputSpec(
+        kind="upload",
+        label="File",
+        field="file",
+        guide=("Open the export page.", "Download the file."),
+        empty_state="Drop the export here.",
+        help_url="https://example.invalid/export",
+    )
+    identity_kinds = frozenset({"isbn"})
+    error_codes = frozenset({"invalid_source"})
+
+    def read(self, *_args: object) -> None:
+        return None
+
+    def stage(self, *_args: object) -> None:
+        return None
+
+    def match(self, *_args: object) -> None:
+        return None
+
+
+def test_a_well_formed_declaration_passes() -> None:
+    assert_declared_guidance(_DeclaringImporter())
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        # A guide is ordered steps, not prose and not a blank line.
+        ("guide", "Open the export page."),
+        ("guide", ("Open the export page.", "   ")),
+        ("empty_state", "   "),
+        # Anything a screen turns into a link leaves the LAN, so it is https or
+        # it is not published at all.
+        ("help_url", "http://example.invalid/export"),
+        ("help_url", "javascript:alert(1)"),
+        # Only a source that is a place can be browsed into.
+        ("browsable", True),
+    ],
+)
+def test_the_suite_rejects_a_malformed_declaration(field: str, value: object) -> None:
+    class Malformed(_DeclaringImporter):
+        input = replace(_DeclaringImporter.input, **{field: value})
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(Malformed())
+
+
+def test_the_suite_rejects_an_empty_or_malformed_error_vocabulary() -> None:
+    class NoCodes(_DeclaringImporter):
+        error_codes = frozenset()
+
+    class ShoutedCode(_DeclaringImporter):
+        error_codes = frozenset({"Invalid Source"})
+
+    for broken in (NoCodes(), ShoutedCode()):
+        with pytest.raises(AssertionError):
+            assert_declared_guidance(broken)
+
+
+def test_an_undeclared_error_code_never_reaches_a_reader_as_itself() -> None:
+    """The closed set is enforced, not merely declared.
+
+    A connector that raises a code its declaration does not list is a defect in
+    the connector, and the screen has no copy for it. It is republished under one
+    stable code instead of leaking an unknown vocabulary to the client.
+    """
+    importer = _DeclaringImporter()
+    declared = ImportReadError("invalid_source", "Bad file", user_message="Pick a CSV.")
+    assert declared_read_error(importer, declared) is declared
+
+    smuggled = ImportReadError(
+        "surprise", "Something else", details={"row": 4}, action="Try again."
+    )
+    published = declared_read_error(importer, smuggled)
+    assert published.code == "undeclared_import_error"
+    assert published.details == {"row": 4}
+    assert published.action == "Try again."
+
+
+def test_every_registered_importer_declares_its_error_vocabulary() -> None:
+    """A connector's codes are its own, and every one of them is declared."""
+    assert IMPORTERS["goodreads"].error_codes
+    assert IMPORTERS["calibre"].error_codes
+    assert "calibre_library_not_found" in IMPORTERS["calibre"].error_codes
+    assert IMPORTERS["calibre"].input.browsable is True
+    assert IMPORTERS["goodreads"].input.browsable is False
 
 
 def test_the_suite_covers_every_field_of_the_contract() -> None:

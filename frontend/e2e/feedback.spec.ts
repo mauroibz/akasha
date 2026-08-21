@@ -2,7 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { stillDurations } from "./motion";
-import { stubItemTypes } from "./seed";
+import { stubImporters, stubItemTypes } from "./seed";
 
 /**
  * Product spec section 4.3 and technical spec section 8 require that every user
@@ -228,8 +228,9 @@ for (const size of widths) {
           },
         }),
       );
+      await stubImporters(page);
       await page.goto("/import");
-      await page.getByLabel(/goodreads csv/i).setInputFiles({
+      await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
         name: "goodreads.csv",
         mimeType: "text/csv",
         buffer: Buffer.from("Title,Author\nRayuela,Julio Cortázar\n"),

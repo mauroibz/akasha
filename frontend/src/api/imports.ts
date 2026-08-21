@@ -41,7 +41,39 @@ export interface ImporterDefinition {
     accept: string | null;
     placeholder: string | null;
     help: string | null;
+    /** How to obtain the source, one step per string, rendered in order. */
+    guide: string[];
+    /** What the input says while nothing has been chosen. */
+    empty_state: string | null;
+    help_url: string | null;
+    browsable: boolean;
   };
+}
+
+/** One level of a browsable connector's source. Relative names, never host paths. */
+export interface ImportBrowseListing {
+  path: string;
+  parent: string | null;
+  directories: string[];
+  importable: boolean;
+}
+
+/**
+ * A refused import request, carrying what the reader can do about it.
+ *
+ * The connector owns the sentence: it knows that a locked Calibre database means
+ * "close Calibre and try again", and the shared screen cannot (DEC-080).
+ */
+export class ImportRequestError extends Error {
+  readonly code: string;
+  readonly action: string | null;
+
+  constructor(message: string, code: string, action: string | null) {
+    super(message);
+    this.name = "ImportRequestError";
+    this.code = code;
+    this.action = action;
+  }
 }
 export interface ImportPreview {
   batch_id: string;
@@ -84,9 +116,21 @@ export interface UndoResult {
 async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const value = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
+      error?: {
+        code?: string;
+        message?: string;
+        user_message?: string;
+        action?: string;
+      };
     } | null;
-    throw new Error(value?.error?.message ?? "Import request failed");
+    const error = value?.error;
+    // `user_message` is written for a person and `message` for a log; prefer the
+    // first when the connector supplied one.
+    throw new ImportRequestError(
+      error?.user_message ?? error?.message ?? "Import request failed",
+      error?.code ?? "import_failed",
+      error?.action ?? null,
+    );
   }
   return response.json() as Promise<T>;
 }
@@ -95,6 +139,12 @@ export function getImporters() {
   return fetch("/api/importers").then((response) =>
     responseJson<ImporterDefinition[]>(response),
   );
+}
+
+export function browseImportSource(importerId: string, path: string) {
+  return fetch(
+    `/api/import/${encodeURIComponent(importerId)}/browse?path=${encodeURIComponent(path)}`,
+  ).then((response) => responseJson<ImportBrowseListing>(response));
 }
 
 export function previewImport(

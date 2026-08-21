@@ -2,33 +2,12 @@ import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
 import { chooseOption } from "./radix";
+import { stubImporters } from "./seed";
 
 // Triage lives on `/import` now (DEC-079), so the screen around it asks the
-// registry which connectors exist. Stubbed here so the folded tab strip is the
-// real one rather than a lone Triage tab.
+// registry which connectors exist.
 test.beforeEach(async ({ page }) => {
-  await page.route("**/api/importers", (route) =>
-    route.fulfill({
-      json: [
-        {
-          id: "goodreads",
-          label: "Goodreads",
-          item_type: "book",
-          input: { kind: "upload", label: "Goodreads CSV", field: "file" },
-        },
-        {
-          id: "calibre",
-          label: "Calibre",
-          item_type: "book",
-          input: {
-            kind: "path",
-            label: "Calibre library path",
-            field: "library_path",
-          },
-        },
-      ],
-    }),
-  );
+  await stubImporters(page);
 });
 
 function makeEntries(count: number) {

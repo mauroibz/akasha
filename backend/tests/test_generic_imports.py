@@ -103,37 +103,26 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
         response = await client.get("/api/importers")
 
     assert response.status_code == 200
-    assert response.json() == [
-        {
-            "id": "goodreads",
-            "label": "Goodreads",
-            "item_type": "book",
-            "input": {
-                "kind": "upload",
-                "label": "Goodreads CSV",
-                "field": "file",
-                "accept": ".csv,text/csv",
-                "placeholder": None,
-                "help": None,
-            },
-        },
-        {
-            "id": "calibre",
-            "label": "Calibre",
-            "item_type": "book",
-            "input": {
-                "kind": "path",
-                "label": "Calibre library path",
-                "field": "library_path",
-                "accept": None,
-                "placeholder": "Library",
-                "help": (
-                    "Akasha opens this library read-only inside the configured Calibre mount. "
-                    "Enter a relative folder only; covers are copied during preview."
-                ),
-            },
-        },
-    ]
+    published = response.json()
+    assert [row["id"] for row in published] == ["goodreads", "calibre"]
+
+    goodreads, calibre = published
+    assert goodreads["input"]["kind"] == "upload"
+    assert goodreads["input"]["accept"] == ".csv,text/csv"
+    assert goodreads["input"]["browsable"] is False
+    assert calibre["input"]["kind"] == "path"
+    assert calibre["input"]["browsable"] is True
+
+    # The screen renders what the connector declares, so what it declares has to
+    # arrive intact: ordered steps, an empty state and an https help address.
+    for row in published:
+        spec = row["input"]
+        assert spec["guide"] and all(step.strip() for step in spec["guide"])
+        assert spec["empty_state"]
+        assert spec["help_url"].startswith("https://")
+    assert any("review/import" in step for step in goodreads["input"]["guide"])
+    assert any("provisional" in step.lower() for step in goodreads["input"]["guide"])
+    assert any("read-only" in step for step in calibre["input"]["guide"])
 
 
 @pytest.mark.anyio
@@ -217,3 +206,182 @@ async def test_normalized_records_are_validated_against_the_target_domain(
     assert caught.value.code == "invalid_import_record"
     assert caught.value.status_code == 422
     assert message in caught.value.message
+
+
+def _browsable_calibre_tree(root: Path) -> None:
+    """A mount with two libraries, a decoy folder and a file beside them."""
+    _calibre_library(root / "Fiction")
+    _calibre_library(root / "Comics")
+    (root / "Fiction" / "Notes").mkdir()
+    (root / "loose.txt").write_text("not a folder")
+
+
+@pytest.mark.anyio
+async def test_browsing_lists_folder_names_and_nothing_else(tmp_path: Path) -> None:
+    """The picker exists so nobody types a path blind; it publishes names only."""
+    calibre_root = tmp_path / "calibre"
+    calibre_root.mkdir()
+    _browsable_calibre_tree(calibre_root)
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=calibre_root,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        top = await client.get("/api/import/calibre/browse")
+        inside = await client.get("/api/import/calibre/browse", params={"path": "Fiction"})
+        nested = await client.get("/api/import/calibre/browse", params={"path": "Fiction/library"})
+
+    assert top.status_code == 200
+    assert top.json() == {
+        "path": "",
+        "parent": None,
+        "directories": ["Comics", "Fiction"],
+        "importable": False,
+    }
+    # The loose file is absent, and so is every absolute path.
+    assert "loose.txt" not in str(top.json())
+    assert str(calibre_root) not in str(top.json())
+
+    assert inside.json()["parent"] == ""
+    assert inside.json()["directories"] == ["Notes", "library"]
+    # `Fiction` itself holds no metadata.db; the library one level down does.
+    assert inside.json()["importable"] is False
+    assert nested.json() == {
+        "path": "Fiction/library",
+        "parent": "Fiction",
+        "directories": [],
+        "importable": True,
+    }
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "path",
+    ["../..", "Fiction/../../etc", "/etc", "Fiction/../../../", "\\etc"],
+)
+async def test_browsing_refuses_to_leave_the_mount(tmp_path: Path, path: str) -> None:
+    calibre_root = tmp_path / "calibre"
+    calibre_root.mkdir()
+    _browsable_calibre_tree(calibre_root)
+    (tmp_path / "secret").mkdir()
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=calibre_root,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get("/api/import/calibre/browse", params={"path": path})
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] in {
+        "invalid_calibre_path",
+        "calibre_library_not_found",
+    }
+    assert "secret" not in response.text
+
+
+@pytest.mark.anyio
+async def test_a_symlink_out_of_the_mount_is_not_a_way_out(tmp_path: Path) -> None:
+    """Resolution happens after the string checks, which is what catches this."""
+    calibre_root = tmp_path / "calibre"
+    calibre_root.mkdir()
+    outside = tmp_path / "outside"
+    (outside / "private").mkdir(parents=True)
+    (calibre_root / "escape").symlink_to(outside)
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=calibre_root,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        listing = await client.get("/api/import/calibre/browse")
+        followed = await client.get("/api/import/calibre/browse", params={"path": "escape"})
+
+    # The link is not offered, and asking for it by name is refused.
+    assert listing.json()["directories"] == []
+    assert followed.status_code == 422
+    assert followed.json()["error"]["code"] == "invalid_calibre_path"
+
+
+@pytest.mark.anyio
+async def test_an_upload_connector_has_nothing_to_browse(tmp_path: Path) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get("/api/import/goodreads/browse")
+        missing = await client.get("/api/import/nowhere/browse")
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "importer_not_browsable"
+    assert missing.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_a_read_failure_publishes_what_the_reader_can_do_about_it(
+    tmp_path: Path,
+) -> None:
+    """A 422 that only says `invalid_calibre_database` is a dead end (DEC-080)."""
+    calibre_root = tmp_path / "calibre"
+    library = calibre_root / "broken"
+    library.mkdir(parents=True)
+    (library / "metadata.db").write_bytes(b"not a database at all")
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=calibre_root,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post("/api/import/calibre/preview", json={"library_path": "broken"})
+        empty = await client.post(
+            "/api/import/goodreads/preview",
+            files={"file": ("empty.csv", b"nothing,useful\n", "text/csv")},
+        )
+
+    assert response.status_code == 422
+    error = response.json()["error"]
+    assert error["code"] == "invalid_calibre_database"
+    assert error["user_message"]
+    assert error["action"] == (
+        "Close Calibre and try again; it locks the database while it is writing."
+    )
+
+    assert empty.status_code == 422
+    assert empty.json()["error"]["code"] == "missing_columns"
+    assert "goodreads.com" in empty.json()["error"]["action"]
+
+
+@pytest.mark.anyio
+async def test_an_ordinary_error_payload_keeps_its_shape(tmp_path: Path) -> None:
+    """The two new keys appear only where a connector supplied them."""
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post("/api/import/goodreads/preview", json={})
+
+    assert response.status_code == 422
+    assert set(response.json()["error"]) == {"code", "message", "details"}

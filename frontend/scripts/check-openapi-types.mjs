@@ -33,6 +33,23 @@ const expected = {
   FormatSpecResponse: ["value", "label"],
   FacetsResponse: ["status_counts", "status_counts_by_type", "format_counts"],
   ShelfResponse: ["id", "name", "slug", "entry_count"],
+  // `src/api/imports.ts` mirrors these by hand, and the import screen renders
+  // whatever a connector declares in them rather than branching on which
+  // connector it is holding (DEC-080).
+  ImporterResponse: ["id", "label", "item_type", "input"],
+  ImportInputResponse: [
+    "kind",
+    "label",
+    "field",
+    "accept",
+    "placeholder",
+    "help",
+    "guide",
+    "empty_state",
+    "help_url",
+    "browsable",
+  ],
+  ImportBrowseResponse: ["path", "parent", "directories", "importable"],
 };
 
 for (const [name, properties] of Object.entries(expected)) {
