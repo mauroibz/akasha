@@ -4,11 +4,16 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, func, select, text
 from sqlalchemy.orm import Session
 
+from book_tracker.infrastructure.attachments import (
+    AttachmentError,
+    delete_blob_if_unreferenced,
+)
 from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.models import (
     AttachmentRow,
@@ -41,11 +46,17 @@ class UndoService:
     - Cancel all queued/running jobs for the batch atomically.
     - Repeated undo is harmless (second call is a no-op).
     - Undo is available only within the 24-hour window.
+    - An attachment the ledger claims is reversed; one it does not is the owner's
+      and keeps its item alive (DEC-047, DEC-083).
     """
 
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, *, data_dir: Path | None = None) -> None:
         self.engine = engine
         self.repo = JobRepository(engine)
+        # Where the blobs live, when this undo is allowed to drop them. Without it the
+        # rows still go and `reclaim` collects the files later (DEC-049) — correct, but
+        # slower to give the disk back.
+        self.data_dir = data_dir
 
     def undo(self, batch_id: str, *, now: datetime | None = None) -> dict[str, Any]:
         if now is None:
@@ -101,13 +112,43 @@ class UndoService:
                 # may have multiple effects — create + fill_empty)
                 seen_entries: set[int] = set()
                 seen_items: set[int] = set()
+                seen_attachments: set[int] = set()
                 # Items that had a fill_empty effect where the current value
                 # didn't match the after_value — user edited after import.
                 # These items must not be deleted by their create effect.
                 modified_items: set[int] = set()
 
+                # Blobs to drop once the rows are gone. Deferred to after the commit
+                # because a file removed inside a transaction that then rolls back is
+                # a row pointing at nothing — the one failure this store cannot heal.
+                orphaned: list[str] = []
                 for effect in effects:
                     if effect.effect_type == "create":
+                        if effect.entity_type == "attachment":
+                            # Reversed before the item that carries it, which falls out
+                            # of descending effect_id: a file is attached after its
+                            # item is created, so its effect is always the later one.
+                            attachment_id = int(effect.entity_id)
+                            if attachment_id in seen_attachments:
+                                continue
+                            seen_attachments.add(attachment_id)
+                            row = session.get(AttachmentRow, attachment_id)
+                            if row is None:
+                                skipped += 1
+                                continue
+                            after = json.loads(effect.after_values)
+                            if row.filename != after.get("filename") or row.sha256 != after.get(
+                                "sha256"
+                            ):
+                                # Renamed or replaced since the import, so it is the
+                                # owner's now — the same rule a hand-edited field gets.
+                                retained += 1
+                                continue
+                            session.delete(row)
+                            session.flush()
+                            orphaned.append(row.sha256)
+                            reverted += 1
+                            continue
                         if effect.entity_type == "entry":
                             entry_id = int(effect.entity_id)
                             if entry_id in seen_entries:
@@ -272,6 +313,8 @@ class UndoService:
             finally:
                 session.close()
 
+        self._release(orphaned)
+
         return {
             "batch_id": batch_id,
             "state": "undone",
@@ -282,6 +325,29 @@ class UndoService:
             "reverted_items": reverted_items,
             "retained_items": retained_items,
         }
+
+    def _release(self, digests: list[str]) -> None:
+        """Drop each blob nothing points at any more, once the rows are committed.
+
+        Refcounted here rather than assumed: the same file attached to two books is
+        one blob, and undoing one import must not take the other book's copy with it.
+        A digest that is still referenced simply stays, and a failure to unlink is not
+        allowed to fail an undo that has already succeeded — `reclaim` sweeps whatever
+        is left (DEC-049).
+        """
+        if self.data_dir is None or not digests:
+            return
+        with Session(self.engine) as session:
+            for digest in dict.fromkeys(digests):
+                references = session.scalar(
+                    select(func.count())
+                    .select_from(AttachmentRow)
+                    .where(AttachmentRow.sha256 == digest)
+                )
+                try:
+                    delete_blob_if_unreferenced(self.data_dir, digest, references=references or 0)
+                except AttachmentError:
+                    continue
 
 
 def _get_item_field(item: ItemRow, field: str) -> Any:

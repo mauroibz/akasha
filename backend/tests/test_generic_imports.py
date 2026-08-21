@@ -1043,6 +1043,29 @@ async def test_the_attachment_cap_is_published_with_the_registry(tmp_path: Path)
     assert calibre["attachment_max_bytes"] == 25 * 1024 * 1024
 
 
+@pytest.mark.anyio
+async def test_undoing_an_import_takes_back_the_files_it_attached(tmp_path: Path) -> None:
+    """AC6: undo returns the library to where it was, rows and bytes alike."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    store = tmp_path / "data" / "attachments"
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        batch_id = await _import(client, library)
+        await client.post(f"/api/import/calibre/batches/{batch_id}/files", **_file_part(library))
+        assert [blob for blob in store.rglob("*") if blob.is_file()]
+
+        undone = await client.delete(f"/api/import/batches/{batch_id}")
+
+    assert undone.status_code == 200, undone.text
+    with Session(app.state.engine) as session:
+        assert session.execute(text("SELECT count(*) FROM attachments")).scalar_one() == 0
+        assert session.execute(text("SELECT count(*) FROM items")).scalar_one() == 0
+    assert not [blob for blob in store.rglob("*") if blob.is_file()]
+
+
 def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) -> None:
     """AC5: a bigger shelf must not mean a query per book."""
     from sqlalchemy import event

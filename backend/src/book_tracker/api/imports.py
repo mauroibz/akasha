@@ -646,7 +646,7 @@ async def backfill_enrichment(request: Request) -> BackfillResponse:
 async def undo_batch(batch_id: str, request: Request) -> UndoEffectSummary:
     from book_tracker.application.undo import UndoExpiredError, UndoService
 
-    undo = UndoService(request.app.state.engine)
+    undo = UndoService(request.app.state.engine, data_dir=request.app.state.data_dir)
     try:
         result = undo.undo(batch_id)
     except LookupError as error:

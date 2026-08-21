@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from book_tracker.application.undo import UndoExpiredError, UndoService
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
+from book_tracker.infrastructure.attachments import blob_path, store_blob
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import JobRow
 from book_tracker.main import create_app
@@ -126,6 +127,44 @@ def _add_fill_empty_effect(
                 "eid": entity_id,
                 "before": json.dumps({field: before}),
                 "after": json.dumps({field: after}),
+            },
+        ).scalar_one()
+
+
+def _attach(eng: Engine, item_id: int, filename: str, sha256: str, byte_size: int) -> int:
+    with eng.begin() as conn:
+        return conn.execute(
+            text(
+                "INSERT INTO attachments"
+                "(item_id,filename,byte_size,sha256,created_at,updated_at) "
+                "VALUES(:iid,:name,:size,:sha,'n','n') RETURNING id"
+            ),
+            {"iid": item_id, "name": filename, "size": byte_size, "sha": sha256},
+        ).scalar_one()
+
+
+def _add_attachment_effect(
+    eng: Engine, batch_id: str, attachment_id: int, item_id: int, filename: str, sha256: str
+) -> int:
+    with eng.begin() as conn:
+        return conn.execute(
+            text(
+                "INSERT INTO import_effects"
+                "(batch_id,record_id,effect_type,entity_type,entity_id,"
+                "before_values,after_values) "
+                "VALUES(:bid,1,'create','attachment',:eid,'{}',:after) RETURNING effect_id"
+            ),
+            {
+                "bid": batch_id,
+                "eid": str(attachment_id),
+                "after": json.dumps(
+                    {
+                        "created": True,
+                        "item_id": item_id,
+                        "filename": filename,
+                        "sha256": sha256,
+                    }
+                ),
             },
         ).scalar_one()
 
@@ -433,6 +472,87 @@ class TestUndo:
         with engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM items")) == 1
             assert conn.scalar(text("SELECT count(*) FROM attachments")) == 1
+
+    def test_undo_removes_an_attachment_the_import_created(
+        self, engine: Engine, tmp_path: Path
+    ) -> None:
+        """DEC-083: the ledger is what tells an imported file from the owner's.
+
+        Without this the DEC-047 guard above fires on every imported book and undo
+        stops undoing anything at all.
+        """
+        batch_id = _create_committed_batch(engine)
+        item_id = _create_item(engine, "Imported with its file", year=2000)
+        entry_id = _create_entry(engine, item_id, "read", 8)
+        _add_create_effect(engine, batch_id, 1, "item", item_id)
+        _add_create_effect(engine, batch_id, 1, "entry", entry_id)
+        blob = store_blob(b"epub bytes", tmp_path)
+        attachment_id = _attach(engine, item_id, "book.epub", blob.sha256, blob.byte_size)
+        _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
+
+        result = UndoService(engine, data_dir=tmp_path).undo(batch_id)
+
+        assert result["reverted_items"] >= 1
+        with engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM attachments")) == 0
+            assert conn.scalar(text("SELECT count(*) FROM items")) == 0
+        assert not blob_path(tmp_path, blob.sha256).exists()
+
+    def test_undo_keeps_a_blob_another_item_still_references(
+        self, engine: Engine, tmp_path: Path
+    ) -> None:
+        """The same epub on two books is one blob; undoing one must not take it."""
+        batch_id = _create_committed_batch(engine)
+        item_id = _create_item(engine, "Imported", year=2000)
+        other_id = _create_item(engine, "Kept by hand", year=2001)
+        _add_create_effect(engine, batch_id, 1, "item", item_id)
+        blob = store_blob(b"shared bytes", tmp_path)
+        attachment_id = _attach(engine, item_id, "book.epub", blob.sha256, blob.byte_size)
+        _attach(engine, other_id, "book.epub", blob.sha256, blob.byte_size)
+        _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
+
+        UndoService(engine, data_dir=tmp_path).undo(batch_id)
+
+        with engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM attachments")) == 1
+        assert blob_path(tmp_path, blob.sha256).is_file()
+
+    def test_undo_retains_an_attachment_the_owner_renamed(
+        self, engine: Engine, tmp_path: Path
+    ) -> None:
+        """Field-matching semantics, applied to a file: a touched row is the owner's."""
+        batch_id = _create_committed_batch(engine)
+        item_id = _create_item(engine, "Renamed after import", year=2000)
+        _add_create_effect(engine, batch_id, 1, "item", item_id)
+        blob = store_blob(b"epub bytes", tmp_path)
+        attachment_id = _attach(engine, item_id, "My copy.epub", blob.sha256, blob.byte_size)
+        _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
+
+        result = UndoService(engine, data_dir=tmp_path).undo(batch_id)
+
+        assert result["retained_items"] >= 1
+        with engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM attachments")) == 1
+            assert conn.scalar(text("SELECT count(*) FROM items")) == 1
+        assert blob_path(tmp_path, blob.sha256).is_file()
+
+    def test_undoing_twice_leaves_the_attachment_alone(
+        self, engine: Engine, tmp_path: Path
+    ) -> None:
+        batch_id = _create_committed_batch(engine)
+        item_id = _create_item(engine, "Imported", year=2000)
+        _add_create_effect(engine, batch_id, 1, "item", item_id)
+        blob = store_blob(b"epub bytes", tmp_path)
+        attachment_id = _attach(engine, item_id, "book.epub", blob.sha256, blob.byte_size)
+        _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
+
+        undo = UndoService(engine, data_dir=tmp_path)
+        undo.undo(batch_id)
+        again = undo.undo(batch_id)
+
+        assert again["skipped"] == 1
+        with engine.connect() as conn:
+            assert conn.scalar(text("SELECT count(*) FROM attachments")) == 0
 
     def test_undo_still_deletes_an_item_with_no_attachment(self, engine: Engine) -> None:
         """The guard must be narrow, or undo stops undoing anything."""
