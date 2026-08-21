@@ -2,7 +2,7 @@ import json
 import sqlite3
 import tempfile
 import tracemalloc
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 import httpx
@@ -867,6 +867,180 @@ async def test_an_item_with_a_cover_but_no_file_still_wants_its_file(tmp_path: P
 def _only_item(app: Any) -> int:
     with Session(app.state.engine) as session:
         return int(session.execute(text("SELECT id FROM items")).scalars().one())
+
+
+async def _import(client: httpx.AsyncClient, library: Path) -> str:
+    preview = await client.post("/api/import/calibre/preview", files=_parts(library))
+    batch_id = str(preview.json()["batch_id"])
+    await client.post("/api/import/calibre/commit", json={"batch_id": batch_id})
+    return batch_id
+
+
+def _file_part(library: Path, path: str = EBOOK) -> dict[str, Any]:
+    return {
+        "files": {
+            "file": (
+                PurePosixPath(path).name,
+                (library / path).read_bytes(),
+                "application/epub+zip",
+            )
+        },
+        "data": {"path": path},
+    }
+
+
+@pytest.mark.anyio
+async def test_a_committed_batch_takes_the_file_its_record_named(tmp_path: Path) -> None:
+    """The path resolves to a record through `source_files`, and to that record's item."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        batch_id = await _import(client, library)
+        response = await client.post(
+            f"/api/import/calibre/batches/{batch_id}/files", **_file_part(library)
+        )
+        item_id = _only_item(app)
+        listed = await client.get(f"/api/items/{item_id}/attachments")
+
+    assert response.status_code == 201, response.text
+    assert response.json()["filename"] == "book.epub"
+    assert [row["filename"] for row in listed.json()["attachments"]] == ["book.epub"]
+
+
+@pytest.mark.anyio
+async def test_a_file_over_the_cap_is_refused_and_leaves_nothing_behind(tmp_path: Path) -> None:
+    """AC5: named and skipped, never a half-stored blob."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        batch_id = await _import(client, library)
+        cap = int(app.state.attachment_max_bytes)
+        response = await client.post(
+            f"/api/import/calibre/batches/{batch_id}/files",
+            files={"file": ("book.epub", b"x" * (cap + 1), "application/epub+zip")},
+            data={"path": EBOOK},
+        )
+        listed = await client.get(f"/api/items/{_only_item(app)}/attachments")
+
+    assert response.status_code == 413, response.text
+    assert listed.json()["attachments"] == []
+    store = tmp_path / "data" / "attachments"
+    assert not [blob for blob in store.rglob("*") if blob.is_file()]
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize(
+    "path",
+    [
+        "../escape.epub",
+        ".caltrash/b/1/book.epub",
+        "Brandon Sanderson/Mistborn_ The Final Empire (2)/notes.docx",
+    ],
+)
+async def test_the_file_route_refuses_what_the_upload_route_refuses(
+    tmp_path: Path, path: str
+) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        batch_id = await _import(client, library)
+        response = await client.post(
+            f"/api/import/calibre/batches/{batch_id}/files",
+            files={"file": ("x.epub", b"payload", "application/epub+zip")},
+            data={"path": path},
+        )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["error"]["code"] == "invalid_import_source"
+    assert not (tmp_path / "escape.epub").exists()
+
+
+@pytest.mark.anyio
+async def test_a_file_no_record_claims_is_refused(tmp_path: Path) -> None:
+    """A declared shape is not a promise that this batch has that book."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        batch_id = await _import(client, library)
+        response = await client.post(
+            f"/api/import/calibre/batches/{batch_id}/files",
+            files={"file": ("other.epub", b"payload", "application/epub+zip")},
+            data={"path": "Someone Else/A Book (9)/other.epub"},
+        )
+
+    assert response.status_code == 404, response.text
+    assert response.json()["error"]["code"] == "import_file_not_wanted"
+
+
+@pytest.mark.anyio
+async def test_a_batch_that_has_not_committed_takes_no_files(tmp_path: Path) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", files=_parts(library))
+        pending = str(preview.json()["batch_id"])
+        response = await client.post(
+            f"/api/import/calibre/batches/{pending}/files", **_file_part(library)
+        )
+        missing = await client.post(
+            "/api/import/calibre/batches/does-not-exist/files", **_file_part(library)
+        )
+
+    assert response.status_code == 409, response.text
+    assert response.json()["error"]["code"] == "import_batch_not_committed"
+    assert missing.status_code == 404
+
+
+@pytest.mark.anyio
+async def test_the_same_file_twice_is_one_attachment(tmp_path: Path) -> None:
+    """Retrying a request that timed out must not double the row or the blob."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        batch_id = await _import(client, library)
+        first = await client.post(
+            f"/api/import/calibre/batches/{batch_id}/files", **_file_part(library)
+        )
+        second = await client.post(
+            f"/api/import/calibre/batches/{batch_id}/files", **_file_part(library)
+        )
+        listed = await client.get(f"/api/items/{_only_item(app)}/attachments")
+
+    assert first.status_code == 201 and second.status_code == 201, second.text
+    assert first.json()["id"] == second.json()["id"]
+    assert len(listed.json()["attachments"]) == 1
+
+
+@pytest.mark.anyio
+async def test_the_attachment_cap_is_published_with_the_registry(tmp_path: Path) -> None:
+    """So the client can refuse a too-large file before spending the upload."""
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get("/api/importers")
+
+    calibre = next(row for row in response.json() if row["id"] == "calibre")
+    assert calibre["attachment_max_bytes"] == 25 * 1024 * 1024
 
 
 def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) -> None:

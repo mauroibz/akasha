@@ -10,7 +10,7 @@ from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
 from book_tracker.application.imports import ImportService
-from book_tracker.application.library import LibraryError
+from book_tracker.application.library import LibraryError, clean_attachment_filename
 from book_tracker.domain.importers import (
     BrowsableImporter,
     ImportCandidate,
@@ -24,7 +24,16 @@ from book_tracker.domain.importers import (
     planned_upload,
 )
 from book_tracker.domain.registry import IMPORTERS
+from book_tracker.infrastructure.attachments import (
+    AttachmentError,
+    AttachmentTooLarge,
+    BlobWriter,
+)
 from book_tracker.infrastructure.repositories import DomainRepository
+
+#: Matches the item attachment route: one megabyte through, never the whole file
+#: in memory (DEC-049).
+UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 router = APIRouter(prefix="/api/import", tags=["imports"])
 catalog_router = APIRouter(prefix="/api/importers", tags=["imports"])
@@ -127,6 +136,9 @@ class ImporterResponse(BaseModel):
     label: str
     item_type: str
     input: ImportInputResponse
+    #: The per-file ceiling on anything this import attaches, so the screen can name
+    #: a file it will not send instead of spending the upload to be refused (DEC-083).
+    attachment_max_bytes: int
 
 
 def _published_input(spec: ImportInputSpec) -> ImportInputResponse:
@@ -138,13 +150,14 @@ def _published_input(spec: ImportInputSpec) -> ImportInputResponse:
 
 
 @catalog_router.get("", response_model=list[ImporterResponse])
-async def available_importers() -> list[ImporterResponse]:
+async def available_importers(request: Request) -> list[ImporterResponse]:
     return [
         ImporterResponse(
             id=importer.name,
             label=importer.label,
             item_type=importer.item_type,
             input=_published_input(importer.input),
+            attachment_max_bytes=int(request.app.state.attachment_max_bytes),
         )
         for importer in IMPORTERS.values()
     ]
@@ -476,6 +489,91 @@ def _candidates(manifest: str | None, spec: ImportInputSpec) -> tuple[ImportCand
             user_message="Akasha could not read what your browser offered to send.",
             action="Choose the folder again.",
         ) from error
+
+
+class ImportFileResponse(BaseModel):
+    id: int
+    item_id: int
+    filename: str
+    byte_size: int
+    sha256: str
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/files",
+    status_code=201,
+    response_model=ImportFileResponse,
+)
+async def attach_file(importer_name: str, batch_id: str, request: Request) -> ImportFileResponse:
+    """Take one file the import wants and attach it to the item it belongs to.
+
+    One file per request, and that is the design rather than an implementation
+    detail (DEC-083). Folding these into the preview bundle would bound the feature
+    by the size of the whole library instead of by the size of one file, so a shelf
+    of any size would eventually stop importing; here a 600-book library behaves
+    exactly like an 18-book one, a file that cannot be stored costs one book rather
+    than the import, and the screen can count progress honestly.
+    """
+    import_service = service(request, importer_name)
+    spec = IMPORTERS[importer_name].input
+    cap = int(request.app.state.attachment_max_bytes)
+    parser = _DiskSpooledMultiPart(
+        request.headers,
+        request.stream(),
+        max_files=2,
+        max_fields=4,
+        max_part_size=cap + 1,
+    )
+    try:
+        form = await parser.parse()
+    except MultiPartException as error:
+        raise _file_too_large(cap) from error
+    try:
+        offered = form.get("path")
+        upload = form.get("file")
+        if not isinstance(offered, str) or not isinstance(upload, UploadFile):
+            raise LibraryError(
+                "invalid_import_source",
+                "A file and the path it was offered under are both required",
+                status_code=422,
+            )
+        path = _bundle_member(offered, spec)
+        # Resolved before a byte is read: an upload nothing wants should cost a round
+        # trip, not a whole ebook.
+        item_id = import_service.resolve_file(batch_id, path)
+        writer = BlobWriter(request.app.state.data_dir, max_bytes=cap)
+        try:
+            while chunk := await upload.read(UPLOAD_CHUNK_BYTES):
+                writer.write(chunk)
+            stored = writer.commit()
+        except AttachmentTooLarge as error:
+            raise _file_too_large(cap) from error
+        except AttachmentError as error:
+            raise LibraryError("invalid_attachment", str(error), status_code=422) from error
+        except BaseException:
+            writer.abort()
+            raise
+        attachment = import_service.record_file(
+            batch_id,
+            item_id,
+            filename=clean_attachment_filename(PurePosixPath(path).name) or "attachment",
+            sha256=stored.sha256,
+            byte_size=stored.byte_size,
+        )
+    finally:
+        await form.close()
+    return ImportFileResponse.model_validate({**attachment, "item_id": item_id})
+
+
+def _file_too_large(cap: int) -> LibraryError:
+    megabytes = cap // (1024 * 1024)
+    return LibraryError(
+        "attachment_too_large",
+        f"Attachments are limited to {cap} bytes",
+        status_code=413,
+        user_message=f"That file is larger than the {megabytes} MB Akasha stores.",
+        action="It was skipped; everything else in this import still went through.",
+    )
 
 
 @router.get("/{importer_name}/browse", response_model=ImportBrowseResponse)

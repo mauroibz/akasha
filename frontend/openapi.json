@@ -1116,6 +1116,39 @@
         "title": "ImportBrowseResponse",
         "type": "object"
       },
+      "ImportFileResponse": {
+        "properties": {
+          "byte_size": {
+            "title": "Byte Size",
+            "type": "integer"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "item_id": {
+            "title": "Item Id",
+            "type": "integer"
+          },
+          "sha256": {
+            "title": "Sha256",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "item_id",
+          "filename",
+          "byte_size",
+          "sha256"
+        ],
+        "title": "ImportFileResponse",
+        "type": "object"
+      },
       "ImportInputResponse": {
         "properties": {
           "accept": {
@@ -1395,6 +1428,10 @@
       },
       "ImporterResponse": {
         "properties": {
+          "attachment_max_bytes": {
+            "title": "Attachment Max Bytes",
+            "type": "integer"
+          },
           "id": {
             "title": "Id",
             "type": "string"
@@ -1415,7 +1452,8 @@
           "id",
           "label",
           "item_type",
-          "input"
+          "input",
+          "attachment_max_bytes"
         ],
         "title": "ImporterResponse",
         "type": "object"
@@ -3006,6 +3044,58 @@
           }
         },
         "summary": "Get Job Progress",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/files": {
+      "post": {
+        "description": "Take one file the import wants and attach it to the item it belongs to.\n\nOne file per request, and that is the design rather than an implementation\ndetail (DEC-083). Folding these into the preview bundle would bound the feature\nby the size of the whole library instead of by the size of one file, so a shelf\nof any size would eventually stop importing; here a 600-book library behaves\nexactly like an 18-book one, a file that cannot be stored costs one book rather\nthan the import, and the screen can count progress honestly.",
+        "operationId": "attach_file_api_import__importer_name__batches__batch_id__files_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportFileResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Attach File",
         "tags": [
           "imports"
         ]

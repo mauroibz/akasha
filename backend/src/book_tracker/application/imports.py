@@ -1,6 +1,7 @@
 import json
 import uuid
 from collections.abc import Mapping
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -8,7 +9,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.application.enrichment import enqueue_enrichment_backfill
-from book_tracker.application.library import LibraryError
+from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.importers import (
     Importer,
     ImportReadContext,
@@ -26,7 +27,11 @@ from book_tracker.domain.spec import (
     validate_status,
 )
 from book_tracker.infrastructure.covers import CoverError, install_cover
-from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
+from book_tracker.infrastructure.models import (
+    ImportBatchRow,
+    ImportEffectRow,
+    ImportRecordRow,
+)
 from book_tracker.infrastructure.repositories import DomainRepository, ImportRepository
 
 
@@ -232,6 +237,97 @@ class ImportService:
                 "summary": json.loads(batch.preview_summary),
                 "records": [_preview_record(row) for row in rows],
             }
+
+    def resolve_file(self, batch_id: str, path: str, *, now: datetime | None = None) -> int:
+        """Which committed item a file offered under `path` belongs to.
+
+        Asked **before** a byte is read, so an upload nothing wants costs a round trip
+        rather than a whole ebook. The batch has to be committed and still inside its
+        undo window: a file attached to a batch that can no longer be reversed would be
+        a row the ledger cannot claim.
+        """
+        moment = (now or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
+        with Session(self.engine) as session:
+            batch = session.get(ImportBatchRow, batch_id)
+            if batch is None or batch.kind != self.importer.name:
+                raise LibraryError(
+                    "import_batch_not_found", "Import batch was not found", status_code=404
+                )
+            if batch.state != "committed":
+                raise LibraryError(
+                    "import_batch_not_committed",
+                    f"Import batch is {batch.state}, so it takes no files",
+                    status_code=409,
+                )
+            if batch.undo_expires_at is not None and moment > batch.undo_expires_at:
+                raise LibraryError(
+                    "import_batch_not_committed",
+                    "Import batch is closed, so it takes no files",
+                    status_code=409,
+                )
+            for row in session.scalars(
+                select(ImportRecordRow).where(
+                    ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.matched_item_id.is_not(None),
+                )
+            ):
+                if path in json.loads(row.normalized_payload).get("source_files", []):
+                    assert row.matched_item_id is not None
+                    return row.matched_item_id
+        raise LibraryError(
+            "import_file_not_wanted",
+            "No record in this import claims that file",
+            status_code=404,
+        )
+
+    def record_file(
+        self, batch_id: str, item_id: int, *, filename: str, sha256: str, byte_size: int
+    ) -> dict[str, Any]:
+        """Attach a stored blob to an item and tell the ledger the import did it.
+
+        The row is written before the effect on purpose. A crash between the two leaves
+        an attachment the ledger does not claim, which undo then treats as the owner's
+        and **retains** — the safe direction. The other order would let undo delete a
+        file it never put there.
+        """
+        attachment = LibraryService(self.engine).record_attachment(
+            item_id, filename=filename, sha256=sha256, byte_size=byte_size
+        )
+        with Session(self.engine) as session:
+            record_id = session.scalar(
+                select(ImportRecordRow.id).where(
+                    ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.matched_item_id == item_id,
+                )
+            )
+            existing = session.scalar(
+                select(ImportEffectRow.effect_id).where(
+                    ImportEffectRow.batch_id == batch_id,
+                    ImportEffectRow.entity_type == "attachment",
+                    ImportEffectRow.entity_id == str(attachment["id"]),
+                )
+            )
+            if existing is None:
+                session.add(
+                    ImportEffectRow(
+                        batch_id=batch_id,
+                        record_id=record_id,
+                        effect_type="create",
+                        entity_type="attachment",
+                        entity_id=str(attachment["id"]),
+                        before_values="{}",
+                        after_values=json.dumps(
+                            {
+                                "created": True,
+                                "item_id": item_id,
+                                "filename": filename,
+                                "sha256": sha256,
+                            }
+                        ),
+                    )
+                )
+                session.commit()
+        return attachment
 
     def commit(self, batch_id: str, choices: Mapping[int, Mapping[str, Any]]) -> dict[str, Any]:
         result = self.imports.commit(
