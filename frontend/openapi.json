@@ -1243,6 +1243,36 @@
         "title": "ImportInputResponse",
         "type": "object"
       },
+      "ImportPlanResponse": {
+        "description": "Which offered members are worth uploading, and how many were skipped.",
+        "properties": {
+          "holding": {
+            "default": 0,
+            "title": "Holding",
+            "type": "integer"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "wanted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Wanted",
+            "type": "array"
+          }
+        },
+        "title": "ImportPlanResponse",
+        "type": "object"
+      },
       "ImportRecordResponse": {
         "additionalProperties": true,
         "properties": {
@@ -3077,6 +3107,49 @@
           }
         },
         "summary": "Commit",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/plan": {
+      "post": {
+        "description": "Say which of the offered files are worth sending, before they are sent.\n\nThe client uploads the cheap half of the source \u2014 for Calibre, `metadata.db` \u2014 plus\na manifest of what it is holding back. The connector answers from identities the\nlibrary already has, because the client cannot hash: `crypto.subtle` is undefined on\nthe plain-HTTP LAN origin this is served from (DEC-082).",
+        "operationId": "plan_api_import__importer_name__plan_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportPlanResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Plan",
         "tags": [
           "imports"
         ]

@@ -1,5 +1,6 @@
 import hashlib
 import sqlite3
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
@@ -8,10 +9,13 @@ from urllib.parse import quote
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.importers import (
     ImportBrowseResult,
+    ImportCandidate,
     ImportEntry,
     ImportInputSpec,
+    ImportInventory,
     ImportItem,
     ImportMatcher,
+    ImportPlan,
     ImportReadContext,
     ImportReadError,
     ImportSnapshot,
@@ -264,6 +268,9 @@ class CalibreAdapter:
                     "connection_mode": "ro",
                     "query_only": query_only,
                     "cover_source": str(cover_source) if cover_source else None,
+                    # Kept for the planner: where this book's cover lives relative to
+                    # the library root, which is what a client offers by path.
+                    "book_path": book_path,
                 }
             )
         return records
@@ -316,6 +323,9 @@ class CalibreImporter:
         # below, which has no such ceiling.
         max_bytes=256 * 1024 * 1024,
         max_files=10_000,
+        # A Calibre book carries a uuid that survives edits and re-exports, which is
+        # what makes planning by identity honest here (DEC-082).
+        incremental=True,
         # The mount, kept: automation has no browser, and a library too large to
         # upload still has a way in.
         alternate=ImportInputSpec(
@@ -338,6 +348,46 @@ class CalibreImporter:
 
     def browse(self, path: str, context: ImportReadContext) -> ImportBrowseResult:
         return CalibreAdapter(context.path_root).browse(path)
+
+    def plan(
+        self,
+        source: ImportSource,
+        candidates: Sequence[ImportCandidate],
+        inventory: ImportInventory,
+        _context: ImportReadContext,
+    ) -> ImportPlan:
+        """Which offered files are worth sending, decided from `metadata.db` alone.
+
+        The database is always wanted — it is small, it is what everything else is
+        derived from, and Calibre rewrites it constantly. A cover is wanted unless the
+        library already holds that book **with a picture**: an item that arrived
+        without one has to be offered it again, or a failed first attempt would be
+        skipped forever.
+        """
+        if source.directory is None:
+            return ImportPlan(wanted=tuple(c.path for c in candidates))
+        offered = {candidate.path for candidate in candidates}
+        snapshot = CalibreAdapter(source.directory).read("library")
+
+        covers: dict[str, str] = {}
+        for payload in snapshot.records:
+            uuid = str(payload.get("calibre_uuid") or "")
+            book_path = str(payload.get("book_path") or "")
+            if not uuid or not book_path:
+                continue
+            relative = f"{book_path}/cover.jpg"
+            if relative in offered:
+                covers[relative] = uuid
+
+        held = inventory.with_cover("calibre_uuid", sorted(set(covers.values())))
+        wanted = [path for path in offered if path not in covers]
+        wanted += [path for path, uuid in covers.items() if uuid not in held]
+        skipped = len(covers) - sum(1 for uuid in covers.values() if uuid not in held)
+        return ImportPlan(
+            wanted=tuple(sorted(wanted)),
+            holding=skipped,
+            reason=(f"{skipped} already in your library with a cover" if skipped else None),
+        )
 
     def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
         # Two ways in, one reader. An uploaded bundle has already been materialized by

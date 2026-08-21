@@ -1,3 +1,4 @@
+import json
 import sqlite3
 import tempfile
 import tracemalloc
@@ -7,6 +8,8 @@ from typing import Any
 import httpx
 import pytest
 from PIL import Image
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 
 from book_tracker.api.imports import MAX_IMPORT_BYTES, _DiskSpooledMultiPart
 from book_tracker.application.imports import ImportService
@@ -640,3 +643,157 @@ def test_every_uploaded_part_is_spooled_to_disk() -> None:
     with tempfile.SpooledTemporaryFile(max_size=_DiskSpooledMultiPart.spool_max_size) as spooled:
         spooled.write(b"x" * 4096)
         assert spooled._rolled, "parts must reach disk, not stay in memory"
+
+
+def _manifest(root: Path) -> str:
+    parts = _parts(root)
+    return json.dumps([{"path": p[1][0], "size": len(p[1][1])} for p in parts])
+
+
+async def _plan(client: httpx.AsyncClient, root: Path, importer: str = "calibre") -> Any:
+    return await client.post(
+        f"/api/import/{importer}/plan",
+        files=_parts(root),
+        data={"manifest": _manifest(root)},
+    )
+
+
+@pytest.mark.anyio
+async def test_an_empty_library_wants_everything_offered(tmp_path: Path) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await _plan(client, library)
+
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert sorted(body["wanted"]) == sorted(
+        ["metadata.db", "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg"]
+    )
+    assert body["holding"] == 0
+
+
+@pytest.mark.anyio
+async def test_an_unchanged_library_wants_only_the_database(tmp_path: Path) -> None:
+    """The point of DEC-082: a re-sync that changes nothing moves 416 KB, not 10 MB."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", files=_parts(library))
+        await client.post(
+            "/api/import/calibre/commit", json={"batch_id": preview.json()["batch_id"]}
+        )
+        response = await _plan(client, library)
+
+    body = response.json()
+    assert body["wanted"] == ["metadata.db"], body
+    assert body["holding"] == 1
+    assert "already in your library" in (body["reason"] or "")
+
+
+@pytest.mark.anyio
+async def test_an_item_without_a_cover_is_offered_one_again(tmp_path: Path) -> None:
+    """A failed first attempt heals; it is not skipped forever (AC3)."""
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", files=_parts(library))
+        await client.post(
+            "/api/import/calibre/commit", json={"batch_id": preview.json()["batch_id"]}
+        )
+        # The book is held, but its picture never landed.
+        with Session(app.state.engine) as session:
+            session.execute(text("UPDATE items SET cover_path = NULL"))
+            session.commit()
+        response = await _plan(client, library)
+
+    assert sorted(response.json()["wanted"]) == sorted(
+        ["metadata.db", "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg"]
+    )
+    assert response.json()["holding"] == 0
+
+
+@pytest.mark.anyio
+async def test_planning_refuses_what_the_upload_route_refuses(tmp_path: Path) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    parts = [*_parts(library), ("files", ("../escape.jpg", b"x", "image/jpeg"))]
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post(
+            "/api/import/calibre/plan", files=parts, data={"manifest": _manifest(library)}
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "invalid_import_source"
+    assert not (tmp_path / "escape.jpg").exists()
+
+
+@pytest.mark.anyio
+async def test_a_connector_that_does_not_plan_has_no_plan_route(tmp_path: Path) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.post(
+            "/api/import/goodreads/plan",
+            files={"file": ("library.csv", b"a,b\n", "text/csv")},
+            data={"manifest": "[]"},
+        )
+
+    assert response.status_code == 404
+    assert response.json()["error"]["code"] == "importer_not_incremental"
+
+
+@pytest.mark.anyio
+async def test_planning_leaves_no_bundle_behind(tmp_path: Path) -> None:
+    library = _bundle_library(tmp_path / "Calibre Library")
+    app = _no_mount_app(tmp_path)
+    before = set(Path(tempfile.gettempdir()).glob("akasha-import-*"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        await _plan(client, library)
+        await client.post(
+            "/api/import/calibre/plan",
+            files=[*_parts(library), ("files", ("../x.jpg", b"x", "image/jpeg"))],
+            data={"manifest": _manifest(library)},
+        )
+
+    assert set(Path(tempfile.gettempdir()).glob("akasha-import-*")) == before
+
+
+def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) -> None:
+    """AC5: a bigger shelf must not mean a query per book."""
+    from sqlalchemy import event
+
+    from book_tracker.database import create_engine
+    from book_tracker.infrastructure.repositories import DomainRepository
+    from book_tracker.migrations import upgrade
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+    repository = DomainRepository(create_engine(configured))
+    engine = repository.engine
+
+    statements: list[str] = []
+    event.listen(engine, "before_cursor_execute", lambda *a: statements.append(a[2]))
+
+    values = [f"uuid-{index}" for index in range(1200)]
+    repository.with_cover("calibre_uuid", values)
+    # 1200 values, chunked at 500: three statements, not twelve hundred.
+    assert len(statements) == 3, statements

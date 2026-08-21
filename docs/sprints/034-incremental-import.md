@@ -1,6 +1,6 @@
 # Sprint 034 — Incremental import
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 033
 **Roadmap revision:** 16
 

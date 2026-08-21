@@ -66,6 +66,10 @@ class ImportInputSpec:
     help_url: str | None = None
     #: Whether the connector can list what a `path` source holds. See `BrowsableImporter`.
     browsable: bool = False
+    #: Whether the connector can say, before an upload, which members are worth
+    #: sending. See `IncrementalImporter`. A source with no durable identity should
+    #: leave this false rather than guess (DEC-082).
+    incremental: bool = False
     #: Whether this connector's `read` can take `ImportSource.files`. Required by
     #: `kind="directory"`, which would otherwise accept an upload it cannot use.
     accepts_files: bool = False
@@ -81,6 +85,45 @@ class ImportInputSpec:
     #: one of them is how a limit stops meaning anything.
     max_bytes: int | None = None
     max_files: int | None = None
+
+
+@dataclass(frozen=True)
+class ImportCandidate:
+    """One file the client is offering to upload, named and measured but unread.
+
+    `size` comes from the browser's own file metadata, so building a manifest costs
+    no reads and no hashing — which matters because `crypto.subtle` is unavailable on
+    the plain-HTTP LAN origin this application is served from (DEC-082).
+    """
+
+    path: str
+    size: int
+
+
+@dataclass(frozen=True)
+class ImportPlan:
+    """Which of the offered candidates are actually worth sending.
+
+    `holding` is how many the library already has, so the screen can say what it is
+    skipping rather than silently sending less than the reader chose.
+    """
+
+    wanted: tuple[str, ...]
+    holding: int = 0
+    reason: str | None = None
+
+
+class ImportInventory(Protocol):
+    """The narrow library view a planning connector may consult.
+
+    Two questions, batched, and nothing else — the same containment `ImportMatcher`
+    established. "Do you have this?" and "does it have a picture?" are different
+    questions, and conflating them would skip a cover for an item that never got one.
+    """
+
+    def existing(self, kind: str, values: Sequence[str]) -> frozenset[str]: ...
+
+    def with_cover(self, kind: str, values: Sequence[str]) -> frozenset[str]: ...
 
 
 @dataclass(frozen=True)
@@ -120,6 +163,8 @@ class ImportSource:
     filename: str | None = None
     path: str | None = None
     directory: Path | None = None
+    #: The client's offer, as raw JSON, when this source came through the plan route.
+    manifest: str | None = None
 
 
 @dataclass(frozen=True)
@@ -253,3 +298,36 @@ def declared_read_error(importer: Importer, error: ImportReadError) -> ImportRea
         user_message=error.user_message,
         action=error.action,
     )
+
+
+@runtime_checkable
+class IncrementalImporter(Protocol):
+    """A connector that can say what is worth uploading before it is uploaded.
+
+    Separate from `Importer` for the reason `BrowsableImporter` is: most sources have
+    nothing to plan. The connector is handed the cheap half of the source — for a
+    Calibre bundle, `metadata.db` alone — plus what the client is offering, and answers
+    with the subset it wants.
+    """
+
+    def plan(
+        self,
+        source: ImportSource,
+        candidates: Sequence[ImportCandidate],
+        inventory: ImportInventory,
+        context: ImportReadContext,
+    ) -> ImportPlan: ...
+
+
+def planned_upload(candidates: Sequence[ImportCandidate], plan: ImportPlan) -> ImportPlan:
+    """The plan as the boundary may publish it.
+
+    A connector may decline a candidate; it may not invent one. Naming a path the
+    client never offered would have the client upload something it did not choose,
+    which is the client's business and not the connector's.
+    """
+    offered = {candidate.path for candidate in candidates}
+    for path in plan.wanted:
+        if path not in offered:
+            raise ValueError(f"planned path {path!r} was not offered as a candidate")
+    return plan

@@ -1,3 +1,4 @@
+import json
 import shutil
 import tempfile
 from pathlib import Path, PurePosixPath
@@ -12,13 +13,17 @@ from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.importers import (
     BrowsableImporter,
+    ImportCandidate,
     ImportInputSpec,
     ImportReadContext,
     ImportReadError,
     ImportSource,
+    IncrementalImporter,
     declared_read_error,
+    planned_upload,
 )
 from book_tracker.domain.registry import IMPORTERS
+from book_tracker.infrastructure.repositories import DomainRepository
 
 router = APIRouter(prefix="/api/import", tags=["imports"])
 catalog_router = APIRouter(prefix="/api/importers", tags=["imports"])
@@ -92,6 +97,14 @@ class ImportInputResponse(BaseModel):
     max_files: int | None = None
     #: A second way into the same connector, rendered beneath the primary. One deep.
     alternate: "ImportInputResponse | None" = None
+
+
+class ImportPlanResponse(BaseModel):
+    """Which offered members are worth uploading, and how many were skipped."""
+
+    wanted: list[str] = Field(default_factory=list)
+    holding: int = 0
+    reason: str | None = None
 
 
 class ImportBrowseResponse(BaseModel):
@@ -302,7 +315,9 @@ async def _source(request: Request, importer_name: str) -> ImportSource:
     return ImportSource(path=value)
 
 
-async def _bundle(request: Request, spec: ImportInputSpec) -> ImportSource:
+async def _bundle(
+    request: Request, spec: ImportInputSpec, *, form_extras: tuple[str, ...] = ()
+) -> ImportSource:
     """Stream an uploaded folder to disk as a library the reader already understands.
 
     Members land under `<bundle>/library/...` rather than at the root so the connector
@@ -342,6 +357,7 @@ async def _bundle(request: Request, spec: ImportInputSpec) -> ImportSource:
                     if total > max_bytes:
                         raise _too_large(spec)
                     sink.write(chunk)
+        extras = {name: value for name in form_extras if isinstance(value := form.get(name), str)}
         if not (bundle / "library" / "metadata.db").is_file():
             raise LibraryError(
                 "invalid_import_source",
@@ -353,7 +369,7 @@ async def _bundle(request: Request, spec: ImportInputSpec) -> ImportSource:
                     "calls your Calibre Library."
                 ),
             )
-        return ImportSource(directory=bundle)
+        return ImportSource(directory=bundle, manifest=extras.get("manifest"))
     except BaseException:
         shutil.rmtree(bundle, ignore_errors=True)
         raise
@@ -387,6 +403,73 @@ async def preview(importer_name: str, request: Request) -> PreviewResponse:
         if source.directory is not None:
             shutil.rmtree(source.directory, ignore_errors=True)
     return PreviewResponse.model_validate(result)
+
+
+@router.post("/{importer_name}/plan", response_model=ImportPlanResponse)
+async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
+    """Say which of the offered files are worth sending, before they are sent.
+
+    The client uploads the cheap half of the source — for Calibre, `metadata.db` — plus
+    a manifest of what it is holding back. The connector answers from identities the
+    library already has, because the client cannot hash: `crypto.subtle` is undefined on
+    the plain-HTTP LAN origin this is served from (DEC-082).
+    """
+    importer = IMPORTERS.get(importer_name)
+    if (
+        importer is None
+        or not importer.input.incremental
+        or not isinstance(importer, IncrementalImporter)
+    ):
+        raise LibraryError(
+            "importer_not_incremental",
+            "This importer cannot plan an upload",
+            status_code=404,
+        )
+    spec = _chosen_input(importer, request)
+    source = await _bundle(request, spec, form_extras=("manifest",))
+    try:
+        candidates = _candidates(source.manifest)
+        result = planned_upload(
+            candidates,
+            importer.plan(
+                source,
+                candidates,
+                DomainRepository(request.app.state.engine),
+                ImportReadContext(path_root=request.app.state.calibre_dir),
+            ),
+        )
+    except ImportReadError as error:
+        raise read_failure(importer, error) from error
+    except ValueError as error:
+        raise LibraryError("invalid_import_plan", str(error), status_code=500) from error
+    finally:
+        if source.directory is not None:
+            shutil.rmtree(source.directory, ignore_errors=True)
+    return ImportPlanResponse(
+        wanted=list(result.wanted), holding=result.holding, reason=result.reason
+    )
+
+
+def _candidates(manifest: str | None) -> tuple[ImportCandidate, ...]:
+    """The client's offer, validated by the same rule the upload route applies."""
+    try:
+        rows = json.loads(manifest or "[]")
+        if not isinstance(rows, list) or len(rows) > 100_000:
+            raise ValueError("manifest must be a list")
+        return tuple(
+            ImportCandidate(path=_bundle_member(str(row["path"])), size=int(row["size"]))
+            for row in rows
+        )
+    except (TypeError, KeyError, ValueError, json.JSONDecodeError) as error:
+        if isinstance(error, LibraryError):  # pragma: no cover - defensive
+            raise
+        raise LibraryError(
+            "invalid_import_source",
+            "The upload manifest is malformed",
+            status_code=422,
+            user_message="Akasha could not read what your browser offered to send.",
+            action="Choose the folder again.",
+        ) from error
 
 
 @router.get("/{importer_name}/browse", response_model=ImportBrowseResponse)

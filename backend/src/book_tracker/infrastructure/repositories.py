@@ -122,6 +122,49 @@ class DomainRepository:
                         suggestions.add(item_id)
             return decide_match(exact, suggestions)
 
+    # ---------------------------------------------------------------------------
+    # `ImportInventory`: the two questions a planning connector may ask (DEC-082)
+    # ---------------------------------------------------------------------------
+
+    def existing(self, kind: str, values: Sequence[str]) -> frozenset[str]:
+        """Which of these identity values the library already holds as items."""
+        return self._identities(kind, values, cover_only=False)
+
+    def with_cover(self, kind: str, values: Sequence[str]) -> frozenset[str]:
+        """Which of them are held **and** already have a cover.
+
+        Separate from `existing` because an item that arrived without a picture must
+        be offered one again; conflating the two would skip it forever.
+        """
+        return self._identities(kind, values, cover_only=True)
+
+    def _identities(self, kind: str, values: Sequence[str], *, cover_only: bool) -> frozenset[str]:
+        """One query per chunk, never one per book.
+
+        SQLite caps a statement at 999 bound parameters by default, so a library of a
+        few thousand is chunked rather than sent whole — bounded work, and still a
+        constant number of round trips for any realistic shelf.
+        """
+        wanted = [value for value in dict.fromkeys(values) if value]
+        if not wanted:
+            return frozenset()
+        found: set[str] = set()
+        with Session(self.engine) as session:
+            for start in range(0, len(wanted), 500):
+                chunk = wanted[start : start + 500]
+                query = (
+                    select(ItemIdentifierRow.normalized_value)
+                    .join(ItemRow, ItemRow.id == ItemIdentifierRow.item_id)
+                    .where(
+                        ItemIdentifierRow.kind == kind,
+                        ItemIdentifierRow.normalized_value.in_(chunk),
+                    )
+                )
+                if cover_only:
+                    query = query.where(ItemRow.cover_path.is_not(None))
+                found.update(value for (value,) in session.execute(query))
+        return frozenset(found)
+
     def create_or_get_entry(
         self,
         *,

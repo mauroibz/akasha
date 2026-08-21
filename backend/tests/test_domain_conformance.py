@@ -35,10 +35,14 @@ from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.importers import (
     BrowsableImporter,
+    ImportCandidate,
     Importer,
     ImportInputSpec,
+    ImportPlan,
     ImportReadError,
+    IncrementalImporter,
     declared_read_error,
+    planned_upload,
 )
 from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
 from book_tracker.domain.registry import (
@@ -108,6 +112,11 @@ def assert_declared_guidance(importer: Importer) -> None:
     )
     assert not spec.browsable or isinstance(importer, BrowsableImporter), (
         f"{importer.name} declares browsing but has no browse method"
+    )
+    # Same shape as browsable: the flag is a promise the connector has to keep, and
+    # a source with no durable identity should decline rather than guess (DEC-082).
+    assert not spec.incremental or isinstance(importer, IncrementalImporter), (
+        f"{importer.name} declares incremental but has no plan method"
     )
     assert_declared_envelope(importer, spec)
     if spec.alternate is not None:
@@ -619,6 +628,34 @@ def test_an_undeclared_error_code_never_reaches_a_reader_as_itself() -> None:
     assert published.code == "undeclared_import_error"
     assert published.details == {"row": 4}
     assert published.action == "Try again."
+
+
+def test_the_suite_rejects_incremental_without_a_plan_method() -> None:
+    class Claims(_DeclaringImporter):
+        input = replace(_DeclaringImporter.input, incremental=True)
+
+    with pytest.raises(AssertionError):
+        assert_declared_guidance(Claims())
+
+
+def test_a_plan_may_only_want_what_it_was_offered() -> None:
+    """The plan decides what to send; it does not get to invent a path.
+
+    A connector that names something the client never offered would have the client
+    upload a file it did not choose, which is the client's business and not the
+    connector's. Enforced at the boundary rather than trusted.
+    """
+    candidates = (
+        ImportCandidate(path="metadata.db", size=10),
+        ImportCandidate(path="A/B (1)/cover.jpg", size=20),
+    )
+    honest = ImportPlan(wanted=("metadata.db",), holding=1)
+    assert planned_upload(candidates, honest).wanted == ("metadata.db",)
+
+    with pytest.raises(ValueError, match="was not offered"):
+        planned_upload(candidates, ImportPlan(wanted=("/etc/passwd",), holding=0))
+    with pytest.raises(ValueError, match="was not offered"):
+        planned_upload(candidates, ImportPlan(wanted=("A/Other (2)/cover.jpg",), holding=0))
 
 
 def test_every_registered_importer_declares_its_error_vocabulary() -> None:
