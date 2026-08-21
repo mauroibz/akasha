@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 14
+**Plan revision:** 15
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — 032 closed on 2026-08-21 and the numbered plan is complete.
+**Active sprint:** 033 — Calibre without a mount (planned)
 
 ## Shape of the plan
 
@@ -27,7 +27,8 @@ Post-v1 work branches:
                          └─ 029 One search bar
                              └─ 030 Entry depth  [GATED, Phase A only]
                                  └─ 031 Per-domain imports
-                                └─ 032 Import UX and connector extensibility  ← the plan ends here
+                                └─ 032 Import UX and connector extensibility
+                                   └─ 033 Calibre without a mount  ← the plan ends here
 ```
 
 **The plan stops at 032, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
@@ -86,12 +87,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
 │ [031](031-per-domain-imports.md) | Per-domain imports | 030 | completed |
 | [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
+| [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 032 have files, and every one of them is closed.
+incorporating actual deviations. Sprints 019 through 033 have files; 019 through 032 are closed.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -523,6 +525,27 @@ The last sprint in the plan. Sprint 031 shipped the `Importer` contract and gene
 The outcome is an import flow that explains itself and a contract that lets a connector guide its own users. Concretely: Triage folded into Import as a tab; Goodreads guidance and drag-and-drop; Calibre guidance and a browsable folder picker rooted at the configured mount; `ImportInputSpec` extended with optional `guide`, `empty_state`, `help_url`; `ImportReadError` extended with `user_message` and `action`; conformance checks so a malformed declaration fails by existing. The existing reader suites are the no-behavior-change net. Documentation follows: README, the domain guide, technical spec §6.5/§7.1, product spec §7.
 
 **Delivered 2026-08-21 (DEC-080).** All of the above, plus one field the contract needed and the plan did not name: `ImportInputSpec.browsable` with a separate `BrowsableImporter` protocol, because an upload has nothing to browse and every future connector would otherwise implement a method it has no use for. `error_codes` became a required member rather than a convention, so the closed set is enforced at the boundary and not merely asserted. `/triage` redirects rather than 404s. The walkthrough gate produced three fixes no test would have: a preview belongs to the connector that produced it, the folder picker states its situation once, and the triage tab does not repeat the surface's own back link. See the sprint file's Outcome.
+
+### [Sprint 033 — Calibre without a mount](033-calibre-without-a-mount.md)
+
+Added at plan revision 15, after the owner used 032's picker against a real library and hit what the
+mount actually costs: `CALIBRE_DIR` is a container-level setting, so pointing Akasha at a different
+library means editing `.env` and restarting, and the library on the NAS is held open by
+calibre-web-automated, which does not support several services reading it at once. Neither problem is
+about the picker. They are both about the mount being the only way in.
+
+Measurement said the obvious alternative is not enough on its own: uploading `metadata.db` alone is
+one small file, but covers live one-per-book-directory and only 19% of that library carries an ISBN,
+so enrichment would refill four covers out of twenty-one and the rest would stay blank. The browser
+can read the whole folder, though, and filter it — `metadata.db` plus the covers is 8.7 MB of a 95 MB
+library.
+
+The outcome is a Calibre tab you point at a folder on your own machine, with covers, no `CALIBRE_DIR`
+and no restart. `ImportInputSpec` gains `kind="directory"` and a one-deep `alternate`, so the mount
+picker and the typed path stay on the same tab underneath it (the owner's call — nothing is
+deleted). The uploaded bundle is materialized into a temporary directory and read by the **existing**
+`CalibreAdapter`, so both paths normalize through identical code and `test_calibre_import.py` remains
+the net.
 
 ## Future epics, after this plan
 

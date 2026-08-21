@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 14,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 15,
+  "project_status": "ready",
+  "active_sprint": "033",
+  "active_sprint_file": "docs/sprints/033-calibre-without-a-mount.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "032",
   "completed_sprints": [
     "001",
@@ -41,5 +41,5 @@
     "032"
   ],
   "started_at": null,
-  "updated_at": "2026-08-21T13:40:00-03:00"
+  "updated_at": "2026-08-21T14:30:00-03:00"
 }

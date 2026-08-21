@@ -1917,3 +1917,30 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   IGDB, Series/TMDB, Music/Spotify, Steam) inherit the extended contract; the first thing Spotify
   will hit is that `ImportInputSpec.kind` is still `upload | path` and an OAuth handshake is
   neither.
+
+## 2026-08-21 — Sprint 033 planned (docs-only)
+- Done: owner-directed planning session after they used 032's picker against a real library. The
+  complaint was the mount, not the picker: `CALIBRE_DIR` is container-level so re-aiming it needs
+  an `.env` edit plus a restart, and the NAS library is held open by calibre-web-automated.
+  Established by measurement rather than argument — nothing in the codebase syncs Calibre
+  automatically (there is no scheduler at all; the mount is read only by `browse` and `read`, both
+  user-triggered), so the mount buys file access at one instant, and what it really buys is
+  covers. Measured both libraries: `/home/ibz/Calibre Library` = 2 books / 416 KB db / 3
+  `cover.jpg` of which one is `.caltrash` trash / 32 MB total; the NAS one = 21 books / 448 KB /
+  8.2 MB covers / 95 MB / 19% ISBN coverage. The ISBN number killed the cheap option
+  (upload `metadata.db` alone → enrichment refills 4 of 21 covers, 17 stay blank). Probed
+  `<input webkitdirectory>` in Chromium via Playwright before committing to the design: it is
+  driveable from tests with a real directory path, `webkitRelativePath` is populated, its first
+  segment is the picked folder's own name, and hidden dirs and ebooks are both in the file list.
+  Wrote `docs/sprints/033-calibre-without-a-mount.md` from TEMPLATE.md; ROADMAP to revision 15;
+  state.json -> `ready`/033; FINAL_SPRINT 32 -> 33; appended DEC-081.
+- Verified: `python scripts/validate_project.py` (pass). `make test` not run — docs-only session,
+  no application code changed.
+- Deviations: none. AGENTS.md §1 permits documentation-only changes when owner-directed.
+- Owner decision taken during planning: the mount is **kept**, as secondary affordances beneath
+  the folder chooser on the same Calibre tab, rather than deleted or split into a second tab.
+  That is what forces `ImportInputSpec.alternate` — one connector, two ways in.
+- Blocked/open: the sprint's risks section carries one that needs evidence during implementation —
+  whether Starlette's multipart handling can stream parts at the granularity AC5 requires, or
+  whether the honest answer is a lower declared `max_bytes`.
+- Next: execute **Sprint 033** per the normal protocol.
