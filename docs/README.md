@@ -35,6 +35,7 @@ follow one as instructions; follow the canonical documents below.
 | [`brand/BRAND.md`](brand/BRAND.md) | Palette, typography, the mark and how it is constructed. |
 | [`agent/HANDOFF.md`](agent/HANDOFF.md) | Current reality for whoever picks the work up next. |
 | [`agent/state.json`](agent/state.json) | The machine-readable sprint pointer. Validated by `scripts/validate_project.py`. |
+| [`agent/TESTING.md`](agent/TESTING.md) | Verification cadence, environment triage, walkthrough reuse, and the post-gate rerun matrix. |
 | [`sprints/ROADMAP.md`](sprints/ROADMAP.md) | What each sprint delivers, and the contracts for the ones not yet built. |
 | [`entry-depth-verdict.md`](entry-depth-verdict.md) | Sprint 030's verdict: a child of an entry needs no state of its own; depth is per-domain progress or provider `rows`; sets are ordered shelves. |
 
@@ -65,5 +66,7 @@ canonical documents summarise but do not reproduce.
 
 ## For agents
 
-[`../AGENTS.md`](../AGENTS.md) is the entrypoint and the protocol; [`agent/WORKFLOW.md`](agent/WORKFLOW.md)
-expands it. Both are canonical and binding on any session that changes this repository.
+[`../AGENTS.md`](../AGENTS.md) is the entrypoint and the protocol;
+[`agent/WORKFLOW.md`](agent/WORKFLOW.md) expands it; and
+[`agent/TESTING.md`](agent/TESTING.md) defines the verification cadence. All three are canonical and
+binding on any session that changes this repository.

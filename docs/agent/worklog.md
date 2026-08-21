@@ -2128,3 +2128,20 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   release action is needed or was performed.
 - Next: none scheduled. The numbered plan is complete through Sprint 035; future work begins by
   planning one of the unnumbered roadmap epics or a remediation sprint.
+
+## 2026-08-21 — Post-Sprint 035 verification protocol optimization (docs-only)
+- Done: registered the Sprint 035 testing retrospective as DEC-084 and canonical
+  `docs/agent/TESTING.md`; linked it from the documentation map, AGENTS entry sequence and WORKFLOW.
+  Amended the binding protocol to run distinct exhaustive gates once after code freeze and to use a
+  post-gate diff matrix instead of automatically repeating all product tests after documentation-only
+  closure edits. Recorded duration baselines, the Codex sandbox/TestClient deadlock signature,
+  walkthrough reuse rules, output discipline and a clearly unimplemented optimization backlog.
+- Verified: project validator, `make check`, and `git diff --check` passed. `make test` was not run:
+  this owner-directed session changed documentation and agent protocol only; DEC-084's matrix
+  requires no product rerun for that class of change.
+- Deviations: none. This is the owner-requested protocol change following the completed sprint, not
+  a reopened Sprint 035 or a new product sprint; project state remains `complete`.
+- Blocked/open: none. The Playwright project split, Vitest warning cleanup, tracked walkthrough
+  launcher and bounded phase timeouts remain explicit future work rather than hidden scope growth.
+- Next: use the new ladder when the owner schedules the next sprint; if optimizing test
+  infrastructure itself is chosen, plan a remediation sprint around the measured backlog.

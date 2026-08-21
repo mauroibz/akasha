@@ -53,3 +53,9 @@ while avoiding a rewrite next time.
 No numbered sprint is active. A future session should first plan a new remediation sprint or choose
 one of ROADMAP's unnumbered epics, update `FINAL_SPRINT`, and move state from `complete` according to
 the normal planning protocol. Do not push, tag, deploy or release unless the owner asks.
+
+Before executing that sprint, read `docs/agent/TESTING.md` and DEC-084. Verification now uses one
+exhaustive gate after implementation freezes, followed by diff-classified closure checks; pure
+Outcome/roadmap/worklog/handoff/state edits do not trigger a second product-suite run. The playbook
+also records the Codex sandbox/TestClient deadlock signature, current gate durations, walkthrough
+reuse rules and the unimplemented test-infrastructure optimization backlog.

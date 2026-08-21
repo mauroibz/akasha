@@ -17,6 +17,7 @@ From the repository root:
    - the active sprint file named by `active_sprint_file`;
    - every document listed in that sprint's `Required context` section;
    - `docs/agent/WORKFLOW.md`;
+   - `docs/agent/TESTING.md`;
    - the last entry of `docs/agent/worklog.md`: where the previous session stopped, what it verified, and any warning it left;
    - `docs/decisions.md` entries referenced by the sprint.
 3. Inspect existing code and tests named by the sprint. Never infer their content from an earlier agent's summary.
@@ -39,7 +40,17 @@ If state is inconsistent, repair documentation-only inconsistencies when the int
 
 ## 3. Verify
 
-Run every command in the sprint's `Verification` section, then run `make check` and `make test` if those targets exist. For UI behavior, execute the specified browser or Playwright checks rather than relying only on unit tests. For deployment work, build and exercise the container.
+Follow `docs/agent/TESTING.md`'s verification ladder. After implementation and tests are frozen, run
+each distinct command in the sprint's `Verification` section once, plus `make check` and `make test`
+if those targets exist and the sprint did not already name them. For UI behavior, execute the
+specified browser or Playwright checks rather than relying only on unit tests. For deployment work,
+build and exercise the container.
+
+Do not rerun an exhaustive product suite merely because the only subsequent changes are sprint
+Outcome, roadmap, worklog, handoff, or state documentation. Classify the post-gate diff using the
+playbook and run its required closure checks. Any later change to runtime code, tests, migrations,
+dependencies, build/test configuration, or generated contracts invalidates the relevant gate and
+must be verified again.
 
 A sprint is not complete if required verification is skipped. If the environment makes a check impossible, leave the sprint `in_progress`, document the exact blocker and command output in `docs/agent/HANDOFF.md`, and do not claim completion.
 
@@ -71,7 +82,10 @@ Only after all acceptance criteria and verification pass:
 1. Mark the active sprint `completed` in its file.
 2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if the final planned sprint just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
 3. Append a `docs/agent/worklog.md` entry for this session (done, verified-and-how, deviations, next), then rewrite `docs/agent/HANDOFF.md` for the next agent as concise current reality, not a transcript.
-4. Run `python scripts/validate_project.py`, `make check`, and `make test` once more.
+4. Classify every change made after the exhaustive gate using `docs/agent/TESTING.md`. For the
+   normal documentation/state-only closure, run `python scripts/validate_project.py` and
+   `git diff --check`; run documentation formatting or link checks when applicable. If a post-gate
+   change invalidated a product gate, rerun that gate before closing.
 5. Create the final documentation/state commit: `docs(sprint-NNN): close sprint and hand off`.
 6. Confirm `git status --short` is empty, then write the completion report for the owner (Mauro, not a frontend developer): in plain language, the sprint that was completed, one line per acceptance criterion and how it was verified, any deviations, anything that needs the owner (accounts, keys, money, irreversible choices), and one sentence on what the next sprint delivers. Keep audit detail — commit hashes, full command output — in the sprint `Outcome` and worklog, not the report.
 

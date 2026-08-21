@@ -2707,3 +2707,36 @@ Append-only record of material architecture choices, product-default resolutions
   - **One request per file, after the batch commits**, rather than folding the ebooks into the preview bundle. The bundle route's ceiling is per request (`max_bytes` is 256 MiB), so folding them in would cap the feature at roughly forty books; a per-file route is bounded by the attachment cap instead, which makes a 600-book shelf behave exactly like an 18-book one. It also means a bad file costs one book rather than the import, that skip-and-report above the cap falls out of per-file error reporting instead of being built, and that progress can be counted honestly.
   - **The undo ledger gets a sixth entity type**, and it is the sprint's real work. DEC-047 made "this item has an attachment" mean "the owner did something deliberate here, do not delete it". An import that attaches files makes that sentence false. Only the ledger can tell an imported file from a hand-uploaded one: an attachment effect carries the row id, `sha256` and `filename`, is reversed before its item's create effect because it is written later, and is reversed **only while the row still matches what the import recorded** — a renamed or replaced attachment is retained, like any hand-edited field. Get this wrong in one direction and undo destroys an owner's file; wrong in the other and every imported book is permanently un-undoable.
 - **Consequences:** Two shared-layer contracts widen. `NormalizedImportRecord` gains `source_files`, so a record can name the files that belong to it and a shared route can resolve an uploaded path without knowing what a Calibre library looks like; and `ImportInputSpec` gains `members` patterns, which removes the hardcoded Calibre bundle shape from `_bundle_member` — a real `if calibre` in a shared layer that this sprint is forced to pay off. `ImportInventory` answers a third question, `attached`, keeping the connector out of storage. The disk curve is **stated rather than bounded**: 95 MB here, roughly 3.2 GB for a 600-book library at the measured mean, with DEC-047's strategy E holding backups at ~1.0 effective copies only while `BACKUP_DIR` shares a filesystem with the data directory. No disk budget exists anywhere in this repository and this entry does not invent one. Product spec §1's "not an ebook server" non-goal **stands as written**: no reader, no format parsing, no progress, no format-aware file UI. What changes is that the importer can put a file where the owner could already have put it by hand.
+
+## DEC-084 — Exhaustive verification runs once after code freeze; closure reruns follow the diff
+
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Extends:** DEC-025 (the walkthrough gate) and the agent protocol's verification/closure rules.
+- **Context:** Sprint 035's healthy closure gates were not intrinsically long: about 8 seconds for
+  `make check`, 60 seconds for 559 backend tests, 25 seconds for 179 frontend tests and 1 minute 40
+  seconds for 101 Playwright cases. The session nevertheless spent much longer testing. Two
+  avoidable causes dominated. First, FastAPI `TestClient` deadlocked inside Codex's isolated
+  PID/network sandbox; the same export cases passed in 3.79 seconds outside it, but only after the
+  opaque sandboxed run and then a focused sandboxed rerun had both been allowed to wait for minutes.
+  Second, AGENTS.md required `make check` and `make test` once during verification and then “once
+  more” after edits limited to Outcome, roadmap, worklog, handoff and state. That repeated about 85
+  seconds of product tests without changing the product. The realistic-data walkthrough also had to
+  be reconstructed and failed twice on its own selectors before the successful script was retained.
+- **Decision:** `docs/agent/TESTING.md` is the canonical verification cadence. Work climbs from
+  focused TDD to neighboring regressions to one stable walkthrough, then freezes implementation and
+  runs every distinct exhaustive gate once. Closure changes are classified by effect. Pure
+  documentation/state closure reruns project validation, applicable document checks and
+  `git diff --check`; a later runtime, test, migration, dependency, build/test-configuration or
+  generated-contract change invalidates and reruns the affected exhaustive gate. A stalled command
+  is diagnosed against recorded phase durations and reproduced once with one changed variable;
+  agents do not repeat the same opaque command in the same environment without a new hypothesis.
+  Useful realistic-data walkthroughs are parameterized and retained locally under an ignored path,
+  then promoted to tracked sanitized infrastructure only when generally reusable.
+- **Consequences:** No acceptance criterion, external-boundary proof, walkthrough, full-suite or
+  failure test is removed. The routine documentation-only closure no longer pays for a second
+  product suite, and an environment deadlock should cost one focused comparison rather than several
+  open-ended waits. The playbook records current duration baselines and an explicit, unimplemented
+  optimization backlog: isolate the two serial Playwright cases so the rest can parallelize, remove
+  known Vitest warning noise, build a one-command realistic-data launcher and add bounded phase
+  timeouts. Those are future implementation work, not claims about the current suite.
