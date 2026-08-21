@@ -67,9 +67,19 @@ ends rather than a separate destination: it is empty until something lands in it
 Each connector explains itself on its own tab. Goodreads tells you where the export
 lives (`goodreads.com/review/import` → Export Library, desktop web only), that it is
 a snapshot rather than a sync, and what happens to your ratings; drop the CSV on the
-tab or choose it. Calibre lets you **browse the mounted library** instead of typing a
-path — pick the folder that holds `metadata.db` and the screen confirms it found one.
-Typing a relative path still works, for scripts.
+tab or choose it.
+
+**Calibre needs no setup at all: choose your library folder and your browser reads it.**
+There is nothing to mount, no `CALIBRE_DIR`, and no restart. Only `metadata.db` and the
+covers are sent — your ebooks never leave your machine, which is why a 32 MB library is
+a few megabytes of upload — and the screen counts what it will send before it sends
+anything. Nothing is written back to Calibre and nothing holds the library open, so it
+is safe to do while Calibre or calibre-web is running.
+
+If instead the library is somewhere the server can already see, the same tab offers
+that underneath: mount it, browse to the folder that holds `metadata.db`, and the screen
+confirms it found one. Typing a relative path still works, for scripts. That path has no
+upload ceiling, which is what a library too large for a browser should use.
 
 Every import starts with a preview: you can inspect errors and settle ambiguous
 matches before Akasha changes anything. A committed row enters Triage as `unsorted`,

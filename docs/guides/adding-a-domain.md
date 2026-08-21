@@ -281,6 +281,18 @@ class SteamImporter:
         empty_state="Drop your Steam export here, or choose a file.",
         help_url="https://help.steampowered.com/",   # https, or leave it out
         browsable=False,            # `path` connectors may set this; see below
+        # If one source is reachable two ways, declare the second here rather than
+        # registering a second connector — one source, one tab (DEC-081). Exactly
+        # one level deep, and it must use a different `field`.
+        alternate=None,
+        # Per-input, because the shared route's 5 MiB default is the wrong size for
+        # some sources and raising it for everyone is how a limit stops meaning
+        # anything.
+        max_bytes=None,
+        max_files=None,
+        # Whether `read` can take `ImportSource.directory`. Required by
+        # `kind="directory"`; conformance refuses the kind without it.
+        accepts_files=False,
     )
     identity_kinds = frozenset({"steam_app"})
     # Closed. An undeclared code is republished as `undeclared_import_error`
@@ -322,7 +334,17 @@ it. Both reach the client in the 422 payload and the screen renders the action b
 Do not return a raw provider row or put domain metadata in `source_fields`: the shared service
 validates `metadata`, entry values, status and identity kinds before it calls `match`.
 
-If your source is a place rather than a file, implement `BrowsableImporter` as well and set
+If your source is a **folder on the reader's own machine**, use `kind="directory"` and set
+`accepts_files=True`. The screen renders a folder chooser, the client filters the selection to the
+members you want and uploads only those, and the route streams them to disk, validates every
+client-supplied relative path, and materializes them at `<bundle>/library/...`. Your `read` then
+receives `ImportSource.directory` and should point its **ordinary adapter** at that folder — the
+whole point is that an uploaded source and a local one normalize through the same code, so the
+reader never learns there were two ways in. `CalibreImporter.read` is nine lines and is the worked
+example. Declare `max_bytes`/`max_files` honestly: a refusal that names your `alternate` is far
+better than a timeout.
+
+If your source is a place the **server** can see, implement `BrowsableImporter` as well and set
 `input.browsable = True`. `browse(path, context)` returns an `ImportBrowseResult` with the relative
 path, its parent, the **names** of the immediate subdirectories and whether that folder is itself
 importable. Names only: an absolute path publishes the deployment's filesystem layout to anyone on
@@ -360,7 +382,9 @@ Add parser/adapter fixtures for the source itself and a generic route round-trip
 shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
 will reject a missing protocol member, an unknown target domain, empty identity kinds, a misplaced
 registration, a malformed guide, a non-https `help_url`, browsing declared without a `browse`
-method, or an empty or shouted error vocabulary.
+method, an empty or shouted error vocabulary, a nested `alternate`, an `alternate` reusing the
+primary's `field`, a non-positive `max_bytes`/`max_files`, or `kind="directory"` without
+`accepts_files`.
 
 ### Step 6 — Prove it
 
@@ -419,7 +443,7 @@ writing any of it, stop — you are about to duplicate something:
 | The detail page | your metadata fields in your order, your status vocabulary, your panel heading |
 | Triage | your hotkeys, bulk operations, selection across pages |
 | The add flow | search, add-by-URL, manual entry and the confirm screen rendered from your field spec |
-| Import | registry-driven source tab rendering your declared guidance, preview/commit, validation, the folder picker for a browsable source, triage as a tab, and undo |
+| Import | registry-driven source tab rendering your declared guidance, preview/commit, validation, a folder chooser for a directory source and a picker for a browsable one, your alternate beneath your primary, triage as a tab, and undo |
 | Shelves | the owner's own tier of organisation, across every domain |
 | Import ledger and undo | 24-hour reversal of anything an import did |
 | Export | entity-shaped JSON carrying `type`, identifiers and your opaque metadata |

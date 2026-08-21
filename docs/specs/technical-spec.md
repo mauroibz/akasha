@@ -318,6 +318,28 @@ connector's declaration as `undeclared_import_error`, so an unknown vocabulary n
 boundary. The conformance suite rejects a malformed guide, a non-https `help_url`, an empty or
 malformed error vocabulary, and `browsable` declared without a `browse` method (DEC-080).
 
+**A connector may offer two ways in, on one tab.** `ImportInputSpec.alternate` is a second spec
+rendered beneath the primary, **exactly one level deep** and using a different `field`. A Calibre
+library is one source reachable two ways — the folder on your machine or a mount the server can
+already see — and splitting that across two tabs would name one thing twice (DEC-081). The route
+picks between them by content type rather than by declaration: a body of parts is the `upload` or
+`directory` input, a JSON body is the `path` one. `max_bytes` and `max_files` are declared per input
+because a folder of covers is legitimately far larger than a CSV, and raising the shared ceiling to
+suit one connector is how a limit stops meaning anything.
+
+**A `directory` connector is a folder read by the browser.** The client selects a folder, filters it,
+and posts the members it kept as multipart parts whose filenames are relative paths. The route
+streams each part to disk — Starlette spools a part only past 1 MiB and a cover is smaller than
+that, so `MultiPartParser.spool_max_size` is overridden to 1 and peak memory tracks one member rather
+than the library (measured: a 60 MiB bundle at a 1.8 MiB Python peak). Member paths come from the
+client and are validated before a byte is written: absolute paths, `..`, any segment beginning with
+`.`, and anything that is neither `metadata.db` nor `*/cover.jpg` are refused. The surviving members
+are materialized at `<bundle>/library/...` and the connector points its **ordinary adapter** at that
+directory, so an uploaded library and a mounted one normalize through identical code. The route owns
+the bundle and removes it once preview has staged what it needs, including when the read failed.
+`accepts_files` is the connector's promise that its `read` can take one; conformance refuses
+`kind="directory"` without it.
+
 **A `path` connector may be browsed.** Setting `input.browsable` and implementing `BrowsableImporter`
 publishes `GET /api/import/{importer}/browse?path=`, which returns one level of the source as an
 `ImportBrowseResult`: the relative path, its parent, the **names** of immediate subdirectories, and
@@ -503,9 +525,14 @@ The product-spec route list is authoritative, with these refinements:
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - `GET /importers` publishes `{id, label, item_type, input}` from the importer registry, where
-  `input` carries the connector's declared `guide`, `empty_state`, `help_url` and `browsable`
-  alongside `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
-  `POST /import/{importer}/preview` accepts the declared upload field or path field;
+  `input` carries the connector's declared `guide`, `empty_state`, `help_url`, `browsable`,
+  `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternate`, alongside
+  `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
+  `POST /import/{importer}/preview` accepts the declared upload field, path field, or — for a
+  `directory` input — repeated file parts whose filenames are relative paths inside the chosen
+  folder. A connector with an `alternate` accepts either on the same route, chosen by content type.
+  An oversize bundle is a 413 naming the alternate; a member outside the declared shape is a 422
+  that names what to choose instead.
   `POST /import/{importer}/commit` accepts only the durable preview batch ID and ambiguity choices,
   never client-controlled normalized records. Calibre's path is relative to the configured mount;
   preview responses may expose its normalized UUID/book identity and whether a local cover was

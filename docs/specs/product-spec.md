@@ -390,10 +390,20 @@ flag.
 Calibre's `metadata.db` is a plain SQLite database — no API needed, and this is
 the better of the two integrations.
 
-**Access:** mount the Calibre library directory read-only into the container and
-open with `sqlite3.connect("file:metadata.db?mode=ro", uri=True)`. Never write
-to it. Do not read it while Calibre is mid-write; a stale read is possible but
-harmless for a one-shot import.
+**Access, two ways** (DEC-081). **Primarily, the reader chooses the folder in the
+browser** and the client uploads `metadata.db` plus the covers — nothing is mounted,
+nothing is configured, and no handle is held on a library another program is using.
+This is the answer to the real-world problem the mount created: `CALIBRE_DIR` is a
+container-level setting, and a library served by calibre-web-automated is held open,
+where concurrent readers are not supported.
+
+**Secondarily, a mounted library** the server can already see: mounted read-only into
+the container and opened with `sqlite3.connect("file:metadata.db?mode=ro", uri=True)`.
+It is what automation and a too-large-to-upload library use.
+
+Either way Akasha never writes to Calibre. Do not read a library mid-write; a stale
+read is possible but harmless for a one-shot import — and the upload path avoids the
+question entirely, since it copies bytes once rather than reading a live file.
 
 **Tables:** `books` (title, sort, pubdate, path, uuid), `authors` +
 `books_authors_link`, `identifiers` (rows with `type` in `isbn`, `google`,
@@ -504,6 +514,7 @@ DELETE /api/shelves/{id}               → detaches, does not delete entries
 POST   /api/import/goodreads/preview   → CSV upload, returns dry-run report
 POST   /api/import/goodreads/commit    → {batch_id, options}
 POST   /api/import/calibre/preview     → {library_path}, returns dry-run report
+POST   /api/import/calibre/preview     → chosen-folder upload (metadata.db + covers)
 POST   /api/import/calibre/commit      → {batch_id, options}
 GET    /api/import/calibre/browse      → ?path=, folder names under the mount
 GET    /api/import/jobs/{id}           → progress for background enrichment
@@ -760,11 +771,22 @@ than copy of its own** (DEC-080). Goodreads states where the export lives
 (`goodreads.com/review/import` → Export Library, desktop web only), that it is a
 snapshot rather than a sync, that ratings are doubled and marked provisional, and
 that shelves become tags; its input takes a dropped file as well as a chosen one.
-Calibre states that it is opened read-only, that only empty fields are filled and
-your edits win, and that covers are copied during preview — and it is **browsed
-rather than typed**: a breadcrumb and a folder list rooted at the mounted library,
-which says whether the folder you are standing in holds a library. Typing a
-relative path still works, for automation.
+**Calibre needs no setup at all** (DEC-081): you choose your library folder and the
+browser reads it, so there is nothing to mount, no `CALIBRE_DIR` and no restart —
+and nothing holds the library open while Calibre or calibre-web is using it, which
+is what made the mount painful in practice. Only `metadata.db` and the covers are
+sent; ebooks never leave the machine, and the screen counts and sizes what it will
+send before sending it, because "choose a folder" and "upload your ebook collection"
+are otherwise indistinguishable. Choosing a folder with no `metadata.db` is refused
+in the browser, before any request.
+
+Beneath it, the same tab offers **a library the server can already see**: mount it and
+it is browsed rather than typed — a breadcrumb and a folder list rooted at the mount,
+which says whether the folder you are standing in holds a library. Typing a relative
+path still works, for automation. That path has no upload ceiling, so it is what a
+library too large for a browser uses. Both say that Calibre is opened read-only, that
+only empty fields are filled and your edits win, and that covers are copied during
+preview.
 
 Both show the dry-run preview before any write, with the unmatched/ambiguous rows
 called out. A refused read says what to do about it in the connector's own words
