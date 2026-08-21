@@ -1,8 +1,9 @@
-# Handoff — the numbered plan is complete
+# Handoff — Sprint 035 is planned and ready
 
-Plan revision 16. **Sprint 034 closed on 2026-08-21 and no sprint is active.** `state.json` reads
-`complete` with null active fields and 001–034 in `completed_sprints`; `FINAL_SPRINT` in
-`scripts/validate_project.py` is 34. Nothing has been tagged, pushed, released or deployed.
+Plan revision 17. **Sprint 034 closed on 2026-08-21; Sprint 035 is planned and `ready`, not
+started.** `state.json` names `docs/sprints/035-ebook-attachments.md` with 001–034 in
+`completed_sprints`; `FINAL_SPRINT` in `scripts/validate_project.py` is 35. Nothing has been tagged,
+pushed, released or deployed.
 
 ## What the import flow looks like now
 
@@ -19,22 +20,32 @@ The mount survives beneath it all as the connector's declared `alternate`.
 - The walkthrough ran four phases against the owner's real library. Read that worklog entry before
   touching the import flow.
 
-## The next thing the owner wants
+## The next sprint
 
-**Sprint 035 — ebook attachments on a toggle.** Deliberately after 034, because with the plan step
-in place, turning it on costs one large first sync and near-nothing after, instead of 163 MB every
-time. What it needs:
+**Sprint 035 — Ebook attachments on a toggle**, planned in its own file and recorded as DEC-083.
+Read the sprint file; the summary is that a Calibre import can bring the ebooks along on a toggle
+that is off by default, one file per book, epub first.
 
-1. **A sixth entity type in the undo ledger.** It currently knows `entry`, `entry_shelf`, `item`,
-   `item_identifier`, `shelf` — no `attachment`. Without it, undoing an import would drop rows via
-   `ON DELETE CASCADE`, leave the bytes for `reclaim`, and undercount what it reverted.
-2. **A format decision.** 14 of the owner's books exist as both `.epub` and `.azw3` — 163 MB for
-   both, 95 MB for epub only.
-3. **Skip-and-report above the 25 MiB attachment cap**, rather than failing the whole import.
+Three things are settled and should not be re-litigated at execution time:
+
+1. **The undo ledger is the real work.** `UndoService` retains any item that has an attachment
+   (DEC-047), so an import that attaches files makes every imported book un-undoable unless a sixth
+   `attachment` entity type lets the ledger tell an imported file from a hand-uploaded one. Take
+   this before the toggle.
+2. **One request per file, after the batch commits.** The bundle route's ceiling is per request, so
+   folding ebooks into the preview bundle caps the feature at roughly forty books.
+3. **`_bundle_member` has to become connector-declared.** It hardcodes the Calibre bundle shape in a
+   shared route. Change the tail, keep the traversal guard.
 
 The scope boundary is settled: **attaching files is a feature of the importer.** Akasha's own file
-UI stays simple and file-type agnostic rather than growing toward an ebook manager. Product spec §1's
-"not an ebook server" non-goal stands as written.
+UI stays simple and file-type agnostic. Product spec §1's "not an ebook server" non-goal stands as
+written.
+
+One thing the owner should see before execution starts: the disk curve — 95 MB for this library,
+roughly 3.2 GB for 600 books, and backups at ~1.0 effective copies only while `BACKUP_DIR` shares a
+filesystem with the data directory. Note also that **calibre-web-automated is being retired**, so
+Akasha's blob store becomes the only copy of these files that is backed up. Undo and restore are
+load-bearing accordingly.
 
 ## Known and left
 

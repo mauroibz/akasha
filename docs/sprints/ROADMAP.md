@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 16
+**Plan revision:** 17
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — 034 closed on 2026-08-21 and the numbered plan is complete.
+**Active sprint:** 035 — Ebook attachments on a toggle (planned)
 
 ## Shape of the plan
 
@@ -29,7 +29,8 @@ Post-v1 work branches:
                                  └─ 031 Per-domain imports
                                 └─ 032 Import UX and connector extensibility
                                    └─ 033 Calibre without a mount
-                                      └─ 034 Incremental import  ← the plan ends here
+                                      └─ 034 Incremental import
+                                         └─ 035 Ebook attachments on a toggle  ← the plan ends here
 ```
 
 **The plan stops at 032, and that is the point (DEC-058, extended by DEC-065 and DEC-071).** Sprint 025 asked whether a second domain
@@ -90,12 +91,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [032](032-import-ux-and-connector-extensibility.md) | Import UX and connector extensibility | 031 | completed |
 | [033](033-calibre-without-a-mount.md) | Calibre without a mount | 032 | completed |
 | [034](034-incremental-import.md) | Incremental import | 033 | completed |
+| [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | planned |
 
 ## Contracts for planned sprints
 
 These are binding outcome boundaries. Before a planned sprint becomes active, the closing agent for
 the prior sprint must expand it into a dedicated `docs/sprints/NNN-*.md` file using `TEMPLATE.md`,
-incorporating actual deviations. Sprints 019 through 034 have files, and every one of them is closed.
+incorporating actual deviations. Sprints 019 through 035 have files; 019 through 034 are closed.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -581,6 +583,35 @@ predicted. See the sprint file's Outcome.
 
 This is deliberately **before** ebook attachments, which is the next thing the owner wants. Shipping
 attachments first would mean 163 MB on every sync — exactly the problem this sprint removes.
+
+### [Sprint 035 — Ebook attachments on a toggle](035-ebook-attachments.md)
+
+Added at plan revision 17, from the owner's question about Sprint 033's copy: why does the Calibre
+import promise that ebooks never leave the machine, when attachments already exist and this is their
+ideal use case? The owner settled the scope boundary in the same message — attaching files is a
+feature of **the importer**, and Akasha's own file surface stays simple and file-type agnostic rather
+than growing toward an ebook manager.
+
+Measured on the owner's library: 18 books, 18 epub at 95.4 MB, 14 azw3 at 67.4 MB, and nothing above
+the 25 MiB attachment cap. So one file per book in preference order, epub first: 95 MB rather than
+163 MB, and one row per book in a list that does not know what a format is.
+
+The files go up **one request each, after the batch commits**, rather than inside the preview bundle.
+The bundle route's ceiling is per request, so folding them in would cap the feature at roughly forty
+books; per file it is bounded by the attachment cap instead, a bad file costs one book rather than
+the import, and skip-and-report above the cap falls out of per-file error reporting instead of being
+built.
+
+The real work is undo. DEC-047 made "this item has an attachment" mean "the owner did something
+deliberate here, do not delete it" — and an import that attaches files makes that false. Only the
+ledger can tell the two apart, so it gains a sixth entity type and reverses an attachment only while
+the row still matches what the import recorded. Wrong in one direction it destroys an owner's file;
+wrong in the other every imported book becomes permanently un-undoable.
+
+**Planned, not started (DEC-083).** The disk cost is stated rather than bounded: 95 MB here, roughly
+3.2 GB for a 600-book library at the measured mean, with backups holding ~1.0 effective copies only
+while `BACKUP_DIR` shares a filesystem with the data directory. No disk budget exists anywhere in
+this repository and this sprint does not invent one.
 
 ## Future epics, after this plan
 

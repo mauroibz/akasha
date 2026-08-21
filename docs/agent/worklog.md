@@ -2061,3 +2061,36 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   affordable. It still needs a sixth `attachment` entity type in the undo ledger, a decision on
   `.epub` vs `.azw3` where a book has both (14 of the owner's do), and skip-and-report above the
   25 MiB attachment cap.
+
+## 2026-08-21 — Sprint 035 planned (ebook attachments on a toggle)
+
+- Planning session only. No product code was touched and no sprint was executed.
+- Question asked was whether the feature makes sense and is viable, so the assessment came before
+  the plan and is recorded in DEC-083 rather than only in the sprint file.
+- Measured rather than assumed, on `/home/ibz/Calibre Library`: 174 MB total — 18 books, 18 epub
+  (95.4 MB, mean 5.3 MB, **max 14.8 MB**), 14 azw3 (67.4 MB, max 15.3 MB), 18 covers (9.6 MB),
+  `metadata.db` 0.5 MB. **Zero files exceed the 25 MiB attachment cap**, so skip-and-report is built
+  for correctness rather than for this corpus. `du -sh data` is 2.6 MB today, of which
+  `data/attachments` is 1.5 MB.
+- Read fresh before deciding anything: `application/undo.py` in full, `infrastructure/attachments.py`,
+  `backup.py` (`_share_attachments`), `reclaim.py`, `api/imports.py` (`_bundle_member`, `_bundle`,
+  `_candidates`, `plan`), `application/imports.py`, `domains/book/calibre.py`, `bundle.ts`.
+- Three findings shaped the plan and none of them came from the previous handoff:
+  1. `UndoService` **retains any item that has an attachment** (DEC-047). An import that attaches
+     files therefore makes every imported book permanently un-undoable unless the ledger can tell an
+     imported file from a hand-uploaded one. That is the sprint's real work, not the upload.
+  2. `_bundle_member` hardcodes the Calibre bundle shape in a **shared** route, down to naming
+     Calibre in its refusal. Widening it for ebooks forces that to become connector-declared, which
+     the domain-contract invariant wanted anyway.
+  3. The bundle route's ceiling is **per request** (`max_bytes` 256 MiB), so folding ebooks into the
+     preview bundle would cap the feature at roughly forty books. One request per file after commit
+     removes the ceiling, bounds every request by the attachment cap, and makes skip-and-report and
+     progress fall out instead of being built.
+- Written: `docs/sprints/035-ebook-attachments.md`, DEC-083, ROADMAP to revision 17 (tree, table,
+  contract section), `state.json` to `ready`/035, `FINAL_SPRINT` 34 → 35.
+- Verified: `python scripts/validate_project.py` passed.
+- Blocked/open: nothing blocking. Two things the owner should see before execution starts — the disk
+  curve (95 MB here, ~3.2 GB for 600 books, backups at ~1.0 effective copies only while `BACKUP_DIR`
+  shares a filesystem with the data directory) and the honest scope of the value, since
+  calibre-web-automated already holds and reads these files.
+- Next: execute Sprint 035 in deliverable order, taking the undo ledger before the toggle.
