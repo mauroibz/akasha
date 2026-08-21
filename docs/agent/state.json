@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 13,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "030",
   "active_sprint_file": "docs/sprints/030-entry-depth.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "029",
   "completed_sprints": [
     "001",
@@ -37,6 +37,6 @@
     "028",
     "029"
   ],
-  "started_at": "2026-08-17T21:00:00-03:00",
-  "updated_at": "2026-08-17T21:00:00-03:00"
+  "started_at": "2026-08-20T00:00:00-03:00",
+  "updated_at": "2026-08-20T00:00:00-03:00"
 }
