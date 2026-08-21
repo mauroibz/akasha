@@ -36,6 +36,7 @@ follow one as instructions; follow the canonical documents below.
 | [`agent/HANDOFF.md`](agent/HANDOFF.md) | Current reality for whoever picks the work up next. |
 | [`agent/state.json`](agent/state.json) | The machine-readable sprint pointer. Validated by `scripts/validate_project.py`. |
 | [`sprints/ROADMAP.md`](sprints/ROADMAP.md) | What each sprint delivers, and the contracts for the ones not yet built. |
+| [`entry-depth-verdict.md`](entry-depth-verdict.md) | Sprint 030's verdict: a child of an entry needs no state of its own; depth is per-domain progress or provider `rows`; sets are ordered shelves. |
 
 ## Historical
 

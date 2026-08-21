@@ -2576,3 +2576,45 @@ Append-only record of material architecture choices, product-default resolutions
   - The expanded contract is what the closing agent for Sprint 030 expands into
     `docs/sprints/031-*.md` from `TEMPLATE.md`; until then the roadmap paragraph is the binding
     boundary, per the roadmap's own rule for planned sprints.
+
+## DEC-077 — Entry depth: the flat entry holds; depth is per-domain progress or provider rows; sets are ordered shelves
+
+- **Date:** 2026-08-20
+- **Status:** accepted
+- **Cross-references:** DEC-071 (the two-phase entry this closes the first phase of),
+  DEC-052 (the measurement method, and the Strategy-B rejection this verdict echoes),
+  DEC-058 (the series vocabulary collision), DEC-068 (the IGDB paper walk).
+- **Context:** Sprint 030 asked one question with evidence: does a child of an entry
+  need state of its own? The full reasoning, the costed table over the nine shared
+  surfaces, and the provider provenance are in `docs/entry-depth-verdict.md`; this
+  entry adopts that document and does not reproduce it.
+- **Decision.** The flat entry holds; **nothing is built in Phase A.** A child of an
+  entry does not need state of its own, because the two providers measured or walked
+  that could have forced the question refused to: MusicBrainz delivers depth as
+  metadata on the parent (one `inc=recordings` parameter, no extra request — shipped
+  in Sprint 026 as the `rows` field, re-measured live on 2026-08-20 and unchanged),
+  and IGDB models its would-be children as sibling records with typed edges. Depth,
+  when a domain needs it, is shape (a) — a per-domain `progress` field, declarative
+  under the Domain contract — or shape (b), a progress marker in provider-supplied
+  `rows`. Shape (c), real child entities with their own status, is rejected on
+  evidence: it is the only shape that taxes every shared surface (cursor, triage,
+  bulk, facets, export, undo, library row, detail page), and no measured provider
+  asks for it. **A set is not depth.** The Harry Potter set and the Malazan series
+  (product spec §11 item 4) are the same request twice, and the answer is an ordered
+  shelf — an additive feature on the flat model, deferred, not denied.
+- **Honest gaps, stated rather than smoothed over.** TMDB's series/season/episode
+  hierarchy — the strongest candidate for shape (c) — is **reasoned, not measured**:
+  no credential was available and the owner did not supply one, so that arm is a
+  labelled paper walk with the closing cost named (a token, two requests, committed
+  captures). Its first draft was written from model memory; challenged by the owner,
+  it was re-grounded against the published API reference on 2026-08-20 and every
+  claim now names the document it stands on — but a documented schema is still not
+  an observed response, and the arm stays a paper walk until the captures exist.
+  And "I've read the first four Malazan books" — per-member state inside
+  a curated set — has no cheap shape; the verdict refuses to buy it with a redesign.
+- **What would reopen this:**
+  1. A domain whose provider, measured live, returns children carrying their own
+     user-facing state — the TMDB arm is the standing candidate.
+  2. The owner stating the Malazan sentence as a need rather than an example.
+  3. Two domains shipping shape (a) and their `progress` vocabularies drifting,
+     promoting the field to a shared typed concept.

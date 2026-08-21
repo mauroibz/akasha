@@ -525,15 +525,23 @@ contract and Sprint 031's import boundary, developed in parallel without interfe
   score, one status, one `reread_count` per item (product spec section 10, item 4), and a television
   series does not fit it: either a series is one entry and "watched through season 3" is not
   expressible, or entries gain hierarchy, which reaches keyset pagination, triage selection, bulk
-  operations and every count in the UI. Note the vocabulary collision before it causes confusion —
-  book-series already exists as a free-text `metadata` field, and product spec section 11 item 4
-  records the deliberate choice not to model it.
+  operations and every count in the UI. **Sprint 030's verdict (DEC-077, `docs/entry-depth-verdict.md`)
+  priced that hierarchy and rejected it on evidence**: depth is a per-domain `progress` field or a
+  marker in provider `rows`, never child entities. What the verdict could not do is measure TMDB —
+  no credential was available, so the series/season/episode arm is a labelled paper walk whose
+  closing cost is a token and two requests. This epic inherits that measurement as its first task.
+  Note the vocabulary collision before it causes confusion — book-series already exists as a
+  free-text `metadata` field, and product spec section 11 item 4 records the deliberate choice not
+  to model it.
 - **Music imports — `spotify → music`.** The natural first exercise of Sprint 031's boundary, and
   deliberately **an architecture goal, not a commitment** (DEC-076): the owner is in no hurry to
   build it and wants the ground stable underneath first. Its design constraint is real, though —
   Spotify imports are playlist/saved-*track* shaped, so whether it rolls tracks up to albums or
   models songs directly is a Sprint 030 question, and the epic is shaped by that verdict whenever
-  it is picked up.
+  it is picked up. **The verdict (DEC-077) answers it:** a track is metadata on the album (the
+  `rows` precedent), not a child entity — so a Spotify importer rolls saved tracks up to their
+  albums and never touches the entry model. That is precisely the "plug and play with the music
+  system" outcome the boundary exists to make possible.
 
 ## Owner feedback — recorded 2026-08-14, unscheduled
 

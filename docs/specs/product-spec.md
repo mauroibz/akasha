@@ -899,4 +899,7 @@ acceptance criteria.
 4. **Series.** Free-text in `metadata`, not modelled. Only becomes a problem if
    you want "show me the Malazan books in reading order", which needs a real
    series + position pair. Add later if you miss it — it's an additive migration,
-   not a destructive one.
+   not a destructive one. **Sprint 030 answered the adjacent question** (does a
+   child of an entry need state of its own: no) and found a set is a different
+   concept from depth — an ordered shelf, not a parent entity. The verdict and
+   what would reopen it are in [`../entry-depth-verdict.md`](../entry-depth-verdict.md).
