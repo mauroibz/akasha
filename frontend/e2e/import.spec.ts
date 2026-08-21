@@ -20,6 +20,41 @@ const record = {
   candidates: [],
 };
 
+test.beforeEach(async ({ page }) => {
+  await page.route("**/api/importers", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "goodreads",
+          label: "Goodreads",
+          item_type: "book",
+          input: {
+            kind: "upload",
+            label: "Goodreads CSV",
+            field: "file",
+            accept: ".csv,text/csv",
+            placeholder: null,
+            help: null,
+          },
+        },
+        {
+          id: "calibre",
+          label: "Calibre",
+          item_type: "book",
+          input: {
+            kind: "path",
+            label: "Calibre library path",
+            field: "library_path",
+            accept: null,
+            placeholder: "Library",
+            help: "Opened read-only inside the configured Calibre mount.",
+          },
+        },
+      ],
+    }),
+  );
+});
+
 test("Goodreads preview and commit stay keyboard-complete at mobile width", async ({
   page,
 }) => {

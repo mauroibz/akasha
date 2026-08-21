@@ -48,6 +48,23 @@ const entry = {
 async function common(page: Page) {
   await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
   await stubItemTypes(page);
+  // Keep this suite isolated from a developer's real library on the proxy target.
+  // The selected-provider flow below needs an empty local result set; leaving this
+  // request unstubbed made the answer depend on whatever happened to be on :8000.
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [],
+        next_cursor: null,
+        total: 0,
+        facets: {
+          status_counts: {},
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({ json: entry }),
   );
