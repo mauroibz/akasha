@@ -340,6 +340,21 @@ the bundle and removes it once preview has staged what it needs, including when 
 `accepts_files` is the connector's promise that its `read` can take one; conformance refuses
 `kind="directory"` without it.
 
+**A connector may plan an upload before it happens.** Declaring `incremental` and implementing
+`IncrementalImporter` publishes `POST /api/import/{importer}/plan`, which takes the cheap half of the
+source plus a `manifest` of `[{path, size}]` and answers with the subset worth sending. Content
+addressing dedupes *storage*, not *transfer* — the server only recognises bytes after they arrive —
+so without this an unchanged re-sync pays full price. **The client cannot hash instead:**
+`crypto.subtle` requires a secure context, and while `localhost` is one, a reverse-proxied
+`http://host.lan` is not, so a digest negotiation would work from the box and fail silently from the
+rest of the LAN (DEC-082). The connector reaches storage only through `ImportInventory`, whose two
+questions — `existing` and `with_cover` — are batched in chunks of 500 so a large shelf is a constant
+number of round trips. `planned_upload` refuses a plan naming a path the client never offered.
+`metadata.db` therefore travels twice, once to plan and once to preview; that is a stated cost, not
+an oversight. Planning by identity means a changed file under an unchanged identity is not detected,
+and the escape hatch is that an item without a cover is always wanted. **The plan is never
+load-bearing:** a client whose plan fails sends everything and says so.
+
 **A `path` connector may be browsed.** Setting `input.browsable` and implementing `BrowsableImporter`
 publishes `GET /api/import/{importer}/browse?path=`, which returns one level of the source as an
 `ImportBrowseResult`: the relative path, its parent, the **names** of immediate subdirectories, and
@@ -526,7 +541,7 @@ The product-spec route list is authoritative, with these refinements:
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - `GET /importers` publishes `{id, label, item_type, input}` from the importer registry, where
   `input` carries the connector's declared `guide`, `empty_state`, `help_url`, `browsable`,
-  `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternate`, alongside
+  `incremental`, `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternate`, alongside
   `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
   `POST /import/{importer}/preview` accepts the declared upload field, path field, or — for a
   `directory` input — repeated file parts whose filenames are relative paths inside the chosen
@@ -537,6 +552,10 @@ The product-spec route list is authoritative, with these refinements:
   never client-controlled normalized records. Calibre's path is relative to the configured mount;
   preview responses may expose its normalized UUID/book identity and whether a local cover was
   staged, never a source filesystem path.
+- `POST /import/{importer}/plan` exists only for a connector that declares `incremental`; any other
+  is a 404 `importer_not_incremental`. It applies the same member validation the upload route does,
+  so a manifest cannot smuggle a path the upload would refuse, and it removes its bundle on every
+  path. See §6.5.
 - `GET /import/{importer}/browse?path=` exists only for a connector that declares `browsable`; any
   other importer, and any unknown one, is a 404 `importer_not_browsable`. It is read-only, returns
   directory names and nothing else, and refuses an absolute path, a `..` segment or a symlink out of

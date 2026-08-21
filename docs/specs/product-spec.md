@@ -397,6 +397,13 @@ This is the answer to the real-world problem the mount created: `CALIBRE_DIR` is
 container-level setting, and a library served by calibre-web-automated is held open,
 where concurrent readers are not supported.
 
+**A re-import sends only what is missing** (DEC-082). Before uploading, the client
+asks the server which books it already holds with a cover, and sends the rest.
+Measured on an 18-book library: 10.55 MB for a first import, 0.99 MB for an
+unchanged re-sync, and one new book costs only that book's cover. The check is an
+optimisation and never a gate — if it fails, everything is sent and the screen
+says so.
+
 **Secondarily, a mounted library** the server can already see: mounted read-only into
 the container and opened with `sqlite3.connect("file:metadata.db?mode=ro", uri=True)`.
 It is what automation and a too-large-to-upload library use.
@@ -777,7 +784,8 @@ and nothing holds the library open while Calibre or calibre-web is using it, whi
 is what made the mount painful in practice. Only `metadata.db` and the covers are
 sent; ebooks never leave the machine, and the screen counts and sizes what it will
 send before sending it, because "choose a folder" and "upload your ebook collection"
-are otherwise indistinguishable. Choosing a folder with no `metadata.db` is refused
+are otherwise indistinguishable. A re-import sends only what is missing, and says how
+much it skipped. Choosing a folder with no `metadata.db` is refused
 in the browser, before any request.
 
 Beneath it, the same tab offers **a library the server can already see**: mount it and

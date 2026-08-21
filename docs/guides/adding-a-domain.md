@@ -293,6 +293,10 @@ class SteamImporter:
         # Whether `read` can take `ImportSource.directory`. Required by
         # `kind="directory"`; conformance refuses the kind without it.
         accepts_files=False,
+        # Whether you can say what is worth uploading before it is uploaded. Needs
+        # `IncrementalImporter` and a durable identity in the source; leave it false
+        # rather than guess (DEC-082).
+        incremental=False,
     )
     identity_kinds = frozenset({"steam_app"})
     # Closed. An undeclared code is republished as `undeclared_import_error`
@@ -344,6 +348,15 @@ reader never learns there were two ways in. `CalibreImporter.read` is nine lines
 example. Declare `max_bytes`/`max_files` honestly: a refusal that names your `alternate` is far
 better than a timeout.
 
+**If a re-import would resend what the library already has**, implement `IncrementalImporter` and set
+`input.incremental = True`. `plan` receives the cheap half of the source, the client's `{path, size}`
+offer, and an `ImportInventory` with two batched questions — `existing` and `with_cover` — and
+answers with the subset worth uploading. Plan by a **durable identity** in the source, never by a
+digest: the client cannot hash, because `crypto.subtle` is undefined outside a secure context and
+this application is served over plain HTTP on a LAN. A source with no stable identity should leave
+`incremental` false rather than guess. Remember that the plan is an optimisation the client is
+allowed to skip, so `read` must still behave correctly when it receives everything.
+
 If your source is a place the **server** can see, implement `BrowsableImporter` as well and set
 `input.browsable = True`. `browse(path, context)` returns an `ImportBrowseResult` with the relative
 path, its parent, the **names** of the immediate subdirectories and whether that folder is itself
@@ -383,8 +396,8 @@ shared service or screen. `test_domain_conformance.py` is parametrized over regi
 will reject a missing protocol member, an unknown target domain, empty identity kinds, a misplaced
 registration, a malformed guide, a non-https `help_url`, browsing declared without a `browse`
 method, an empty or shouted error vocabulary, a nested `alternate`, an `alternate` reusing the
-primary's `field`, a non-positive `max_bytes`/`max_files`, or `kind="directory"` without
-`accepts_files`.
+primary's `field`, a non-positive `max_bytes`/`max_files`, `kind="directory"` without
+`accepts_files`, or `incremental` without a `plan` method.
 
 ### Step 6 — Prove it
 

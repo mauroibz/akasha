@@ -71,9 +71,15 @@ tab or choose it.
 
 **Calibre needs no setup at all: choose your library folder and your browser reads it.**
 There is nothing to mount, no `CALIBRE_DIR`, and no restart. Only `metadata.db` and the
-covers are sent — your ebooks never leave your machine, which is why a 32 MB library is
-a few megabytes of upload — and the screen counts what it will send before it sends
-anything. Nothing is written back to Calibre and nothing holds the library open, so it
+covers are sent — your ebooks never leave your machine, which is why a 174 MB library is
+about 10 MB of upload — and the screen counts what it will send before it sends anything.
+
+**Re-syncing is cheap.** Before uploading, Akasha asks itself which books it already
+holds and sends only what is missing, so importing the same folder again moves about a
+megabyte instead of the whole thing — measured at 10.55 MB for a first import and
+0.99 MB for an unchanged re-sync of the same 18-book library. Add one book and only that
+book's cover travels. If the check fails for any reason, everything is sent and the
+screen says so, so a re-sync is never worse than it used to be. Nothing is written back to Calibre and nothing holds the library open, so it
 is safe to do while Calibre or calibre-web is running.
 
 If instead the library is somewhere the server can already see, the same tab offers
