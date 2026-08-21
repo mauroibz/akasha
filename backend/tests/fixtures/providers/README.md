@@ -33,6 +33,15 @@ Thirteen files were **added** on 2026-08-14 for Sprint 025 (the `musicbrainz_*`,
 between requests. MusicBrainz answered one **`503`** during the run, which is how it
 signals throttling — it does not use `429`. Nothing else was re-recorded.
 
+Two files were **added** on 2026-08-20 for Sprint 030 (the `*_20260820` rows below),
+captured with `User-Agent: Akasha/1.2 (+<contact address>)`. They are the sprint's
+**control measurement**: MusicBrainz was already measured in Sprint 026, so the
+question here is whether the finding still holds against the live API today. It does —
+the two 2026-08-15 captures were re-requested verbatim and the tracklist the
+`recordings` parameter returns is identical, row for row, in `(number, title, length,
+recording.id)`. MusicBrainz answered one **`503`** during this run too; the retry
+after five seconds succeeded, which is three-for-three on that throttling shape.
+
 | File | Source |
 |---|---|
 | `isbn_9788437604572.headers` | `GET https://openlibrary.org/isbn/9788437604572.json` — response headers only. Status **302**, `Location: https://openlibrary.org/books/OL19845805M.json`. The same ISBN against `https://openlibrary.org/books/9788437604572.json` returns **404**: that endpoint takes an OLID, and requesting it with an ISBN is the defect Sprint 014 repaired. |
@@ -61,6 +70,8 @@ signals throttling — it does not use `429`. Nothing else was re-recorded.
 | `coverartarchive_release_group_kind_of_blue.json` | `GET https://coverartarchive.org/release-group/8e8a594f-2175-38c7-a871-abb68ec363e7` — captured **2026-08-14**. The `image` URL is **`http://`**, and each image carries `1200`/`500`/`250` thumbnails. `MAX_COVER_EDGE` is 600, so the 1200 is the one to fetch: the full image is downscaled to 600 anyway and the 500 would upscale. |
 | `coverartarchive_thumbnail_1200.headers` | `GET http://coverartarchive.org/release/e7ba3cb7-a074-45ee-870f-3baeb6d3e8bf/12708426541-1200.jpg` — response headers only, captured **2026-08-14**. Status **307**, `Location:` an `http://archive.org/download/...` URL. |
 | `archive_org_download_redirect.headers` | `GET http://archive.org/download/mbid-e7ba3cb7-…-12708426541_thumb1200.jpg` — response headers only, captured **2026-08-14**. Status **302** to `http://dn710907.ca.archive.org/…`, a host matched by neither `archive.org` exactly nor the `.us.archive.org` suffix rule. Note that **both** hops answer `http://`, so an https upgrade applied only to the first URL does not survive the chain. |
+| `musicbrainz_release_kind_of_blue_recordings_only_20260820.json` | `GET https://musicbrainz.org/ws/2/release/bee5e0cd-1767-4a8e-9578-6455e87ba60b?inc=artist-credits+labels+media+release-groups+recordings&fmt=json` — captured **2026-08-20** for Sprint 030's control. The same request as the 2026-08-15 row above, re-run live: the `media[].tracks` list is identical to that capture in `(number, title, length, recording.id)`, so "a tracklist is one parameter and no extra request" still holds. 6.5 KB. |
+| `musicbrainz_release_group_kind_of_blue_releases_20260820.json` | `GET https://musicbrainz.org/ws/2/release-group/8e8a594f-2175-38c7-a871-abb68ec363e7?inc=releases+artist-credits&fmt=json` — captured **2026-08-20** for the same control. Still **25 releases in one group**; the release-group ≈ work, release ≈ edition observation is unchanged. |
 
 The `fields` parameter used for both search recordings is the one
 `OpenLibraryProvider.search` sends; it is reproduced in the test that replays them.
