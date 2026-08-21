@@ -1,9 +1,9 @@
 """Which domains exist, and the unions the API publishes across them.
 
 The registry is **code, not a plugin runtime** (product spec section 2): a domain is a
-Python object registered here at import time. Adding one is an import and a tuple entry
-— one of the three registration points a domain is allowed to share, the others being
-provider wiring in the lifespan and migrations (technical spec 6.6).
+Python object registered here at import time. Adding one is an import and a tuple entry.
+Provider wiring and migrations are the other required shared registration points; an
+optional importer adds one more tuple here (technical spec 6.6).
 
 Nothing in this module knows what a book or an album *is*. That lives in
 `book_tracker/domains/<item_type>/`, and what a domain may declare lives in

@@ -299,7 +299,30 @@ Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the
 
 ### 6.5 Imports
 
-Preview is mandatory and has no library side effects beyond durable staging/audit records. Uploaded Goodreads files are copied to `/data/imports/{batch_id}/` with size limits and a SHA-256 fingerprint. Parse and persist normalized `ImportRecord` rows, match decisions, explicit ambiguities, row errors, and preview counts. Calibre requests identify only a path relative to configured `BOOK_TRACKER_CALIBRE_DIR`; resolve and verify it cannot escape the mount, open `metadata.db` with `mode=ro` and `PRAGMA query_only=ON`, and stage its normalized rows during preview so commit never rereads a changing source DB.
+An importer is a domain-owned connector implementing the `Importer` protocol in
+`domain/importers.py`. It declares a permanent `name`, user-facing `label`, target `item_type`, an
+`ImportInputSpec` (`upload` or `path`), and the exact `identity_kinds` it trusts. Its `read` method
+normalizes the source into an `ImportSnapshot`; `stage` archives the source or prepares local
+assets after fingerprint replay has been ruled out; and `match` applies its source-specific
+identity and near-match strategy through the narrow `ImportMatcher` view. Importers live under
+`domains/<item_type>/` and are registered in `IMPORTERS_BY_DOMAIN`; the shared pipeline never
+imports or branches on one.
+
+A `NormalizedImportRecord` has a neutral item (`title`, `subtitle`, `year`, identifiers, opaque
+metadata and optional curated creator sort), a neutral entry (score, notes, date added, the target
+domain's declared entry values, provisional flag and suggested status), shelves, row errors and
+opaque source fields. Before matching, the shared service validates metadata against the target
+domain's `fields`, entry values against `entry_fields`, suggested status against `statuses`, and
+identifiers against the importer's declared kinds. An invalid connector row is refused with
+`invalid_import_record`; it is never smuggled into another domain's vocabulary.
+
+Preview is mandatory and has no library side effects beyond durable staging/audit records. Uploaded
+Goodreads files are copied to `/data/imports/{batch_id}/` with size limits and a SHA-256 fingerprint.
+Parse and persist normalized `ImportRecord` rows, match decisions, explicit ambiguities, row errors,
+and preview counts. Calibre requests identify only a path relative to configured
+`BOOK_TRACKER_CALIBRE_DIR`; resolve and verify it cannot escape the mount, open `metadata.db` with
+`mode=ro` and `PRAGMA query_only=ON`, and stage its normalized rows during preview so commit never
+rereads a changing source DB.
 
 Commit accepts a preview batch ID, rejects stale/missing/mismatched previews or unresolved ambiguities, and applies the persisted plan in one bounded `BEGIN IMMEDIATE` transaction. Revalidate authoritative identifiers because the library may have changed since preview. If exact keys now resolve to different items, mark the record `identity_conflict` and abort that record rather than choosing a winner. Otherwise create/reuse items and entries, fill empty item fields, attach shelves only to newly created entries, record audit conflicts/effects, and persist enrichment jobs before commit. Existing entries are never reset to `unsorted` or modified. All parsing, Calibre reads, cover copies, image work, and provider calls stay outside the write transaction. A uniqueness race may reload and reuse a winner only when every exact identity agrees on that item.
 
@@ -353,6 +376,10 @@ Plus, outside the record itself:
 - **An adapter** implementing the `Provider` protocol (`domain/providers.py`), in the domain's own package as `domains/<item_type>/providers.py`: `name`, `item_type`, `async search(query, limit)` and `async fetch(source_id)`, returning `SearchCandidate` / `ItemPayload`. It owns its own rate limit, User-Agent and authentication, and never leaks a raw provider response above infrastructure (section 6.2). Its boundary behaviour is proven against committed recorded responses, never against a mock of the method under test (DEC-025).
 - **Cover URLs**, as candidates only. The shared pipeline keeps sole ownership of https upgrading, the host allowlist, the redirect policy and the pixel and byte bounds; a domain whose art lives on a new host adds that host to the allowlist and nothing else (seam 4).
 - **A curated sort name where the source knows one.** `SearchCandidate.creator_sort` seeds the owner's override; the `creator_sort_name` heuristic runs only when nothing knew. A source that distinguishes a person from a group must say so this way rather than let the heuristic invert `Daft Punk` (DEC-051, DEC-052).
+- **Zero or more importers** implementing `Importer` (`domain/importers.py`) in the domain's own
+  package. Each owns source reading, normalization, matching and source/asset staging; the shared
+  service owns validation, durable preview, commit, triage, fingerprint replay and undo (section
+  6.5). A domain without an importer registers an empty tuple and remains complete.
 
 #### Rules each supplied part must satisfy
 
@@ -379,17 +406,22 @@ Books and albums live there as of Sprint 028: `domains/book/` holds its declarat
 
 **The practical guide to building one is [`docs/guides/adding-a-domain.md`](../guides/adding-a-domain.md)**, which walks this section step by step with diagrams and a worked example. This section is the contract; that guide is how to satisfy it.
 
-Exactly three things stay shared, and they are the registration points rather than the domain's substance:
+Exactly three required things stay shared, and they are registration points rather than the
+domain's substance. An importer adds the optional fourth:
 
 1. **The registry** — the domain is added to `DOMAINS`, which is what makes it exist.
 2. **Provider wiring** in the application lifespan, where its adapter is constructed with its configuration.
 3. **Migrations**, which are global by nature and are the one path to a schema change.
+4. **Importer registration**, when the domain has one — add the domain-owned connector to
+   `IMPORTERS_BY_DOMAIN`; `IMPORTERS`, `GET /api/importers` and the generic routes derive from it.
 
 Anything else a domain has to edit outside its own package is a coupling, and a coupling is a defect to record and cost. Two remain after Sprint 028, both deliberately (DEC-066, DEC-067): the published unions (`EntryStatus`, `EntryFormat`, `ItemTypeName`), which are three type-safe lines per domain that a test refuses to let drift, and the cover host allowlist, which is central precisely so a domain cannot widen it from its own package. The third — `entries.ck_entries_status`, a CHECK rendered from the registry when its migration was written — was removed in migration `0014`, because a domain needing a schema change on a shared table is not a coupling that can be paid per domain: two domain teams would both write that migration against the same alembic head.
 
 #### How the core serves a domain
 
 - `GET /api/item-types` publishes every field of every registered domain, and every screen renders from it: the library's tabs, the status chips, the format selector, the triage hotkeys, the metadata dialog and the detail page's field order.
+- `GET /api/importers` publishes every registered importer and its input descriptor; the import
+  screen renders its tabs and input control from that declaration.
 - **A write is validated against the item's own domain** (`LibraryService._validated`), refused with a 422 that names the domain — the value is very often valid one row further down the library, so "invalid status" alone would send the reader hunting. A bulk write spanning domains is refused whole.
 - **A filter legitimately spans domains**, so query parameters validate against the union of every domain's values while writes validate against one domain. `type` is not an ordinary facet dimension: both status facets clear it so the inbox badge keeps agreeing with the domain-agnostic triage screen, while `format_counts` applies it because that selector sits under the tab (DEC-062).
 - Enrichment is queued only for domains that declare `enriches`.
@@ -426,6 +458,9 @@ The product-spec route list is authoritative, with these refinements:
   accepts `notes`, `formats` and the passage fields, each validated against the item's own domain
   and refused with a 422 naming it — the same rule `PATCH` follows, applied **before the write**, so
   a refusal never leaves a half-added row.
+- A manual `POST /entries` payload must name `manual.item_type`; absence is a 422 rather than a
+  fallback to the default domain. Its opaque `manual.metadata` is validated against that domain's
+  `fields`, and `/add` renders the same declaration behind an authoritative domain chooser.
 - **Two searches exist and they are not the same kind of thing.** `GET /entries?q=` is SQL over
   stored normalized projections: free, local, and reached by every keystroke the library filter
   makes. `GET /search?q=&type=` fans out to the chosen domain's providers at five seconds each and
@@ -445,11 +480,12 @@ The product-spec route list is authoritative, with these refinements:
   somebody is waiting for it.
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
-- Import commit bodies contain preview batch IDs, not client-controlled source payloads.
-- `POST /import/calibre/preview` accepts only `library_path` relative to the configured mount;
-  `POST /import/calibre/commit` accepts the durable batch ID and ambiguity choices. Preview responses
-  expose normalized Calibre UUID/book identity and whether a local cover was staged, never a source
-  filesystem path.
+- `GET /importers` publishes `{id, label, item_type, input}` from the importer registry.
+  `POST /import/{importer}/preview` accepts the declared upload field or path field;
+  `POST /import/{importer}/commit` accepts only the durable preview batch ID and ambiguity choices,
+  never client-controlled normalized records. Calibre's path is relative to the configured mount;
+  preview responses may expose its normalized UUID/book identity and whether a local cover was
+  staged, never a source filesystem path.
 - Cover files are served from a controlled route or static mount with immutable cache headers; database paths are relative and never accepted from clients.
 - `GET /api/export` streams the whole library rather than buffering it: rows are walked in keyset
   batches of 200 and each is serialized and yielded on its own, so peak memory tracks the batch and

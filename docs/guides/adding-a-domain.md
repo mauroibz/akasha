@@ -9,9 +9,10 @@ films, board games — is built by following this guide, and **you should not ne
 were built to do it.** If you find yourself reading Sprints 025–028 to answer a question this guide
 does not, that is a defect in this guide; say so.
 
-The promise this structure exists to keep: **adding a domain touches your own directory and three
-lines of registration. It does not touch another domain's files, and it does not require a database
-migration.**
+The promise this structure exists to keep: **adding a domain touches your own directory and small,
+explicit registration points. It does not touch another domain's files, and it does not require a
+database migration.** An optional importer is another object in that same directory plus one
+registry tuple entry; it does not change the shared pipeline.
 
 ---
 
@@ -118,8 +119,10 @@ Nine `◆`, and every one of them is a value or a function you declared in your 
 | 7 | Credentials | `config.py` + `.env.example` | if your provider needs a key |
 | 8 | Cover host | `infrastructure/covers.py` allowlist | if your art is hosted somewhere new |
 | 9 | Recorded responses | `backend/tests/fixtures/providers/` | yes |
+| 10 | Your importer | `backend/src/book_tracker/domains/<item_type>/<source>.py` | if this domain imports an external source |
+| 11 | Register the importer | `domain/registry.py` — one import, one tuple entry | same condition as 10 |
 
-**That is the complete list.** Items 3–8 are the shared registration points, and they are
+**That is the complete list.** Items 3–8 and 11 are the shared registration points, and they are
 deliberately shared — §5 explains why each one was kept rather than removed. Everything else about
 your domain lives in your own directory.
 
@@ -252,6 +255,82 @@ Then run `make openapi` so the checked-in schema carries your values.
 Then construct your adapter in the `main.py` lifespan, into the provider catalog. Everything else —
 `/api/health/providers`, search routing, add-by-URL — picks it up from there.
 
+### Optional step — Add an importer
+
+An importer is for an existing external library, not interactive provider search. Put it in your
+domain package and implement `Importer` from `domain/importers.py`:
+
+```python
+class SteamImporter:
+    name = "steam"                 # permanent route and batch kind
+    label = "Steam"                # user-facing tab
+    item_type = DOMAIN.item_type    # the domain every normalized row must satisfy
+    input = ImportInputSpec(
+        kind="upload",             # or "path" for a configured host mount
+        label="Steam export",
+        field="file",
+        accept="application/json",
+    )
+    identity_kinds = frozenset({"steam_app"})
+
+    def read(
+        self, source: ImportSource, context: ImportReadContext
+    ) -> ImportSnapshot: ...
+
+    def stage(
+        self, snapshot: ImportSnapshot, directory: Path, data_dir: Path
+    ) -> ImportSnapshot: ...
+
+    def match(
+        self, record: NormalizedImportRecord, matcher: ImportMatcher
+    ) -> MatchDecision: ...
+
+IMPORTER = SteamImporter()
+```
+
+`read` owns decoding, source validation and fingerprinting. It returns an immutable snapshot whose
+records use only the neutral shapes:
+
+- `ImportItem`: title/subtitle/year, an identifiers mapping, metadata declared by `DOMAIN.fields`,
+  and an optional curated creator sort;
+- `ImportEntry`: score, notes, date added, values declared by `DOMAIN.entry_fields`, an optional
+  provisional score flag and suggested status;
+- `NormalizedImportRecord`: those two halves plus shelves, row errors, opaque source fields and an
+  optional cover source.
+
+Raise `ImportReadError(code, message, details)` for an invalid source. Do not return a raw provider
+row or put domain metadata in `source_fields`: the shared service validates `metadata`, entry values,
+status and identity kinds before it calls `match`.
+
+`stage` runs only after fingerprint replay has been checked. Copy an uploaded source into
+`directory`, or prepare covers there and return records whose `cover_stage` paths are relative to
+`data_dir`. Remove raw bytes and host paths from the returned snapshot. Commit never opens the
+source again.
+
+`match` receives the one narrow library operation it may use. Normalize only identifiers listed in
+`identity_kinds`, then call `matcher.match(...)`; never query storage directly. Finally register the
+connector:
+
+```python
+# domain/registry.py
+from book_tracker.domains.game.steam import IMPORTER as STEAM_IMPORTER
+
+IMPORTERS_BY_DOMAIN = {
+    # ...
+    GAME.item_type: (STEAM_IMPORTER,),
+}
+```
+
+That one entry publishes the tab through `GET /api/importers` and serves preview/commit at
+`POST /api/import/steam/preview` and `POST /api/import/steam/commit`. The shared service supplies
+durable preview, ambiguity choices, one bounded commit, `unsorted` triage, fingerprint idempotency,
+the 24-hour undo window and enrichment only when the target domain declares it.
+
+Add parser/adapter fixtures for the source itself and a generic route round-trip. Do not edit the
+shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
+will reject a missing protocol member, an unknown target domain, empty identity kinds, or a
+misplaced registration.
+
 ### Step 6 — Prove it
 
 ```bash
@@ -308,7 +387,8 @@ writing any of it, stop — you are about to duplicate something:
 | The library screen | tabs, status chips, format picker, sorting, keyset pagination, facet counts |
 | The detail page | your metadata fields in your order, your status vocabulary, your panel heading |
 | Triage | your hotkeys, bulk operations, selection across pages |
-| The add flow | search, add-by-URL, the confirm screen rendered from your field spec |
+| The add flow | search, add-by-URL, manual entry and the confirm screen rendered from your field spec |
+| Import | registry-driven source tab, preview/commit, validation, triage and undo for a registered importer |
 | Shelves | the owner's own tier of organisation, across every domain |
 | Import ledger and undo | 24-hour reversal of anything an import did |
 | Export | entity-shaped JSON carrying `type`, identifiers and your opaque metadata |
@@ -348,7 +428,7 @@ without reading that entry:
 
 ---
 
-## 6. Two things that are not solved yet
+## 6. One thing that is not solved yet
 
 Read these before you design around them.
 
@@ -359,10 +439,6 @@ seam**: albums declare `False` because one MusicBrainz fetch returns everything 
 domain genuinely needs background enrichment on another key, that is the point at which the seam gets
 built properly, with your real case to design against (DEC-067 row 3). Declare `enriches=False` and
 say so in your sprint or issue.
-
-**Manual entry is a book form.** The manual add path is bound to the default domain and asks for an
-ISBN. A new domain has no manual fallback until that screen is rendered from the field spec
-(DEC-067 row 6).
 
 ---
 
@@ -397,6 +473,7 @@ cite it as measurement; it carries its own list of what to verify first.
 | `domain/spec.py` | What a domain *is*: `Domain`, `FieldSpec`, `StatusSpec`, `FormatSpec`, the validators, `UrlMatch`, `split_url` |
 | `domain/registry.py` | Which domains *exist*: `DOMAINS`, `DEFAULT_DOMAIN`, the three published unions |
 | `domain/providers.py` | `SearchCandidate`, `ItemPayload`, the `Provider` protocol, `IdentityStrategy`, `merge_and_rank` |
+| `domain/importers.py` | The `Importer` protocol and neutral import snapshot/record shapes |
 | `domains/book/` | Books: declaration, Open Library and Google Books adapters, Goodreads and Calibre importers |
 | `domains/album/` | Albums: declaration, MusicBrainz and Cover Art Archive adapter |
 | `infrastructure/providers.py` | The shared HTTP boundary only: `bounded_json`, `parse_year`, retry policy, the client |
@@ -418,3 +495,4 @@ worth reading before you design a domain are:
   every coupling that remains.
 - **DEC-068** — the IGDB walk.
 - **DEC-069** — what moving the code found that reading it could not.
+- **DEC-076 / DEC-078** — why importers are domain-owned, and the concrete boundary that shipped.

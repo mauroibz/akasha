@@ -2618,3 +2618,39 @@ Append-only record of material architecture choices, product-default resolutions
   2. The owner stating the Malazan sentence as a need rather than an example.
   3. Two domains shipping shape (a) and their `progress` vocabularies drifting,
      promoting the field to a shared typed concept.
+
+## DEC-078 — Importers normalize once; the shared pipeline validates and commits
+
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Extends:** DEC-069 (readers belong to their domain), DEC-076 (the measured import coupling)
+- **Context:** Sprint 031 had to choose the concrete contract a future connector implements. The
+  choice determines whether the next importer stays inside its domain or has to teach shared code
+  its source vocabulary. It also had to settle route compatibility and the shape of manual entry,
+  both called out as risks in the sprint contract.
+- **Decision.** `Importer` is an explicit, runtime-checkable protocol beside `Provider`. A connector
+  declares its permanent name, label, target domain, input descriptor and authoritative identity
+  kinds, then implements three operations: `read` produces an immutable neutral snapshot; `stage`
+  archives source bytes or prepares local assets only after fingerprint replay has been ruled out;
+  and `match` applies the connector's identity strategy through a narrow library matcher. The
+  normalized row has nested neutral item and entry halves plus opaque source fields. The shared
+  `ImportService` owns domain validation, durable planning, commit, enrichment eligibility and the
+  ledger; `ImportRepository` reads the target `Domain` declaration and importer identity kinds,
+  never a book key list.
+- **Route compatibility.** The two public URLs did not change: the generic template
+  `/api/import/{importer}/preview|commit` resolves to the existing Goodreads and Calibre paths.
+  Dedicated handlers were removed rather than retained as delegates because there is no distinct
+  legacy path to redirect. `GET /api/importers` is the new catalog used by the screen. Preview keeps
+  compatibility fields supplied by each reader while adding nested `item`, `entry` and
+  `source_fields`; new shared code depends only on the nested shape.
+- **Manual entry.** `manual.item_type` is required; absence is a 422 rather than a silent book
+  default. `manual.metadata` and optional `manual.identifiers` replace the book-shaped manual body,
+  and the server validates metadata against the named domain before matching or writing. `/add`
+  renders ordinary metadata controls from `GET /api/item-types`; structured `rows` remain
+  source-provided rather than being flattened into a hand-entry text box.
+- **Consequences.** Goodreads and Calibre retain their parsers and observable behavior, held by
+  their unmodified suites. A new importer adds one module and one registry tuple, and automatically
+  receives the catalog tab, generic routes, preview/commit transaction, `unsorted` triage,
+  fingerprint idempotency and undo. The contract deliberately does not provide discovery or a
+  plugin runtime: connectors are code-owned and ship with the application, like domains and
+  providers.

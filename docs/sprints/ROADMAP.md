@@ -2,7 +2,7 @@
 
 **Plan revision:** 13
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 030](030-entry-depth.md)
+**Active sprint:** [Sprint 031](031-per-domain-imports.md)
 
 ## Shape of the plan
 
@@ -83,7 +83,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [028](028-the-domain-contract.md) | The domain contract | 027 | completed |
 | [029](029-one-search-bar.md) | One search bar | 027, 028 | completed |
 | [030](030-entry-depth.md) | Entry depth: the decision **[GATED]** | 029 | completed |
-| [031](031-per-domain-imports.md) | Per-domain imports | 030 | **ready** |
+| [031](031-per-domain-imports.md) | Per-domain imports | 030 | **in_progress** |
 
 ## Contracts for planned sprints
 

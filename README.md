@@ -58,6 +58,25 @@ in case you need a safe place to store that PDF.
 
 </details>
 
+## Importing and triage
+
+Use **Import** when you already have a book library in Goodreads or Calibre. Every
+import starts with a preview: you can inspect errors and settle ambiguous matches
+before Akasha changes the library. A committed row enters **Triage** as `unsorted`.
+The ordinary library view deliberately hides unsorted entries, so open Triage after
+an import and choose the status that reflects what each book means to you.
+
+Re-running a source is useful when that source has changed. The source fingerprint
+makes an unchanged replay harmless. A Calibre re-sync can fill metadata that is still
+empty, but it never overwrites a value you have edited in Akasha; your corrections
+always win. A committed batch can be undone from the completion screen for 24 hours,
+while its audit record remains durable after that window.
+
+Import connectors are domain-owned and registry-driven. Goodreads and Calibre ship
+for books today; contributors can add another connector without changing the shared
+preview, commit, triage, or undo pipeline. See
+[how to add a domain and importer](docs/guides/adding-a-domain.md).
+
 ## Quick start
 
 You need Docker with the Compose plugin. Nothing else.
