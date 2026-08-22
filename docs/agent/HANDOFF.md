@@ -1,54 +1,48 @@
-# Handoff — numbered plan complete through Sprint 036
+# Handoff — Sprint 037 verification remains
 
-Plan revision 18. **Sprint 036 closed on 2026-08-21 and project state is `complete`.** Sprints
-001–036 are completed; active sprint fields are null; `FINAL_SPRINT` is 36. Nothing was tagged,
-pushed, released or deployed.
+Plan revision 19. Sprint 037 is `in_progress`; Sprints 001–036 are complete. The owner ended the
+session after implementation and the realistic walkthrough but during the exhaustive gates. Nothing
+was pushed, tagged, deployed or released.
 
-## What now ships
+## Implemented and committed
 
-The existing `/import` route reads as two independent steps: **1. Import** contains the registered
-source tabs, and **2. Triage** contains review. Connector URLs, remembered source, staged previews,
-undo and the old `/triage` redirect retain their behavior.
+- `b556b1d`: Triage uses window/page virtualization instead of a nested 70vh vertical scroller.
+  Row statuses stage locally until Apply; Discard sends nothing; Apply groups equal statuses into
+  existing bulk requests and retains failed groups. Scores and explicit checkbox bulk actions remain
+  immediate.
+- `8de69ed`: pending-status and bulk actions share one non-overlapping sticky stack. README, product
+  spec, technical spec and DEC-087 describe the corrected contract.
 
-In Triage, status and score are editable directly on every row. Each control writes only that entry
-with optimistic rollback. Clicking the row body opens detail; only the checkbox enters pointer bulk
-selection. Shift ranges, Ctrl/Cmd+A, bulk actions, keyboard shortcuts and bounded virtualization
-remain. The controls fit a 390 px viewport, and a short inbox uses only the height its rows need.
+The worktree was clean before this handoff-only update. No backend, API, schema, dependency or build
+configuration changed.
 
-## Closure evidence
+## Evidence already green
 
-- `make check` passed Ruff, Prettier, ESLint, mypy, TypeScript, OpenAPI and project validation.
-- `make test` passed 559 backend and 179 frontend tests; the affected frontend gate passed all 179
-  again after the final accessibility-only JSX correction.
-- Full Playwright at one worker passed 101 with 2 intentional skips. Focused Triage (16), Triage axe
-  (2) and production-bundle (2) checks passed.
-- Realistic-data mobile walkthrough exercised both steps, two row-local edits, row navigation and
-  checkbox-only bulk selection. It found and drove the short-inbox height repair; the repeat had no
-  overflow, console error or page error. Live owner data was never mutated.
+- TypeScript passed.
+- Full focused Triage/axe run: 20 passed.
+- Additional post-toolbar focused geometry/accessibility run: 2 passed.
+- Project validator and `git diff --check` passed.
+- Realistic walkthrough passed against disposable `/tmp/akasha-s37-walkthrough.RbFZRa/data` at
+  390x844: 16 rows used document scroll; two statuses staged and discarded with no request; a score
+  saved immediately; two repeated status choices remained until Apply, produced exactly two grouped
+  bulk requests, then left Inbox at 14. No console/page errors. Live `data/` was untouched. The
+  ignored runner is `frontend/e2e/scratchpad/sprint37-walkthrough.spec.ts`; screenshot is
+  `/tmp/akasha-s37-walkthrough.png`. The isolated backend was stopped.
 
-## Testing next time
+## Required next
 
-Follow `docs/agent/TESTING.md` and DEC-084: stabilize focused checks, freeze implementation, run each
-affected exhaustive gate once, then classify closure-only diffs. Do not automatically repeat backend
-tests after frontend- or documentation-only changes.
+Implementation is frozen. Run, once and in order:
 
-Reusable owner-data flows live locally under ignored `frontend/e2e/scratchpad/` and are excluded from
-ordinary Playwright discovery. Opt into one explicitly from `frontend/` with
-`BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 npm run test:e2e -- --project=chromium --workers=1
-e2e/scratchpad/<file>.spec.ts`. Adapt the closest runner rather than recreating and deleting it.
+1. `make check`
+2. `make test` — use the documented non-sandbox execution if the known TestClient futex signature
+   appears.
+3. `cd frontend && npm run test:e2e -- --workers=1`
 
-## Known and left
+The previous attempt started the first two commands in parallel but was intentionally aborted after
+11.6 seconds when the owner ended the session. It produced no usable result, no process remains, and
+neither command counts. Full Playwright was not started.
 
-- `_bundle` still refuses a missing root `metadata.db` with Calibre-specific wording even though
-  allowed members are connector-declared. Generalizing required root files needs a scoped follow-up.
-- Playwright still emits proxy errors for optional endpoints that some isolated specs do not stub,
-  and Vitest still emits JSDOM/reduced-motion warnings. They are noisy but green; DEC-084 records
-  fixture centralization and warning cleanup as optimization work.
-- The two heavy library browser cases remain load-sensitive with parallel workers. One worker is the
-  established exhaustive gate; do not weaken their DOM or keyboard invariants.
-
-## Next
-
-No numbered sprint is active. A future session must first plan a new remediation sprint or select an
-unnumbered roadmap epic, update `FINAL_SPRINT`, and move state from `complete` through the normal
-planning protocol. Do not push, tag, deploy or release unless the owner asks.
+If all three pass, complete the Sprint 037 Outcome and closure docs, set state back to project
+`complete` with completed sprints 001–037 and null active fields, run the closure validator plus
+`git diff --check`, and commit `docs(sprint-037): close sprint and hand off`. Do not rerun the
+realistic walkthrough unless runtime/test code changes.

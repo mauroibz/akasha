@@ -2182,3 +2182,36 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   action is needed or was performed.
 - Next: none scheduled. The numbered plan is complete through Sprint 036; future product work starts
   by planning a new sprint from an unnumbered roadmap epic or a remediation need.
+
+## 2026-08-21 — Sprint 037 (in progress; implementation frozen)
+
+- Done: opened owner-directed remediation Sprint 037. Triage now window-virtualizes against the
+  document instead of keeping a nested 70vh scroller. Row status choices are visible client drafts;
+  Apply groups IDs by status through the existing bulk endpoint, Discard sends nothing, partial
+  failures retain only failed drafts, and score writes remain immediate. Pending-status and explicit
+  bulk controls share one sticky stack rather than overlapping. Commits: `b556b1d`, `8de69ed`.
+- Verified before freeze: TypeScript passed. The complete Triage/axe regression passed 20 browser
+  cases; focused failure-first coverage passed staging, discard, grouped apply, partial failure,
+  window scroll, bounded 200-row DOM, immediate score, combined-toolbar geometry and accessibility.
+  Project validation and `git diff --check` passed. No backend/API/schema change exists.
+- Walkthrough: used `/tmp/akasha-s37-walkthrough.RbFZRa/data`, a disposable copy of realistic owner
+  data with all 16 entries temporarily marked unsorted, at 390x844. The browser window reached the
+  final rows with no nested overflow. Two status choices stayed visible and made zero requests;
+  Discard restored both. Repeating them plus a Tokio blues score change produced one immediate row
+  PATCH, then exactly two status-group bulk PATCHes only after Apply; the two rows left and Inbox
+  became 14. The final pass had no console/page error; screenshot:
+  `/tmp/akasha-s37-walkthrough.png`. Live `data/` was untouched and the backend was stopped.
+- Walkthrough adaptation: two early local assertions were wrong, not product failures. A 16-row real
+  list legitimately fit inside virtualization overscan, and after scrolling to the bottom the first
+  title was correctly unmounted. The retained ignored Sprint 037 runner now uses the actual final-row
+  title and leaves the 200-row DOM bound to the deterministic tracked test.
+- Interrupted verification: `make check` and `make test` were started together after freeze, then the
+  owner ended the session after 11.6 seconds. The tool returned no usable result and no check/test
+  process remains, so neither command counts as run. Full Playwright was not started. Do not close
+  Sprint 037 until all three exhaustive gates pass.
+- Blocked/open: not blocked; paused at the owner's request. Product implementation and canonical
+  README/spec/DEC-087 changes are committed. Only exhaustive verification and normal sprint closure
+  documentation/state remain.
+- Next: run `make check`, `make test`, then `npm run test:e2e -- --workers=1` once. If green, update
+  Sprint 037 Outcome, roadmap, worklog, handoff and state to project-complete, run closure validator
+  plus `git diff --check`, and create `docs(sprint-037): close sprint and hand off`.
