@@ -2787,3 +2787,28 @@ Append-only record of material architecture choices, product-default resolutions
   score narrow, and the row is asserted not to overflow. The realistic walkthrough also exposed the
   old fixed 70vh blank panel under a short inbox; triage now sizes to its virtual content until the
   same 70vh/760px scroll cap is reached.
+
+## DEC-087 — Triage uses page scroll and status drafts
+
+- **Date:** 2026-08-21
+- **Status:** accepted
+- **Supersedes:** DEC-085's immediate row-status write and DEC-086's nested-scroll consequence;
+  preserves their checkbox-only selection, native row-control and optimistic score decisions.
+- **Context:** In the owner's first sustained use, the 70vh Triage box made the wheel manage a
+  second vertical position while unused document space remained below it. More seriously, a native
+  status selection patched immediately and invalidated the `status=unsorted` query. The browser
+  could repaint the controlled select as Inbox during refresh or remove the row altogether, so an
+  ordinary one-row decision interrupted the act of reading down the list. This was technically the
+  contract Sprint 036 wrote and still the wrong interaction.
+- **Decision:** Triage window-virtualizes its fixed rows using the measured document offset and lets
+  the browser own scrolling. A row-local status choice is a client-side draft, visibly marked as not
+  saved. One explicit toolbar applies all drafts, grouped into one existing bulk request per chosen
+  status; another discards them without a request. Successfully applied groups clear and may leave
+  Inbox, while failed groups remain staged for retry with one error announcement. Row-local scores
+  and explicit checkbox bulk actions continue saving immediately.
+- **Consequences:** Review order stays visually stable until the owner chooses the commit boundary.
+  Applying several different statuses is not transactionally atomic because the existing endpoint
+  accepts one status per request; the UI reports partial failure honestly and retains only the
+  failed drafts. No backend, schema or API change is required. A 200-row browser test asserts window
+  scroll and bounded mounted DOM, and the realistic 16-row walkthrough confirms that discard sends
+  nothing and apply is the first status write.

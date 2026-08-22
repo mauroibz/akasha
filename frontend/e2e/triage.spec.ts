@@ -239,6 +239,18 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
     0,
   );
 
+  await row.getByRole("checkbox", { name: "Select Book 1" }).click();
+  const pendingBox = await page
+    .getByRole("toolbar", { name: "Pending status changes" })
+    .boundingBox();
+  const bulkBox = await page
+    .getByRole("toolbar", { name: "Bulk actions" })
+    .boundingBox();
+  expect(pendingBox).not.toBeNull();
+  expect(bulkBox).not.toBeNull();
+  expect(bulkBox!.y).toBeGreaterThanOrEqual(pendingBox!.y + pendingBox!.height);
+  await page.getByRole("button", { name: "Clear selection" }).click();
+
   await page.getByRole("button", { name: "Discard status changes" }).click();
   await expect(
     row.getByRole("combobox", { name: "Status for Book 1" }),

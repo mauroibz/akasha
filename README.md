@@ -101,10 +101,12 @@ upload ceiling, which is what a library too large for a browser should use.
 Every import starts with a preview: you can inspect errors and settle ambiguous
 matches before Akasha changes anything. A committed row enters Triage as `unsorted`,
 and the ordinary library view deliberately hides unsorted entries, so the Triage step
-is where an import actually shows up. Score and status can be changed directly on each
-row as you read down the list. Check a row only when you want bulk actions; clicking the
-rest of the row opens its detail page. When a source cannot be read, the connector says
-what to do about it — a locked Calibre database asks you to close Calibre and try again.
+is where an import actually shows up. The list uses the page's vertical scroll. Score
+changes save immediately; status choices stay visibly staged on their rows until you
+apply or discard them together, so nothing leaves the Inbox while you are still reading
+down the list. Check a row only when you want bulk actions; clicking the rest of the row
+opens its detail page. When a source cannot be read, the connector says what to do about
+it — a locked Calibre database asks you to close Calibre and try again.
 
 Re-running a source is useful when that source has changed. The source fingerprint
 makes an unchanged replay harmless. A Calibre re-sync can fill metadata that is still

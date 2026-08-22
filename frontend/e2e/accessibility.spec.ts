@@ -315,6 +315,10 @@ test("triage pending status actions have no serious accessibility violations", a
   await expect(
     page.getByRole("toolbar", { name: "Pending status changes" }),
   ).toBeVisible();
+  await page.getByRole("checkbox").nth(1).click();
+  await expect(
+    page.getByRole("toolbar", { name: "Bulk actions" }),
+  ).toBeVisible();
   await expectNoSeriousViolations(page, "triage (pending statuses)");
 });
 

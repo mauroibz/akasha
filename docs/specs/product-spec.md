@@ -755,12 +755,15 @@ is explicit, and keyboard-first throughout.
 - **Dense table by default** — small cover thumb, title, author, suggested status,
   and directly editable current status and score. Compact rows, ~25 visible at once;
   on a narrow screen the redundant cover and detail chevron hide so the controls do
-  not create horizontal scroll. A short inbox fits its rows; a long one scrolls at the
-  existing viewport cap.
-- **Row-local editing** — changing the status or score control always patches that
-  one entry, optimistically. A successful status change removes the row from the
-  `unsorted` inbox; a failed write restores its previous value and announces once.
-  Clicking anywhere else on the row opens detail and never selects it.
+  not create horizontal scroll. The inbox grows down the document and the browser window
+  owns vertical scrolling; it never nests a second vertical scroll box inside the page.
+- **Row-local editing** — changing score patches that one entry optimistically. Status is
+  deliberately different: each choice stays visibly marked as not saved, and no status
+  request is sent until *Apply status changes*. *Discard status changes* restores the
+  rows to Inbox without a request. Apply groups rows by chosen status; only successfully
+  applied rows may leave the `unsorted` inbox, while failed groups remain staged for retry
+  and produce one error announcement. Clicking anywhere else on the row opens detail and
+  never selects it.
 - **Selection model** — the checkbox is the pointer boundary for selection, with
   shift-click range selection and `Ctrl/Cmd+A`. A persistent action bar appears when anything is
   selected: *Set status · Add shelves · Set score · Clear provisional · Delete*.
