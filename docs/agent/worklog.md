@@ -2215,3 +2215,25 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: run `make check`, `make test`, then `npm run test:e2e -- --workers=1` once. If green, update
   Sprint 037 Outcome, roadmap, worklog, handoff and state to project-complete, run closure validator
   plus `git diff --check`, and create `docs(sprint-037): close sprint and hand off`.
+
+## 2026-08-22 — Sprint 037 (complete; project complete)
+
+- Done: resumed the frozen Sprint 037 implementation from the verification handoff. No runtime or
+  test code changed. Completed the sprint Outcome, marked the roadmap and state complete through
+  Sprint 037, and rewrote the handoff as release-state current reality. Implementation commits remain
+  `b556b1d` and `8de69ed`.
+- Verified: `make check` passed all formatting, lint, type, OpenAPI and project checks. `make test`
+  passed 559 backend tests and 179 frontend tests. The isolated run reproduced the documented
+  FastAPI `TestClient` stall in `test_export.py`; after stopping that non-counting run, the approved
+  outside-sandbox run completed the backend suite in 49.95 seconds. Full Playwright at one worker
+  passed 103 cases with 2 intentional skips across 105 cases.
+- Walkthrough evidence reused from the immediately preceding frozen implementation session, per
+  `docs/agent/TESTING.md`: disposable realistic data at 390x844 proved document scroll, staging and
+  no-request discard, immediate score save, two grouped Apply requests, Inbox reduction from 16 to
+  14, and no console/page errors. No code changed after that walkthrough.
+- Deviations/observations: no product or architecture deviation. Existing Playwright proxy chatter
+  from deliberately unstubbed optional requests and Vitest jsdom/Radix warnings remained noisy but
+  did not hide failures. The working branch was already `main`, so closure required no feature-branch
+  merge commit.
+- Next: no numbered sprint remains. New work must be planned explicitly; the roadmap's unnumbered
+  epics are not active commitments.

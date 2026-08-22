@@ -1,48 +1,30 @@
-# Handoff — Sprint 037 verification remains
+# Handoff — numbered plan complete through Sprint 037
 
-Plan revision 19. Sprint 037 is `in_progress`; Sprints 001–036 are complete. The owner ended the
-session after implementation and the realistic walkthrough but during the exhaustive gates. Nothing
-was pushed, tagged, deployed or released.
+Plan revision 19 is complete. Sprints 001–037 are closed, `docs/agent/state.json` has no active
+sprint, and the repository is on `main`. Sprint 037 was the final numbered sprint selected by
+`scripts/validate_project.py`.
 
-## Implemented and committed
+## Delivered state
 
-- `b556b1d`: Triage uses window/page virtualization instead of a nested 70vh vertical scroller.
-  Row statuses stage locally until Apply; Discard sends nothing; Apply groups equal statuses into
-  existing bulk requests and retains failed groups. Scores and explicit checkbox bulk actions remain
-  immediate.
-- `8de69ed`: pending-status and bulk actions share one non-overlapping sticky stack. README, product
-  spec, technical spec and DEC-087 describe the corrected contract.
+- Triage is the second step on Import and uses the browser page for vertical scrolling, with a
+  bounded window-virtualized DOM.
+- Row status choices remain visibly staged until the owner applies or discards them. Apply groups
+  equal statuses through the existing bulk endpoint and retains failed groups for retry.
+- Row scores and explicit checkbox bulk actions still save immediately. The pending-status and bulk
+  toolbars share one non-overlapping sticky stack.
+- Canonical behavior is recorded in README, product spec section 7, technical spec section 8 and
+  DEC-087. No backend, API or schema change was required.
 
-The worktree was clean before this handoff-only update. No backend, API, schema, dependency or build
-configuration changed.
+## Verification at closure
 
-## Evidence already green
+- `make check` passed.
+- `make test` passed with 559 backend and 179 frontend tests; the backend suite used the documented
+  outside-sandbox workaround after the isolated `TestClient` stall reproduced.
+- Full Playwright passed with 103 cases and 2 intentional skips at one worker.
+- The realistic owner-data walkthrough passed at 390x844 against disposable data and left live data
+  untouched.
+- Closure project validation and `git diff --check` passed.
 
-- TypeScript passed.
-- Full focused Triage/axe run: 20 passed.
-- Additional post-toolbar focused geometry/accessibility run: 2 passed.
-- Project validator and `git diff --check` passed.
-- Realistic walkthrough passed against disposable `/tmp/akasha-s37-walkthrough.RbFZRa/data` at
-  390x844: 16 rows used document scroll; two statuses staged and discarded with no request; a score
-  saved immediately; two repeated status choices remained until Apply, produced exactly two grouped
-  bulk requests, then left Inbox at 14. No console/page errors. Live `data/` was untouched. The
-  ignored runner is `frontend/e2e/scratchpad/sprint37-walkthrough.spec.ts`; screenshot is
-  `/tmp/akasha-s37-walkthrough.png`. The isolated backend was stopped.
-
-## Required next
-
-Implementation is frozen. Run, once and in order:
-
-1. `make check`
-2. `make test` — use the documented non-sandbox execution if the known TestClient futex signature
-   appears.
-3. `cd frontend && npm run test:e2e -- --workers=1`
-
-The previous attempt started the first two commands in parallel but was intentionally aborted after
-11.6 seconds when the owner ended the session. It produced no usable result, no process remains, and
-neither command counts. Full Playwright was not started.
-
-If all three pass, complete the Sprint 037 Outcome and closure docs, set state back to project
-`complete` with completed sprints 001–037 and null active fields, run the closure validator plus
-`git diff --check`, and commit `docs(sprint-037): close sprint and hand off`. Do not rerun the
-realistic walkthrough unless runtime/test code changes.
+There is no next numbered sprint. Future work must be planned explicitly and must reactivate state
+through the normal workflow. The unnumbered epics in `docs/sprints/ROADMAP.md` remain possibilities,
+not active commitments.

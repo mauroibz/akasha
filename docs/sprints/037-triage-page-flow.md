@@ -1,6 +1,6 @@
 # Sprint 037 — Triage page flow and staged statuses
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 036
 **Roadmap revision:** 19
 
@@ -85,4 +85,44 @@ nearby entries. Score edits work and should retain their immediate-save behavior
 
 ## Outcome
 
-_In progress._
+Completed 2026-08-22.
+
+- Triage now virtualizes against the browser window and grows down the document instead of owning a
+  nested `70vh` scroller. A deterministic 200-row browser case reaches the final row through page
+  scroll while keeping fewer than 30 articles mounted (`b556b1d`).
+- Row status choices are visible client-side drafts and send no row or bulk request before Apply.
+  Discard restores Inbox without a request; Apply groups entries by status through the existing bulk
+  endpoint, clears successful groups, retains failed groups for retry, and invalidates Triage and
+  Library once (`b556b1d`).
+- Pending-status and explicit checkbox-bulk actions share one keyboard-accessible sticky stack and
+  do not overlap at mobile width. Scores and all explicit bulk, selection, keyboard, motion and
+  accessibility contracts remain immediate and intact (`8de69ed`).
+- README, product spec, technical spec and DEC-087 describe the corrected interaction. No backend,
+  API, schema, dependency or build-configuration change was needed.
+
+Acceptance criteria 1–7 passed. Focused browser coverage exercised status staging, discard,
+grouped apply, partial failure, immediate score persistence, page scrolling, bounded mounted DOM,
+combined-toolbar geometry and accessibility; the complete focused Triage/axe run passed 20 cases,
+with 2 affected geometry/accessibility cases passing again after the final toolbar correction.
+
+Verification after implementation freeze:
+
+- `make check`: Ruff, Prettier, ESLint, mypy, TypeScript, OpenAPI/type consistency and project
+  validation passed;
+- `make test`: 559 backend and 179 frontend tests passed. The first isolated attempt exhibited the
+  documented FastAPI `TestClient` stall in `test_export.py`; the prescribed outside-sandbox run
+  completed the backend suite in 49.95 seconds;
+- full Playwright at one worker: 103 passed and 2 intentionally skipped across 105 cases;
+- `python scripts/validate_project.py` and `git diff --check` passed after the documentation/state
+  closure edits.
+
+The realistic walkthrough used a disposable copy of owner data at 390x844 with 16 entries placed
+in Inbox. The browser reached the final rows with no nested overflow. Two staged choices remained
+visible and Discard restored them with zero status requests. Repeating two status groups plus a
+score edit produced one immediate score PATCH, then exactly two grouped bulk PATCHes only after
+Apply; the successful rows left Inbox and the count became 14. No console or page error appeared,
+and live application data was untouched.
+
+There were no product or architecture deviations. Grouped Apply is deliberately not transactionally
+atomic because the existing endpoint accepts one status per request; DEC-087 records the honest,
+retryable partial-failure behavior. This is the final numbered sprint in plan revision 19.

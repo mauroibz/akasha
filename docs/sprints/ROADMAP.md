@@ -2,7 +2,7 @@
 
 **Plan revision:** 19
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [037 — Triage page flow and staged statuses](037-triage-page-flow.md)
+**Active sprint:** none — the numbered plan is complete through Sprint 037
 
 ## Shape of the plan
 
@@ -32,7 +32,7 @@ Post-v1 work branches:
                                       └─ 034 Incremental import
                                          └─ 035 Ebook attachments on a toggle
                                             └─ 036 Import and triage flow
-                                               └─ 037 Triage page flow and staged statuses  ← active
+                                               └─ 037 Triage page flow and staged statuses  ✓
 ```
 
 **The numbered plan now stops at 037 (DEC-058, extended through the owner-directed Sprint 037).** Sprint 025 asked whether a second domain
@@ -95,12 +95,12 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [034](034-incremental-import.md) | Incremental import | 033 | completed |
 | [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | completed |
 | [036](036-import-triage-flow.md) | Import and triage flow | 035 | completed |
-| [037](037-triage-page-flow.md) | Triage page flow and staged statuses | 036 | in_progress |
+| [037](037-triage-page-flow.md) | Triage page flow and staged statuses | 036 | completed |
 
 ## Sprint contracts
 
-These are the binding outcome boundaries for the post-v1 line. Sprints 019 through 036 are closed;
-Sprint 037 is active. Their individual Outcome sections record delivered reality.
+These are the binding outcome boundaries for the post-v1 line. Sprints 019 through 037 are closed.
+Their individual Outcome sections record delivered reality.
 
 ### [Sprint 019 — Post-v1 polish and ledger clearing](019-post-v1-polish.md)
 
@@ -644,6 +644,12 @@ the row blinked back or left before the owner could finish reading its neighbors
 Move Triage to the same window-virtualization contract as the Library. Keep row status choices as
 visible drafts until an explicit apply, with discard and retryable partial failure; scores and
 explicit bulk actions keep saving immediately.
+
+**Delivered.** Triage uses document scrolling with bounded window-virtualized rows. Status choices
+stay visibly staged until Apply or Discard; Apply groups equal choices into existing bulk requests,
+clears successful groups and retains failed groups for retry. The pending and explicit-bulk action
+surfaces form one non-overlapping sticky stack, while score edits and explicit bulk actions remain
+immediate (DEC-087).
 
 ## Future epics, after this plan
 
