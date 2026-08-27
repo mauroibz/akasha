@@ -311,7 +311,7 @@ test("triage pending status actions have no serious accessibility violations", a
   await page
     .locator('[data-entry-id="1"]')
     .getByRole("combobox", { name: "Status for Book 1" })
-    .selectOption("read");
+    .selectOption("reading");
   await expect(
     page.getByRole("toolbar", { name: "Pending status changes" }),
   ).toBeVisible();

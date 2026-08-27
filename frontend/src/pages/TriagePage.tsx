@@ -22,7 +22,7 @@ import {
   type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
-import { ChevronRight } from "lucide-react";
+import { Check } from "lucide-react";
 
 import { CoverImage } from "@/components/CoverImage";
 import { Button } from "@/components/ui/button";
@@ -239,11 +239,22 @@ export function TriagePage() {
       );
       return { successfulIds, failedIds };
     },
+    onMutate: (drafts) => {
+      // A row can apply its importer suggestion or domain default without first
+      // touching the select. Put that target into the same draft map before the
+      // request so a failed one remains visible and retryable like every other draft.
+      setPendingStatuses((current) => new Map([...current, ...drafts]));
+    },
     onSuccess: ({ successfulIds, failedIds }) => {
       const failed = new Set(failedIds);
+      const attempted = new Set([...successfulIds, ...failedIds]);
       setPendingStatuses(
         (current) =>
-          new Map(Array.from(current).filter(([id]) => failed.has(id))),
+          new Map(
+            Array.from(current).filter(
+              ([id]) => !attempted.has(id) || failed.has(id),
+            ),
+          ),
       );
       if (failedIds.length > 0) {
         toast.error("Some status changes could not be applied", {
@@ -454,7 +465,15 @@ export function TriagePage() {
           // action is the commit boundary.
           setPendingStatuses((current) => {
             const next = new Map(current);
-            if (statusKey === focused!.status) next.delete(focused!.id);
+            const domainDefault =
+              itemTypes.data?.find((type) => type.id === focused!.item.type)
+                ?.default_status ??
+              statusesFor(focused!.item.type, itemTypes.data).find(
+                (status) => status.choosable,
+              )?.value ??
+              focused!.status;
+            const originalTarget = focused!.suggested_status ?? domainDefault;
+            if (statusKey === originalTarget) next.delete(focused!.id);
             else next.set(focused!.id, statusKey);
             return next;
           });
@@ -828,7 +847,21 @@ export function TriagePage() {
               {mountedRows.map((row) => {
                 const entry = entries[row.index];
                 const selected = isRowSelected(entry.id);
-                const hasConflict = entry.suggested_status !== null;
+                const domainDefault =
+                  itemTypes.data?.find((type) => type.id === entry.item.type)
+                    ?.default_status ??
+                  statusesFor(entry.item.type, itemTypes.data).find(
+                    (status) => status.choosable,
+                  )?.value ??
+                  entry.status;
+                const originalTarget = entry.suggested_status ?? domainDefault;
+                const targetStatus =
+                  pendingStatuses.get(entry.id) ?? originalTarget;
+                const targetLabel = statusLabelFor(
+                  entry.item.type,
+                  itemTypes.data,
+                  targetStatus,
+                );
                 return (
                   <div
                     key={entry.id}
@@ -879,35 +912,6 @@ export function TriagePage() {
                         {entry.item.creator ?? "Unknown"}
                       </p>
                     </div>
-                    {hasConflict && (
-                      <span
-                        className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-xs text-primary"
-                        title={`Suggested: ${statusLabelFor(
-                          entry.item.type,
-                          itemTypes.data,
-                          entry.suggested_status!,
-                        )}`}
-                      >
-                        <span className="sr-only">
-                          Suggested status:{" "}
-                          {statusLabelFor(
-                            entry.item.type,
-                            itemTypes.data,
-                            entry.suggested_status!,
-                          )}
-                        </span>
-                        <span className="hidden lg:inline" aria-hidden="true">
-                          {statusLabelFor(
-                            entry.item.type,
-                            itemTypes.data,
-                            entry.suggested_status!,
-                          )}
-                        </span>
-                        <span className="lg:hidden" aria-hidden="true">
-                          !
-                        </span>
-                      </span>
-                    )}
                     <div
                       className="flex shrink-0 items-center gap-2"
                       data-row-controls=""
@@ -917,13 +921,14 @@ export function TriagePage() {
                       onClick={(event) => event.stopPropagation()}
                     >
                       <select
-                        value={pendingStatuses.get(entry.id) ?? entry.status}
+                        value={targetStatus}
                         disabled={pendingStatusMutation.isPending}
                         onChange={(event) => {
                           const status = event.target.value as EntryStatus;
                           setPendingStatuses((current) => {
                             const next = new Map(current);
-                            if (status === entry.status) next.delete(entry.id);
+                            if (status === originalTarget)
+                              next.delete(entry.id);
                             else next.set(entry.id, status);
                             return next;
                           });
@@ -938,13 +943,13 @@ export function TriagePage() {
                             : "border-input",
                         )}
                       >
-                        {statusesFor(entry.item.type, itemTypes.data).map(
-                          (status) => (
+                        {statusesFor(entry.item.type, itemTypes.data)
+                          .filter((status) => status.choosable)
+                          .map((status) => (
                             <option key={status.value} value={status.value}>
                               {status.label}
                             </option>
-                          ),
-                        )}
+                          ))}
                       </select>
                       <select
                         value={
@@ -990,16 +995,21 @@ export function TriagePage() {
                           </option>
                         ))}
                       </select>
+                      <Button
+                        size="sm"
+                        className="h-9 shrink-0 rounded-full px-2 text-xs sm:px-3"
+                        aria-label={`Apply ${targetLabel} to ${entry.item.title}`}
+                        disabled={pendingStatusMutation.isPending}
+                        onClick={() =>
+                          pendingStatusMutation.mutate(
+                            new Map([[entry.id, targetStatus]]),
+                          )
+                        }
+                      >
+                        <Check className="h-4 w-4" aria-hidden="true" />
+                        <span className="hidden lg:inline">Apply</span>
+                      </Button>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="hidden h-8 w-8 shrink-0 rounded-full p-0 text-muted-foreground sm:inline-flex"
-                      aria-label={`Open ${entry.item.title}`}
-                      onClick={() => void navigate(`/books/${entry.id}`)}
-                    >
-                      <ChevronRight />
-                    </Button>
                   </div>
                 );
               })}

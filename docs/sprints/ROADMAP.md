@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 21
+**Plan revision:** 22
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 042 — Sharpening the domain contract
+**Active sprint:** 042 — One decision per Triage row
 
 ## Shape of the plan
 
@@ -37,7 +37,8 @@ Post-v1 work branches:
                                                       ├─ 039 Enrichment beyond the ISBN  ✓
                                                       └─ 040 Entry progress  ✓
                                                            └─ 041 The MyAnimeList import  ✓
-                                                               └─ 042 Sharpening the domain contract
+                                                               └─ 042 One decision per Triage row
+                                                                   └─ 043 Sharpening the domain contract
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -122,7 +123,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [039](039-enrichment-beyond-isbn.md) | Enrichment beyond the ISBN | 038 | completed |
 | [040](040-entry-progress.md) | Entry progress | 038 | completed |
 | [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | completed |
-| [042](042-sharpening-the-domain-contract.md) | Sharpening the domain contract | 041 | ready |
+| [042](042-one-decision-per-triage-row.md) | One decision per Triage row | 041 | in_progress |
+| [043](043-sharpening-the-domain-contract.md) | Sharpening the domain contract | 042 | planned |
 
 ## Sprint contracts
 
@@ -733,6 +735,23 @@ Its sharpest acceptance criterion is a negative one: **no change to `application
 `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.** Sprint 032 made connectors self-describing
 so that adding one is a package plus one tuple entry. Whether that held for a connector written by
 somebody who did not write the pipeline is the finding, either way it goes.
+
+### [Sprint 042 — One decision per Triage row](042-one-decision-per-triage-row.md)
+
+Inserted by owner direction at plan revision 22 after the first real anime triage. The screen
+currently presents the same decision twice: the persisted Inbox status in a select and an imported
+target in a separate chip. Rows without an imported target present no useful default, and approving
+an already-correct row requires leaving it for a page-level toolbar.
+
+Each row instead presents one target in its native select: the importer suggestion when present,
+otherwise the domain's declared default. Inbox is implied by the screen and is neither displayed
+nor choosable. A row-level Apply commits the displayed target in one click; the existing page-level
+staging, discard, partial-failure and explicit bulk flows remain for multi-row work.
+
+### [Sprint 043 — Sharpening the domain contract](043-sharpening-the-domain-contract.md)
+
+The anime-line retrospective originally planned as Sprint 042 moves one place without changing its
+scope. It follows the owner-visible triage correction and remains deliberately non-visual.
 
 ## Future epics, after this plan
 
