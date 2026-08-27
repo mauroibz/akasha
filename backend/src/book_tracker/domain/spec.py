@@ -101,6 +101,39 @@ PASSAGE_FIELDS = frozenset({"date_started", "date_finished", "reread_count"})
 
 
 @dataclass(frozen=True)
+class ProgressSpec:
+    """How far through one of these you are, when that is a thing this domain has.
+
+    DEC-077 priced entry *depth* across nine shared surfaces, rejected child entities
+    with their own state on evidence, and chose this shape instead: one number on the
+    flat entry, declared by the domain that means something by it. An anime records
+    episodes watched; a book records nothing of the kind, because a page count is not
+    something the entry holds.
+
+    It is deliberately **not** a fourth `PASSAGE_FIELDS` name. Those are three fixed
+    columns with fixed meanings, and `validate_entry_fields` polices only names inside
+    that set — an unknown key passes straight through it. Progress also needs a label, a
+    unit and a reference to its total, none of which a passage field has anywhere to put.
+    """
+
+    #: What this domain calls the count. "Episodes watched".
+    label: str
+    #: The singular noun for one of them, so a control can read "20 / 170 episodes".
+    unit_label: str
+    #: A `number` metadata field on the *item* holding the total, when one exists.
+    #:
+    #: **For display only, and never a bound.** Refusing a count above it was the first
+    #: draft of this sprint and the owner rejected it: AniList returns `episodes: null`
+    #: for an airing or unreleased show, a weekly series' cached total is stale by
+    #: definition, and an explicit metadata refresh could lower the total underneath a
+    #: count already stored — making a row that was valid when written invalid on its
+    #: next write. That is `ck_entries_status`'s mistake wearing new clothes: a
+    #: constraint over data the domain does not control (DEC-067 row 1). The reader's
+    #: number wins over our cache.
+    total_field: str | None = None
+
+
+@dataclass(frozen=True)
 class EnrichmentSpec:
     """What background enrichment means for one domain (DEC-067 row 3).
 
@@ -173,6 +206,9 @@ class Domain:
     #: Sprint 039: the flag was real, and everything underneath it assumed an ISBN and
     #: two book providers (DEC-067 row 3).
     enrichment: "EnrichmentSpec | None" = None
+    #: How far through one of these you are, or `None` for a domain where that means
+    #: nothing. DEC-077's shape (a), built in Sprint 040 against anime's real case.
+    progress: "ProgressSpec | None" = None
     #: Recognizes a URL or identifier this domain can resolve, for add-by-URL. The
     #: neutral default recognizes nothing, which is the safe answer for a domain that
     #: has not written one yet: `resolve_input` simply asks the next domain.
@@ -210,6 +246,10 @@ class InvalidEntryField(ValueError):
     """An entry field the item's own domain does not have (DEC-057)."""
 
 
+class InvalidProgress(ValueError):
+    """A progress count on a domain that has no such concept, or a negative one."""
+
+
 def validate_status(domain: Domain, value: str) -> str:
     """The one place a status is checked against the domain holding the item.
 
@@ -240,6 +280,25 @@ def validate_entry_fields(domain: Domain, changes: Mapping[str, Any]) -> dict[st
         if name in changes:
             raise InvalidEntryField(f"{domain.label} entries have no {name!r}")
     return dict(changes)
+
+
+def validate_progress(domain: Domain, value: int | None) -> int | None:
+    """The fourth validator, keyed on the domain holding the item (DEC-077).
+
+    `None` is always allowed, in every domain: it means *not recorded*, and clearing a
+    value nobody should have set is not something to refuse. `0` is a different fact —
+    recorded as zero — and the owner's own library holds one, a film sitting at 0 of 1
+    episodes under `Plan to Watch`.
+
+    There is no upper bound. See `ProgressSpec.total_field` for why.
+    """
+    if value is None:
+        return None
+    if domain.progress is None:
+        raise InvalidProgress(f"{domain.label} entries do not record progress")
+    if value < 0:
+        raise InvalidProgress(f"{domain.label} progress cannot be negative")
+    return value
 
 
 @dataclass(frozen=True)

@@ -1,6 +1,6 @@
 # Sprint 040 — Entry progress
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 038
 **Roadmap revision:** 20
 
@@ -62,8 +62,16 @@ holds.
 
 `validate_progress(domain, value)` is the fourth validator beside `validate_status`,
 `validate_formats` and `validate_metadata_patch`: it refuses a progress write on a domain that
-declares none, refuses a negative value, and refuses a value above the declared total when the item
-carries one. The message names the domain, as the others do.
+declares none, and refuses a negative value. The message names the domain, as the others do.
+
+**It does not bound the value by the item's total, and `total_field` is display only.** The owner
+settled this at planning time on 2026-08-27, against this file's first draft. Measured: AniList
+returns `episodes: null` for airing and unreleased shows, a weekly series' cached total is stale by
+definition, and an explicit metadata refresh could lower `episodes` under an already-stored
+progress — making a row that was valid when written violate a rule on its next write. That is
+`ck_entries_status`'s mistake in a new costume: a constraint over data the domain does not control
+(DEC-067 row 1). The reader's number wins over our cache, which is the technical spec's first
+priority.
 
 ### 2. The schema — `backend/alembic/versions/0015_entry_progress.py`
 
@@ -105,8 +113,8 @@ an export that loses it.
 
 1. Anime entries accept, store, return and export a progress count; books and albums refuse one with
    422 naming the domain.
-2. A negative progress is refused. A progress above the item's declared total is refused; an item
-   with no total accepts any non-negative value.
+2. A negative progress is refused. **A progress above the item's total is accepted** — the total
+   is display only, and an item with no total at all is equally fine.
 3. `null` progress round-trips as "not recorded" and is distinguishable from `0`.
 4. The detail page shows `20 / 170 episodes` for an anime with a 170-episode total, and shows no
    progress control at all on a book or an album.
@@ -146,6 +154,9 @@ the migration on a copy of real data, and confirm nothing else moved.
 - **Child entities.** DEC-077 rejected shape (c) on evidence over nine shared surfaces. This sprint
   does not reopen it and finding it convenient is not evidence.
 - **Progress as a sort key or a filter.** Additive later if wanted; not needed to hold the value.
+- **Progress on the library card or in Triage.** The owner scoped this to the detail page and the
+  opinion dialog on 2026-08-27. Neither surface shows any entry field beyond status and score today,
+  and widening the row controls Sprints 036/037 just settled is not this sprint's business.
 - **Auto-advancing progress**, watch dates per episode, or anything that turns a count into a log.
 - **A shared typed progress concept.** DEC-077's reopen condition 3 is *two* domains shipping shape
   (a) and their vocabularies drifting. One domain is not that.

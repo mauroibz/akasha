@@ -21,6 +21,7 @@ from book_tracker.domain.spec import (
     EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ProgressSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -151,6 +152,10 @@ DOMAIN = Domain(
     # `Started` and `Finished` read correctly for a series; `Rereads` does not.
     entry_field_labels={"reread_count": "Rewatches"},
     enrichment=ANIME_ENRICHMENT,
+    # Every row of a MyAnimeList export carries a watched-episode count, and 7 of
+    # the owner's 81 are partial — `Black Clover`, dropped at 20 of 170. Without
+    # this the library can say only "dropped" (DEC-077 shape (a)).
+    progress=ProgressSpec("Episodes watched", "episode", total_field="episodes"),
     recognize=lambda value: recognize_anime_url(value),
     chooses_covers=False,
 )

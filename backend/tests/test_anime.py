@@ -161,3 +161,24 @@ class TestEnrichment:
 
     def test_enriches_still_reads_as_a_yes_or_no(self) -> None:
         assert DOMAIN.enriches is True
+
+
+class TestProgress:
+    """DEC-077 shape (a): a per-domain progress count, declarative under the contract.
+
+    The verdict chose this shape in Sprint 030 and built none of it. Anime is the first
+    domain to declare it, because every row of a MyAnimeList export carries a
+    watched-episode count and the entry model had nowhere to put one.
+    """
+
+    def test_it_counts_episodes_watched(self) -> None:
+        assert DOMAIN.progress is not None
+        assert DOMAIN.progress.label == "Episodes watched"
+        assert DOMAIN.progress.unit_label == "episode"
+
+    def test_the_total_names_a_field_this_domain_declares(self) -> None:
+        """`total_field` is for rendering `20 / 170`, and nothing else reads it."""
+        assert DOMAIN.progress is not None
+        assert DOMAIN.progress.total_field == "episodes"
+        episodes = next(field for field in DOMAIN.fields if field.name == "episodes")
+        assert episodes.type == "number"

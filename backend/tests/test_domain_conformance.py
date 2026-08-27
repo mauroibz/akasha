@@ -62,6 +62,7 @@ from book_tracker.domain.spec import (
     EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ProgressSpec,
     StatusSpec,
     UrlMatch,
 )
@@ -245,6 +246,39 @@ def entry_field_labels_name_fields_this_domain_has(domain: Domain) -> None:
     assert not unknown, f"{domain.item_type} labels entry fields it does not declare: {unknown}"
     assert all(label and label.strip() for label in domain.entry_field_labels.values()), (
         f"{domain.item_type} has a bare entry field label"
+    )
+
+
+@registry_check
+def progress_counts_something_this_domain_declares(domain: Domain) -> None:
+    """DEC-077 shape (a): a count the domain means something by, and can render.
+
+    `None` is the complete answer for a book — a page count is not something the entry
+    records. What is checked for a domain that does declare one is that it can be
+    *rendered*: a label and a unit to put beside the number, and a `total_field` that
+    names a real numeric field when it names anything at all.
+
+    That last check is the same trap Sprint 039 found in `completeness_fields`: a name
+    the domain never stores is always absent, so a total pointing at nothing would make
+    "20 / —" the permanent reading rather than an occasional one.
+    """
+    spec = domain.progress
+    if spec is None:
+        return
+    assert spec.label and spec.label.strip(), f"{domain.item_type} progress has no label"
+    assert spec.unit_label and spec.unit_label.strip(), (
+        f"{domain.item_type} progress has no unit to count in"
+    )
+    if spec.total_field is None:
+        return
+    field = next((row for row in domain.fields if row.name == spec.total_field), None)
+    assert field is not None, (
+        f"{domain.item_type} counts progress towards {spec.total_field!r}, "
+        "which it does not declare as a metadata field"
+    )
+    assert field.type == "number", (
+        f"{domain.item_type} counts progress towards {spec.total_field!r}, "
+        f"which is {field.type} rather than a number"
     )
 
 
@@ -812,6 +846,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "recognize": "the_recognizer_answers_for_any_string",
         "chooses_covers": "the_cover_chooser_is_only_declared_where_it_can_work",
         "enrichment": "enrichment_is_answerable_by_this_domain",
+        "progress": "progress_counts_something_this_domain_declares",
     }
     declared = set(Domain.__dataclass_fields__)
     assert declared == set(covered), (
@@ -1017,6 +1052,22 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "enrichment_is_answerable_by_this_domain",
         "enrichment nothing would ever complete",
         a_third_domain(enrichment=EnrichmentSpec("igdb_id", ("igdb",), ())),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "progress towards a total the domain does not store",
+        a_third_domain(progress=ProgressSpec("Completion", "percent", "hours_to_beat")),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "progress towards a field that is not a number",
+        # The fixture declares `platform` as text, so a total could never be read off it.
+        a_third_domain(progress=ProgressSpec("Completion", "percent", "platform")),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "a progress count with nothing to call it",
+        a_third_domain(progress=ProgressSpec("   ", "percent")),
     ),
 ]
 

@@ -233,3 +233,43 @@ def test_the_published_enums_agree_with_the_registry() -> None:
     # `type` a query parameter. Same reason, same failure mode: a third domain that
     # nobody adds here is a domain the library cannot be filtered to.
     assert {member.value for member in ItemTypeName} == set(DOMAINS)
+
+
+def test_only_a_domain_that_declares_progress_may_record_it() -> None:
+    """The fourth validator, beside status, formats and metadata (DEC-077).
+
+    A book has no partial-progress concept: a page count is not something the entry
+    records. So the value is refused on write rather than merely hidden, for the same
+    reason a reread count on a record is (DEC-057).
+    """
+    from book_tracker.domain.spec import InvalidProgress, validate_progress
+    from book_tracker.domains.anime import DOMAIN as ANIME
+
+    assert validate_progress(ANIME, 20) == 20
+    # Zero is a recorded value, not an absence: the owner's own library holds a row
+    # sitting at 0 of 1 episodes, `Plan to Watch`.
+    assert validate_progress(ANIME, 0) == 0
+    # Not recorded at all, which is a different fact from zero.
+    assert validate_progress(ANIME, None) is None
+    # Clearing it is always allowed, even on a domain that has no progress.
+    assert validate_progress(BOOK, None) is None
+
+    for domain in (BOOK, ALBUM):
+        with pytest.raises(InvalidProgress) as refused:
+            validate_progress(domain, 3)
+        assert domain.label in str(refused.value)
+
+
+def test_a_negative_progress_is_refused_but_a_large_one_is_not() -> None:
+    """The total is display only and never a bound (owner decision, 2026-08-27).
+
+    AniList returns `episodes: null` for an airing show and a weekly series' cached
+    total is stale by definition, so refusing a number above it would reject the
+    reader's own data because our cache is behind.
+    """
+    from book_tracker.domain.spec import InvalidProgress, validate_progress
+    from book_tracker.domains.anime import DOMAIN as ANIME
+
+    with pytest.raises(InvalidProgress):
+        validate_progress(ANIME, -1)
+    assert validate_progress(ANIME, 100_000) == 100_000

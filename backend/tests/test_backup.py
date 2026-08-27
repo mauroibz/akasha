@@ -35,6 +35,19 @@ from book_tracker.infrastructure.models import (
 from book_tracker.migrations import upgrade
 
 NOW = "2026-08-13T00:00:00+00:00"
+
+
+def current_head() -> str:
+    """The migration head this build ships, read rather than spelled."""
+    from alembic.script import ScriptDirectory
+
+    from book_tracker.migrations import alembic_config
+
+    head = ScriptDirectory.from_config(alembic_config("sqlite://")).get_current_head()
+    assert head is not None
+    return head
+
+
 COVER_BYTES = b"\xff\xd8\xff\xe0 not really a jpeg, but bytes that must survive"
 
 
@@ -118,7 +131,10 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
         "covers": 1,
         "attachments": 0,
     }
-    assert result.manifest["alembic_revision"] == "0014_status_is_the_domains"
+    # Derived rather than spelled: this asserted "0014_status_is_the_domains" and so
+    # failed on the next migration with no behaviour changing. A test that enumerates
+    # what exists today is a test the next change breaks (DEC-090).
+    assert result.manifest["alembic_revision"] == current_head()
     verify_backup(result.path)
 
 
