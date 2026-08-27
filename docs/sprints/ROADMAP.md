@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 20
+**Plan revision:** 21
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the numbered plan is complete through Sprint 041
+**Active sprint:** 042 — Sharpening the domain contract
 
 ## Shape of the plan
 
@@ -37,6 +37,7 @@ Post-v1 work branches:
                                                       ├─ 039 Enrichment beyond the ISBN  ✓
                                                       └─ 040 Entry progress  ✓
                                                            └─ 041 The MyAnimeList import  ✓
+                                                               └─ 042 Sharpening the domain contract
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -121,6 +122,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [039](039-enrichment-beyond-isbn.md) | Enrichment beyond the ISBN | 038 | completed |
 | [040](040-entry-progress.md) | Entry progress | 038 | completed |
 | [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | completed |
+| [042](042-sharpening-the-domain-contract.md) | Sharpening the domain contract | 041 | ready |
 
 ## Sprint contracts
 

@@ -1,89 +1,83 @@
-# Handoff — the anime line is complete and waiting to be merged
+# Handoff — Sprint 042 planned and not started
 
-Plan revision 20 is complete. Sprints 001–041 are closed, `docs/agent/state.json` has no
-active sprint, and `project_status` is `complete`. Sprint 041 was the final numbered
-sprint selected by `scripts/validate_project.py`.
+Plan revision 21. The anime line (Sprints 038–041) is complete; **Sprint 042 is planned,
+`ready`, and deliberately unexecuted.** The owner has a UX fix to do first and asked for
+the plan committed ahead of it.
 
-**The work is on the branch `sprint-038-anime`, unpushed and unmerged.** It was cut from
-`main` at `bcb11ca` under DEC-053, which says merging back is the owner's call at the
-line's close rather than an automatic step. `main` still holds everything through Sprint
-037 and is what a failed experiment would be abandoned back to.
+Work remains on the branch **`sprint-038-anime`**, unpushed and **unmerged**. Sprint 042
+depends on the anime line's code, which is not on `main`, so it continues there unless the
+owner merges first (DEC-053).
 
-## What merging would bring
+## What Sprint 042 is
 
-Four sprints, eleven commits, and a third domain:
+Close the frictions the third domain actually hit, so the fourth does not hit them again.
+**Nothing user-visible changes and there is no walkthrough gate** — if a deliverable turns
+out to touch a screen, that is a scope error, not a reason to add one.
 
-- **038** — the `anime` domain: a package, two adapters (AniList, Kitsu), small
-  registration points, no migration, no screen written for it.
-- **039** — enrichment off the ISBN: a domain declares the identifier it is keyed on, the
-  providers that answer it, and what counts as still incomplete.
-- **040** — the entry holds a progress count. **One migration on a shared table**
-  (`0015_entry_progress`).
-- **041** — the MyAnimeList connector, plus `0016_import_kind_is_the_registrys`, which
-  deletes a frozen `kind IN ('goodreads','calibre')`.
+The retrospective behind it is **DEC-094**, and its finding is not the expected one: **the
+abstraction held; the friction was mechanical.** Ranked by time the line actually lost:
 
-**Two migrations mean the live database changes on the first real start after a merge.**
-It currently holds 16 entries and no `progress` column. Both were applied to a *copy* of
-it during the walkthroughs with everything preserved and `integrity_check ok`, but take a
-backup before the first start anyway — that is what the nightly backup is for and this is
-the one moment it earns its keep.
+1. Walkthrough selector churn — every walkthrough needed 2–4 corrections, and the
+   assumption was wrong every time rather than the product.
+2. The `entries` rebuild recipe — three failed attempts in Sprint 040.
+3. `validate_entry_fields` is a denylist — the root cause of `progress` reaching storage
+   unvalidated for a whole sprint.
+4. Conformance has no wiring tier.
+5. Three entry-field render sites; 6. three hand-enumerated `EntryRow` constructions.
 
-At closure: `make check` green, `make test` **698 backend / 189 frontend**, Playwright
-**103 passed / 2 skipped**, and the owner's real 81-row export imported, triaged and
-enriched end to end against a disposable database.
+Six deliverables follow from those, and the sprint file holds them in full. The two that
+carry real work are the allowlisting validator and the conformance wiring tier; the other
+four are small, and the sprint file names them as the split point if the first two run long.
 
-## The verdict the trial run returned
+## Before starting it
 
-The owner framed this line as a test of the Sprint 028 domain contract. Both halves were
-built by a session that did not write them.
+Read `docs/sprints/042-sharpening-the-domain-contract.md` and **DEC-094**, then the
+baseline it records — every fact in that section was verified on 2026-08-27 at `0f1b86e`
+rather than recalled, but re-check anything the UX fix may have moved. In particular:
 
-- **The domain half held.** ~45 lines of shared registration; no migration; registering a
-  third domain broke no existing test.
-- **The connector half held in code and failed once in the schema.** `api/imports.py` and
-  both import screens were never touched. `ck_import_batches_kind` was a frozen list —
-  `ck_entries_status`'s mistake one table over — and cost a migration to delete.
+- `validate_entry_fields` is called from `application/library.py:163`,
+  `application/add.py:187` and `application/imports.py:157`, and its return value is
+  discarded at two of the three.
+- Conformance has exactly two tiers, `REGISTRY_CHECKS` and `CORE_CHECKS`, registered by
+  the decorators at `tests/test_domain_conformance.py:161-170`.
+- The wiring check to move lives at `tests/test_enrichment_pipeline.py:550`.
+- `EntryRow` is constructed at `infrastructure/repositories.py:256,382,774`.
+- `alembic/env.py` still says nothing about the `PRAGMA foreign_keys` silence that three
+  migrations depend on.
 
-Everything else the line spent went on two seams the export forced, both already foreseen
-and priced: enrichment beyond the ISBN (DEC-067 row 3) and a per-domain progress field
-(DEC-077). The reasoning is in **DEC-088 through DEC-093**, and the guide has been
-corrected from what each sprint found rather than left describing an intention.
+**Deliverable 1 touches every entry write path in the application.** The existing tests are
+the guard and must not be relaxed to fit the new signature; if one has to change, say
+exactly why in the Outcome.
 
-## Recurring findings worth carrying forward
+## Deliberately not in it
 
-- **A test that enumerates what exists today is a test the next change breaks.** Four
-  instances in four sprints: `provider_health`, the enrichment revision lists,
-  `test_backup.py`'s head revision, and the published importer ids. Assert against the
-  registry.
-- **A schema constraint that freezes a vocabulary the application owns will be wrong.**
-  Two instances now: `ck_entries_status` (DEC-067 row 1) and `ck_import_batches_kind`
-  (DEC-093). `grep "CheckConstraint" alembic/versions | grep " IN ("` finds no third.
-- **Rebuilding a table is a `DROP TABLE`.** Under `PRAGMA foreign_keys=ON` it cascades
-  children away silently. `alembic/env.py` never enables it; that is load-bearing and now
-  asserted.
-- **A reader tested only against the file in front of you is tested against one file.**
-  Sprint 041's connector passed, imported all 81 rows, and still held seven defects the
-  owner's export does not exercise (DEC-093).
+The shared frontend hook for the three entry-field render sites (a refactor with its own
+risk — Sprint 040 already repaired its one real consequence), the OAuth seam IGDB will
+need, a generalised cover chooser, and `goodreads.py`'s two pre-existing defects
+(an unguarded `shelf_slug`, a blank title left blank — DEC-093). All named in the sprint
+file so they read as deferred rather than missed.
 
-## Known and unowned
+## The caveat worth carrying
 
-- `goodreads.py` shares two of the defects repaired in the MyAnimeList reader: it calls
-  `shelf_slug` unguarded (a 500 on a punctuation-only shelf) and leaves a blank title
-  blank (which would 422 a whole import).
+**This is a sample of one domain, and an unusual one** — anime was the first with a real
+cross-provider identity, the first needing enrichment on a non-ISBN key, and the first
+needing a per-entry number. Games would exercise authentication with a lifetime instead
+and would very likely surface a different list. The argument for waiting was weighed and
+rejected because deliverables 1–3 record mistakes already made rather than predictions;
+if any of them starts to feel speculative mid-sprint, that is the signal to stop and hand
+the rest to the domain that asks.
+
+## Still open, and nobody's sprint
+
 - `JobRepository.complete` never clears `error`/`error_code`, so a job that failed then
   succeeded shows `succeeded` beside stale failure text (DEC-091).
 - `createEntry`'s body type in `frontend/src/api/add.ts` is out of sync with what
-  `AddForm` sends; the extra keys slip past excess-property checking via conditional
-  spreads.
-- Watched-episode counts do not appear in Triage. That was the owner's scoping decision in
-  Sprint 040, not an oversight — worth living with before changing.
+  `AddForm` sends.
+- Watched-episode counts do not appear in Triage — the owner's Sprint 040 scoping, not an
+  oversight.
 
-## If more work follows
+## State at this handoff
 
-There is no next numbered sprint. New work must be planned explicitly and must reactivate
-state through the normal workflow. The unnumbered epics in `docs/sprints/ROADMAP.md` —
-games on IGDB, series on TMDB, a Spotify connector — remain possibilities rather than
-commitments. Manga is refused by name in the MyAnimeList connector and would be its own
-domain, not a mode of this one.
-
-The owner's export sits gitignored at the repository root and is not committed; the
-fixtures under `backend/tests/fixtures/imports/` are trimmed and anonymised copies.
+`make check`, `make test` (698 backend / 189 frontend) and Playwright (103 passed, 2
+skipped) were all green at `0f1b86e`. This commit changes documentation, state and the
+validator's sprint bound only; no product gate applies to it.

@@ -2423,3 +2423,34 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   writing — still 16 entries, no anime, no `progress` column.
 - Next: nothing numbered. The plan is complete through 041 and `state.json` is `complete`. The
   branch holds four sprints and is the owner's to merge.
+
+## 2026-08-27 — Plan revision 21: Sprint 042 planned, not started
+
+- Done: retrospective on the anime line at the owner's request, written up as **DEC-094**,
+  and **Sprint 042 planned**. `FINAL_SPRINT` moves to 42 and state reactivates from
+  `complete` to `ready` with 042 active. **No implementation.** The owner has a UX fix to
+  do first and asked for the plan committed unexecuted.
+- The finding, which is not the one that was expected: **the abstraction held; the friction
+  was mechanical.** Ranked by time actually lost — walkthrough selector churn (every
+  walkthrough needed 2-4 corrections and the assumption was wrong every time, never the
+  product), the `entries` rebuild recipe (three failed attempts in 040), the
+  `validate_entry_fields` denylist (root cause of `progress` reaching storage unvalidated
+  for a sprint), the missing conformance wiring tier, three entry-field render sites, and
+  three hand-enumerated `EntryRow` constructions.
+- Verified while writing it rather than recalled: `alembic/env.py` still says nothing about
+  the `PRAGMA foreign_keys` silence three migrations depend on; `EntryRow` is constructed
+  at `repositories.py:256,382,774`; `validate_entry_fields` is called from three sites and
+  its return value is discarded at two of them; conformance has exactly two tiers; and no
+  live CHECK constraint enumerates an application-owned vocabulary (both offenders gone,
+  nothing keeping it that way).
+- Deferred deliberately and recorded in DEC-094: the shared frontend hook for the three
+  entry-field render sites (a refactor with its own risk, and 040 already repaired its one
+  real consequence), the OAuth seam IGDB will need, and a generalised cover chooser.
+- Stated caveat: this is a sample of one domain, and an unusual one. Games would exercise
+  authentication with a lifetime and would likely surface a different list. Weighed and
+  rejected in favour of proceeding, because deliverables 1-3 record mistakes already made
+  rather than predictions.
+- Branch: still `sprint-038-anime`, unpushed and **unmerged**. Sprint 042 depends on the
+  anime line's code, which is not on `main`, so it continues there unless the owner merges
+  first.
+- Next: the owner's UX fix, then execute Sprint 042.

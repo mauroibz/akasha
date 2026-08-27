@@ -3277,3 +3277,77 @@ start dates); 81 items and 81 `unsorted` entries committed; all 81 enriched from
 with covers, years, studios and synopses; `Black Clover` reading 20 of 170; re-uploading
 the same file replaying rather than importing twice; and undo reversing a new batch
 completely, progress included.
+
+## DEC-094 — What the third domain actually cost, and the six things worth fixing before a fourth
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-090, DEC-091, DEC-092, DEC-093 (the four sprints this reflects
+  on), DEC-052 and DEC-066/DEC-067 (the contract being tested), DEC-058 and DEC-089 (the
+  plan lines this extends).
+- **Context:** The owner framed Sprints 038–041 as a trial run of the Sprint 028 domain
+  contract and asked, at its close, what should change so the next domain goes better.
+  This entry is the answer and the reason `FINAL_SPRINT` moves to 42.
+
+### The finding, which is not the one that was expected
+
+**The abstraction held. The friction was mechanical.** Almost nothing that cost time came
+from the domain contract being wrong: it came from test hygiene, from an undocumented
+migration recipe, and from UI control idioms written down nowhere. That is worth stating
+plainly, because the tempting conclusion after four sprints of findings is that the
+architecture needs work, and the evidence does not support it.
+
+Ranked by time actually lost across the line:
+
+1. **Walkthrough selector churn.** Every walkthrough needed two to four selector
+   corrections on its first run, and **in every case the assumption was wrong rather than
+   the product**. The domain chooser is a `radiogroup`, the library status filter is a
+   popover whose options carry facet counts, library rows use popovers where Triage uses
+   native selects, the Triage heading reads `Inbox N unsorted`. Pure documentation, and
+   the single largest sink.
+2. **The `entries` rebuild recipe.** Three failed attempts in Sprint 040 before the rules
+   were understood: `copy_from` must not spell the new column, a module-level `Column`
+   cannot be reused, and a rebuild is a `DROP TABLE` whose cascade is only survivable
+   because `alembic/env.py` never enables `PRAGMA foreign_keys` — a load-bearing silence
+   that the file still does not mention.
+3. **`validate_entry_fields` is a denylist.** It refuses only `PASSAGE_FIELDS` names a
+   domain lacks and is silent about everything else, which is how `progress` reached
+   storage unvalidated on the import path for a whole sprint, and how Sprint 040's Outcome
+   came to claim a guard that did not exist.
+4. **Conformance has no wiring tier.** A domain can be internally consistent and hostable
+   by the core and still name a provider nobody constructed; that surfaces at runtime as
+   `enrichment_not_configured`, which reads like a missing API key.
+5. **Three render sites for entry fields**, of which Sprint 038 fixed two.
+6. **Three hand-enumerated `EntryRow` constructions**, so a new column is a three-site edit.
+
+### Two classes now closed, and one of them should be kept closed by a test
+
+- **Tests that enumerate what exists today** broke five times across five sprints
+  (`test_item_types`, `provider_health`, the enrichment revision lists, `test_backup`'s
+  head revision, the published importer ids). Each failed with no behaviour changing. All
+  are derived now, and the remaining literal `{"book", "album"}` assertions are tests
+  checking data they created themselves, which is legitimate.
+- **Schema constraints freezing an application-owned vocabulary** were written twice and
+  deleted twice (`ck_entries_status`, `ck_import_batches_kind`). Verified: no live third
+  exists. Nothing keeps it that way, so Sprint 042 adds the guard.
+
+### Decision
+
+Sprint 042 builds the six items above minus the frontend hook, which is deferred as a
+refactor with its own risk rather than a contract problem — Sprint 040 already repaired
+its one real consequence. `FINAL_SPRINT` moves to 42 and the plan revision to 21.
+
+**What is deliberately not built:** the OAuth seam IGDB will need, a generalised cover
+chooser, and anything else speculative. Deliverables 1–3 are about not repeating *known*
+mistakes; the rest of the contract's future should be designed against the domain that
+asks for it, which is the same rule DEC-067 row 3 followed and which produced Sprint 039.
+
+### The honest caveat
+
+**This is a sample of one domain**, and an unusual one: anime was the first with a real
+cross-provider identity, the first to need enrichment on a key that is not an ISBN, and
+the first to need a per-entry number. Games would exercise authentication with a lifetime
+instead and would very likely surface a different list. There is a real argument for
+waiting for a second data point rather than optimising for what anime happened to hit; it
+was weighed and rejected, because items 1 to 3 record mistakes already made rather than
+predictions about mistakes to come.

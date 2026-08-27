@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 20,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 21,
+  "project_status": "ready",
+  "active_sprint": "042",
+  "active_sprint_file": "docs/sprints/042-sharpening-the-domain-contract.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "041",
   "completed_sprints": [
     "001",
@@ -50,5 +50,5 @@
     "041"
   ],
   "started_at": null,
-  "updated_at": "2026-08-27T19:30:00-03:00"
+  "updated_at": "2026-08-27T20:05:00-03:00"
 }
