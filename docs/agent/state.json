@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 20,
-  "project_status": "in_progress",
-  "active_sprint": "038",
-  "active_sprint_file": "docs/sprints/038-anime-domain.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "037",
+  "project_status": "ready",
+  "active_sprint": "039",
+  "active_sprint_file": "docs/sprints/039-enrichment-beyond-isbn.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "038",
   "completed_sprints": [
     "001",
     "002",
@@ -43,8 +43,9 @@
     "034",
     "035",
     "036",
-    "037"
+    "037",
+    "038"
   ],
-  "started_at": "2026-08-27T14:20:00-03:00",
-  "updated_at": "2026-08-27T14:41:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-27T15:40:00-03:00"
 }

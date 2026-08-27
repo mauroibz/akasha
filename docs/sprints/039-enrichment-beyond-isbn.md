@@ -1,6 +1,6 @@
 # Sprint 039 — Enrichment beyond the ISBN
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 038
 **Roadmap revision:** 20
 

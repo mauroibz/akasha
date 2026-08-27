@@ -1,6 +1,6 @@
 # Sprint 038 — Anime: the third domain
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 037
 **Roadmap revision:** 20
 
@@ -211,5 +211,70 @@ deliverable of this sprint, not a courtesy.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, the guide-accuracy report, and impact on Sprints 039–041._
+**Completed 2026-08-27** on branch `sprint-038-anime`. Commits `9144daf` (the declaration),
+`7165816` (the adapters), `b2482c8` (the per-domain passage-field labels), and the closure commit.
+
+### Acceptance criteria, one line each
+
+1. **Registered and published.** `GET /api/item-types` serves anime's label, eleven fields, six
+   statuses, `default_status: completed`, three entry fields, three formats,
+   `entry_panel_label: "Your watch data"`, `entry_field_labels: {reread_count: Rewatches}` and
+   `chooses_covers: false`. Verified live against the running application.
+2. **Conformance passed with no test added to admit anime.** The suite is parametrized over
+   `DOMAINS` and held the new domain by existing. One check *was* added — `entry_field_labels` is a
+   new contract field and `test_the_suite_covers_every_field_of_the_contract` demands one — plus two
+   malformed fixtures so it can fail. That is the contract growing, not a check bent to fit.
+3. **Both providers, merged.** A live search for `akame ga kill` returned three rows; the first two
+   each carry `source_refs` from both `anilist` and `kitsu` with `anilist` primary, on the shared
+   `mal:` identity. First real cross-provider merge since books.
+4. **A candidate with no mapping merges with nothing.** `anilist_search_bocchi_null_idmal.json` pins
+   a real `idMal: null` row; `mal_identity` answers `None` and it adds normally.
+5. **All URL forms resolve.** `myanimelist.net/anime/22199` → AniList by `idMal`;
+   `anilist.co/anime/154587`; `kitsu.io/anime/cowboy-bebop` (slug) and `kitsu.app/anime/8270` (id).
+   `http://[` still lets every other domain take its turn (conformance probe set).
+6. **Covers install through the shared pipeline.** AniList's `extraLarge` arrived and was stored at
+   425x600 / 74 KiB; Kitsu's poster likewise. Two new allowlist entries, no rule relaxed.
+7. **Every screen rendered from the registry.** Walkthrough at 390x844: the domain chooser offers
+   Anime, the status filter lists all six of its statuses with facet counts, and the detail page
+   shows the declared fields in the declared order. No screen branches on the item type.
+8. **Validation is keyed on the item's own domain.** `PATCH status=read` → 422 *"Anime has no status
+   named 'read'"*; `formats=["vinyl"]` → 422 *"Anime has no format named 'vinyl'"*;
+   `reread_count=3` → 200, because anime declares it.
+9. **The entry panel names rewatches.** Live snapshot reads `Rewatches: 3` on an anime; books still
+   read `Rereads`.
+10. **No migration.** Head is still `0014_status_is_the_domains`.
+
+### Verification
+
+- `make check` — green (lint, format, mypy, tsc, OpenAPI drift, project validator).
+- `make test` — **616 backend, 183 frontend**, up from 559/179 at Sprint 037 closure.
+- `npm run test:e2e` — **103 passed, 2 skipped**, matching the Sprint 037 baseline.
+- Walkthrough: **5 of 5** in `frontend/e2e/scratchpad/anime-walkthrough.spec.ts`, at 390x844 against
+  a disposable data directory and the **live** AniList and Kitsu APIs. Live `data/` untouched.
+
+### Deviations, all recorded in DEC-090
+
+Three shared changes the guide did not predict, each costed against its alternative: `bounded_json`
+gained `method`/`json_body` because GraphQL asks by POST; three `provider_health` tests were derived
+from the registry rather than enumerating providers; and `Domain` gained `entry_field_labels`.
+
+### What the walkthrough found that the tests could not
+
+- **Kitsu returns four producers and only one is the studio.** Square Enix and TOHO animation are
+  `producer`, Sentai Filmworks is `licensor`, White Fox is `studio`. Taking the first would have
+  filed Akame ga Kill! under its manga publisher.
+- **Kitsu holds no production records at all for some series**, Cowboy Bebop included, so it arrives
+  with no creator where AniList has Sunrise. A gap in the source, and part of why AniList is primary.
+- **`Episode length: 24` carries no unit** on the detail page. Minutes are implied by the label but
+  not stated. Cosmetic, out of scope, and left as observed rather than silently fixed.
+- **`creators` never renders as a labelled fact** — it is the credit line for every domain, so the
+  `Studios` label reaches only the metadata dialog. Shared behaviour; now documented in the guide.
+- **`default_status: completed` read correctly in use**, matching the owner's export shape.
+
+### Impact on Sprints 039–041
+
+None of the three is invalidated. Sprint 039 still finds `enriches=False` on anime and flips it;
+Sprint 040's `entries.progress` remains the only shared-table change in the line; Sprint 041's
+connector target domain now exists and its `mal` identity kind is live and proven end to end. Sprint
+039 inherits one new fact: `bounded_json` already takes a method, so a provider it reaches by POST
+costs nothing extra.

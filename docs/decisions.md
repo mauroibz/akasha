@@ -2947,3 +2947,72 @@ the `l` suffix variant is 431x600 and is the one that would be correct.
   unnumbered epic**; games, series and Spotify remain so. If 038 completes without needing 039 or
   040 — that is, if the guide's promise survives contact — those two sprints are still owed, because
   the export the owner brought is what defines "complete" here.
+
+## DEC-090 — What building anime found: three shared changes, and the contract gained a field
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-088 (the providers), DEC-089 (the four-sprint plan), DEC-067 rows 1 and 5
+  (the couplings this touches), DEC-070 (the first time the guide was proved by following it),
+  DEC-052 and DEC-057 (the seams and the entry vocabulary).
+- **Context:** Sprint 038 built the anime domain from `docs/guides/adding-a-domain.md` alone, as the
+  owner's trial run of whether a third domain is really an epic on top of the Sprint 028 contract.
+  This entry records what that cost outside the domain's own directory, because the whole value of
+  the exercise is the parts the guide did not predict.
+
+### The promise held
+
+No migration. No screen written for the domain. No other domain's file touched. **Registering the
+domain broke nothing**: the full backend suite passed on the first run after the registry entry, and
+the conformance suite held anime to the contract by parametrization with **no test added to admit
+it**. Statuses, formats, triage hotkeys, the metadata dialog, the detail layout, facet counts and the
+domain chooser all rendered from `GET /api/item-types`.
+
+### Three changes outside the package, each with its alternative costed
+
+1. **`bounded_json` gained `method` and `json_body`.** It streamed `GET` only, because every provider
+   before AniList read with one; GraphQL asks by `POST`. The alternative was an adapter writing its
+   own request loop, which would have silently dropped the retry policy, the 2 MiB bound and the
+   streaming read — the three things that boundary exists to own. **This is not a seventh seam**: no
+   shared layer branches on a provider, the boundary gained a verb. Recorded because a future reader
+   should find a decision rather than an unexplained parameter.
+2. **Three `provider_health` tests were derived from the registry.** DEC-067 row 5 made the endpoint
+   itself registry-derived in Sprint 028 and left its tests asserting the wired providers as literal
+   lists, so a third domain's two adapters failed them **with no behaviour changing**. This is the
+   same defect `test_item_types.py` had when the guide was first proved (DEC-070), one layer down,
+   and the general rule is now written into the guide: a test that enumerates what exists today is a
+   test the next domain breaks.
+3. **`Domain` gained `entry_field_labels`.** Sprint 028 made the heading over the personal region the
+   domain's copy and left the three passage fields under it spelled for books, so an anime read
+   `Rereads`. Invisible until a domain arrived that reads none of the three correctly. The field is
+   partial on purpose — `Started` and `Finished` are right for a book and a series alike — keys are
+   refused by conformance unless the domain declares that field, and **the client fallback is a
+   neutral word rather than a book's**, for the same reason `labelFor` falls back to `Item`.
+
+### The identity finding
+
+**Anime is the first domain since books whose candidates genuinely merge.** Both providers publish
+the MyAnimeList id — AniList as `idMal`, Kitsu as a mapping returned inside the *search* response —
+so `identity_key` returns `mal:<id>` and a live search for `akame ga kill` returns one row carrying
+both `source_refs`, AniList primary. Albums answered `None` because a barcode is not an edition key
+(DEC-052); copying that answer here would have thrown away a real global identifier. A candidate with
+no mapping still merges with nothing, and AniList really does return `idMal: null`.
+
+### Two things stated rather than argued with
+
+- **A domain must declare at least one format.** Conformance refuses an empty vocabulary, so a domain
+  with no real notion of how a copy is held has to invent one. Anime declares `streaming`, `digital`,
+  `bluray`, which is honest enough. Whether the check is right is left open; it was satisfied, not
+  changed, because changing a conformance rule to suit the domain being added is how a contract stops
+  meaning anything.
+- **`creators` never renders as a labelled fact.** It becomes the credit line under the title for
+  every domain, so `FieldSpec("creators", "Studios", ...)` names something the detail page never
+  prints. Shared behaviour, not this domain's to change; now documented in the guide.
+
+### From the walkthrough, which no test would have found
+
+Kitsu returns four production companies for Akame ga Kill! and only one carries `role: "studio"` —
+Square Enix and TOHO animation are `producer`, Sentai Filmworks is `licensor`. Taking the first would
+have filed the series under its manga publisher. And Kitsu holds **no production records at all** for
+some series, Cowboy Bebop among them, so that record arrives with no creator; AniList has Sunrise for
+it. That is a gap in the source rather than in the adapter, and it is part of why AniList is primary.

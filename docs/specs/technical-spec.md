@@ -435,6 +435,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. |
 | `default_status` | What a newly added entry gets when nobody chose. Must be one of `statuses`. |
 | `entry_fields` | Which of `date_started` / `date_finished` / `reread_count` this domain's entries have. Anything absent is **refused on write**, not merely hidden. |
+| `entry_field_labels` | What this domain calls those fields, for the ones a neutral word gets wrong: an anime has *Rewatches*, a book has *Rereads*. Partial — `Started` and `Finished` are right for both, and a key naming a field the domain does not declare is refused by conformance. The client falls back to a neutral word, never to a book's. |
 | `formats` | The `FormatSpec` vocabulary for how a copy is held. Closed and declared, which is what a shelf is not (DEC-059). |
 | `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |

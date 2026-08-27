@@ -1,49 +1,55 @@
-# Handoff — plan revision 20, Sprint 038 ready
+# Handoff — Sprint 038 closed, Sprint 039 ready
 
-The numbered plan was complete through Sprint 037. The owner then asked for **anime as a third
-domain**, with an importer for their own MyAnimeList export, explicitly as a trial run of the Sprint
-028 domain contract whose findings feed back into this repository. Plan revision 20 adds Sprints
-038–041; `FINAL_SPRINT` is 41; the active sprint is **038** with status `ready`.
+Anime ships. Plan revision 20, `FINAL_SPRINT` 41, active sprint **039 — Enrichment beyond the ISBN**,
+status `ready`. Work is on the branch **`sprint-038-anime`**, cut from `main` at `bcb11ca` under
+DEC-053. Nothing is pushed. Merging the branch is the owner's call at the line's close, not per sprint.
 
-Work is on the branch **`sprint-038-anime`**, cut from `main` at `bcb11ca` under DEC-053's rule that
-a domain-line sprint runs on a branch. Merging it back is the owner's call at the line's close.
+## What Sprint 038 delivered
 
-## What was decided, and where
+A registered `anime` domain with two adapters — AniList primary, Kitsu second — added and used
+through the existing screens. **No migration, no screen written for it, no other domain's file
+touched.** Full detail in the sprint's Outcome; the reasoning is DEC-088 (the providers, measured)
+and DEC-090 (what building it found).
 
-- **DEC-088** — the providers, measured live on 2026-08-27 rather than chosen from documentation.
-  AniList first, Kitsu second, Jikan rejected. Read it before touching an adapter; it carries the
-  numbers, the two things the owner has to own, and the cover-host measurements.
-- **DEC-089** — why anime is four sprints and not one, and the two seams it collects.
-- Sprint files `038`–`041` carry the acceptance criteria. `038` is the only one that is `ready`.
+Verification at closure: `make check` green, `make test` **616 backend / 183 frontend**, Playwright
+**103 passed / 2 skipped**, and a 5-of-5 walkthrough at 390x844 against a disposable data directory
+and the live provider APIs. Live `data/` untouched.
 
-## The plan in one paragraph
+## Sprint 039 in one paragraph
 
-038 builds the domain the way `docs/guides/adding-a-domain.md` says one is built — a package, two
-adapters, small registration points, no migration, no screen — and reports whether that guide was
-sufficient on its own. 039 pays DEC-067 row 3, whose stated trigger ("the first domain that wants
-background enrichment on a non-ISBN key") is now met. 040 builds DEC-077 shape (a), the per-domain
-progress field that verdict chose and did not build; it is the **only shared-table migration in the
-line**. 041 is the MyAnimeList connector, which lands complete because 039 and 040 precede it.
+DEC-067 row 3 named its own trigger — "the first domain that wants background enrichment on a
+non-ISBN key" — and anime is it. `PROVIDER_ORDER` is a module constant naming two book providers,
+`_backfillable_items` joins `item_identifiers` on the literal `'isbn'`, and `_fetch` calls
+`fetch_by_isbn`. A domain declares its enrichment key and provider order instead; **books' behaviour
+must not change**, and the existing enrichment tests are the guard rather than something to relax.
+No migration — a job is a row with a JSON payload — but there **is** a compatibility path for jobs
+already queued under the old shape, and it needs a test, because nobody would notice it failing.
 
 ## Things a fresh session will otherwise rediscover
 
-- **Jikan is not an option.** It returned HTTP 504 to every request across a forty-minute window —
-  0/12 on search, 1/81 by id, and that one success was its own cache. `myanimelist.net` answered this
-  host in 0.66s throughout. Do not re-add it on the theory that it was a bad afternoon without
-  re-measuring first.
-- **AniList needs a User-Agent** or Cloudflare answers `error code: 1010` with HTTP 403.
-- **Kitsu returns the MyAnimeList id on a search row** with `include=mappings`, and studios plus
-  categories in the same fetch with `include=animeProductions.producer,categories`. Studios are not an
-  extra request per item; an earlier note in this planning session said they were and was wrong.
-- **Anime is the first domain since books with a real cross-provider identity.** Both providers
-  publish the MAL id, so `identity_key` returns `mal:<id>` and candidates merge. Albums' `None` is not
-  the precedent to copy here.
-- The owner's export is gitignored now, at the repository root. Use it for the Sprint 041 walkthrough
-  only; the committed fixtures are trimmed and anonymised.
+- **`bounded_json` already takes `method` and `json_body`.** Sprint 038 added them for AniList's
+  GraphQL POST. A provider reached by POST costs Sprint 039 nothing extra. Do not write a bespoke
+  request loop.
+- **Translate provider HTTP errors at the adapter.** A 404 is `record_not_found`, anything else is
+  `provider_http_error`; enrichment's retry reads the difference. Both anime adapters and
+  `domains/book/providers.py` do this.
+- **AniList needs a User-Agent** or Cloudflare answers `error code: 1010` / HTTP 403. It answers a
+  missing record with **404**, not a 200 carrying null.
+- **Anime's enrichment key is `mal`,** and both providers resolve it: AniList through `Media(idMal:)`,
+  Kitsu through the mappings filter. Measured resolving all 81 of the owner's export ids — AniList in
+  2 requests / 54 KiB, Kitsu in 5 requests / 552 KiB (DEC-088).
+- **Jikan is not an option** and is not registered. It returned HTTP 504 to every request across a
+  forty-minute window while `myanimelist.net` answered in 0.66 s. Do not re-add it without measuring.
+- **A test that enumerates what exists today is a test the next domain breaks.** Sprint 038 hit this
+  in `test_provider_health.py`; Sprint 028 hit it in `test_item_types.py`. Assert against the registry.
+- **Writing a walkthrough?** The domain chooser is a `radiogroup`, the status filter is a popover
+  whose options carry facet counts, and library row controls are popovers where Triage's are native
+  selects (DEC-086). Four of my first assertions were wrong about the UI, none about the product.
+  `frontend/e2e/scratchpad/anime-walkthrough.spec.ts` is the working example; it is gitignored.
 
-## State at this handoff
+## After 039
 
-- `python scripts/validate_project.py` passes.
-- Nothing outside `docs/`, `.gitignore` and the validator's sprint bound has changed. No product gate
-  applies to the planning commit.
-- No runtime code has been written for anime yet.
+**040 — Entry progress** builds DEC-077 shape (a) and is the **only shared-table migration in the
+line**; it and 039 are independent of each other and both block **041 — The MyAnimeList import**. The
+owner's export sits gitignored at the repository root; use it for 041's walkthrough only, and commit
+trimmed anonymised fixtures instead.

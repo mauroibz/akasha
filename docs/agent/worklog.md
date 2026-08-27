@@ -2278,3 +2278,34 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Verified: `python scripts/validate_project.py` passed. No product gate applies — nothing outside
   `docs/`, `.gitignore` and the validator's sprint bound changed.
 - Next: execute Sprint 038 under the ordinary protocol.
+
+## 2026-08-27 — Sprint 038 (complete)
+
+- Done: built the anime domain from `docs/guides/adding-a-domain.md` alone — package, AniList and
+  Kitsu adapters, registration, ten recorded provider responses, and the per-domain passage-field
+  labels. Commits `9144daf`, `7165816`, `b2482c8`. Branch `sprint-038-anime`, unpushed.
+- Verified: `make check` green. `make test` **616 backend / 183 frontend** (from 559/179 at Sprint 037
+  closure). Playwright **103 passed, 2 skipped**, matching the prior baseline. Conformance passed over
+  three domains; registering the domain broke no existing backend test on the first run.
+- Walkthrough: 5 of 5 in the ignored `frontend/e2e/scratchpad/anime-walkthrough.spec.ts`, at 390x844
+  against a disposable `BOOK_TRACKER_DATA_DIR` and the **live** AniList and Kitsu APIs, backend on
+  8123 and vite on 5199. Observed: a live `akame ga kill` search returned three rows with the first
+  two merged across both providers on `mal:22199`, AniList primary; all four URL forms resolved;
+  covers installed from both new hosts (AniList's stored at 425x600 / 74 KiB); `status=read` and
+  `formats=["vinyl"]` each refused 422 naming Anime; `reread_count=3` accepted; the detail page read
+  `Your watch data` and **`Rewatches: 3`**; the status filter listed all six anime statuses with facet
+  counts and no book vocabulary. Live `data/` untouched.
+- Four walkthrough assertions failed first and **every one was my selector, not the product**: the
+  domain chooser is a `radiogroup` and not tabs (Sprint 029), the status filter is a popover and not
+  a select (multi-valued, see `StatusFilter.tsx`), its options carry facet counts, and library row
+  controls are popovers where Triage's are native (DEC-086). Worth knowing before writing the next
+  walkthrough.
+- Three shared changes, all in DEC-090: `bounded_json` gained `method`/`json_body` because GraphQL
+  asks by POST; three `provider_health` tests were deriving nothing and enumerating providers, so a
+  third domain failed them with no behaviour changing; `Domain` gained `entry_field_labels`.
+- Observed and left alone, out of scope: `Episode length: 24` carries no unit on the detail page;
+  Kitsu holds no production records at all for some series (Cowboy Bebop), so it arrives with no
+  creator where AniList has Sunrise; and conformance requires a non-empty `formats` vocabulary, which
+  a domain with no notion of a copy would have to invent one for.
+- Next: Sprint 039, enrichment beyond the ISBN. It inherits one fact from this sprint — `bounded_json`
+  already takes a method, so a provider reached by POST costs it nothing.

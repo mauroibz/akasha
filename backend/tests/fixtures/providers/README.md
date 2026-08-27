@@ -75,3 +75,36 @@ after five seconds succeeded, which is three-for-three on that throttling shape.
 
 The `fields` parameter used for both search recordings is the one
 `OpenLibraryProvider.search` sends; it is reproduced in the test that replays them.
+
+Ten files were **added** on 2026-08-27 for Sprint 038 (the `anilist_*` and `kitsu_*` rows
+below), captured with `User-Agent: Akasha/1.2 (+https://github.com/mauroibz/akasha)` and
+paced at ~1 s between requests. Nothing was re-recorded. They are the measurement DEC-088
+rests on, and two of them exist to pin behaviour that a reasonable implementation would
+have guessed wrong:
+
+- **AniList requires a User-Agent.** Requested without one, Cloudflare answers
+  `error code: 1010` with HTTP **403**. This is why the header is constructed in the
+  adapter rather than left to the shared client.
+- **AniList answers a record that does not exist with HTTP 404**, carrying a GraphQL
+  `errors` array *and* `"data": {"Media": null}` — not a 200 with a null payload. Latency
+  across the capture run was 0.3–1.5 s with one 40.04 s outlier on an otherwise ordinary
+  request.
+
+**Jikan (`api.jikan.moe`) has no recordings because it is not registered.** It returned
+HTTP 504 (`Jikan failed to connect to MyAnimeList`) to **every** request across a
+forty-minute window — 0 of 12 searches and 1 of 81 by-id lookups, where that single
+success was a record requested moments earlier and served from its own cache — while
+`myanimelist.net` answered the same host in 0.66 s throughout. See DEC-088.
+
+| File | Source |
+|---|---|
+| `anilist_search_frieren.json` | `POST https://graphql.anilist.co` — the search query the adapter sends, with `{"query": "frieren", "perPage": 10}`. Four of the five rows carry an `idMal`; `Sousou no Frieren` is the first and the studio arrives as `MADHOUSE`, uninverted, in the search response itself, so no second lookup is needed for a sort name. |
+| `anilist_search_bocchi_null_idmal.json` | The same query with `"bocchi the rock"`. **`Bocchi the Rock! Re:Re:` has `idMal: null`** — a real record with no MyAnimeList mapping, which is why `identity_key` answering `None` is a live path and not a defensive branch. |
+| `anilist_media_20613_akame.json` | `Media(id: 20613)` — Akame ga Kill!. Carries `idMal: 22199`, the same series `kitsu_anime_8270_akame.json` holds, which is what makes the cross-provider merge testable. Its `description` contains `<br>` **even though the query asks for `asHtml: false`**, which is why the adapter strips markup. |
+| `anilist_media_mal_44511_chainsaw.json` | `Media(idMal: 44511)` — Chainsaw Man, fetched by MyAnimeList id rather than AniList id. This is the path a pasted `myanimelist.net` link takes. |
+| `anilist_media_mal_missing.json` | `Media(idMal: 99999999)` — response body for the **404** described above. |
+| `kitsu_search_akame_mappings.json` | `GET https://kitsu.io/api/edge/anime?filter[text]=akame+ga+kill&page[limit]=10&include=mappings` — 19.2 KiB. The `include` is the point: every result carries its `myanimelist/anime` external id in the same request, so a Kitsu **search row** can merge with an AniList one. Without it this domain would have no cross-provider identity. |
+| `kitsu_search_frieren_mappings.json` | The same request for `frieren`, 35.0 KiB. Kitsu matched `Blame! Movie` and other export titles that AniList's `SEARCH_MATCH` did not, which is part of why it is registered rather than merely available. |
+| `kitsu_anime_8270_akame.json` | `GET .../anime/8270?include=animeProductions.producer,categories,mappings` — 22.7 KiB in one request. **Four producers come back and only one has `role: "studio"`**: Square Enix and TOHO animation are `producer`, Sentai Filmworks is `licensor`, White Fox is the studio. Taking the first would file the series under its manga publisher. Eight mappings arrive, so the MyAnimeList one is matched by site rather than by position. |
+| `kitsu_anime_slug_akame.json` | `GET .../anime?filter[slug]=akame-ga-kill&include=...` — the same record reached the way a pasted `kitsu.io/anime/<slug>` URL reaches it. `/anime/{id}` takes a numeric id only. |
+| `kitsu_anime_missing.json` | `GET .../anime/99999999?include=...` — Kitsu's **404** body, for the counterpart of the AniList case above. |
