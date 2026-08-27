@@ -49,6 +49,27 @@ import {
   mergeUniqueEntries,
 } from "@/features/library/library";
 
+const STATUS_DRAFTS_STORAGE_KEY = "akasha.triage.status-drafts.v1";
+
+function loadStatusDrafts(): Map<number, EntryStatus> {
+  try {
+    const stored = window.sessionStorage.getItem(STATUS_DRAFTS_STORAGE_KEY);
+    if (!stored) return new Map();
+    const parsed: unknown = JSON.parse(stored);
+    if (!Array.isArray(parsed)) return new Map();
+    return new Map(
+      parsed.filter(
+        (draft): draft is [number, EntryStatus] =>
+          Array.isArray(draft) &&
+          Number.isInteger(draft[0]) &&
+          typeof draft[1] === "string",
+      ),
+    );
+  } catch {
+    return new Map();
+  }
+}
+
 function filtersFromParams(params: URLSearchParams): LibraryFilters {
   const statuses = params.getAll("status") as EntryStatus[];
   return {
@@ -79,13 +100,28 @@ export function TriagePage() {
   const [excludedIds, setExcludedIds] = useState<Set<number>>(new Set());
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [lastShiftIndex, setLastShiftIndex] = useState<number | null>(null);
-  const [pendingStatuses, setPendingStatuses] = useState<
-    Map<number, EntryStatus>
-  >(new Map());
+  const [pendingStatuses, setPendingStatuses] =
+    useState<Map<number, EntryStatus>>(loadStatusDrafts);
   const searchRef = useRef<HTMLInputElement>(null);
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
   const navigate = useNavigate();
+
+  useEffect(() => {
+    try {
+      if (pendingStatuses.size === 0) {
+        window.sessionStorage.removeItem(STATUS_DRAFTS_STORAGE_KEY);
+      } else {
+        window.sessionStorage.setItem(
+          STATUS_DRAFTS_STORAGE_KEY,
+          JSON.stringify(Array.from(pendingStatuses)),
+        );
+      }
+    } catch {
+      // Storage can be unavailable in privacy-restricted browser contexts. The
+      // row still works for the current visit; only cross-navigation recovery is lost.
+    }
+  }, [pendingStatuses]);
 
   // Debounce search. Same guard as the library: writing an identical query
   // string back to the URL re-rendered the whole virtualized table a quarter
@@ -673,160 +709,118 @@ export function TriagePage() {
 
       {entries.length > 0 && (
         <>
-          {(pendingStatuses.size > 0 || selectionCount > 0) && (
+          {selectionCount > 0 && (
             <div className="sticky top-3 z-20 mt-4 space-y-2">
-              {pendingStatuses.size > 0 && (
-                <m.div
-                  className="flex flex-wrap items-center gap-3 rounded-2xl border border-primary/25 bg-surface-raised p-3 shadow-lg"
-                  role="toolbar"
-                  aria-label="Pending status changes"
-                  initial={presets.actionBar.initial}
-                  animate={presets.actionBar.animate}
-                >
-                  <span className="mr-auto px-2 text-sm text-foreground">
-                    {pendingStatuses.size}{" "}
-                    {pendingStatuses.size === 1
-                      ? "status change ready"
-                      : "status changes ready"}
-                  </span>
-                  <Button
-                    className="rounded-full text-sm"
-                    disabled={pendingStatusMutation.isPending}
-                    onClick={() =>
-                      pendingStatusMutation.mutate(new Map(pendingStatuses))
-                    }
-                  >
-                    {pendingStatusMutation.isPending
-                      ? "Applying…"
-                      : "Apply status changes"}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="rounded-full text-sm"
-                    disabled={pendingStatusMutation.isPending}
-                    onClick={() => setPendingStatuses(new Map())}
-                  >
-                    Discard status changes
-                  </Button>
-                </m.div>
-              )}
-
               {/* Bulk action bar */}
-              {selectionCount > 0 && (
-                // Transform and opacity only. The bars share one sticky stack,
-                // so a pending-status action and bulk selection never overlap.
-                <m.div
-                  className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-raised p-3 shadow-lg"
-                  role="toolbar"
-                  aria-label="Bulk actions"
-                  initial={presets.actionBar.initial}
-                  animate={presets.actionBar.animate}
-                >
-                  <span className="px-2 text-sm text-foreground">
-                    {selectionCount} selected
-                  </span>
-                  {/* An action menu, not a stateful field: it fires and resets, so
+              <m.div
+                className="flex flex-wrap items-center gap-3 rounded-2xl bg-surface-raised p-3 shadow-lg"
+                role="toolbar"
+                aria-label="Bulk actions"
+                initial={presets.actionBar.initial}
+                animate={presets.actionBar.animate}
+              >
+                <span className="px-2 text-sm text-foreground">
+                  {selectionCount} selected
+                </span>
+                {/* An action menu, not a stateful field: it fires and resets, so
                       it carries no value and shows its prompt as a placeholder. */}
+                <Select
+                  value=""
+                  onValueChange={(value) =>
+                    bulkMutation.mutate(
+                      buildBulkBody({ status: value as EntryStatus }),
+                    )
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Set status for selected"
+                    className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
+                  >
+                    <SelectValue placeholder="Set status…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {selectionStatuses
+                      .filter((status) => status.choosable)
+                      .map((status) => (
+                        <SelectItem key={status.value} value={status.value}>
+                          {status.label}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value=""
+                  onValueChange={(value) =>
+                    bulkMutation.mutate(buildBulkBody({ score: Number(value) }))
+                  }
+                >
+                  <SelectTrigger
+                    aria-label="Set score for selected"
+                    className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
+                  >
+                    <SelectValue placeholder="Set score…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 10 }, (_, i) => i + 1).map(
+                      (score) => (
+                        <SelectItem key={score} value={String(score)}>
+                          {score}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+                {shelfChoices.length > 0 && (
+                  // Product spec section 7 has listed this beside the others since
+                  // v1 and it was never built, so putting twenty imported books on
+                  // one shelf meant opening twenty detail pages. Fire-and-reset like
+                  // the two above it: it is an action, not a field.
                   <Select
                     value=""
                     onValueChange={(value) =>
                       bulkMutation.mutate(
-                        buildBulkBody({ status: value as EntryStatus }),
+                        buildBulkBody({ add_shelves: [Number(value)] }),
                       )
                     }
                   >
                     <SelectTrigger
-                      aria-label="Set status for selected"
+                      aria-label="Add selected to a shelf"
                       className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
                     >
-                      <SelectValue placeholder="Set status…" />
+                      <SelectValue placeholder="Add to shelf…" />
                     </SelectTrigger>
                     <SelectContent>
-                      {selectionStatuses
-                        .filter((status) => status.choosable)
-                        .map((status) => (
-                          <SelectItem key={status.value} value={status.value}>
-                            {status.label}
-                          </SelectItem>
-                        ))}
+                      {shelfChoices.map((shelf) => (
+                        <SelectItem key={shelf.id} value={String(shelf.id)}>
+                          {shelf.name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
-                  <Select
-                    value=""
-                    onValueChange={(value) =>
-                      bulkMutation.mutate(
-                        buildBulkBody({ score: Number(value) }),
-                      )
-                    }
-                  >
-                    <SelectTrigger
-                      aria-label="Set score for selected"
-                      className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
-                    >
-                      <SelectValue placeholder="Set score…" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Array.from({ length: 10 }, (_, i) => i + 1).map(
-                        (score) => (
-                          <SelectItem key={score} value={String(score)}>
-                            {score}
-                          </SelectItem>
-                        ),
-                      )}
-                    </SelectContent>
-                  </Select>
-                  {shelfChoices.length > 0 && (
-                    // Product spec section 7 has listed this beside the others since
-                    // v1 and it was never built, so putting twenty imported books on
-                    // one shelf meant opening twenty detail pages. Fire-and-reset like
-                    // the two above it: it is an action, not a field.
-                    <Select
-                      value=""
-                      onValueChange={(value) =>
-                        bulkMutation.mutate(
-                          buildBulkBody({ add_shelves: [Number(value)] }),
-                        )
-                      }
-                    >
-                      <SelectTrigger
-                        aria-label="Add selected to a shelf"
-                        className="h-11 w-auto gap-2 rounded-full bg-surface-raised text-sm"
-                      >
-                        <SelectValue placeholder="Add to shelf…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {shelfChoices.map((shelf) => (
-                          <SelectItem key={shelf.id} value={String(shelf.id)}>
-                            {shelf.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  )}
-                  <Button
-                    variant="secondary"
-                    className="rounded-full text-sm"
-                    onClick={() =>
-                      bulkMutation.mutate(
-                        buildBulkBody({ clear_provisional: true }),
-                      )
-                    }
-                  >
-                    Clear provisional
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    className="rounded-full text-sm"
-                    onClick={() => {
-                      setSelectedIds(new Set());
-                      setAllMatching(false);
-                      setExcludedIds(new Set());
-                    }}
-                  >
-                    Clear selection
-                  </Button>
-                </m.div>
-              )}
+                )}
+                <Button
+                  variant="secondary"
+                  className="rounded-full text-sm"
+                  onClick={() =>
+                    bulkMutation.mutate(
+                      buildBulkBody({ clear_provisional: true }),
+                    )
+                  }
+                >
+                  Clear provisional
+                </Button>
+                <Button
+                  variant="secondary"
+                  className="rounded-full text-sm"
+                  onClick={() => {
+                    setSelectedIds(new Set());
+                    setAllMatching(false);
+                    setExcludedIds(new Set());
+                  }}
+                >
+                  Clear selection
+                </Button>
+              </m.div>
             </div>
           )}
 
@@ -997,7 +991,7 @@ export function TriagePage() {
                       </select>
                       <Button
                         size="sm"
-                        className="h-9 shrink-0 rounded-full px-2 text-xs sm:px-3"
+                        className="h-9 w-9 shrink-0 rounded-full bg-primary-foreground p-0 text-primary hover:bg-primary-foreground/80"
                         aria-label={`Apply ${targetLabel} to ${entry.item.title}`}
                         disabled={pendingStatusMutation.isPending}
                         onClick={() =>
@@ -1007,7 +1001,6 @@ export function TriagePage() {
                         }
                       >
                         <Check className="h-4 w-4" aria-hidden="true" />
-                        <span className="hidden lg:inline">Apply</span>
                       </Button>
                     </div>
                   </div>

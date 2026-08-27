@@ -3380,3 +3380,25 @@ predictions about mistakes to come.
   registry already supplied both required facts (`default_status` and `choosable`). Plan
   revision 22 inserts this as Sprint 042, moves the DEC-094 work unchanged to Sprint 043,
   and moves `FINAL_SPRINT` from 42 to 43.
+
+## DEC-096 — Triage status decisions have one commit surface and survive navigation
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Supersedes:** DEC-095's retained sticky Apply/Discard surface; preserves its target
+  precedence, row Apply, failure retry and explicit checkbox bulk-action contracts.
+- **Context:** In the owner's approval pass, the added row check made the separate status-change
+  toolbar visibly redundant: the select already showed the row's pending decision and the check
+  already committed it. Removing that toolbar exposed the remaining risk—draft state lived only in
+  the mounted Triage component, so leaving to inspect Detail or Library could erase work.
+- **Decision:** The row check is the only commit surface for a row target. Its compact treatment is
+  a yellow check on a dark circular button, with the full target-and-title accessible name and no
+  visible `Apply` copy. There is no global Apply/Discard toolbar for row drafts; choosing the
+  suggestion/domain default again clears a draft. Drafts mirror into versioned, tab-scoped
+  `sessionStorage`, survive route changes and refresh, clear on a successful row or explicit bulk
+  status commit, and remain after failure. The checkbox-driven bulk toolbar is unchanged.
+- **Consequences:** The UI now has one visible decision and one commit point per ordinary row,
+  without losing unfinished choices during inspection. Persistence is deliberately tab-scoped:
+  drafts do not leak into another browser tab or become durable library data before approval. No
+  backend, API, schema, migration or dependency changes. Plan revision 23 records this as Sprint
+  043, moves the DEC-094 work unchanged to Sprint 044, and moves `FINAL_SPRINT` to 44.

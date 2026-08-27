@@ -300,7 +300,7 @@ test("triage has no serious accessibility violations", async ({ page }) => {
   await expectNoSeriousViolations(page, "triage");
 });
 
-test("triage pending status actions have no serious accessibility violations", async ({
+test("triage row status action with bulk selection has no serious accessibility violations", async ({
   page,
 }) => {
   await stubImporters(page);
@@ -314,6 +314,11 @@ test("triage pending status actions have no serious accessibility violations", a
     .selectOption("reading");
   await expect(
     page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toHaveCount(0);
+  await expect(
+    page
+      .locator('[data-entry-id="1"]')
+      .getByRole("button", { name: "Apply Reading to Book 1" }),
   ).toBeVisible();
   await page.getByRole("checkbox").nth(1).click();
   await expect(

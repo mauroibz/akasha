@@ -247,9 +247,13 @@ test("each row presents one target and can apply it in one click", async ({
   await bookTarget.selectOption("reading");
   expect(writes).toEqual([]);
 
-  await anime
-    .getByRole("button", { name: "Apply Completed to Cowboy Bebop" })
-    .click();
+  const animeApply = anime.getByRole("button", {
+    name: "Apply Completed to Cowboy Bebop",
+  });
+  await expect(animeApply).toHaveText("");
+  await expect(animeApply).toHaveClass(/\bbg-primary-foreground\b/);
+  await expect(animeApply).toHaveClass(/\btext-primary\b/);
+  await animeApply.click();
   await expect
     .poll(() => writes)
     .toContainEqual({
@@ -261,7 +265,10 @@ test("each row presents one target and can apply it in one click", async ({
   await expect(
     book.getByRole("combobox", { name: /status for ficciones.*not saved/i }),
   ).toHaveValue("reading");
-  await page.getByRole("button", { name: "Discard status changes" }).click();
+  await expect(
+    page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toHaveCount(0);
+  await bookTarget.selectOption("read");
   await expect(bookTarget).toHaveValue("read");
 
   await book.getByRole("button", { name: "Apply Read to Ficciones" }).click();
@@ -309,8 +316,11 @@ test("triage keyboard shortcuts stage status on a focused row until apply", asyn
   expect(bulkBodies).toEqual([]);
   await expect(
     page.getByRole("toolbar", { name: "Pending status changes" }),
-  ).toContainText("1 status change ready");
-  await page.getByRole("button", { name: "Apply status changes" }).click();
+  ).toHaveCount(0);
+  await page
+    .locator('[data-entry-id="1"]')
+    .getByRole("button", { name: "Apply To read to Book 1" })
+    .click();
   await expect
     .poll(() => bulkBodies)
     .toEqual([
@@ -380,24 +390,20 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
   ).toHaveValue("reading");
   await expect(
     page.getByRole("toolbar", { name: "Pending status changes" }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await expect(page.getByRole("toolbar", { name: "Bulk actions" })).toHaveCount(
     0,
   );
 
   await row.getByRole("checkbox", { name: "Select Book 1" }).click();
-  const pendingBox = await page
-    .getByRole("toolbar", { name: "Pending status changes" })
-    .boundingBox();
-  const bulkBox = await page
-    .getByRole("toolbar", { name: "Bulk actions" })
-    .boundingBox();
-  expect(pendingBox).not.toBeNull();
-  expect(bulkBox).not.toBeNull();
-  expect(bulkBox!.y).toBeGreaterThanOrEqual(pendingBox!.y + pendingBox!.height);
+  await expect(
+    page.getByRole("toolbar", { name: "Bulk actions" }),
+  ).toBeVisible();
   await page.getByRole("button", { name: "Clear selection" }).click();
 
-  await page.getByRole("button", { name: "Discard status changes" }).click();
+  await row
+    .getByRole("combobox", { name: /status for book 1.*not saved/i })
+    .selectOption("read");
   await expect(
     row.getByRole("combobox", { name: "Status for Book 1" }),
   ).toHaveValue("read");
@@ -409,7 +415,7 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
   ).toBeVisible();
 });
 
-test("status apply keeps failed drafts and clears successful groups", async ({
+test("row status actions apply independently and keep failed drafts", async ({
   page,
 }) => {
   let storedEntries = makeEntries(3);
@@ -462,11 +468,29 @@ test("status apply keeps failed drafts and clears successful groups", async ({
     .selectOption("to_read");
 
   expect(bulkWrites).toEqual([]);
-  await page.getByRole("button", { name: "Apply status changes" }).click();
+  await expect(
+    page.getByRole("toolbar", { name: "Pending status changes" }),
+  ).toHaveCount(0);
+  await page
+    .locator('[data-entry-id="1"]')
+    .getByRole("button", { name: "Apply Reading to Book 1" })
+    .click();
+  await page
+    .locator('[data-entry-id="2"]')
+    .getByRole("button", { name: "Apply Reading to Book 2" })
+    .click();
+  await page
+    .locator('[data-entry-id="3"]')
+    .getByRole("button", { name: "Apply To read to Book 3" })
+    .click();
 
-  await expect.poll(() => bulkWrites).toHaveLength(2);
+  await expect.poll(() => bulkWrites).toHaveLength(3);
   expect(bulkWrites).toContainEqual({
-    entry_ids: [1, 2],
+    entry_ids: [1],
+    set: { status: "reading" },
+  });
+  expect(bulkWrites).toContainEqual({
+    entry_ids: [2],
     set: { status: "reading" },
   });
   await expect(page.locator('[data-entry-id="1"]')).toHaveCount(0);
@@ -481,7 +505,7 @@ test("status apply keeps failed drafts and clears successful groups", async ({
   ).toHaveCount(1);
   await expect(
     page.getByRole("toolbar", { name: "Pending status changes" }),
-  ).toContainText("1 status change ready");
+  ).toHaveCount(0);
 });
 
 test("a failed row apply keeps its target ready to retry", async ({ page }) => {
@@ -600,6 +624,51 @@ test("clicking a triage row opens it instead of selecting it", async ({
   await expect(page.getByRole("toolbar", { name: "Bulk actions" })).toHaveCount(
     0,
   );
+});
+
+test("a row status draft survives navigation away from triage", async ({
+  page,
+}) => {
+  const entries = makeEntries(2);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+
+  await page.goto("/import?tab=triage");
+  const target = page
+    .locator('[data-entry-id="1"]')
+    .getByRole("combobox", { name: "Status for Book 1" });
+  await target.selectOption("reading");
+  await expect(target).toHaveAccessibleName(/not saved/i);
+
+  await page.getByText("Book 1", { exact: true }).click();
+  await expect(page).toHaveURL(/\/books\/1$/);
+  await page.goBack();
+
+  await expect(page).toHaveURL(/\/import\?tab=triage$/);
+  await expect(
+    page
+      .locator('[data-entry-id="1"]')
+      .getByRole("combobox", { name: /status for book 1.*not saved/i }),
+  ).toHaveValue("reading");
+
+  await page.reload();
+  await expect(
+    page
+      .locator('[data-entry-id="1"]')
+      .getByRole("combobox", { name: /status for book 1.*not saved/i }),
+  ).toHaveValue("reading");
 });
 
 test("triage bulk status update with selection", async ({ page }) => {

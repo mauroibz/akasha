@@ -763,12 +763,12 @@ is explicit, and keyboard-first throughout.
   deliberately different: the select represents the proposed destination rather than the
   persisted Inbox state. A row-level Apply commits that displayed target, including an
   untouched importer suggestion or domain default, so an already-correct row is one click.
-  Changed targets stay visibly marked as not saved and can instead be committed together
-  from *Apply status changes*. *Discard status changes* restores each row's suggestion or
-  domain default without a request. Apply groups rows by chosen status; only successfully
-  applied rows may leave the `unsorted` inbox, while failed groups remain staged for retry
-  and produce one error announcement. Clicking anywhere else on the row opens detail and
-  never selects it.
+  Changed targets stay visibly marked as not saved and persist across navigation or refresh
+  within the browser tab. The row's icon-only check is the sole commit surface for that
+  decision; choosing its suggestion/domain default again clears the draft without a request.
+  Only a successfully applied row may leave the `unsorted` inbox, while a failed row remains
+  staged for retry and produces one error announcement. Clicking anywhere else on the row
+  opens detail and never selects it.
 - **Selection model** — the checkbox is the pointer boundary for selection, with
   shift-click range selection and `Ctrl/Cmd+A`. A persistent action bar appears when anything is
   selected: *Set status · Add shelves · Set score · Clear provisional · Delete*.

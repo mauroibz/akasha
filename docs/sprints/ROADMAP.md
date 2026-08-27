@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 22
+**Plan revision:** 23
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 043 — Sharpening the domain contract
+**Active sprint:** 043 — Row-only Triage decisions
 
 ## Shape of the plan
 
@@ -38,7 +38,8 @@ Post-v1 work branches:
                                                       └─ 040 Entry progress  ✓
                                                            └─ 041 The MyAnimeList import  ✓
                                                                └─ 042 One decision per Triage row  ✓
-                                                                   └─ 043 Sharpening the domain contract
+                                                                   └─ 043 Row-only Triage decisions
+                                                                      └─ 044 Sharpening the domain contract
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -124,7 +125,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [040](040-entry-progress.md) | Entry progress | 038 | completed |
 | [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | completed |
 | [042](042-one-decision-per-triage-row.md) | One decision per Triage row | 041 | completed |
-| [043](043-sharpening-the-domain-contract.md) | Sharpening the domain contract | 042 | ready |
+| [043](043-row-only-triage-decisions.md) | Row-only Triage decisions | 042 | in_progress |
+| [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | planned |
 
 ## Sprint contracts
 
@@ -752,10 +754,18 @@ staging, discard, partial-failure and explicit bulk flows remain for multi-row w
 API or schema change. The real-data walkthrough imported 81 anime and 18 Calibre books into a
 disposable Inbox and verified both sources use the same row flow at mobile width.
 
-### [Sprint 043 — Sharpening the domain contract](043-sharpening-the-domain-contract.md)
+### [Sprint 043 — Row-only Triage decisions](043-row-only-triage-decisions.md)
+
+Added at plan revision 23 from the owner's hands-on approval pass over Sprint 042. The row action
+becomes a quiet icon-only check, and the now-redundant global Apply/Discard toolbar disappears. A
+row's target remains a draft until its own check is pressed, but that draft survives navigation and
+refresh within the browser tab so reviewing a detail cannot erase work in progress. Explicit
+checkbox bulk actions remain.
+
+### [Sprint 044 — Sharpening the domain contract](044-sharpening-the-domain-contract.md)
 
 The anime-line retrospective originally planned as Sprint 042 moves one place without changing its
-scope. It follows the owner-visible triage correction and remains deliberately non-visual.
+scope. It follows the owner-visible Triage corrections and remains deliberately non-visual.
 
 ## Future epics, after this plan
 
