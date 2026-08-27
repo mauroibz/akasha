@@ -406,3 +406,177 @@ async def test_an_album_is_never_queued_for_enrichment(tmp_path: Path) -> None:
 
     assert queued == 1
     assert [json.loads(payload)["item_id"] for payload in payloads] == [book]
+
+
+# --------------------------------------------------------------------------------------
+# Sprint 039: the backfill is keyed on each domain's own identifier and its own
+# incompleteness rule (DEC-067 row 3). Everything below used to be books' alone.
+# --------------------------------------------------------------------------------------
+
+
+def create_typed_item(
+    engine: Engine,
+    title: str,
+    item_type: str,
+    identifier: tuple[str, str] | None,
+    **columns: Any,
+) -> int:
+    """An item of any domain, with an identifier of any kind."""
+    with engine.begin() as connection:
+        item_id = connection.execute(
+            text(
+                "INSERT INTO items"
+                "(type,title,year,cover_path,identifiers,metadata,created_at,updated_at) "
+                "VALUES(:type,:title,:year,:cover_path,'{}',:metadata,'n','n') RETURNING id"
+            ),
+            {
+                "type": item_type,
+                "title": title,
+                "year": columns.get("year"),
+                "cover_path": columns.get("cover_path"),
+                "metadata": json.dumps(columns.get("metadata", {})),
+            },
+        ).scalar_one()
+        if identifier is not None:
+            kind, value = identifier
+            connection.execute(
+                text(
+                    "INSERT INTO item_identifiers(item_id,kind,normalized_value,value,"
+                    "created_at,updated_at) VALUES(:item,:kind,:value,:value,'n','n')"
+                ),
+                {"item": item_id, "kind": kind, "value": value},
+            )
+    return item_id
+
+
+def queued_payloads(engine: Engine) -> list[dict[str, Any]]:
+    with engine.connect() as connection:
+        rows = connection.execute(
+            text("SELECT payload FROM jobs WHERE kind='enrich_item' ORDER BY id")
+        ).scalars()
+        return [json.loads(row) for row in rows]
+
+
+@pytest.mark.anyio
+async def test_each_domain_is_queued_on_its_own_identifier(tmp_path: Path) -> None:
+    """A book is found by its ISBN and an anime by its MyAnimeList id.
+
+    Before this, the backfill joined `item_identifiers` on the literal `'isbn'`, so an
+    anime could declare enrichment and be queued nothing at all.
+    """
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        book = create_typed_item(engine, "A book", "book", ("isbn", RECORDED_ISBN))
+        anime = create_typed_item(engine, "An anime", "anime", ("mal", "22199"))
+
+        assert enqueue_enrichment_backfill(engine) == 2
+        payloads = {row["item_id"]: row for row in queued_payloads(engine)}
+
+    assert payloads[book]["kind"] == "isbn"
+    assert payloads[book]["value"] == RECORDED_ISBN
+    assert payloads[anime]["kind"] == "mal"
+    assert payloads[anime]["value"] == "22199"
+
+
+@pytest.mark.anyio
+async def test_an_item_carrying_the_wrong_kind_of_identifier_is_not_queued(
+    tmp_path: Path,
+) -> None:
+    """An anime with an ISBN is not something AniList can look up."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        create_typed_item(engine, "Mislabelled", "anime", ("isbn", RECORDED_ISBN))
+        assert enqueue_enrichment_backfill(engine) == 0
+
+
+@pytest.mark.anyio
+async def test_a_domain_that_does_not_enrich_is_never_queued(tmp_path: Path) -> None:
+    """Albums declare `enrichment=None`: one release fetch already returns everything."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        create_typed_item(engine, "An album", "album", ("mal", "1"))
+        assert enqueue_enrichment_backfill(engine) == 0
+
+
+@pytest.mark.anyio
+async def test_completeness_is_judged_by_each_domain_s_own_fields(tmp_path: Path) -> None:
+    """The sharp one. The rule was `publisher`/`page_count`/`description` for every
+    domain, and an anime has none of the three — so every anime would have looked
+    incomplete for ever and been re-queued on every backfill."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        complete = create_typed_item(
+            engine,
+            "A complete anime",
+            "anime",
+            ("mal", "22199"),
+            year=2014,
+            cover_path="covers/1.jpg",
+            metadata={"creators": ["White Fox"], "genres": ["Action"], "synopsis": "..."},
+        )
+        thin = create_typed_item(engine, "A thin anime", "anime", ("mal", "44511"))
+
+        assert enqueue_enrichment_backfill(engine) == 1
+        queued = [row["item_id"] for row in queued_payloads(engine)]
+
+    assert queued == [thin]
+    assert complete not in queued
+
+
+@pytest.mark.anyio
+async def test_a_book_missing_only_an_anime_field_is_still_complete(tmp_path: Path) -> None:
+    """The mirror of the case above: a book has no `synopsis` and never will, and
+    judging it by anime's rule would re-queue every book in the library."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        create_typed_item(
+            engine,
+            "A complete book",
+            "book",
+            ("isbn", RECORDED_ISBN),
+            year=1949,
+            cover_path="covers/1.jpg",
+            metadata={"publisher": "P", "page_count": 10, "description": "d"},
+        )
+        assert enqueue_enrichment_backfill(engine) == 0
+
+
+@pytest.mark.anyio
+async def test_every_enriching_domain_names_providers_this_build_actually_wires(
+    tmp_path: Path,
+) -> None:
+    """A domain's enrichment declaration is a promise about wiring, not just shape.
+
+    The conformance suite checks what a domain can know on its own; it has no provider
+    catalog, so it cannot see that `provider_order` names an adapter nobody constructed
+    or one that cannot answer the declared key. That failure is invisible until a job
+    runs and reports `enrichment_not_configured`, which reads like a missing API key.
+    """
+    from book_tracker.domain.providers import EnrichingProvider
+    from book_tracker.domain.registry import DOMAINS
+
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        catalog = app.state.provider_catalog
+        for domain in DOMAINS.values():
+            spec = domain.enrichment
+            if spec is None:
+                continue
+            for name in spec.provider_order:
+                provider = catalog.get(name)
+                assert provider is not None, (
+                    f"{domain.item_type} enriches through {name!r}, which this build "
+                    "does not construct"
+                )
+                assert isinstance(provider, EnrichingProvider), (
+                    f"{name} cannot answer background enrichment at all"
+                )
+                assert provider.item_type == domain.item_type, (
+                    f"{domain.item_type} enriches through {name!r}, which serves "
+                    f"{provider.item_type!r}"
+                )

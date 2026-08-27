@@ -295,3 +295,117 @@ async def test_a_late_job_from_an_undone_batch_cancels_without_calling_a_provide
         assert result["state"] == "cancelled"
         with Session(engine) as session:
             assert session.get(JobRow, job_id).state == "cancelled"
+
+
+# --------------------------------------------------------------------------------------
+# Sprint 039: the handler reads the item's own domain rather than assuming books
+# (DEC-067 row 3).
+# --------------------------------------------------------------------------------------
+
+
+def create_typed_item(
+    engine: Engine, title: str, item_type: str, identifier: tuple[str, str] | None
+) -> int:
+    with engine.begin() as connection:
+        item_id = connection.execute(
+            text(
+                "INSERT INTO items(type,title,identifiers,metadata,created_at,updated_at) "
+                "VALUES(:type,:title,'{}','{}','n','n') RETURNING id"
+            ),
+            {"type": item_type, "title": title},
+        ).scalar_one()
+        if identifier is not None:
+            kind, value = identifier
+            connection.execute(
+                text(
+                    "INSERT INTO item_identifiers(item_id,kind,normalized_value,value,"
+                    "created_at,updated_at) VALUES(:item,:kind,:value,:value,'n','n')"
+                ),
+                {"item": item_id, "kind": kind, "value": value},
+            )
+    return item_id
+
+
+def enqueue(engine: Engine, payload: dict[str, Any]) -> str:
+    return JobRepository(engine).enqueue(None, "enrich_item", payload)
+
+
+@pytest.mark.anyio
+async def test_a_job_queued_under_the_old_isbn_payload_still_processes(
+    engine: Engine,
+) -> None:
+    """Jobs survive restart by design, so a row written before this sprint is still in
+    the queue after the upgrade that changed the payload shape. It would have failed
+    silently with `no_enrichment_key`, and nobody would have looked."""
+    item_id = create_typed_item(engine, "Rayuela", "book", ("isbn", RECORDED_ISBN))
+    job_id = enqueue(engine, {"item_id": item_id, "isbn": RECORDED_ISBN})
+    async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+    assert result["state"] == "succeeded"
+
+
+@pytest.mark.anyio
+async def test_an_item_with_no_lookup_key_fails_with_a_typed_reason(engine: Engine) -> None:
+    item_id = create_typed_item(engine, "Nameless", "book", None)
+    job_id = enqueue(engine, {"item_id": item_id})
+    async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+    assert result["state"] == "failed"
+    assert result["error_code"] == "no_enrichment_key"
+
+
+@pytest.mark.anyio
+async def test_an_item_whose_domain_does_not_enrich_is_refused(engine: Engine) -> None:
+    """An album declares `enrichment=None`. A job for one should never exist, and if a
+    stale row does, it must not be processed against some other domain's providers."""
+    item_id = create_typed_item(engine, "Kind of Blue", "album", ("mal", "1"))
+    job_id = enqueue(engine, {"item_id": item_id, "kind": "mal", "value": "1"})
+    async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+    assert result["state"] == "failed"
+    assert result["error_code"] == "domain_does_not_enrich"
+
+
+@pytest.mark.anyio
+async def test_an_anime_is_enriched_from_its_own_providers(engine: Engine) -> None:
+    """The whole point of the sprint, end to end: a `mal` key, anime's own provider
+    order, and a record filled from AniList rather than from a book provider."""
+    from recordings import recording, replay
+
+    from book_tracker.domains.anime.providers import AniListProvider
+    from book_tracker.infrastructure.providers import create_provider_client
+
+    item_id = create_typed_item(engine, "Chainsaw Man", "anime", ("mal", "44511"))
+    job_id = enqueue(engine, {"item_id": item_id, "kind": "mal", "value": "44511"})
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    transport = replay({"/": (200, recording("anilist_media_mal_44511_chainsaw.json"))})
+    async with create_provider_client(transport) as client:
+        providers = {"anilist": AniListProvider(client, "test@example.invalid", sleep=no_sleep)}
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+
+    assert result["state"] == "succeeded", result
+    assert result["progress"]["provider"] == "anilist"
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT year, metadata FROM items WHERE id=:id"), {"id": item_id}
+        ).one()
+    metadata = json.loads(row.metadata)
+    assert row.year == 2022
+    assert metadata["creators"] == ["MAPPA"]
+    assert metadata["kind"] == "TV"
+    assert "Action" in metadata["genres"]
+
+
+@pytest.mark.anyio
+async def test_a_book_provider_is_never_asked_for_an_anime(engine: Engine) -> None:
+    """Anime's provider order names `anilist` and `kitsu`. If neither is wired the job
+    fails saying so, rather than quietly trying Open Library with a MyAnimeList id."""
+    item_id = create_typed_item(engine, "Chainsaw Man", "anime", ("mal", "44511"))
+    job_id = enqueue(engine, {"item_id": item_id, "kind": "mal", "value": "44511"})
+    async with enrichment_providers(openlibrary=OPENLIBRARY_HIT, forbid_calls=False) as providers:
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+    assert result["state"] == "failed"
+    assert result["error_code"] == "enrichment_not_configured"

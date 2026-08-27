@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from book_tracker.domain.providers import ItemPayload
 from book_tracker.domain.registry import DOMAINS
+from book_tracker.domain.spec import EnrichmentSpec
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import (
@@ -28,10 +29,18 @@ from book_tracker.infrastructure.quota import ProviderQuota
 
 logger = logging.getLogger(__name__)
 
-# Open Library first, Google Books as the fallback: Open Library carries edition-level
-# identity, Google Books carries better Spanish-language coverage (product spec 4.2).
-PROVIDER_ORDER = ("openlibrary", "googlebooks")
-PROVIDER_LABELS = {"openlibrary": "Open Library", "googlebooks": "Google Books"}
+# Which providers are asked, and in what order, is now the *domain's* declaration
+# (`EnrichmentSpec.provider_order`) rather than a constant here — books' "Open Library
+# first, Google Books as the fallback" lives in `domains/book/` where it belongs
+# (product spec 4.2, DEC-067 row 3). What remains is display copy: how to name a
+# provider in a reason a person reads. A provider absent from this table is named by
+# its own identifier, which is legible.
+PROVIDER_LABELS = {
+    "openlibrary": "Open Library",
+    "googlebooks": "Google Books",
+    "anilist": "AniList",
+    "kitsu": "Kitsu",
+}
 
 
 def _label(name: str) -> str:
@@ -74,9 +83,17 @@ class EnrichmentHandler:
         self.repo = JobRepository(engine)
 
     async def _fetch(
-        self, isbn: str, now: datetime | None = None
+        self,
+        kind: str,
+        value: str,
+        spec: EnrichmentSpec,
+        now: datetime | None = None,
     ) -> tuple[ItemPayload | None, str | None, dict[str, Any] | None]:
-        """Try each provider in order, returning the first usable payload.
+        """Try the domain's providers in its order, returning the first usable payload.
+
+        The order is the domain's declaration rather than a module constant, and the
+        key is the domain's too: this loop said `openlibrary`, `googlebooks` and
+        `fetch_by_isbn` until Sprint 039 (DEC-067 row 3).
 
         Failures are never swallowed: every attempt contributes a sentence to the
         reason recorded on the job row (DEC-025, technical spec 6.2).
@@ -90,7 +107,7 @@ class EnrichmentHandler:
         capped = False
         available = False
         moment = now or datetime.now(UTC)
-        for name in PROVIDER_ORDER:
+        for name in spec.provider_order:
             provider = self.providers.get(name)
             if provider is None:
                 reasons.append(f"{_label(name)} is not configured.")
@@ -104,7 +121,7 @@ class EnrichmentHandler:
             if self.quota is not None:
                 self.quota.record(name, moment)
             try:
-                payload = await provider.fetch_by_isbn(isbn)
+                payload = await provider.fetch_by_identifier(kind, value)
             except ProviderPayloadError as error:
                 unreachable = unreachable or error.code in {
                     "provider_unreachable",
@@ -113,7 +130,7 @@ class EnrichmentHandler:
                 reasons.append(f"{error}.")
                 logger.warning(
                     "enrichment provider miss",
-                    extra={"provider": name, "isbn": isbn, "code": error.code},
+                    extra={"provider": name, "kind": kind, "value": value, "code": error.code},
                 )
                 continue
             except (TimeoutError, httpx.HTTPError, OSError) as error:
@@ -121,11 +138,18 @@ class EnrichmentHandler:
                 reasons.append(f"{_label(name)} could not be reached ({type(error).__name__}).")
                 logger.warning(
                     "enrichment provider unreachable",
-                    extra={"provider": name, "isbn": isbn, "error": type(error).__name__},
+                    extra={
+                        "provider": name,
+                        "kind": kind,
+                        "value": value,
+                        "error": type(error).__name__,
+                    },
                 )
                 continue
             if not _is_usable(payload):
-                reasons.append(f"{_label(name)} returned no usable metadata for ISBN {isbn}.")
+                reasons.append(
+                    f"{_label(name)} returned no usable metadata for {kind.upper()} {value}."
+                )
                 continue
             return payload, name, None
 
@@ -158,16 +182,42 @@ class EnrichmentHandler:
                     self.repo.cancel(job_id)
                     return {"state": "cancelled"}
 
-        # Fetch provider data
-        isbn = payload.get("isbn")
-        if not isbn:
+        # Which domain is this, and what does it enrich on? Read from the item rather
+        # than carried in the payload, so a queued job picks up a deployment's current
+        # provider order instead of the one that happened to be wired when it was made.
+        with self.engine.connect() as connection:
+            item_type = connection.execute(
+                text("SELECT type FROM items WHERE id = :id"), {"id": item_id}
+            ).scalar_one_or_none()
+        if item_type is None:
             return {
                 "state": "failed",
-                "error": "This item has no ISBN to look up",
-                "error_code": "no_isbn",
+                "error": f"Item {item_id} no longer exists",
+                "error_code": "item_not_found",
+            }
+        domain = DOMAINS.get(str(item_type))
+        spec = domain.enrichment if domain is not None else None
+        if spec is None:
+            return {
+                "state": "failed",
+                "error": f"{item_type} records are not enriched in the background",
+                "error_code": "domain_does_not_enrich",
             }
 
-        if not any(self.providers.get(name) for name in PROVIDER_ORDER):
+        # The payload shape changed in Sprint 039 from `{item_id, isbn}` to
+        # `{item_id, kind, value}`. Jobs survive restart by design, so a row queued
+        # before the upgrade is still here afterwards; it is read as the domain's own
+        # key rather than failing silently in a queue nobody is watching.
+        kind = str(payload.get("kind") or spec.identity_kind)
+        value = payload.get("value") or payload.get("isbn")
+        if not value:
+            return {
+                "state": "failed",
+                "error": f"This item has no {kind} to look up",
+                "error_code": "no_enrichment_key",
+            }
+
+        if not any(self.providers.get(name) for name in spec.provider_order):
             return {
                 "state": "failed",
                 "error": "No metadata provider is configured",
@@ -182,7 +232,7 @@ class EnrichmentHandler:
                 "error_code": "rate_limited",
             }
 
-        payload_data, source_name, failure = await self._fetch(isbn, now)
+        payload_data, source_name, failure = await self._fetch(kind, str(value), spec, now)
         if payload_data is None:
             assert failure is not None
             if failure["state"] == "deferred":
@@ -326,55 +376,75 @@ def enqueue_enrichment_backfill(
         return 0
     rows = _backfillable_items(engine, item_ids)
     repository = JobRepository(engine)
-    for item_id, isbn in rows:
-        repository.enqueue(batch_id, "enrich_item", {"item_id": item_id, "isbn": isbn})
+    for item_id, kind, value in rows:
+        repository.enqueue(
+            batch_id, "enrich_item", {"item_id": item_id, "kind": kind, "value": value}
+        )
     return len(rows)
 
 
 def _backfillable_items(
     engine: Engine, item_ids: Collection[int] | None = None
-) -> list[tuple[int, str]]:
-    # A domain declares whether background enrichment applies at all. One MusicBrainz
-    # release fetch already returns everything an album has, so there is nothing for a
-    # job to fill and no ISBN to key it on — "this domain does not enrich" is a
-    # simplification rather than a gap (DEC-052 seam 6).
-    enriching = tuple(domain.item_type for domain in DOMAINS.values() if domain.enriches)
-    types = ", ".join(f":type_{index}" for index, _ in enumerate(enriching))
-    parameters: dict[str, Any] = {f"type_{index}": value for index, value in enumerate(enriching)}
-    scope = ""
-    if item_ids is not None:
-        # Bound and parameterised rather than interpolated.
-        placeholders = ", ".join(f":item_{index}" for index, _ in enumerate(item_ids))
-        scope = f"AND items.id IN ({placeholders})"
-        parameters.update({f"item_{index}": value for index, value in enumerate(item_ids)})
-    with engine.connect() as connection:
-        result = connection.execute(
-            text(
-                f"""
-                SELECT items.id AS item_id, MIN(ident.normalized_value) AS isbn
-                FROM items
-                JOIN item_identifiers AS ident
-                  ON ident.item_id = items.id AND ident.kind = 'isbn'
-                WHERE items.type IN ({types})
-                  AND (
-                        items.cover_path IS NULL
-                     OR items.cover_path = ''
-                     OR items.year IS NULL
-                     OR json_extract(items.metadata, '$.publisher') IS NULL
-                     OR json_extract(items.metadata, '$.page_count') IS NULL
-                     OR json_extract(items.metadata, '$.description') IS NULL
-                  )
-                  AND NOT EXISTS (
-                        SELECT 1 FROM jobs
-                        WHERE jobs.kind = 'enrich_item'
-                          AND jobs.state IN ('queued', 'running')
-                          AND json_extract(jobs.payload, '$.item_id') = items.id
-                  )
-                  {scope}
-                GROUP BY items.id
-                ORDER BY items.id
-                """
-            ),
-            parameters,
-        )
-        return [(row.item_id, row.isbn) for row in result]
+) -> list[tuple[int, str, str]]:
+    """Every item worth a lookup, asked once per enriching domain.
+
+    One statement per domain rather than one across all of them, because all three
+    halves of the question are the domain's own (DEC-067 row 3): which identifier the
+    lookup is keyed on, and which missing metadata fields mean "still worth asking".
+    Both were books' until Sprint 039 — the join said `kind = 'isbn'` and the
+    incompleteness rule named `publisher`, `page_count` and `description`, which an
+    anime has none of, so every anime would have looked incomplete for ever.
+
+    A missing cover or year counts in every domain and is not part of the declaration.
+    """
+    rows: list[tuple[int, str, str]] = []
+    for domain in DOMAINS.values():
+        # A domain declares whether background enrichment applies at all. One
+        # MusicBrainz release fetch already returns everything an album has, so there is
+        # nothing for a job to fill — a simplification rather than a gap (DEC-052).
+        spec = domain.enrichment
+        if spec is None:
+            continue
+        parameters: dict[str, Any] = {"type": domain.item_type, "kind": spec.identity_kind}
+        # The field names reach SQLite as *bound* `json_extract` paths rather than as
+        # interpolated SQL, so a domain cannot spell its way into the statement.
+        incomplete = []
+        for index, field in enumerate(spec.completeness_fields):
+            incomplete.append(f"json_extract(items.metadata, :path_{index}) IS NULL")
+            parameters[f"path_{index}"] = f"$.{field}"
+        scope = ""
+        if item_ids is not None:
+            # Bound and parameterised rather than interpolated.
+            placeholders = ", ".join(f":item_{index}" for index, _ in enumerate(item_ids))
+            scope = f"AND items.id IN ({placeholders})"
+            parameters.update({f"item_{index}": value for index, value in enumerate(item_ids)})
+        with engine.connect() as connection:
+            result = connection.execute(
+                text(
+                    f"""
+                    SELECT items.id AS item_id, MIN(ident.normalized_value) AS value
+                    FROM items
+                    JOIN item_identifiers AS ident
+                      ON ident.item_id = items.id AND ident.kind = :kind
+                    WHERE items.type = :type
+                      AND (
+                            items.cover_path IS NULL
+                         OR items.cover_path = ''
+                         OR items.year IS NULL
+                         OR {" OR ".join(incomplete)}
+                      )
+                      AND NOT EXISTS (
+                            SELECT 1 FROM jobs
+                            WHERE jobs.kind = 'enrich_item'
+                              AND jobs.state IN ('queued', 'running')
+                              AND json_extract(jobs.payload, '$.item_id') = items.id
+                      )
+                      {scope}
+                    GROUP BY items.id
+                    ORDER BY items.id
+                    """
+                ),
+                parameters,
+            )
+            rows.extend((row.item_id, spec.identity_kind, row.value) for row in result)
+    return sorted(rows)
