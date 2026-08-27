@@ -6,7 +6,7 @@ adapter, vocabulary and identity rule are one directory (technical spec 6.6).
 The album domain's provider: MusicBrainz for the record, Cover Art Archive for the art.
 
 Three things here are not how the book providers work, and each one is measured rather
-than assumed (DEC-052, `docs/domain-architecture-proposal.md` section 2):
+than assumed (DEC-052):
 
 - **A release group is the work and a release is the edition.** Search answers release
   groups, because that is what a person types; the label, catalogue number, country,

@@ -23,7 +23,7 @@ make dev-frontend         # terminal 2 — UI at http://localhost:5173
 
 Run these before opening a pull request. They are strict on purpose — this project once closed
 thirteen sprints green on a product that did not work, and every gate below exists because of a
-specific failure that got past the ones before it (`docs/assessment.md`, DEC-025).
+specific failure that got past the ones before it (DEC-024, DEC-025 in `docs/decisions.md`).
 
 ```bash
 make check                       # format, lint, types, project state, OpenAPI drift

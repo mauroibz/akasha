@@ -37,7 +37,6 @@ follow one as instructions; follow the canonical documents below.
 | [`agent/state.json`](agent/state.json) | The machine-readable sprint pointer. Validated by `scripts/validate_project.py`. |
 | [`agent/TESTING.md`](agent/TESTING.md) | Verification cadence, environment triage, walkthrough reuse, and the post-gate rerun matrix. |
 | [`sprints/ROADMAP.md`](sprints/ROADMAP.md) | What each sprint delivers, and the contracts for the ones not yet built. |
-| [`entry-depth-verdict.md`](entry-depth-verdict.md) | Sprint 030's verdict: a child of an entry needs no state of its own; depth is per-domain progress or provider `rows`; sets are ordered shelves. |
 
 ## Historical
 
@@ -48,21 +47,14 @@ Kept because they are the record, not because they are current.
 | [`decisions.md`](decisions.md) | Every material decision with its reasoning, append-only. Entries are superseded by later entries, never edited. | — |
 | [`agent/worklog.md`](agent/worklog.md) | One entry per working session: what was done, verified, and what went wrong. Append-only. | — |
 | [`sprints/`](sprints/) | One file per sprint, each with its acceptance criteria and its outcome. **File paths inside closed sprints predate later refactors** — Sprint 028 moved each domain into its own package, so anything referring to `domain/domains.py`, `domain/goodreads.py`, `domain/calibre.py` or `infrastructure/musicbrainz.py` is describing where those lived at the time. | technical spec §2 and §6.6 |
-| [`assessment.md`](assessment.md) | The 2026-08-08 audit after thirteen sprints closed green on a product that did not work. Diagnosis and remedies. | DEC-024, DEC-025, DEC-026 |
-| [`domain-expansion-assessment.md`](domain-expansion-assessment.md) | 2026-08-15, after Sprint 028: did the domain work reach its goal? What is proved, what is missing, and the one open question that could force a redesign. Costed options. | — |
 | [`domain_metadata_roadmap_report.md`](domain_metadata_roadmap_report.md) | Which domains are viable at all, by provider: catalogue breadth, Spanish coverage, licensing. | — for viability; its architecture recommendation is superseded by DEC-052 |
-| [`operations/release-notes-v1.md`](operations/release-notes-v1.md), [`release-notes-v1.1.md`](operations/release-notes-v1.1.md) | What shipped, per release. | — |
+| [`operations/release-notes-v1.md`](operations/release-notes-v1.md), [`release-notes-v1.1.md`](operations/release-notes-v1.1.md), [`release-notes-v1.2.md`](operations/release-notes-v1.2.md) | What shipped, per release. | — |
 | [`brand/brand-handoff.md`](brand/brand-handoff.md) | The brand work as delivered. | `brand/BRAND.md` |
 
-## Proposals
-
-Accepted, and now built or scheduled. Kept for the measurements that produced them, which the
-canonical documents summarise but do not reproduce.
-
-| Document | Status |
-|---|---|
-| [`domain-architecture-proposal.md`](domain-architecture-proposal.md) | **Accepted** (DEC-052) and **delivered** by Sprints 025–028. The live measurements against MusicBrainz are here; how domains work *now* is technical spec §6.6 and [`guides/adding-a-domain.md`](guides/adding-a-domain.md). |
-| [`unified-search-proposal.md`](unified-search-proposal.md) | **Accepted** (DEC-065), amended twice, and **delivered** by Sprint 029. The measurement of the two searches is here; what was actually built — the firing rule, results below the library, `/add` as manual entry — is DEC-073, product spec §7 and technical spec §8. |
+Superseded one-off proposals and assessments (domain architecture, unified search, the post-Sprint-013
+audit, the domain-expansion assessment, the entry-depth verdict) have been removed now that their
+decisions are built and recorded in `decisions.md` (DEC-024–026, DEC-052, DEC-065, DEC-077) — see
+`git log` for the originals if the underlying measurements are ever needed again.
 
 ## For agents
 

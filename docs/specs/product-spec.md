@@ -981,4 +981,4 @@ acceptance criteria.
    not a destructive one. **Sprint 030 answered the adjacent question** (does a
    child of an entry need state of its own: no) and found a set is a different
    concept from depth — an ordered shelf, not a parent entity. The verdict and
-   what would reopen it are in [`../entry-depth-verdict.md`](../entry-depth-verdict.md).
+   what would reopen it are in `docs/decisions.md` (DEC-077).

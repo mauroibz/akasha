@@ -2,9 +2,8 @@
 
 The shared layers speak in neutral terms — an item has a type, a title, creators,
 identifiers and an opaque metadata object — and a domain plugin supplies the parts
-only it can know (DEC-052, `docs/domain-architecture-proposal.md` section 4). A domain
-is never translated into another domain's vocabulary, and the shared layer never
-branches on which one it is holding.
+only it can know (DEC-052). A domain is never translated into another domain's
+vocabulary, and the shared layer never branches on which one it is holding.
 
 **This module holds the shapes and the rules; no domain lives here.** Each domain
 declares itself in `book_tracker/domains/<item_type>/`, and `domain/registry.py` says
