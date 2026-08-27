@@ -17,6 +17,12 @@ playwright-report/
 test-results/
 
 # Runtime data and secrets
+# Source exports the owner drops here to import. They carry account ids and
+# usernames, and AGENTS.md forbids committing uploaded imports; test fixtures are
+# trimmed and anonymised copies under backend/tests/fixtures/imports/ instead.
+animelist_*.xml
+animelist_*.xml.gz
+goodreads_library_export*.csv
 .env
 .env.*
 !.env.example

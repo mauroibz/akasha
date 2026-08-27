@@ -2237,3 +2237,44 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   merge commit.
 - Next: no numbered sprint remains. New work must be planned explicitly; the roadmap's unnumbered
   epics are not active commitments.
+
+## 2026-08-27 — Plan revision 20: anime as the third domain (planning only)
+
+- Done: planned the anime domain end to end at the owner's request, as an explicit trial run of the
+  Sprint 028 domain contract whose findings feed back into the repository. Probed four metadata
+  providers live from this host between 16:20 and 17:00 UTC, parsed the owner's real MyAnimeList
+  export, wrote DEC-088 and DEC-089, and added Sprints 038–041. Moved `FINAL_SPRINT` to 41, plan
+  revision to 20, and reactivated state with 038 `ready`. **No runtime code was written.** Work is on
+  the `sprint-038-anime` branch under DEC-053.
+- Measured, not reasoned: AniList answered 6/6 searches (0.3–1.5s median, one 40.04s outlier) and
+  resolved all 81 of the export's ids in **2 requests / 54 KiB** through `media(idMal_in:)`. Kitsu
+  answered 6/6 (3.7s median, one 8.2s), returns the MyAnimeList id on a search row via
+  `include=mappings`, and returns studios and categories in the same fetch via
+  `include=animeProductions.producer,categories` — correcting an earlier assumption that studios cost
+  one request per item. **Jikan returned HTTP 504 to every request across ~40 minutes**: 0/12 on
+  search and 1/81 by id, where the single success was a record fetched moments earlier from its own
+  cache. `myanimelist.net` answered this host in 0.66s throughout, so MAL was up and Jikan could not
+  reach it. AniList returns Cloudflare `error code: 1010` / 403 without a User-Agent. Cover variants
+  measured against the pipeline bounds: AniList `extraLarge` 460x635 / 110 KiB, Kitsu `original`
+  980x1420 / 1.6 MiB PNG (so `large` is the one to ask for).
+- The export: 81 rows, gzipped XML, `series_animedb_id` distinct on every row, `my_status` in
+  {Completed 74, Dropped 6, Plan to Watch 1}, `my_score` 0 on 3 rows meaning unrated, `my_start_date`
+  `0000-00-00` on all 81 and `my_finish_date` on 76, `my_watched_episodes` diverging from
+  `series_episodes` on the partial rows (`Black Clover`, 20 of 170, dropped).
+- Two seams found, both foreseen and both unbuilt: **DEC-067 row 3** (enrichment is keyed on the
+  literal `'isbn'` below `Domain.enriches`, with a module-constant provider order of two book
+  providers) and **DEC-077 shape (a)** (a per-domain progress field, chosen by that verdict and never
+  implemented). They are Sprints 039 and 040 rather than folded into the domain or the connector.
+  Three smaller findings recorded in the sprint files: `DetailPage.tsx:368` hardcodes `Rereads` as the
+  label for `reread_count` in every domain, which is the entry panel's last book-shaped word; the
+  conformance suite requires a non-empty `formats` vocabulary, which a domain with no notion of a
+  copy would have to invent one for; and the owner's export sat untracked at the repository root
+  carrying a user id and username, now gitignored.
+- Owner decisions taken at planning time, recorded in DEC-088 and DEC-089: AniList plus Kitsu despite
+  AniList's terms naming anime tracker services, with Kitsu kept as the hedge; build progress before
+  the import rather than drop the watched-episode counts and re-import; generalize enrichment rather
+  than let the connector fetch at read time. One earlier framing of Jikan was corrected to the owner
+  mid-planning after the wider measurement contradicted it, and the provider question was re-put.
+- Verified: `python scripts/validate_project.py` passed. No product gate applies — nothing outside
+  `docs/`, `.gitignore` and the validator's sprint bound changed.
+- Next: execute Sprint 038 under the ordinary protocol.

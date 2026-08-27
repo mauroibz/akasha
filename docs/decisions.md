@@ -2812,3 +2812,138 @@ Append-only record of material architecture choices, product-default resolutions
   failed drafts. No backend, schema or API change is required. A 200-row browser test asserts window
   scroll and bounded mounted DOM, and the realistic 16-row walkthrough confirms that discard sends
   nothing and apply is the first status write.
+
+## DEC-088 — Anime's providers, measured: AniList and Kitsu, and Jikan rejected on evidence
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-052 (measure a domain rather than reason about it), DEC-051 (a curated
+  sort name beats a heuristic), DEC-067 row 3 and row 4, `docs/domain_metadata_roadmap_report.md`
+  (which called anime "a good domain, wrong default provider" and is superseded on that point by
+  what follows).
+- **Context:** The owner asked for anime as a third domain, with an importer for their own
+  MyAnimeList export. Four candidate providers were probed live from the deployment host on
+  2026-08-27 between 16:20 and 17:00 UTC. Nothing below is reasoned from documentation; each claim
+  names what was observed.
+
+### What was measured
+
+| Provider | Auth | Search | Resolve the export's 81 ids | Studios | Observed availability |
+|---|---|---|---|---|---|
+| **AniList** GraphQL | none, but a User-Agent is mandatory | 6/6, 0.3–1.5s median | **2 requests, 54 KiB** via `media(idMal_in:)` | `studios(isMain:true)`, same request | 100% |
+| **Kitsu** JSON:API | none | 6/6, 3.7s median, one 8.2s | 5 requests, 552 KiB via the mappings filter | `include=animeProductions.producer`, same request, `role == "studio"` | 100% |
+| **Jikan** (unofficial MAL mirror) | none | **0/12** | **1/81** | yes, when it answers | **~40 minutes of continuous HTTP 504** |
+| MyAnimeList API v2 | client id the owner must register | — | — | — | not measured; no credential |
+
+- **Jikan is rejected on measurement, not on principle.** Across two windows fifteen minutes apart it
+  returned `504 BadResponseException — Jikan failed to connect to MyAnimeList` to every request.
+  The single by-id success in 81 was a record fetched moments earlier, so it was Jikan's own cache
+  rather than a working path. `myanimelist.net` itself answered this host in 0.66s throughout, so
+  MAL was up and Jikan could not reach it. A scraper in the path is a dependency on somebody else's
+  tolerance, and that is what an availability measurement looks like when the tolerance runs out.
+- **AniList carries the MAL identity, so Jikan was never needed for it.** `Media.idMal` is published
+  on the record and `media(idMal_in: [...])` queries by it. The export's `series_animedb_id` is
+  therefore resolvable without MyAnimeList or any mirror of it in the request path.
+- **Kitsu answers the same question on a search row.** `include=mappings` returns the
+  `myanimelist/anime` external id for every result in the same request (14 KiB for two rows), which
+  is what makes an identity strategy possible rather than aspirational.
+
+### Decision
+
+- **Two providers: AniList first, Kitsu second.** `source_preference = ("anilist", "kitsu")`.
+- **`identity_key` returns `mal:<id>`, and returns `None` when a candidate carries no MAL mapping.**
+  This is the **first domain since books with a real cross-provider identity**. Albums answered
+  `None` because a barcode is not an edition key; anime has a global identifier that both providers
+  publish, so merging is correct rather than approximate. A row without a mapping — AniList returned
+  `idMal: null` for several legitimate ONA entries — merges with nothing, which is the honest answer.
+- **Kitsu is the hedge as well as the second source.** If the terms question below closes against
+  AniList, Kitsu already carries search, fetch, MAL-id identity and studios on its own. That is why
+  the domain ships with two adapters rather than one and a plan.
+- **The curated sort name is the studio name unchanged.** A studio never inverts, exactly as DEC-068
+  predicted for IGDB's companies, so both adapters supply `creator_sort` verbatim and the DEC-051
+  heuristic never runs on `MAPPA`.
+
+### Two things the owner has to own, stated rather than buried
+
+1. **AniList's terms name this application's category.** They prohibit use "within competing
+   noncomplementary services", listing "Anime/Manga list/tracker services", and permit non-commercial
+   use under $150/month revenue otherwise. Akasha with an anime domain is an anime tracker by the
+   plain reading. It is also single-user, LAN-only, self-hosted and unmonetised, and the terms carry
+   an authorization path at `contact@anilist.co`. **The owner chose to proceed on 2026-08-27** on
+   that reading. The Kitsu adapter exists so that reversing this decision is a configuration change
+   and not a sprint.
+2. **AniList requires a User-Agent.** Without one, Cloudflare answers `error code: 1010` with HTTP
+   403. One otherwise-normal request also took 40.04s against a sub-second median, so the adapter
+   goes through `bounded_json` with the interactive retry policy rather than a bare client.
+
+### Cover art
+
+Both hosts are new and each is one line in the allowlist (DEC-067 row 4 keeps that list central on
+purpose). Measured against the pipeline's bounds — `MIN_PROVIDER_COVER_EDGE` 200, `MAX_COVER_EDGE`
+600, aspect ratio under 3.0, 10 MiB:
+
+| Host | Variant to use | Measured |
+|---|---|---|
+| `s4.anilist.co` | `coverImage.extraLarge` | 460x635, 110 KiB, ratio 1.38 |
+| `media.kitsu.app` | `posterImage.large` | measured good; `original` is 980x1420 at **1.6 MiB PNG** and is not the one to ask for |
+
+`cdn.myanimelist.net` is **not** added, because Jikan is not registered. Note for whoever revisits
+this: MAL's default image variant is 225x313, which clears `MIN_PROVIDER_COVER_EDGE` by 25 pixels;
+the `l` suffix variant is 431x600 and is the one that would be correct.
+
+## DEC-089 — Anime is four sprints, and it collects two seams the plan deliberately left unbuilt
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-058 (the numbered plan ended at the domain contract; further domains are
+  epics), DEC-067 row 3 (enrichment beyond the ISBN, reserved for the first domain that needs it),
+  DEC-077 (entry depth: shape (a) is a per-domain progress field, and nothing was built),
+  DEC-088 (the providers), DEC-053 (a domain-line sprint runs on a branch).
+- **Context:** The owner asked whether anime is one sprint or several, and framed the exercise as a
+  test run for domain expansion whose findings feed back into the repository. `docs/guides/adding-a-domain.md`
+  promises that a domain is its own directory plus small registration points, with no migration and
+  no screen. **That promise holds for the anime domain itself and fails for the anime domain the
+  owner actually asked for**, because the MyAnimeList export carries two facts the core has no home
+  for. Both were foreseen and costed by earlier decisions; neither was built, because no domain had
+  yet asked.
+- **Decision — four sprints, in this dependency order.**
+
+  ```text
+  038 Anime: the third domain
+   ├─ 039 Enrichment beyond the ISBN     (DEC-067 row 3)
+   └─ 040 Entry progress                 (DEC-077 shape (a))
+        └─ 041 The MyAnimeList import    (depends on both)
+  ```
+
+  - **038 is the guide's promise, kept.** Package, two adapters, registration, recorded responses,
+    conformance. No migration, no new screen. If the guide is accurate, this sprint is evidence of it;
+    if it is not, this sprint is where that is discovered, and saying so is the point of the exercise.
+  - **039 pays DEC-067 row 3**, which named its own trigger: "the first domain that wants background
+    enrichment on a non-ISBN key pays for (b) then, with a real case to design against instead of a
+    hypothetical one." An imported MAL row is a `mal_id`, a title, a type and an episode count.
+    Everything else — cover, studio, year, synopsis, season — has to be fetched, and `_backfillable_items`
+    joins `item_identifiers` on the literal `'isbn'` while `_fetch` calls `fetch_by_isbn` against a
+    module-level `PROVIDER_ORDER` of two book providers. The row costed this at about half a sprint.
+  - **040 builds DEC-077 shape (a).** Every one of the 81 rows carries `my_watched_episodes`; one is
+    `Black Clover`, dropped at 20 of 170. The entry model has `date_started`, `date_finished` and
+    `reread_count` and nowhere to put that number. The verdict already chose the shape — "a
+    per-domain `progress` field, declarative under the Domain contract" — and built none of it. This
+    is the sprint that does, and it is **the only one of the four that touches a shared table.**
+  - **041 is the importer**, which lands complete because 039 and 040 precede it.
+
+- **Why not one sprint.** The four slices are 038 alone at roughly the size of Sprint 025, plus a
+  costed half-sprint, plus a migration on `entries` with its contract, API, UI and export surfaces,
+  plus a connector with a real 81-row source to walk through. Folding them together would mean
+  trimming the design to fit rather than splitting the plan, and would put a schema change on a
+  shared table in the same commit range as a new domain's first walkthrough.
+- **Why not gate 039 and 040.** A gate exists where cost is unknown (DEC-035, DEC-042). Both of these
+  were already measured and costed by the decisions that deferred them, and the owner settled both
+  forks at planning time on 2026-08-27: generalize enrichment rather than let the connector fetch at
+  read time, and build progress before the import rather than drop the data and re-import. Gating
+  what has already been priced and decided is ceremony.
+- **Consequences.** `FINAL_SPRINT` moves to 41 and plan revision to 20. The line runs on the
+  `sprint-038-anime` branch under DEC-053's rule, because a third domain is exactly the class of work
+  that could fail spectacularly and `main` is what it is abandoned back to. **Anime is no longer an
+  unnumbered epic**; games, series and Spotify remain so. If 038 completes without needing 039 or
+  040 — that is, if the guide's promise survives contact — those two sprints are still owed, because
+  the export the owner brought is what defines "complete" here.

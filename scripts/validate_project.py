@@ -32,8 +32,9 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # the plan finished early. Move it whenever the roadmap is extended, and record the move in
 # the decision that extends it (DEC-035 moved it to 19, DEC-042 to 26, DEC-052 to 28,
 # DEC-058 to 29, DEC-065 to 30, DEC-071 to 31, DEC-076 revised 31's scope without moving it,
-# DEC-079 to 32, DEC-081 to 33, DEC-082 to 34, DEC-083 to 35, DEC-085 to 36).
-FINAL_SPRINT = 37
+# DEC-079 to 32, DEC-081 to 33, DEC-082 to 34, DEC-083 to 35, DEC-085 to 36,
+# DEC-089 to 41).
+FINAL_SPRINT = 41
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

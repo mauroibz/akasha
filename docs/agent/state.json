@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 19,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 20,
+  "project_status": "ready",
+  "active_sprint": "038",
+  "active_sprint_file": "docs/sprints/038-anime-domain.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "037",
   "completed_sprints": [
     "001",
@@ -46,5 +46,5 @@
     "037"
   ],
   "started_at": null,
-  "updated_at": "2026-08-22T03:38:40-03:00"
+  "updated_at": "2026-08-27T14:05:00-03:00"
 }
