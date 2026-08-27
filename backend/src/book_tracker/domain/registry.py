@@ -16,11 +16,12 @@ from enum import StrEnum
 from book_tracker.domain.importers import Importer
 from book_tracker.domain.spec import Domain
 from book_tracker.domains.album import DOMAIN as ALBUM
+from book_tracker.domains.anime import DOMAIN as ANIME
 from book_tracker.domains.book import DOMAIN as BOOK
 from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 
-DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM)}
+DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM, ANIME)}
 
 # The same code-owned registration model as domains and providers: no discovery or
 # plugin runtime.  Connectors live in the package of the domain they target; the shared
@@ -28,6 +29,9 @@ DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBU
 IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
     BOOK.item_type: (GOODREADS_IMPORTER, CALIBRE_IMPORTER),
     ALBUM.item_type: (),
+    # Sprint 041 registers the MyAnimeList connector here. A domain without an importer
+    # registers an empty tuple and remains complete (technical spec 6.6).
+    ANIME.item_type: (),
 }
 IMPORTERS: dict[str, Importer] = {
     importer.name: importer for importers in IMPORTERS_BY_DOMAIN.values() for importer in importers
@@ -76,6 +80,10 @@ class EntryStatus(StrEnum):
     DROPPED = "dropped"
     PENDING = "pending"
     OWNED = "owned"
+    WATCHING = "watching"
+    COMPLETED = "completed"
+    ON_HOLD = "on_hold"
+    PLAN_TO_WATCH = "plan_to_watch"
 
 
 class EntryFormat(StrEnum):
@@ -86,6 +94,8 @@ class EntryFormat(StrEnum):
     DIGITAL = "digital"
     VINYL = "vinyl"
     CD = "cd"
+    STREAMING = "streaming"
+    BLURAY = "bluray"
 
 
 class ItemTypeName(StrEnum):
@@ -98,3 +108,4 @@ class ItemTypeName(StrEnum):
 
     BOOK = "book"
     ALBUM = "album"
+    ANIME = "anime"

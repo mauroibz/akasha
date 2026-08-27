@@ -12,6 +12,10 @@ export const entryStatuses = [
   "dropped",
   "pending",
   "owned",
+  "watching",
+  "completed",
+  "on_hold",
+  "plan_to_watch",
 ] as const;
 
 /** The union of every domain's formats, for the same reason (DEC-059). */
@@ -21,6 +25,8 @@ export const entryFormats = [
   "digital",
   "vinyl",
   "cd",
+  "streaming",
+  "bluray",
 ] as const;
 
 export type EntryStatus = (typeof entryStatuses)[number];

@@ -28,6 +28,12 @@ ALLOWED_COVER_HOSTS = {
     "books.googleusercontent.com",
     "archive.org",
     "coverartarchive.org",
+    # Anime art (DEC-088). Both measured 2026-08-27 against the bounds above: AniList's
+    # `coverImage.extraLarge` is 460x635 at 110 KiB, and Kitsu's `posterImage.large` is
+    # the variant to ask for — its `original` is 980x1420 at 1.6 MiB. The list stays
+    # central so a domain cannot widen it from its own package (DEC-067 row 4).
+    "s4.anilist.co",
+    "media.kitsu.app",
 }
 # The Cover Art Archive redirects through `archive.org` to a numbered storage node —
 # `dn710907.ca.archive.org` was the one observed — which no fixed list can enumerate.

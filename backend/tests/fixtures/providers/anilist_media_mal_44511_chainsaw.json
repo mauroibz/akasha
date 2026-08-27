@@ -1,0 +1,42 @@
+{
+  "data": {
+    "Media": {
+      "id": 127230,
+      "idMal": 44511,
+      "title": {
+        "romaji": "Chainsaw Man",
+        "english": "Chainsaw Man",
+        "native": "チェンソーマン"
+      },
+      "format": "TV",
+      "episodes": 12,
+      "duration": 25,
+      "status": "FINISHED",
+      "startDate": {
+        "year": 2022
+      },
+      "season": "FALL",
+      "seasonYear": 2022,
+      "source": "MANGA",
+      "countryOfOrigin": "JP",
+      "siteUrl": "https://anilist.co/anime/127230",
+      "genres": [
+        "Action",
+        "Drama",
+        "Horror",
+        "Supernatural"
+      ],
+      "studios": {
+        "nodes": [
+          {
+            "name": "MAPPA"
+          }
+        ]
+      },
+      "coverImage": {
+        "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx127230-DdP4vAdssLoz.png"
+      },
+      "description": "Denji is a teenage boy living with a Chainsaw Devil named Pochita. Due to the debt his father left behind, he has been living a rock-bottom life while repaying his debt by harvesting devil corpses with Pochita.<br><br>\nOne day, Denji is betrayed and killed. As his consciousness fades, he makes a contract with Pochita and gets revived as \"Chainsaw Man\" — a man with a devil's heart.<br>\n<br>\n(Source: Crunchyroll)"
+    }
+  }
+}

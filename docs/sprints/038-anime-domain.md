@@ -1,6 +1,6 @@
 # Sprint 038 — Anime: the third domain
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 037
 **Roadmap revision:** 20
 
