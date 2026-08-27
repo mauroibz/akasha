@@ -189,6 +189,27 @@ async def test_generic_routes_round_trip_each_registered_book_importer(tmp_path:
         )
         assert calibre_commit.status_code == 200
 
+        # The third connector, and the first for a domain that is not books. It goes
+        # through the same two routes with no shared code knowing it exists — which is
+        # the whole claim Sprint 032's boundary makes.
+        mal = await client.post(
+            "/api/import/myanimelist/preview",
+            files={
+                "file": (
+                    "animelist.xml",
+                    (FIXTURES / "imports" / "myanimelist_sample.xml").read_bytes(),
+                    "text/xml",
+                )
+            },
+        )
+        assert mal.status_code == 201, mal.text
+        assert mal.json()["summary"]["total"] == 8
+        mal_commit = await client.post(
+            "/api/import/myanimelist/commit", json={"batch_id": mal.json()["batch_id"]}
+        )
+        assert mal_commit.status_code == 200
+        assert mal_commit.json()["created_entries"] == 8
+
     assert goodreads_commit.json()["created_entries"] == 1
     assert calibre_commit.json()["unchanged_entries"] == 1
 

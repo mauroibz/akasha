@@ -81,6 +81,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0013_entry_formats",
         "0014_status_is_the_domains",
         "0015_entry_progress",
+        "0016_import_kind_is_the_registrys",
     ]
 
     upgrade(configured.database_url)
@@ -153,6 +154,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0013_entry_formats",
         "0014_status_is_the_domains",
         "0015_entry_progress",
+        "0016_import_kind_is_the_registrys",
     ]
 
 
@@ -650,4 +652,70 @@ def test_progress_is_added_without_disturbing_an_existing_row(tmp_path: Path) ->
         "dropped",
         4,
     )
+    connection.close()
+
+
+def test_the_connector_name_is_the_registrys_and_its_batches_keep_their_records(
+    tmp_path: Path,
+) -> None:
+    """`ck_import_batches_kind` was `ck_entries_status`'s mistake one table over.
+
+    It listed `goodreads` and `calibre` and was frozen in migration `0002`, so the first
+    connector added since — Sprint 041's — passed every application check and was then
+    refused by SQLite. `IMPORTERS` is the authority and is strictly stronger: the route
+    404s a name it does not hold, which the constraint could never express.
+
+    The rebuild is also a `DROP TABLE`, and `import_records` cascades from this table.
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", "0015_entry_progress")
+    database_path = configured.data_dir / "books.db"
+    connection = sqlite3.connect(database_path)
+    connection.execute(
+        "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+        " VALUES ('b1', 'goodreads', 'abc', 'committed', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO import_records (id, batch_id, row_number, created_at, updated_at)"
+        " VALUES (1, 'b1', 2, ?, ?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    # Before: a connector this list never heard of is refused by the database.
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+            " VALUES ('b2', 'myanimelist', 'def', 'previewed', ?, ?)",
+            (NOW, NOW),
+        )
+    connection.close()
+
+    command.upgrade(alembic_config(configured.database_url), "0016_import_kind_is_the_registrys")
+
+    connection = sqlite3.connect(database_path)
+    schema = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='import_batches'"
+    ).fetchone()[0]
+    assert "ck_import_batches_kind" not in schema
+    # The replay key is a real invariant and stays.
+    assert "uq_import_batch_input" in schema
+    # The batch and its record both survived the rebuild.
+    assert connection.execute("SELECT count(*) FROM import_batches").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_records").fetchone()[0] == 1
+    # And a third connector's batch is now the registry's business, not the schema's.
+    connection.execute(
+        "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+        " VALUES ('b2', 'myanimelist', 'def', 'previewed', ?, ?)",
+        (NOW, NOW),
+    )
+    # The replay key still refuses the same source twice for one connector.
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+            " VALUES ('b3', 'myanimelist', 'def', 'previewed', ?, ?)",
+            (NOW, NOW),
+        )
+    connection.commit()
     connection.close()
