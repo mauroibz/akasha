@@ -242,3 +242,22 @@ async def test_a_tracklist_is_described_as_rows_and_validated_as_rows(tmp_path: 
     assert invented_column.status_code == 422
     assert wrong_cell_type.status_code == 422
     assert not_rows.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_only_the_domains_that_count_progress_publish_a_spec(tmp_path: Path) -> None:
+    """The screens render a declaration rather than branching on the item type."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as http,
+    ):
+        published = {row["id"]: row for row in (await http.get("/api/item-types")).json()}
+
+    assert published["anime"]["progress"] == {
+        "label": "Episodes watched",
+        "unit_label": "episode",
+        "total_field": "episodes",
+    }
+    assert published["book"]["progress"] is None
+    assert published["album"]["progress"] is None

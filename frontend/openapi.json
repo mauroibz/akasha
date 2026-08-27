@@ -479,6 +479,18 @@
             ],
             "title": "Notes"
           },
+          "progress": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
           "reread_count": {
             "anyOf": [
               {
@@ -731,6 +743,18 @@
             ],
             "title": "Notes"
           },
+          "progress": {
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
           "reread_count": {
             "anyOf": [
               {
@@ -841,6 +865,17 @@
             ],
             "title": "Notes"
           },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
+          },
           "reread_count": {
             "title": "Reread Count",
             "type": "integer"
@@ -891,6 +926,7 @@
           "date_started",
           "date_finished",
           "reread_count",
+          "progress",
           "score_provisional",
           "suggested_status",
           "item",
@@ -1706,6 +1742,16 @@
             "title": "Label",
             "type": "string"
           },
+          "progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProgressSpecResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "statuses": {
             "items": {
               "$ref": "#/components/schemas/StatusSpecResponse"
@@ -1722,6 +1768,7 @@
           "default_status",
           "entry_fields",
           "entry_field_labels",
+          "progress",
           "formats",
           "entry_panel_label",
           "chooses_covers"
@@ -1930,6 +1977,37 @@
           "ambiguous"
         ],
         "title": "PreviewSummary",
+        "type": "object"
+      },
+      "ProgressSpecResponse": {
+        "description": "How this domain counts progress, so a screen renders a declaration.\n\n`total_field` names a metadata field on the *item*; it is for reading \"20 / 170\"\nand is never a bound (DEC-077, Sprint 040).",
+        "properties": {
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "total_field": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total Field"
+          },
+          "unit_label": {
+            "title": "Unit Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "unit_label",
+          "total_field"
+        ],
+        "title": "ProgressSpecResponse",
         "type": "object"
       },
       "ProviderHealth": {

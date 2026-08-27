@@ -422,3 +422,46 @@ async def test_export_carries_the_format_of_a_copy(tmp_path: Path) -> None:
     assert entry["formats"] == ["digital", "vinyl"]
     # Independent axes: the export carries both without one implying the other.
     assert entry["status"] == "wishlist"
+
+
+@pytest.mark.anyio
+async def test_the_json_export_carries_progress_and_the_goodreads_csv_does_not(
+    tmp_path: Path,
+) -> None:
+    """Progress is owner data, so the export that claims to hold everything holds it.
+
+    The Goodreads CSV view is books' own export shape and books declare no progress,
+    so there is nothing to write there and inventing a column would grow one domain's
+    export a field that domain does not have.
+    """
+    from book_tracker.application.export import GOODREADS_COLUMNS
+
+    assert "progress" not in {column.lower() for column in GOODREADS_COLUMNS}
+
+
+@pytest.mark.anyio
+async def test_an_exported_entry_keeps_its_progress(tmp_path: Path) -> None:
+    """A count the reader recorded is not something an export may quietly drop."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        anime = repository.create_or_get_entry(title="Black Clover", creators=("Pierrot",))
+        book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE items SET type='anime' WHERE id=:id"), {"id": anime.item_id}
+            )
+            connection.execute(
+                text("UPDATE entries SET progress=20 WHERE id=:id"), {"id": anime.entry_id}
+            )
+        response = await client.get("/api/export")
+
+    payload = json.loads(response.text)
+    entries = {row["item_id"]: row for row in payload["entries"]}
+    assert entries[anime.item_id]["progress"] == 20
+    # A book records none, and the key is present carrying null rather than absent: a
+    # consumer must be able to tell "not recorded" from "this export predates the field".
+    assert entries[book.item_id]["progress"] is None

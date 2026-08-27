@@ -17,9 +17,11 @@ from book_tracker.domain.spec import (
     Domain,
     InvalidEntryField,
     InvalidFormat,
+    InvalidProgress,
     InvalidStatus,
     validate_entry_fields,
     validate_formats,
+    validate_progress,
     validate_status,
 )
 from book_tracker.infrastructure.attachments import (
@@ -159,6 +161,12 @@ class LibraryService:
         """
         try:
             validated = validate_entry_fields(domain, changes)
+            # Membership, not `.get(...) is not None`: an explicit `null` clears the
+            # value and must still be validated rather than skipped. `validate_progress`
+            # permits `None` on every domain, which is the only way to remove a count a
+            # retyped item or a withdrawn declaration left stranded.
+            if "progress" in changes:
+                validated["progress"] = validate_progress(domain, changes["progress"])
             if changes.get("status") is not None:
                 validate_status(domain, changes["status"])
             if changes.get("formats") is not None:
@@ -172,6 +180,8 @@ class LibraryService:
             raise LibraryError("invalid_format", str(error), status_code=422) from error
         except InvalidEntryField as error:
             raise LibraryError("invalid_entry_field", str(error), status_code=422) from error
+        except InvalidProgress as error:
+            raise LibraryError("invalid_progress", str(error), status_code=422) from error
         return validated
 
     def _formats_for_entry(self, session: Session, entry_id: int, domain: Domain) -> list[str]:
@@ -225,6 +235,7 @@ class LibraryService:
             "date_started": entry.date_started,
             "date_finished": entry.date_finished,
             "reread_count": entry.reread_count,
+            "progress": entry.progress,
             "score_provisional": bool(entry.score_provisional),
             "suggested_status": entry.suggested_status,
             "item": self._item_dict(session, item),
@@ -294,7 +305,10 @@ class LibraryService:
                 "date_started",
                 "date_finished",
                 "reread_count",
+                "progress",
             ):
+                # Membership rather than truthiness, so an explicit `null` clears the
+                # stored value instead of being mistaken for "not sent".
                 if field in changes:
                     setattr(entry, field, changes[field])
             if "score" in changes:

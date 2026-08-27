@@ -14,10 +14,12 @@ from book_tracker.domain.spec import (
     InvalidEntryField,
     InvalidFormat,
     InvalidMetadata,
+    InvalidProgress,
     InvalidStatus,
     validate_entry_fields,
     validate_formats,
     validate_metadata_patch,
+    validate_progress,
     validate_status,
 )
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
@@ -183,8 +185,12 @@ class AddService:
         # It runs before the write, so a refusal leaves no half-added row behind.
         try:
             checked_values = validate_entry_fields(domain, entry_values or {})
+            if "progress" in checked_values:
+                checked_values["progress"] = validate_progress(domain, checked_values["progress"])
         except InvalidEntryField as error:
             raise LibraryError("invalid_entry_field", str(error), status_code=422) from error
+        except InvalidProgress as error:
+            raise LibraryError("invalid_progress", str(error), status_code=422) from error
         try:
             checked_formats = validate_formats(domain, formats or ())
         except InvalidFormat as error:
