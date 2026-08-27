@@ -1,8 +1,8 @@
-# Sprint 042 — Sharpening the domain contract
+# Sprint 043 — Sharpening the domain contract
 
-**Status:** ready
-**Depends on:** 041
-**Roadmap revision:** 21
+**Status:** planned
+**Depends on:** 042
+**Roadmap revision:** 22
 
 ## Objective
 
@@ -26,7 +26,9 @@ Nothing user-visible changes.
 
 ## Current implementation baseline
 
-Observed on 2026-08-27 at `0f1b86e`, the close of the anime line.
+Observed on 2026-08-27 at `0f1b86e`, the close of the anime line. **Sprint 042 was
+inserted ahead of this one by owner direction and touches `TriagePage.tsx` only**, so every
+fact below still holds — but re-check rather than trusting this line.
 
 - **`validate_entry_fields` is a denylist.** It refuses only names *inside*
   `PASSAGE_FIELDS` that the domain lacks; every other key passes through untouched, and
@@ -178,12 +180,12 @@ that is a scope error — stop and re-plan rather than adding a gate.
 
 ## Commit checkpoints
 
-1. `feat(sprint-042): one allowlisting validator for a domain's entry values`
-2. `feat(sprint-042): hold a domain to the wiring this build actually has`
-3. `test(sprint-042): refuse a CHECK that freezes an application vocabulary`
-4. `refactor(sprint-042): construct an entry row in one place`
-5. `docs(sprint-042): the rebuild recipe, the pragma, and how to drive these screens`
-6. `docs(sprint-042): close sprint and hand off`
+1. `feat(sprint-043): one allowlisting validator for a domain's entry values`
+2. `feat(sprint-043): hold a domain to the wiring this build actually has`
+3. `test(sprint-043): refuse a CHECK that freezes an application vocabulary`
+4. `refactor(sprint-043): construct an entry row in one place`
+5. `docs(sprint-043): the rebuild recipe, the pragma, and how to drive these screens`
+6. `docs(sprint-043): close sprint and hand off`
 
 ## Risks and decisions to surface
 
