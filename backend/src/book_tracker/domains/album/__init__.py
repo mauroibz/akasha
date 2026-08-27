@@ -113,7 +113,9 @@ DOMAIN = Domain(
     entry_fields=frozenset(),
     formats=ALBUM_FORMATS,
     entry_panel_label="Your copy",
-    enriches=False,
+    # One MusicBrainz release fetch already returns everything an album has, so
+    # there is nothing for a background job to fill. A complete answer, not a gap.
+    enrichment=None,
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,
 )

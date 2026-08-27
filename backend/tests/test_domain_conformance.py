@@ -59,6 +59,7 @@ from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     RESERVED_FIELD_NAMES,
     Domain,
+    EnrichmentSpec,
     FieldSpec,
     FormatSpec,
     StatusSpec,
@@ -244,6 +245,44 @@ def entry_field_labels_name_fields_this_domain_has(domain: Domain) -> None:
     assert not unknown, f"{domain.item_type} labels entry fields it does not declare: {unknown}"
     assert all(label and label.strip() for label in domain.entry_field_labels.values()), (
         f"{domain.item_type} has a bare entry field label"
+    )
+
+
+@registry_check
+def enrichment_is_answerable_by_this_domain(domain: Domain) -> None:
+    """DEC-067 row 3: what a domain enriches on, and what counts as still incomplete.
+
+    `None` is a complete answer — an album's one release fetch already returns
+    everything it has. What is checked is that a domain which *does* declare
+    enrichment declares something the backfill can act on. The
+    `completeness_fields` rule is the sharp one: a name this domain does not
+    declare is always absent from its metadata, so the record would look
+    incomplete for ever and be re-queued on every backfill. That is exactly what
+    would have happened to anime under the old rule, which named books' fields
+    for every domain.
+    """
+    spec = domain.enrichment
+    if spec is None:
+        return
+    assert spec.identity_kind and spec.identity_kind.strip(), (
+        f"{domain.item_type} enriches on an unnamed identifier kind"
+    )
+    assert spec.provider_order, f"{domain.item_type} enriches but names no provider to ask"
+    assert all(name and name.strip() for name in spec.provider_order), (
+        f"{domain.item_type} names a blank provider"
+    )
+    assert len(set(spec.provider_order)) == len(spec.provider_order), (
+        f"{domain.item_type} names one provider twice in its enrichment order"
+    )
+    assert spec.completeness_fields, (
+        f"{domain.item_type} enriches but nothing would ever make a record complete"
+    )
+    declared = {field.name for field in domain.fields}
+    unknown = set(spec.completeness_fields) - declared
+    assert not unknown, (
+        f"{domain.item_type} judges completeness by fields it does not declare: "
+        f"{unknown}. A field this domain never stores is always absent, so every "
+        "record would be re-queued for ever."
     )
 
 
@@ -772,9 +811,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "identity": "identity_is_a_strategy",
         "recognize": "the_recognizer_answers_for_any_string",
         "chooses_covers": "the_cover_chooser_is_only_declared_where_it_can_work",
-        # Declarative and checked by the enrichment path rather than by shape: a domain
-        # that does not enrich is queued no jobs (`_backfillable_items`).
-        "enriches": None,
+        "enrichment": "enrichment_is_answerable_by_this_domain",
     }
     declared = set(Domain.__dataclass_fields__)
     assert declared == set(covered), (
@@ -806,7 +843,7 @@ def a_third_domain(**overrides: object) -> Domain:
             FieldSpec("creators", "Studios", multiplicity="many"),
             FieldSpec("platform", "Platform"),
         ),
-        "enriches": False,
+        "enrichment": None,
         "statuses": (
             StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
             StatusSpec("wishlist", "Wishlist", hotkey="w"),
@@ -959,6 +996,27 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "entry_field_labels_name_fields_this_domain_has",
         "a bare entry field label",
         a_third_domain(entry_field_labels={"date_finished": "   "}),
+    ),
+    (
+        "enrichment_is_answerable_by_this_domain",
+        "enrichment with nobody to ask",
+        a_third_domain(
+            enrichment=EnrichmentSpec("igdb_id", (), ("platform",)),
+        ),
+    ),
+    (
+        "enrichment_is_answerable_by_this_domain",
+        "an incompleteness rule naming a field this domain does not have",
+        # The anime bug, as a fixture: `description` is a book's field, and a domain
+        # that judges itself by one it never stores is never complete.
+        a_third_domain(
+            enrichment=EnrichmentSpec("igdb_id", ("igdb",), ("description",)),
+        ),
+    ),
+    (
+        "enrichment_is_answerable_by_this_domain",
+        "enrichment nothing would ever complete",
+        a_third_domain(enrichment=EnrichmentSpec("igdb_id", ("igdb",), ())),
     ),
 ]
 

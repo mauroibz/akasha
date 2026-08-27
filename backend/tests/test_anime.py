@@ -61,10 +61,6 @@ class TestVocabulary:
         assert "kind" in names and "format" not in names
         assert "airing_status" in names and "status" not in names
 
-    def test_it_declares_no_background_enrichment_yet(self) -> None:
-        """Sprint 039 turns this on; an added anime already arrives complete."""
-        assert DOMAIN.enriches is False
-
     def test_it_offers_no_cover_chooser(self) -> None:
         """The shared chooser is Open Library's work-editions path (DEC-067 row 7)."""
         assert DOMAIN.chooses_covers is False
@@ -140,3 +136,28 @@ class TestEntryFieldLabels:
         """`Started` and `Finished` read correctly for a series and for a book, so a
         domain that overrides them is adding noise rather than clarity."""
         assert set(DOMAIN.entry_field_labels) == {"reread_count"}
+
+
+class TestEnrichment:
+    """Sprint 039: an imported row is a `mal` id and little else, so this domain does
+    enrich — on a key that is not an ISBN, which is the seam DEC-067 row 3 reserved."""
+
+    def test_it_enriches_on_the_myanimelist_id(self) -> None:
+        assert DOMAIN.enrichment is not None
+        assert DOMAIN.enrichment.identity_kind == "mal"
+
+    def test_it_names_the_providers_that_answer_that_key(self) -> None:
+        assert DOMAIN.enrichment is not None
+        assert DOMAIN.enrichment.provider_order == ("anilist", "kitsu")
+
+    def test_incompleteness_is_this_domain_s_own_fields(self) -> None:
+        """The rule used to be `publisher`/`page_count`/`description` for every domain,
+        which an anime has none of — so every anime would have looked incomplete for
+        ever and been re-queued on every backfill."""
+        assert DOMAIN.enrichment is not None
+        declared = {field.name for field in DOMAIN.fields}
+        assert set(DOMAIN.enrichment.completeness_fields) <= declared
+        assert "synopsis" in DOMAIN.enrichment.completeness_fields
+
+    def test_enriches_still_reads_as_a_yes_or_no(self) -> None:
+        assert DOMAIN.enriches is True

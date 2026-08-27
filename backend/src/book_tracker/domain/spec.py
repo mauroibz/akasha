@@ -101,6 +101,36 @@ PASSAGE_FIELDS = frozenset({"date_started", "date_finished", "reread_count"})
 
 
 @dataclass(frozen=True)
+class EnrichmentSpec:
+    """What background enrichment means for one domain (DEC-067 row 3).
+
+    Everything below `enriches` used to be books': the backfill joined
+    `item_identifiers` on the literal `'isbn'`, judged a record incomplete by the
+    absence of `publisher`, `page_count` and `description`, and tried two book
+    providers from a module constant. A domain that enriches on anything else could
+    declare the flag and get nothing — or worse, look permanently incomplete because
+    it has none of the three book fields, and be re-queued on every backfill.
+
+    All three parts are per-domain, because all three were book-shaped:
+
+    - **`identity_kind`** is the `item_identifiers.kind` the lookup is keyed on:
+      `isbn` for a book, `mal` for an anime. An item carrying no identifier of this
+      kind is never queued, because there is nothing to look it up by.
+    - **`provider_order`** is which adapters are asked, in order. The first usable
+      payload wins; a provider that is not wired contributes a sentence to the
+      recorded reason rather than being skipped silently.
+    - **`completeness_fields`** are the metadata fields whose absence means this
+      record is still worth a lookup. They must be fields the domain declares — a
+      name it does not have is always absent, so the record would never look complete.
+      A missing cover or year always counts, in every domain, and is not listed here.
+    """
+
+    identity_kind: str
+    provider_order: tuple[str, ...]
+    completeness_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Domain:
     """Everything the shared layers may know about one kind of thing.
 
@@ -136,10 +166,13 @@ class Domain:
     #: Partial on purpose: `Started` and `Finished` are right for a book and a series
     #: alike, and a domain restating them adds drift rather than clarity.
     entry_field_labels: Mapping[str, str] = MappingProxyType({})
-    #: Whether background enrichment applies. One MusicBrainz release fetch already
-    #: returns everything an album has, where a Goodreads row starts as little more
-    #: than an ISBN — so "this domain does not enrich" is a simplification, not a gap.
-    enriches: bool = True
+    #: What background enrichment is keyed on, whom it asks and what counts as
+    #: incomplete — or `None` for a domain that does not enrich at all. One MusicBrainz
+    #: release fetch already returns everything an album has, so `None` is a
+    #: simplification rather than a gap. This replaced a bare `enriches: bool` in
+    #: Sprint 039: the flag was real, and everything underneath it assumed an ISBN and
+    #: two book providers (DEC-067 row 3).
+    enrichment: "EnrichmentSpec | None" = None
     #: Recognizes a URL or identifier this domain can resolve, for add-by-URL. The
     #: neutral default recognizes nothing, which is the safe answer for a domain that
     #: has not written one yet: `resolve_input` simply asks the next domain.
@@ -154,6 +187,15 @@ class Domain:
 
     def status(self, value: str) -> StatusSpec | None:
         return next((row for row in self.statuses if row.value == value), None)
+
+    @property
+    def enriches(self) -> bool:
+        """Whether background enrichment applies at all.
+
+        Kept as a reading of the declaration so no call site has to ask two questions,
+        and so the one thing most code wants to know stays a single word.
+        """
+        return self.enrichment is not None
 
 
 class InvalidStatus(ValueError):
