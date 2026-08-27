@@ -1,6 +1,6 @@
 # Sprint 039 — Enrichment beyond the ISBN
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 038
 **Roadmap revision:** 20
 
@@ -164,4 +164,79 @@ not a summary of them.
 
 ## Outcome
 
-_Not started._
+**Completed 2026-08-27** on branch `sprint-038-anime`. Commits `c62c559` (the contract),
+`81e110f` (the provider interface), `16e2f20` (the backfill and handler), `eb03114` and `19a3361`
+(documentation). Recorded as **DEC-091**.
+
+### The deliverable the plan did not name
+
+`EnrichmentSpec` has **three** parts, not the two this sprint's baseline described. The baseline
+listed the ISBN join, the payload and `PROVIDER_ORDER`; it missed that `_backfillable_items` also
+judged **incompleteness** by `publisher`, `page_count` and `description`. An anime has none of the
+three, so under the old rule every anime would have looked permanently incomplete and been re-queued
+on every backfill — the domain would have appeared to enrich while never finishing. DEC-067 row 3's
+option (b) did name "an incompleteness rule per domain", so this is a gap in the sprint file rather
+than in the original costing. `completeness_fields` is the third part, and conformance refuses one
+naming a field the domain does not declare.
+
+### Acceptance criteria, one line each
+
+1. **Books are unchanged.** Same provider order (now declared in `domains/book/` rather than a shared
+   constant), same fill-empty-only rule, same edition verification, same quota, same ledger effects.
+   Every existing enrichment test passes **unmodified**; none named `no_isbn` or the payload shape.
+2. **An anime is enqueued and filled from AniList.** Proved by test against a recorded response and
+   live in the walkthrough below.
+3. **A domain declaring no enrichment is never enqueued** — albums, with an explicit `None`.
+4. **An item carrying the wrong kind of identifier is not enqueued** — an anime with an ISBN.
+5. **A job under the old `{item_id, isbn}` payload processes.** Test plus a live exercise.
+6. **Enrichment never overwrites an edited value.** The existing tests carry this; the walkthrough
+   confirmed `kind` and `episodes` survived a fill that added eleven fields around them.
+7. **Nothing in the enrichment path names an identifier kind or a provider.** `PROVIDER_ORDER` is
+   gone; what remains in the shared layer is `PROVIDER_LABELS`, display copy for naming a provider in
+   a reason a person reads. **Stated precisely rather than claimed broadly**: `grep isbn
+   application/` still returns hits in `export.py` (the CSV column names of a books export),
+   `add.py` (the near-match check) and `providers.py` (the cover chooser's Open Library path, kept
+   deliberately by DEC-067 rows 6 and 7). Those are other features with their own decisions, not
+   enrichment.
+8. **No migration.** A job is a row with a JSON payload.
+
+### Verification
+
+- `make check` — green. One real catch: the backfill route's docstring is its OpenAPI description,
+  so rewording it made the checked-in schema stale until `make openapi`.
+- `make test` — **641 backend, 183 frontend** (from 616/183 at Sprint 038 closure).
+- `npm run test:e2e` — **103 passed, 2 skipped**, unchanged.
+
+### Walkthrough, against live providers on a disposable database
+
+Added Chainsaw Man by MyAnimeList URL, stripped it to what a MyAnimeList import really leaves —
+`{"kind": "TV", "episodes": 12}`, no year, no cover, one `mal` identifier — and triggered
+`POST /api/enrichment/backfill`.
+
+```text
+payload : {"item_id": 1, "kind": "mal", "value": "44511"}
+state   : succeeded    provider: anilist
+filled  : year, creators, english_title, japanese_title, episode_minutes, season,
+          source, genres, airing_status, synopsis, cover
+```
+
+`kind` and `episodes` were left alone. A second backfill queued **0** — the completeness rule worked,
+which is the bug this sprint existed to avoid. A thin book beside it queued
+`{"item_id": 2, "kind": "isbn", "value": "9788437604572"}`, succeeded against Open Library and filled
+publisher, language, page_count, description, subjects, series and original_year: the book path is
+untouched. A job hand-written in the **old** payload shape succeeded too, read as `isbn` from the
+domain's own spec. Live `data/` untouched throughout.
+
+### Observed and left alone
+
+`JobRepository.complete` does not clear `error`/`error_code`, so a job that failed once and then
+succeeded on retry shows `state: succeeded` beside stale failure text. Seen live. Pre-existing and
+unrelated to this sprint; recorded in DEC-091 rather than fixed inside it.
+
+### Impact on Sprints 040 and 041
+
+Neither is invalidated. 040 is untouched — it is the entry model, not the item's. **041 inherits a
+working fill path**, which is why this sprint precedes it: its connector produces rows carrying a
+`mal` identifier and little else, and they now enrich without the connector fetching anything. One
+thing for 041 to watch: the backfill queues one job per item, so the owner's 81-row export is 81 jobs
+against a provider publishing `X-RateLimit-Limit: 30`. That is named in 041's risks already.

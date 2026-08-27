@@ -2,7 +2,7 @@
 
 **Plan revision:** 20
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 039 — Enrichment beyond the ISBN
+**Active sprint:** 040 — Entry progress
 
 ## Shape of the plan
 
@@ -34,7 +34,7 @@ Post-v1 work branches:
                                             └─ 036 Import and triage flow
                                                └─ 037 Triage page flow and staged statuses  ✓
                                                   └─ 038 Anime: the third domain  ✓
-                                                      ├─ 039 Enrichment beyond the ISBN
+                                                      ├─ 039 Enrichment beyond the ISBN  ✓
                                                       └─ 040 Entry progress
                                                            └─ 041 The MyAnimeList import
 ```
@@ -109,8 +109,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [036](036-import-triage-flow.md) | Import and triage flow | 035 | completed |
 | [037](037-triage-page-flow.md) | Triage page flow and staged statuses | 036 | completed |
 | [038](038-anime-domain.md) | Anime: the third domain | 037 | completed |
-| [039](039-enrichment-beyond-isbn.md) | Enrichment beyond the ISBN | 038 | ready |
-| [040](040-entry-progress.md) | Entry progress | 038 | planned |
+| [039](039-enrichment-beyond-isbn.md) | Enrichment beyond the ISBN | 038 | completed |
+| [040](040-entry-progress.md) | Entry progress | 038 | ready |
 | [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | planned |
 
 ## Sprint contracts

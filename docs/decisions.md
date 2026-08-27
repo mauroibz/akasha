@@ -3016,3 +3016,67 @@ Square Enix and TOHO animation are `producer`, Sentai Filmworks is `licensor`. T
 have filed the series under its manga publisher. And Kitsu holds **no production records at all** for
 some series, Cowboy Bebop among them, so that record arrives with no creator; AniList has Sunrise for
 it. That is a gap in the source rather than in the adapter, and it is part of why AniList is primary.
+
+## DEC-091 — Enrichment beyond the ISBN, as built: three per-domain parts, not one
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-067 row 3 (the option (b) this builds, and the trigger it
+  named), DEC-089 (the four-sprint plan), DEC-088 and DEC-090 (the anime domain this was
+  designed against), DEC-008 (fill-empty-only), DEC-045 (the provider quota).
+- **Context:** DEC-067 row 3 costed generalizing enrichment at "about half a sprint" and
+  deferred it with its trigger stated: *the first domain that wants background enrichment
+  on a non-ISBN key pays for it then, with a real case to design against.* Anime is that
+  case — an imported MyAnimeList row is an id, a title, a type and an episode count, and
+  everything worth looking at has to be fetched.
+- **Decision — a domain declares an `EnrichmentSpec`, and it has three parts rather than
+  the two the row anticipated.**
+
+  1. **`identity_kind`** — the `item_identifiers.kind` the lookup is keyed on. The join
+     said `kind = 'isbn'` as a literal.
+  2. **`provider_order`** — which adapters answer it, in order. This was
+     `PROVIDER_ORDER`, a module constant in the shared layer naming two book providers.
+     Books' "Open Library first, Google Books as the fallback" now lives in
+     `domains/book/`, which is where product spec 4.2's reasoning always belonged.
+  3. **`completeness_fields`** — which missing metadata means "still worth asking".
+     **This is the part the sprint's own baseline missed**, though DEC-067 row 3's
+     option (b) did name it: a record counted as incomplete when it lacked `publisher`,
+     `page_count` or `description`. An anime has none of the three, so under the old
+     rule every anime would have looked incomplete for ever and been re-queued on every
+     backfill — the domain would have appeared to enrich while quietly never finishing.
+
+  Conformance refuses a `completeness_fields` entry naming a field the domain does not
+  declare, because a field it never stores is always absent. That bug is committed as a
+  malformed fixture rather than as a comment.
+
+- **Where each thing is checked, and why they are different places.** The conformance
+  suite has no provider catalog, so it can check the *shape* of a declaration and not
+  whether `provider_order` names an adapter anybody constructed. That check lives in
+  `test_enrichment_pipeline.py`, with the app built: every enriching domain's providers
+  must exist, implement `EnrichingProvider`, and serve that domain. Without it, a wiring
+  mistake surfaces only when a job runs, as `enrichment_not_configured` — which reads
+  exactly like a missing API key.
+- **`fetch_by_isbn` survives; it stopped being the interface.** `EnrichingProvider`'s
+  `fetch_by_identifier(kind, value)` is what enrichment asks through, and the book
+  adapters keep `fetch_by_isbn` because the *add* path genuinely resolves a typed ISBN —
+  that is a book's business. What could not survive was the shared enrichment layer
+  saying the word. A provider handed a kind it does not answer raises
+  `unsupported_identity_kind` rather than guessing.
+- **The handler reads the item's domain rather than trusting the payload.** The provider
+  order could have been frozen into the job at enqueue time; it is looked up instead, so
+  a job queued last week runs against the wiring this deployment actually has.
+- **The old payload still processes.** Jobs survive restart by design, so a
+  `{item_id, isbn}` row written before the upgrade is still in the queue after it. It is
+  read as the domain's own key. This has a test and was exercised live, because it is
+  the failure nobody would ever see: a stale row failing quietly in a queue no one
+  watches.
+- **Consequences.** DEC-067 row 3 is closed and `docs/guides/adding-a-domain.md` §6 —
+  titled "One thing that is not solved yet" since Sprint 028 — is now a description of
+  what a domain declares. No migration: a job is a row with a JSON payload. Anime
+  enriches; albums still declare `None`, which remains a complete answer. Sprint 041's
+  MyAnimeList import inherits a working fill path, which is the whole reason this sprint
+  precedes it.
+- **Observed and left alone.** `JobRepository.complete` does not clear `error` or
+  `error_code`, so a job that fails once and then succeeds keeps the stale failure text
+  beside a `succeeded` state. Seen live during the walkthrough on a retry. Pre-existing,
+  unrelated to this sprint, and recorded rather than fixed inside it.

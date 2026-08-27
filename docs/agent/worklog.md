@@ -2309,3 +2309,38 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   a domain with no notion of a copy would have to invent one for.
 - Next: Sprint 039, enrichment beyond the ISBN. It inherits one fact from this sprint — `bounded_json`
   already takes a method, so a provider reached by POST costs it nothing.
+
+## 2026-08-27 — Sprint 039 (complete)
+
+- Done: generalized background enrichment off the ISBN. `EnrichmentSpec` on the domain contract,
+  `EnrichingProvider.fetch_by_identifier` as the interface, a per-domain backfill query, and a handler
+  that reads the item's domain instead of assuming books. Commits `c62c559`, `81e110f`, `16e2f20`,
+  `eb03114`, `19a3361`. Recorded as DEC-091. Branch `sprint-038-anime`, unpushed.
+- **The spec has three parts, not two.** The sprint file's baseline named the ISBN join, the payload
+  and `PROVIDER_ORDER` and missed that `_backfillable_items` also judged incompleteness by
+  `publisher`/`page_count`/`description`. An anime has none of the three, so every anime would have
+  looked incomplete for ever and been re-queued on every backfill — enrichment appearing to work while
+  never finishing. DEC-067 row 3's option (b) had named "an incompleteness rule per domain", so the
+  gap was in the sprint file rather than the original costing. `completeness_fields` is the third part
+  and conformance refuses one naming a field the domain does not declare.
+- Verified: `make check` green. `make test` **641 backend / 183 frontend** (from 616/183). Playwright
+  **103 passed, 2 skipped**, unchanged. `make check` caught one real thing: the backfill route's
+  docstring is its OpenAPI description, so rewording it made the checked-in schema stale.
+- Walkthrough on a disposable database at port 8124, live providers. Chainsaw Man added by MAL URL,
+  stripped to `{"kind": "TV", "episodes": 12}` with no year and no cover, then backfilled. Job row
+  verbatim: `{"item_id": 1, "kind": "mal", "value": "44511"}` → succeeded via `anilist`, filling year,
+  creators, english_title, japanese_title, episode_minutes, season, source, genres, airing_status,
+  synopsis and cover. `kind` and `episodes` untouched. **A second backfill queued 0**, which is the
+  completeness rule doing the job this sprint existed for. A thin book beside it queued
+  `{"item_id": 2, "kind": "isbn", "value": "9788437604572"}` and filled from Open Library exactly as
+  before. A hand-written job in the **old** `{item_id, isbn}` payload also succeeded. Live `data/`
+  untouched.
+- Observed, pre-existing, not fixed here: `JobRepository.complete` never clears `error`/`error_code`,
+  so a job that failed once and then succeeded on retry shows `succeeded` beside stale failure text.
+  Seen live. In DEC-091.
+- Criterion 7 stated precisely rather than broadly: the enrichment path names no identifier kind or
+  provider, but `grep isbn application/` still hits `export.py` (books' CSV column names), `add.py`
+  (the near-match check) and `providers.py` (the cover chooser's Open Library path, kept by DEC-067
+  rows 6 and 7). Those are other features with their own decisions.
+- Next: Sprint 040, entry progress. It is the only shared-table migration in the line and is
+  independent of this sprint; both block Sprint 041.

@@ -1,6 +1,6 @@
 # Sprint 040 — Entry progress
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 038
 **Roadmap revision:** 20
 
