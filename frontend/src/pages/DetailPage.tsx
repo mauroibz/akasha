@@ -37,11 +37,13 @@ import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
   choosesCovers,
+  entryFieldLabel,
   entryPanelLabel,
   formatLabels,
   hasEntryField,
   statusLabelFor,
 } from "@/features/library/labels";
+import type { EntryFieldName } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -209,8 +211,11 @@ export function DetailPage() {
   // gets its own region rather than being joined into one line (a tracklist).
   const rowFields = fields.filter((field) => field.type === "rows");
   const editableFields = fields.filter((field) => field.type !== "rows");
-  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+  const has = (field: EntryFieldName) =>
     hasEntryField(item.type, itemTypes.data, field);
+  // The domain's own word for the field, not a book's (technical spec 6.6).
+  const nameOf = (field: EntryFieldName) =>
+    entryFieldLabel(item.type, itemTypes.data, field);
 
   async function handleDelete() {
     setDeleteError("");
@@ -355,17 +360,17 @@ export function DetailPage() {
                   .join(", ") || "—"}
               </Fact>
               {has("date_started") && (
-                <Fact name="started" label="Started">
+                <Fact name="started" label={nameOf("date_started")}>
                   {entry.date_started ?? "—"}
                 </Fact>
               )}
               {has("date_finished") && (
-                <Fact name="finished" label="Finished">
+                <Fact name="finished" label={nameOf("date_finished")}>
                   {entry.date_finished ?? "—"}
                 </Fact>
               )}
               {has("reread_count") && (
-                <Fact name="rereads" label="Rereads">
+                <Fact name="rereads" label={nameOf("reread_count")}>
                   {entry.reread_count}
                 </Fact>
               )}

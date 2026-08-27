@@ -1666,6 +1666,13 @@
             "title": "Default Status",
             "type": "string"
           },
+          "entry_field_labels": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Entry Field Labels",
+            "type": "object"
+          },
           "entry_fields": {
             "items": {
               "type": "string"
@@ -1714,6 +1721,7 @@
           "statuses",
           "default_status",
           "entry_fields",
+          "entry_field_labels",
           "formats",
           "entry_panel_label",
           "chooses_covers"

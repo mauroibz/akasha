@@ -6,10 +6,12 @@ import type { LibraryEntry } from "@/api/library";
 import { ScorePicker } from "@/components/ScorePicker";
 import { StatusSelect } from "@/components/StatusSelect";
 import {
+  entryFieldLabel,
   formatsFor,
   hasEntryField,
   statusesFor,
 } from "@/features/library/labels";
+import type { EntryFieldName } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { FormatPicker } from "@/features/library/FormatPicker";
 import { Button } from "@/components/ui/button";
@@ -64,8 +66,11 @@ export function OpinionDialog({
   const errors = form.formState.errors;
   // DEC-057: a record has no reread count and no started/finished dates, so this
   // asks the domain rather than branching on the type.
-  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+  const has = (field: EntryFieldName) =>
     hasEntryField(entry.item.type, itemTypes.data, field);
+  // The domain's own word for the field. An anime has rewatches, not rereads.
+  const nameOf = (field: EntryFieldName) =>
+    entryFieldLabel(entry.item.type, itemTypes.data, field);
   const formats = formatsFor(entry.item.type, itemTypes.data);
 
   return (
@@ -152,7 +157,7 @@ export function OpinionDialog({
           {has("date_started") && (
             <Field
               id="opinion-started"
-              label="Started"
+              label={nameOf("date_started")}
               error={errors.date_started?.message}
             >
               {(props) => (
@@ -168,7 +173,7 @@ export function OpinionDialog({
           {has("date_finished") && (
             <Field
               id="opinion-finished"
-              label="Finished"
+              label={nameOf("date_finished")}
               error={errors.date_finished?.message}
             >
               {(props) => (
@@ -184,7 +189,7 @@ export function OpinionDialog({
           {has("reread_count") && (
             <Field
               id="opinion-rereads"
-              label="Reread count"
+              label={nameOf("reread_count")}
               error={errors.reread_count?.message}
             >
               {(props) => (

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { entryFormats, entryStatuses, type ItemType } from "@/api/library";
 import {
+  entryFieldLabel,
   fallbackStatuses,
   formatsFor,
   hasEntryField,
@@ -34,6 +35,7 @@ const registry: ItemType[] = [
       { value: "digital", label: "Digital" },
     ],
     entry_panel_label: "Your reading data",
+    entry_field_labels: { reread_count: "Rereads" },
     chooses_covers: true,
   },
   {
@@ -48,6 +50,7 @@ const registry: ItemType[] = [
     ],
     default_status: "owned",
     entry_fields: [],
+    entry_field_labels: {},
     formats: [
       { value: "vinyl", label: "Vinyl" },
       { value: "cd", label: "CD" },
@@ -119,5 +122,31 @@ describe("the status vocabulary", () => {
     expect(hasEntryField("book", registry, "reread_count")).toBe(true);
     expect(hasEntryField("album", registry, "reread_count")).toBe(false);
     expect(hasEntryField("album", registry, "date_finished")).toBe(false);
+  });
+});
+
+describe("entryFieldLabel", () => {
+  it("uses the domain's own word for a passage field", () => {
+    // The entry panel said `Rereads` over every domain until the label became the
+    // domain's copy, the way `entry_panel_label` already was.
+    expect(entryFieldLabel("book", registry, "reread_count")).toBe("Rereads");
+  });
+
+  it("falls back to a neutral word, not to a book's", () => {
+    // An album declares no labels at all, and a domain this registry has never heard
+    // of must still render a named control rather than a blank one.
+    expect(entryFieldLabel("album", registry, "reread_count")).toBe("Repeats");
+    expect(entryFieldLabel("nonesuch", registry, "reread_count")).toBe(
+      "Repeats",
+    );
+  });
+
+  it("leaves the dates alone, because the neutral word is already right", () => {
+    expect(entryFieldLabel("book", registry, "date_started")).toBe("Started");
+    expect(entryFieldLabel("book", registry, "date_finished")).toBe("Finished");
+  });
+
+  it("still names the field when the registry never arrived", () => {
+    expect(entryFieldLabel("book", undefined, "date_started")).toBe("Started");
   });
 });

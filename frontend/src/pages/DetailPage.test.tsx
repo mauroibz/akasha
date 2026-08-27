@@ -62,6 +62,9 @@ const itemTypes = [
         maximum: 9999,
       },
     ],
+    // What a book calls its passage fields. The entry panel used to say `Rereads`
+    // over every domain; it is the domain's copy now, like `entry_panel_label`.
+    entry_field_labels: { reread_count: "Rereads" },
   },
 ];
 
@@ -372,6 +375,7 @@ describe("DetailPage", () => {
         ],
         default_status: "owned",
         entry_fields: [],
+        entry_field_labels: {},
         formats: [
           { value: "vinyl", label: "Vinyl" },
           { value: "cd", label: "CD" },
@@ -423,6 +427,7 @@ describe("DetailPage", () => {
         ],
         default_status: "read",
         entry_fields: ["date_started", "date_finished", "reread_count"],
+        entry_field_labels: { reread_count: "Rereads" },
         formats: [],
         entry_panel_label: "Your reading data",
         chooses_covers: true,
@@ -662,7 +667,7 @@ describe("DetailPage", () => {
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
     await user.click(screen.getByRole("button", { name: /edit opinion/i }));
-    const rereads = screen.getByLabelText(/reread count/i);
+    const rereads = screen.getByLabelText(/rereads/i);
     await user.clear(rereads);
     await user.type(rereads, "99999");
     await user.click(screen.getByRole("button", { name: /save opinion/i }));

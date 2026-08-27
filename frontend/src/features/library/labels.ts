@@ -129,13 +129,43 @@ export function formatLabels(
 export function hasEntryField(
   itemType: string,
   types: ItemType[] | undefined,
-  field: "date_started" | "date_finished" | "reread_count",
+  field: EntryFieldName,
 ): boolean {
   const declared = Array.isArray(types)
     ? types.find((type) => type.id === itemType)?.entry_fields
     : undefined;
   // Unknown domain: assume the book shape rather than hiding a reader's own data.
   return declared ? declared.includes(field) : true;
+}
+
+/**
+ * The neutral name of a passage field, used where a domain does not rename it.
+ *
+ * Deliberately not a book's words. `Started` and `Finished` are right for a book, a
+ * series and anything else that takes time; `reread_count` has no neutral English word
+ * at all, so the fallback is the flattest one available and the domains that care say
+ * what they mean. Before this, the detail page said `Rereads` over every domain.
+ */
+const neutralEntryFieldLabels: Record<EntryFieldName, string> = {
+  date_started: "Started",
+  date_finished: "Finished",
+  reread_count: "Repeats",
+};
+
+export type EntryFieldName = "date_started" | "date_finished" | "reread_count";
+
+/** What *this* domain calls one of its passage fields. */
+export function entryFieldLabel(
+  itemType: string,
+  types: ItemType[] | undefined,
+  field: EntryFieldName,
+): string {
+  // Defensive for the same reason as `statusesFor`: a registry that has not arrived
+  // must never be the reason a control loses its name.
+  const declared = Array.isArray(types)
+    ? types.find((type) => type.id === itemType)?.entry_field_labels
+    : undefined;
+  return declared?.[field] ?? neutralEntryFieldLabels[field];
 }
 
 /** Whether this domain offers the cover chooser at all (DEC-067 row 7). */

@@ -85,6 +85,11 @@ export interface ItemType {
   default_status: EntryStatus;
   /** Which of `date_started`, `date_finished`, `reread_count` this domain has. */
   entry_fields: string[];
+  /**
+   * What this domain calls those fields, where a neutral word is wrong: an anime has
+   * rewatches, not rereads. Partial — anything absent uses the neutral label below.
+   */
+  entry_field_labels: Record<string, string>;
   formats: FormatSpec[];
   /** The heading over the personal region of the detail page. */
   entry_panel_label: string;

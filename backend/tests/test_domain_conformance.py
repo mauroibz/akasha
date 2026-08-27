@@ -232,6 +232,22 @@ def entry_fields_are_passage_fields(domain: Domain) -> None:
 
 
 @registry_check
+def entry_field_labels_name_fields_this_domain_has(domain: Domain) -> None:
+    """A domain may rename a passage field it has, and only one it has.
+
+    `entry_panel_label` made the heading the domain's copy and left the fields under it
+    reading `Rereads` on everything. These are the same kind of copy. A label for a
+    field the domain does not declare is a label nothing will ever render, which looks
+    exactly like a label that is not working.
+    """
+    unknown = set(domain.entry_field_labels) - domain.entry_fields
+    assert not unknown, f"{domain.item_type} labels entry fields it does not declare: {unknown}"
+    assert all(label and label.strip() for label in domain.entry_field_labels.values()), (
+        f"{domain.item_type} has a bare entry field label"
+    )
+
+
+@registry_check
 def fields_are_described_completely(domain: Domain) -> None:
     """Seam 3: storage is opaque, so the spec is the only description there is."""
     names = [field.name for field in domain.fields]
@@ -751,6 +767,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "default_status": "statuses_are_a_usable_vocabulary",
         "formats": "formats_are_a_usable_vocabulary",
         "entry_fields": "entry_fields_are_passage_fields",
+        "entry_field_labels": "entry_field_labels_name_fields_this_domain_has",
         "fields": "fields_are_described_completely",
         "identity": "identity_is_a_strategy",
         "recognize": "the_recognizer_answers_for_any_string",
@@ -930,6 +947,18 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "the_cover_chooser_is_only_declared_where_it_can_work",
         "a chooser no provider can serve",
         a_third_domain(chooses_covers=True),
+    ),
+    (
+        "entry_field_labels_name_fields_this_domain_has",
+        "a label for a passage field the domain does not have",
+        # The fixture declares `date_finished` alone, so this names a field that will
+        # never render — which looks identical to a label that is not working.
+        a_third_domain(entry_field_labels={"reread_count": "Replays"}),
+    ),
+    (
+        "entry_field_labels_name_fields_this_domain_has",
+        "a bare entry field label",
+        a_third_domain(entry_field_labels={"date_finished": "   "}),
     ),
 ]
 

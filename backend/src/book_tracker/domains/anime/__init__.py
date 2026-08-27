@@ -133,6 +133,8 @@ DOMAIN = Domain(
     entry_fields=PASSAGE_FIELDS,
     formats=ANIME_FORMATS,
     entry_panel_label="Your watch data",
+    # `Started` and `Finished` read correctly for a series; `Rereads` does not.
+    entry_field_labels={"reread_count": "Rewatches"},
     # Sprint 039 turns this on, once enrichment stops being keyed on an ISBN
     # (DEC-067 row 3). An anime added interactively already arrives complete from one
     # fetch; only an imported one is thin, and there is no importer yet.

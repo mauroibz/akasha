@@ -123,3 +123,20 @@ class TestRecognizer:
     def test_it_declines_everything_else_without_raising(self) -> None:
         for probe in ("", "   ", "http://[", "https://", "//", "9780000000000", "a" * 4000):
             assert recognize_anime_url(probe) is None
+
+
+class TestEntryFieldLabels:
+    """The entry panel's last book-shaped word.
+
+    `entry_panel_label` fixed the heading in Sprint 028, but the three passage fields
+    under it kept labels written for books, so an anime read `Rereads`. The labels are
+    the domain's copy for the same reason the heading is.
+    """
+
+    def test_anime_rewatches_rather_than_rereads(self) -> None:
+        assert DOMAIN.entry_field_labels["reread_count"] == "Rewatches"
+
+    def test_the_neutral_dates_are_left_alone(self) -> None:
+        """`Started` and `Finished` read correctly for a series and for a book, so a
+        domain that overrides them is adding noise rather than clarity."""
+        assert set(DOMAIN.entry_field_labels) == {"reread_count"}

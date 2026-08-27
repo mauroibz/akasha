@@ -119,6 +119,9 @@ class ItemTypeResponse(BaseModel):
     statuses: list[StatusSpecResponse]
     default_status: str
     entry_fields: list[str]
+    #: What this domain calls those fields, where a neutral word is wrong. Partial:
+    #: anything absent falls back to the neutral label the client already has.
+    entry_field_labels: dict[str, str]
     formats: list[FormatSpecResponse]
     entry_panel_label: str
     #: Whether to offer the cover chooser at all (DEC-067 row 7).
@@ -488,6 +491,7 @@ async def list_item_types() -> list[ItemTypeResponse]:
             statuses=[StatusSpecResponse(**vars(status)) for status in domain.statuses],
             default_status=domain.default_status,
             entry_fields=sorted(domain.entry_fields),
+            entry_field_labels=dict(domain.entry_field_labels),
             formats=[FormatSpecResponse(**vars(row)) for row in domain.formats],
             entry_panel_label=domain.entry_panel_label,
             chooses_covers=domain.chooses_covers,

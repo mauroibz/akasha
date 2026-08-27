@@ -13,6 +13,7 @@ parallel without editing each other's file (technical spec 6.6, DEC-067).
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Literal
 from urllib.parse import SplitResult, urlsplit
 
@@ -126,6 +127,15 @@ class Domain:
     #: The heading over the personal region of the detail page. "Your reading data" is
     #: a book's phrase, and an album's entry records possession rather than reading.
     entry_panel_label: str
+    #: What this domain calls its `entry_fields`, for the ones a neutral word gets wrong.
+    #:
+    #: `entry_panel_label` above made the heading over the personal region the domain's
+    #: copy; the fields under it stayed book-shaped, so an anime read `Rereads`. Keys are
+    #: `PASSAGE_FIELDS` names the domain declares — labelling a field you do not have is
+    #: a label nothing renders — and anything absent falls back to the neutral word.
+    #: Partial on purpose: `Started` and `Finished` are right for a book and a series
+    #: alike, and a domain restating them adds drift rather than clarity.
+    entry_field_labels: Mapping[str, str] = MappingProxyType({})
     #: Whether background enrichment applies. One MusicBrainz release fetch already
     #: returns everything an album has, where a Goodreads row starts as little more
     #: than an ISBN — so "this domain does not enrich" is a simplification, not a gap.

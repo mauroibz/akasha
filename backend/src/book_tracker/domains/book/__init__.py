@@ -105,6 +105,9 @@ DOMAIN = Domain(
     entry_fields=PASSAGE_FIELDS,
     formats=BOOK_FORMATS,
     entry_panel_label="Your reading data",
+    # Stated rather than inherited: the neutral fallback is deliberately not a
+    # book's word, so the domain that wants one says so (technical spec 6.6).
+    entry_field_labels={"reread_count": "Rereads"},
     enriches=True,
     recognize=lambda value: recognize_book_input(value),
     chooses_covers=True,
