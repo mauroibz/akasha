@@ -2351,7 +2351,7 @@
   "paths": {
     "/api/enrichment/backfill": {
       "post": {
-        "description": "Queue enrichment for persisted items an ISBN lookup could still improve.\n\nExplicit and operator-driven: it only queues work, and the handler it queues fills\nempty fields only, so it can never overwrite a hand edit.",
+        "description": "Queue enrichment for persisted items a provider lookup could still improve.\n\nExplicit and operator-driven: it only queues work, and the handler it queues fills\nempty fields only, so it can never overwrite a hand edit. Each domain is asked on\nits own identifier and its own incompleteness rule (DEC-067 row 3).",
         "operationId": "backfill_enrichment_api_enrichment_backfill_post",
         "responses": {
           "202": {

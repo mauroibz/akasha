@@ -362,7 +362,7 @@ class EnrichmentHandler:
 def enqueue_enrichment_backfill(
     engine: Engine, *, batch_id: str | None = None, item_ids: Collection[int] | None = None
 ) -> int:
-    """Queue enrichment for persisted items an ISBN lookup could still improve.
+    """Queue enrichment for persisted items a provider lookup could still improve.
 
     Every enrichment job failed between Sprint 011 and Sprint 014, so libraries imported
     in that window hold rows with an ISBN and nothing else. This is the explicit path
