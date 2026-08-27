@@ -116,7 +116,11 @@ class TestTheMapping:
         assert rows()["Gake no Ue no Ponyo"]["progress"] == 0
 
     def test_an_unrated_row_has_no_score_rather_than_a_score_of_zero(self) -> None:
-        assert rows()["Psycho-Pass"]["score"] is None
+        """And `0` is not a mistake either, so it costs no row error — unlike an 11,
+        which `ck_entries_score` would refuse at commit."""
+        unrated = rows()["Psycho-Pass"]
+        assert unrated["score"] is None
+        assert unrated["errors"] == []
 
     def test_a_score_transfers_unchanged_and_is_not_provisional(self) -> None:
         """MyAnimeList's scale is already 1-10, unlike Goodreads' five stars, so there
@@ -234,3 +238,108 @@ class TestTheSnapshot:
         assert snapshot.source_descriptor == {  # type: ignore[attr-defined]
             "filename": "animelist_123_-_456.xml"
         }
+
+
+class TestRowsThatWouldHaveCostTheWholeFile:
+    """Every case here reached the shared pipeline and killed an 81-row import.
+
+    `ImportService._validate` runs over *every* record before anything is staged and
+    raises `invalid_import_record` — a code outside this connector's vocabulary, which
+    no screen has copy for. So a defect in one row must never reach it. The `entries`
+    CHECK constraints are worse still: they pass preview and detonate at commit, half
+    way through the batch.
+    """
+
+    def one(self, **fields: str) -> dict:
+        body = "".join(f"<{k}>{v}</{k}>" for k, v in fields.items())
+        return parse_myanimelist(
+            b"<myanimelist><myinfo><user_export_type>1</user_export_type></myinfo>"
+            + f"<anime>{body}</anime>".encode()
+            + b"</myanimelist>"
+        )[0]
+
+    def test_an_airing_show_reports_no_episode_count_rather_than_zero(self) -> None:
+        """`series_episodes` of `0` is MyAnimeList's spelling of "still airing", and
+        the domain declares `episodes` with a minimum of 1 — so passing it through
+        raises `InvalidMetadata` and takes every other row with it."""
+        row = self.one(
+            series_animedb_id="1",
+            series_title="Airing",
+            series_episodes="0",
+            my_watched_episodes="5",
+            my_status="Watching",
+        )
+        assert row["episodes"] is None
+        assert row["progress"] == 5
+
+    def test_a_score_outside_the_scale_is_refused_before_the_database_sees_it(self) -> None:
+        """`ck_entries_score` allows 1-10. An 11 survives preview and raises an
+        IntegrityError at commit, after part of the batch is written."""
+        row = self.one(series_animedb_id="1", series_title="X", my_score="11")
+        assert row["score"] is None
+        assert row["errors"][0]["code"] == "out_of_range"
+
+    def test_a_negative_count_is_refused_before_the_database_sees_it(self) -> None:
+        """`ck_entries_progress` and `ck_entries_reread_count` both refuse negatives."""
+        row = self.one(
+            series_animedb_id="1",
+            series_title="X",
+            my_watched_episodes="-3",
+            my_times_watched="-1",
+        )
+        assert row["progress"] is None
+        assert row["reread_count"] == 0
+        assert {error["code"] for error in row["errors"]} == {"out_of_range"}
+
+    def test_a_row_with_no_title_gets_one_rather_than_killing_the_file(self) -> None:
+        """A blank title fails `_validate`'s own check and 422s the import."""
+        row = self.one(series_animedb_id="34572", series_title="")
+        assert row["title"] == "MyAnimeList 34572"
+        assert row["errors"][0]["field"] == "series_title"
+
+    def test_a_half_known_date_is_absence_rather_than_a_string_in_a_date_column(self) -> None:
+        """MyAnimeList writes a zero in any position it does not know. `entries`
+        stores dates as bare text with no CHECK, so `2021-05-00` would be kept and
+        would poison every reader downstream."""
+        row = self.one(
+            series_animedb_id="1",
+            series_title="X",
+            my_start_date="2021-05-00",
+            my_finish_date="0000-00-00",
+        )
+        assert row["date_started"] is None
+        assert row["date_finished"] is None
+
+    def test_a_tag_of_punctuation_is_skipped_rather_than_raising(self) -> None:
+        """`shelf_slug` refuses a name with no letters or digits by raising, which
+        would have left the route with an unhandled 500 rather than an import error."""
+        row = self.one(series_animedb_id="1", series_title="X", my_tags="!!!, ok, ???")
+        assert row["shelves"] == ["ok"]
+
+    def test_the_same_series_twice_is_reported_rather_than_silently_dropped(self) -> None:
+        """Commit resolves identity inside one session, so the second row would find
+        the item the first created, see an entry already there, and count itself
+        `unchanged` — its score, dates and watch count discarded under a success."""
+        twice = (
+            b"<myanimelist><myinfo><user_export_type>1</user_export_type></myinfo>"
+            b"<anime><series_animedb_id>7</series_animedb_id>"
+            b"<series_title>First</series_title><my_score>8</my_score></anime>"
+            b"<anime><series_animedb_id>7</series_animedb_id>"
+            b"<series_title>Second</series_title><my_score>3</my_score></anime>"
+            b"</myanimelist>"
+        )
+        first, second = parse_myanimelist(twice)
+        assert not first["errors"]
+        assert second["errors"][0]["code"] == "duplicate_series_id"
+
+    def test_a_doctype_inside_a_comment_is_not_mistaken_for_one(self) -> None:
+        """The guard is the parser's own callback, not a scan of the bytes: a scan
+        refuses a legitimate file whose comment happens to mention one, and misses a
+        real declaration in any encoding it cannot read."""
+        commented = (
+            b"<!-- exported with <!DOCTYPE support disabled -->"
+            b"<myanimelist><myinfo><user_export_type>1</user_export_type></myinfo>"
+            b"<anime><series_animedb_id>1</series_animedb_id>"
+            b"<series_title>Fine</series_title></anime></myanimelist>"
+        )
+        assert parse_myanimelist(commented)[0]["title"] == "Fine"

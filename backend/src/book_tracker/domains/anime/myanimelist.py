@@ -18,7 +18,6 @@ Three things about the source that a reasonable implementation would get wrong:
 import gzip
 import hashlib
 import io
-import re
 import xml.etree.ElementTree as ElementTree
 from dataclasses import replace
 from pathlib import Path
@@ -59,15 +58,26 @@ SUGGESTED_STATUS = {
 #:
 #: The upload route admits 5 MiB of *compressed* bytes and never consults this
 #: connector's `max_bytes`, so this is the only thing standing between a crafted
-#: archive and memory. At the measured 965 bytes per row this admits roughly 34,000
-#: entries — past any real MyAnimeList list, and still a hard bound.
-MAX_DECOMPRESSED_BYTES = 32 * 1024 * 1024
-_CHUNK = 512 * 1024
+#: archive and memory: deflate reaches about 1,000:1, which makes that 5 MiB worth
+#: some gigabytes. At the measured 965 bytes per row this admits roughly 8,700
+#: entries, a hundred times the owner's list. It is deliberately *above* the route's
+#: own 5 MiB, so a plain-XML upload can never trip it — only a gzip that lied about
+#: its size can. And it keeps the preview response, which is unpaginated and holds
+#: every record, to a few MiB.
+MAX_DECOMPRESSED_BYTES = 8 * 1024 * 1024
+_CHUNK = 64 * 1024
 
-#: A date MyAnimeList writes when it has none.
-_NO_DATE = "0000-00-00"
+#: Ceilings that exist because the *database* has them. `ck_entries_score` allows 1-10
+#: and `ck_entries_progress`/`ck_entries_reread_count` refuse negatives, and nothing
+#: between this reader and the commit re-checks — an out-of-range value survives
+#: preview and raises an IntegrityError half way through writing the batch.
+_MAX_SCORE = 10
+_MAX_EPISODES = 10_000
+_MAX_PROGRESS = 100_000
+_MAX_REWATCHES = 10_000
+_MAX_TITLE = 500
+
 _GZIP_MAGIC = b"\x1f\x8b"
-_DOCTYPE = re.compile(rb"<!DOCTYPE", re.IGNORECASE)
 
 
 class MyAnimeListError(ImportReadError):
@@ -129,27 +139,84 @@ def _decoded(data: bytes) -> bytes:
     return bytes(read)
 
 
+class _RefuseDoctype(ElementTree.TreeBuilder):
+    """A tree builder that will not read a document type declaration.
+
+    Measured on this build's Python 3.12: ElementTree resolves **internal** entities,
+    so billion laughs is live and expands inside the parser, where the decompression
+    ceiling above cannot reach it. External entities and external DTDs are already
+    ignored, so there is no file disclosure or SSRF to worry about — the whole of the
+    exposure is inside a `<!DOCTYPE`, and a MyAnimeList export carries none.
+
+    Done through the parser's own callback rather than by scanning the bytes for
+    `<!DOCTYPE`: a scan refuses a legitimate file whose *comment* happens to mention
+    one, and misses a real declaration in any encoding it cannot read. Because this is
+    a callback the standard library chooses to invoke, the test that it fires is
+    load-bearing — if a future Python stops calling it, that test fails loudly rather
+    than the hole reopening in silence.
+    """
+
+    def doctype(self, name: str, pubid: str | None, system: str | None) -> None:
+        raise MyAnimeListError(
+            "invalid_xml",
+            "A MyAnimeList export carries no document type declaration",
+            {"name": name},
+        )
+
+
 def _text(element: ElementTree.Element, tag: str) -> str:
     found = element.findtext(tag)
     return (found or "").strip()
 
 
-def _integer(element: ElementTree.Element, tag: str, errors: list[dict[str, str]]) -> int | None:
-    """A whole number, or `None` plus a note on the row that it could not be read."""
+def _integer(
+    element: ElementTree.Element,
+    tag: str,
+    errors: list[dict[str, str]],
+    *,
+    maximum: int,
+    minimum: int = 0,
+) -> int | None:
+    """A whole number within bounds, or `None` plus a note on the row.
+
+    Bounded rather than merely parsed, because this reader is upstream of constraints
+    it cannot watch fail: `ck_entries_score` allows 1-10 and the two count columns
+    refuse negatives, and nothing between here and the commit re-checks. An
+    out-of-range value passes preview cleanly and then raises an IntegrityError half
+    way through writing the batch.
+    """
     raw = _text(element, tag)
     if not raw:
         return None
     try:
-        return int(raw)
+        number = int(raw)
     except ValueError:
-        errors.append({"field": tag, "code": "invalid_integer", "value": raw})
+        # Also where a 5,000-digit number lands: `int()` refuses to convert past 4,300
+        # digits and raises here rather than spending the time on it.
+        errors.append({"field": tag, "code": "invalid_integer", "value": raw[:50]})
         return None
+    if not minimum <= number <= maximum:
+        errors.append({"field": tag, "code": "out_of_range", "value": raw[:50]})
+        return None
+    return number
 
 
 def _date(element: ElementTree.Element, tag: str) -> str | None:
-    """A date, or `None` for the all-zero one MyAnimeList writes when it has none."""
+    """A date, or `None` wherever MyAnimeList wrote a zero because it did not know.
+
+    `0000-00-00` is every start date in the owner's export, but a half-remembered date
+    is written the same way in one position — `2021-05-00`. `entries` stores dates as
+    bare text with no CHECK, so a partial one would be kept and would poison every
+    reader downstream. None of these is an error: the file is telling the truth about
+    not knowing.
+    """
     raw = _text(element, tag)
-    return None if not raw or raw == _NO_DATE else raw
+    if not raw:
+        return None
+    parts = raw.split("-")
+    if len(parts) == 3 and any(not part.strip("0") for part in parts):
+        return None
+    return raw
 
 
 def parse_myanimelist(data: bytes) -> list[dict[str, Any]]:
@@ -160,15 +227,10 @@ def parse_myanimelist(data: bytes) -> list[dict[str, Any]]:
     owner can see on the preview screen what did not arrive.
     """
     decoded = _decoded(data)
-    # Refused before the parser sees it. Measured on Python 3.12: ElementTree expands
-    # internal entities, so billion laughs is live — and it expands *in* the parser,
-    # where the decompression ceiling above cannot reach it. External entities are
-    # already refused, so there is no file disclosure to worry about. A real export
-    # carries no DOCTYPE at all, which is what makes a flat refusal free.
-    if _DOCTYPE.search(decoded):
-        raise MyAnimeListError("invalid_xml", "A MyAnimeList export declares no DOCTYPE")
     try:
-        root = ElementTree.fromstring(decoded)
+        root = ElementTree.fromstring(
+            decoded, parser=ElementTree.XMLParser(target=_RefuseDoctype())
+        )
     except ElementTree.ParseError as error:
         raise MyAnimeListError("invalid_xml", "The XML structure is malformed") from error
     if root.tag != "myanimelist":
@@ -180,40 +242,80 @@ def parse_myanimelist(data: bytes) -> list[dict[str, Any]]:
         raise MyAnimeListError("not_an_anime_export", "This export holds manga, not anime")
 
     records: list[dict[str, Any]] = []
+    seen: dict[str, int] = {}
     for row_number, anime in enumerate(root.findall("anime"), 1):
         errors: list[dict[str, str]] = []
         mal_id = _text(anime, "series_animedb_id")
-        if not mal_id.isdigit():
-            errors.append({"field": "series_animedb_id", "code": "required", "value": mal_id})
+        if not mal_id:
+            errors.append({"field": "series_animedb_id", "code": "required", "value": ""})
+        elif not mal_id.isdigit():
+            # `mal_identity` only merges on a numeric id, so a non-numeric one would be
+            # stored, never match another provider's row and never enrich.
+            errors.append(
+                {"field": "series_animedb_id", "code": "invalid_id", "value": mal_id[:50]}
+            )
             mal_id = ""
-        title = _text(anime, "series_title")
+        elif mal_id in seen:
+            # Not harmless. Commit resolves identity inside one session, so the second
+            # row would find the item the first created, see an entry already there and
+            # count itself `unchanged` — its score, dates and watch count discarded
+            # under a success. Better refused where a person can see it.
+            errors.append(
+                {"field": "series_animedb_id", "code": "duplicate_series_id", "value": mal_id}
+            )
+        else:
+            seen[mal_id] = row_number
+
+        title = " ".join(_text(anime, "series_title").split())
         if not title:
+            # A blank title fails `ImportService._validate`, which raises a 422 under a
+            # code outside this connector's vocabulary and takes every other row with
+            # it. A placeholder keeps one bad row a row problem.
             errors.append({"field": "series_title", "code": "required", "value": ""})
-        score = _integer(anime, "my_score", errors)
+            title = f"MyAnimeList {mal_id}" if mal_id else f"MyAnimeList row {row_number}"
+        elif len(title) > _MAX_TITLE:
+            errors.append({"field": "series_title", "code": "too_long", "value": title[:50]})
+            title = title[:_MAX_TITLE]
+
         shelves: list[str] = []
         for value in _text(anime, "my_tags").split(","):
-            # `shelf_slug` refuses a name with no letters or digits rather than
-            # returning an empty one, so a trailing comma is filtered before the call.
             if not value.strip():
                 continue
-            slug = shelf_slug(value.strip())
+            try:
+                slug = shelf_slug(value)
+            except ValueError:
+                # A tag of pure punctuation slugs to nothing and `shelf_slug` says so by
+                # raising. Skipped rather than reported: there was nothing in it to lose,
+                # and an uncaught one is a 500 rather than an import error.
+                continue
             if slug and slug not in shelves:
                 shelves.append(slug)
+
         records.append(
             {
                 "row_number": row_number,
                 "mal_id": mal_id or None,
                 "title": title,
                 "kind": _text(anime, "series_type") or None,
-                "episodes": _integer(anime, "series_episodes", errors),
-                # `0` is unrated on MyAnimeList, and unrated is not a score of zero.
-                "score": score or None,
+                # `0` is MyAnimeList's spelling of "still airing", and the domain
+                # declares `episodes` with a minimum of 1 — so a zero passed through
+                # raises `InvalidMetadata` and 422s the whole import.
+                "episodes": _integer(
+                    anime, "series_episodes", errors, minimum=1, maximum=_MAX_EPISODES
+                ),
+                # `0` is unrated on MyAnimeList, and unrated is not a score of zero —
+                # nor is it a mistake, so it becomes absence without a row error. `11`
+                # or `-1` is a mistake, and `ck_entries_score` would refuse it anyway.
+                "score": _integer(anime, "my_score", errors, maximum=_MAX_SCORE) or None,
                 # Nothing to double and nothing to mark: the scale is already 1-10.
                 "score_provisional": False,
                 "date_started": _date(anime, "my_start_date"),
                 "date_finished": _date(anime, "my_finish_date"),
-                "reread_count": _integer(anime, "my_times_watched", errors) or 0,
-                "progress": _integer(anime, "my_watched_episodes", errors),
+                "reread_count": _integer(anime, "my_times_watched", errors, maximum=_MAX_REWATCHES)
+                or 0,
+                # Deliberately not clamped to `episodes`: the total is for display and
+                # never a bound (DEC-092), and 20 of 170 is the entire point.
+                "progress": _integer(anime, "my_watched_episodes", errors, maximum=_MAX_PROGRESS),
                 "notes": _text(anime, "my_comments") or None,
                 "suggested_status": SUGGESTED_STATUS.get(_text(anime, "my_status")),
                 "shelves": shelves,
