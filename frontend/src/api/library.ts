@@ -68,6 +68,18 @@ export interface StatusSpec {
   hotkey: string | null;
 }
 
+/** How a domain counts progress, when that means something to it (DEC-077). */
+export interface ProgressSpec {
+  label: string;
+  unit_label: string;
+  /**
+   * A `number` metadata field on the item holding the total, for reading "20 / 170".
+   * Display only — never a bound, because a cached total goes stale and an airing
+   * series has none at all.
+   */
+  total_field: string | null;
+}
+
 export interface FormatSpec {
   value: EntryFormat;
   label: string;
@@ -90,6 +102,8 @@ export interface ItemType {
    * rewatches, not rereads. Partial — anything absent uses the neutral label below.
    */
   entry_field_labels: Record<string, string>;
+  /** How far through one of these you are, or `null` where that means nothing. */
+  progress: ProgressSpec | null;
   formats: FormatSpec[];
   /** The heading over the personal region of the detail page. */
   entry_panel_label: string;
@@ -144,6 +158,8 @@ export interface LibraryEntry {
   date_started: string | null;
   date_finished: string | null;
   reread_count: number;
+  /** `null` is *not recorded*, which is a different fact from a recorded `0`. */
+  progress: number | null;
   score_provisional: boolean;
   suggested_status: EntryStatus | null;
   item: LibraryItem;
@@ -221,6 +237,7 @@ export async function patchEntry(
       | "date_started"
       | "date_finished"
       | "reread_count"
+      | "progress"
     >
   > & { shelf_ids?: number[]; formats?: EntryFormat[] },
 ): Promise<LibraryEntry> {

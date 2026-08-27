@@ -180,3 +180,21 @@ test("the domain's own default status is what it opens on", async () => {
   // Not a literal `read`: the API refuses the other domain's default outright.
   expect(JSON.parse(bodies[0]).status).toBe("owned");
 });
+
+test("the add screen names the passage fields as the domain does", async () => {
+  // Sprint 038's deliverable 5 claimed the entry panel's last hardcoded book word and
+  // fixed the detail page and the opinion dialog only. This screen is the third render
+  // site and kept saying "Reread count" to every domain.
+  const anime = {
+    ...book,
+    id: "anime",
+    label: "Anime",
+    entry_field_labels: { reread_count: "Rewatches" },
+  } as unknown as ItemType;
+  renderForm({ itemType: "anime", itemTypes: [anime] });
+
+  expect(await screen.findByLabelText("Rewatches")).toBeInTheDocument();
+  expect(screen.queryByLabelText("Reread count")).toBeNull();
+  // The neutral two are right for a series and are left alone.
+  expect(screen.getByLabelText("Started")).toBeInTheDocument();
+});

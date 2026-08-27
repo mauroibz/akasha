@@ -78,6 +78,7 @@ const entry = {
   date_started: null,
   date_finished: null,
   reread_count: 0,
+  progress: null,
   score_provisional: false,
   suggested_status: null,
   item: {
@@ -959,5 +960,57 @@ describe("DetailPage", () => {
       within(dialog).queryByRole("textbox", { name: "New shelf name" }),
     ).toBeNull();
     expect(within(dialog).getByText("Format")).toBeVisible();
+  });
+
+  it("shows a progress count only where the domain declares one", async () => {
+    // DEC-077 shape (a). A book has no partial-progress concept, so the control is
+    // absent rather than rendered empty; an anime reads `20 / 170 episodes` from its
+    // own declaration plus the item's own metadata.
+    const anime = {
+      ...entry,
+      progress: 20,
+      item: { ...entry.item, type: "anime", metadata: { episodes: 170 } },
+    };
+    const types = [
+      {
+        ...itemTypes[0],
+        id: "anime",
+        label: "Anime",
+        entry_panel_label: "Your watch data",
+        progress: {
+          label: "Episodes watched",
+          unit_label: "episode",
+          total_field: "episodes",
+        },
+      },
+    ];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types") return new Response(JSON.stringify(types));
+      return new Response(JSON.stringify(anime));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    const fact = document.querySelector("[data-fact='progress'] dd");
+    expect(fact?.textContent).toBe("20 / 170 episodes");
+  });
+
+  it("offers no progress control to a domain that counts nothing", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
+      return new Response(JSON.stringify(entry));
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+
+    expect(document.querySelector("[data-fact='progress']")).toBeNull();
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /edit opinion/i }));
+    expect(screen.queryByLabelText(/episodes watched/i)).toBeNull();
   });
 });

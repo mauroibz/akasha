@@ -41,6 +41,7 @@ import {
   entryPanelLabel,
   formatLabels,
   hasEntryField,
+  progressFor,
   statusLabelFor,
 } from "@/features/library/labels";
 import type { EntryFieldName } from "@/features/library/labels";
@@ -216,6 +217,13 @@ export function DetailPage() {
   // The domain's own word for the field, not a book's (technical spec 6.6).
   const nameOf = (field: EntryFieldName) =>
     entryFieldLabel(item.type, itemTypes.data, field);
+  const progress = progressFor(item.type, itemTypes.data);
+  // The total is the item's own metadata and is often absent — an airing series has
+  // none — so the reading falls back to the bare count rather than "20 / —".
+  const progressTotal =
+    progress?.total_field != null
+      ? item.metadata[progress.total_field]
+      : undefined;
 
   async function handleDelete() {
     setDeleteError("");
@@ -374,6 +382,15 @@ export function DetailPage() {
                   {entry.reread_count}
                 </Fact>
               )}
+              {progress && (
+                <Fact name="progress" label={progress.label}>
+                  {entry.progress == null
+                    ? "—"
+                    : typeof progressTotal === "number"
+                      ? `${entry.progress} / ${progressTotal} ${progress.unit_label}s`
+                      : `${entry.progress} ${progress.unit_label}s`}
+                </Fact>
+              )}
               {/* Editable where it is read. The owner's complaint was distance:
                   shelf membership lived inside a dialog named after something
                   else, and creating a shelf was a whole route. */}
@@ -525,6 +542,15 @@ export function DetailPage() {
                   : {}),
                 ...(has("reread_count")
                   ? { reread_count: Number(values.reread_count || 0) }
+                  : {}),
+                // `""` is "not recorded" and must reach the server as null, while
+                // `"0"` is a recorded zero. `Number("")` is `0`, so the empty check
+                // comes first — the reread line above cannot be copied here.
+                ...(progress
+                  ? {
+                      progress:
+                        values.progress === "" ? null : Number(values.progress),
+                    }
                   : {}),
               }),
             )

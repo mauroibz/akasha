@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { entryFormats, entryStatuses, type ItemType } from "@/api/library";
 import {
   entryFieldLabel,
+  progressFor,
   fallbackStatuses,
   formatsFor,
   hasEntryField,
@@ -36,6 +37,7 @@ const registry: ItemType[] = [
     ],
     entry_panel_label: "Your reading data",
     entry_field_labels: { reread_count: "Rereads" },
+    progress: null,
     chooses_covers: true,
   },
   {
@@ -51,6 +53,7 @@ const registry: ItemType[] = [
     default_status: "owned",
     entry_fields: [],
     entry_field_labels: {},
+    progress: null,
     formats: [
       { value: "vinyl", label: "Vinyl" },
       { value: "cd", label: "CD" },
@@ -148,5 +151,42 @@ describe("entryFieldLabel", () => {
 
   it("still names the field when the registry never arrived", () => {
     expect(entryFieldLabel("book", undefined, "date_started")).toBe("Started");
+  });
+});
+
+describe("progressFor", () => {
+  const withProgress: ItemType[] = [
+    {
+      ...registry[0],
+      id: "anime",
+      label: "Anime",
+      progress: {
+        label: "Episodes watched",
+        unit_label: "episode",
+        total_field: "episodes",
+      },
+    },
+  ];
+
+  it("returns the domain's own declaration", () => {
+    expect(progressFor("anime", withProgress)).toEqual({
+      label: "Episodes watched",
+      unit_label: "episode",
+      total_field: "episodes",
+    });
+  });
+
+  it("returns null for a domain that counts nothing", () => {
+    expect(progressFor("book", registry)).toBeNull();
+    expect(progressFor("album", registry)).toBeNull();
+  });
+
+  it("returns null rather than guessing when the registry never arrived", () => {
+    // Deliberately unlike `hasEntryField` and `choosesCovers`, which fall back to the
+    // book shape so a missing registry never hides a reader's own data. There is no
+    // neutral progress concept to fall back *to*: an unlabelled number box is worse
+    // than no box for the moment before `/api/item-types` lands.
+    expect(progressFor("anime", undefined)).toBeNull();
+    expect(progressFor("nonesuch", registry)).toBeNull();
   });
 });

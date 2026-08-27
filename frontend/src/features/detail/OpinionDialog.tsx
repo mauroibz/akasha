@@ -9,6 +9,7 @@ import {
   entryFieldLabel,
   formatsFor,
   hasEntryField,
+  progressFor,
   statusesFor,
 } from "@/features/library/labels";
 import type { EntryFieldName } from "@/features/library/labels";
@@ -60,6 +61,10 @@ export function OpinionDialog({
       date_started: entry.date_started ?? "",
       date_finished: entry.date_finished ?? "",
       reread_count: String(entry.reread_count),
+      // `String(null)` renders the word "null" in the box, and `String(undefined)`
+      // renders "undefined" and makes the form permanently invalid — so the empty
+      // case is spelled out, loosely, and covers a response that omits the field.
+      progress: entry.progress == null ? "" : String(entry.progress),
       formats: entry.formats ?? [],
     },
   });
@@ -71,6 +76,7 @@ export function OpinionDialog({
   // The domain's own word for the field. An anime has rewatches, not rereads.
   const nameOf = (field: EntryFieldName) =>
     entryFieldLabel(entry.item.type, itemTypes.data, field);
+  const progress = progressFor(entry.item.type, itemTypes.data);
   const formats = formatsFor(entry.item.type, itemTypes.data);
 
   return (
@@ -199,6 +205,23 @@ export function OpinionDialog({
                   min="0"
                   className="h-11"
                   {...form.register("reread_count")}
+                />
+              )}
+            </Field>
+          )}
+          {progress && (
+            <Field
+              id="opinion-progress"
+              label={progress.label}
+              error={errors.progress?.message}
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  min="0"
+                  className="h-11"
+                  {...form.register("progress")}
                 />
               )}
             </Field>

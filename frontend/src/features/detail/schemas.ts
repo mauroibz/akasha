@@ -47,6 +47,14 @@ export const opinionSchema = z
     date_started: optionalIsoDate,
     date_finished: optionalIsoDate,
     reread_count: optionalNumber("Rereads must be between 0 and 9999", 0, 9999),
+    // Generous rather than tight: the total this counts towards is display only
+    // and a cached one goes stale, so the form must not refuse what the server
+    // accepts. `""` is allowed and means "not recorded" (DEC-077, Sprint 040).
+    progress: optionalNumber(
+      "That is not a whole number of episodes",
+      0,
+      99999,
+    ),
     // The union; which of them this entry may hold is its domain's business and is
     // enforced on the server against the item's own type (DEC-059).
     formats: z.array(z.enum(entryFormats)),

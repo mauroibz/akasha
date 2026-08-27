@@ -3,6 +3,7 @@ import type {
   EntryStatus,
   FormatSpec,
   ItemType,
+  ProgressSpec,
   SortKey,
   StatusSpec,
 } from "@/api/library";
@@ -166,6 +167,26 @@ export function entryFieldLabel(
     ? types.find((type) => type.id === itemType)?.entry_field_labels
     : undefined;
   return declared?.[field] ?? neutralEntryFieldLabels[field];
+}
+
+/**
+ * How this domain counts progress, or `null` where that means nothing (DEC-077).
+ *
+ * The fallback is deliberately **not** the book shape its neighbours here use.
+ * `hasEntryField` and `choosesCovers` assume a domain *has* the thing when the
+ * registry has not arrived, because guessing wrong there hides a reader's own data.
+ * There is no neutral progress concept to guess: without a declaration there is no
+ * label and no unit, and an unlabelled number box is worse than no box at all for
+ * the moment before `/api/item-types` lands.
+ */
+export function progressFor(
+  itemType: string,
+  types: ItemType[] | undefined,
+): ProgressSpec | null {
+  const declared = Array.isArray(types)
+    ? types.find((type) => type.id === itemType)?.progress
+    : undefined;
+  return declared ?? null;
 }
 
 /** Whether this domain offers the cover chooser at all (DEC-067 row 7). */
