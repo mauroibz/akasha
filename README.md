@@ -63,9 +63,10 @@ in case you need a safe place to store that PDF.
 **Import** brings in a Goodreads CSV export or a Calibre library. The screen has two
 steps: preview a source and commit it, then work through **Triage**, where committed
 rows land as `unsorted` — the ordinary library view hides those until you sort them.
-Score edits in Triage save immediately; status changes stay staged on their row until
-you apply or discard them, so nothing leaves the queue while you're still reading down
-the list.
+Score edits in Triage save immediately. Each row's status control shows the imported
+suggestion, or that domain's default when the source has none — Inbox is already implied
+by the screen. Change the target if needed, then apply that row from its check button;
+several changed targets can still be applied or discarded together from the staged bar.
 
 Calibre needs no mount: point it at your library folder and the browser reads it
 directly. Only the database and covers upload by default, which keeps the transfer

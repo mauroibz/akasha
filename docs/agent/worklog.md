@@ -2454,3 +2454,37 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   anime line's code, which is not on `main`, so it continues there unless the owner merges
   first.
 - Next: the owner's UX fix, then execute Sprint 042.
+
+## 2026-08-27 — Sprint 042 (complete; one decision per Triage row)
+
+- Done: inserted and completed the owner-directed Triage correction ahead of the already-planned
+  domain-contract sprint. Commit `c99aa23`. A row now displays explicit draft → importer suggestion
+  → domain default, offers only choosable statuses, has no duplicate suggestion chip, and applies
+  its displayed target from a check action at the row's right. Applying one row preserves unrelated
+  drafts; failure retains the attempted target for retry. DEC-095. Sprint 043 is ready.
+- TDD: the new real-flow browser case first failed because anime displayed `unsorted` rather than
+  `completed`. A second assertion exposed that the first row-Apply implementation cleared an
+  unrelated book draft; the mutation now clears only IDs it attempted. Focused Triage/accessibility:
+  **36 passed**.
+- Verified after implementation freeze: `make check` passed; `make test` passed **698 backend / 189
+  frontend**; full Playwright **105 passed / 2 skipped**. The first sandboxed `make test` advanced to
+  `test_export.py` and stopped with the documented TestClient signature; it was interrupted and the
+  prescribed outside-sandbox run passed 698 in 57.58 seconds. The first `make check` found only an
+  unformatted ignored walkthrough file; formatting it made the exact gate pass.
+- Walkthrough: fresh disposable data at `/tmp/akasha-s42-visual.v4vaHl`, 390×844. Imported the
+  owner's real 81-row MyAnimeList export and 18-book Calibre library through the UI: 99 unsorted.
+  `Akame ga Kill!` displayed Completed from its suggestion with no Inbox option or duplicate chip;
+  row Apply removed it. `Proyecto Hail Mary` displayed Read from the book default; changing it made
+  no request, Discard restored Read, and row Apply removed it. `Black Clover` changed from Dropped
+  to Watching and left only on page-level Apply. Exactly three status bulk requests occurred, no
+  row overflow at mobile width, and no console/page errors. Live `data/` was never opened for
+  writing. Background AniList requests succeeded while the disposable app was running.
+- Observed and left out of scope: with a search whose only matching row has just left, Triage says
+  `Inbox is clear` although unfiltered rows remain; and `Accept all suggested` stays visible on a
+  Calibre-only filtered result with no suggestion, where it would affect zero rows. Both pre-date
+  this sprint and belong to a later filtered-state/copy correction.
+- Deviations: no product or architecture deviation. The prior `1466208` rename had made room for
+  Sprint 042 but left state, roadmap, validator and the new sprint file inconsistent; the intended
+  owner-directed repair was unambiguous and was completed before implementation.
+- Next: Sprint 043, sharpening the domain contract. Its scope is unchanged from DEC-094 and has no
+  user-visible behavior or walkthrough gate.

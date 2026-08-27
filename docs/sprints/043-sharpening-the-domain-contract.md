@@ -1,6 +1,6 @@
 # Sprint 043 — Sharpening the domain contract
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 042
 **Roadmap revision:** 22
 
@@ -11,7 +11,8 @@ Nothing user-visible changes.
 
 ## Required context
 
-- `docs/decisions.md`: **DEC-094** (the retrospective this sprint implements), and the
+- `docs/decisions.md`: **DEC-094** (the retrospective this sprint implements), **DEC-095**
+  (the Triage sprint inserted ahead of this one), and the
   four it draws on — DEC-090, DEC-091, DEC-092, DEC-093. Also DEC-067 row 1 (the frozen
   vocabulary), DEC-057 and DEC-060 (what a domain declares about its entries), DEC-077.
 - `docs/guides/adding-a-domain.md` in full. **This sprint edits it, and the point is that

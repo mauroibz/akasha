@@ -3351,3 +3351,32 @@ instead and would very likely surface a different list. There is a real argument
 waiting for a second data point rather than optimising for what anime happened to hit; it
 was weighed and rejected, because items 1 to 3 record mistakes already made rather than
 predictions about mistakes to come.
+
+## DEC-095 — A Triage status control is the target, with its commit on the row
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Supersedes:** DEC-087's persisted-status reset point and page-toolbar-only commit;
+  preserves its staged multi-row apply, discard, partial-failure and window-virtualization
+  contracts. Extends DEC-085 and DEC-086's row-local/native-control decisions.
+- **Context:** The owner's first real anime triage exposed two slightly different mental
+  models in one row. Every entry displayed Inbox because that is its persisted status,
+  while anime also displayed a separate chip for the imported target. Calibre books had
+  no suggestion chip, so the owner had to replace Inbox manually, then move away from the
+  row to a sticky Apply bar. An untouched anime row whose target and score were already
+  correct had no one-row approval action at all. Inbox communicates nothing inside the
+  Inbox screen; the decision is where the entry should go.
+- **Decision:** A Triage row status select displays an explicit draft, otherwise the
+  importer's suggestion, otherwise the domain's declared `default_status`. It contains
+  only statuses the domain marks `choosable`; `unsorted` remains the persisted queue state
+  but is neither displayed nor offered. The separate suggestion chip is removed. A check
+  action at the row's right commits the displayed target through the existing grouped bulk
+  mutation, even if the owner never touched the select. Manual choices remain drafts, so
+  the existing sticky Apply/Discard surface still handles several decisions together.
+  Discard restores the suggestion/default. Applying one row clears only that attempted
+  row, not unrelated drafts; failure keeps the target ready to retry.
+- **Consequences:** Suggested anime and suggestion-less Calibre books now use one flow.
+  No domain name, backend route, API shape, schema or migration changes. The domain
+  registry already supplied both required facts (`default_status` and `choosable`). Plan
+  revision 22 inserts this as Sprint 042, moves the DEC-094 work unchanged to Sprint 043,
+  and moves `FINAL_SPRINT` from 42 to 43.

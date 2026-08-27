@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 22,
-  "project_status": "in_progress",
-  "active_sprint": "042",
-  "active_sprint_file": "docs/sprints/042-one-decision-per-triage-row.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "041",
+  "project_status": "ready",
+  "active_sprint": "043",
+  "active_sprint_file": "docs/sprints/043-sharpening-the-domain-contract.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "042",
   "completed_sprints": [
     "001",
     "002",
@@ -47,8 +47,9 @@
     "038",
     "039",
     "040",
-    "041"
+    "041",
+    "042"
   ],
-  "started_at": "2026-08-27T21:00:00-03:00",
-  "updated_at": "2026-08-27T21:00:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-27T19:22:10-03:00"
 }

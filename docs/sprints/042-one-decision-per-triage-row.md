@@ -1,6 +1,6 @@
 # Sprint 042 — One decision per Triage row
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 041
 **Roadmap revision:** 22
 
@@ -108,4 +108,32 @@ worklog. This sprint changes user-visible behavior, so the walkthrough gate appl
 
 ## Outcome
 
-_In progress._
+Completed 2026-08-27.
+
+- Every row now displays one destination: explicit draft, imported suggestion, then the row
+  domain's default. Only the domain's choosable statuses appear, so Inbox is neither repeated nor
+  offered, and the separate suggestion chip is gone (`c99aa23`).
+- A check action on the row commits the displayed target through the existing bulk endpoint. It
+  works without touching the select first, retains a failed target for retry and leaves drafts on
+  other rows untouched. The page-level grouped Apply/Discard path remains for several changes
+  (`c99aa23`).
+- Browser coverage proves anime suggestions, suggestion-less book defaults, one-click approval,
+  staging without a write, discard-to-target, retry after failure, mobile geometry, domain
+  vocabulary, explicit bulk actions, virtualization, motion and accessibility (`c99aa23`). README,
+  product/technical specs and DEC-095 record the final contract.
+
+Acceptance criteria 1–7 passed. Focused Playwright passed 36 cases. `make check` passed; `make test`
+passed 698 backend and 189 frontend tests; full Playwright passed 105 with 2 intentional skips. The
+first sandboxed `make test` stalled in `test_export.py` with the documented FastAPI TestClient
+signature; the prescribed outside-sandbox run completed the backend suite in 57.58 seconds.
+
+The realistic walkthrough used fresh disposable application data at 390×844, imported the owner's
+real 81-row MyAnimeList export and 18-book Calibre library through the browser, then exercised a
+99-row Inbox. Anime showed Completed from its suggestion; the Calibre book showed Read from the
+book default; neither offered Inbox or overflowed. Row Apply removed each intended row, Discard
+restored the default without a request, and page Apply committed a changed anime target. No console
+or page errors appeared; live application data was never opened for writing. Two pre-existing
+filtered-empty/bulk-copy rough edges are recorded in the worklog rather than pulled into scope.
+
+No backend, API, schema, migration or dependency changed. Sprint 043 is the unchanged domain-contract
+work originally planned as 042.
