@@ -2384,3 +2384,42 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   Goodreads CSV does not.
 - Next: Sprint 041, the MyAnimeList import — the last in the line. It writes a watched-episode count
   through `ImportEntry.values`, which all three `EntryRow` constructions now carry.
+
+## 2026-08-27 — Sprint 041 (complete; the anime line closed)
+
+- Done: the MyAnimeList connector, its registration, migration `0016` and two prerequisite
+  repairs. Commits `a738828`, `5b55e53`, `0d9b6a3`. DEC-093. Branch `sprint-038-anime`,
+  **unpushed and unmerged** — the merge is the owner's call at the line's close (DEC-053).
+- **The central criterion, answered precisely.** `api/imports.py`, `ImportPage.tsx` and
+  `TriagePage.tsx` were not touched at all; `application/imports.py` changed by eight lines and
+  that was the prerequisite repair. What did not hold was the schema: `ck_import_batches_kind` read
+  `kind IN ('goodreads','calibre')`, frozen in migration `0002` — `ck_entries_status`'s mistake one
+  table over, surviving because no connector had been added since. The first one to try passed
+  every application check and failed at commit. `0016` deletes it.
+- **A correction to Sprint 040.** Its Outcome and handoff both claimed `validate_progress` ran on
+  the import path. It did not — `validate_entry_fields` is a denylist over `PASSAGE_FIELDS`, so
+  `progress` passed through unchecked and reached the column unvalidated. Closed here with a test.
+- **Seven defects found after the first green run**, by adversarial review, none of them exercised
+  by the owner's own file: `series_episodes` of `0` (MyAnimeList's "still airing", which the domain
+  refuses with a minimum of 1), a blank title, out-of-range numbers that pass preview and raise an
+  IntegrityError mid-commit, a duplicate id counted as `unchanged` with its data discarded, a
+  half-known date like `2021-05-00` stored verbatim in a text column, a punctuation-only tag raising
+  a 500 out of `shelf_slug`, and a byte-scan DOCTYPE guard with a comment false positive. All
+  reproduced before being fixed. `goodreads.py` still shares two of them.
+- **Measured rather than assumed:** ElementTree on Python 3.12 expands internal entities, so billion
+  laughs is live and expands inside the parser where a decompression cap cannot reach it; external
+  entities are already refused. The guard is the parser's own `doctype` callback, so the test that
+  it fires is load-bearing. And `ImportInputSpec.max_bytes` is ignored for `kind="upload"` while
+  still being published to the client — the connector declares none and bounds its own gunzip at
+  8 MiB.
+- Verified: `make check` green. `make test` **698 backend / 189 frontend** (from 660/189).
+  Playwright **103 passed, 2 skipped**. One browser run reported 102 with no failure text and exit
+  code 0; the immediate re-run gave 103, matching every earlier run. Recorded rather than smoothed.
+- Walkthrough on a disposable directory with the owner's real gitignored export: 81 records
+  previewed with zero row errors and every measured count matching, 81 items and 81 `unsorted`
+  entries committed, Triage reading `Inbox 81 unsorted` in anime's own vocabulary, `Black Clover`
+  at 20 of 170, all 81 enriched from AniList with covers and studios, a re-upload replaying rather
+  than importing twice, and undo reversing a new batch completely. Live `data/` never opened for
+  writing — still 16 entries, no anime, no `progress` column.
+- Next: nothing numbered. The plan is complete through 041 and `state.json` is `complete`. The
+  branch holds four sprints and is the owner's to merge.

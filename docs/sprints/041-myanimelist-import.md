@@ -1,6 +1,6 @@
 # Sprint 041 — The MyAnimeList import
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 039, 040
 
 **Roadmap revision:** 20
@@ -231,4 +231,87 @@ second test batch and confirm it reverses cleanly. Record row counts observed, n
 
 ## Outcome
 
-_Not started._
+**Completed 2026-08-27** on branch `sprint-038-anime`. Commits `a738828` (prerequisite
+repairs), `5b55e53` (the connector, its registration and migration `0016`), `0d9b6a3`
+(hardening), and the closure commit. Recorded as **DEC-093**. This closes the anime line.
+
+### The central criterion, answered precisely
+
+**`api/imports.py`, `ImportPage.tsx` and `TriagePage.tsx` were not touched at all.** The
+tab, the connector's own guide, its help link, the drop zone, the preview list, commit,
+undo and the whole of Triage rendered a connector they had never heard of.
+`application/imports.py` changed by eight lines, and that was the prerequisite repair
+below rather than anything this connector needed.
+
+**One thing did not hold, and it was the schema.** `ck_import_batches_kind` read
+`kind IN ('goodreads','calibre')`, frozen in migration `0002` — exactly
+`ck_entries_status`'s mistake one table over, surviving only because no connector had been
+added since. The first one to try passed every application check and failed at commit.
+Migration `0016` deletes it, mirroring `0014`; `IMPORTERS` is the authority and is
+strictly stronger. So the honest answer is: **a connector cost one tuple entry plus one
+migration that existed only to remove a constraint that should never have been written.**
+
+### Acceptance criteria
+
+1. **Published from the registry** — `GET /api/importers` serves three connectors, the
+   third targeting `anime`, rendered with no frontend change.
+2. **Preview of the real 81-row export**: 81 records, **zero row errors**, and every
+   measured count matching — 74 completed / 6 dropped / 1 plan-to-watch, 3 rows with no
+   score, 5 with a finish date, 0 with a start date.
+3. **Commit** landed 81 items and 81 `unsorted` entries; Triage read `Inbox 81 unsorted`
+   and offered anime's own status vocabulary with none of the book words.
+4. **`Black Clover` reads 20 of 170**, dropped — the row Sprint 040 existed for.
+5. **Replay**: re-uploading the same file returned the same committed batch rather than
+   importing twice. **Undo**: a new batch reversed completely, progress included.
+6. **A manga export is refused** under `not_an_anime_export` with a user message and an
+   imperative action; malformed XML, a truncated gzip, a wrong root, a DOCTYPE and an
+   oversized decompression are each refused under a declared code.
+7. **Enrichment**: all 81 items filled from AniList — covers, years, studios, seasons,
+   genres and synopses, 81 cover files on disk — with no fetching by the connector.
+
+### Deviations, and a correction to Sprint 040
+
+- **`validate_progress` did not run on the import path.** Sprint 040's Outcome and handoff
+  both said it did. `validate_entry_fields` is a denylist over `PASSAGE_FIELDS`, so
+  `progress` passed straight through and reached the column unvalidated. Closed here.
+- **`missing_series_id` was dropped from the declared error vocabulary.** This file first
+  made it fatal; a single malformed row should not cost the other eighty, so it is a
+  row-level error like Goodreads' are.
+- **No `max_bytes` is declared.** The upload route ignores it and publishes it, so
+  declaring one would advertise a limit the server does not keep.
+- **`test_generic_imports.py` enumerated the published connectors** and would have failed
+  with no behaviour changing — the fourth instance of that defect class in four sprints.
+  Derived now.
+
+### Seven defects an adversarial review found after the first green run
+
+The connector passed its tests, imported all 81 rows and enriched them, and still held
+seven defects that the owner's own file does not exercise. Four would have aborted a whole
+import under a code no screen has copy for (`series_episodes` of `0`, which is
+MyAnimeList's "still airing"; a blank title; and out-of-range numbers, which pass preview
+and raise an `IntegrityError` mid-commit). Two lost data silently (a duplicate
+`series_animedb_id`, counted as `unchanged` with its score and watch count discarded; a
+half-known date like `2021-05-00` stored verbatim in a text column). One was a plain 500
+(`shelf_slug` raises on a tag of pure punctuation — and `goodreads.py` calls it unguarded
+to this day). All seven are reproduced in tests before they were fixed. **The lesson is in
+DEC-093: a reader tested only against the file in front of you is tested against one file.**
+
+### Verification
+
+- `make check` green. `make test` — **698 backend, 189 frontend** (from 660/189 at Sprint
+  040 closure). Playwright **103 passed, 2 skipped**.
+  *One run of the browser gate reported 102 passed with no failure text and exit code 0;
+  the immediate re-run gave 103, matching every previous run. Recorded rather than
+  smoothed over.*
+- Walkthrough against a disposable data directory and the owner's real gitignored export:
+  the numbers in criteria 2–7 above, plus 3 of 3 browser checks in
+  `frontend/e2e/scratchpad/myanimelist-walkthrough.spec.ts`. Live `data/` was never opened
+  for writing and still holds 16 entries and no anime.
+
+### Observed and left alone
+
+Watched-episode counts do not appear in Triage — it shows status, score and the suggested
+status for every domain. That matches the owner's Sprint 040 scoping and is worth living
+with before deciding it is wrong. And `goodreads.py` shares two of the defects repaired
+here (an unguarded `shelf_slug`, and a blank title left blank); neither is this sprint's
+to fix, and both are named in DEC-093.

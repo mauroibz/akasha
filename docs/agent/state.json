@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 20,
-  "project_status": "in_progress",
-  "active_sprint": "041",
-  "active_sprint_file": "docs/sprints/041-myanimelist-import.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "040",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "041",
   "completed_sprints": [
     "001",
     "002",
@@ -46,8 +46,9 @@
     "037",
     "038",
     "039",
-    "040"
+    "040",
+    "041"
   ],
-  "started_at": "2026-08-27T18:40:00-03:00",
-  "updated_at": "2026-08-27T18:40:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-27T19:30:00-03:00"
 }

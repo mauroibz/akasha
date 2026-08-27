@@ -2,7 +2,7 @@
 
 **Plan revision:** 20
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 041 — The MyAnimeList import
+**Active sprint:** none — the numbered plan is complete through Sprint 041
 
 ## Shape of the plan
 
@@ -36,7 +36,7 @@ Post-v1 work branches:
                                                   └─ 038 Anime: the third domain  ✓
                                                       ├─ 039 Enrichment beyond the ISBN  ✓
                                                       └─ 040 Entry progress  ✓
-                                                           └─ 041 The MyAnimeList import
+                                                           └─ 041 The MyAnimeList import  ✓
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -54,6 +54,15 @@ other two precede it.
 
 Anime is therefore **no longer an unnumbered epic**. Games, series and the Spotify connector remain
 so, and are named under [Future epics](#future-epics-after-this-plan).
+
+**The line closed on 2026-08-27 and the trial run returned a verdict.** Both halves of the domain
+contract were built by a session that did not write them. The domain half held outright; the
+connector half held in code — `api/imports.py` and both import screens were never touched — and
+failed once in the schema, on a frozen `kind IN ('goodreads','calibre')` that migration `0016`
+deleted. Adding a domain cost about 45 lines of shared registration; adding a connector cost one
+tuple entry and one migration whose only purpose was removing a constraint that should not have
+existed. Everything else the line spent went on two seams the owner's export forced, both of which
+earlier decisions had already foreseen and priced (DEC-090, DEC-091, DEC-092, DEC-093).
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -111,7 +120,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [038](038-anime-domain.md) | Anime: the third domain | 037 | completed |
 | [039](039-enrichment-beyond-isbn.md) | Enrichment beyond the ISBN | 038 | completed |
 | [040](040-entry-progress.md) | Entry progress | 038 | completed |
-| [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | ready |
+| [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | completed |
 
 ## Sprint contracts
 

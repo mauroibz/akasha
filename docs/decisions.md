@@ -3178,3 +3178,102 @@ Reviewing 038 and 039 before planning this sprint found that its deliverable 5 c
 `AddForm.tsx` still spelled `Started`, `Finished` and `Reread count` verbatim, so adding
 an anime by hand said "Reread count" where the detail page said "Rewatches". Repaired as
 a prerequisite defect, per AGENTS.md.
+
+## DEC-093 — The connector boundary held, and the one thing that stopped it was a frozen list
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-076 and DEC-078 (importers normalize once; the shared
+  pipeline validates and commits), DEC-079 and DEC-080 (self-describing connectors),
+  DEC-067 row 1 (`ck_entries_status`, the mistake this repeats one table over),
+  DEC-088–DEC-092 (the rest of the anime line), DEC-089 (the four-sprint plan).
+- **Context:** Sprint 041 is the last of the anime line and the test of the *connector*
+  half of `docs/guides/adding-a-domain.md`, the way Sprint 038 tested the domain half.
+  The guide promises an importer is "another object in that same directory plus one
+  registry tuple entry; it does not change the shared pipeline." A MyAnimeList reader
+  targeting anime was written against that promise by a session that did not write the
+  pipeline.
+
+### The promise held in code and failed in the schema
+
+`api/imports.py`, `ImportPage.tsx` and `TriagePage.tsx` were **not touched at all**. The
+tab, the guide, the help link, the drop zone, the preview list, commit, undo and the
+whole of Triage rendered a connector they had never heard of. `application/imports.py`
+changed by eight lines, and that was a pre-existing repair rather than anything this
+connector needed.
+
+**What did not hold was `ck_import_batches_kind`.** Migration `0002` wrote
+`CHECK (kind IN ('goodreads','calibre'))` and froze it there. It is exactly
+`ck_entries_status`'s mistake one table over, and it survived because no connector had
+been added since — the first one to try failed at commit with
+`CHECK constraint failed: ck_import_batches_kind`, after passing every application check.
+
+Migration `0016` drops it, mirroring `0014`. `IMPORTERS` is the authority and is strictly
+stronger: the route resolves a name against the registry and answers 404 for anything it
+does not hold, which the constraint could never express — it could only carry whichever
+names existed the day it was written, and it happily admitted `calibre` on a row an anime
+connector produced. `uq_import_batch_input` stays, because `(kind, fingerprint)` is a real
+invariant rather than a frozen list.
+
+**So the honest verdict is: adding a connector cost one tuple entry and one migration on a
+shared table, and the migration existed only to delete a constraint that should never have
+been written.** The guide is corrected rather than the promise weakened.
+
+### Seven defects the owner's own file would never have found
+
+The connector passed its first tests, imported all 81 rows and enriched them. An
+adversarial review then found seven ways it would have failed on a *different* export,
+each reproduced before it was fixed. They are recorded because the shape is the lesson:
+**a reader tested only against the file in front of you is tested against one file.**
+
+Four would have aborted the whole import under `invalid_import_record`, a code outside
+the connector's declared vocabulary that no screen has copy for:
+
+- **`series_episodes` of `0`** — MyAnimeList's spelling of "still airing", and the domain
+  declares `episodes` with a minimum of 1. Every row in the owner's file has a real count,
+  so this ships the day he adds a currently-airing show.
+- **A blank `series_title`**, which fails the shared validator's own check.
+- **Out-of-range numbers**, which are worse: `ck_entries_score` and `ck_entries_progress`
+  pass preview and raise an `IntegrityError` at commit, half way through the batch.
+
+Two lost data in silence: a **duplicate `series_animedb_id`** would have found the item the
+first row created, seen an entry already there and counted itself `unchanged` — its score,
+dates and watch count discarded under a success — and a **half-known date** like
+`2021-05-00`, which MyAnimeList writes for a date it partly knows, would have been stored
+verbatim in a text column with no CHECK and read as a date thereafter. One was a plain
+500: `shelf_slug` raises on a tag of pure punctuation, and the Goodreads reader calls it
+unguarded to this day.
+
+### Two things measured rather than assumed
+
+- **ElementTree expands internal entities on Python 3.12**, so billion laughs is live. It
+  expands *inside the parser*, where a decompression ceiling cannot reach it. External
+  entities and external DTDs are already ignored, so there is no file disclosure. The
+  whole exposure is inside a `<!DOCTYPE`, and the guard is the parser's own `doctype`
+  callback rather than a scan of the bytes — a scan refuses a legitimate file whose
+  *comment* mentions one and misses a real declaration in any encoding it cannot read.
+  Because it is a callback the standard library chooses to invoke, **the test that it
+  fires is load-bearing**.
+- **The upload route caps the body at 5 MiB of *compressed* bytes and never consults
+  `ImportInputSpec.max_bytes`**, while publishing that value to the client. Deflate
+  reaches about 1,000:1, so the route's cap bounds nothing. The connector declares no
+  `max_bytes` — advertising a limit the server does not keep is worse than declaring none
+  — and defends itself with an 8 MiB ceiling on the decompressed stream, read
+  incrementally rather than through `gzip.decompress`.
+
+### A re-import adds and does not update
+
+Confirmed against `repositories.py`: a matched entry is linked and skipped entirely, so a
+fresher export never updates a stale watched-episode count. That is the invariant working
+as designed, and the owner settled it at planning time. **The limit is written into the
+connector's own guide text**, so it is read on the import screen before uploading rather
+than discovered afterwards.
+
+### What the walkthrough showed
+
+The owner's real export: 81 records previewed with zero row errors and every measured
+count matching (74/6/1 across the three statuses present, 3 unscored, 5 finish dates, 0
+start dates); 81 items and 81 `unsorted` entries committed; all 81 enriched from AniList
+with covers, years, studios and synopses; `Black Clover` reading 20 of 170; re-uploading
+the same file replaying rather than importing twice; and undo reversing a new batch
+completely, progress included.

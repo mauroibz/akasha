@@ -17,6 +17,11 @@ explicit registration points. It does not touch another domain's files, and it d
 database migration.** An optional importer is another object in that same directory plus one
 registry tuple entry; it does not change the shared pipeline.
 
+**Both halves have now been built by somebody who did not write the contract.** The domain half held
+(§3's closing note); the connector half held in code — `api/imports.py` and both screens were not
+touched at all — and failed once in the schema, on a frozen list that has since been deleted
+(DEC-093). Neither promise is aspirational any more, and neither is unqualified.
+
 ---
 
 ## 1. What you are plugging into
@@ -434,6 +439,29 @@ the 24-hour undo window, optional post-commit source files, and enrichment only 
 domain declares it. The registry response publishes the application's attachment cap for clients
 that can refuse an oversize file before sending it.
 
+**Test your reader against a file you did not write.** Sprint 041's connector passed its first
+tests, imported all 81 rows of the owner's real export and enriched them — and still held seven
+defects, four of which would have aborted a whole import under a code no screen has copy for
+(DEC-093). The owner's file exercised none of them. In particular, before you emit a value:
+
+- **a metadata field with a `minimum` will refuse a source's zero**, and `validate_metadata_patch`
+  runs over every record before anything is staged, so one row takes the file with it;
+- **the `entries` CHECK constraints are downstream of you and nothing re-checks between** — an
+  out-of-range score or a negative count passes preview and raises an `IntegrityError` at commit,
+  half way through the batch;
+- **a blank title fails the shared validator** the same way;
+- **a repeated identity silently loses the second row**, which commit counts as `unchanged`;
+- and **`shelf_slug` raises** on a tag with no letters or digits rather than returning nothing.
+
+Prefer a row-level error to a fatal one: put the complaint in the record's `errors` and let the row
+through, so one bad row costs a row rather than the file. Reserve raising for a file that is the
+wrong file.
+
+**If your source is compressed, the route does not protect you.** The upload cap is on *compressed*
+bytes and `ImportInputSpec.max_bytes` is ignored for `kind="upload"` — it is published to the client
+but never enforced, so declaring one advertises a limit the server does not keep. Bound the
+decompressed stream yourself, incrementally.
+
 Add parser/adapter fixtures for the source itself and a generic route round-trip. Do not edit the
 shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
 will reject a missing protocol member, an unknown target domain, empty identity kinds, a misplaced
@@ -682,7 +710,7 @@ cite it as measurement; it carries its own list of what to verify first.
 | `domain/importers.py` | The `Importer` protocol and neutral import snapshot/record shapes |
 | `domains/book/` | Books: declaration, Open Library and Google Books adapters, Goodreads and Calibre importers |
 | `domains/album/` | Albums: declaration, MusicBrainz and Cover Art Archive adapter |
-| `domains/anime/` | Anime: declaration, AniList and Kitsu adapters |
+| `domains/anime/` | Anime: declaration, AniList and Kitsu adapters, MyAnimeList importer |
 | `infrastructure/providers.py` | The shared HTTP boundary only: `bounded_json`, `parse_year`, retry policy, the client |
 | `backend/tests/test_domain_conformance.py` | The suite every domain passes by existing |
 | `backend/tests/fixtures/providers/` | Pinned real provider responses. **Never re-record one to make a test pass** |
