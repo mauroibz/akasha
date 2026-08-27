@@ -225,3 +225,53 @@ class TestBothAdaptersAgree:
                 "airing_status",
                 "synopsis",
             }
+
+
+class TestFetchByIdentifier:
+    """Sprint 039: the interface background enrichment asks through.
+
+    It replaced `fetch_by_isbn` as the enrichment entry point, because a domain's
+    enrichment key is the domain's to name (DEC-067 row 3). Both anime adapters answer
+    `mal`, which is the key `domains/anime` declares.
+    """
+
+    async def test_anilist_answers_a_myanimelist_id(self) -> None:
+        payload = await anilist(CHAINSAW_ROUTE).fetch_by_identifier("mal", "44511")
+        assert payload.title == "Chainsaw Man"
+        assert payload.identifiers == {"mal": "44511"}
+
+    async def test_kitsu_answers_a_myanimelist_id(self) -> None:
+        """Kitsu reaches it in two requests: the mapping, then the record.
+
+        Nested includes are refused with a 400 (measured 2026-08-27), so the mapping
+        alone carries no studios or genres — and those are two of the three fields
+        anime judges completeness by, so a one-request answer would leave every
+        record looking incomplete for ever. Kitsu is the fallback provider, so the
+        second request is only ever paid when AniList has already failed.
+        """
+        routes = {
+            "/api/edge/mappings": (200, recording("kitsu_mappings_mal_22199.json")),
+            "/api/edge/anime/8270": (200, recording("kitsu_anime_8270_akame.json")),
+        }
+        seen: list[httpx.Request] = []
+        payload = await kitsu(routes, on_request=seen.append).fetch_by_identifier("mal", "22199")
+        assert payload.creators == ("White Fox",)
+        assert "Action" in payload.metadata["genres"]
+        assert payload.title == "Akame ga Kill!"
+        assert payload.source_id == "8270"
+        assert payload.identifiers == {"mal": "22199"}
+        assert seen[0].url.params["filter[externalSite]"] == "myanimelist/anime"
+        assert seen[0].url.params["filter[externalId]"] == "22199"
+
+    async def test_a_kind_the_adapter_does_not_answer_is_refused(self) -> None:
+        """A domain naming a key its providers cannot answer is a wiring mistake, and
+        it must surface as a typed provider error rather than a wrong lookup."""
+        for provider in (anilist(AKAME_ROUTE), kitsu(KITSU_FETCH)):
+            with pytest.raises(ProviderPayloadError) as caught:
+                await provider.fetch_by_identifier("isbn", "9788437604572")
+            assert caught.value.code == "unsupported_identity_kind"
+
+    async def test_a_mal_id_that_resolves_to_nothing_is_refused(self) -> None:
+        routes: dict[str, object] = {"/api/edge/mappings": (200, {"data": []})}
+        with pytest.raises(ProviderPayloadError):
+            await kitsu(routes).fetch_by_identifier("mal", "99999999")

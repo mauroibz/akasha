@@ -371,6 +371,21 @@ class OpenLibraryProvider:
             )
         return await self._edition_payload(row, key.removeprefix("/books/"), isbn)
 
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        """Background enrichment's entry point (DEC-067 row 3).
+
+        Books' declared key is `isbn`, so this is `fetch_by_isbn` under the name the
+        shared layer knows. The word "ISBN" stays here, in the domain that owns it:
+        the enrichment layer used to say it, and that is what stopped every other
+        domain from enriching at all.
+        """
+        if kind != "isbn":
+            raise ProviderPayloadError(
+                f"Open Library cannot look a record up by {kind!r}",
+                code="unsupported_identity_kind",
+            )
+        return await self.fetch_by_isbn(value)
+
     async def work_id(
         self,
         edition_id: str,
@@ -578,3 +593,18 @@ class GoogleBooksProvider:
                 code="edition_unverified",
             )
         return ItemPayload(**candidate.__dict__, edition_match=match)
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        """Background enrichment's entry point (DEC-067 row 3).
+
+        Books' declared key is `isbn`, so this is `fetch_by_isbn` under the name the
+        shared layer knows. The word "ISBN" stays here, in the domain that owns it:
+        the enrichment layer used to say it, and that is what stopped every other
+        domain from enriching at all.
+        """
+        if kind != "isbn":
+            raise ProviderPayloadError(
+                f"Google Books cannot look a record up by {kind!r}",
+                code="unsupported_identity_kind",
+            )
+        return await self.fetch_by_isbn(value)

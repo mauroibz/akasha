@@ -343,6 +343,19 @@ class AniListProvider:
             raise ProviderPayloadError("AniList returned a record with no usable title")
         return ItemPayload(**vars(candidate))
 
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        """Background enrichment's entry point (DEC-067 row 3).
+
+        Anime's declared key is `mal`, and AniList resolves it directly through
+        `Media(idMal:)` — no mapping hop, which is one reason it is the primary.
+        """
+        if kind != "mal":
+            raise ProviderPayloadError(
+                f"AniList cannot look a record up by {kind!r}",
+                code="unsupported_identity_kind",
+            )
+        return await self.fetch(f"{MAL_PREFIX}{value}")
+
 
 class KitsuProvider:
     """Kitsu's JSON:API. The second source, and the hedge behind AniList (DEC-088)."""
@@ -537,3 +550,39 @@ class KitsuProvider:
         if candidate is None:
             raise ProviderPayloadError("Kitsu returned a record with no usable title")
         return ItemPayload(**vars(candidate))
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        """Background enrichment's entry point, in two requests.
+
+        Kitsu keys its own records by its own id, so a MyAnimeList id is resolved
+        through `mappings` first. Nested includes are refused with a 400 (measured
+        2026-08-27), so the mapping response cannot carry the studios and genres the
+        record needs — and two of anime's three completeness fields are exactly those,
+        so a one-request answer would leave every record looking incomplete for ever.
+        Kitsu is the fallback provider, so the second request is only ever paid once
+        AniList has already failed.
+        """
+        if kind != "mal":
+            raise ProviderPayloadError(
+                f"Kitsu cannot look a record up by {kind!r}",
+                code="unsupported_identity_kind",
+            )
+        body = await self._json(
+            "/mappings",
+            {
+                "filter[externalSite]": "myanimelist/anime",
+                "filter[externalId]": value,
+                # Without this the relationship carries links and no id, so the record
+                # could not be reached at all.
+                "include": "item",
+            },
+        )
+        rows = body.get("data")
+        mapping = rows[0] if isinstance(rows, list) and rows else None
+        related = self._related(mapping, "item") if isinstance(mapping, Mapping) else []
+        if not related:
+            raise ProviderPayloadError(
+                f"Kitsu has no record mapped to MyAnimeList id {value}",
+                code="record_not_found",
+            )
+        return await self.fetch(related[0])

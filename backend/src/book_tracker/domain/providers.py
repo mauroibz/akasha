@@ -1,7 +1,7 @@
 from collections import Counter
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Protocol
+from typing import Any, Protocol, runtime_checkable
 
 from book_tracker.domain.normalization import normalize_text
 
@@ -56,6 +56,30 @@ class Provider(Protocol):
     async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]: ...
 
     async def fetch(self, source_id: str) -> ItemPayload: ...
+
+
+@runtime_checkable
+class EnrichingProvider(Protocol):
+    """A provider that can answer background enrichment by a stored identifier.
+
+    Separate from `Provider` for the reason `BrowsableImporter` is separate from
+    `Importer`: a domain that declares no enrichment needs none of this, and folding it
+    in would make every future adapter implement a method it has no use for.
+
+    This replaced `fetch_by_isbn` as the interface enrichment asks through (DEC-067
+    row 3). `fetch_by_isbn` survives on the book adapters because the *add* path
+    genuinely resolves a typed ISBN, which is a book's business and not a shared one;
+    what could not survive was the enrichment layer knowing that word.
+
+    `kind` is the domain's declared `EnrichmentSpec.identity_kind`. A provider handed a
+    kind it does not answer raises `ProviderPayloadError(code="unsupported_identity_kind")`
+    rather than guessing: a domain naming a key its providers cannot answer is a wiring
+    mistake, and a wrong lookup would fill a record with somebody else's data.
+    """
+
+    name: str
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload: ...
 
 
 @dataclass(frozen=True)
