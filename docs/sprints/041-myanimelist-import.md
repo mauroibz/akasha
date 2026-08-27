@@ -1,6 +1,6 @@
 # Sprint 041 — The MyAnimeList import
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 039, 040
 
 **Roadmap revision:** 20
@@ -73,17 +73,28 @@ class MyAnimeListImporter:
     item_type = DOMAIN.item_type
     input = ImportInputSpec(kind="upload", label="MyAnimeList export", field="file", ...)
     identity_kinds = frozenset({"mal"})
-    error_codes = frozenset({
-        "invalid_xml", "not_an_anime_export", "missing_series_id", "export_too_large",
-    })
+    error_codes = frozenset({"invalid_xml", "not_an_anime_export", "export_too_large"})
 ```
 
 - **`read` accepts gzip and plain XML**, sniffing the magic bytes rather than trusting the filename,
   because MyAnimeList serves the export gzipped and a reader may or may not have unpacked it.
-- **A decompression bound.** A 3 KB gzip is not the worst case a LAN with no auth can post. Cap the
-  decompressed size explicitly and raise `export_too_large` rather than streaming it into memory.
-  Declare `max_bytes` on the input honestly.
-- XML parsed defensively: no external entity resolution, no DTD.
+- **A decompression bound.** A 3 KB gzip is not the worst case a LAN with no auth can post, and the
+  owner's own file expands **25x**. Read through `gzip.GzipFile` in chunks against a **32 MiB**
+  ceiling — about 34,000 entries at the measured 965 bytes/row — and raise `export_too_large`.
+  Never `gzip.decompress`, which is unbounded.
+- **`max_bytes` is deliberately not declared.** The upload route hard-caps at `MAX_IMPORT_BYTES`
+  (5 MiB) with a hardcoded message and never consults `spec.max_bytes`, while the declared value
+  *is* published to the client — so declaring one would advertise a limit the server does not honour.
+- **A `<!DOCTYPE` is refused before parsing.** Measured on this build's Python 3.12:
+  `ElementTree` **expands internal entities**, so billion laughs is live, and it expands in-parser
+  where the size cap above cannot reach it. External entities are already refused, so there is no
+  file disclosure. The real export carries no DOCTYPE, so a flat refusal costs nothing.
+  No new dependency: `defusedxml` is not a dependency and one line of stdlib beats adding one.
+- **A bad row is a row error, not a fatal one.** Only a wrong *file* aborts: not gzip and not XML,
+  a root that is not `myanimelist`, a DOCTYPE, a manga export, or the size breach. A missing or
+  non-numeric `series_animedb_id` lands in that record's `errors` list the way Goodreads' do, so
+  one malformed row does not cost the other eighty. This replaces the `missing_series_id` code
+  this file first named.
 - `user_export_type == 2` raises `not_an_anime_export` with an `action` naming the next move —
   DEC-080's point is that `action` is the only part a person can act on.
 - Normalization, per row:
@@ -133,7 +144,9 @@ item rather than a batch, which is a thing to observe rather than assume.
 
 ### 5. Fixtures, and the owner's file
 
-- A trimmed, anonymised fixture at `backend/tests/fixtures/imports/myanimelist_sample.xml.gz`:
+- A trimmed, anonymised fixture at `backend/tests/fixtures/imports/myanimelist_sample.xml`, held
+  as **plain XML rather than gzipped** so it is readable in a diff; the test gzips it in memory,
+  which exercises the sniffing path and proves both branches from one file. It holds:
   eight rows covering every status in the map, a `0` score, an all-zero date, a real finish date, a
   partial watch count, a row with tags, and a row with a comment. `myinfo` stripped of `user_id` and
   `user_name`.

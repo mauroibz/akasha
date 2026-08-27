@@ -113,9 +113,14 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
 
     assert response.status_code == 200
     published = response.json()
-    assert [row["id"] for row in published] == ["goodreads", "calibre"]
+    # Derived, not spelled. This asserted `["goodreads", "calibre"]` and would have
+    # failed the moment a third connector registered, with no behaviour changing — the
+    # fourth instance of that defect class in four sprints (DEC-090, DEC-091, DEC-092).
+    from book_tracker.domain.registry import IMPORTERS
 
-    goodreads, calibre = published
+    assert [row["id"] for row in published] == list(IMPORTERS)
+
+    goodreads, calibre = published[0], published[1]
     assert goodreads["input"]["kind"] == "upload"
     assert goodreads["input"]["accept"] == ".csv,text/csv"
     assert goodreads["input"]["browsable"] is False
@@ -1092,3 +1097,44 @@ def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) ->
     statements.clear()
     assert repository.attached("calibre_uuid", values) == {}
     assert len(statements) == 3, statements
+
+
+@pytest.mark.anyio
+async def test_the_import_path_refuses_a_progress_the_domain_does_not_record(
+    tmp_path: Path,
+) -> None:
+    """Sprint 040 wired the write and not the guard, and said otherwise.
+
+    `validate_entry_fields` is a *denylist* over `PASSAGE_FIELDS`, so `progress` — which
+    is deliberately not one of them — passed straight through it. The value reached the
+    column unvalidated: a domain declaring no `ProgressSpec` could be given one, and a
+    negative would be stored, where the PATCH and add paths refuse both.
+    """
+    from book_tracker.application.imports import ImportService
+    from book_tracker.application.library import LibraryError
+    from book_tracker.domain.importers import ImportEntry, ImportItem, NormalizedImportRecord
+    from book_tracker.domain.registry import IMPORTERS
+
+    def record(item_type_progress: int | None) -> NormalizedImportRecord:
+        return NormalizedImportRecord(
+            row_number=2,
+            item=ImportItem(title="Rayuela", subtitle=None, year=None, identifiers={}, metadata={}),
+            entry=ImportEntry(
+                score=None,
+                notes=None,
+                date_added=None,
+                values={"progress": item_type_progress},
+            ),
+            shelves=(),
+            errors=(),
+            source_fields={},
+        )
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        # Goodreads targets books, and a book records no progress at all.
+        service = ImportService(app.state.engine, tmp_path, tmp_path, IMPORTERS["goodreads"])
+        with pytest.raises(LibraryError) as refused:
+            service._validate(record(3))
+    assert refused.value.status_code == 422
+    assert "progress" in str(refused.value).lower() or "Book" in str(refused.value)

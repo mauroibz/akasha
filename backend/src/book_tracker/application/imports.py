@@ -21,9 +21,11 @@ from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import (
     InvalidEntryField,
     InvalidMetadata,
+    InvalidProgress,
     InvalidStatus,
     validate_entry_fields,
     validate_metadata_patch,
+    validate_progress,
     validate_status,
 )
 from book_tracker.infrastructure.covers import CoverError, install_cover
@@ -153,9 +155,14 @@ class ImportService:
         try:
             validate_metadata_patch(self.domain, record.item.metadata)
             validate_entry_fields(self.domain, record.entry.values)
+            # `validate_entry_fields` is a denylist over `PASSAGE_FIELDS`, and `progress`
+            # is deliberately not one of them — so it passed straight through here and
+            # reached the column unvalidated. Sprint 040 wired the write and not this.
+            if "progress" in record.entry.values:
+                validate_progress(self.domain, record.entry.values["progress"])
             if record.entry.suggested_status is not None:
                 validate_status(self.domain, record.entry.suggested_status)
-        except (InvalidMetadata, InvalidEntryField, InvalidStatus) as error:
+        except (InvalidMetadata, InvalidEntryField, InvalidProgress, InvalidStatus) as error:
             raise LibraryError(
                 "invalid_import_record",
                 str(error),
