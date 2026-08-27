@@ -176,7 +176,7 @@ DOMAIN = Domain(
     entry_fields=frozenset(),       # which passage fields you have: none, for an album
     formats=ALBUM_FORMATS,          # how a copy is held
     entry_panel_label="Your copy",  # the heading over the personal region
-    enriches=False,                 # background enrichment: see §6
+    enrichment=None,                # background enrichment: see §6
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,           # the cover chooser: see §5
 )
@@ -580,17 +580,63 @@ without reading that entry:
 
 ---
 
-## 6. One thing that is not solved yet
+## 6. Background enrichment, if your domain needs it
 
-Read these before you design around them.
+This section used to say the seam was unbuilt and that you should declare `enriches=False` and move
+on. **Sprint 039 built it** against anime's real case, which is what DEC-067 row 3 said it was
+waiting for. Enrichment is a declaration like everything else now.
 
-**Background enrichment is ISBN-keyed.** `Domain.enriches` is a real switch — a domain that declares
-`False` is queued no jobs — but everything behind it (`_backfillable_items`, `_fetch`,
-`PROVIDER_ORDER`) assumes an ISBN and books' provider order. **No domain has ever exercised that
-seam**: albums declare `False` because one MusicBrainz fetch returns everything an album has. If your
-domain genuinely needs background enrichment on another key, that is the point at which the seam gets
-built properly, with your real case to design against (DEC-067 row 3). Declare `enriches=False` and
-say so in your sprint or issue.
+**What it is for.** An item added interactively arrives complete — you searched, you picked a result,
+the adapter fetched the record. An **imported** one usually does not: a Goodreads row is little more
+than an ISBN, and a MyAnimeList row is an id, a title, a type and an episode count. The cover, the
+creators and the description have to be fetched afterwards, by a background job, without overwriting
+anything the owner has touched (DEC-008).
+
+If your domain has no importer, or its importer's rows arrive complete, declare `enrichment=None` and
+skip the rest of this section. That is albums' answer and a complete one: a single MusicBrainz
+release fetch already returns everything an album has.
+
+```python
+ANIME_ENRICHMENT = EnrichmentSpec(
+    identity_kind="mal",                     # the item_identifiers.kind to look up by
+    provider_order=("anilist", "kitsu"),     # who to ask, in order
+    completeness_fields=("creators", "genres", "synopsis"),  # what "still thin" means
+)
+```
+
+All three are per-domain because all three used to be books'. The third is the subtle one, so it is
+worth saying what each does:
+
+- **`identity_kind`** is the `item_identifiers.kind` the lookup is keyed on. An item carrying no
+  identifier of this kind is never queued, because there is nothing to look it up by. Your importer's
+  `identity_kinds` and this value are usually the same word, and should be.
+- **`provider_order`** is which adapters are asked and in what order. The first usable payload wins.
+  A provider that is not wired contributes a sentence to the reason recorded on the job rather than
+  being skipped in silence, so a missing key reads as a missing key.
+- **`completeness_fields`** are the metadata fields whose absence means the record is still worth a
+  lookup. **They must be fields your domain declares** — conformance refuses anything else, because a
+  name your domain never stores is always absent, so every record would look incomplete for ever and
+  be re-queued on every backfill. That is not hypothetical: the rule was `publisher`, `page_count`
+  and `description` for *every* domain until Sprint 039, and an anime has none of the three.
+
+  Choose fields a complete record really has. `season` and `episode_minutes` are legitimately absent
+  from plenty of anime, so naming them would re-queue those rows for ever — the same bug in a subtler
+  hat. A missing cover or year already counts in every domain and is not something you declare.
+
+**Your adapter implements `EnrichingProvider`**, which is one method:
+
+```python
+async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload: ...
+```
+
+Raise `ProviderPayloadError(code="unsupported_identity_kind")` for a kind you do not answer rather
+than guessing — a domain naming a key its providers cannot answer is a wiring mistake, and a wrong
+lookup fills a record with somebody else's data. `test_enrichment_pipeline.py` asserts that every
+enriching domain's `provider_order` names adapters this build actually constructs and that each one
+can answer, because the conformance suite has no provider catalog and cannot see that.
+
+**Two things the shared pipeline still owns**, and you do not: the fill-empty-only rule, and the
+ledger effect that makes an enrichment undoable along with the import that queued it.
 
 ---
 
@@ -606,7 +652,7 @@ available example of what "planning a domain" looks like here. In short:
 | Metadata | Platforms, genres, summary, release year all fit existing field types. **No new seam.** |
 | Covers | One allowlist entry for `images.igdb.com`. **No new seam.** |
 | Statuses | Games want `playing` and a backlog. That is the vocabulary working as designed. **No new seam.** |
-| Enrichment / add-by-URL | One query returns everything; `enriches=False`. **No new seam.** |
+| Enrichment / add-by-URL | One query returns everything; `enrichment=None`. **No new seam.** |
 
 **What games need that nothing has needed: authentication with a lifetime.** IGDB requires Twitch
 client credentials exchanged for a token that expires and must be refreshed, where every provider so

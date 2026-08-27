@@ -431,7 +431,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `label` | The user-facing name of one item ("Book", "Album"). Copy, and free to change. |
 | `identity` | An `IdentityStrategy`: how two candidates are judged the same record, and which source wins a merge. |
 | `fields` | The ordered `FieldSpec` list describing this domain's metadata. Storage stays opaque; this is the only description of it that exists. |
-| `enriches` | Whether background enrichment applies at all. `False` is a complete answer, not a gap. |
+| `enrichment` | An `EnrichmentSpec` — the `item_identifiers.kind` background enrichment is keyed on, the provider order that answers it, and the metadata fields whose absence means a record is still worth a lookup — or `None` for a domain that does not enrich, which is a complete answer rather than a gap. All three parts are per-domain because all three were books' until Sprint 039, and a `completeness_fields` entry naming a field the domain does not declare is refused: a field it never stores is always absent, so the record would be re-queued for ever (DEC-067 row 3). `Domain.enriches` survives as a boolean reading of it. |
 | `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. |
 | `default_status` | What a newly added entry gets when nobody chose. Must be one of `statuses`. |
 | `entry_fields` | Which of `date_started` / `date_finished` / `reread_count` this domain's entries have. Anything absent is **refused on write**, not merely hidden. |
@@ -494,7 +494,7 @@ Anything else a domain has to edit outside its own package is a coupling, and a 
   screen renders its tabs and input control from that declaration.
 - **A write is validated against the item's own domain** (`LibraryService._validated`), refused with a 422 that names the domain — the value is very often valid one row further down the library, so "invalid status" alone would send the reader hunting. A bulk write spanning domains is refused whole.
 - **A filter legitimately spans domains**, so query parameters validate against the union of every domain's values while writes validate against one domain. `type` is not an ordinary facet dimension: both status facets clear it so the inbox badge keeps agreeing with the domain-agnostic triage screen, while `format_counts` applies it because that selector sits under the tab (DEC-062).
-- Enrichment is queued only for domains that declare `enriches`.
+- Enrichment is queued only for domains that declare an `enrichment` spec, asked once per domain on that domain's own identifier kind and its own incompleteness rule.
 
 #### How a domain is verified
 
