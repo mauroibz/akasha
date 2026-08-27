@@ -2488,3 +2488,28 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   owner-directed repair was unambiguous and was completed before implementation.
 - Next: Sprint 043, sharpening the domain contract. Its scope is unchanged from DEC-094 and has no
   user-visible behavior or walkthrough gate.
+
+## 2026-08-27 — Sprint 043 complete; v1.3 release gates green
+
+- Done: completed the owner's final Triage pass in `bb474c7`. The check is icon-only and visually
+  quiet, the redundant staged-status toolbar is gone, and row targets persist in tab-scoped session
+  storage across navigation and refresh. Successful commits clear their drafts and failures retain
+  them. Explicit checkbox bulk actions are unchanged. DEC-096.
+- TDD/focused evidence: the navigation/reload case failed before persistence was implemented; 20
+  Triage browser tests, 3 Triage accessibility tests and frontend type checking then passed.
+- Walkthrough: disposable data with the owner's real 81-row MyAnimeList export plus 18-book Calibre
+  library at 390×844. A book target survived Library navigation and refresh and then committed; an
+  anime suggestion and an overridden anime target each committed from their own row. No console or
+  page errors; live data untouched.
+- Release freeze evidence for v1.3.0: `make check` passed; `make test` passed 698 backend / 189
+  frontend; full Playwright passed 106 / 2 intentionally skipped; `make build` passed; container
+  smoke passed health, non-root/no-Node, API persistence, assets/deep links, read-only Calibre,
+  backup/restore, named-volume recreation and graceful shutdown.
+- The first container smoke run found its own stale manual add payload (`authors`, no `item_type`),
+  not a product failure. The harness now sends the current domain-neutral shape; the rerun passed,
+  followed by fresh `make check` and `make test` because test configuration changed.
+- Release preparation updates README coverage for anime and MyAnimeList, synchronizes all version
+  surfaces at 1.3.0, adds release notes, and refreshes the generated OpenAPI contract. Merge, tag and
+  push remain the next authorized release actions.
+- Next: merge/tag/push v1.3.0, then execute Sprint 044. The owner's root Letterboxd archive is
+  private feasibility input for the subsequent movies line and remains uncommitted.

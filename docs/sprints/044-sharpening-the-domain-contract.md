@@ -1,6 +1,6 @@
 # Sprint 044 — Sharpening the domain contract
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 043
 **Roadmap revision:** 23
 

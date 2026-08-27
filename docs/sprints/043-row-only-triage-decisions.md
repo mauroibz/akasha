@@ -1,6 +1,6 @@
 # Sprint 043 — Row-only Triage decisions
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 042
 **Roadmap revision:** 23
 
@@ -44,4 +44,27 @@ This is user-visible and requires a realistic browser walkthrough before closure
 
 ## Outcome
 
-_In progress._
+Completed 2026-08-27 in `bb474c7`.
+
+- The row action is now an icon-only yellow check on a dark circular surface at every viewport,
+  while its accessible name still identifies both target and title.
+- Changing a target remains a local draft and makes no request. The redundant page-level
+  Apply/Discard bar is gone; the row check is the sole commit for that decision, while explicit
+  checkbox bulk actions are unchanged.
+- Drafts use versioned, tab-scoped session storage, so they survive Detail/Library navigation and
+  refresh without leaking across tabs. Success clears only committed drafts; failure retains them
+  for retry.
+- TDD captured the intended navigation/reload failure before persistence was added. Focused gates
+  passed: 20 Triage browser tests, 3 Triage accessibility tests, and frontend type checking.
+- Release-level verification after implementation freeze passed: `make check`; `make test` with
+  698 backend and 189 frontend tests; full Playwright with 106 passed and 2 intentionally skipped;
+  `make build`; and the complete container smoke flow. The first smoke exposed an obsolete manual
+  book payload in the harness; updating it to the current domain-neutral API contract made the
+  rerun pass, followed by fresh `make check` and `make test` gates.
+- The realistic walkthrough used a disposable database with the owner's 81-row MyAnimeList export
+  and 18-book Calibre library at 390×844. A book draft survived Library navigation and refresh,
+  then committed; an anime suggestion committed directly; and an anime override committed from
+  its row. No console or page errors occurred, and live data was untouched.
+
+No API, schema, or product-scope deviation. The two pre-existing filtered-state copy rough edges
+recorded by Sprint 042 remain outside this sprint.
