@@ -193,6 +193,14 @@ DOMAIN = Domain(
   which is a different feature; the two must never converge into one control (DEC-059). **At least
   one is required** — conformance refuses an empty vocabulary, so a domain with no real notion of
   how a copy is held still has to name one.
+- **Progress.** Optional. If "how far through it are you" is a real question for your
+  domain — episodes watched, chapters read — declare a `ProgressSpec` with a label, a
+  singular unit, and optionally `total_field` naming a `number` metadata field to read
+  "20 / 170" against. **The total is display only and never a bound**: a cached total
+  goes stale, an airing series has none at all, and a refresh could lower it under a
+  count already stored, so the reader's number always wins (DEC-092). `None` is a
+  complete answer, and books and albums both give it. `NULL` means *not recorded* and
+  `0` means *recorded as zero*; they are different facts and the API keeps them apart.
 - **Entry field labels.** Optional, and only for a field you declared. `Started` and `Finished` read
   correctly for anything that takes time; `reread_count` does not, so a domain that has it says what
   it calls it — `Rereads`, `Rewatches`. Anything you leave out falls back to a neutral word, never to

@@ -145,7 +145,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 `entries`
 
 - product-spec fields plus foreign key `item_id` with restrict-on-delete
-- checks for score, nonnegative `reread_count`, and boolean `score_provisional`. **There is no CHECK on `status`** (migration `0014`, DEC-067 row 1): the vocabulary is the domain's, and a constraint listing the union of every domain's values could neither express "`owned` is not a book status" nor admit a domain added later without a migration on this table. `validate_status`, keyed on the item's own domain, is the authority and is strictly stronger
+- checks for score, nonnegative `reread_count`, nonnegative `progress`, and boolean `score_provisional`. **There is no CHECK on `status`** (migration `0014`, DEC-067 row 1): the vocabulary is the domain's, and a constraint listing the union of every domain's values could neither express "`owned` is not a book status" nor admit a domain added later without a migration on this table. `validate_status`, keyed on the item's own domain, is the authority and is strictly stronger
 - unique `(user_id, item_id)`
 - indexes supporting status/score/date list paths
 
@@ -435,6 +435,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. |
 | `default_status` | What a newly added entry gets when nobody chose. Must be one of `statuses`. |
 | `entry_fields` | Which of `date_started` / `date_finished` / `reread_count` this domain's entries have. Anything absent is **refused on write**, not merely hidden. |
+| `progress` | A `ProgressSpec` — how far through one of these the reader is — or `None` where that means nothing, which is a complete answer (DEC-077 shape (a)). Bounded below and **never above**: `total_field` names a `number` metadata field for reading "20 / 170" and is display only, because a cached total goes stale, an airing series has none, and a refresh could lower it under a count already stored (DEC-092). `NULL` is *not recorded* and `0` is *recorded as zero*. |
 | `entry_field_labels` | What this domain calls those fields, for the ones a neutral word gets wrong: an anime has *Rewatches*, a book has *Rereads*. Partial — `Started` and `Finished` are right for both, and a key naming a field the domain does not declare is refused by conformance. The client falls back to a neutral word, never to a book's. |
 | `formats` | The `FormatSpec` vocabulary for how a copy is held. Closed and declared, which is what a shelf is not (DEC-059). |
 | `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |

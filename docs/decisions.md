@@ -3080,3 +3080,101 @@ it. That is a gap in the source rather than in the adapter, and it is part of wh
   `error_code`, so a job that fails once and then succeeds keeps the stale failure text
   beside a `succeeded` state. Seen live during the walkthrough on a retry. Pre-existing,
   unrelated to this sprint, and recorded rather than fixed inside it.
+
+## DEC-092 — Entry progress, as built: a floor and no ceiling, and three states not two
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-077 (the verdict this implements), DEC-089 (the four-sprint
+  plan), DEC-067 row 1 (`ck_entries_status`, the mistake this deliberately does not
+  repeat), DEC-057 and DEC-060 (what a domain declares about its entries), DEC-090
+  and DEC-091 (what the two preceding sprints found).
+- **Context:** DEC-077 priced entry depth over nine shared surfaces, rejected child
+  entities with their own state, and chose **shape (a) — "a per-domain `progress` field,
+  declarative under the Domain contract"** — then built none of it. Anime is the first
+  domain to need it: every row of a MyAnimeList export carries a watched-episode count,
+  and 7 of the owner's 81 are partial.
+
+### The value is bounded below and not above, and the asymmetry is the decision
+
+The sprint's own first draft refused a count above the item's episode total. **The owner
+overruled it at planning time and was right.** Measured: AniList returns `episodes: null`
+for an airing or unreleased show; a weekly series' cached total is stale by definition;
+and an explicit metadata refresh can lower `episodes` underneath a count already stored,
+making a row that was valid when written violate a rule on its next write.
+
+That is `ck_entries_status`'s mistake in new clothes — a constraint over data the domain
+does not control — and migration `0014` exists to undo exactly it. Non-negativity is the
+opposite kind of rule: a neutral fact about a count that no domain redefines and no
+provider can invalidate, which is the category `ck_entries_score` and
+`ck_entries_reread_count` already occupy. So `ck_entries_progress` is spelled the way
+they are, and there is no upper bound anywhere in the stack. **The reader's number wins
+over our cache**, which is the technical spec's first priority.
+
+`ProgressSpec.total_field` therefore names a field for *display* — "20 / 170" — and the
+conformance suite checks it names a `number` field the domain actually declares, because
+a total pointing at nothing would make "20 / —" permanent. That is the same trap
+DEC-091 found in `completeness_fields`, and it is now the third contract field carrying
+that check.
+
+### Three states, and the two places they nearly collapsed into two
+
+`NULL` is *not recorded*; `0` is *recorded as zero* — the owner's library holds one, a
+film at 0 of 1 episodes under `Plan to Watch`; `N` is a count.
+
+1. **The column is nullable with no `server_default`.** A default of `0` — which
+   `reread_count` and `score_provisional` legitimately carry two lines away in the same
+   table — would have asserted that every existing book and album entry had recorded a
+   progress of zero, irreversibly and in the one direction a downgrade cannot repair.
+2. **The form's empty box means `null`, not `0`.** `Number("")` is `0`, so the
+   `reread_count` line directly above it in `DetailPage` could not be copied: that column
+   is non-nullable and has no way to say "none". Walked through in the browser rather
+   than assumed, because the failure is silent — every anime nobody typed a number into
+   would have been recorded as "watched zero episodes".
+
+`_validated` tests **membership** rather than truthiness so an explicit `null` is
+validated and applied rather than mistaken for "not sent", and `validate_progress` permits
+`None` on **every** domain including one declaring no progress. That last is deliberate:
+refusing it would strand a value a retyped item or a withdrawn declaration had already
+left behind, with no way to remove it. The orphan is named rather than swept — `entry_fields`
+has the same latent one and nothing sweeps that either.
+
+### The migration, and what a rebuild nearly cost
+
+SQLite cannot `ADD CONSTRAINT`, so a named CHECK costs a table rebuild. Two things that
+rebuild taught, both now asserted rather than assumed:
+
+- **A `copy_from` that already spells the new column dies on the row copy.** Alembic
+  builds the `INSERT … SELECT` from the `copy_from` columns, so the new column must
+  arrive inside the `with` block. This cost two failed attempts before it was understood.
+- **A rebuild is a `DROP TABLE`.** Under `PRAGMA foreign_keys=ON` that fires the
+  `ON DELETE CASCADE` on `entry_shelves` and `entry_formats`, emptying both with no error
+  and a migration that reports success. `alembic/env.py` never enables the pragma, unlike
+  `database.py` — **load-bearing, undocumented, and depended on by `0013` and `0014`
+  already**. Nothing tested it; the test now seeds a shelf and a format and asserts both
+  survive, and pins the six indexes a drifted `copy_from` would silently drop.
+
+Also corrected: `0014`'s docstring says SQLAlchemy does not reflect SQLite CHECK
+constraints. On SQLAlchemy 2.0 it does. `copy_from` is still right, for two other reasons
+— a reflected rebuild drops an *unnamed* CHECK and downgrades `ON DELETE RESTRICT` to a
+bare reference — and `0015` states those instead.
+
+### Consequences
+
+`entries.progress` is the only shared-table change in the anime line. The flat entry
+holds: `test_flat_entry_contract.py` passes unchanged, which is exactly what it was
+written to permit. Bulk deliberately does not carry progress — setting one episode count
+across a 200-row selection means nothing — and the omission is recorded here so nobody
+"completes" the set. Sprint 041's importer writes it through `ImportEntry.values`, which
+the three hand-enumerated `EntryRow` constructions now all carry.
+
+DEC-077's reopen condition 3 — two domains shipping shape (a) and their vocabularies
+drifting — is **not** met by one domain, and this entry is not that trigger.
+
+### A Sprint 038 miss, repaired here
+
+Reviewing 038 and 039 before planning this sprint found that its deliverable 5 claimed
+"the entry panel's last hardcoded book word" and fixed two of the **three** render sites.
+`AddForm.tsx` still spelled `Started`, `Finished` and `Reread count` verbatim, so adding
+an anime by hand said "Reread count" where the detail page said "Rewatches". Repaired as
+a prerequisite defect, per AGENTS.md.

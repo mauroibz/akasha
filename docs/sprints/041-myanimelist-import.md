@@ -1,6 +1,6 @@
 # Sprint 041 — The MyAnimeList import
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 039, 040
 
 **Roadmap revision:** 20

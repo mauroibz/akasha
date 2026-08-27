@@ -2344,3 +2344,43 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   rows 6 and 7). Those are other features with their own decisions.
 - Next: Sprint 040, entry progress. It is the only shared-table migration in the line and is
   independent of this sprint; both block Sprint 041.
+
+## 2026-08-27 — Sprint 040 (complete)
+
+- Done: built DEC-077 shape (a) — a per-domain progress count on the flat entry.
+  `ProgressSpec` on the contract, `validate_progress` as the fourth validator, migration
+  `0015_entry_progress`, API and export, the detail page and opinion dialog, and a Sprint 038
+  prerequisite repair. Commits `b17060b`, `e396d46`, `e16a4b3`. DEC-092. Branch
+  `sprint-038-anime`, unpushed.
+- **The plan's own bounding rule was wrong and the owner overruled it.** The first draft refused a
+  count above the item's episode total; AniList returns `episodes: null` for airing shows, a weekly
+  total is stale by definition, and a refresh could lower it under a stored count — making a valid
+  row invalid on its next write, which is `ck_entries_status`'s mistake again. Bounded below only.
+- Verified: `make check` green, `make test` **660 backend / 189 frontend** (from 641/183),
+  Playwright **103 passed / 2 skipped**.
+- Migration walkthrough on a **copy** of the real database: 16 entries, 19 items, 7 shelf
+  memberships, 6 formats — all preserved, `integrity_check ok`, four CHECKs including
+  `ck_entries_progress`, six indexes, and all 16 rows `NULL` rather than `0`. Live `data/` was never
+  opened for writing and still has no `progress` column.
+- Browser walkthrough 4/4 at 390x844 against that copy: `20 / 170 episodes` rendered from the
+  declaration plus the item's metadata, an emptied box PATCHes `null`, `"0"` PATCHes `0` and reads
+  `0 / 170 episodes`, and a book offers no control and still says "Rereads".
+- **Two rebuild traps, both cost failed attempts and are now asserted.** A `copy_from` that already
+  spells the new column dies on the row copy — the column must arrive inside the `with` block. And a
+  rebuild is a `DROP TABLE`, so under `PRAGMA foreign_keys=ON` it would silently empty
+  `entry_shelves` and `entry_formats` via CASCADE and still report success. `alembic/env.py` never
+  sets that pragma, unlike `database.py` — load-bearing, undocumented, and already relied on by
+  `0013` and `0014`. The test seeds a shelf and a format and checks both survive, and pins the six
+  indexes a drifted `copy_from` would drop.
+- `0014`'s docstring is wrong that SQLAlchemy cannot reflect SQLite CHECKs — on 2.0 it can.
+  `copy_from` is still correct for two other reasons (unnamed CHECKs, and `ON DELETE RESTRICT`
+  downgraded), and `0015` states those.
+- Review findings folded in: **`AddForm.tsx` was the third render site Sprint 038 missed** and still
+  said "Reread count" to an anime — repaired. `test_backup.py` hardcoded the head revision, the third
+  instance of that defect class in three sprints. `String(undefined)` from a fixture without the key
+  made the opinion form permanently unsaveable; the client tolerates an omitted field now.
+- AC7 was untestable as written — there is no JSON importer, so "export and re-import" does not
+  exist. Rewritten as: the JSON export carries progress including an explicit null for a book; the
+  Goodreads CSV does not.
+- Next: Sprint 041, the MyAnimeList import — the last in the line. It writes a watched-episode count
+  through `ImportEntry.values`, which all three `EntryRow` constructions now carry.

@@ -1,6 +1,6 @@
 # Sprint 040 — Entry progress
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 038
 **Roadmap revision:** 20
 
@@ -184,4 +184,90 @@ the migration on a copy of real data, and confirm nothing else moved.
 
 ## Outcome
 
-_Not started._
+**Completed 2026-08-27** on branch `sprint-038-anime`. Commits `b17060b` (contract and
+migration), `e396d46` (validation and API), `e16a4b3` (screens and the add-form repair),
+and the closure commit. Recorded as **DEC-092**.
+
+### The decision that changed during planning
+
+This file's first draft refused a count above the item's episode total. **The owner
+overruled it and was right.** AniList returns `episodes: null` for airing and unreleased
+shows, a weekly series' cached total is stale by definition, and a metadata refresh can
+lower `episodes` under a count already stored — making a row that was valid when written
+violate a rule on its next write. That is `ck_entries_status`'s mistake in new clothes.
+The value is bounded below and never above, everywhere in the stack, and `total_field` is
+for display only. See DEC-092.
+
+### Acceptance criteria, one line each
+
+1. **Per domain.** Anime stores, returns and exports a count; a book and an album refuse
+   one with 422 naming the domain (`Book entries do not record progress`), verified live.
+2. **Negative refused, large accepted.** `-1` is refused by Pydantic before the service;
+   `200` against a 170-episode item is stored, which is the criterion this file inverted.
+3. **Three states.** `null` round-trips as not-recorded and is distinguishable from `0`;
+   a patch that never mentions progress leaves it alone. `exclude_unset` is what keeps
+   them apart, and clearing is allowed on every domain — including one declaring no
+   progress, so a value a retyped item stranded can still be removed.
+4. **The detail page** reads `20 / 170 episodes` with a total and `20 episodes` without,
+   `—` when null, and shows no control at all on a book or an album.
+5. **Migration `0015`** applies forward and back against a populated database; both
+   directions are tested.
+6. **Existing entries unaffected** — proved against a copy of the owner's real library
+   (16 entries, 19 items, 7 shelf memberships, 6 formats): every count preserved,
+   `integrity_check ok`, all four CHECKs, six indexes, and all 16 rows `NULL` rather
+   than `0`.
+7. **Export.** Rewritten from the original wording: there is no JSON *importer*, so
+   "export and re-import" was untestable. The JSON export carries `progress`, including
+   an explicit `null` for a book so a consumer can tell "not recorded" from "an older
+   export"; the Goodreads CSV does not and should not.
+8. **`test_flat_entry_contract.py` passes unchanged.** A scalar column is exactly what it
+   was written to permit.
+
+### Verification
+
+- `make check` green; `make openapi` regenerated for three response models.
+- `make test` — **660 backend, 189 frontend** (from 641/183 at Sprint 039 closure).
+- `npm run test:e2e` — **103 passed, 2 skipped**, unchanged.
+- Walkthrough: migration applied to a **copy** of the real database (results in criterion
+  6), then 4 of 4 browser checks at 390x844 in
+  `frontend/e2e/scratchpad/progress-walkthrough.spec.ts`, asserting the rendered reading,
+  that an emptied box PATCHes `null`, that `0` PATCHes `0` and reads `0 / 170 episodes`,
+  and that a book offers no control. Live `data/` never opened for writing and still has
+  no `progress` column.
+
+### What the rebuild taught, and what nearly went wrong
+
+Two things cost failed attempts and are now asserted rather than assumed. A `copy_from`
+that already spells the new column **dies on the row copy** — the column must arrive
+inside the `with` block. And a rebuild is a `DROP TABLE`, so under `PRAGMA
+foreign_keys=ON` it would fire the `ON DELETE CASCADE` on `entry_shelves` and
+`entry_formats`, emptying both with no error and a migration reporting success.
+`alembic/env.py` never enables that pragma, unlike `database.py`; that was load-bearing,
+undocumented, and already depended on by `0013` and `0014`. The test seeds a shelf and a
+format and asserts both survive, and pins the six indexes a drifted `copy_from` would
+silently drop.
+
+`0014`'s docstring is also wrong on one point and `0015` states the correct reason:
+SQLAlchemy 2.0 *does* reflect named SQLite CHECK constraints. `copy_from` is still right,
+because a reflected rebuild drops an **unnamed** CHECK and downgrades `ON DELETE
+RESTRICT` to a bare reference.
+
+### Deviations and prerequisite repair
+
+- **A Sprint 038 miss, repaired here.** Its deliverable 5 claimed "the entry panel's last
+  hardcoded book word" and fixed two of the **three** render sites. `AddForm.tsx` still
+  spelled `Started`, `Finished` and `Reread count` verbatim, so adding an anime by hand
+  read "Reread count" where the detail page read "Rewatches".
+- **`test_backup.py` hardcoded the head revision** and failed with no behaviour changing.
+  It derives it now — the third instance of that defect class in three sprints
+  (DEC-090's `provider_health`, DEC-091's, and this).
+- **A fixture without the key broke the dialog.** `String(undefined)` made the form
+  permanently invalid and unsaveable. The client tolerates a response omitting the field
+  now, which is the defensiveness the rest of that file already has.
+
+### Impact on Sprint 041
+
+None adverse; it is unblocked. The importer writes a watched-episode count through
+`ImportEntry.values`, which all three `EntryRow` constructions now carry, and
+`validate_progress` polices it on the import path beside `validate_entry_fields`. Bulk
+deliberately carries no progress and 041 should not add it.
