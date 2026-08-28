@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 24
+**Plan revision:** 25
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** 045 — Movies viability: providers and Letterboxd shape
 
@@ -41,6 +41,8 @@ Post-v1 work branches:
                                                                    └─ 043 Row-only Triage decisions  ✓
                                                                       └─ 044 Sharpening the domain contract  ✓
                                                                           └─ 045 Movies viability  [GATED]
+                                                                              └─ 046 Movie domain on Wikidata
+                                                                                  └─ 047 Letterboxd import
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -128,7 +130,9 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [042](042-one-decision-per-triage-row.md) | One decision per Triage row | 041 | completed |
 | [043](043-row-only-triage-decisions.md) | Row-only Triage decisions | 042 | completed |
 | [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | completed |
-| [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | ready |
+| [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | in_progress |
+| [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | planned |
+| [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | planned |
 
 ## Sprint contracts
 
@@ -790,10 +794,26 @@ The gate closes by planning at least two ordered implementation sprints: movie d
 providers first, Letterboxd importer second. A credential or terms decision that only the owner can
 make is reported explicitly rather than worked around with scraping.
 
+### [Sprint 046 — Movies: the fourth domain on Wikidata](046-movie-domain.md)
+
+The flat movie domain and the keyless provider Sprint 045 measured live. Wikidata supplies stable
+cross-catalogue identities, Spanish/English labels and structured film metadata through its official
+API. Arbitrary `P18` photography is not called a poster. External Wikidata, IMDb, TMDB and
+Letterboxd URLs resolve through exact claims; short Letterboxd URLs use HEAD only and no page scrape.
+No migration and no movie-specific screen.
+
+### [Sprint 047 — Letterboxd import for movies](047-letterboxd-import.md)
+
+The owner's multi-CSV ZIP becomes one movie record per exact Letterboxd URI, with watched/watchlist,
+half-star-to-ten-point scores, dates, rewatches, plain-text reviews and tags mapped explicitly.
+Wikidata enrichment resolves the stored short URI after commit. A neutral title+year matcher offers
+an ambiguity for a movie already added through Wikidata and never auto-merges. Private data remains
+walkthrough input; synthetic fixtures prove every source shape and archive failure.
+
 ## Future epics, after this plan
 
-Except for the owner-scheduled movies gate, these are not sprints and remain deliberately unnumbered
-(DEC-058). Each becomes an epic on top of Sprint 028's contract and Sprint 031's import boundary.
+These are not sprints and remain deliberately unnumbered (DEC-058). Each becomes an epic on top of
+Sprint 028's contract and Sprint 031's import boundary.
 
 Each of these inherits the **extended** import contract (DEC-080): a connector declares its own
 guide, empty state, help link, browsability and error vocabulary, so it is a package rather than a
@@ -804,9 +824,6 @@ its `action` sentences beside its reader, and the shared screen renders them wit
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
   Twitch OAuth client credentials and token refresh, where every provider so far has needed at most a
   static API key. `steam → games` is the import.
-- **Movies — provider selected by Sprint 045; Letterboxd import.** A film is a flat item and does
-  not inherit television's hierarchy problem. The historical survey proposes TMDB, but Sprint 045
-  now measures that claim and the real export before two implementation sprints receive numbers.
 - **Series — TMDB.** Gated on a product decision rather than an integration. The entry model is one
   score, one status, one `reread_count` per item (product spec section 10, item 4), and a television
   series does not fit it: either a series is one entry and "watched through season 3" is not

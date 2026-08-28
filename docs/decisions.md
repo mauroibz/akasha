@@ -3424,3 +3424,43 @@ predictions about mistakes to come.
   constraints, live responses and the private Letterboxd export. That gate must contract at least
   two later sprints in order—movie domain/providers, then Letterboxd importer—and may identify an
   owner-only credential or terms action rather than accepting it on the owner's behalf.
+
+## DEC-098 — Movies launch on measured Wikidata; Letterboxd follows as its own sprint
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-052 and DEC-067 (domain seams), DEC-077 (flat entry), DEC-087 (Triage
+  targets), DEC-093 (connector evidence), DEC-097 (the gate). Evidence:
+  `docs/movie-domain-viability.md`.
+- **Context:** The owner directed movies next, required providers be tested before implementation,
+  and supplied a private Letterboxd ZIP. The historical survey recommended TMDB from catalogue and
+  localization capabilities. Sprint 045 checked current terms, credentials and real boundaries
+  rather than treating that dated conclusion as authorization.
+- **Provider decision:** Wikidata ships first. Live film-filtered searches found the Argentine,
+  old, recent and same-title/remake cases; five fetched entities all carried release date, director,
+  genre, runtime, country, original language, screenwriter, cast, IMDb id and TMDB id, with Spanish
+  and English labels on all 41 linked values. Exact IMDb, TMDB and Letterboxd claims each resolved
+  back to the same film. Wikidata is CC0 and keyless, with a descriptive User-Agent and bounded
+  official API use required. It is intentionally visually modest: only one of five records had
+  `P18`, and it was not a poster, so launch maps no automatic cover.
+- **Rejected launch providers:** TMDB returned 401 because no owner credential exists; more
+  importantly, its current terms cap cached content at six months and require attribution/purge,
+  while Akasha cannot distinguish a provider field from a later owner edit. It waits behind an
+  explicit provenance/expiry design and owner acceptance of terms. OMDb also returned 401, lacks
+  first-class localization, places its dedicated poster API behind patron access, and carries a
+  personal/non-commercial license. Neither untested record payload is represented as measured.
+- **Domain decision:** A movie is one flat item. Its statuses are Watchlist and Watched, defaulting
+  to Watchlist; entry depth is Watched date and Rewatches with no progress; media formats are
+  streaming, digital, Blu-ray and DVD. Wikidata provides directors and the measured structured
+  fields. Letterboxd becomes the enrichment identity so short export URIs can resolve by HEAD to a
+  film slug and then exact Wikidata `P6127`, without parsing Letterboxd HTML.
+- **Import decision:** The initial connector consumes only watched, ratings, diary, reviews and
+  watchlist CSVs, aggregating one record per exact URI. Deleted/orphaned data, profile, comments,
+  likes and lists are deliberately ignored. Half-stars double exactly; live watched evidence wins
+  over watchlist; Watched Date, Rewatch, latest review and live tags map to the existing personal
+  fields. Title+year is added to the neutral matcher as an ambiguous suggestion only, never exact
+  identity, so an existing Wikidata movie can be chosen before the short URI is attached.
+- **Consequences:** Plan revision 25 schedules Sprint 046 for the movie domain/recorded Wikidata
+  provider and Sprint 047 for the bounded Letterboxd importer. `FINAL_SPRINT` moves 45 to 47.
+  Sprint 046 has no migration or shared screen; Sprint 047's only shared behavior is the neutral
+  optional year ambiguity. The private archive stays untracked and is walkthrough input only.

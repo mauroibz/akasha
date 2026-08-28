@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_revision": 24,
+  "plan_revision": 25,
   "project_status": "in_progress",
   "active_sprint": "045",
   "active_sprint_file": "docs/sprints/045-movies-viability.md",
@@ -53,5 +53,5 @@
     "044"
   ],
   "started_at": "2026-08-27T22:08:00-03:00",
-  "updated_at": "2026-08-27T22:08:00-03:00"
+  "updated_at": "2026-08-27T22:26:00-03:00"
 }
