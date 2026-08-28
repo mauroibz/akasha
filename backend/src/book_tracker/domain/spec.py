@@ -130,9 +130,9 @@ class ProgressSpec:
     something the entry holds.
 
     It is deliberately **not** a fourth `PASSAGE_FIELDS` name. Those are three fixed
-    columns with fixed meanings, and `validate_entry_fields` polices only names inside
-    that set — an unknown key passes straight through it. Progress also needs a label, a
-    unit and a reference to its total, none of which a passage field has anywhere to put.
+    columns with fixed meanings. The shared `validate_entry_values` allowlist composes
+    their domain declaration with this separate progress rule, which also needs a label,
+    a unit and a reference to its total—none of which a passage field can express.
     """
 
     #: What this domain calls the count. "Episodes watched".

@@ -10,7 +10,8 @@ ways: over the domains this build registers, and over deliberately broken ones d
 at the bottom of this file. **A conformance suite that cannot fail is decoration**, and
 the malformed fixtures are what keep this one honest.
 
-They come in two groups, and the split is the finding of Sprint 028's measurement:
+They come in three tiers. The first two are Sprint 028's measurement; the third closes
+the wiring gap the anime line exposed:
 
 - `REGISTRY_CHECKS` are what a domain satisfies **on its own** — internal consistency of
   its vocabularies, its fields, its identity rule and its URL recognizer. `A_THIRD_DOMAIN`
@@ -19,6 +20,8 @@ They come in two groups, and the split is the finding of Sprint 028's measuremen
   unions carry its values and whether the database will accept them. Books and albums
   pass. `A_THIRD_DOMAIN` fails both, and that failure is the measurement: a domain is not
   yet a unit of code, because declaring one is not enough to make the core accept it.
+- `APP_CHECKS` are whether this built application's lifespan constructed the providers
+  the domain names, for the same domain and with the capabilities its routes require.
 """
 
 from collections.abc import Callable
@@ -239,8 +242,8 @@ def formats_are_a_usable_vocabulary(domain: Domain) -> None:
 def entry_fields_are_passage_fields(domain: Domain) -> None:
     """DEC-057: a domain declares which of the three it has, and may not invent a fourth.
 
-    An unknown name here would be silently ignored by `validate_entry_fields`, which
-    refuses *absent* names — so the domain would believe it had a field nothing writes.
+    A name outside this fixed set would be a declaration no shared write model can
+    express, so the domain would believe it had a field nothing writes.
     """
     unknown = domain.entry_fields - PASSAGE_FIELDS
     assert not unknown, f"{domain.item_type} declares entry fields that do not exist: {unknown}"

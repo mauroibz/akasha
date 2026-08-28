@@ -92,6 +92,22 @@ Before writing a walkthrough, search the active sprint, `frontend/e2e/`,
   `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 npm run test:e2e -- --project=chromium --workers=1
   e2e/scratchpad/<file>.spec.ts` from `frontend/`.
 
+### Current UI idioms
+
+Use the controls the application actually exposes when adapting a walkthrough:
+
+- the domain chooser is a `radiogroup`, not tabs or a native select;
+- the Library status filter is a popover whose option names include live facet counts;
+- Library-row status controls are popovers, while Triage-row status controls are native selects
+  (DEC-086);
+- the Triage heading reads `Inbox N unsorted`; and
+- Detail remains `/books/:id` for every domain, a deliberate cosmetic coupling (DEC-067 row 8).
+
+`frontend/e2e/scratchpad/anime-walkthrough.spec.ts` is the working reference for the domain chooser,
+Library filters, row controls and Detail route. `frontend/e2e/scratchpad/sprint42-walkthrough.spec.ts`
+is the working reference for mixed-domain Triage rows and their native status selects. Adapt their
+role/name selectors; do not copy their owner-specific data paths.
+
 The walkthrough remains a manual acceptance gate even when expressed as Playwright: a skipped local
 walkthrough does not count as having exercised the flow.
 

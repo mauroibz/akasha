@@ -419,7 +419,7 @@ async def create_entry(
                 ("reread_count", body.reread_count),
                 ("progress", body.progress),
             )
-            # Only what was actually sent: `validate_entry_fields` refuses a key the
+            # Only what was actually sent: `validate_entry_values` refuses a key the
             # domain does not have, and a `None` nobody typed is not a key. Note this
             # makes create and patch differ on an explicit `null`: patch clears the
             # value, create drops the key and lets the column's own NULL stand. Both

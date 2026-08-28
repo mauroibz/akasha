@@ -1131,10 +1131,11 @@ async def test_the_import_path_refuses_a_progress_the_domain_does_not_record(
 ) -> None:
     """Sprint 040 wired the write and not the guard, and said otherwise.
 
-    `validate_entry_fields` is a *denylist* over `PASSAGE_FIELDS`, so `progress` — which
-    is deliberately not one of them — passed straight through it. The value reached the
-    column unvalidated: a domain declaring no `ProgressSpec` could be given one, and a
-    negative would be stored, where the PATCH and add paths refuse both.
+    The old passage-field validator was a denylist, so `progress`—deliberately not one
+    of those fields—passed straight through it. The value reached the column
+    unvalidated: a domain declaring no `ProgressSpec` could be given one, and a negative
+    would be stored, where the PATCH and add paths refused both. The unified allowlist
+    keeps this regression case on the import boundary.
     """
     from book_tracker.application.imports import ImportService
     from book_tracker.application.library import LibraryError

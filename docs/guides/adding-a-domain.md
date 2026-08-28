@@ -147,6 +147,30 @@ the registry arrives a row renders its stored value, which is legible.
 **No migration.** `entries.status` has had no CHECK constraint since migration `0014`, precisely so a
 domain's vocabulary is never a schema change (DEC-067 row 1).
 
+### If a shared capability needs a table rebuild
+
+A domain itself still needs no migration. If it exposes a genuinely shared missing capability and
+that capability changes a SQLite table, use the proven batch-rebuild recipe from migrations
+`0014`–`0016`:
+
+- `copy_from` describes the table **exactly as the previous revision left it**. The new column is
+  added inside `batch_alter_table`; do not put it in `copy_from` early.
+- `copy_from` is a declaration, not a reflection check. A column, CHECK, foreign key or index omitted
+  from that declaration is dropped silently. Spell every surviving object and assert the migrated
+  head schema in `tests/test_migrations.py`.
+- Build the `Column` objects inside the helper each time it is called. A SQLAlchemy `Column` belongs
+  to one `Table`; reusing the same instance across upgrade and downgrade raises after it has already
+  been attached.
+- A batch rebuild is a `DROP TABLE` followed by a rename. Alembic's migration connection
+  deliberately does **not** enable `PRAGMA foreign_keys`: enabling it would fire `ON DELETE CASCADE`
+  and erase `entry_shelves`, `entry_formats`, `import_records` or `import_effects` while the
+  migration still reports success. The load-bearing exception is documented in `alembic/env.py`
+  and DEC-092; runtime connections continue to enforce foreign keys.
+
+Never use a rebuild to add a domain vocabulary. Statuses, formats, item types, identity kinds,
+provider names and importer names are registry-owned strings; the head-schema guard rejects a new
+string-valued CHECK that freezes one of those lists.
+
 ---
 
 ## 3. Step by step
@@ -478,8 +502,11 @@ cd backend && uv run pytest tests/test_domain_conformance.py -q
 ```
 
 The suite is parametrized over `DOMAINS`, so **your domain is held to the contract by existing**. You
-add no test to it. Its checks come in two groups: what your domain satisfies on its own, and whether
-the core can host it.
+add no test to admit it. Its checks come in three tiers: what the declaration satisfies on its own,
+whether the neutral core can store it, and whether the built application actually constructs every
+provider its identity, enrichment and recognizer name. The application tier also proves a declared
+cover chooser has a provider capable of offering candidates. Each tier has deliberately broken
+fixtures, so a green check is evidence rather than decoration.
 
 Then the rest of the gates:
 
@@ -667,9 +694,10 @@ async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload: ...
 
 Raise `ProviderPayloadError(code="unsupported_identity_kind")` for a kind you do not answer rather
 than guessing — a domain naming a key its providers cannot answer is a wiring mistake, and a wrong
-lookup fills a record with somebody else's data. `test_enrichment_pipeline.py` asserts that every
-enriching domain's `provider_order` names adapters this build actually constructs and that each one
-can answer, because the conformance suite has no provider catalog and cannot see that.
+lookup fills a record with somebody else's data. The `APP_CHECKS` tier in
+`test_domain_conformance.py` starts the built application and asserts that every enriching domain's
+`provider_order` names adapters the lifespan actually constructs, that each serves the same domain,
+and that each can answer enrichment.
 
 **Two things the shared pipeline still owns**, and you do not: the fill-empty-only rule, and the
 ledger effect that makes an enrichment undoable along with the import that queued it.
