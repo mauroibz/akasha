@@ -544,3 +544,141 @@ async def test_a_book_missing_only_an_anime_field_is_still_complete(tmp_path: Pa
             metadata={"publisher": "P", "page_count": 10, "description": "d"},
         )
         assert enqueue_enrichment_backfill(engine) == 0
+
+
+# --------------------------------------------------------------------------------------
+# Movies: a key that is neither an ISBN nor a MyAnimeList id (Sprint 046)
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_movie_is_queued_on_its_letterboxd_film(tmp_path: Path) -> None:
+    """The third distinct enrichment key. A film's export carries no ISBN and no
+    MyAnimeList id; what it carries is a Letterboxd film (DEC-067 row 3)."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        movie = create_typed_item(engine, "Suspiria", "movie", ("letterboxd", "suspiria"))
+
+        assert enqueue_enrichment_backfill(engine) == 1
+        payloads = {row["item_id"]: row for row in queued_payloads(engine)}
+
+    assert payloads[movie]["kind"] == "letterboxd"
+    assert payloads[movie]["value"] == "suspiria"
+
+
+@pytest.mark.anyio
+async def test_a_movie_with_no_letterboxd_film_is_never_queued(tmp_path: Path) -> None:
+    """A film added by hand and never matched to Letterboxd has nothing to look up by."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        create_typed_item(engine, "Untitled", "movie", ("imdb", "tt0076786"))
+        assert enqueue_enrichment_backfill(engine) == 0
+
+
+@pytest.mark.anyio
+async def test_movie_enrichment_fills_only_what_is_empty(tmp_path: Path) -> None:
+    """Against the real recorded Wikidata boundary, not a mock of the fetch under test.
+
+    The owner's own title, year and edits survive: enrichment is a filler of blanks and
+    never a corrector of somebody's library.
+    """
+    from recordings import recording  # noqa: PLC0415
+    from test_wikidata_provider import FETCH_1977, claim_key, wikidata_route_key  # noqa: PLC0415
+
+    from book_tracker.domains.movie.providers import WikidataMovieProvider  # noqa: PLC0415
+    from book_tracker.infrastructure.providers import create_provider_client  # noqa: PLC0415
+
+    routes = {
+        claim_key("P6127", "suspiria"): (200, recording("wikidata_search_p6127_suspiria.json")),
+        **FETCH_1977,
+    }
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        item_id = create_typed_item(
+            engine,
+            # The skeletal record a Letterboxd export creates, with one field already
+            # written by hand so the fill-empty-only rule has something to respect.
+            "Suspiria (mi copia)",
+            "movie",
+            ("letterboxd", "suspiria"),
+            metadata={"description": "La que vi en el cine club"},
+        )
+        client = create_provider_client(replay(routes, key=wikidata_route_key))
+        handler = EnrichmentHandler(
+            engine,
+            {"wikidata": WikidataMovieProvider(client, "test@example.invalid")},
+            rate_limiter=None,
+            data_dir=tmp_path,
+        )
+        job_id = JobRepository(engine).enqueue(
+            None, "enrich_item", {"item_id": item_id, "kind": "letterboxd", "value": "suspiria"}
+        )
+        assert (await handler.process(job_id, datetime.now(UTC)))["state"] == "succeeded"
+        with engine.connect() as connection:
+            row = connection.execute(
+                text("SELECT title, year, metadata FROM items WHERE id = :id"), {"id": item_id}
+            ).one()
+        await client.aclose()
+
+    metadata = json.loads(row.metadata)
+    assert row.title == "Suspiria (mi copia)"
+    assert row.year == 1977
+    assert metadata["description"] == "La que vi en el cine club"
+    assert metadata["creators"] == ["Dario Argento"]
+    assert metadata["runtime"] == 94
+    assert "cine de terror" in metadata["genres"]
+
+
+@pytest.mark.anyio
+async def test_a_movie_provider_miss_is_a_typed_outcome_and_not_a_crash(tmp_path: Path) -> None:
+    """A Letterboxd film Wikidata does not carry leaves the item exactly as it was."""
+    from recordings import recording  # noqa: PLC0415
+    from test_wikidata_provider import claim_key, wikidata_route_key  # noqa: PLC0415
+
+    from book_tracker.domains.movie.providers import WikidataMovieProvider  # noqa: PLC0415
+    from book_tracker.infrastructure.providers import create_provider_client  # noqa: PLC0415
+
+    routes = {
+        claim_key("P6127", "this-film-does-not-exist-xyz"): (
+            200,
+            recording("wikidata_search_p6127_no_match.json"),
+        )
+    }
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        item_id = create_typed_item(
+            engine, "Something", "movie", ("letterboxd", "this-film-does-not-exist-xyz")
+        )
+        client = create_provider_client(replay(routes, key=wikidata_route_key))
+        handler = EnrichmentHandler(
+            engine,
+            {"wikidata": WikidataMovieProvider(client, "test@example.invalid")},
+            rate_limiter=None,
+            data_dir=tmp_path,
+        )
+        job_id = JobRepository(engine).enqueue(
+            None,
+            "enrich_item",
+            {
+                "item_id": item_id,
+                "kind": "letterboxd",
+                "value": "this-film-does-not-exist-xyz",
+            },
+        )
+        result = await handler.process(job_id, datetime.now(UTC))
+        with engine.connect() as connection:
+            title = connection.execute(
+                text("SELECT title FROM items WHERE id = :id"), {"id": item_id}
+            ).scalar_one()
+        await client.aclose()
+
+    assert title == "Something"
+    assert result["state"] == "failed"
+    # The reason is written for a person reading a failed job, and names the film it
+    # could not find rather than leaking a provider exception.
+    assert "this-film-does-not-exist-xyz" in str(result["error"])
+    assert "Wikidata" in str(result["error"])
