@@ -34,6 +34,12 @@ ALLOWED_COVER_HOSTS = {
     # central so a domain cannot widen it from its own package (DEC-067 row 4).
     "s4.anilist.co",
     "media.kitsu.app",
+    # Film posters (Sprint 048). Wikidata has none and structurally cannot, so the
+    # movie domain gets them from Stremio's keyless image service — measured at
+    # 500x750, JPEG or WebP, with a clean 404 on a miss — and from TMDB for the ~2%
+    # of films that carry a TMDB id and no IMDb id.
+    "images.metahub.space",
+    "image.tmdb.org",
 }
 # The Cover Art Archive redirects through `archive.org` to a numbered storage node —
 # `dn710907.ca.archive.org` was the one observed — which no fixed list can enumerate.

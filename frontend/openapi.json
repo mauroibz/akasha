@@ -649,7 +649,8 @@
           "vinyl",
           "cd",
           "streaming",
-          "bluray"
+          "bluray",
+          "dvd"
         ],
         "title": "EntryFormat",
         "type": "string"
@@ -950,7 +951,9 @@
           "watching",
           "completed",
           "on_hold",
-          "plan_to_watch"
+          "plan_to_watch",
+          "watchlist",
+          "watched"
         ],
         "title": "EntryStatus",
         "type": "string"
@@ -1686,7 +1689,8 @@
         "enum": [
           "book",
           "album",
-          "anime"
+          "anime",
+          "movie"
         ],
         "title": "ItemTypeName",
         "type": "string"
@@ -2423,7 +2427,7 @@
   },
   "info": {
     "title": "Akasha Book Tracker",
-    "version": "1.3.0"
+    "version": "1.4.0"
   },
   "openapi": "3.1.0",
   "paths": {

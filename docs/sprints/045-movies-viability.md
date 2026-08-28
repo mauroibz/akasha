@@ -1,6 +1,6 @@
 # Sprint 045 — Movies viability: providers and Letterboxd shape
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 044
 **Roadmap revision:** 24
 
@@ -125,4 +125,42 @@ frontend, Playwright, build or container suites unless it changes their code or 
 
 ## Outcome
 
-_Not started._
+Completed 2026-08-27. The full evidence and structural sample summary are in
+`docs/movie-domain-viability.md`; DEC-098 records the decisions.
+
+- **Providers measured.** No TMDB or OMDb credential exists. Their official APIs both returned
+  HTTP 401 without one, so no record payload from either is represented as tested. TMDB's official
+  docs confirm the expected localization/search/image capability, but its current terms impose
+  mandatory attribution and a six-month cache ceiling incompatible with Akasha's provenance-free,
+  owner-editable permanent cache. OMDb lacks comparable localization and its dedicated poster API
+  is patron-only. Neither was selected by assumption.
+- **A provider survived live testing.** Wikidata's official keyless API returned the expected
+  Argentine, old, recent and same-title/remake films through a film-only search. Five fetched
+  entities all carried the measured structured claim set and stable Wikidata/IMDb/TMDB ids; all 41
+  linked values had Spanish and English labels. Exact IMDb, TMDB and Letterboxd ids each resolved to
+  the same film. Only one entity had an image, and it was not a poster, so the launch provider is
+  valid but deliberately coverless. Commit `83646a7`.
+- **Movie contract walked.** A flat movie fits the existing package, provider, identity, field,
+  status, format, entry and enrichment declarations with no schema/API/screen seam. It uses
+  Watchlist/Watched, Watched date/Rewatches and no progress. Wikidata is the first provider and
+  Letterboxd is the enrichment key; arbitrary `P18` images are not covers.
+- **Private export measured.** The unmodified 1,022-byte ZIP has 16 CSV members. The sample has two
+  distinct watched films, both rated, complete cross-file URI overlap, ISO dates, half-step ratings,
+  and empty diary/review/watchlist/deleted/orphaned/likes tables. No personal value is reproduced.
+  A supplied short URI was tested without logging it: GET and HEAD each followed one redirect to
+  HTTPS `/film/<slug>/`, proving exact Wikidata `P6127` resolution without page scraping. The
+  five-file aggregation and personal-field mapping are explicit. Commit `36621ef`.
+- **Implementation planned in order.** Sprint 046 builds the movie domain plus recorded Wikidata
+  provider; Sprint 047 builds the bounded Letterboxd ZIP importer, neutral title/year ambiguity and
+  provider enrichment. Both have TDD, regression, real-response and walkthrough contracts. Commit
+  `0e93be8`.
+
+Provider probes used official TMDB, OMDb, Wikidata and Letterboxd endpoints only, with bounded calls
+and a descriptive User-Agent where required. Temporary responses stayed under `/tmp` and were not
+committed. `python scripts/validate_project.py` and `git diff --check` passed. Per this sprint's
+explicit verification contract, no application, frontend, browser, build or container suite ran:
+runtime code and configuration did not change.
+
+No owner action is required to proceed with Wikidata. A future TMDB proposal would require the owner
+to accept its then-current terms and supply a read token, after provider provenance/expiry is
+designed; that is not a hidden prerequisite for Sprints 046 or 047.

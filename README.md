@@ -24,12 +24,12 @@
 
 ## What it is
 
-You add a book, record or anime series, score it out of ten, write a note, put it on a shelf.
+You add a book, record, anime series or film, score it out of ten, write a note, put it on a shelf.
 Reading trackers optimise for other people seeing your opinions and their vendors selling you stuff;
 this optimises for you remembering, three years later, whether something was any good.
 
 Akasha is domain agnostic, it's built so you can extend it to hold information on anything you enjoy,
-but today it supports Books, Albums and Anime. See [Domains](#domains-and-stack) for more info.
+but today it supports Books, Albums, Anime and Movies. See [Domains](#domains-and-stack) for more info.
 
 > [!WARNING]
 > **v1 has no authentication of any kind.** Anyone who can reach the port can read
@@ -62,8 +62,8 @@ in case you need a safe place to store that PDF.
 
 ## Importing and triage
 
-**Import** brings in a Goodreads CSV export, a Calibre library or a MyAnimeList anime
-export. The screen has two steps: preview a source and commit it, then work through **Triage**, where committed
+**Import** brings in a Goodreads CSV export, a Calibre library, a MyAnimeList anime
+export or a Letterboxd data export. The screen has two steps: preview a source and commit it, then work through **Triage**, where committed
 rows land as `unsorted` — the ordinary library view hides those until you sort them.
 Score edits in Triage save immediately. Each row's status control shows the imported
 suggestion, or that domain's default when the source has none — Inbox is already implied
@@ -83,8 +83,15 @@ score, dates, rewatches, watched-episode progress, notes and tags come across; i
 then fills its cover, studio, year, season, genres and synopsis from AniList, with Kitsu as a
 fallback. This is a snapshot import rather than two-way synchronization.
 
+Letterboxd's export is a .zip of CSVs; upload it exactly as it downloads. Watched films,
+ratings, diary entries, reviews, the watchlist and tags come across as one record per film —
+half-star ratings double exactly onto Akasha's 1–10, repeated diary rows become rewatches, and
+deleted or orphaned entries are deliberately left alone. Films then fill their director,
+runtime, countries, languages, genres and cast from Wikidata, and their poster from Stremio's
+keyless image service.
+
 Connectors are domain-owned and registry-driven; Goodreads and Calibre ship for books,
-and MyAnimeList ships for anime. A new one can be added without touching the shared
+MyAnimeList for anime, and Letterboxd for movies. A new one can be added without touching the shared
 preview, commit, triage or undo pipeline. See
 [how to add a domain and importer](docs/guides/adding-a-domain.md).
 
@@ -208,7 +215,7 @@ FastAPI, SQLAlchemy, Alembic and SQLite on the backend; React 18, Vite, TypeScri
 Tailwind, shadcn/ui and TanStack Query on the frontend. One container, one process,
 one SQLite file.
 
-A **domain** is a kind of thing the library holds — a book, an album, an anime series.
+A **domain** is a kind of thing the library holds — a book, an album, an anime series, a film.
 Each lives in its own package under `backend/src/book_tracker/domains/`, declaring its fields, statuses,
 formats, identity rule and provider; that declaration is served over the API and every
 screen renders from it, so nothing above the registry branches on type. Adding one

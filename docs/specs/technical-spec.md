@@ -250,7 +250,10 @@ Matching precedence for imports and add dedupe:
 1. authoritative provider source ID;
 2. canonical ISBN-13 (including validated ISBN-10 conversion-equivalence);
 3. Calibre UUID;
-4. normalized title plus normalized first author as an **ambiguous suggestion only**.
+4. normalized title plus normalized first author as an **ambiguous suggestion only**;
+5. normalized title plus **exact** year, scoped to one item type, as an ambiguous suggestion only, and only for a source that carries no creator at all.
+
+Rule 5 exists for a source that identifies its records by an opaque URI and knows nothing else about them — a Letterboxd export names a film, a year and a link, and the film may already be held under a different form of the same identity. It is deliberately narrower than rule 4 in three ways: the year must be exact rather than near, the caller must name the item type it is matching within, and it applies only when no first creator is available. Title plus year is a much weaker key than title plus author, because a novel and the film made of it routinely share both; scoping it to one domain is what keeps a book out of a film's candidate list. A caller that supplies neither a year nor an item type gets rules 1–4 unchanged.
 
 A fuzzy title/author result never merges automatically because the model is edition-level: translations and reprints commonly share that key. It requires an explicit preview decision or creates a separate item. A match result records rule, confidence, and decision provenance. If two or more exact identities from one record resolve to different existing items, return a typed `identity_conflict`, quarantine that record for explicit resolution, and attach no new identifier or entry automatically.
 
@@ -401,7 +404,7 @@ Undo is available in the UI until `undo_expires_at` (24 hours), while the durabl
 
 ### 6.6 The domain contract
 
-A **domain** is a kind of thing the library holds: books, albums. This section is the whole contract. A new domain is built from it alone; reading how albums were built is not required and is not a substitute, because that record describes one domain's choices rather than the rules (DEC-052, DEC-066).
+A **domain** is a kind of thing the library holds: books, albums or anime. This section is the whole contract. A new domain is built from it alone; reading how albums were built is not required and is not a substitute, because that record describes one domain's choices rather than the rules (DEC-052, DEC-066).
 
 **The core is neutral and stays that way.** `items` has been `type` / `title` / `subtitle` / `year` / `cover_path` / `identifiers` / opaque `metadata` since Sprint 002, and `entries` hold one person's opinion of an item. No shared layer branches on which domain it is holding; a domain is never translated into another domain's vocabulary, and there is no `if item_type == ...` anywhere above the registry. **A shared layer that needs to know the domain asks the registry for a declaration; it does not grow a branch.**
 
@@ -724,4 +727,6 @@ Defaults adopted until Mauro changes them:
 3. One item is one edition; rereads of another edition remain represented lossily by the same entry and incremented `reread_count`.
 4. Series remains free text in metadata.
 
-Deferred to v2+: export, authentication, sharing, multiuser UI, Calibre write-back, OPDS, and new item domains. Agents must not implement these as speculative infrastructure.
+Deferred to v2+: authentication, sharing, multiuser UI, Calibre write-back and OPDS. Unscheduled
+item domains remain speculative; the roadmap-authorized movie line is governed by Sprints 046–047
+and DEC-098 rather than by this deferral.

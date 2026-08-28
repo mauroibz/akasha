@@ -304,3 +304,36 @@ async def test_resolve_accepts_isbn_and_supported_edition_urls() -> None:
     assert isbn[0].source_id == "OL1M"
     assert [row.source_id for row in (*ol, *gb)] == ["OL7M", "g7"]
     assert fetched == ["OL7M", "g7"]
+
+
+@pytest.mark.anyio
+async def test_a_pasted_film_link_reaches_the_movie_adapter(tmp_path_factory: object) -> None:
+    """The whole add-by-URL path for the fourth domain, against real recordings.
+
+    IMDb, TMDB and Letterboxd have no adapter here. Their links still work, because the
+    movie domain recognizes them and spends them on the exact Wikidata claim that names
+    the same film — identity resolution against a source we have, rather than a scrape
+    of one we do not (DEC-098).
+    """
+    from recordings import recording, replay
+    from test_wikidata_provider import FETCH_1977, claim_key
+
+    from book_tracker.domains.movie.providers import WikidataMovieProvider, wikidata_route_key
+    from book_tracker.infrastructure.providers import create_provider_client
+
+    routes = {
+        claim_key("P345", "tt0076786"): (200, recording("wikidata_search_p345_tt0076786.json")),
+        **FETCH_1977,
+    }
+    client = create_provider_client(replay(routes, key=wikidata_route_key))
+    provider = WikidataMovieProvider(client, "test@example.invalid")
+    try:
+        resolved = await resolve_input(
+            "https://www.imdb.com/title/tt0076786/", {"wikidata": provider}
+        )
+    finally:
+        await client.aclose()
+
+    assert [row.source_id for row in resolved] == ["Q546900"]
+    assert resolved[0].title == "Suspiria"
+    assert resolved[0].year == 1977

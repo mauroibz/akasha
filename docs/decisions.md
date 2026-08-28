@@ -3424,3 +3424,182 @@ predictions about mistakes to come.
   constraints, live responses and the private Letterboxd export. That gate must contract at least
   two later sprints in order—movie domain/providers, then Letterboxd importer—and may identify an
   owner-only credential or terms action rather than accepting it on the owner's behalf.
+
+## DEC-098 — Movies launch on measured Wikidata; Letterboxd follows as its own sprint
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-052 and DEC-067 (domain seams), DEC-077 (flat entry), DEC-087 (Triage
+  targets), DEC-093 (connector evidence), DEC-097 (the gate). Evidence:
+  `docs/movie-domain-viability.md`.
+- **Context:** The owner directed movies next, required providers be tested before implementation,
+  and supplied a private Letterboxd ZIP. The historical survey recommended TMDB from catalogue and
+  localization capabilities. Sprint 045 checked current terms, credentials and real boundaries
+  rather than treating that dated conclusion as authorization.
+- **Provider decision:** Wikidata ships first. Live film-filtered searches found the Argentine,
+  old, recent and same-title/remake cases; five fetched entities all carried release date, director,
+  genre, runtime, country, original language, screenwriter, cast, IMDb id and TMDB id, with Spanish
+  and English labels on all 41 linked values. Exact IMDb, TMDB and Letterboxd claims each resolved
+  back to the same film. Wikidata is CC0 and keyless, with a descriptive User-Agent and bounded
+  official API use required. It is intentionally visually modest: only one of five records had
+  `P18`, and it was not a poster, so launch maps no automatic cover.
+- **Rejected launch providers:** TMDB returned 401 because no owner credential exists; more
+  importantly, its current terms cap cached content at six months and require attribution/purge,
+  while Akasha cannot distinguish a provider field from a later owner edit. It waits behind an
+  explicit provenance/expiry design and owner acceptance of terms. OMDb also returned 401, lacks
+  first-class localization, places its dedicated poster API behind patron access, and carries a
+  personal/non-commercial license. Neither untested record payload is represented as measured.
+- **Domain decision:** A movie is one flat item. Its statuses are Watchlist and Watched, defaulting
+  to Watchlist; entry depth is Watched date and Rewatches with no progress; media formats are
+  streaming, digital, Blu-ray and DVD. Wikidata provides directors and the measured structured
+  fields. Letterboxd becomes the enrichment identity so short export URIs can resolve by HEAD to a
+  film slug and then exact Wikidata `P6127`, without parsing Letterboxd HTML.
+- **Import decision:** The initial connector consumes only watched, ratings, diary, reviews and
+  watchlist CSVs, aggregating one record per exact URI. Deleted/orphaned data, profile, comments,
+  likes and lists are deliberately ignored. Half-stars double exactly; live watched evidence wins
+  over watchlist; Watched Date, Rewatch, latest review and live tags map to the existing personal
+  fields. Title+year is added to the neutral matcher as an ambiguous suggestion only, never exact
+  identity, so an existing Wikidata movie can be chosen before the short URI is attached.
+- **Consequences:** Plan revision 25 schedules Sprint 046 for the movie domain/recorded Wikidata
+  provider and Sprint 047 for the bounded Letterboxd importer. `FINAL_SPRINT` moves 45 to 47.
+  Sprint 046 has no migration or shared screen; Sprint 047's only shared behavior is the neutral
+  optional year ambiguity. The private archive stays untracked and is walkthrough input only.
+
+## DEC-099 — A Wikidata search is several bounded reads, and a claim is read by rank
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-025 (recorded responses, not mocks), DEC-098 (the provider choice),
+  DEC-067 row 3 (per-domain enrichment). Evidence: `backend/tests/fixtures/providers/README.md`
+  and the Sprint 046 Outcome.
+- **Context:** Sprint 045 established that Wikidata answers the four representative movie queries
+  and carries the structured claims a film needs. What it did not measure was the cost and the
+  shape of reading them, and both turned out to constrain the adapter.
+- **Measurement:** `wbgetentities` with `props=labels|descriptions|claims` returns ~113 KB for one
+  film, up to 1.15 MB for five and **1.9 MB for ten**, against `MAX_PROVIDER_BYTES` of 2 MiB. A
+  twenty-result search in one request would be refused by the shared HTTP boundary, and a
+  five-result one is already within a factor of two of the limit.
+- **Decision:** A movie search is bounded to six candidates and reads entities three at a time,
+  followed by one `props=labels` batch of at most fifty linked ids. Measured live: 1 search +
+  2 entity reads + 1 label read in ~2.0 s, and 2.8 s for the six-result `Metropolis` case, inside
+  the shared five-second interactive search budget.
+- **Decision:** Claims are read through a rank filter, never by first value. `Q546900` lists four
+  original languages with the *preferred* one third, so a first-value parser calls Dario Argento's
+  film German. `Q151599` opens with a **deprecated** country Wikidata has explicitly retired and a
+  `P364` whose snaktype is `somevalue` — known to exist, unknown which. Publication dates arrive up
+  to thirty times per film at mixed precision, including `+1977-03-00T00:00:00Z`, so the year is
+  the earliest best-ranked statement read as text rather than parsed as a date.
+- **Decision:** A search hit is not proof of a claim. `haswbstatement:P345=tt0000000` returns a real
+  film, because that entity genuinely carries the placeholder id — Wikidata is edited by people. An
+  identity lookup therefore re-checks the value on the fetched entity, and zero or more than one hit
+  is a typed miss or ambiguity rather than a title guess.
+- **Consequences:** A movie search costs four bounded requests instead of one large one, and returns
+  six candidates rather than twenty. The parser is longer than a first-value reader would be, and
+  every branch of it is pinned by a committed recording of the response that forced it.
+
+## DEC-100 — The `letterboxd` identity holds two shapes, and coverless movies stay backfillable
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-067 row 3 (per-domain enrichment), DEC-098 (the Letterboxd seam).
+  Supersedes nothing; records two consequences of the movie domain that Sprint 047 inherits.
+- **Context:** The movie domain enriches on a `letterboxd` identity. Sprint 046 stores what Wikidata
+  publishes — the `P6127` film slug — while Sprint 047's export identifies films by short `boxd.it`
+  URI. One declared `identity_kind` therefore holds two value shapes.
+- **Decision:** `fetch_by_identifier("letterboxd", …)` accepts a bare slug, a full
+  `letterboxd.com/film/<slug>/` URL and a `boxd.it` short URI. The short URI is resolved with HEAD
+  requests only, bounded to three hops, and accepted only when it ends at an HTTPS Letterboxd film
+  page. The body is never requested. Normalizing the export's URI to a slug at import time is
+  rejected for Sprint 047: it would cost one network request per row during a preview.
+- **Observed and not repaired:** `_backfillable_items` treats a null `cover_path` or `year` as
+  "worth a lookup" in every domain, independently of the domain's `completeness_fields`. Movies ship
+  deliberately coverless, so every movie is permanently backfillable. This is harmless today —
+  interactive add never enqueues, and only an import commit or an explicit
+  `POST /api/enrichment/backfill` does — but the explicit route will re-queue every movie on every
+  call, and each job will ask Wikidata for a cover it will never return. The fix belongs with
+  whichever sprint gives a domain a way to say "a cover is not something I have", not here.
+- **Observed and not repaired:** `GET /api/search/resolve` maps every exception from `resolve_input`
+  to **HTTP 502 `provider_failure`**. A typed `record_not_found` is an answer — that film does not
+  exist — and the reader is told the provider failed. It predates this sprint and affects every
+  domain equally; a pasted Open Library URL for a withdrawn edition behaves the same way.
+
+## DEC-101 — Title plus exact year is a scoped offer, never a match
+
+- **Date:** 2026-08-28
+- **Status:** accepted
+- **Cross-references:** DEC-076 and DEC-078–083 (the import boundary), DEC-098 and DEC-100 (the
+  Letterboxd seam). Implements technical spec 6.1 rule 5.
+- **Context:** A Letterboxd export identifies a film by a short `boxd.it` URI, a title and a year,
+  and nothing else — there is no director in the file. The same film may already be in the library
+  from a Wikidata search, carrying Letterboxd's *slug* rather than the export's short URI. Those two
+  are not equal until something resolves one into the other, and resolving during a preview would
+  cost one network request per row.
+- **Decision:** `ImportMatcher.match` takes optional `year` and `item_type`. When no exact identity
+  matches and the source offers no creator, normalized title plus **exact** year may return existing
+  item ids as an ambiguity for the owner to accept or reject. It never merges automatically.
+- **Decision:** the offer is **scoped to one item type**, and that scope is the load-bearing part.
+  `DomainRepository.match` scanned every item row regardless of type. Title plus author survives that
+  because sharing both is genuinely rare; title plus year does not, because a novel and the film made
+  of it routinely share a title and a year. Without the scope, importing a film diary would offer to
+  merge films into books.
+- **Consequences:** Every connector that passes neither argument — Goodreads, Calibre, MyAnimeList —
+  executes the identical query it did before, which is asserted by a test rather than argued. A
+  remake stays a separate item, because the year is exact rather than near. A film with no year in
+  the export offers nothing rather than every film sharing its title.
+
+## DEC-102 — Sprint 047 was verified at a reduced level, by owner direction
+
+- **Date:** 2026-08-28
+- **Status:** accepted
+- **Cross-references:** DEC-025 and the walkthrough gate in `AGENTS.md`, which this deliberately
+  departs from for one sprint.
+- **Context:** The owner directed that Sprint 047 skip the in-depth testing pass, observing that it
+  had been consuming roughly two thirds of a sprint's effort. That instruction is the top of the
+  authority order, so it was followed rather than argued.
+- **Decision:** the sprint ran its focused suite, the conformance and every other importer suite,
+  `make check`, `make openapi`, both full unit suites, and a real end-to-end pass on the owner's own
+  archive through the running application. It did **not** run Playwright, did not add frontend tests
+  for the new connector declaration, and did not perform the walkthrough gate through the real
+  screens.
+- **Consequences, stated plainly so nobody reads this sprint's green as Sprint 046's green:** the
+  Letterboxd connector has never been seen rendered on the Import page, no movie row has been
+  approved from the Triage UI, and **undo has no coverage at any level in this sprint**. The
+  Import → Triage flow is proven at the API and the enrichment boundary, which is where the risky
+  logic is, and unproven at the screen. The first person to use this feature in a browser is the
+  first person to test it there. If a UI-level defect turns up, this is why, and it is a recorded
+  trade the owner chose rather than an oversight.
+
+## DEC-103 — Posters come from a keyless source; TMDB is a 2% fallback, uncompliant by choice
+
+- **Date:** 2026-08-28
+- **Status:** accepted
+- **Cross-references:** DEC-098 (why movies launched coverless), DEC-025 (measure, do not assume).
+  Supersedes DEC-098's "launch is intentionally coverless" for the cover question only; its provider
+  verdict for *metadata* stands unchanged.
+- **Context:** the owner's first real Letterboxd import produced a library of blank tiles. Sprint 046
+  was right that Wikidata has no posters — its own `P3383` film-poster property was on one of eight
+  sampled films, a 1927 lithograph that is public domain by age — and wrong about the consequence
+  being acceptable. Posters are copyrighted, so no permissively-licensed archive exists at all; the
+  choice was never "free or paid" but "whose terms".
+- **Measurement, 2026-08-28:** Stremio's `images.metahub.space` returned a poster for **14 of 14**
+  films chosen to be hard (Argentine cinema, `Sátántangó`, `Tokyo Story`, `Cure`, a 14-hour film),
+  with no key. Its URL is **deterministic from the IMDb id**, so a poster costs zero requests, where
+  TMDB needs one per film for an opaque `poster_path`. A miss is a clean **404**, not a placeholder.
+  `medium` is 500×750, inside the existing cover bounds. Of **50** films carrying a TMDB id, **49**
+  also carry an IMDb id.
+- **Decision:** Stremio is primary and TMDB is the fallback for the ~2% of films with a TMDB id and
+  no IMDb id. This inverts the order first proposed. The reasoning is the owner's own requirement —
+  a fresh install should show posters with no setup — plus the measurement above: with both ids
+  present, asking TMDB spends a request to duplicate an answer already in hand.
+- **Known risk, accepted:** metahub is Stremio's internal CDN, not a documented API. It publishes no
+  terms, no license and no support commitment, and could change shape or block non-Stremio clients
+  without notice. Provenance is murkier than TMDB's, not cleaner. The mitigation is that a poster is
+  a nicety on a complete record: if it disappears, films go back to being coverless and nothing else
+  breaks.
+- **Decision, owner-directed:** the six-month TMDB cache refresh and the TMDB attribution notice are
+  **not** built. The owner was shown the trade twice — once with a costing that put the refresh at
+  roughly a fifth of a sprint reusing existing machinery — first accepted it, then reversed. That
+  reversal is recorded here as a deliberate choice, not an oversight. Akasha therefore caches TMDB
+  poster images past six months and shows no TMDB attribution, which is outside TMDB's API terms for
+  the ~2% of films that path serves. Anyone revisiting this should treat it as a known, dated
+  position rather than as something nobody thought about.

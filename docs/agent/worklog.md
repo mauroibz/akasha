@@ -2535,3 +2535,159 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   is documentation/state only and was checked with the validator and `git diff --check`.
 - Next: Sprint 045 on a separate movies branch. Measure current providers and the private
   Letterboxd ZIP, then plan movie domain/provider and Letterboxd importer sprints in that order.
+
+## 2026-08-27 — Sprint 045 complete; movies/provider gate measured
+
+- Done: created `sprint-045-movies`, measured providers and the private Letterboxd export, recorded
+  DEC-098, and planned Sprint 046 (movie domain/Wikidata) followed by Sprint 047 (Letterboxd import).
+  No runtime code, dependency, migration, generated contract or deployment configuration changed.
+- Live provider evidence: TMDB and OMDb both returned 401 without a configured key; neither record
+  payload is claimed as tested. TMDB's current six-month cache term is incompatible with Akasha's
+  provenance-free permanent owner-editable cache. Wikidata film-filtered search found all four
+  representative query classes; five fetched entities carried the structured claim set and all 41
+  linked values had Spanish/English labels. Exact IMDb, TMDB and Letterboxd claims converged on one
+  film. Image coverage was 1/5 and not poster art, so launch is intentionally coverless.
+- Private sample evidence: ZIP read in place, 16 CSV files / 1,022 uncompressed bytes; two distinct
+  watched rows and the same two rated rows; all other live film tables empty; dates ISO and ratings
+  valid half-steps. No personal value was copied to docs, fixtures or logs. One source URI was
+  followed without printing it: GET and HEAD each made one redirect to HTTPS `/film/<slug>/`.
+- Plan: Sprint 046 supplies a recorded-response Wikidata provider, exact external-id/URL resolution,
+  Movie declarations and Letterboxd-keyed enrichment. Sprint 047 supplies bounded ZIP parsing,
+  aggregation/mapping, a neutral title+year ambiguity and the real Import → Triage walkthrough.
+- Verified only the sprint's documentation gate: `python scripts/validate_project.py` and
+  `git diff --check`. No application/frontend/Playwright/build/container rerun by explicit sprint
+  contract and in response to the owner's request to stop debugging an unrelated working container.
+- Next: Sprint 046 is ready on this branch. No owner key/account/payment is needed for Wikidata.
+  The private ZIP remains untracked for Sprint 047 walkthrough only.
+
+## 2026-08-27 — Sprint 046 complete; movies ship as the fourth domain
+
+- Done in three implementation commits: the movie declaration (`6e53952`), the recorded Wikidata
+  adapter with its registration (`1cd443e`), and exact identity resolution plus enrichment
+  (`20fda58`). DEC-099 and DEC-100.
+- Validated the two new sprint plans against the code before starting. Everything Sprint 046 assumed
+  held; three things did not, and all three are now recorded rather than discovered later.
+- **Measured before building, and it changed the design.** `wbgetentities` with claims costs ~113 KB
+  for one film, up to 1.15 MB for five and **1.9 MB for ten**, against `MAX_PROVIDER_BYTES` of
+  2 MiB. A twenty-result search is unreadable through the shared boundary. Search is now six
+  candidates, entities three at a time, one label batch: measured 1.6 s for one result and 2.8 s for
+  the six-result `Metropolis` query through the running app, inside the five-second search budget.
+- **The rank traps the plan predicted are real and are now pinned by fixtures.** `Q546900` lists
+  four original languages with the preferred one third, so a first-value parser calls Dario Argento's
+  film German. `Q151599` opens with a deprecated country and a `somevalue` language. `P577` arrives
+  up to thirty times per film at mixed precision including `+1977-03-00T00:00:00Z`, which is day
+  zero and unparseable as a date.
+- **A `haswbstatement` hit is not proof of the claim.** `P345=tt0000000` returns a real film, because
+  that entity genuinely carries the placeholder id. The adapter now re-checks the value on the
+  fetched entity. Found while recording a zero-hit fixture; the fixture was re-recorded against a
+  value that truly matches nothing.
+- Nineteen fixtures recorded live today (~940 KB), one of them synthetic and labelled as such, with
+  a README row each. The only shared test change is `recordings.py:replay` gaining an optional route
+  key, because Wikidata answers search, entity and label reads at one path.
+- TDD evidence: each slice first failed at its intended boundary — the declaration on a missing
+  module, the adapter on a missing module then on eighteen behavioural assertions, enrichment on a
+  handler that queued nothing for a `letterboxd` key.
+- Gates: focused suite **239**; `make openapi` then `make check` clean; `make test` **818 backend /
+  189 frontend**; Playwright **106 passed, 2 intentional skips**.
+- Walkthrough: `frontend/e2e/scratchpad/movie-walkthrough.spec.ts`, **12 passed** at 390×844 against
+  a disposable `BOOK_TRACKER_DATA_DIR` and the **live** Wikidata API, launched with
+  `BOOK_TRACKER_DATA_DIR=/tmp/akasha-movie-walkthrough USER_AGENT_CONTACT=<contact> uv run uvicorn
+  book_tracker.main:app --host 127.0.0.1 --port 8100` and
+  `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 BOOK_TRACKER_E2E_BACKEND=http://127.0.0.1:8100`. Added the
+  Argentine film, the 1927 film and Suspiria 1977 through the real add box. Verified Spanish labels
+  (`Metrópolis`, `El secreto de sus ojos`), Juan José Campanella as the credit, runtimes 129/153/94,
+  countries, genres, cast, `Your viewing data`, Rewatches with no Started and no Rereads, the exact
+  identities on Detail, default Watchlist, a status change to Watched, the four declared formats
+  with `dvd` applied while the film stayed on the Watchlist, status filtering, and a pasted IMDb
+  link resolving to Suspiria 1977. Final library: 3 films, facets `{watched: 1, watchlist: 2}` and
+  `{dvd: 1}`, all three `cover_url: null`. Provider health lists `wikidata` available; `degraded` is
+  true only for the long-standing missing Google Books key. No 500s and no unexplained console or
+  page errors.
+- Observed and left out of scope, all three recorded in DEC-100 and the sprint Outcome:
+  `_backfillable_items` counts a null cover as incomplete in every domain regardless of
+  `completeness_fields`, so the explicit backfill route will re-queue every (deliberately coverless)
+  movie forever; `GET /api/search/resolve` reports a typed `record_not_found` as HTTP 502
+  `provider_failure`, so a link to a film that does not exist tells the reader the provider failed;
+  and Triage could not be exercised with a movie row at all, because nothing yet produces an
+  unsorted film and the domain chooser is absent from Triage while the inbox is empty.
+- Deviations: one, and it is the search-shape bound above. No product or architecture deviation, no
+  migration, no screen change, no credential, no container work.
+- Next: Sprint 047, the Letterboxd importer. Its plan now carries the two constraints this sprint
+  found for it — scope the title+year suggestion to the target domain, and store the export's URI as
+  it comes because the adapter already accepts all three Letterboxd shapes.
+
+## 2026-08-28 — Sprint 047 complete; the plan is finished, at a reduced gate
+
+- Done in one implementation commit, `a076f0c`: the bounded Letterboxd ZIP reader, the five-table
+  aggregation and mapping, the archive-safety checks, and the scoped title+year matcher seam.
+  DEC-101 and DEC-102.
+- **The owner directed this sprint to skip the in-depth testing pass**, observing it had been taking
+  about two thirds of a sprint. That instruction sits above the protocol in the authority order, so
+  it was followed and the trade is recorded rather than argued (DEC-102).
+- What ran: `test_letterboxd_import.py` **61 passed**; conformance plus every other importer suite
+  **239 passed**, which is what proves Goodreads, Calibre and MyAnimeList are untouched by the
+  matcher change; `make check` clean; `make openapi` no diff; full suites **880 backend / 189
+  frontend**.
+- Real-data pass against the owner's own archive on a disposable data directory, through the running
+  application: preview returned the measured two unique films with exactly doubled scores and both
+  suggesting Watched, zero row errors; commit created 2 items and 2 unsorted entries; **both Wikidata
+  enrichment jobs succeeded**, resolving each `boxd.it` short URI by HEAD and filling directors,
+  runtime and Spanish genres; both films appeared as ordinary unsorted Triage rows, which is the
+  first time any movie has reached Triage; re-uploading the identical archive returned
+  `state: committed` rather than duplicating. The archive is byte-identical at 2,908 bytes and still
+  untracked. No title, URI, rating or review from it is in the repository.
+- **What did not run, and is not evidence:** Playwright; the walkthrough gate through the real
+  screens; frontend tests for the new connector declaration. Nobody has seen the Letterboxd connector
+  rendered on the Import page or approved a movie row from the Triage UI, and **undo has no coverage
+  at any level in this sprint**. The risky logic — archive handling, the mapping matrix, the matcher
+  scope, enrichment — is covered; the screen is not.
+- The matcher change is the only shared behaviour change and it is deliberately narrow: title plus
+  *exact* year, scoped to one item type, offered and never merged. The scope is the load-bearing
+  part — `DomainRepository.match` scanned every row regardless of type, so without it a film diary
+  would have offered to merge films into books.
+- Deviations: none in product or architecture. No migration, no new route, no OpenAPI change, no
+  screen change, no credential.
+- Next: **the plan is finished.** Sprint 047 was the final planned sprint, so project state is
+  `complete` with null active fields. Nothing is tagged, released or pushed. The obvious next pieces
+  of work are the two defects DEC-100 recorded, the untested UI surface DEC-102 names, and a v1.4
+  release for the movie line if the owner wants one.
+
+## 2026-08-28 — Sprint 048 complete; v1.4.0 prepared
+
+- Done in one implementation commit, `beb4427`: movie posters from Stremio's keyless image service,
+  with TMDB as a narrow fallback. DEC-103.
+- The trigger was the owner's own report: the Letterboxd import worked and every film was a blank
+  tile. Sprint 046's gate had passed while producing exactly that, because it asserted `cover_url`
+  was null *on purpose* and nobody looked at a screen. The lesson is in this sprint's verification.
+- Measured live before writing code: Stremio answered **14 of 14** films on a deliberately hard
+  sample (Argentine cinema, `Sátántangó`, `Tokyo Story`, `Cure`, `La flor`); its URL is
+  **deterministic from the IMDb id** so a poster costs zero requests; a miss is a clean **404**, not
+  a placeholder; `medium` is 500×750, inside the existing cover bounds; and **49 of 50** films
+  carrying a TMDB id also carry an IMDb id, which is what reduced TMDB to a ~2% fallback.
+- Also measured and worth keeping: Wikidata's own `P3383` film-poster property was present on **one
+  of eight** sampled films, and that one is a 1927 lithograph that is public domain by age. There is
+  no permissively-licensed poster archive because posters are copyrighted; the choice was never
+  "free or paid" but "whose terms".
+- Gates: `test_movie_posters.py` **22**; `test_wikidata_provider.py` **60**; `make check` clean;
+  `make openapi` no diff beyond the version; full suites **903 backend / 189 frontend**;
+  `make build` produced the 1.4.0 wheel and the frontend bundle.
+- **Verified on a screen**, which is the point of this sprint: the owner's archive re-imported on a
+  disposable data directory with the real configuration; both enrichment jobs succeeded; both films
+  installed a 400×600 JPEG; each image was opened and confirmed to be that film's real poster art;
+  and `frontend/e2e/scratchpad/movie-posters.spec.ts` asserted an `<img>` pointing at the cover
+  endpoint with non-zero `naturalWidth` in **Triage** and the **Library**. The width assertion is
+  deliberate — an element whose image failed to load still has a `src`.
+- Sprint 046's two `NoCover` tests were rewritten rather than deleted. The decision they encoded is
+  reversed; the invariant inside them is not. `P18` is still never read, and `Q151599` must still not
+  wear its set photograph, so those assertions now name the poster the film should have instead.
+- Owner-directed omission, recorded in DEC-103: no six-month TMDB cache refresh and no TMDB
+  attribution notice. The owner accepted the refresh when it was costed, then reversed. Akasha
+  therefore sits outside TMDB's API terms for the ~2% of films that path serves.
+- Release preparation for **v1.4.0**: all four version surfaces bumped together, README coverage
+  extended to Movies and Letterboxd, `docs/operations/release-notes-v1.4.md` added with a
+  **Known limitations** section naming all six recorded defects and omissions, and the generated
+  OpenAPI contract refreshed. **No migration in this release at all** — the movie domain, its
+  importer and its posters are entirely application-level.
+- Not run: the container smoke drill, per the owner's standing request not to re-investigate a
+  working container, and no packaging behaviour changed in this release.
+- Next: merge to `main`, tag `v1.4.0`, push — all three explicitly authorized by the owner.

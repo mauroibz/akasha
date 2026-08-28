@@ -46,3 +46,9 @@ calibre/
 # Agent scratch files
 .hermes/
 frontend/e2e/scratchpad/
+
+# The owner's private Letterboxd export. Read-only walkthrough input for the
+# movie importer; never a fixture and never committed. Sprint 048's release
+# commit picked it up through `git add -A`, which is why the pattern is here
+# rather than relying on anyone remembering.
+letterboxd-*.zip

@@ -40,19 +40,28 @@ def replay(
     routes: Mapping[str, Route],
     *,
     on_request: Callable[[httpx.Request], None] | None = None,
+    key: Callable[[httpx.Request], str] | None = None,
 ) -> httpx.MockTransport:
     """Serve recorded responses keyed by request path.
 
     Any path that was not recorded fails the test loudly rather than returning a
     convenient default, so a test can never pass on a response nobody captured.
+
+    `key` is how a provider that multiplexes every operation onto **one** path says
+    which recording a request wants. Wikidata's Action API answers search, entity and
+    label reads at `/w/api.php` alike, so a path is not a route there; the supplier
+    reads the parameters that actually distinguish them. Every earlier provider gives
+    each operation its own path and passes nothing here.
     """
+    route_for = key if key is not None else (lambda request: request.url.path)
 
     def handler(request: httpx.Request) -> httpx.Response:
         if on_request is not None:
             on_request(request)
-        route = routes.get(request.url.path)
+        name = route_for(request)
+        route = routes.get(name)
         if route is None:
-            raise AssertionError(f"no recording for {request.url.path}")
+            raise AssertionError(f"no recording for {name}")
         status, body = route[0], route[1]
         headers = dict(route[2]) if len(route) > 2 else {}
         if body is None:

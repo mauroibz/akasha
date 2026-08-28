@@ -12,6 +12,10 @@ class Settings(BaseSettings):
     backup_dir: Path | None = None
     database_url: str | None = None
     google_books_api_key: str = Field(default="", validation_alias="GOOGLE_BOOKS_API_KEY")
+    # Optional, and narrow: the movie domain's poster fallback for films carrying a
+    # TMDB id and no IMDb id. Absent, those films stay coverless and nothing else
+    # changes — the keyless primary source needs no configuration at all.
+    tmdb_read_token: str = Field(default="", validation_alias="TMDB_READ_TOKEN")
     user_agent_contact: str | None = Field(default=None, validation_alias="USER_AGENT_CONTACT")
     timezone: str = Field(default="UTC", validation_alias="TZ")
     log_level: str = Field(default="INFO", validation_alias="LOG_LEVEL")

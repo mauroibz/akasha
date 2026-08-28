@@ -108,3 +108,52 @@ success was a record requested moments earlier and served from its own cache —
 | `kitsu_anime_8270_akame.json` | `GET .../anime/8270?include=animeProductions.producer,categories,mappings` — 22.7 KiB in one request. **Four producers come back and only one has `role: "studio"`**: Square Enix and TOHO animation are `producer`, Sentai Filmworks is `licensor`, White Fox is the studio. Taking the first would file the series under its manga publisher. Eight mappings arrive, so the MyAnimeList one is matched by site rather than by position. |
 | `kitsu_anime_slug_akame.json` | `GET .../anime?filter[slug]=akame-ga-kill&include=...` — the same record reached the way a pasted `kitsu.io/anime/<slug>` URL reaches it. `/anime/{id}` takes a numeric id only. |
 | `kitsu_anime_missing.json` | `GET .../anime/99999999?include=...` — Kitsu's **404** body, for the counterpart of the AniList case above. |
+
+Nineteen files were **added** on 2026-08-27 for Sprint 046 (the `wikidata_*` and
+`letterboxd_*` rows below), captured with
+`User-Agent: Akasha/1.3 (+https://github.com/mauroibz/akasha)` and paced at ~1 s between
+requests. Nothing was re-recorded. Every response is a verbatim body except
+`wikidata_search_ambiguous.json`, which is **synthetic** and says so in its own row.
+
+The common parameters, sent on every Wikidata request the adapter makes and therefore on
+every capture: `format=json&formatversion=2&maxlag=5`, plus `languages=es|en` on entity
+reads. Search is `action=query&list=search`; entity and label reads are
+`action=wbgetentities`, distinguished only by their `props`. All of them are
+`GET https://www.wikidata.org/w/api.php`, which is why the test transport keys routes by
+parameters rather than by path.
+
+Three observations are pinned by these files and are the reason the parser reads ranks,
+snaktypes and precision rather than first values:
+
+- `Q546900` lists **four** `P364` original languages — German, Latin, *preferred* Italian,
+  English — in that order. First-value parsing reads Dario Argento's film as German.
+- `Q151599` opens with a **deprecated** `P495` (Germany, retired in favour of the Weimar
+  Republic) and a `P364` whose snaktype is `somevalue`: known to exist, unknown which.
+- `P577` arrives up to **thirty** times per film at mixed precision, including
+  `+1977-03-00T00:00:00Z`. Day zero is a valid month-precision Wikidata timestamp and no
+  date parser will read it, so the year is taken from the text.
+
+A fourth observation needed no fixture but is worth recording: `haswbstatement:P345=tt0000000`
+returns a real film (`Q137599605`) because that entity genuinely carries the placeholder id.
+Wikidata is edited by people, so the adapter re-checks the claim on the fetched entity
+rather than trusting that a search hit holds the value it was found by.
+
+| File | Source |
+|---|---|
+| `wikidata_search_suspiria_films.json` | `srsearch=Suspiria haswbstatement:P31=Q11424&srlimit=6` — exactly two hits, `Q546900` (1977) and `Q28123467` (2018). The same-title remake case, and the evidence that title and year are not identity even between two films that share both. |
+| `wikidata_search_metropolis_films.json` | The same search for `Metropolis` — **six** films for one word, with the 1927 one ranked first. The relevance-preservation case; the Sprint 045 unfiltered control put it tenth, behind a record label, a novel and several games. |
+| `wikidata_search_el_secreto_de_sus_ojos.json` | The same search for `El secreto de sus ojos` — the Argentine Spanish-language case, one hit. |
+| `wikidata_search_la_sustancia.json` | The same search for `La sustancia` — the recent (2024) case, searched in Spanish, one hit. |
+| `wikidata_entities_suspiria_pair.json` | `action=wbgetentities&ids=Q546900|Q28123467&props=labels|descriptions|claims` — 200 KiB for **two** films. This is the measurement the batch bound rests on: one entity is ~113 KiB, five reached 1.15 MB and ten reached 1.9 MB against a 2 MiB response limit. |
+| `wikidata_entity_Q546900_suspiria_1977.json` | The same request for `Q546900` alone — the fetch-by-id path. Holds the preferred-rank `P364`, the nine mixed-precision `P577` statements, a 17-name cast, `P2047` in minutes, and exact `P345`/`P4947`/`P6127` claims. **No `P18` at all.** |
+| `wikidata_entity_Q28123467_suspiria_2018.json` | The same for the 2018 film, whose `P6127` is `suspiria-2018` — the second half of the remake pair. |
+| `wikidata_entity_Q748851_secreto.json` | The same for `El secreto de sus ojos`. Its Spanish label differs from its English one (`The Secret in Their Eyes`), which is the localization case, and it credits **thirty-one** cast members, which is the case the cast bound exists for. |
+| `wikidata_entity_Q151599_metropolis.json` | The same for `Metropolis`. The deprecated-country and `somevalue`-language case, thirty release dates, and a `P18` that is **`Horst von Harbou - Metropolis set photograph 05.jpg`** — the evidence behind shipping no cover. |
+| `wikidata_entity_Q113380226_sustancia.json` | The same for `The Substance` (2024). Its `P18` is a photograph of the cast at a festival: the second measured image, also not poster art. |
+| `wikidata_labels_suspiria_pair.json`, `wikidata_labels_Q546900_suspiria_1977.json`, `wikidata_labels_Q748851_secreto.json`, `wikidata_labels_Q151599_metropolis.json`, `wikidata_labels_Q113380226_sustancia.json` | `action=wbgetentities&props=labels` for exactly the linked directors, countries, languages, genres and bounded cast of the entity files above, in the order the adapter asks for them. All under 7 KiB: localizing a whole search costs one small request. |
+| `wikidata_search_p6127_suspiria.json` | `srsearch=haswbstatement:P6127=suspiria&srlimit=2` — one hit. Exact Letterboxd-slug resolution through a claim, rather than through a scrape of a site this build has no adapter for. |
+| `wikidata_search_p345_tt0076786.json` | The same by IMDb id — one hit, the same film. |
+| `wikidata_search_p4947_11906.json` | The same by TMDB movie id — one hit, the same film. Three external identities converging on one entity. |
+| `wikidata_search_p6127_no_match.json` | `haswbstatement:P6127=this-film-does-not-exist-xyz` — `totalhits: 0`. A miss is an answer, and is never settled by falling back to a title. |
+| `wikidata_search_ambiguous.json` | **Synthetic.** The `P345` response above with its single hit duplicated under a second entity id. No such pair exists on Wikidata today and manufacturing one on a public database is not something to do for a test; the envelope is real so the parser is still exercised against the true shape. |
+| `letterboxd_boxd_it_redirect.headers` | `HEAD https://boxd.it/2b0k` — response headers only. Status **302**, `Location: https://letterboxd.com/film/the-dark-knight/`. A public short link, not the owner's export. One hop, HEAD only, and the body is never requested: this is identity resolution, and parsing the destination's HTML would cross the boundary the movie design deliberately avoids. |
