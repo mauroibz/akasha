@@ -6,6 +6,7 @@ backup that cannot be written stops the upgrade rather than proceeding blind.
 """
 
 import json
+import re
 import sqlite3
 from pathlib import Path
 
@@ -20,6 +21,16 @@ from book_tracker.migrations import alembic_config, pending_revisions, upgrade
 
 PRE_PROJECTION = "0006_job_error_code"
 NOW = "2026-08-13T00:00:00+00:00"
+
+# `jobs.state` is a schema-owned finite-state machine: its CHECK is the transition
+# invariant, not an extensible registry vocabulary. Every other string-valued `IN`
+# constraint needs an explicit architectural decision before it may enter the schema.
+SCHEMA_OWNED_STATE_CHECKS = frozenset({("jobs", "ck_jobs_state")})
+STRING_ENUM_CHECK = re.compile(
+    r"(?:CONSTRAINT\s+(?P<name>[A-Za-z0-9_]+)\s+)?"
+    r"CHECK\s*\((?P<body>[^)]*\bIN\s*\([^)]*'[^)]*)\)",
+    re.IGNORECASE,
+)
 
 
 @pytest.fixture
@@ -37,6 +48,36 @@ def database_at(data_dir: Path, revision: str) -> Settings:
     assert configured.database_url is not None
     upgrade(configured.database_url, revision=revision)
     return configured
+
+
+def assert_no_frozen_application_vocabulary(connection: sqlite3.Connection) -> None:
+    """Read head schema DDL and reject a new code-owned string enumeration."""
+    frozen: list[str] = []
+    rows = connection.execute(
+        "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql IS NOT NULL"
+    )
+    for table, sql in rows:
+        for match in STRING_ENUM_CHECK.finditer(sql):
+            name = match.group("name") or "<unnamed>"
+            if (table, name) not in SCHEMA_OWNED_STATE_CHECKS:
+                frozen.append(f"{table}.{name}: {match.group('body')}")
+    assert not frozen, "schema freezes an application vocabulary: " + "; ".join(frozen)
+
+
+def test_head_schema_does_not_freeze_an_application_vocabulary(tmp_path: Path) -> None:
+    configured = database_at(tmp_path / "data", "head")
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+
+    assert_no_frozen_application_vocabulary(connection)
+
+    # Prove the guard bites on the exact class of constraint Sprints 028 and 041
+    # removed. This table exists only inside this test and is never a migration.
+    connection.execute(
+        "CREATE TABLE frozen_vocabulary_probe (value TEXT CHECK(value IN ('first', 'second')))"
+    )
+    with pytest.raises(AssertionError, match="frozen_vocabulary_probe"):
+        assert_no_frozen_application_vocabulary(connection)
+    connection.close()
 
 
 def seed_accented_library(database_path: Path) -> None:
