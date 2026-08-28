@@ -27,6 +27,7 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi import FastAPI
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
 
@@ -45,7 +46,12 @@ from book_tracker.domain.importers import (
     planned_upload,
     valid_member_pattern,
 )
-from book_tracker.domain.providers import IdentityStrategy, ItemPayload, SearchCandidate
+from book_tracker.domain.providers import (
+    EnrichingProvider,
+    IdentityStrategy,
+    ItemPayload,
+    SearchCandidate,
+)
 from book_tracker.domain.registry import (
     ALL_STATUSES,
     DOMAINS,
@@ -72,9 +78,11 @@ from book_tracker.migrations import upgrade
 
 RegistryCheck = Callable[[Domain], None]
 CoreCheck = Callable[[Domain, Engine], None]
+AppCheck = Callable[[Domain, FastAPI], None]
 
 REGISTRY_CHECKS: dict[str, RegistryCheck] = {}
 CORE_CHECKS: dict[str, CoreCheck] = {}
+APP_CHECKS: dict[str, AppCheck] = {}
 
 
 def assert_importer_contract(importer: object) -> None:
@@ -167,6 +175,11 @@ def registry_check(function: RegistryCheck) -> RegistryCheck:
 
 def core_check(function: CoreCheck) -> CoreCheck:
     CORE_CHECKS[function.__name__] = function
+    return function
+
+
+def app_check(function: AppCheck) -> AppCheck:
+    APP_CHECKS[function.__name__] = function
     return function
 
 
@@ -413,25 +426,7 @@ def the_recognizer_answers_for_any_string(domain: Domain) -> None:
     domain after it in the registry its turn, and the reader gets a provider error for
     what is really a typo. One domain must not be able to break another's add box.
     """
-    probes = (
-        "",
-        "   ",
-        "x",
-        "not a url at all",
-        # Malformed enough that `urlsplit` itself raises: bracket-parsing for IPv6.
-        "http://[",
-        "http://[::1",
-        "https://",
-        "//",
-        "https://example.invalid/nothing/here",
-        "978-3-16-148410-0",
-        "9780000000000",
-        "https://openlibrary.org/books/OL1M",
-        "https://musicbrainz.org/release-group/00000000-0000-0000-0000-000000000000",
-        "https://books.google.com/books?id=zyTCAlFPjgYC",
-        "a" * 4000,
-    )
-    for probe in probes:
+    for probe in RECOGNIZER_PROBES:
         try:
             answer = domain.recognize(probe)
         except Exception as error:  # noqa: BLE001 - the point of the check
@@ -445,6 +440,30 @@ def the_recognizer_answers_for_any_string(domain: Domain) -> None:
         if answer is not None:
             assert answer.action in {"fetch", "work", "search"}
             assert answer.value, f"{domain.item_type} matched {probe!r} with nothing to spend"
+
+
+RECOGNIZER_PROBES = (
+    "",
+    "   ",
+    "x",
+    "not a url at all",
+    # Malformed enough that `urlsplit` itself raises: bracket-parsing for IPv6.
+    "http://[",
+    "http://[::1",
+    "https://",
+    "//",
+    "https://example.invalid/nothing/here",
+    "978-3-16-148410-0",
+    "9780000000000",
+    "https://openlibrary.org/books/OL1M",
+    "https://openlibrary.org/works/OL1W",
+    "https://musicbrainz.org/release-group/00000000-0000-0000-0000-000000000000",
+    "https://books.google.com/books?id=zyTCAlFPjgYC",
+    "https://anilist.co/anime/1/example",
+    "https://kitsu.app/anime/example",
+    "https://myanimelist.net/anime/1/example",
+    "a" * 4000,
+)
 
 
 # --------------------------------------------------------------------------------------
@@ -517,6 +536,70 @@ def the_database_accepts_every_declared_status(domain: Domain, engine: Engine) -
             ) from error
 
 
+# --------------------------------------------------------------------------------------
+# Whether this built application actually wires what the domain names
+# --------------------------------------------------------------------------------------
+
+
+@app_check
+def declared_providers_are_constructed_for_this_domain(domain: Domain, app: FastAPI) -> None:
+    """Declarations must name adapters this build constructs for the same domain."""
+    catalog = app.state.provider_catalog
+    enrichment_names = set(domain.enrichment.provider_order) if domain.enrichment else set()
+    names = set(domain.identity.source_preference) | enrichment_names
+    for name in names:
+        provider = catalog.get(name)
+        assert provider is not None, (
+            f"{domain.item_type} names {name!r}, which this build does not construct"
+        )
+        assert provider.item_type == domain.item_type, (
+            f"{domain.item_type} names {name!r}, which serves {provider.item_type!r}"
+        )
+        if name in enrichment_names:
+            assert isinstance(provider, EnrichingProvider), (
+                f"{domain.item_type} enriches through {name!r}, which cannot answer "
+                "background enrichment"
+            )
+
+
+@app_check
+def recognized_provider_routes_are_constructed_for_this_domain(
+    domain: Domain, app: FastAPI
+) -> None:
+    """Every concrete provider route the recognizer emits must be spendable."""
+    catalog = app.state.provider_catalog
+    for probe in RECOGNIZER_PROBES:
+        match = domain.recognize(probe)
+        if match is None or not match.provider:
+            continue
+        provider = catalog.get(match.provider)
+        assert provider is not None, (
+            f"{domain.item_type} recognizes {probe!r} through {match.provider!r}, "
+            "which this build does not construct"
+        )
+        assert provider.item_type == domain.item_type, (
+            f"{domain.item_type} routes {probe!r} to {match.provider!r}, which serves "
+            f"{provider.item_type!r}"
+        )
+
+
+@app_check
+def cover_choice_has_a_provider_that_can_offer_candidates(domain: Domain, app: FastAPI) -> None:
+    """A published cover chooser must have a constructed candidate source."""
+    if not domain.chooses_covers:
+        return
+    catalog = app.state.provider_catalog
+    candidates = [
+        catalog.get(name)
+        for name in domain.identity.source_preference
+        if catalog.get(name) is not None
+    ]
+    assert any(
+        provider.item_type == domain.item_type and callable(getattr(provider, "resolve_work", None))
+        for provider in candidates
+    ), f"{domain.item_type} chooses covers but no constructed provider offers candidates"
+
+
 _NOW = "2026-08-15T00:00:00Z"
 
 
@@ -546,6 +629,15 @@ def test_a_registered_domain_satisfies_the_contract(name: str, domain: Domain) -
 @pytest.mark.parametrize("domain", list(DOMAINS.values()), ids=lambda row: str(row.item_type))
 def test_the_core_can_host_a_registered_domain(name: str, domain: Domain, migrated: Engine) -> None:
     CORE_CHECKS[name](domain, migrated)
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("name", sorted(APP_CHECKS))
+async def test_the_built_application_wires_a_registered_domain(name: str, tmp_path: Path) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        for domain in DOMAINS.values():
+            APP_CHECKS[name](domain, app)
 
 
 @pytest.mark.parametrize("importer", list(IMPORTERS.values()), ids=lambda row: str(row.name))
@@ -858,6 +950,14 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
             assert check in REGISTRY_CHECKS, f"{field} names a check that does not exist"
 
 
+def test_the_suite_has_an_application_wiring_tier() -> None:
+    assert set(APP_CHECKS) == {
+        "declared_providers_are_constructed_for_this_domain",
+        "recognized_provider_routes_are_constructed_for_this_domain",
+        "cover_choice_has_a_provider_that_can_offer_candidates",
+    }
+
+
 # --------------------------------------------------------------------------------------
 # A domain that does not exist, so the suite can be shown to fail
 # --------------------------------------------------------------------------------------
@@ -1085,6 +1185,40 @@ def test_the_suite_rejects_a_malformed_domain(name: str, domain: Domain) -> None
     """
     with pytest.raises(AssertionError):
         REGISTRY_CHECKS[name](domain)
+
+
+class _CatalogProvider:
+    name = "igdb"
+    item_type = "game"
+
+
+@pytest.mark.parametrize(
+    ("name", "domain", "catalog"),
+    [
+        (
+            "declared_providers_are_constructed_for_this_domain",
+            a_third_domain(),
+            {},
+        ),
+        (
+            "recognized_provider_routes_are_constructed_for_this_domain",
+            a_third_domain(recognize=lambda value: UrlMatch("ghost", "fetch", value)),
+            {"igdb": _CatalogProvider()},
+        ),
+        (
+            "cover_choice_has_a_provider_that_can_offer_candidates",
+            a_third_domain(chooses_covers=True),
+            {"igdb": _CatalogProvider()},
+        ),
+    ],
+)
+def test_the_application_tier_rejects_broken_wiring(
+    name: str, domain: Domain, catalog: dict[str, object]
+) -> None:
+    app = create_app(Settings(user_agent_contact="test@example.invalid"))
+    app.state.provider_catalog = catalog
+    with pytest.raises(AssertionError):
+        APP_CHECKS[name](domain, app)
 
 
 # --------------------------------------------------------------------------------------

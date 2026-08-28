@@ -544,39 +544,3 @@ async def test_a_book_missing_only_an_anime_field_is_still_complete(tmp_path: Pa
             metadata={"publisher": "P", "page_count": 10, "description": "d"},
         )
         assert enqueue_enrichment_backfill(engine) == 0
-
-
-@pytest.mark.anyio
-async def test_every_enriching_domain_names_providers_this_build_actually_wires(
-    tmp_path: Path,
-) -> None:
-    """A domain's enrichment declaration is a promise about wiring, not just shape.
-
-    The conformance suite checks what a domain can know on its own; it has no provider
-    catalog, so it cannot see that `provider_order` names an adapter nobody constructed
-    or one that cannot answer the declared key. That failure is invisible until a job
-    runs and reports `enrichment_not_configured`, which reads like a missing API key.
-    """
-    from book_tracker.domain.providers import EnrichingProvider
-    from book_tracker.domain.registry import DOMAINS
-
-    app = create_app(settings(tmp_path))
-    async with app.router.lifespan_context(app):
-        catalog = app.state.provider_catalog
-        for domain in DOMAINS.values():
-            spec = domain.enrichment
-            if spec is None:
-                continue
-            for name in spec.provider_order:
-                provider = catalog.get(name)
-                assert provider is not None, (
-                    f"{domain.item_type} enriches through {name!r}, which this build "
-                    "does not construct"
-                )
-                assert isinstance(provider, EnrichingProvider), (
-                    f"{name} cannot answer background enrichment at all"
-                )
-                assert provider.item_type == domain.item_type, (
-                    f"{domain.item_type} enriches through {name!r}, which serves "
-                    f"{provider.item_type!r}"
-                )
