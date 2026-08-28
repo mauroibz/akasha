@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 25,
-  "project_status": "in_progress",
-  "active_sprint": "045",
-  "active_sprint_file": "docs/sprints/045-movies-viability.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "044",
+  "project_status": "ready",
+  "active_sprint": "046",
+  "active_sprint_file": "docs/sprints/046-movie-domain.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "045",
   "completed_sprints": [
     "001",
     "002",
@@ -50,8 +50,9 @@
     "041",
     "042",
     "043",
-    "044"
+    "044",
+    "045"
   ],
-  "started_at": "2026-08-27T22:08:00-03:00",
-  "updated_at": "2026-08-27T22:26:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-27T22:38:17-03:00"
 }

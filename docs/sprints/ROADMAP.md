@@ -2,7 +2,7 @@
 
 **Plan revision:** 25
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 045 — Movies viability: providers and Letterboxd shape
+**Active sprint:** 046 — Movies: the fourth domain on Wikidata
 
 ## Shape of the plan
 
@@ -40,7 +40,7 @@ Post-v1 work branches:
                                                                └─ 042 One decision per Triage row  ✓
                                                                    └─ 043 Row-only Triage decisions  ✓
                                                                       └─ 044 Sharpening the domain contract  ✓
-                                                                          └─ 045 Movies viability  [GATED]
+                                                                          └─ 045 Movies viability  [GATED]  ✓
                                                                               └─ 046 Movie domain on Wikidata
                                                                                   └─ 047 Letterboxd import
 ```
@@ -130,8 +130,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [042](042-one-decision-per-triage-row.md) | One decision per Triage row | 041 | completed |
 | [043](043-row-only-triage-decisions.md) | Row-only Triage decisions | 042 | completed |
 | [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | completed |
-| [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | in_progress |
-| [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | planned |
+| [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | completed |
+| [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | ready |
 | [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | planned |
 
 ## Sprint contracts
@@ -793,6 +793,12 @@ owner's private Letterboxd export structurally. It writes no movie runtime code.
 The gate closes by planning at least two ordered implementation sprints: movie domain and valid
 providers first, Letterboxd importer second. A credential or terms decision that only the owner can
 make is reported explicitly rather than worked around with scraping.
+
+**Measured and closed 2026-08-27 (DEC-098).** Wikidata passed current live film search, localized
+structured-data and exact external-identity probes and is the launch provider. TMDB's richer API is
+not selected: no credential exists and its six-month content-cache rule is incompatible with the
+current permanent owner-editable cache. The private ZIP's topology and semantics were measured
+without committing personal data. Sprints 046 and 047 are the executable result.
 
 ### [Sprint 046 — Movies: the fourth domain on Wikidata](046-movie-domain.md)
 

@@ -1,6 +1,6 @@
 # Sprint 046 — Movies: the fourth domain on Wikidata
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 045
 **Roadmap revision:** 25
 

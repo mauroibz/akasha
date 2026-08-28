@@ -2535,3 +2535,27 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   is documentation/state only and was checked with the validator and `git diff --check`.
 - Next: Sprint 045 on a separate movies branch. Measure current providers and the private
   Letterboxd ZIP, then plan movie domain/provider and Letterboxd importer sprints in that order.
+
+## 2026-08-27 — Sprint 045 complete; movies/provider gate measured
+
+- Done: created `sprint-045-movies`, measured providers and the private Letterboxd export, recorded
+  DEC-098, and planned Sprint 046 (movie domain/Wikidata) followed by Sprint 047 (Letterboxd import).
+  No runtime code, dependency, migration, generated contract or deployment configuration changed.
+- Live provider evidence: TMDB and OMDb both returned 401 without a configured key; neither record
+  payload is claimed as tested. TMDB's current six-month cache term is incompatible with Akasha's
+  provenance-free permanent owner-editable cache. Wikidata film-filtered search found all four
+  representative query classes; five fetched entities carried the structured claim set and all 41
+  linked values had Spanish/English labels. Exact IMDb, TMDB and Letterboxd claims converged on one
+  film. Image coverage was 1/5 and not poster art, so launch is intentionally coverless.
+- Private sample evidence: ZIP read in place, 16 CSV files / 1,022 uncompressed bytes; two distinct
+  watched rows and the same two rated rows; all other live film tables empty; dates ISO and ratings
+  valid half-steps. No personal value was copied to docs, fixtures or logs. One source URI was
+  followed without printing it: GET and HEAD each made one redirect to HTTPS `/film/<slug>/`.
+- Plan: Sprint 046 supplies a recorded-response Wikidata provider, exact external-id/URL resolution,
+  Movie declarations and Letterboxd-keyed enrichment. Sprint 047 supplies bounded ZIP parsing,
+  aggregation/mapping, a neutral title+year ambiguity and the real Import → Triage walkthrough.
+- Verified only the sprint's documentation gate: `python scripts/validate_project.py` and
+  `git diff --check`. No application/frontend/Playwright/build/container rerun by explicit sprint
+  contract and in response to the owner's request to stop debugging an unrelated working container.
+- Next: Sprint 046 is ready on this branch. No owner key/account/payment is needed for Wikidata.
+  The private ZIP remains untracked for Sprint 047 walkthrough only.

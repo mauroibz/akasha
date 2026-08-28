@@ -921,11 +921,18 @@ not a unique edition key.
 Sprints 025–027 built albums; **Sprint 028 wrote the contract and made a domain a
 unit of code**: each one lives in its own package, holds its own vocabulary and
 adapter, and is held to a conformance suite it passes by existing. A third domain
-is now an **epic on top of that contract** rather than a sprint inside this plan
-(DEC-058), and it costs its own package, one registry entry, provider wiring and
-three enum lines — no migration, and no edit to another domain's files (DEC-069).
-**Games and series are named as future epics and carry no sprint number.** The
-guide is `docs/guides/adding-a-domain.md`.
+became an **epic on top of that contract** rather than a sprint inside the original plan
+(DEC-058): Sprints 038–041 shipped anime and MyAnimeList, then Sprint 044 enforced the
+mechanical lessons the line exposed. A domain costs its own package, one registry entry,
+provider wiring and typed vocabulary lines — no migration and no edit to another domain's
+files (DEC-069, DEC-097).
+
+**Movies are now the scheduled fourth domain.** Sprint 045 measured current providers and the
+owner's private Letterboxd export before implementation. DEC-098 selects keyless, CC0 Wikidata
+for Sprint 046 and a separate Letterboxd connector for Sprint 047. TMDB's richer metadata is
+not silently adopted: its current six-month cache/attribution terms do not fit the permanent,
+owner-editable cache. Games and series remain future epics with no sprint number. The guide is
+`docs/guides/adding-a-domain.md`.
 
 The line that has not moved: **no plugin runtime.** The registry is code, built
 and shipped with the application. Nothing here proposes discovery, sandboxing or

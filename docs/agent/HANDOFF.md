@@ -1,29 +1,31 @@
-# Handoff — Sprint 045 ready: measure movies before building them
+# Handoff — Sprint 046 ready: movies on measured Wikidata
 
-Sprint 044 is complete. Its five implementation commits are `16461c4`, `2718ac6`, `34cee3c`,
-`add4124` and `f4bacec`; DEC-097 records the boundary decisions. The focused suite passed 265 tests,
-then `make check`, 710 backend tests, 189 frontend tests and Playwright 106/2 passed. No container or
-build rerun was needed for this nonvisual contract refactor.
+Sprint 045 is complete on `sprint-045-movies` in `83646a7`, `36621ef` and `0e93be8`; DEC-098 and
+`docs/movie-domain-viability.md` hold the evidence. **Wikidata is the selected launch provider.**
+Its official API was live-tested across Spanish/Argentine, old, recent and remake cases, linked
+labels and exact IMDb/TMDB/Letterboxd identities. It needs no key. Image coverage was poor and the
+one image was not a poster, so Sprint 046 deliberately offers no automatic cover.
 
-The v1.3.0 anime/MyAnimeList release is already merged, tagged and pushed on `main` at `3bce2de`.
+TMDB/OMDb both require absent owner credentials and returned 401. TMDB is not merely waiting for a
+token: its six-month cache/attribution terms conflict with the current permanent, owner-editable
+cache. Do not add either to make the movie walkthrough prettier.
 
 ## Next sprint
 
-Sprint 045 is a gated feasibility sprint, not implementation. Create the owner-requested movies
-branch, then read `docs/sprints/045-movies-viability.md` and its required context. Test credible
-movie providers against current official documentation and live responses before selecting one.
-Inspect the root Letterboxd archive read-only and summarize only its topology, headers, counts and
-relationships—never titles, review text or other personal content.
+Sprint 046 is ready. Read `docs/sprints/046-movie-domain.md` and every required source, then inspect
+the actual current registry/provider/conformance code. Build the movie declaration and recorded
+Wikidata adapter with exact external-id and HEAD-only Letterboxd URL resolution. It is a user-visible
+domain sprint: run the focused tests, ordinary gates and disposable realistic walkthrough it names.
+No migration, shared screen or container work is planned.
 
-Close the gate by planning at least two ordered future sprints: movie domain plus the provider(s)
-that survived measurement, then the Letterboxd importer. No movie runtime code belongs in 045.
+Sprint 047 is planned after it and owns the Letterboxd ZIP reader plus neutral title/year ambiguity.
+Do not pull importer work into 046.
 
 ## Private and operational constraints
 
-- `letterboxd-tomateperitarg-2026-08-27-22-42-utc.zip` is private user data. It stays untracked and
-  must not be copied into fixtures, committed, deleted or rewritten.
-- Check for provider credentials without printing values. Do not create accounts, accept terms,
-  purchase service or scrape consumer sites on the owner's behalf.
-- The user explicitly asked to avoid redundant debugging of the working container. Sprint 045 is
-  documentation-only; its defined gates are the project validator and `git diff --check`, plus the
-  actual provider/archive probes recorded in its Outcome.
+- `letterboxd-tomateperitarg-2026-08-27-22-42-utc.zip` remains untracked private data. Sprint 046
+  must not read it; Sprint 047 may use it only as read-only walkthrough input and never a fixture.
+- Public provider fixtures must be freshly recorded and bounded, with source/date/probe documented.
+- The user asked to avoid redundant investigation of the working container. Follow each sprint's
+  actual gates; neither planned sprint includes container/build work unless packaging changes.
+- The v1.3.0 anime/MyAnimeList release remains merged, tagged and pushed on `main` at `3bce2de`.
