@@ -263,6 +263,9 @@ class DomainRepository:
                 date_started=None,
                 date_finished=None,
                 reread_count=0,
+                # No progress: an entry nobody has touched has recorded nothing,
+                # which is NULL and not zero.
+                progress=None,
                 score_provisional=0,
                 suggested_status=None,
                 created_at=now,
@@ -386,6 +389,7 @@ class DomainRepository:
                 date_started=values.get("date_started"),
                 date_finished=values.get("date_finished"),
                 reread_count=values.get("reread_count") or 0,
+                progress=values.get("progress"),
                 score_provisional=0,
                 suggested_status=None,
                 created_at=now,
@@ -777,6 +781,10 @@ class ImportRepository:
                     date_started=entry_values.get("date_started"),
                     date_finished=entry_values.get("date_finished"),
                     reread_count=entry_values.get("reread_count", 0),
+                    # The import path. Sprint 041 supplies a MyAnimeList
+                    # watched-episode count through here; `.get` rather than
+                    # `.get(..., 0)` because absent means not recorded.
+                    progress=entry_values.get("progress"),
                     score_provisional=int(entry_payload.get("score_provisional", False)),
                     suggested_status=entry_payload.get("suggested_status"),
                     created_at=now,

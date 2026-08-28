@@ -109,6 +109,9 @@ class EntryRow(Base):
     date_started: Mapped[str | None]
     date_finished: Mapped[str | None]
     reread_count: Mapped[int]
+    #: How far through this one you are, when the domain records such a thing.
+    #: NULL is *not recorded*; 0 is *recorded as zero* (DEC-077, Sprint 040).
+    progress: Mapped[int | None]
     score_provisional: Mapped[int]
     suggested_status: Mapped[str | None]
     created_at: Mapped[str]

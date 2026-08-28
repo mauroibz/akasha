@@ -107,6 +107,18 @@ class FormatSpecResponse(BaseModel):
     label: str
 
 
+class ProgressSpecResponse(BaseModel):
+    """How this domain counts progress, so a screen renders a declaration.
+
+    `total_field` names a metadata field on the *item*; it is for reading "20 / 170"
+    and is never a bound (DEC-077, Sprint 040).
+    """
+
+    label: str
+    unit_label: str
+    total_field: str | None
+
+
 class ItemTypeResponse(BaseModel):
     """What a domain says about itself, so a screen can render it without branching."""
 
@@ -119,6 +131,11 @@ class ItemTypeResponse(BaseModel):
     statuses: list[StatusSpecResponse]
     default_status: str
     entry_fields: list[str]
+    #: What this domain calls those fields, where a neutral word is wrong. Partial:
+    #: anything absent falls back to the neutral label the client already has.
+    entry_field_labels: dict[str, str]
+    #: How far through one of these you are, or `None` where that means nothing.
+    progress: ProgressSpecResponse | None
     formats: list[FormatSpecResponse]
     entry_panel_label: str
     #: Whether to offer the cover chooser at all (DEC-067 row 7).
@@ -153,6 +170,10 @@ class EntryResponse(BaseModel):
     date_started: str | None
     date_finished: str | None
     reread_count: int
+    #: How far through this one the reader is, or `None` for not recorded. Serialized
+    #: even when null — these routes deliberately do not set `response_model_exclude_none`,
+    #: because a client has to tell "not recorded" from "this field does not exist".
+    progress: int | None
     score_provisional: bool
     suggested_status: EntryStatus | None
     item: ItemResponse
@@ -214,6 +235,9 @@ class EntryCreateBody(BaseModel):
     date_started: date | None = None
     date_finished: date | None = None
     reread_count: int | None = Field(default=None, ge=0)
+    #: Absent on create means the column's own NULL, which is what "not recorded"
+    #: is. The filter below drops a `None` nobody typed, and `0` survives it.
+    progress: int | None = Field(default=None, ge=0)
     idempotency_key: str | None = Field(default=None, min_length=1, max_length=100)
     confirm_near_match: bool = False
 
@@ -248,6 +272,10 @@ class EntryPatch(BaseModel):
     date_started: date | None = None
     date_finished: date | None = None
     reread_count: int | None = Field(default=None, ge=0)
+    #: Three states, and `exclude_unset` is what keeps them apart: an absent key
+    #: leaves the stored value alone, an explicit `null` clears it back to "not
+    #: recorded", and `0` records zero — a row the owner's library actually holds.
+    progress: int | None = Field(default=None, ge=0)
     shelf_ids: list[int] | None = None
     #: Replaces the set, the way `shelf_ids` does; `[]` clears it.
     formats: list[str] | None = Field(default=None, max_length=20)
@@ -389,9 +417,13 @@ async def create_entry(
                 ("date_started", body.date_started.isoformat() if body.date_started else None),
                 ("date_finished", body.date_finished.isoformat() if body.date_finished else None),
                 ("reread_count", body.reread_count),
+                ("progress", body.progress),
             )
             # Only what was actually sent: `validate_entry_fields` refuses a key the
-            # domain does not have, and a `None` nobody typed is not a key.
+            # domain does not have, and a `None` nobody typed is not a key. Note this
+            # makes create and patch differ on an explicit `null`: patch clears the
+            # value, create drops the key and lets the column's own NULL stand. Both
+            # end at "not recorded", so the difference costs nothing.
             if value is not None
         },
         formats=body.formats,
@@ -488,6 +520,12 @@ async def list_item_types() -> list[ItemTypeResponse]:
             statuses=[StatusSpecResponse(**vars(status)) for status in domain.statuses],
             default_status=domain.default_status,
             entry_fields=sorted(domain.entry_fields),
+            entry_field_labels=dict(domain.entry_field_labels),
+            progress=(
+                ProgressSpecResponse(**vars(domain.progress))
+                if domain.progress is not None
+                else None
+            ),
             formats=[FormatSpecResponse(**vars(row)) for row in domain.formats],
             entry_panel_label=domain.entry_panel_label,
             chooses_covers=domain.chooses_covers,

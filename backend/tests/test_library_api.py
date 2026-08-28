@@ -370,3 +370,105 @@ async def test_the_facets_under_a_domain_filter(tmp_path: Path) -> None:
     assert facets["status_counts"] == {"owned": 1, "read": 1}
     assert facets["status_counts_by_type"] == {"book": {"read": 1}, "album": {"owned": 1}}
     assert facets["format_counts"] == {"vinyl": 1}
+
+
+async def _an_anime(app: object) -> int:
+    """One anime entry, whose domain is the only one declaring progress."""
+    repository = DomainRepository(app.state.engine)  # type: ignore[attr-defined]
+    anime = repository.create_or_get_entry(title="Black Clover", creators=("Studio Pierrot",))
+    with app.state.engine.begin() as connection:  # type: ignore[attr-defined]
+        connection.execute(
+            text("UPDATE items SET type='anime', metadata=:meta WHERE id=:id"),
+            {"id": anime.item_id, "meta": '{"episodes": 170}'},
+        )
+    return int(anime.entry_id)
+
+
+@pytest.mark.anyio
+async def test_only_a_domain_that_declares_progress_may_record_one(tmp_path: Path) -> None:
+    """DEC-077 shape (a), at the boundary. A book records no partial progress."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        book_entry, album_entry = await _one_of_each(app)
+        anime_entry = await _an_anime(app)
+
+        on_a_book = await client.patch(f"/api/entries/{book_entry}", json={"progress": 3})
+        on_an_album = await client.patch(f"/api/entries/{album_entry}", json={"progress": 3})
+        on_an_anime = await client.patch(f"/api/entries/{anime_entry}", json={"progress": 20})
+        negative = await client.patch(f"/api/entries/{anime_entry}", json={"progress": -1})
+
+    assert on_a_book.status_code == 422
+    assert "Book" in on_a_book.json()["error"]["message"]
+    assert on_an_album.status_code == 422
+    assert on_an_anime.status_code == 200
+    assert on_an_anime.json()["progress"] == 20
+    # Refused by Pydantic before the service, which is why it is a plain 422.
+    assert negative.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_not_recorded_zero_and_a_count_are_three_different_things(tmp_path: Path) -> None:
+    """`NULL` is not `0`. The owner's own library holds a row at 0 of 1 episodes.
+
+    `exclude_unset` is what keeps them apart: an absent key leaves the stored value
+    alone, an explicit `null` clears it, and `0` records zero.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        anime_entry = await _an_anime(app)
+
+        fresh = await client.get(f"/api/entries/{anime_entry}")
+        zero = await client.patch(f"/api/entries/{anime_entry}", json={"progress": 0})
+        untouched = await client.patch(f"/api/entries/{anime_entry}", json={"score": 7})
+        cleared = await client.patch(f"/api/entries/{anime_entry}", json={"progress": None})
+
+    # A new entry has recorded nothing, which the response says rather than omits.
+    assert fresh.json()["progress"] is None
+    assert zero.json()["progress"] == 0
+    # A patch that never mentions progress must not disturb it.
+    assert untouched.json()["progress"] == 0
+    assert untouched.json()["score"] == 7
+    assert cleared.status_code == 200
+    assert cleared.json()["progress"] is None
+
+
+@pytest.mark.anyio
+async def test_clearing_progress_is_allowed_on_a_domain_that_has_none(tmp_path: Path) -> None:
+    """Refusing this would strand a value that a retyped item or a withdrawn
+    declaration had already left behind, with no way to remove it."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        book_entry, _album = await _one_of_each(app)
+        cleared = await client.patch(f"/api/entries/{book_entry}", json={"progress": None})
+
+    assert cleared.status_code == 200
+    assert cleared.json()["progress"] is None
+
+
+@pytest.mark.anyio
+async def test_a_count_above_the_total_is_stored_rather_than_refused(tmp_path: Path) -> None:
+    """The total is display only (owner decision, 2026-08-27).
+
+    The item declares 170 episodes. Refusing 200 would reject the reader's own number
+    because our cached metadata is behind — and a refresh can lower that total under a
+    count already stored, which would make a valid row invalid on its next write.
+    """
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        anime_entry = await _an_anime(app)
+        beyond = await client.patch(f"/api/entries/{anime_entry}", json={"progress": 200})
+
+    assert beyond.status_code == 200
+    assert beyond.json()["progress"] == 200

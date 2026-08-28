@@ -1,0 +1,17 @@
+{
+  "errors": [
+    {
+      "message": "Not Found.",
+      "status": 404,
+      "locations": [
+        {
+          "line": 1,
+          "column": 23
+        }
+      ]
+    }
+  ],
+  "data": {
+    "Media": null
+  }
+}

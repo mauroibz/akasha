@@ -59,8 +59,10 @@ from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     RESERVED_FIELD_NAMES,
     Domain,
+    EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ProgressSpec,
     StatusSpec,
     UrlMatch,
 )
@@ -229,6 +231,93 @@ def entry_fields_are_passage_fields(domain: Domain) -> None:
     """
     unknown = domain.entry_fields - PASSAGE_FIELDS
     assert not unknown, f"{domain.item_type} declares entry fields that do not exist: {unknown}"
+
+
+@registry_check
+def entry_field_labels_name_fields_this_domain_has(domain: Domain) -> None:
+    """A domain may rename a passage field it has, and only one it has.
+
+    `entry_panel_label` made the heading the domain's copy and left the fields under it
+    reading `Rereads` on everything. These are the same kind of copy. A label for a
+    field the domain does not declare is a label nothing will ever render, which looks
+    exactly like a label that is not working.
+    """
+    unknown = set(domain.entry_field_labels) - domain.entry_fields
+    assert not unknown, f"{domain.item_type} labels entry fields it does not declare: {unknown}"
+    assert all(label and label.strip() for label in domain.entry_field_labels.values()), (
+        f"{domain.item_type} has a bare entry field label"
+    )
+
+
+@registry_check
+def progress_counts_something_this_domain_declares(domain: Domain) -> None:
+    """DEC-077 shape (a): a count the domain means something by, and can render.
+
+    `None` is the complete answer for a book — a page count is not something the entry
+    records. What is checked for a domain that does declare one is that it can be
+    *rendered*: a label and a unit to put beside the number, and a `total_field` that
+    names a real numeric field when it names anything at all.
+
+    That last check is the same trap Sprint 039 found in `completeness_fields`: a name
+    the domain never stores is always absent, so a total pointing at nothing would make
+    "20 / —" the permanent reading rather than an occasional one.
+    """
+    spec = domain.progress
+    if spec is None:
+        return
+    assert spec.label and spec.label.strip(), f"{domain.item_type} progress has no label"
+    assert spec.unit_label and spec.unit_label.strip(), (
+        f"{domain.item_type} progress has no unit to count in"
+    )
+    if spec.total_field is None:
+        return
+    field = next((row for row in domain.fields if row.name == spec.total_field), None)
+    assert field is not None, (
+        f"{domain.item_type} counts progress towards {spec.total_field!r}, "
+        "which it does not declare as a metadata field"
+    )
+    assert field.type == "number", (
+        f"{domain.item_type} counts progress towards {spec.total_field!r}, "
+        f"which is {field.type} rather than a number"
+    )
+
+
+@registry_check
+def enrichment_is_answerable_by_this_domain(domain: Domain) -> None:
+    """DEC-067 row 3: what a domain enriches on, and what counts as still incomplete.
+
+    `None` is a complete answer — an album's one release fetch already returns
+    everything it has. What is checked is that a domain which *does* declare
+    enrichment declares something the backfill can act on. The
+    `completeness_fields` rule is the sharp one: a name this domain does not
+    declare is always absent from its metadata, so the record would look
+    incomplete for ever and be re-queued on every backfill. That is exactly what
+    would have happened to anime under the old rule, which named books' fields
+    for every domain.
+    """
+    spec = domain.enrichment
+    if spec is None:
+        return
+    assert spec.identity_kind and spec.identity_kind.strip(), (
+        f"{domain.item_type} enriches on an unnamed identifier kind"
+    )
+    assert spec.provider_order, f"{domain.item_type} enriches but names no provider to ask"
+    assert all(name and name.strip() for name in spec.provider_order), (
+        f"{domain.item_type} names a blank provider"
+    )
+    assert len(set(spec.provider_order)) == len(spec.provider_order), (
+        f"{domain.item_type} names one provider twice in its enrichment order"
+    )
+    assert spec.completeness_fields, (
+        f"{domain.item_type} enriches but nothing would ever make a record complete"
+    )
+    declared = {field.name for field in domain.fields}
+    unknown = set(spec.completeness_fields) - declared
+    assert not unknown, (
+        f"{domain.item_type} judges completeness by fields it does not declare: "
+        f"{unknown}. A field this domain never stores is always absent, so every "
+        "record would be re-queued for ever."
+    )
 
 
 @registry_check
@@ -751,13 +840,13 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "default_status": "statuses_are_a_usable_vocabulary",
         "formats": "formats_are_a_usable_vocabulary",
         "entry_fields": "entry_fields_are_passage_fields",
+        "entry_field_labels": "entry_field_labels_name_fields_this_domain_has",
         "fields": "fields_are_described_completely",
         "identity": "identity_is_a_strategy",
         "recognize": "the_recognizer_answers_for_any_string",
         "chooses_covers": "the_cover_chooser_is_only_declared_where_it_can_work",
-        # Declarative and checked by the enrichment path rather than by shape: a domain
-        # that does not enrich is queued no jobs (`_backfillable_items`).
-        "enriches": None,
+        "enrichment": "enrichment_is_answerable_by_this_domain",
+        "progress": "progress_counts_something_this_domain_declares",
     }
     declared = set(Domain.__dataclass_fields__)
     assert declared == set(covered), (
@@ -789,7 +878,7 @@ def a_third_domain(**overrides: object) -> Domain:
             FieldSpec("creators", "Studios", multiplicity="many"),
             FieldSpec("platform", "Platform"),
         ),
-        "enriches": False,
+        "enrichment": None,
         "statuses": (
             StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u"),
             StatusSpec("wishlist", "Wishlist", hotkey="w"),
@@ -930,6 +1019,55 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "the_cover_chooser_is_only_declared_where_it_can_work",
         "a chooser no provider can serve",
         a_third_domain(chooses_covers=True),
+    ),
+    (
+        "entry_field_labels_name_fields_this_domain_has",
+        "a label for a passage field the domain does not have",
+        # The fixture declares `date_finished` alone, so this names a field that will
+        # never render — which looks identical to a label that is not working.
+        a_third_domain(entry_field_labels={"reread_count": "Replays"}),
+    ),
+    (
+        "entry_field_labels_name_fields_this_domain_has",
+        "a bare entry field label",
+        a_third_domain(entry_field_labels={"date_finished": "   "}),
+    ),
+    (
+        "enrichment_is_answerable_by_this_domain",
+        "enrichment with nobody to ask",
+        a_third_domain(
+            enrichment=EnrichmentSpec("igdb_id", (), ("platform",)),
+        ),
+    ),
+    (
+        "enrichment_is_answerable_by_this_domain",
+        "an incompleteness rule naming a field this domain does not have",
+        # The anime bug, as a fixture: `description` is a book's field, and a domain
+        # that judges itself by one it never stores is never complete.
+        a_third_domain(
+            enrichment=EnrichmentSpec("igdb_id", ("igdb",), ("description",)),
+        ),
+    ),
+    (
+        "enrichment_is_answerable_by_this_domain",
+        "enrichment nothing would ever complete",
+        a_third_domain(enrichment=EnrichmentSpec("igdb_id", ("igdb",), ())),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "progress towards a total the domain does not store",
+        a_third_domain(progress=ProgressSpec("Completion", "percent", "hours_to_beat")),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "progress towards a field that is not a number",
+        # The fixture declares `platform` as text, so a total could never be read off it.
+        a_third_domain(progress=ProgressSpec("Completion", "percent", "platform")),
+    ),
+    (
+        "progress_counts_something_this_domain_declares",
+        "a progress count with nothing to call it",
+        a_third_domain(progress=ProgressSpec("   ", "percent")),
     ),
 ]
 

@@ -2237,3 +2237,279 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   merge commit.
 - Next: no numbered sprint remains. New work must be planned explicitly; the roadmap's unnumbered
   epics are not active commitments.
+
+## 2026-08-27 — Plan revision 20: anime as the third domain (planning only)
+
+- Done: planned the anime domain end to end at the owner's request, as an explicit trial run of the
+  Sprint 028 domain contract whose findings feed back into the repository. Probed four metadata
+  providers live from this host between 16:20 and 17:00 UTC, parsed the owner's real MyAnimeList
+  export, wrote DEC-088 and DEC-089, and added Sprints 038–041. Moved `FINAL_SPRINT` to 41, plan
+  revision to 20, and reactivated state with 038 `ready`. **No runtime code was written.** Work is on
+  the `sprint-038-anime` branch under DEC-053.
+- Measured, not reasoned: AniList answered 6/6 searches (0.3–1.5s median, one 40.04s outlier) and
+  resolved all 81 of the export's ids in **2 requests / 54 KiB** through `media(idMal_in:)`. Kitsu
+  answered 6/6 (3.7s median, one 8.2s), returns the MyAnimeList id on a search row via
+  `include=mappings`, and returns studios and categories in the same fetch via
+  `include=animeProductions.producer,categories` — correcting an earlier assumption that studios cost
+  one request per item. **Jikan returned HTTP 504 to every request across ~40 minutes**: 0/12 on
+  search and 1/81 by id, where the single success was a record fetched moments earlier from its own
+  cache. `myanimelist.net` answered this host in 0.66s throughout, so MAL was up and Jikan could not
+  reach it. AniList returns Cloudflare `error code: 1010` / 403 without a User-Agent. Cover variants
+  measured against the pipeline bounds: AniList `extraLarge` 460x635 / 110 KiB, Kitsu `original`
+  980x1420 / 1.6 MiB PNG (so `large` is the one to ask for).
+- The export: 81 rows, gzipped XML, `series_animedb_id` distinct on every row, `my_status` in
+  {Completed 74, Dropped 6, Plan to Watch 1}, `my_score` 0 on 3 rows meaning unrated, `my_start_date`
+  `0000-00-00` on all 81 and `my_finish_date` on 76, `my_watched_episodes` diverging from
+  `series_episodes` on the partial rows (`Black Clover`, 20 of 170, dropped).
+- Two seams found, both foreseen and both unbuilt: **DEC-067 row 3** (enrichment is keyed on the
+  literal `'isbn'` below `Domain.enriches`, with a module-constant provider order of two book
+  providers) and **DEC-077 shape (a)** (a per-domain progress field, chosen by that verdict and never
+  implemented). They are Sprints 039 and 040 rather than folded into the domain or the connector.
+  Three smaller findings recorded in the sprint files: `DetailPage.tsx:368` hardcodes `Rereads` as the
+  label for `reread_count` in every domain, which is the entry panel's last book-shaped word; the
+  conformance suite requires a non-empty `formats` vocabulary, which a domain with no notion of a
+  copy would have to invent one for; and the owner's export sat untracked at the repository root
+  carrying a user id and username, now gitignored.
+- Owner decisions taken at planning time, recorded in DEC-088 and DEC-089: AniList plus Kitsu despite
+  AniList's terms naming anime tracker services, with Kitsu kept as the hedge; build progress before
+  the import rather than drop the watched-episode counts and re-import; generalize enrichment rather
+  than let the connector fetch at read time. One earlier framing of Jikan was corrected to the owner
+  mid-planning after the wider measurement contradicted it, and the provider question was re-put.
+- Verified: `python scripts/validate_project.py` passed. No product gate applies — nothing outside
+  `docs/`, `.gitignore` and the validator's sprint bound changed.
+- Next: execute Sprint 038 under the ordinary protocol.
+
+## 2026-08-27 — Sprint 038 (complete)
+
+- Done: built the anime domain from `docs/guides/adding-a-domain.md` alone — package, AniList and
+  Kitsu adapters, registration, ten recorded provider responses, and the per-domain passage-field
+  labels. Commits `9144daf`, `7165816`, `b2482c8`. Branch `sprint-038-anime`, unpushed.
+- Verified: `make check` green. `make test` **616 backend / 183 frontend** (from 559/179 at Sprint 037
+  closure). Playwright **103 passed, 2 skipped**, matching the prior baseline. Conformance passed over
+  three domains; registering the domain broke no existing backend test on the first run.
+- Walkthrough: 5 of 5 in the ignored `frontend/e2e/scratchpad/anime-walkthrough.spec.ts`, at 390x844
+  against a disposable `BOOK_TRACKER_DATA_DIR` and the **live** AniList and Kitsu APIs, backend on
+  8123 and vite on 5199. Observed: a live `akame ga kill` search returned three rows with the first
+  two merged across both providers on `mal:22199`, AniList primary; all four URL forms resolved;
+  covers installed from both new hosts (AniList's stored at 425x600 / 74 KiB); `status=read` and
+  `formats=["vinyl"]` each refused 422 naming Anime; `reread_count=3` accepted; the detail page read
+  `Your watch data` and **`Rewatches: 3`**; the status filter listed all six anime statuses with facet
+  counts and no book vocabulary. Live `data/` untouched.
+- Four walkthrough assertions failed first and **every one was my selector, not the product**: the
+  domain chooser is a `radiogroup` and not tabs (Sprint 029), the status filter is a popover and not
+  a select (multi-valued, see `StatusFilter.tsx`), its options carry facet counts, and library row
+  controls are popovers where Triage's are native (DEC-086). Worth knowing before writing the next
+  walkthrough.
+- Three shared changes, all in DEC-090: `bounded_json` gained `method`/`json_body` because GraphQL
+  asks by POST; three `provider_health` tests were deriving nothing and enumerating providers, so a
+  third domain failed them with no behaviour changing; `Domain` gained `entry_field_labels`.
+- Observed and left alone, out of scope: `Episode length: 24` carries no unit on the detail page;
+  Kitsu holds no production records at all for some series (Cowboy Bebop), so it arrives with no
+  creator where AniList has Sunrise; and conformance requires a non-empty `formats` vocabulary, which
+  a domain with no notion of a copy would have to invent one for.
+- Next: Sprint 039, enrichment beyond the ISBN. It inherits one fact from this sprint — `bounded_json`
+  already takes a method, so a provider reached by POST costs it nothing.
+
+## 2026-08-27 — Sprint 039 (complete)
+
+- Done: generalized background enrichment off the ISBN. `EnrichmentSpec` on the domain contract,
+  `EnrichingProvider.fetch_by_identifier` as the interface, a per-domain backfill query, and a handler
+  that reads the item's domain instead of assuming books. Commits `c62c559`, `81e110f`, `16e2f20`,
+  `eb03114`, `19a3361`. Recorded as DEC-091. Branch `sprint-038-anime`, unpushed.
+- **The spec has three parts, not two.** The sprint file's baseline named the ISBN join, the payload
+  and `PROVIDER_ORDER` and missed that `_backfillable_items` also judged incompleteness by
+  `publisher`/`page_count`/`description`. An anime has none of the three, so every anime would have
+  looked incomplete for ever and been re-queued on every backfill — enrichment appearing to work while
+  never finishing. DEC-067 row 3's option (b) had named "an incompleteness rule per domain", so the
+  gap was in the sprint file rather than the original costing. `completeness_fields` is the third part
+  and conformance refuses one naming a field the domain does not declare.
+- Verified: `make check` green. `make test` **641 backend / 183 frontend** (from 616/183). Playwright
+  **103 passed, 2 skipped**, unchanged. `make check` caught one real thing: the backfill route's
+  docstring is its OpenAPI description, so rewording it made the checked-in schema stale.
+- Walkthrough on a disposable database at port 8124, live providers. Chainsaw Man added by MAL URL,
+  stripped to `{"kind": "TV", "episodes": 12}` with no year and no cover, then backfilled. Job row
+  verbatim: `{"item_id": 1, "kind": "mal", "value": "44511"}` → succeeded via `anilist`, filling year,
+  creators, english_title, japanese_title, episode_minutes, season, source, genres, airing_status,
+  synopsis and cover. `kind` and `episodes` untouched. **A second backfill queued 0**, which is the
+  completeness rule doing the job this sprint existed for. A thin book beside it queued
+  `{"item_id": 2, "kind": "isbn", "value": "9788437604572"}` and filled from Open Library exactly as
+  before. A hand-written job in the **old** `{item_id, isbn}` payload also succeeded. Live `data/`
+  untouched.
+- Observed, pre-existing, not fixed here: `JobRepository.complete` never clears `error`/`error_code`,
+  so a job that failed once and then succeeded on retry shows `succeeded` beside stale failure text.
+  Seen live. In DEC-091.
+- Criterion 7 stated precisely rather than broadly: the enrichment path names no identifier kind or
+  provider, but `grep isbn application/` still hits `export.py` (books' CSV column names), `add.py`
+  (the near-match check) and `providers.py` (the cover chooser's Open Library path, kept by DEC-067
+  rows 6 and 7). Those are other features with their own decisions.
+- Next: Sprint 040, entry progress. It is the only shared-table migration in the line and is
+  independent of this sprint; both block Sprint 041.
+
+## 2026-08-27 — Sprint 040 (complete)
+
+- Done: built DEC-077 shape (a) — a per-domain progress count on the flat entry.
+  `ProgressSpec` on the contract, `validate_progress` as the fourth validator, migration
+  `0015_entry_progress`, API and export, the detail page and opinion dialog, and a Sprint 038
+  prerequisite repair. Commits `b17060b`, `e396d46`, `e16a4b3`. DEC-092. Branch
+  `sprint-038-anime`, unpushed.
+- **The plan's own bounding rule was wrong and the owner overruled it.** The first draft refused a
+  count above the item's episode total; AniList returns `episodes: null` for airing shows, a weekly
+  total is stale by definition, and a refresh could lower it under a stored count — making a valid
+  row invalid on its next write, which is `ck_entries_status`'s mistake again. Bounded below only.
+- Verified: `make check` green, `make test` **660 backend / 189 frontend** (from 641/183),
+  Playwright **103 passed / 2 skipped**.
+- Migration walkthrough on a **copy** of the real database: 16 entries, 19 items, 7 shelf
+  memberships, 6 formats — all preserved, `integrity_check ok`, four CHECKs including
+  `ck_entries_progress`, six indexes, and all 16 rows `NULL` rather than `0`. Live `data/` was never
+  opened for writing and still has no `progress` column.
+- Browser walkthrough 4/4 at 390x844 against that copy: `20 / 170 episodes` rendered from the
+  declaration plus the item's metadata, an emptied box PATCHes `null`, `"0"` PATCHes `0` and reads
+  `0 / 170 episodes`, and a book offers no control and still says "Rereads".
+- **Two rebuild traps, both cost failed attempts and are now asserted.** A `copy_from` that already
+  spells the new column dies on the row copy — the column must arrive inside the `with` block. And a
+  rebuild is a `DROP TABLE`, so under `PRAGMA foreign_keys=ON` it would silently empty
+  `entry_shelves` and `entry_formats` via CASCADE and still report success. `alembic/env.py` never
+  sets that pragma, unlike `database.py` — load-bearing, undocumented, and already relied on by
+  `0013` and `0014`. The test seeds a shelf and a format and checks both survive, and pins the six
+  indexes a drifted `copy_from` would drop.
+- `0014`'s docstring is wrong that SQLAlchemy cannot reflect SQLite CHECKs — on 2.0 it can.
+  `copy_from` is still correct for two other reasons (unnamed CHECKs, and `ON DELETE RESTRICT`
+  downgraded), and `0015` states those.
+- Review findings folded in: **`AddForm.tsx` was the third render site Sprint 038 missed** and still
+  said "Reread count" to an anime — repaired. `test_backup.py` hardcoded the head revision, the third
+  instance of that defect class in three sprints. `String(undefined)` from a fixture without the key
+  made the opinion form permanently unsaveable; the client tolerates an omitted field now.
+- AC7 was untestable as written — there is no JSON importer, so "export and re-import" does not
+  exist. Rewritten as: the JSON export carries progress including an explicit null for a book; the
+  Goodreads CSV does not.
+- Next: Sprint 041, the MyAnimeList import — the last in the line. It writes a watched-episode count
+  through `ImportEntry.values`, which all three `EntryRow` constructions now carry.
+
+## 2026-08-27 — Sprint 041 (complete; the anime line closed)
+
+- Done: the MyAnimeList connector, its registration, migration `0016` and two prerequisite
+  repairs. Commits `a738828`, `5b55e53`, `0d9b6a3`. DEC-093. Branch `sprint-038-anime`,
+  **unpushed and unmerged** — the merge is the owner's call at the line's close (DEC-053).
+- **The central criterion, answered precisely.** `api/imports.py`, `ImportPage.tsx` and
+  `TriagePage.tsx` were not touched at all; `application/imports.py` changed by eight lines and
+  that was the prerequisite repair. What did not hold was the schema: `ck_import_batches_kind` read
+  `kind IN ('goodreads','calibre')`, frozen in migration `0002` — `ck_entries_status`'s mistake one
+  table over, surviving because no connector had been added since. The first one to try passed
+  every application check and failed at commit. `0016` deletes it.
+- **A correction to Sprint 040.** Its Outcome and handoff both claimed `validate_progress` ran on
+  the import path. It did not — `validate_entry_fields` is a denylist over `PASSAGE_FIELDS`, so
+  `progress` passed through unchecked and reached the column unvalidated. Closed here with a test.
+- **Seven defects found after the first green run**, by adversarial review, none of them exercised
+  by the owner's own file: `series_episodes` of `0` (MyAnimeList's "still airing", which the domain
+  refuses with a minimum of 1), a blank title, out-of-range numbers that pass preview and raise an
+  IntegrityError mid-commit, a duplicate id counted as `unchanged` with its data discarded, a
+  half-known date like `2021-05-00` stored verbatim in a text column, a punctuation-only tag raising
+  a 500 out of `shelf_slug`, and a byte-scan DOCTYPE guard with a comment false positive. All
+  reproduced before being fixed. `goodreads.py` still shares two of them.
+- **Measured rather than assumed:** ElementTree on Python 3.12 expands internal entities, so billion
+  laughs is live and expands inside the parser where a decompression cap cannot reach it; external
+  entities are already refused. The guard is the parser's own `doctype` callback, so the test that
+  it fires is load-bearing. And `ImportInputSpec.max_bytes` is ignored for `kind="upload"` while
+  still being published to the client — the connector declares none and bounds its own gunzip at
+  8 MiB.
+- Verified: `make check` green. `make test` **698 backend / 189 frontend** (from 660/189).
+  Playwright **103 passed, 2 skipped**. One browser run reported 102 with no failure text and exit
+  code 0; the immediate re-run gave 103, matching every earlier run. Recorded rather than smoothed.
+- Walkthrough on a disposable directory with the owner's real gitignored export: 81 records
+  previewed with zero row errors and every measured count matching, 81 items and 81 `unsorted`
+  entries committed, Triage reading `Inbox 81 unsorted` in anime's own vocabulary, `Black Clover`
+  at 20 of 170, all 81 enriched from AniList with covers and studios, a re-upload replaying rather
+  than importing twice, and undo reversing a new batch completely. Live `data/` never opened for
+  writing — still 16 entries, no anime, no `progress` column.
+- Next: nothing numbered. The plan is complete through 041 and `state.json` is `complete`. The
+  branch holds four sprints and is the owner's to merge.
+
+## 2026-08-27 — Plan revision 21: Sprint 042 planned, not started
+
+- Done: retrospective on the anime line at the owner's request, written up as **DEC-094**,
+  and **Sprint 042 planned**. `FINAL_SPRINT` moves to 42 and state reactivates from
+  `complete` to `ready` with 042 active. **No implementation.** The owner has a UX fix to
+  do first and asked for the plan committed unexecuted.
+- The finding, which is not the one that was expected: **the abstraction held; the friction
+  was mechanical.** Ranked by time actually lost — walkthrough selector churn (every
+  walkthrough needed 2-4 corrections and the assumption was wrong every time, never the
+  product), the `entries` rebuild recipe (three failed attempts in 040), the
+  `validate_entry_fields` denylist (root cause of `progress` reaching storage unvalidated
+  for a sprint), the missing conformance wiring tier, three entry-field render sites, and
+  three hand-enumerated `EntryRow` constructions.
+- Verified while writing it rather than recalled: `alembic/env.py` still says nothing about
+  the `PRAGMA foreign_keys` silence three migrations depend on; `EntryRow` is constructed
+  at `repositories.py:256,382,774`; `validate_entry_fields` is called from three sites and
+  its return value is discarded at two of them; conformance has exactly two tiers; and no
+  live CHECK constraint enumerates an application-owned vocabulary (both offenders gone,
+  nothing keeping it that way).
+- Deferred deliberately and recorded in DEC-094: the shared frontend hook for the three
+  entry-field render sites (a refactor with its own risk, and 040 already repaired its one
+  real consequence), the OAuth seam IGDB will need, and a generalised cover chooser.
+- Stated caveat: this is a sample of one domain, and an unusual one. Games would exercise
+  authentication with a lifetime and would likely surface a different list. Weighed and
+  rejected in favour of proceeding, because deliverables 1-3 record mistakes already made
+  rather than predictions.
+- Branch: still `sprint-038-anime`, unpushed and **unmerged**. Sprint 042 depends on the
+  anime line's code, which is not on `main`, so it continues there unless the owner merges
+  first.
+- Next: the owner's UX fix, then execute Sprint 042.
+
+## 2026-08-27 — Sprint 042 (complete; one decision per Triage row)
+
+- Done: inserted and completed the owner-directed Triage correction ahead of the already-planned
+  domain-contract sprint. Commit `c99aa23`. A row now displays explicit draft → importer suggestion
+  → domain default, offers only choosable statuses, has no duplicate suggestion chip, and applies
+  its displayed target from a check action at the row's right. Applying one row preserves unrelated
+  drafts; failure retains the attempted target for retry. DEC-095. Sprint 043 is ready.
+- TDD: the new real-flow browser case first failed because anime displayed `unsorted` rather than
+  `completed`. A second assertion exposed that the first row-Apply implementation cleared an
+  unrelated book draft; the mutation now clears only IDs it attempted. Focused Triage/accessibility:
+  **36 passed**.
+- Verified after implementation freeze: `make check` passed; `make test` passed **698 backend / 189
+  frontend**; full Playwright **105 passed / 2 skipped**. The first sandboxed `make test` advanced to
+  `test_export.py` and stopped with the documented TestClient signature; it was interrupted and the
+  prescribed outside-sandbox run passed 698 in 57.58 seconds. The first `make check` found only an
+  unformatted ignored walkthrough file; formatting it made the exact gate pass.
+- Walkthrough: fresh disposable data at `/tmp/akasha-s42-visual.v4vaHl`, 390×844. Imported the
+  owner's real 81-row MyAnimeList export and 18-book Calibre library through the UI: 99 unsorted.
+  `Akame ga Kill!` displayed Completed from its suggestion with no Inbox option or duplicate chip;
+  row Apply removed it. `Proyecto Hail Mary` displayed Read from the book default; changing it made
+  no request, Discard restored Read, and row Apply removed it. `Black Clover` changed from Dropped
+  to Watching and left only on page-level Apply. Exactly three status bulk requests occurred, no
+  row overflow at mobile width, and no console/page errors. Live `data/` was never opened for
+  writing. Background AniList requests succeeded while the disposable app was running.
+- Observed and left out of scope: with a search whose only matching row has just left, Triage says
+  `Inbox is clear` although unfiltered rows remain; and `Accept all suggested` stays visible on a
+  Calibre-only filtered result with no suggestion, where it would affect zero rows. Both pre-date
+  this sprint and belong to a later filtered-state/copy correction.
+- Deviations: no product or architecture deviation. The prior `1466208` rename had made room for
+  Sprint 042 but left state, roadmap, validator and the new sprint file inconsistent; the intended
+  owner-directed repair was unambiguous and was completed before implementation.
+- Next: Sprint 043, sharpening the domain contract. Its scope is unchanged from DEC-094 and has no
+  user-visible behavior or walkthrough gate.
+
+## 2026-08-27 — Sprint 043 complete; v1.3 release gates green
+
+- Done: completed the owner's final Triage pass in `bb474c7`. The check is icon-only and visually
+  quiet, the redundant staged-status toolbar is gone, and row targets persist in tab-scoped session
+  storage across navigation and refresh. Successful commits clear their drafts and failures retain
+  them. Explicit checkbox bulk actions are unchanged. DEC-096.
+- TDD/focused evidence: the navigation/reload case failed before persistence was implemented; 20
+  Triage browser tests, 3 Triage accessibility tests and frontend type checking then passed.
+- Walkthrough: disposable data with the owner's real 81-row MyAnimeList export plus 18-book Calibre
+  library at 390×844. A book target survived Library navigation and refresh and then committed; an
+  anime suggestion and an overridden anime target each committed from their own row. No console or
+  page errors; live data untouched.
+- Release freeze evidence for v1.3.0: `make check` passed; `make test` passed 698 backend / 189
+  frontend; full Playwright passed 106 / 2 intentionally skipped; `make build` passed; container
+  smoke passed health, non-root/no-Node, API persistence, assets/deep links, read-only Calibre,
+  backup/restore, named-volume recreation and graceful shutdown.
+- The first container smoke run found its own stale manual add payload (`authors`, no `item_type`),
+  not a product failure. The harness now sends the current domain-neutral shape; the rerun passed,
+  followed by fresh `make check` and `make test` because test configuration changed.
+- Release preparation updates README coverage for anime and MyAnimeList, synchronizes all version
+  surfaces at 1.3.0, adds release notes, and refreshes the generated OpenAPI contract. Merge, tag and
+  push remain the next authorized release actions.
+- Next: merge/tag/push v1.3.0, then execute Sprint 044. The owner's root Letterboxd archive is
+  private feasibility input for the subsequent movies line and remains uncommitted.

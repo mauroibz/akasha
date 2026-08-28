@@ -213,6 +213,7 @@ _ENTRY_COLUMNS = (
     EntryRow.date_started,
     EntryRow.date_finished,
     EntryRow.reread_count,
+    EntryRow.progress,
 )
 
 
@@ -263,6 +264,9 @@ def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
                 "date_started": entry.date_started,
                 "date_finished": entry.date_finished,
                 "reread_count": entry.reread_count,
+                # `None` where the domain records none, which is the honest shape:
+                # an export that dropped it would lose owner data silently.
+                "progress": entry.progress,
                 # Names rather than ids: an id means nothing outside this database,
                 # and the name is what the owner typed.
                 "shelves": shelves.get(entry.id, []),

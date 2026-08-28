@@ -14,6 +14,7 @@ from book_tracker.domain.spec import (
     PASSAGE_FIELDS,
     UNSORTED,
     Domain,
+    EnrichmentSpec,
     FieldSpec,
     FormatSpec,
     StatusSpec,
@@ -61,6 +62,15 @@ def isbn_identity(candidate: SearchCandidate) -> str | None:
 
 #: Product spec 4.3 prefers Open Library's record; alphabetical order does not.
 SOURCE_PREFERENCE = ("openlibrary", "googlebooks")
+
+# A Goodreads row starts as little more than an ISBN, so books are the domain
+# background enrichment was built for. The three fields below were the incompleteness
+# rule for *every* domain until Sprint 039; they are books' own now (DEC-067 row 3).
+BOOK_ENRICHMENT = EnrichmentSpec(
+    identity_kind="isbn",
+    provider_order=SOURCE_PREFERENCE,
+    completeness_fields=("publisher", "page_count", "description"),
+)
 BOOK_IDENTITY = IdentityStrategy(isbn_identity, SOURCE_PREFERENCE)
 
 
@@ -105,7 +115,10 @@ DOMAIN = Domain(
     entry_fields=PASSAGE_FIELDS,
     formats=BOOK_FORMATS,
     entry_panel_label="Your reading data",
-    enriches=True,
+    # Stated rather than inherited: the neutral fallback is deliberately not a
+    # book's word, so the domain that wants one says so (technical spec 6.6).
+    entry_field_labels={"reread_count": "Rereads"},
+    enrichment=BOOK_ENRICHMENT,
     recognize=lambda value: recognize_book_input(value),
     chooses_covers=True,
 )

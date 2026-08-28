@@ -632,10 +632,11 @@ async def get_job_progress(job_id: str, request: Request) -> JobProgressResponse
 
 @enrichment_router.post("/backfill", status_code=202, response_model=BackfillResponse)
 async def backfill_enrichment(request: Request) -> BackfillResponse:
-    """Queue enrichment for persisted items an ISBN lookup could still improve.
+    """Queue enrichment for persisted items a provider lookup could still improve.
 
     Explicit and operator-driven: it only queues work, and the handler it queues fills
-    empty fields only, so it can never overwrite a hand edit.
+    empty fields only, so it can never overwrite a hand edit. Each domain is asked on
+    its own identifier and its own incompleteness rule (DEC-067 row 3).
     """
     from book_tracker.application.enrichment import enqueue_enrichment_backfill
 

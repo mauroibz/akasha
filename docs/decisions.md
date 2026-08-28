@@ -2812,3 +2812,593 @@ Append-only record of material architecture choices, product-default resolutions
   failed drafts. No backend, schema or API change is required. A 200-row browser test asserts window
   scroll and bounded mounted DOM, and the realistic 16-row walkthrough confirms that discard sends
   nothing and apply is the first status write.
+
+## DEC-088 — Anime's providers, measured: AniList and Kitsu, and Jikan rejected on evidence
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-052 (measure a domain rather than reason about it), DEC-051 (a curated
+  sort name beats a heuristic), DEC-067 row 3 and row 4, `docs/domain_metadata_roadmap_report.md`
+  (which called anime "a good domain, wrong default provider" and is superseded on that point by
+  what follows).
+- **Context:** The owner asked for anime as a third domain, with an importer for their own
+  MyAnimeList export. Four candidate providers were probed live from the deployment host on
+  2026-08-27 between 16:20 and 17:00 UTC. Nothing below is reasoned from documentation; each claim
+  names what was observed.
+
+### What was measured
+
+| Provider | Auth | Search | Resolve the export's 81 ids | Studios | Observed availability |
+|---|---|---|---|---|---|
+| **AniList** GraphQL | none, but a User-Agent is mandatory | 6/6, 0.3–1.5s median | **2 requests, 54 KiB** via `media(idMal_in:)` | `studios(isMain:true)`, same request | 100% |
+| **Kitsu** JSON:API | none | 6/6, 3.7s median, one 8.2s | 5 requests, 552 KiB via the mappings filter | `include=animeProductions.producer`, same request, `role == "studio"` | 100% |
+| **Jikan** (unofficial MAL mirror) | none | **0/12** | **1/81** | yes, when it answers | **~40 minutes of continuous HTTP 504** |
+| MyAnimeList API v2 | client id the owner must register | — | — | — | not measured; no credential |
+
+- **Jikan is rejected on measurement, not on principle.** Across two windows fifteen minutes apart it
+  returned `504 BadResponseException — Jikan failed to connect to MyAnimeList` to every request.
+  The single by-id success in 81 was a record fetched moments earlier, so it was Jikan's own cache
+  rather than a working path. `myanimelist.net` itself answered this host in 0.66s throughout, so
+  MAL was up and Jikan could not reach it. A scraper in the path is a dependency on somebody else's
+  tolerance, and that is what an availability measurement looks like when the tolerance runs out.
+- **AniList carries the MAL identity, so Jikan was never needed for it.** `Media.idMal` is published
+  on the record and `media(idMal_in: [...])` queries by it. The export's `series_animedb_id` is
+  therefore resolvable without MyAnimeList or any mirror of it in the request path.
+- **Kitsu answers the same question on a search row.** `include=mappings` returns the
+  `myanimelist/anime` external id for every result in the same request (14 KiB for two rows), which
+  is what makes an identity strategy possible rather than aspirational.
+
+### Decision
+
+- **Two providers: AniList first, Kitsu second.** `source_preference = ("anilist", "kitsu")`.
+- **`identity_key` returns `mal:<id>`, and returns `None` when a candidate carries no MAL mapping.**
+  This is the **first domain since books with a real cross-provider identity**. Albums answered
+  `None` because a barcode is not an edition key; anime has a global identifier that both providers
+  publish, so merging is correct rather than approximate. A row without a mapping — AniList returned
+  `idMal: null` for several legitimate ONA entries — merges with nothing, which is the honest answer.
+- **Kitsu is the hedge as well as the second source.** If the terms question below closes against
+  AniList, Kitsu already carries search, fetch, MAL-id identity and studios on its own. That is why
+  the domain ships with two adapters rather than one and a plan.
+- **The curated sort name is the studio name unchanged.** A studio never inverts, exactly as DEC-068
+  predicted for IGDB's companies, so both adapters supply `creator_sort` verbatim and the DEC-051
+  heuristic never runs on `MAPPA`.
+
+### Two things the owner has to own, stated rather than buried
+
+1. **AniList's terms name this application's category.** They prohibit use "within competing
+   noncomplementary services", listing "Anime/Manga list/tracker services", and permit non-commercial
+   use under $150/month revenue otherwise. Akasha with an anime domain is an anime tracker by the
+   plain reading. It is also single-user, LAN-only, self-hosted and unmonetised, and the terms carry
+   an authorization path at `contact@anilist.co`. **The owner chose to proceed on 2026-08-27** on
+   that reading. The Kitsu adapter exists so that reversing this decision is a configuration change
+   and not a sprint.
+2. **AniList requires a User-Agent.** Without one, Cloudflare answers `error code: 1010` with HTTP
+   403. One otherwise-normal request also took 40.04s against a sub-second median, so the adapter
+   goes through `bounded_json` with the interactive retry policy rather than a bare client.
+
+### Cover art
+
+Both hosts are new and each is one line in the allowlist (DEC-067 row 4 keeps that list central on
+purpose). Measured against the pipeline's bounds — `MIN_PROVIDER_COVER_EDGE` 200, `MAX_COVER_EDGE`
+600, aspect ratio under 3.0, 10 MiB:
+
+| Host | Variant to use | Measured |
+|---|---|---|
+| `s4.anilist.co` | `coverImage.extraLarge` | 460x635, 110 KiB, ratio 1.38 |
+| `media.kitsu.app` | `posterImage.large` | measured good; `original` is 980x1420 at **1.6 MiB PNG** and is not the one to ask for |
+
+`cdn.myanimelist.net` is **not** added, because Jikan is not registered. Note for whoever revisits
+this: MAL's default image variant is 225x313, which clears `MIN_PROVIDER_COVER_EDGE` by 25 pixels;
+the `l` suffix variant is 431x600 and is the one that would be correct.
+
+## DEC-089 — Anime is four sprints, and it collects two seams the plan deliberately left unbuilt
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-058 (the numbered plan ended at the domain contract; further domains are
+  epics), DEC-067 row 3 (enrichment beyond the ISBN, reserved for the first domain that needs it),
+  DEC-077 (entry depth: shape (a) is a per-domain progress field, and nothing was built),
+  DEC-088 (the providers), DEC-053 (a domain-line sprint runs on a branch).
+- **Context:** The owner asked whether anime is one sprint or several, and framed the exercise as a
+  test run for domain expansion whose findings feed back into the repository. `docs/guides/adding-a-domain.md`
+  promises that a domain is its own directory plus small registration points, with no migration and
+  no screen. **That promise holds for the anime domain itself and fails for the anime domain the
+  owner actually asked for**, because the MyAnimeList export carries two facts the core has no home
+  for. Both were foreseen and costed by earlier decisions; neither was built, because no domain had
+  yet asked.
+- **Decision — four sprints, in this dependency order.**
+
+  ```text
+  038 Anime: the third domain
+   ├─ 039 Enrichment beyond the ISBN     (DEC-067 row 3)
+   └─ 040 Entry progress                 (DEC-077 shape (a))
+        └─ 041 The MyAnimeList import    (depends on both)
+  ```
+
+  - **038 is the guide's promise, kept.** Package, two adapters, registration, recorded responses,
+    conformance. No migration, no new screen. If the guide is accurate, this sprint is evidence of it;
+    if it is not, this sprint is where that is discovered, and saying so is the point of the exercise.
+  - **039 pays DEC-067 row 3**, which named its own trigger: "the first domain that wants background
+    enrichment on a non-ISBN key pays for (b) then, with a real case to design against instead of a
+    hypothetical one." An imported MAL row is a `mal_id`, a title, a type and an episode count.
+    Everything else — cover, studio, year, synopsis, season — has to be fetched, and `_backfillable_items`
+    joins `item_identifiers` on the literal `'isbn'` while `_fetch` calls `fetch_by_isbn` against a
+    module-level `PROVIDER_ORDER` of two book providers. The row costed this at about half a sprint.
+  - **040 builds DEC-077 shape (a).** Every one of the 81 rows carries `my_watched_episodes`; one is
+    `Black Clover`, dropped at 20 of 170. The entry model has `date_started`, `date_finished` and
+    `reread_count` and nowhere to put that number. The verdict already chose the shape — "a
+    per-domain `progress` field, declarative under the Domain contract" — and built none of it. This
+    is the sprint that does, and it is **the only one of the four that touches a shared table.**
+  - **041 is the importer**, which lands complete because 039 and 040 precede it.
+
+- **Why not one sprint.** The four slices are 038 alone at roughly the size of Sprint 025, plus a
+  costed half-sprint, plus a migration on `entries` with its contract, API, UI and export surfaces,
+  plus a connector with a real 81-row source to walk through. Folding them together would mean
+  trimming the design to fit rather than splitting the plan, and would put a schema change on a
+  shared table in the same commit range as a new domain's first walkthrough.
+- **Why not gate 039 and 040.** A gate exists where cost is unknown (DEC-035, DEC-042). Both of these
+  were already measured and costed by the decisions that deferred them, and the owner settled both
+  forks at planning time on 2026-08-27: generalize enrichment rather than let the connector fetch at
+  read time, and build progress before the import rather than drop the data and re-import. Gating
+  what has already been priced and decided is ceremony.
+- **Consequences.** `FINAL_SPRINT` moves to 41 and plan revision to 20. The line runs on the
+  `sprint-038-anime` branch under DEC-053's rule, because a third domain is exactly the class of work
+  that could fail spectacularly and `main` is what it is abandoned back to. **Anime is no longer an
+  unnumbered epic**; games, series and Spotify remain so. If 038 completes without needing 039 or
+  040 — that is, if the guide's promise survives contact — those two sprints are still owed, because
+  the export the owner brought is what defines "complete" here.
+
+## DEC-090 — What building anime found: three shared changes, and the contract gained a field
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-088 (the providers), DEC-089 (the four-sprint plan), DEC-067 rows 1 and 5
+  (the couplings this touches), DEC-070 (the first time the guide was proved by following it),
+  DEC-052 and DEC-057 (the seams and the entry vocabulary).
+- **Context:** Sprint 038 built the anime domain from `docs/guides/adding-a-domain.md` alone, as the
+  owner's trial run of whether a third domain is really an epic on top of the Sprint 028 contract.
+  This entry records what that cost outside the domain's own directory, because the whole value of
+  the exercise is the parts the guide did not predict.
+
+### The promise held
+
+No migration. No screen written for the domain. No other domain's file touched. **Registering the
+domain broke nothing**: the full backend suite passed on the first run after the registry entry, and
+the conformance suite held anime to the contract by parametrization with **no test added to admit
+it**. Statuses, formats, triage hotkeys, the metadata dialog, the detail layout, facet counts and the
+domain chooser all rendered from `GET /api/item-types`.
+
+### Three changes outside the package, each with its alternative costed
+
+1. **`bounded_json` gained `method` and `json_body`.** It streamed `GET` only, because every provider
+   before AniList read with one; GraphQL asks by `POST`. The alternative was an adapter writing its
+   own request loop, which would have silently dropped the retry policy, the 2 MiB bound and the
+   streaming read — the three things that boundary exists to own. **This is not a seventh seam**: no
+   shared layer branches on a provider, the boundary gained a verb. Recorded because a future reader
+   should find a decision rather than an unexplained parameter.
+2. **Three `provider_health` tests were derived from the registry.** DEC-067 row 5 made the endpoint
+   itself registry-derived in Sprint 028 and left its tests asserting the wired providers as literal
+   lists, so a third domain's two adapters failed them **with no behaviour changing**. This is the
+   same defect `test_item_types.py` had when the guide was first proved (DEC-070), one layer down,
+   and the general rule is now written into the guide: a test that enumerates what exists today is a
+   test the next domain breaks.
+3. **`Domain` gained `entry_field_labels`.** Sprint 028 made the heading over the personal region the
+   domain's copy and left the three passage fields under it spelled for books, so an anime read
+   `Rereads`. Invisible until a domain arrived that reads none of the three correctly. The field is
+   partial on purpose — `Started` and `Finished` are right for a book and a series alike — keys are
+   refused by conformance unless the domain declares that field, and **the client fallback is a
+   neutral word rather than a book's**, for the same reason `labelFor` falls back to `Item`.
+
+### The identity finding
+
+**Anime is the first domain since books whose candidates genuinely merge.** Both providers publish
+the MyAnimeList id — AniList as `idMal`, Kitsu as a mapping returned inside the *search* response —
+so `identity_key` returns `mal:<id>` and a live search for `akame ga kill` returns one row carrying
+both `source_refs`, AniList primary. Albums answered `None` because a barcode is not an edition key
+(DEC-052); copying that answer here would have thrown away a real global identifier. A candidate with
+no mapping still merges with nothing, and AniList really does return `idMal: null`.
+
+### Two things stated rather than argued with
+
+- **A domain must declare at least one format.** Conformance refuses an empty vocabulary, so a domain
+  with no real notion of how a copy is held has to invent one. Anime declares `streaming`, `digital`,
+  `bluray`, which is honest enough. Whether the check is right is left open; it was satisfied, not
+  changed, because changing a conformance rule to suit the domain being added is how a contract stops
+  meaning anything.
+- **`creators` never renders as a labelled fact.** It becomes the credit line under the title for
+  every domain, so `FieldSpec("creators", "Studios", ...)` names something the detail page never
+  prints. Shared behaviour, not this domain's to change; now documented in the guide.
+
+### From the walkthrough, which no test would have found
+
+Kitsu returns four production companies for Akame ga Kill! and only one carries `role: "studio"` —
+Square Enix and TOHO animation are `producer`, Sentai Filmworks is `licensor`. Taking the first would
+have filed the series under its manga publisher. And Kitsu holds **no production records at all** for
+some series, Cowboy Bebop among them, so that record arrives with no creator; AniList has Sunrise for
+it. That is a gap in the source rather than in the adapter, and it is part of why AniList is primary.
+
+## DEC-091 — Enrichment beyond the ISBN, as built: three per-domain parts, not one
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-067 row 3 (the option (b) this builds, and the trigger it
+  named), DEC-089 (the four-sprint plan), DEC-088 and DEC-090 (the anime domain this was
+  designed against), DEC-008 (fill-empty-only), DEC-045 (the provider quota).
+- **Context:** DEC-067 row 3 costed generalizing enrichment at "about half a sprint" and
+  deferred it with its trigger stated: *the first domain that wants background enrichment
+  on a non-ISBN key pays for it then, with a real case to design against.* Anime is that
+  case — an imported MyAnimeList row is an id, a title, a type and an episode count, and
+  everything worth looking at has to be fetched.
+- **Decision — a domain declares an `EnrichmentSpec`, and it has three parts rather than
+  the two the row anticipated.**
+
+  1. **`identity_kind`** — the `item_identifiers.kind` the lookup is keyed on. The join
+     said `kind = 'isbn'` as a literal.
+  2. **`provider_order`** — which adapters answer it, in order. This was
+     `PROVIDER_ORDER`, a module constant in the shared layer naming two book providers.
+     Books' "Open Library first, Google Books as the fallback" now lives in
+     `domains/book/`, which is where product spec 4.2's reasoning always belonged.
+  3. **`completeness_fields`** — which missing metadata means "still worth asking".
+     **This is the part the sprint's own baseline missed**, though DEC-067 row 3's
+     option (b) did name it: a record counted as incomplete when it lacked `publisher`,
+     `page_count` or `description`. An anime has none of the three, so under the old
+     rule every anime would have looked incomplete for ever and been re-queued on every
+     backfill — the domain would have appeared to enrich while quietly never finishing.
+
+  Conformance refuses a `completeness_fields` entry naming a field the domain does not
+  declare, because a field it never stores is always absent. That bug is committed as a
+  malformed fixture rather than as a comment.
+
+- **Where each thing is checked, and why they are different places.** The conformance
+  suite has no provider catalog, so it can check the *shape* of a declaration and not
+  whether `provider_order` names an adapter anybody constructed. That check lives in
+  `test_enrichment_pipeline.py`, with the app built: every enriching domain's providers
+  must exist, implement `EnrichingProvider`, and serve that domain. Without it, a wiring
+  mistake surfaces only when a job runs, as `enrichment_not_configured` — which reads
+  exactly like a missing API key.
+- **`fetch_by_isbn` survives; it stopped being the interface.** `EnrichingProvider`'s
+  `fetch_by_identifier(kind, value)` is what enrichment asks through, and the book
+  adapters keep `fetch_by_isbn` because the *add* path genuinely resolves a typed ISBN —
+  that is a book's business. What could not survive was the shared enrichment layer
+  saying the word. A provider handed a kind it does not answer raises
+  `unsupported_identity_kind` rather than guessing.
+- **The handler reads the item's domain rather than trusting the payload.** The provider
+  order could have been frozen into the job at enqueue time; it is looked up instead, so
+  a job queued last week runs against the wiring this deployment actually has.
+- **The old payload still processes.** Jobs survive restart by design, so a
+  `{item_id, isbn}` row written before the upgrade is still in the queue after it. It is
+  read as the domain's own key. This has a test and was exercised live, because it is
+  the failure nobody would ever see: a stale row failing quietly in a queue no one
+  watches.
+- **Consequences.** DEC-067 row 3 is closed and `docs/guides/adding-a-domain.md` §6 —
+  titled "One thing that is not solved yet" since Sprint 028 — is now a description of
+  what a domain declares. No migration: a job is a row with a JSON payload. Anime
+  enriches; albums still declare `None`, which remains a complete answer. Sprint 041's
+  MyAnimeList import inherits a working fill path, which is the whole reason this sprint
+  precedes it.
+- **Observed and left alone.** `JobRepository.complete` does not clear `error` or
+  `error_code`, so a job that fails once and then succeeds keeps the stale failure text
+  beside a `succeeded` state. Seen live during the walkthrough on a retry. Pre-existing,
+  unrelated to this sprint, and recorded rather than fixed inside it.
+
+## DEC-092 — Entry progress, as built: a floor and no ceiling, and three states not two
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-077 (the verdict this implements), DEC-089 (the four-sprint
+  plan), DEC-067 row 1 (`ck_entries_status`, the mistake this deliberately does not
+  repeat), DEC-057 and DEC-060 (what a domain declares about its entries), DEC-090
+  and DEC-091 (what the two preceding sprints found).
+- **Context:** DEC-077 priced entry depth over nine shared surfaces, rejected child
+  entities with their own state, and chose **shape (a) — "a per-domain `progress` field,
+  declarative under the Domain contract"** — then built none of it. Anime is the first
+  domain to need it: every row of a MyAnimeList export carries a watched-episode count,
+  and 7 of the owner's 81 are partial.
+
+### The value is bounded below and not above, and the asymmetry is the decision
+
+The sprint's own first draft refused a count above the item's episode total. **The owner
+overruled it at planning time and was right.** Measured: AniList returns `episodes: null`
+for an airing or unreleased show; a weekly series' cached total is stale by definition;
+and an explicit metadata refresh can lower `episodes` underneath a count already stored,
+making a row that was valid when written violate a rule on its next write.
+
+That is `ck_entries_status`'s mistake in new clothes — a constraint over data the domain
+does not control — and migration `0014` exists to undo exactly it. Non-negativity is the
+opposite kind of rule: a neutral fact about a count that no domain redefines and no
+provider can invalidate, which is the category `ck_entries_score` and
+`ck_entries_reread_count` already occupy. So `ck_entries_progress` is spelled the way
+they are, and there is no upper bound anywhere in the stack. **The reader's number wins
+over our cache**, which is the technical spec's first priority.
+
+`ProgressSpec.total_field` therefore names a field for *display* — "20 / 170" — and the
+conformance suite checks it names a `number` field the domain actually declares, because
+a total pointing at nothing would make "20 / —" permanent. That is the same trap
+DEC-091 found in `completeness_fields`, and it is now the third contract field carrying
+that check.
+
+### Three states, and the two places they nearly collapsed into two
+
+`NULL` is *not recorded*; `0` is *recorded as zero* — the owner's library holds one, a
+film at 0 of 1 episodes under `Plan to Watch`; `N` is a count.
+
+1. **The column is nullable with no `server_default`.** A default of `0` — which
+   `reread_count` and `score_provisional` legitimately carry two lines away in the same
+   table — would have asserted that every existing book and album entry had recorded a
+   progress of zero, irreversibly and in the one direction a downgrade cannot repair.
+2. **The form's empty box means `null`, not `0`.** `Number("")` is `0`, so the
+   `reread_count` line directly above it in `DetailPage` could not be copied: that column
+   is non-nullable and has no way to say "none". Walked through in the browser rather
+   than assumed, because the failure is silent — every anime nobody typed a number into
+   would have been recorded as "watched zero episodes".
+
+`_validated` tests **membership** rather than truthiness so an explicit `null` is
+validated and applied rather than mistaken for "not sent", and `validate_progress` permits
+`None` on **every** domain including one declaring no progress. That last is deliberate:
+refusing it would strand a value a retyped item or a withdrawn declaration had already
+left behind, with no way to remove it. The orphan is named rather than swept — `entry_fields`
+has the same latent one and nothing sweeps that either.
+
+### The migration, and what a rebuild nearly cost
+
+SQLite cannot `ADD CONSTRAINT`, so a named CHECK costs a table rebuild. Two things that
+rebuild taught, both now asserted rather than assumed:
+
+- **A `copy_from` that already spells the new column dies on the row copy.** Alembic
+  builds the `INSERT … SELECT` from the `copy_from` columns, so the new column must
+  arrive inside the `with` block. This cost two failed attempts before it was understood.
+- **A rebuild is a `DROP TABLE`.** Under `PRAGMA foreign_keys=ON` that fires the
+  `ON DELETE CASCADE` on `entry_shelves` and `entry_formats`, emptying both with no error
+  and a migration that reports success. `alembic/env.py` never enables the pragma, unlike
+  `database.py` — **load-bearing, undocumented, and depended on by `0013` and `0014`
+  already**. Nothing tested it; the test now seeds a shelf and a format and asserts both
+  survive, and pins the six indexes a drifted `copy_from` would silently drop.
+
+Also corrected: `0014`'s docstring says SQLAlchemy does not reflect SQLite CHECK
+constraints. On SQLAlchemy 2.0 it does. `copy_from` is still right, for two other reasons
+— a reflected rebuild drops an *unnamed* CHECK and downgrades `ON DELETE RESTRICT` to a
+bare reference — and `0015` states those instead.
+
+### Consequences
+
+`entries.progress` is the only shared-table change in the anime line. The flat entry
+holds: `test_flat_entry_contract.py` passes unchanged, which is exactly what it was
+written to permit. Bulk deliberately does not carry progress — setting one episode count
+across a 200-row selection means nothing — and the omission is recorded here so nobody
+"completes" the set. Sprint 041's importer writes it through `ImportEntry.values`, which
+the three hand-enumerated `EntryRow` constructions now all carry.
+
+DEC-077's reopen condition 3 — two domains shipping shape (a) and their vocabularies
+drifting — is **not** met by one domain, and this entry is not that trigger.
+
+### A Sprint 038 miss, repaired here
+
+Reviewing 038 and 039 before planning this sprint found that its deliverable 5 claimed
+"the entry panel's last hardcoded book word" and fixed two of the **three** render sites.
+`AddForm.tsx` still spelled `Started`, `Finished` and `Reread count` verbatim, so adding
+an anime by hand said "Reread count" where the detail page said "Rewatches". Repaired as
+a prerequisite defect, per AGENTS.md.
+
+## DEC-093 — The connector boundary held, and the one thing that stopped it was a frozen list
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-076 and DEC-078 (importers normalize once; the shared
+  pipeline validates and commits), DEC-079 and DEC-080 (self-describing connectors),
+  DEC-067 row 1 (`ck_entries_status`, the mistake this repeats one table over),
+  DEC-088–DEC-092 (the rest of the anime line), DEC-089 (the four-sprint plan).
+- **Context:** Sprint 041 is the last of the anime line and the test of the *connector*
+  half of `docs/guides/adding-a-domain.md`, the way Sprint 038 tested the domain half.
+  The guide promises an importer is "another object in that same directory plus one
+  registry tuple entry; it does not change the shared pipeline." A MyAnimeList reader
+  targeting anime was written against that promise by a session that did not write the
+  pipeline.
+
+### The promise held in code and failed in the schema
+
+`api/imports.py`, `ImportPage.tsx` and `TriagePage.tsx` were **not touched at all**. The
+tab, the guide, the help link, the drop zone, the preview list, commit, undo and the
+whole of Triage rendered a connector they had never heard of. `application/imports.py`
+changed by eight lines, and that was a pre-existing repair rather than anything this
+connector needed.
+
+**What did not hold was `ck_import_batches_kind`.** Migration `0002` wrote
+`CHECK (kind IN ('goodreads','calibre'))` and froze it there. It is exactly
+`ck_entries_status`'s mistake one table over, and it survived because no connector had
+been added since — the first one to try failed at commit with
+`CHECK constraint failed: ck_import_batches_kind`, after passing every application check.
+
+Migration `0016` drops it, mirroring `0014`. `IMPORTERS` is the authority and is strictly
+stronger: the route resolves a name against the registry and answers 404 for anything it
+does not hold, which the constraint could never express — it could only carry whichever
+names existed the day it was written, and it happily admitted `calibre` on a row an anime
+connector produced. `uq_import_batch_input` stays, because `(kind, fingerprint)` is a real
+invariant rather than a frozen list.
+
+**So the honest verdict is: adding a connector cost one tuple entry and one migration on a
+shared table, and the migration existed only to delete a constraint that should never have
+been written.** The guide is corrected rather than the promise weakened.
+
+### Seven defects the owner's own file would never have found
+
+The connector passed its first tests, imported all 81 rows and enriched them. An
+adversarial review then found seven ways it would have failed on a *different* export,
+each reproduced before it was fixed. They are recorded because the shape is the lesson:
+**a reader tested only against the file in front of you is tested against one file.**
+
+Four would have aborted the whole import under `invalid_import_record`, a code outside
+the connector's declared vocabulary that no screen has copy for:
+
+- **`series_episodes` of `0`** — MyAnimeList's spelling of "still airing", and the domain
+  declares `episodes` with a minimum of 1. Every row in the owner's file has a real count,
+  so this ships the day he adds a currently-airing show.
+- **A blank `series_title`**, which fails the shared validator's own check.
+- **Out-of-range numbers**, which are worse: `ck_entries_score` and `ck_entries_progress`
+  pass preview and raise an `IntegrityError` at commit, half way through the batch.
+
+Two lost data in silence: a **duplicate `series_animedb_id`** would have found the item the
+first row created, seen an entry already there and counted itself `unchanged` — its score,
+dates and watch count discarded under a success — and a **half-known date** like
+`2021-05-00`, which MyAnimeList writes for a date it partly knows, would have been stored
+verbatim in a text column with no CHECK and read as a date thereafter. One was a plain
+500: `shelf_slug` raises on a tag of pure punctuation, and the Goodreads reader calls it
+unguarded to this day.
+
+### Two things measured rather than assumed
+
+- **ElementTree expands internal entities on Python 3.12**, so billion laughs is live. It
+  expands *inside the parser*, where a decompression ceiling cannot reach it. External
+  entities and external DTDs are already ignored, so there is no file disclosure. The
+  whole exposure is inside a `<!DOCTYPE`, and the guard is the parser's own `doctype`
+  callback rather than a scan of the bytes — a scan refuses a legitimate file whose
+  *comment* mentions one and misses a real declaration in any encoding it cannot read.
+  Because it is a callback the standard library chooses to invoke, **the test that it
+  fires is load-bearing**.
+- **The upload route caps the body at 5 MiB of *compressed* bytes and never consults
+  `ImportInputSpec.max_bytes`**, while publishing that value to the client. Deflate
+  reaches about 1,000:1, so the route's cap bounds nothing. The connector declares no
+  `max_bytes` — advertising a limit the server does not keep is worse than declaring none
+  — and defends itself with an 8 MiB ceiling on the decompressed stream, read
+  incrementally rather than through `gzip.decompress`.
+
+### A re-import adds and does not update
+
+Confirmed against `repositories.py`: a matched entry is linked and skipped entirely, so a
+fresher export never updates a stale watched-episode count. That is the invariant working
+as designed, and the owner settled it at planning time. **The limit is written into the
+connector's own guide text**, so it is read on the import screen before uploading rather
+than discovered afterwards.
+
+### What the walkthrough showed
+
+The owner's real export: 81 records previewed with zero row errors and every measured
+count matching (74/6/1 across the three statuses present, 3 unscored, 5 finish dates, 0
+start dates); 81 items and 81 `unsorted` entries committed; all 81 enriched from AniList
+with covers, years, studios and synopses; `Black Clover` reading 20 of 170; re-uploading
+the same file replaying rather than importing twice; and undo reversing a new batch
+completely, progress included.
+
+## DEC-094 — What the third domain actually cost, and the six things worth fixing before a fourth
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-090, DEC-091, DEC-092, DEC-093 (the four sprints this reflects
+  on), DEC-052 and DEC-066/DEC-067 (the contract being tested), DEC-058 and DEC-089 (the
+  plan lines this extends).
+- **Context:** The owner framed Sprints 038–041 as a trial run of the Sprint 028 domain
+  contract and asked, at its close, what should change so the next domain goes better.
+  This entry is the answer and the reason `FINAL_SPRINT` moves to 42.
+
+### The finding, which is not the one that was expected
+
+**The abstraction held. The friction was mechanical.** Almost nothing that cost time came
+from the domain contract being wrong: it came from test hygiene, from an undocumented
+migration recipe, and from UI control idioms written down nowhere. That is worth stating
+plainly, because the tempting conclusion after four sprints of findings is that the
+architecture needs work, and the evidence does not support it.
+
+Ranked by time actually lost across the line:
+
+1. **Walkthrough selector churn.** Every walkthrough needed two to four selector
+   corrections on its first run, and **in every case the assumption was wrong rather than
+   the product**. The domain chooser is a `radiogroup`, the library status filter is a
+   popover whose options carry facet counts, library rows use popovers where Triage uses
+   native selects, the Triage heading reads `Inbox N unsorted`. Pure documentation, and
+   the single largest sink.
+2. **The `entries` rebuild recipe.** Three failed attempts in Sprint 040 before the rules
+   were understood: `copy_from` must not spell the new column, a module-level `Column`
+   cannot be reused, and a rebuild is a `DROP TABLE` whose cascade is only survivable
+   because `alembic/env.py` never enables `PRAGMA foreign_keys` — a load-bearing silence
+   that the file still does not mention.
+3. **`validate_entry_fields` is a denylist.** It refuses only `PASSAGE_FIELDS` names a
+   domain lacks and is silent about everything else, which is how `progress` reached
+   storage unvalidated on the import path for a whole sprint, and how Sprint 040's Outcome
+   came to claim a guard that did not exist.
+4. **Conformance has no wiring tier.** A domain can be internally consistent and hostable
+   by the core and still name a provider nobody constructed; that surfaces at runtime as
+   `enrichment_not_configured`, which reads like a missing API key.
+5. **Three render sites for entry fields**, of which Sprint 038 fixed two.
+6. **Three hand-enumerated `EntryRow` constructions**, so a new column is a three-site edit.
+
+### Two classes now closed, and one of them should be kept closed by a test
+
+- **Tests that enumerate what exists today** broke five times across five sprints
+  (`test_item_types`, `provider_health`, the enrichment revision lists, `test_backup`'s
+  head revision, the published importer ids). Each failed with no behaviour changing. All
+  are derived now, and the remaining literal `{"book", "album"}` assertions are tests
+  checking data they created themselves, which is legitimate.
+- **Schema constraints freezing an application-owned vocabulary** were written twice and
+  deleted twice (`ck_entries_status`, `ck_import_batches_kind`). Verified: no live third
+  exists. Nothing keeps it that way, so Sprint 042 adds the guard.
+
+### Decision
+
+Sprint 042 builds the six items above minus the frontend hook, which is deferred as a
+refactor with its own risk rather than a contract problem — Sprint 040 already repaired
+its one real consequence. `FINAL_SPRINT` moves to 42 and the plan revision to 21.
+
+**What is deliberately not built:** the OAuth seam IGDB will need, a generalised cover
+chooser, and anything else speculative. Deliverables 1–3 are about not repeating *known*
+mistakes; the rest of the contract's future should be designed against the domain that
+asks for it, which is the same rule DEC-067 row 3 followed and which produced Sprint 039.
+
+### The honest caveat
+
+**This is a sample of one domain**, and an unusual one: anime was the first with a real
+cross-provider identity, the first to need enrichment on a key that is not an ISBN, and
+the first to need a per-entry number. Games would exercise authentication with a lifetime
+instead and would very likely surface a different list. There is a real argument for
+waiting for a second data point rather than optimising for what anime happened to hit; it
+was weighed and rejected, because items 1 to 3 record mistakes already made rather than
+predictions about mistakes to come.
+
+## DEC-095 — A Triage status control is the target, with its commit on the row
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Supersedes:** DEC-087's persisted-status reset point and page-toolbar-only commit;
+  preserves its staged multi-row apply, discard, partial-failure and window-virtualization
+  contracts. Extends DEC-085 and DEC-086's row-local/native-control decisions.
+- **Context:** The owner's first real anime triage exposed two slightly different mental
+  models in one row. Every entry displayed Inbox because that is its persisted status,
+  while anime also displayed a separate chip for the imported target. Calibre books had
+  no suggestion chip, so the owner had to replace Inbox manually, then move away from the
+  row to a sticky Apply bar. An untouched anime row whose target and score were already
+  correct had no one-row approval action at all. Inbox communicates nothing inside the
+  Inbox screen; the decision is where the entry should go.
+- **Decision:** A Triage row status select displays an explicit draft, otherwise the
+  importer's suggestion, otherwise the domain's declared `default_status`. It contains
+  only statuses the domain marks `choosable`; `unsorted` remains the persisted queue state
+  but is neither displayed nor offered. The separate suggestion chip is removed. A check
+  action at the row's right commits the displayed target through the existing grouped bulk
+  mutation, even if the owner never touched the select. Manual choices remain drafts, so
+  the existing sticky Apply/Discard surface still handles several decisions together.
+  Discard restores the suggestion/default. Applying one row clears only that attempted
+  row, not unrelated drafts; failure keeps the target ready to retry.
+- **Consequences:** Suggested anime and suggestion-less Calibre books now use one flow.
+  No domain name, backend route, API shape, schema or migration changes. The domain
+  registry already supplied both required facts (`default_status` and `choosable`). Plan
+  revision 22 inserts this as Sprint 042, moves the DEC-094 work unchanged to Sprint 043,
+  and moves `FINAL_SPRINT` from 42 to 43.
+
+## DEC-096 — Triage status decisions have one commit surface and survive navigation
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Supersedes:** DEC-095's retained sticky Apply/Discard surface; preserves its target
+  precedence, row Apply, failure retry and explicit checkbox bulk-action contracts.
+- **Context:** In the owner's approval pass, the added row check made the separate status-change
+  toolbar visibly redundant: the select already showed the row's pending decision and the check
+  already committed it. Removing that toolbar exposed the remaining risk—draft state lived only in
+  the mounted Triage component, so leaving to inspect Detail or Library could erase work.
+- **Decision:** The row check is the only commit surface for a row target. Its compact treatment is
+  a yellow check on a dark circular button, with the full target-and-title accessible name and no
+  visible `Apply` copy. There is no global Apply/Discard toolbar for row drafts; choosing the
+  suggestion/domain default again clears a draft. Drafts mirror into versioned, tab-scoped
+  `sessionStorage`, survive route changes and refresh, clear on a successful row or explicit bulk
+  status commit, and remain after failure. The checkbox-driven bulk toolbar is unchanged.
+- **Consequences:** The UI now has one visible decision and one commit point per ordinary row,
+  without losing unfinished choices during inspection. Persistence is deliberately tab-scoped:
+  drafts do not leak into another browser tab or become durable library data before approval. No
+  backend, API, schema, migration or dependency changes. Plan revision 23 records this as Sprint
+  043, moves the DEC-094 work unchanged to Sprint 044, and moves `FINAL_SPRINT` to 44.

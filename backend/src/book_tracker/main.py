@@ -25,6 +25,7 @@ from book_tracker.database import create_engine
 from book_tracker.domain.providers import Provider
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domains.album.providers import MusicBrainzProvider
+from book_tracker.domains.anime.providers import AniListProvider, KitsuProvider
 from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.providers import create_provider_client
@@ -164,6 +165,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 provider_client, configured.user_agent_contact or "local@example.invalid"
             )
         )
+        # The anime domain. Neither provider needs a key, and both were measured rather
+        # than chosen from documentation (DEC-088). AniList is primary; Kitsu is the
+        # second opinion and the hedge, so a build that lost one still has a domain.
+        # The User-Agent is not courtesy here: AniList answers 403 without it.
+        catalog.extend(
+            (
+                AniListProvider(
+                    provider_client, configured.user_agent_contact or "local@example.invalid"
+                ),
+                KitsuProvider(
+                    provider_client, configured.user_agent_contact or "local@example.invalid"
+                ),
+            )
+        )
         app.state.provider_catalog = {provider.name: provider for provider in catalog}
         # What search, add and enrichment actually reach. A provider missing its
         # configuration is disabled, not failed (technical spec 6.2).
@@ -212,7 +227,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha Book Tracker", version="1.2.0", lifespan=lifespan)
+    app = FastAPI(title="Akasha Book Tracker", version="1.3.0", lifespan=lifespan)
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:

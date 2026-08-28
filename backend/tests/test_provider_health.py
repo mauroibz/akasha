@@ -42,18 +42,20 @@ async def test_missing_google_key_warns_at_startup_and_reports_a_degraded_provid
     body = response.json()
     assert response.status_code == 200
     assert body["degraded"] is True
-    # In the order each domain prefers its sources, domains in registry order, rather
-    # than in an order this endpoint decides for itself (DEC-067 row 5).
-    assert body["providers"] == [
-        {"name": "openlibrary", "available": True, "reason": None},
-        {
-            "name": "googlebooks",
-            "available": False,
-            "reason": "GOOGLE_BOOKS_API_KEY is not set",
-        },
-        # The album provider needs no key, so it is available wherever it is wired.
-        {"name": "musicbrainz", "available": True, "reason": None},
-    ]
+    rows = {row["name"]: row for row in body["providers"]}
+    # The one provider that needs configuration says so, by name and with the reason.
+    assert rows["googlebooks"] == {
+        "name": "googlebooks",
+        "available": False,
+        "reason": "GOOGLE_BOOKS_API_KEY is not set",
+    }
+    # Every other wired provider needs no key, so it is available. Asserted over the
+    # catalog rather than over a literal list: this test used to enumerate the three
+    # providers of the day, so registering a third domain's two adapters failed it for
+    # no behavioural reason. That is the same defect `test_item_types.py` was repaired
+    # for when the guide was proved by following it (DEC-070), one layer down.
+    assert rows.keys() == set(app.state.provider_catalog)
+    assert all(row["available"] for name, row in rows.items() if name != "googlebooks")
 
 
 @pytest.mark.anyio
@@ -67,11 +69,8 @@ async def test_a_configured_key_reports_every_provider_available(tmp_path: Path)
 
     body = response.json()
     assert body["degraded"] is False
-    assert [row["name"] for row in body["providers"]] == [
-        "openlibrary",
-        "googlebooks",
-        "musicbrainz",
-    ]
+    # Every provider this build wires, and nothing this endpoint decided for itself.
+    assert {row["name"] for row in body["providers"]} == set(app.state.provider_catalog)
     assert all(row["available"] for row in body["providers"])
 
 
@@ -149,7 +148,15 @@ async def test_the_rows_are_derived_from_the_registry_not_from_a_list_of_names(
 
 @pytest.mark.anyio
 async def test_the_rows_follow_the_order_each_domain_prefers(tmp_path: Path) -> None:
-    """Open Library before Google Books is books' own preference (product spec 4.3)."""
+    """Open Library before Google Books is books' own preference (product spec 4.3).
+
+    Checked as *relative* order per domain, derived from each domain's declared
+    `source_preference`, rather than as one literal list. A list is a snapshot of which
+    domains happened to be registered on the day it was written, which is exactly what
+    made this test fail when a third domain arrived without changing any behaviour.
+    """
+    from book_tracker.domain.registry import DOMAINS
+
     app = create_app(settings(tmp_path, key="test-key"))
     async with (
         app.router.lifespan_context(app),
@@ -157,8 +164,11 @@ async def test_the_rows_follow_the_order_each_domain_prefers(tmp_path: Path) -> 
     ):
         response = await client.get("/api/health/providers")
 
-    assert [row["name"] for row in response.json()["providers"]] == [
-        "openlibrary",
-        "googlebooks",
-        "musicbrainz",
-    ]
+    order = [row["name"] for row in response.json()["providers"]]
+    assert order, "the endpoint published no providers at all"
+    for domain in DOMAINS.values():
+        wired = [name for name in domain.identity.source_preference if name in order]
+        positions = [order.index(name) for name in wired]
+        assert positions == sorted(positions), (
+            f"{domain.item_type}'s providers are not in the order it prefers them"
+        )

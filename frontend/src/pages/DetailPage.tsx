@@ -37,11 +37,14 @@ import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
   choosesCovers,
+  entryFieldLabel,
   entryPanelLabel,
   formatLabels,
   hasEntryField,
+  progressFor,
   statusLabelFor,
 } from "@/features/library/labels";
+import type { EntryFieldName } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -209,8 +212,18 @@ export function DetailPage() {
   // gets its own region rather than being joined into one line (a tracklist).
   const rowFields = fields.filter((field) => field.type === "rows");
   const editableFields = fields.filter((field) => field.type !== "rows");
-  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+  const has = (field: EntryFieldName) =>
     hasEntryField(item.type, itemTypes.data, field);
+  // The domain's own word for the field, not a book's (technical spec 6.6).
+  const nameOf = (field: EntryFieldName) =>
+    entryFieldLabel(item.type, itemTypes.data, field);
+  const progress = progressFor(item.type, itemTypes.data);
+  // The total is the item's own metadata and is often absent — an airing series has
+  // none — so the reading falls back to the bare count rather than "20 / —".
+  const progressTotal =
+    progress?.total_field != null
+      ? item.metadata[progress.total_field]
+      : undefined;
 
   async function handleDelete() {
     setDeleteError("");
@@ -355,18 +368,27 @@ export function DetailPage() {
                   .join(", ") || "—"}
               </Fact>
               {has("date_started") && (
-                <Fact name="started" label="Started">
+                <Fact name="started" label={nameOf("date_started")}>
                   {entry.date_started ?? "—"}
                 </Fact>
               )}
               {has("date_finished") && (
-                <Fact name="finished" label="Finished">
+                <Fact name="finished" label={nameOf("date_finished")}>
                   {entry.date_finished ?? "—"}
                 </Fact>
               )}
               {has("reread_count") && (
-                <Fact name="rereads" label="Rereads">
+                <Fact name="rereads" label={nameOf("reread_count")}>
                   {entry.reread_count}
+                </Fact>
+              )}
+              {progress && (
+                <Fact name="progress" label={progress.label}>
+                  {entry.progress == null
+                    ? "—"
+                    : typeof progressTotal === "number"
+                      ? `${entry.progress} / ${progressTotal} ${progress.unit_label}s`
+                      : `${entry.progress} ${progress.unit_label}s`}
                 </Fact>
               )}
               {/* Editable where it is read. The owner's complaint was distance:
@@ -520,6 +542,15 @@ export function DetailPage() {
                   : {}),
                 ...(has("reread_count")
                   ? { reread_count: Number(values.reread_count || 0) }
+                  : {}),
+                // `""` is "not recorded" and must reach the server as null, while
+                // `"0"` is a recorded zero. `Number("")` is `0`, so the empty check
+                // comes first — the reread line above cannot be copied here.
+                ...(progress
+                  ? {
+                      progress:
+                        values.progress === "" ? null : Number(values.progress),
+                    }
                   : {}),
               }),
             )

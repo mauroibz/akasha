@@ -1,0 +1,227 @@
+{
+  "data": {
+    "Page": {
+      "media": [
+        {
+          "id": 154587,
+          "idMal": 52991,
+          "title": {
+            "romaji": "Sousou no Frieren",
+            "english": "Frieren: Beyond Journey’s End",
+            "native": "葬送のフリーレン"
+          },
+          "format": "TV",
+          "episodes": 28,
+          "duration": 24,
+          "status": "FINISHED",
+          "startDate": {
+            "year": 2023
+          },
+          "season": "FALL",
+          "seasonYear": 2023,
+          "source": "MANGA",
+          "countryOfOrigin": "JP",
+          "siteUrl": "https://anilist.co/anime/154587",
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Fantasy"
+          ],
+          "studios": {
+            "nodes": [
+              {
+                "name": "MADHOUSE"
+              }
+            ]
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx154587-qQTzQnEJJ3oB.jpg"
+          },
+          "description": "The adventure is over but life goes on for an elf mage just beginning to learn what living is all about. Elf mage Frieren and her courageous fellow adventurers have defeated the Demon King and brought peace to the land. But Frieren will long outlive the rest of her former party. How will she come to understand what life means to the people around her? Decades after their victory, the funeral of one her friends confronts Frieren with her own near immortality. Frieren sets out to fulfill the last wishes of her comrades and finds herself beginning a new adventure…\n<br><br>\n(Source: Crunchyroll)"
+        },
+        {
+          "id": 209939,
+          "idMal": 63816,
+          "title": {
+            "romaji": "Sousou no Frieren 3rd Season",
+            "english": null,
+            "native": "葬送のフリーレン 第3期"
+          },
+          "format": "TV",
+          "episodes": null,
+          "duration": null,
+          "status": "NOT_YET_RELEASED",
+          "startDate": {
+            "year": 2027
+          },
+          "season": "FALL",
+          "seasonYear": 2027,
+          "source": "MANGA",
+          "countryOfOrigin": "JP",
+          "siteUrl": "https://anilist.co/anime/209939",
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Fantasy"
+          ],
+          "studios": {
+            "nodes": [
+              {
+                "name": "MADHOUSE"
+              }
+            ]
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx209939-g2Njkml1rheG.jpg"
+          },
+          "description": "The third season of <i>Sousou no Frieren</i>."
+        },
+        {
+          "id": 182255,
+          "idMal": 59978,
+          "title": {
+            "romaji": "Sousou no Frieren 2nd Season",
+            "english": "Frieren: Beyond Journey’s End Season 2",
+            "native": "葬送のフリーレン 第2期"
+          },
+          "format": "TV",
+          "episodes": 10,
+          "duration": 24,
+          "status": "FINISHED",
+          "startDate": {
+            "year": 2026
+          },
+          "season": "WINTER",
+          "seasonYear": 2026,
+          "source": "MANGA",
+          "countryOfOrigin": "JP",
+          "siteUrl": "https://anilist.co/anime/182255",
+          "genres": [
+            "Adventure",
+            "Drama",
+            "Fantasy"
+          ],
+          "studios": {
+            "nodes": [
+              {
+                "name": "MADHOUSE"
+              }
+            ]
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx182255-butzrqd4I0aC.jpg"
+          },
+          "description": "Following the First-Class Mage Exam, the trio—elven mage Frieren, warrior Stark, and first-class mage Fern—gains access to the dangerous Northern Plateau. As the party presses onward toward Aureole, formidable adversaries force Stark to confront his insecurities, solidifying his resolve and his role as the party's frontliner. Meanwhile, Fern continues to cherish the gifts she has been blessed with throughout her life, each a reminder of those she holds dear.<br><br>\n\nFrieren—still honoring her vow to understand humanity—revisits memories of her journey with the Hero's party and her fleeting encounter with a legendary figure. As she reflects on the passage of time, the elven mage quietly questions whether she has truly changed, yet in the small, almost subtle choices that she makes, there are signs that she might have become more human than she realizes.<br><br>\n\n(Source: MAL Rewrite)"
+        },
+        {
+          "id": 170068,
+          "idMal": 56885,
+          "title": {
+            "romaji": "Sousou no Frieren: ●● no Mahou",
+            "english": null,
+            "native": "葬送のフリーレン ～●●の魔法～"
+          },
+          "format": "ONA",
+          "episodes": 12,
+          "duration": 1,
+          "status": "FINISHED",
+          "startDate": {
+            "year": 2023
+          },
+          "season": "FALL",
+          "seasonYear": 2023,
+          "source": "MANGA",
+          "countryOfOrigin": "JP",
+          "siteUrl": "https://anilist.co/anime/170068",
+          "genres": [
+            "Comedy",
+            "Fantasy"
+          ],
+          "studios": {
+            "nodes": [
+              {
+                "name": "TOHO animation STUDIO"
+              }
+            ]
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx170068-ijY3tCP8KoWP.jpg"
+          },
+          "description": "Chibi shorts posted on the official YouTube account of TOHO animation and Twitter account of the main series.<br><br>\n<i>Note: Includes \"Tokubetsu-hen:「Shokutaku o Shiawase ni Suru Mahou」/ Mizkan Ajipon Collaboration\"</i>"
+        },
+        {
+          "id": 189513,
+          "idMal": null,
+          "title": {
+            "romaji": "Sousou no Frieren: ●● no Mahou Part 2",
+            "english": null,
+            "native": "葬送のフリーレン ～●●の魔法～ 2クール"
+          },
+          "format": "ONA",
+          "episodes": 6,
+          "duration": 1,
+          "status": "FINISHED",
+          "startDate": {
+            "year": 2025
+          },
+          "season": "SPRING",
+          "seasonYear": 2025,
+          "source": "ORIGINAL",
+          "countryOfOrigin": "JP",
+          "siteUrl": "https://anilist.co/anime/189513",
+          "genres": [
+            "Comedy",
+            "Fantasy"
+          ],
+          "studios": {
+            "nodes": [
+              {
+                "name": "TOHO animation STUDIO"
+              }
+            ]
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/large/bx189513-1R9Sryve0K53.png"
+          },
+          "description": "A second batch of the <i>●● no Mahou</i> shorts released monthly in the lead up to the TV anime's second season, starting with #12. Posted on the official YouTube account of TOHO animation, Frieren Twitter, and Frieren TikTok account.<br><br>\n\n<b>Includes:</b><br>\n• Shinchou ga Nobiru Mahou (身長が伸びる魔法), released Apr 2, 2025. <br>\n• Onaka-ippai ni Naru Mahou (おなかいっぱいになる魔法), released May 7, 2025. <br>\n• Daitai Nan demo Kiru Mahou (大体なんでも切る魔法), released Jun 4, 2025. <br>\n• Kousoku de Idou Suru Mahou (高速で移動する魔法), released Jul 2, 2025. <br>\n• Karada no Mawari wo Suzushiku Suru Mahou (体のまわりを涼しくする魔法), released Aug 6, 2025. <br>\n• Tokui Waza wo Fuujiru Mahou (得意技を封じる魔法), released Sep 3, 2025.<br>"
+        },
+        {
+          "id": 206425,
+          "idMal": null,
+          "title": {
+            "romaji": "Sousou no Frieren: ●● no Mahou Part 3",
+            "english": null,
+            "native": "葬送のフリーレン ～●●の魔法～ 3クール"
+          },
+          "format": "ONA",
+          "episodes": null,
+          "duration": 1,
+          "status": "RELEASING",
+          "startDate": {
+            "year": 2026
+          },
+          "season": "WINTER",
+          "seasonYear": 2026,
+          "source": "ORIGINAL",
+          "countryOfOrigin": "JP",
+          "siteUrl": "https://anilist.co/anime/206425",
+          "genres": [
+            "Comedy",
+            "Fantasy"
+          ],
+          "studios": {
+            "nodes": [
+              {
+                "name": "TOHO animation STUDIO"
+              }
+            ]
+          },
+          "coverImage": {
+            "extraLarge": "https://s4.anilist.co/file/anilistcdn/media/anime/cover/medium/b206425-WOwXsfDbHZwb.jpg"
+          },
+          "description": "A third batch of the <i>●● no Mahou</i> shorts released alongside the airing of the TV anime's second season, starting with #18. Posted on the official YouTube account of TOHO animation, Frieren Twitter, and Frieren TikTok account.<br><br>\n\n<b>Includes:</b><br>\n• Mita Mono wo Kousoku Suru Mahou (見た者を拘束する魔法), released Jan 19, 2026. <br>\n• Doushin ni Kaeru Mahou (童心に還る魔法), released Feb 2, 2026.<br>\n• Kokoro to Karada ga Irekawaru Mahou (心と体が入れ替わる魔法), released Feb 17, 2026.<br>\n• Osentaku no Mahou (お洗濯の魔法), released Mar 2, 2026.<br>\n• Kangaeteiru Koto wo Itte Shimau Mahou Sono Ni (考えていることを言ってしまう魔法その2), released Mar 16, 2026.<br>\n• Akogare ni Hitareru Mahou (憧れにひたれる魔法), released on May 22, 2026.<br>"
+        }
+      ]
+    }
+  }
+}

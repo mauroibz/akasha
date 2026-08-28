@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "plan_revision": 19,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
-  "last_completed_sprint": "037",
+  "plan_revision": 23,
+  "project_status": "ready",
+  "active_sprint": "044",
+  "active_sprint_file": "docs/sprints/044-sharpening-the-domain-contract.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "043",
   "completed_sprints": [
     "001",
     "002",
@@ -43,8 +43,14 @@
     "034",
     "035",
     "036",
-    "037"
+    "037",
+    "038",
+    "039",
+    "040",
+    "041",
+    "042",
+    "043"
   ],
   "started_at": null,
-  "updated_at": "2026-08-22T03:38:40-03:00"
+  "updated_at": "2026-08-27T20:02:34-03:00"
 }

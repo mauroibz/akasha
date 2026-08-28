@@ -4,15 +4,23 @@
 [technical spec §6.6](../specs/technical-spec.md). Where they disagree, the spec wins and this
 document is wrong.
 
-A **domain** is a kind of thing the library holds. Books and albums ship today. A third one — games,
-films, board games — is built by following this guide, and **you should not need to read how albums
-were built to do it.** If you find yourself reading Sprints 025–028 to answer a question this guide
-does not, that is a defect in this guide; say so.
+A **domain** is a kind of thing the library holds. Books, albums and anime ship today. A fourth one —
+games, films, board games — is built by following this guide, and **you should not need to read how
+albums were built to do it.** If you find yourself reading Sprints 025–028 to answer a question this
+guide does not, that is a defect in this guide; say so.
+
+**Anime was built from this page alone in Sprint 038, and §3's closing note records what that
+found.** Two things it did not predict cost a shared change each; everything else held.
 
 The promise this structure exists to keep: **adding a domain touches your own directory and small,
 explicit registration points. It does not touch another domain's files, and it does not require a
 database migration.** An optional importer is another object in that same directory plus one
 registry tuple entry; it does not change the shared pipeline.
+
+**Both halves have now been built by somebody who did not write the contract.** The domain half held
+(§3's closing note); the connector half held in code — `api/imports.py` and both screens were not
+touched at all — and failed once in the schema, on a frozen list that has since been deleted
+(DEC-093). Neither promise is aspirational any more, and neither is unqualified.
 
 ---
 
@@ -144,7 +152,9 @@ domain's vocabulary is never a schema change (DEC-067 row 1).
 ## 3. Step by step
 
 The worked example throughout is `domains/album/`, which is the shortest complete domain in the
-repository — read it start to finish, it is about 120 lines.
+repository — read it start to finish, it is about 120 lines. `domains/anime/` is the most recent and
+the only one with two providers that genuinely merge; read that one if your source has a shared
+identifier.
 
 ### Step 1 — Create the package
 
@@ -171,7 +181,7 @@ DOMAIN = Domain(
     entry_fields=frozenset(),       # which passage fields you have: none, for an album
     formats=ALBUM_FORMATS,          # how a copy is held
     entry_panel_label="Your copy",  # the heading over the personal region
-    enriches=False,                 # background enrichment: see §6
+    enrichment=None,                # background enrichment: see §6
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,           # the cover chooser: see §5
 )
@@ -185,13 +195,29 @@ DOMAIN = Domain(
   status, not in a second table that can drift from it.
 - **Formats.** Multi-valued on the entry and independent of status, so "wishlist → vinyl" is
   expressible. The vocabulary is **closed and declared**. A value the owner invents is a *shelf*,
-  which is a different feature; the two must never converge into one control (DEC-059).
+  which is a different feature; the two must never converge into one control (DEC-059). **At least
+  one is required** — conformance refuses an empty vocabulary, so a domain with no real notion of
+  how a copy is held still has to name one.
+- **Progress.** Optional. If "how far through it are you" is a real question for your
+  domain — episodes watched, chapters read — declare a `ProgressSpec` with a label, a
+  singular unit, and optionally `total_field` naming a `number` metadata field to read
+  "20 / 170" against. **The total is display only and never a bound**: a cached total
+  goes stale, an airing series has none at all, and a refresh could lower it under a
+  count already stored, so the reader's number always wins (DEC-092). `None` is a
+  complete answer, and books and albums both give it. `NULL` means *not recorded* and
+  `0` means *recorded as zero*; they are different facts and the API keeps them apart.
+- **Entry field labels.** Optional, and only for a field you declared. `Started` and `Finished` read
+  correctly for anything that takes time; `reread_count` does not, so a domain that has it says what
+  it calls it — `Rereads`, `Rewatches`. Anything you leave out falls back to a neutral word, never to
+  a book's.
 - **Entry fields.** You declare which of `date_started`, `date_finished`, `reread_count` your entries
   have. Anything you do not declare is **refused on write**, not merely hidden — a reread count on a
   record is not a display problem (DEC-057).
 - **Metadata fields.** Names are permanent, labels are copy. A `rows` field declares `columns` and no
   other field type may. A field may never shadow `title`, `subtitle`, `year` or
-  `creator_sort_override` — those are neutral item columns edited *beside* your metadata.
+  `creator_sort_override` — those are neutral item columns edited *beside* your metadata. **`creators`
+  is special**: whatever you label it, the detail page renders it as the credit line under the title
+  rather than as a labelled fact. The label still reaches the metadata dialog.
 - **The URL recognizer must answer for any string and must never raise.** `resolve_input` asks every
   registered domain in turn, so a recognizer that throws does not fail your domain — it denies every
   domain after you its turn. Parse through `split_url`, never `urlsplit` directly. (This is not
@@ -212,7 +238,14 @@ class IgdbProvider:
 
 Your adapter owns its own rate limit, User-Agent and authentication. It reaches for the shared HTTP
 boundary in `infrastructure/providers.py` — `bounded_json` (bounded, retrying, size-capped) and
-`parse_year` — and it **never leaks a raw provider response above infrastructure**.
+`parse_year` — and it **never leaks a raw provider response above infrastructure**. `bounded_json`
+takes a `method` and a `json_body`, so a GraphQL source that asks by `POST` uses the same retry
+policy and byte bound as everything else; do not write your own request loop.
+
+"Never leaks" includes exceptions. Translate `httpx.HTTPStatusError` into `ProviderPayloadError` with
+a code, the way `domains/book/providers.py` and `domains/anime/providers.py` both do — a 404 means
+*this record does not exist* and anything else means the provider is unwell, and enrichment's retry
+reads the difference.
 
 Two things to get right, both learned the expensive way:
 
@@ -406,6 +439,29 @@ the 24-hour undo window, optional post-commit source files, and enrichment only 
 domain declares it. The registry response publishes the application's attachment cap for clients
 that can refuse an oversize file before sending it.
 
+**Test your reader against a file you did not write.** Sprint 041's connector passed its first
+tests, imported all 81 rows of the owner's real export and enriched them — and still held seven
+defects, four of which would have aborted a whole import under a code no screen has copy for
+(DEC-093). The owner's file exercised none of them. In particular, before you emit a value:
+
+- **a metadata field with a `minimum` will refuse a source's zero**, and `validate_metadata_patch`
+  runs over every record before anything is staged, so one row takes the file with it;
+- **the `entries` CHECK constraints are downstream of you and nothing re-checks between** — an
+  out-of-range score or a negative count passes preview and raises an `IntegrityError` at commit,
+  half way through the batch;
+- **a blank title fails the shared validator** the same way;
+- **a repeated identity silently loses the second row**, which commit counts as `unchanged`;
+- and **`shelf_slug` raises** on a tag with no letters or digits rather than returning nothing.
+
+Prefer a row-level error to a fatal one: put the complaint in the record's `errors` and let the row
+through, so one bad row costs a row rather than the file. Reserve raising for a file that is the
+wrong file.
+
+**If your source is compressed, the route does not protect you.** The upload cap is on *compressed*
+bytes and `ImportInputSpec.max_bytes` is ignored for `kind="upload"` — it is published to the client
+but never enforced, so declaring one advertises a limit the server does not keep. Bound the
+decompressed stream yourself, incrementally.
+
 Add parser/adapter fixtures for the source itself and a generic route round-trip. Do not edit the
 shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
 will reject a missing protocol member, an unknown target domain, empty identity kinds, a misplaced
@@ -437,7 +493,11 @@ And **run the application against real data and use your domain**. Passing tests
 that a flow works — that rule exists because thirteen sprints once closed green on a product whose
 entire feedback layer was invisible (DEC-025).
 
-### This guide was tested by following it
+### This guide was tested by following it, twice
+
+**Sprint 028 — a throwaway `game` domain.**
+
+#### The first time (Sprint 028)
 
 A throwaway `game` domain — its own package, three metadata fields, a status vocabulary containing
 `playing` and `finished`, its own formats, an identity strategy — was built from this page alone and
@@ -458,6 +518,50 @@ documented as gotchas, because a step you have to know about is a step this guid
 
 The only gate that failed for a legitimate reason was the OpenAPI drift check, which is Step 5's
 `make openapi`. That is the guide working.
+
+#### The second time (Sprint 038) — a real domain, built and shipped
+
+Anime was built from this page by a session that did not write the contract, against two live
+providers and with an owner's real library behind it. **The central promise held**: no migration, no
+screen written for the domain, no other domain's file touched, and registering it broke **nothing** —
+586 backend tests passed on the first run after the registry entry, and the conformance suite held the
+new domain to the contract by parametrization with not one test added to admit it.
+
+Three things this page did not predict. Each cost a change outside the domain's own directory, and
+each is written into the guide above rather than left as a gotcha:
+
+1. **`bounded_json` was GET-only.** Step 3 says an adapter "reaches for the shared HTTP boundary",
+   and every provider before AniList read with a `GET`. A GraphQL source asks its question in a
+   `POST` body. The boundary took a `method` and a `json_body` parameter; the alternative was an
+   adapter writing its own request loop and silently losing the retry policy, the byte bound and the
+   streaming read. **If your source is not a GET, that is now supported** — nothing in the boundary
+   branches on who is calling.
+2. **`provider_health` had three tests asserting the wired providers as a literal list.** DEC-067
+   row 5 made the endpoint itself registry-derived, and its tests were not: registering a third
+   domain's two adapters failed them with no behaviour changing. They derive from the catalog and
+   from each domain's own `source_preference` now. This is the same repair `test_item_types.py` had
+   the first time this guide was tested, one layer down, and it suggests the rule generally: **a test
+   that enumerates what exists today is a test the next domain breaks.**
+3. **The entry panel's field labels were still a book's.** `entry_panel_label` fixed the heading in
+   Sprint 028 and left `Rereads` over the three passage fields for every domain, which only became
+   visible when a domain arrived that reads none of them correctly. `Domain.entry_field_labels` is
+   the fix and is now part of the contract; the client falls back to a neutral word rather than a
+   book's.
+
+Two things the page was silent on that a reader should know, both now stated in Step 2 and Step 3:
+
+- **A domain must declare at least one format.** The conformance suite refuses an empty vocabulary,
+  so a domain with no real notion of "how a copy is held" has to invent one. Whether that check is
+  right is an open question; it was satisfied rather than argued with.
+- **`creators` never renders as a labelled fact.** Every domain's creator becomes the credit line
+  under the title, so declaring `FieldSpec("creators", "Studios", ...)` names something no screen
+  ever prints. The label is still worth declaring — the metadata dialog uses it — but do not expect
+  it on the detail page.
+
+**What the walkthrough found that no test could**: Kitsu returns four producers for one series and
+only one has `role: "studio"`, so taking the first files a series under its manga publisher; and
+Kitsu holds no production records at all for some series (Cowboy Bebop among them), which is a gap in
+the source rather than in the adapter and is part of why AniList is primary.
 
 ---
 
@@ -512,17 +616,63 @@ without reading that entry:
 
 ---
 
-## 6. One thing that is not solved yet
+## 6. Background enrichment, if your domain needs it
 
-Read these before you design around them.
+This section used to say the seam was unbuilt and that you should declare `enriches=False` and move
+on. **Sprint 039 built it** against anime's real case, which is what DEC-067 row 3 said it was
+waiting for. Enrichment is a declaration like everything else now.
 
-**Background enrichment is ISBN-keyed.** `Domain.enriches` is a real switch — a domain that declares
-`False` is queued no jobs — but everything behind it (`_backfillable_items`, `_fetch`,
-`PROVIDER_ORDER`) assumes an ISBN and books' provider order. **No domain has ever exercised that
-seam**: albums declare `False` because one MusicBrainz fetch returns everything an album has. If your
-domain genuinely needs background enrichment on another key, that is the point at which the seam gets
-built properly, with your real case to design against (DEC-067 row 3). Declare `enriches=False` and
-say so in your sprint or issue.
+**What it is for.** An item added interactively arrives complete — you searched, you picked a result,
+the adapter fetched the record. An **imported** one usually does not: a Goodreads row is little more
+than an ISBN, and a MyAnimeList row is an id, a title, a type and an episode count. The cover, the
+creators and the description have to be fetched afterwards, by a background job, without overwriting
+anything the owner has touched (DEC-008).
+
+If your domain has no importer, or its importer's rows arrive complete, declare `enrichment=None` and
+skip the rest of this section. That is albums' answer and a complete one: a single MusicBrainz
+release fetch already returns everything an album has.
+
+```python
+ANIME_ENRICHMENT = EnrichmentSpec(
+    identity_kind="mal",                     # the item_identifiers.kind to look up by
+    provider_order=("anilist", "kitsu"),     # who to ask, in order
+    completeness_fields=("creators", "genres", "synopsis"),  # what "still thin" means
+)
+```
+
+All three are per-domain because all three used to be books'. The third is the subtle one, so it is
+worth saying what each does:
+
+- **`identity_kind`** is the `item_identifiers.kind` the lookup is keyed on. An item carrying no
+  identifier of this kind is never queued, because there is nothing to look it up by. Your importer's
+  `identity_kinds` and this value are usually the same word, and should be.
+- **`provider_order`** is which adapters are asked and in what order. The first usable payload wins.
+  A provider that is not wired contributes a sentence to the reason recorded on the job rather than
+  being skipped in silence, so a missing key reads as a missing key.
+- **`completeness_fields`** are the metadata fields whose absence means the record is still worth a
+  lookup. **They must be fields your domain declares** — conformance refuses anything else, because a
+  name your domain never stores is always absent, so every record would look incomplete for ever and
+  be re-queued on every backfill. That is not hypothetical: the rule was `publisher`, `page_count`
+  and `description` for *every* domain until Sprint 039, and an anime has none of the three.
+
+  Choose fields a complete record really has. `season` and `episode_minutes` are legitimately absent
+  from plenty of anime, so naming them would re-queue those rows for ever — the same bug in a subtler
+  hat. A missing cover or year already counts in every domain and is not something you declare.
+
+**Your adapter implements `EnrichingProvider`**, which is one method:
+
+```python
+async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload: ...
+```
+
+Raise `ProviderPayloadError(code="unsupported_identity_kind")` for a kind you do not answer rather
+than guessing — a domain naming a key its providers cannot answer is a wiring mistake, and a wrong
+lookup fills a record with somebody else's data. `test_enrichment_pipeline.py` asserts that every
+enriching domain's `provider_order` names adapters this build actually constructs and that each one
+can answer, because the conformance suite has no provider catalog and cannot see that.
+
+**Two things the shared pipeline still owns**, and you do not: the fill-empty-only rule, and the
+ledger effect that makes an enrichment undoable along with the import that queued it.
 
 ---
 
@@ -538,7 +688,7 @@ available example of what "planning a domain" looks like here. In short:
 | Metadata | Platforms, genres, summary, release year all fit existing field types. **No new seam.** |
 | Covers | One allowlist entry for `images.igdb.com`. **No new seam.** |
 | Statuses | Games want `playing` and a backlog. That is the vocabulary working as designed. **No new seam.** |
-| Enrichment / add-by-URL | One query returns everything; `enriches=False`. **No new seam.** |
+| Enrichment / add-by-URL | One query returns everything; `enrichment=None`. **No new seam.** |
 
 **What games need that nothing has needed: authentication with a lifetime.** IGDB requires Twitch
 client credentials exchanged for a token that expires and must be refreshed, where every provider so
@@ -560,6 +710,7 @@ cite it as measurement; it carries its own list of what to verify first.
 | `domain/importers.py` | The `Importer` protocol and neutral import snapshot/record shapes |
 | `domains/book/` | Books: declaration, Open Library and Google Books adapters, Goodreads and Calibre importers |
 | `domains/album/` | Albums: declaration, MusicBrainz and Cover Art Archive adapter |
+| `domains/anime/` | Anime: declaration, AniList and Kitsu adapters, MyAnimeList importer |
 | `infrastructure/providers.py` | The shared HTTP boundary only: `bounded_json`, `parse_year`, retry policy, the client |
 | `backend/tests/test_domain_conformance.py` | The suite every domain passes by existing |
 | `backend/tests/fixtures/providers/` | Pinned real provider responses. **Never re-record one to make a test pass** |

@@ -24,12 +24,12 @@
 
 ## What it is
 
-You add a book or a record, score it out of ten, write a note, put it on a shelf.
+You add a book, record or anime series, score it out of ten, write a note, put it on a shelf.
 Reading trackers optimise for other people seeing your opinions and their vendors selling you stuff;
 this optimises for you remembering, three years later, whether something was any good.
 
 Akasha is domain agnostic, it's built so you can extend it to hold information on anything you enjoy,
-but today it supports Books and Albums. See [Domains](#domains-and-stack) for more info.
+but today it supports Books, Albums and Anime. See [Domains](#domains-and-stack) for more info.
 
 > [!WARNING]
 > **v1 has no authentication of any kind.** Anyone who can reach the port can read
@@ -39,13 +39,15 @@ but today it supports Books and Albums. See [Domains](#domains-and-stack) for mo
 ## What it does
 
 - **One box for multiple domains.** Akasha reaches the web for public APIs
-(Open Library, Google Books, MusicBrainz) to find any piece of media you are thinking of.
+(Open Library, Google Books, MusicBrainz, AniList and Kitsu) to find any piece of media you are
+thinking of.
 Paste a URL or an ISBN and it resolves that instead of guessing.
 - **Record your opinion.** Give it a score out of ten, leave notes if you have them.
 Did you drop the book halfway through? Do you want to buy this album in vinyl some day?
 Add your item to a shelf and give it a status.
 - **Import your library** Importing from existing systems is supported and extensible.
-Bring your own Goodreads CSV, a read-only Calibre library and get your info migrated.
+Bring your own Goodreads CSV, a read-only Calibre library or a MyAnimeList export and get your
+info migrated.
 - **Choose your covers.** If provided by the API, or upload your own, you can choose the how your items look
 What you see in the app should reflect what's in your house.
 - **Upload your files** While not its primary feature, you can attach files to entries,
@@ -60,12 +62,13 @@ in case you need a safe place to store that PDF.
 
 ## Importing and triage
 
-**Import** brings in a Goodreads CSV export or a Calibre library. The screen has two
-steps: preview a source and commit it, then work through **Triage**, where committed
+**Import** brings in a Goodreads CSV export, a Calibre library or a MyAnimeList anime
+export. The screen has two steps: preview a source and commit it, then work through **Triage**, where committed
 rows land as `unsorted` — the ordinary library view hides those until you sort them.
-Score edits in Triage save immediately; status changes stay staged on their row until
-you apply or discard them, so nothing leaves the queue while you're still reading down
-the list.
+Score edits in Triage save immediately. Each row's status control shows the imported
+suggestion, or that domain's default when the source has none — Inbox is already implied
+by the screen. Change the target if needed, then apply that row from its check button.
+Draft targets survive navigation and refresh within the browser tab until you apply them.
 
 Calibre needs no mount: point it at your library folder and the browser reads it
 directly. Only the database and covers upload by default, which keeps the transfer
@@ -75,9 +78,15 @@ upload ceiling. Re-running a source is cheap and safe — Akasha uploads only wh
 changed and never overwrites a value you've edited by hand — and a committed batch can
 be undone for 24 hours after commit.
 
-Connectors are domain-owned and registry-driven; Goodreads and Calibre ship for books
-today, and a new one can be added without touching the shared preview, commit, triage
-or undo pipeline. See [how to add a domain and importer](docs/guides/adding-a-domain.md).
+MyAnimeList's gzipped XML export can be uploaded as downloaded or unpacked first. Status,
+score, dates, rewatches, watched-episode progress, notes and tags come across; imported anime
+then fills its cover, studio, year, season, genres and synopsis from AniList, with Kitsu as a
+fallback. This is a snapshot import rather than two-way synchronization.
+
+Connectors are domain-owned and registry-driven; Goodreads and Calibre ship for books,
+and MyAnimeList ships for anime. A new one can be added without touching the shared
+preview, commit, triage or undo pipeline. See
+[how to add a domain and importer](docs/guides/adding-a-domain.md).
 
 ## Quick start
 
@@ -199,8 +208,8 @@ FastAPI, SQLAlchemy, Alembic and SQLite on the backend; React 18, Vite, TypeScri
 Tailwind, shadcn/ui and TanStack Query on the frontend. One container, one process,
 one SQLite file.
 
-A **domain** is a kind of thing the library holds — a book, an album. Each lives in its
-own package under `backend/src/book_tracker/domains/`, declaring its fields, statuses,
+A **domain** is a kind of thing the library holds — a book, an album, an anime series.
+Each lives in its own package under `backend/src/book_tracker/domains/`, declaring its fields, statuses,
 formats, identity rule and provider; that declaration is served over the API and every
 screen renders from it, so nothing above the registry branches on type. Adding one
 costs a package, a registry entry and provider wiring: no migration, no edit to

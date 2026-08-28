@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 19
+**Plan revision:** 23
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the numbered plan is complete through Sprint 037
+**Active sprint:** 044 — Sharpening the domain contract
 
 ## Shape of the plan
 
@@ -33,15 +33,39 @@ Post-v1 work branches:
                                          └─ 035 Ebook attachments on a toggle
                                             └─ 036 Import and triage flow
                                                └─ 037 Triage page flow and staged statuses  ✓
+                                                  └─ 038 Anime: the third domain  ✓
+                                                      ├─ 039 Enrichment beyond the ISBN  ✓
+                                                      └─ 040 Entry progress  ✓
+                                                           └─ 041 The MyAnimeList import  ✓
+                                                               └─ 042 One decision per Triage row  ✓
+                                                                   └─ 043 Row-only Triage decisions  ✓
+                                                                      └─ 044 Sharpening the domain contract
 ```
 
-**The numbered plan now stops at 037 (DEC-058, extended through the owner-directed Sprint 037).** Sprint 025 asked whether a second domain
-was affordable and answered yes. Proving the same thing twice more with games and series would spend
-the remaining sprints on confirmation rather than on finishing anything, so this line now finishes
-music, polishes the screen the owner actually uses, and then builds the contract that makes a third
-domain an **epic on top of it** — one that can be developed in parallel with others and without
-touching the core. Games and series are named under [Future epics](#future-epics-after-this-plan)
-and carry no sprint number.
+**Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
+affordable and answered yes; Sprint 028 turned that answer into a contract so that a third domain
+would be an epic on top of it rather than another sprint chain through the core.
+
+**Sprints 038–041 are that third domain, and they exist to test the claim** (DEC-089). The owner
+asked for anime, with an importer for their own MyAnimeList export, explicitly as a trial run whose
+findings feed back into the repository. Sprint 038 is the contract's promise kept — a package, two
+adapters, small registration points, no migration and no screen. Sprints 039 and 040 are the two
+seams the export forces, both of them foreseen, costed and deliberately left unbuilt by the decisions
+that deferred them: enrichment on a key that is not an ISBN (DEC-067 row 3) and a per-domain progress
+count on the entry (DEC-077 shape (a)). Sprint 041 is the connector, which lands complete because the
+other two precede it.
+
+Anime is therefore **no longer an unnumbered epic**. Games, series and the Spotify connector remain
+so, and are named under [Future epics](#future-epics-after-this-plan).
+
+**The line closed on 2026-08-27 and the trial run returned a verdict.** Both halves of the domain
+contract were built by a session that did not write them. The domain half held outright; the
+connector half held in code — `api/imports.py` and both import screens were never touched — and
+failed once in the schema, on a frozen `kind IN ('goodreads','calibre')` that migration `0016`
+deleted. Adding a domain cost about 45 lines of shared registration; adding a connector cost one
+tuple entry and one migration whose only purpose was removing a constraint that should not have
+existed. Everything else the line spent went on two seams the owner's export forced, both of which
+earlier decisions had already foreseen and priced (DEC-090, DEC-091, DEC-092, DEC-093).
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -96,6 +120,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [035](035-ebook-attachments.md) | Ebook attachments on a toggle | 034 | completed |
 | [036](036-import-triage-flow.md) | Import and triage flow | 035 | completed |
 | [037](037-triage-page-flow.md) | Triage page flow and staged statuses | 036 | completed |
+| [038](038-anime-domain.md) | Anime: the third domain | 037 | completed |
+| [039](039-enrichment-beyond-isbn.md) | Enrichment beyond the ISBN | 038 | completed |
+| [040](040-entry-progress.md) | Entry progress | 038 | completed |
+| [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | completed |
+| [042](042-one-decision-per-triage-row.md) | One decision per Triage row | 041 | completed |
+| [043](043-row-only-triage-decisions.md) | Row-only Triage decisions | 042 | completed |
+| [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | ready |
 
 ## Sprint contracts
 
@@ -651,6 +682,95 @@ clears successful groups and retains failed groups for retry. The pending and ex
 surfaces form one non-overlapping sticky stack, while score edits and explicit bulk actions remain
 immediate (DEC-087).
 
+### [Sprint 038 — Anime: the third domain](038-anime-domain.md)
+
+The domain contract's promise, exercised by somebody following it rather than by the person who wrote
+it: a package under `domains/anime/`, two provider adapters, small explicit registration points, **no
+migration and no screen**. Providers were measured live rather than chosen from documentation
+(DEC-088) — AniList first, Kitsu second, and Jikan rejected after returning HTTP 504 to every request
+across a forty-minute window while MyAnimeList itself answered in 0.66s.
+
+Two things here are new. It is the **first domain since books with a real cross-provider identity**:
+both providers publish the MyAnimeList id, so `identity_key` returns `mal:<id>` and candidates
+genuinely merge, where albums correctly answered `None`. And AniList is the first provider that a
+missing User-Agent turns into a Cloudflare 403, which the adapter owns.
+
+A deliverable of equal weight to the code: **a written report on whether
+`docs/guides/adding-a-domain.md` was sufficient on its own.** The guide claims a third domain never
+needs to read how the second was built. This is the sprint that finds out.
+
+### [Sprint 039 — Enrichment beyond the ISBN](039-enrichment-beyond-isbn.md)
+
+DEC-067 row 3 named its own trigger — "the first domain that wants background enrichment on a
+non-ISBN key pays for (b) then, with a real case to design against instead of a hypothetical one" —
+and costed it at about half a sprint. Anime is that case. An imported MyAnimeList row is an id, a
+title, a type and an episode count; `_backfillable_items` joins on the literal `'isbn'` and `_fetch`
+calls `fetch_by_isbn` against a module constant naming two book providers.
+
+A domain declares its enrichment key and its provider order; nothing above the registry names an
+identifier kind or a provider afterwards. **Books' behaviour must not change**, and the existing
+enrichment tests are the guard rather than something to relax. No migration: a job is a row with a
+JSON payload, and this changes what is written into one — including a compatibility path for jobs
+already queued under the old shape, which is the failure nobody would notice.
+
+### [Sprint 040 — Entry progress](040-entry-progress.md)
+
+DEC-077 priced entry depth over nine shared surfaces, rejected child entities on evidence, chose
+shape (a) — "a per-domain `progress` field, declarative under the Domain contract" — and **built
+none of it**. Every row of the owner's export carries `my_watched_episodes`; one is `Black Clover`,
+dropped at 20 of 170. The entry model has three passage fields and nowhere to put that number.
+
+A `ProgressSpec` on the domain, a nullable `entries.progress`, a validator beside the three that
+already exist, a control that renders only where a domain declares one, and the value carried in the
+export. **This is the only shared-table change in the whole line**, which is precisely why it is its
+own sprint and its own migration. It adds a field to the flat entry; it must not add depth, and
+`test_flat_entry_contract.py` is what says so.
+
+### [Sprint 041 — The MyAnimeList import](041-myanimelist-import.md)
+
+The connector, against the owner's real 81-row export, parsed and measured at planning time rather
+than assumed: gzipped XML, `series_animedb_id` distinct on every row, `my_score` of `0` meaning
+unrated, `0000-00-00` meaning absent, and scores that map 1:1 rather than doubling the way Goodreads'
+stars do. It lands complete because 039 fills the records and 040 holds the watched-episode counts.
+
+Its sharpest acceptance criterion is a negative one: **no change to `application/imports.py`,
+`api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.** Sprint 032 made connectors self-describing
+so that adding one is a package plus one tuple entry. Whether that held for a connector written by
+somebody who did not write the pipeline is the finding, either way it goes.
+
+### [Sprint 042 — One decision per Triage row](042-one-decision-per-triage-row.md)
+
+Inserted by owner direction at plan revision 22 after the first real anime triage. The screen
+currently presents the same decision twice: the persisted Inbox status in a select and an imported
+target in a separate chip. Rows without an imported target present no useful default, and approving
+an already-correct row requires leaving it for a page-level toolbar.
+
+Each row instead presents one target in its native select: the importer suggestion when present,
+otherwise the domain's declared default. Inbox is implied by the screen and is neither displayed
+nor choosable. A row-level Apply commits the displayed target in one click; the existing page-level
+staging, discard, partial-failure and explicit bulk flows remain for multi-row work.
+
+**Delivered 2026-08-27 (DEC-095).** The target precedence and row Apply shipped without a backend,
+API or schema change. The real-data walkthrough imported 81 anime and 18 Calibre books into a
+disposable Inbox and verified both sources use the same row flow at mobile width.
+
+### [Sprint 043 — Row-only Triage decisions](043-row-only-triage-decisions.md)
+
+Added at plan revision 23 from the owner's hands-on approval pass over Sprint 042. The row action
+becomes a quiet icon-only check, and the now-redundant global Apply/Discard toolbar disappears. A
+row's target remains a draft until its own check is pressed, but that draft survives navigation and
+refresh within the browser tab so reviewing a detail cannot erase work in progress. Explicit
+checkbox bulk actions remain.
+
+**Delivered 2026-08-27 (DEC-096).** The final approved interaction shipped in `bb474c7`. The
+real-data walkthrough proved a draft survives Library navigation and refresh before its row check
+commits it, and exercised direct and overridden anime targets without console or page errors.
+
+### [Sprint 044 — Sharpening the domain contract](044-sharpening-the-domain-contract.md)
+
+The anime-line retrospective originally planned as Sprint 042 moves one place without changing its
+scope. It follows the owner-visible Triage corrections and remains deliberately non-visual.
+
 ## Future epics, after this plan
 
 Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
@@ -801,7 +921,11 @@ in DEC-073.
 - **Sharing, multiuser, Calibre write-back, OPDS.** Product spec section 9, unchanged.
 - **The owner feedback above**, until it is scheduled.
 - **Wine and the remaining exploratory domains.** `docs/domain_metadata_roadmap_report.md` assesses
-  them; none is scheduled. Wine's weakness is access economics rather than catalogue geography.
+  them; none is scheduled. Wine's weakness is access economics rather than catalogue geography. That
+  report's anime verdict — "a good domain, wrong default provider" — is **superseded by DEC-088**,
+  which measured the providers instead of reading their documentation and reached a different answer.
+- **Manga.** Refused by name in Sprint 041's connector rather than half-supported. A separate domain
+  if it is ever wanted, and not a mode of the anime one.
 
 ## Cross-sprint definition of done
 

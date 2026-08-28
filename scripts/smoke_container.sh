@@ -107,7 +107,12 @@ step "Write an entry, a score and a note through the API"
 # A manual add needs an idempotency key or an ISBN. The key also makes this
 # step safe to re-run against a data directory that already has the entry.
 created="$(api /api/entries -H 'content-type: application/json' -d '{
-  "manual": {"title": "Ficciones", "authors": ["Jorge Luis Borges"], "year": 1944},
+  "manual": {
+    "item_type": "book",
+    "title": "Ficciones",
+    "year": 1944,
+    "metadata": {"creators": ["Jorge Luis Borges"]}
+  },
   "status": "read",
   "score": 9,
   "idempotency_key": "smoke-ficciones"

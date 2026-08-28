@@ -1,30 +1,34 @@
-# Handoff — numbered plan complete through Sprint 037
+# Handoff — Sprint 044 ready after the v1.3 release
 
-Plan revision 19 is complete. Sprints 001–037 are closed, `docs/agent/state.json` has no active
-sprint, and the repository is on `main`. Sprint 037 was the final numbered sprint selected by
-`scripts/validate_project.py`.
+Sprint 043 is complete in `bb474c7`; **Sprint 044 is `ready` and not started.** It is the
+domain-contract QOL sprint planned from the anime retrospective (DEC-094), renumbered only because
+the owner inserted two Triage correction sprints ahead of it.
 
-## Delivered state
+The v1.3.0 release tree has passed its exhaustive gates and is ready for the owner-authorized
+no-fast-forward merge, annotated tag and push. Release preparation adds anime/MyAnimeList README
+coverage, synchronized 1.3.0 version surfaces and release notes. The container smoke harness was
+also corrected to use the current domain-neutral add payload after its stale book-only shape
+produced a useful 422 on the first run.
 
-- Triage is the second step on Import and uses the browser page for vertical scrolling, with a
-  bounded window-virtualized DOM.
-- Row status choices remain visibly staged until the owner applies or discards them. Apply groups
-  equal statuses through the existing bulk endpoint and retains failed groups for retry.
-- Row scores and explicit checkbox bulk actions still save immediately. The pending-status and bulk
-  toolbars share one non-overlapping sticky stack.
-- Canonical behavior is recorded in README, product spec section 7, technical spec section 8 and
-  DEC-087. No backend, API or schema change was required.
+## Next sprint
 
-## Verification at closure
+Read `docs/sprints/044-sharpening-the-domain-contract.md` and DEC-094 in full. Its six non-visual
+deliverables are: one allowlisting entry-value validator used by all three write paths; an
+application-wiring conformance tier; a head-schema guard against vocabulary-freezing CHECKs; one
+`EntryRow` factory; the load-bearing Alembic foreign-key comment; and the table-rebuild/UI-driving
+recipes. It has no walkthrough gate.
 
-- `make check` passed.
-- `make test` passed with 559 backend and 179 frontend tests; the backend suite used the documented
-  outside-sandbox workaround after the isolated `TestClient` stall reproduced.
-- Full Playwright passed with 103 cases and 2 intentional skips at one worker.
-- The realistic owner-data walkthrough passed at 390x844 against disposable data and left live data
-  untouched.
-- Closure project validation and `git diff --check` passed.
+The owner has directed the work after Sprint 044: create a separate movies branch, evaluate the
+documented movies proposal and real metadata providers, inspect the root Letterboxd export as
+read-only sample input, and plan at least two future sprints—movies/domain providers first, then a
+Letterboxd importer. Do not commit, delete or rewrite
+`letterboxd-tomateperitarg-2026-08-27-22-42-utc.zip`; it is private user data.
 
-There is no next numbered sprint. Future work must be planned explicitly and must reactivate state
-through the normal workflow. The unnumbered epics in `docs/sprints/ROADMAP.md` remain possibilities,
-not active commitments.
+## Verified state
+
+- Focused Sprint 043: 20 Triage browser tests, 3 accessibility tests, frontend type checking.
+- Release gates: `make check`; `make test` (698 backend / 189 frontend); full Playwright (106 passed,
+  2 skipped); `make build`; complete container smoke.
+- Realistic walkthrough: 81 MyAnimeList rows + 18 Calibre books in disposable data at mobile width,
+  including navigation/reload draft persistence and three row commits; no console/page errors.
+- Live application data was never opened for writing. The Letterboxd archive remains untracked.

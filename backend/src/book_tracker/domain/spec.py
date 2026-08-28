@@ -13,6 +13,7 @@ parallel without editing each other's file (technical spec 6.6, DEC-067).
 
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import Any, Literal
 from urllib.parse import SplitResult, urlsplit
 
@@ -100,6 +101,69 @@ PASSAGE_FIELDS = frozenset({"date_started", "date_finished", "reread_count"})
 
 
 @dataclass(frozen=True)
+class ProgressSpec:
+    """How far through one of these you are, when that is a thing this domain has.
+
+    DEC-077 priced entry *depth* across nine shared surfaces, rejected child entities
+    with their own state on evidence, and chose this shape instead: one number on the
+    flat entry, declared by the domain that means something by it. An anime records
+    episodes watched; a book records nothing of the kind, because a page count is not
+    something the entry holds.
+
+    It is deliberately **not** a fourth `PASSAGE_FIELDS` name. Those are three fixed
+    columns with fixed meanings, and `validate_entry_fields` polices only names inside
+    that set — an unknown key passes straight through it. Progress also needs a label, a
+    unit and a reference to its total, none of which a passage field has anywhere to put.
+    """
+
+    #: What this domain calls the count. "Episodes watched".
+    label: str
+    #: The singular noun for one of them, so a control can read "20 / 170 episodes".
+    unit_label: str
+    #: A `number` metadata field on the *item* holding the total, when one exists.
+    #:
+    #: **For display only, and never a bound.** Refusing a count above it was the first
+    #: draft of this sprint and the owner rejected it: AniList returns `episodes: null`
+    #: for an airing or unreleased show, a weekly series' cached total is stale by
+    #: definition, and an explicit metadata refresh could lower the total underneath a
+    #: count already stored — making a row that was valid when written invalid on its
+    #: next write. That is `ck_entries_status`'s mistake wearing new clothes: a
+    #: constraint over data the domain does not control (DEC-067 row 1). The reader's
+    #: number wins over our cache.
+    total_field: str | None = None
+
+
+@dataclass(frozen=True)
+class EnrichmentSpec:
+    """What background enrichment means for one domain (DEC-067 row 3).
+
+    Everything below `enriches` used to be books': the backfill joined
+    `item_identifiers` on the literal `'isbn'`, judged a record incomplete by the
+    absence of `publisher`, `page_count` and `description`, and tried two book
+    providers from a module constant. A domain that enriches on anything else could
+    declare the flag and get nothing — or worse, look permanently incomplete because
+    it has none of the three book fields, and be re-queued on every backfill.
+
+    All three parts are per-domain, because all three were book-shaped:
+
+    - **`identity_kind`** is the `item_identifiers.kind` the lookup is keyed on:
+      `isbn` for a book, `mal` for an anime. An item carrying no identifier of this
+      kind is never queued, because there is nothing to look it up by.
+    - **`provider_order`** is which adapters are asked, in order. The first usable
+      payload wins; a provider that is not wired contributes a sentence to the
+      recorded reason rather than being skipped silently.
+    - **`completeness_fields`** are the metadata fields whose absence means this
+      record is still worth a lookup. They must be fields the domain declares — a
+      name it does not have is always absent, so the record would never look complete.
+      A missing cover or year always counts, in every domain, and is not listed here.
+    """
+
+    identity_kind: str
+    provider_order: tuple[str, ...]
+    completeness_fields: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class Domain:
     """Everything the shared layers may know about one kind of thing.
 
@@ -126,10 +190,25 @@ class Domain:
     #: The heading over the personal region of the detail page. "Your reading data" is
     #: a book's phrase, and an album's entry records possession rather than reading.
     entry_panel_label: str
-    #: Whether background enrichment applies. One MusicBrainz release fetch already
-    #: returns everything an album has, where a Goodreads row starts as little more
-    #: than an ISBN — so "this domain does not enrich" is a simplification, not a gap.
-    enriches: bool = True
+    #: What this domain calls its `entry_fields`, for the ones a neutral word gets wrong.
+    #:
+    #: `entry_panel_label` above made the heading over the personal region the domain's
+    #: copy; the fields under it stayed book-shaped, so an anime read `Rereads`. Keys are
+    #: `PASSAGE_FIELDS` names the domain declares — labelling a field you do not have is
+    #: a label nothing renders — and anything absent falls back to the neutral word.
+    #: Partial on purpose: `Started` and `Finished` are right for a book and a series
+    #: alike, and a domain restating them adds drift rather than clarity.
+    entry_field_labels: Mapping[str, str] = MappingProxyType({})
+    #: What background enrichment is keyed on, whom it asks and what counts as
+    #: incomplete — or `None` for a domain that does not enrich at all. One MusicBrainz
+    #: release fetch already returns everything an album has, so `None` is a
+    #: simplification rather than a gap. This replaced a bare `enriches: bool` in
+    #: Sprint 039: the flag was real, and everything underneath it assumed an ISBN and
+    #: two book providers (DEC-067 row 3).
+    enrichment: "EnrichmentSpec | None" = None
+    #: How far through one of these you are, or `None` for a domain where that means
+    #: nothing. DEC-077's shape (a), built in Sprint 040 against anime's real case.
+    progress: "ProgressSpec | None" = None
     #: Recognizes a URL or identifier this domain can resolve, for add-by-URL. The
     #: neutral default recognizes nothing, which is the safe answer for a domain that
     #: has not written one yet: `resolve_input` simply asks the next domain.
@@ -145,6 +224,15 @@ class Domain:
     def status(self, value: str) -> StatusSpec | None:
         return next((row for row in self.statuses if row.value == value), None)
 
+    @property
+    def enriches(self) -> bool:
+        """Whether background enrichment applies at all.
+
+        Kept as a reading of the declaration so no call site has to ask two questions,
+        and so the one thing most code wants to know stays a single word.
+        """
+        return self.enrichment is not None
+
 
 class InvalidStatus(ValueError):
     """A status the item's own domain does not have."""
@@ -156,6 +244,10 @@ class InvalidFormat(ValueError):
 
 class InvalidEntryField(ValueError):
     """An entry field the item's own domain does not have (DEC-057)."""
+
+
+class InvalidProgress(ValueError):
+    """A progress count on a domain that has no such concept, or a negative one."""
 
 
 def validate_status(domain: Domain, value: str) -> str:
@@ -188,6 +280,25 @@ def validate_entry_fields(domain: Domain, changes: Mapping[str, Any]) -> dict[st
         if name in changes:
             raise InvalidEntryField(f"{domain.label} entries have no {name!r}")
     return dict(changes)
+
+
+def validate_progress(domain: Domain, value: int | None) -> int | None:
+    """The fourth validator, keyed on the domain holding the item (DEC-077).
+
+    `None` is always allowed, in every domain: it means *not recorded*, and clearing a
+    value nobody should have set is not something to refuse. `0` is a different fact —
+    recorded as zero — and the owner's own library holds one, a film sitting at 0 of 1
+    episodes under `Plan to Watch`.
+
+    There is no upper bound. See `ProgressSpec.total_field` for why.
+    """
+    if value is None:
+        return None
+    if domain.progress is None:
+        raise InvalidProgress(f"{domain.label} entries do not record progress")
+    if value < 0:
+        raise InvalidProgress(f"{domain.label} progress cannot be negative")
+    return value
 
 
 @dataclass(frozen=True)

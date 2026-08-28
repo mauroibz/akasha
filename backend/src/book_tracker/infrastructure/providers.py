@@ -82,6 +82,8 @@ async def bounded_json(
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
     attempts: int = PROVIDER_ATTEMPTS,
+    method: str = "GET",
+    json_body: Mapping[str, Any] | None = None,
 ) -> Mapping[str, Any]:
     """Fetch and decode a bounded JSON body, retrying a provider that is unwell.
 
@@ -90,10 +92,25 @@ async def bounded_json(
 
     `attempts` is how the caller says whether anyone is waiting: background enrichment
     can afford to be patient, an interactive search cannot.
+
+    `method` and `json_body` exist because a GraphQL provider asks its question in a
+    POST body rather than in a query string. Every provider before AniList read with a
+    GET, so this boundary was GET-only; the alternative was an adapter writing its own
+    request loop and quietly losing the retry policy, the byte bound and the streaming
+    read that are the whole reason this function exists. Nothing here branches on which
+    provider is calling — the boundary gained a verb, not a special case.
     """
     for attempt in range(attempts):
         try:
-            return await _read_json(client, url, params=params, headers=headers, timeout=timeout)
+            return await _read_json(
+                client,
+                url,
+                params=params,
+                headers=headers,
+                timeout=timeout,
+                method=method,
+                json_body=json_body,
+            )
         except httpx.HTTPStatusError as error:
             if error.response.status_code not in RETRYABLE_STATUSES or attempt == attempts - 1:
                 raise
@@ -112,9 +129,13 @@ async def _read_json(
     params: Mapping[str, str | int],
     headers: Mapping[str, str] | None = None,
     timeout: float | None = None,
+    method: str = "GET",
+    json_body: Mapping[str, Any] | None = None,
 ) -> Mapping[str, Any]:
     extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
-    async with client.stream("GET", url, params=params, headers=headers, **extra) as response:
+    if json_body is not None:
+        extra["json"] = json_body
+    async with client.stream(method, url, params=params, headers=headers, **extra) as response:
         response.raise_for_status()
         declared = int(response.headers.get("content-length", "0"))
         if declared > MAX_PROVIDER_BYTES:

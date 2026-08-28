@@ -80,6 +80,8 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0012_creators",
         "0013_entry_formats",
         "0014_status_is_the_domains",
+        "0015_entry_progress",
+        "0016_import_kind_is_the_registrys",
     ]
 
     upgrade(configured.database_url)
@@ -151,6 +153,8 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0012_creators",
         "0013_entry_formats",
         "0014_status_is_the_domains",
+        "0015_entry_progress",
+        "0016_import_kind_is_the_registrys",
     ]
 
 
@@ -549,3 +553,169 @@ def test_the_status_check_comes_back_on_a_downgrade(tmp_path: Path) -> None:
 
     assert "ck_entries_status" in schema
     assert "'owned'" in schema
+
+
+def test_progress_is_added_without_disturbing_an_existing_row(tmp_path: Path) -> None:
+    """Migration 0015 rebuilds `entries`, so what it must not lose is everything else.
+
+    A rebuild is the only way to add a CHECK on SQLite, and `copy_from` skips
+    reflection — SQLAlchemy does not reflect SQLite CHECK constraints at all, so a
+    mis-spelled table silently drops them. This walks a populated row through the
+    upgrade and back down again.
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", "0014_status_is_the_domains")
+    database_path = configured.data_dir / "books.db"
+    connection = sqlite3.connect(database_path)
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'anime', 'Black Clover', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO entries (id, user_id, item_id, status, score, notes, date_added,"
+        " date_started, date_finished, reread_count, score_provisional, created_at, updated_at)"
+        " VALUES (1, 1, 1, 'dropped', 4, 'kept', '2026-01-01', '2026-01-02', '2026-02-02',"
+        " 3, 1, ?, ?)",
+        (NOW, NOW),
+    )
+    # Children of `entries`, because a rebuild is a DROP TABLE and SQLite fires
+    # `ON DELETE CASCADE` on one when `PRAGMA foreign_keys` is on. `alembic/env.py`
+    # deliberately never enables it, and nothing asserted that until now: the failure
+    # empties both of these tables, reports success, and no backup manifest counts them.
+    connection.execute(
+        "INSERT INTO shelves (id, user_id, name, slug, created_at, updated_at)"
+        " VALUES (1, 1, 'Shelf', 'shelf', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute("INSERT INTO entry_shelves (entry_id, shelf_id) VALUES (1, 1)")
+    connection.execute("INSERT INTO entry_formats (entry_id, format) VALUES (1, 'streaming')")
+    connection.commit()
+    connection.close()
+
+    command.upgrade(alembic_config(configured.database_url), "0015_entry_progress")
+
+    connection = sqlite3.connect(database_path)
+    row = connection.execute(
+        "SELECT status, score, notes, date_started, date_finished, reread_count,"
+        " score_provisional, progress FROM entries WHERE id = 1"
+    ).fetchone()
+    # Everything survives, and the new column is NULL rather than 0: an existing entry
+    # has not recorded a progress, which is a different fact from having recorded zero.
+    assert row == ("dropped", 4, "kept", "2026-01-02", "2026-02-02", 3, 1, None)
+
+    assert connection.execute("SELECT count(*) FROM entry_shelves").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM entry_formats").fetchone()[0] == 1
+
+    schema = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+    for surviving in (
+        "ck_entries_score",
+        "ck_entries_reread_count",
+        "ck_entries_score_provisional",
+        "ck_entries_progress",
+    ):
+        assert surviving in schema, f"the rebuild dropped {surviving}"
+    # `copy_from` is a declaration and not a check, so an index left out of it is
+    # dropped in silence. `ix_entries_user_finished_id` serves `sort=date_finished`:
+    # losing it makes a page slower and says nothing.
+    indexes = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='entries'"
+        )
+    }
+    assert indexes >= {
+        "ix_entries_status",
+        "ix_entries_score",
+        "ix_entries_date_added",
+        "ix_entries_user_status_date_id",
+        "ix_entries_user_status_score_id",
+        "ix_entries_user_finished_id",
+    }
+
+    # Zero is storable and negatives are not: the one bound the database keeps.
+    connection.execute("UPDATE entries SET progress = 0 WHERE id = 1")
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute("UPDATE entries SET progress = -1 WHERE id = 1")
+    # There is deliberately no upper bound: the total is display only and a cached one
+    # goes stale, so a count above it must still be storable (DEC-077, this sprint).
+    connection.execute("UPDATE entries SET progress = 100000 WHERE id = 1")
+    connection.commit()
+    connection.close()
+
+    command.downgrade(alembic_config(configured.database_url), "0014_status_is_the_domains")
+    connection = sqlite3.connect(database_path)
+    columns = {row[1] for row in connection.execute("PRAGMA table_info(entries)")}
+    assert "progress" not in columns
+    assert connection.execute("SELECT status, score FROM entries WHERE id = 1").fetchone() == (
+        "dropped",
+        4,
+    )
+    connection.close()
+
+
+def test_the_connector_name_is_the_registrys_and_its_batches_keep_their_records(
+    tmp_path: Path,
+) -> None:
+    """`ck_import_batches_kind` was `ck_entries_status`'s mistake one table over.
+
+    It listed `goodreads` and `calibre` and was frozen in migration `0002`, so the first
+    connector added since — Sprint 041's — passed every application check and was then
+    refused by SQLite. `IMPORTERS` is the authority and is strictly stronger: the route
+    404s a name it does not hold, which the constraint could never express.
+
+    The rebuild is also a `DROP TABLE`, and `import_records` cascades from this table.
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", "0015_entry_progress")
+    database_path = configured.data_dir / "books.db"
+    connection = sqlite3.connect(database_path)
+    connection.execute(
+        "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+        " VALUES ('b1', 'goodreads', 'abc', 'committed', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO import_records (id, batch_id, row_number, created_at, updated_at)"
+        " VALUES (1, 'b1', 2, ?, ?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    # Before: a connector this list never heard of is refused by the database.
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+            " VALUES ('b2', 'myanimelist', 'def', 'previewed', ?, ?)",
+            (NOW, NOW),
+        )
+    connection.close()
+
+    command.upgrade(alembic_config(configured.database_url), "0016_import_kind_is_the_registrys")
+
+    connection = sqlite3.connect(database_path)
+    schema = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='import_batches'"
+    ).fetchone()[0]
+    assert "ck_import_batches_kind" not in schema
+    # The replay key is a real invariant and stays.
+    assert "uq_import_batch_input" in schema
+    # The batch and its record both survived the rebuild.
+    assert connection.execute("SELECT count(*) FROM import_batches").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_records").fetchone()[0] == 1
+    # And a third connector's batch is now the registry's business, not the schema's.
+    connection.execute(
+        "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+        " VALUES ('b2', 'myanimelist', 'def', 'previewed', ?, ?)",
+        (NOW, NOW),
+    )
+    # The replay key still refuses the same source twice for one connector.
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO import_batches (id, kind, fingerprint, state, created_at, updated_at)"
+            " VALUES ('b3', 'myanimelist', 'def', 'previewed', ?, ?)",
+            (NOW, NOW),
+        )
+    connection.commit()
+    connection.close()

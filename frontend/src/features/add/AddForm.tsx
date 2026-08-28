@@ -31,11 +31,13 @@ import {
 import { FormatPicker } from "@/features/library/FormatPicker";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import {
+  entryFieldLabel,
   formatsFor,
   hasEntryField,
   labelFor,
   statusesFor,
 } from "@/features/library/labels";
+import type { EntryFieldName } from "@/features/library/labels";
 import { useMotionPresets } from "@/lib/motion";
 
 export interface AddFormProps {
@@ -90,8 +92,13 @@ export function AddForm(props: AddFormProps) {
 
   // Asked of the domain rather than branched on the type: a record has no reread
   // count and no started/finished dates (DEC-057).
-  const has = (field: "date_started" | "date_finished" | "reread_count") =>
+  const has = (field: EntryFieldName) =>
     hasEntryField(itemType, itemTypes, field);
+  // And named by the domain rather than by a book. Sprint 038 gave the three passage
+  // fields per-domain labels and repaired only the detail page and the opinion
+  // dialog, so this screen went on saying "Reread count" to an anime.
+  const nameOf = (field: EntryFieldName) =>
+    entryFieldLabel(itemType, itemTypes, field);
   const domainFormats = formatsFor(itemType, itemTypes);
   const manualFields =
     itemTypes.find((type) => type.id === itemType)?.fields ?? [];
@@ -403,7 +410,7 @@ export function AddForm(props: AddFormProps) {
         {has("date_started") && (
           <div>
             <Label htmlFor="add-started" className="mb-1 block text-sm">
-              Started
+              {nameOf("date_started")}
             </Label>
             <Input
               id="add-started"
@@ -417,7 +424,7 @@ export function AddForm(props: AddFormProps) {
         {has("date_finished") && (
           <div>
             <Label htmlFor="add-finished" className="mb-1 block text-sm">
-              Finished
+              {nameOf("date_finished")}
             </Label>
             <Input
               id="add-finished"
@@ -431,7 +438,7 @@ export function AddForm(props: AddFormProps) {
         {has("reread_count") && (
           <div>
             <Label htmlFor="add-rereads" className="mb-1 block text-sm">
-              Reread count
+              {nameOf("reread_count")}
             </Label>
             <Input
               id="add-rereads"
