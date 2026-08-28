@@ -34,6 +34,41 @@ def _now() -> str:
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
+def _entry_row(
+    *,
+    user_id: int,
+    item_id: int,
+    status: str,
+    now: str,
+    score: int | None = None,
+    notes: str | None = None,
+    date_added: str | None = None,
+    date_started: str | None = None,
+    date_finished: str | None = None,
+    reread_count: int = 0,
+    progress: int | None = None,
+    score_provisional: bool | int = False,
+    suggested_status: str | None = None,
+) -> EntryRow:
+    """The one complete spelling of an entry row's storage columns."""
+    return EntryRow(
+        user_id=user_id,
+        item_id=item_id,
+        status=status,
+        score=score,
+        notes=notes,
+        date_added=date_added or now,
+        date_started=date_started,
+        date_finished=date_finished,
+        reread_count=reread_count,
+        progress=progress,
+        score_provisional=int(score_provisional),
+        suggested_status=suggested_status,
+        created_at=now,
+        updated_at=now,
+    )
+
+
 @dataclass(frozen=True)
 class SourceIdentity:
     source: str
@@ -253,23 +288,13 @@ class DomainRepository:
             )
             if existing is not None:
                 return EntryResult(item_id, existing.id, True)
-            entry = EntryRow(
+            # No progress: an entry nobody has touched has recorded nothing, which is
+            # NULL and not zero.
+            entry = _entry_row(
                 user_id=user_id,
                 item_id=item_id,
                 status="unsorted",
-                score=None,
-                notes=None,
-                date_added=now,
-                date_started=None,
-                date_finished=None,
-                reread_count=0,
-                # No progress: an entry nobody has touched has recorded nothing,
-                # which is NULL and not zero.
-                progress=None,
-                score_provisional=0,
-                suggested_status=None,
-                created_at=now,
-                updated_at=now,
+                now=now,
             )
             session.add(entry)
             session.flush()
@@ -379,21 +404,17 @@ class DomainRepository:
                 if found != shelves:
                     raise LookupError("shelf_not_found")
             values = dict(entry_values or {})
-            entry = EntryRow(
+            entry = _entry_row(
                 user_id=user_id,
                 item_id=item_id,
                 status=status,
+                now=now,
                 score=score,
                 notes=values.get("notes"),
-                date_added=now,
                 date_started=values.get("date_started"),
                 date_finished=values.get("date_finished"),
                 reread_count=values.get("reread_count") or 0,
                 progress=values.get("progress"),
-                score_provisional=0,
-                suggested_status=None,
-                created_at=now,
-                updated_at=now,
             )
             session.add(entry)
             session.flush()
@@ -771,24 +792,23 @@ class ImportRepository:
                     row.matched_entry_id = existing.id
                     unchanged += 1
                     continue
-                entry = EntryRow(
+                # The import path. Sprint 041 supplies a MyAnimeList watched-episode
+                # count through here; `.get` rather than `.get(..., 0)` because absent
+                # means not recorded.
+                entry = _entry_row(
                     user_id=user_id,
                     item_id=item_id,
                     status="unsorted",
+                    now=now,
                     score=entry_payload.get("score"),
                     notes=entry_payload.get("notes"),
                     date_added=entry_payload.get("date_added") or now,
                     date_started=entry_values.get("date_started"),
                     date_finished=entry_values.get("date_finished"),
                     reread_count=entry_values.get("reread_count", 0),
-                    # The import path. Sprint 041 supplies a MyAnimeList
-                    # watched-episode count through here; `.get` rather than
-                    # `.get(..., 0)` because absent means not recorded.
                     progress=entry_values.get("progress"),
-                    score_provisional=int(entry_payload.get("score_provisional", False)),
+                    score_provisional=entry_payload.get("score_provisional", False),
                     suggested_status=entry_payload.get("suggested_status"),
-                    created_at=now,
-                    updated_at=now,
                 )
                 session.add(entry)
                 session.flush()

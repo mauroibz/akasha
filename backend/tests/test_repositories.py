@@ -1,3 +1,5 @@
+import ast
+import inspect
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -8,8 +10,9 @@ from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.matching import MatchKind
+from book_tracker.infrastructure import repositories
 from book_tracker.infrastructure.models import EntryRow, ItemIdentifierRow, ItemRow, ShelfRow
-from book_tracker.infrastructure.repositories import DomainRepository, IdentityConflict
+from book_tracker.infrastructure.repositories import DomainRepository, IdentityConflict, _entry_row
 from book_tracker.migrations import upgrade
 
 
@@ -21,6 +24,63 @@ def engine(tmp_path: Path) -> Engine:
     value = create_engine(configured)
     yield value
     value.dispose()
+
+
+def test_one_factory_constructs_every_entry_row() -> None:
+    row = _entry_row(
+        user_id=7,
+        item_id=9,
+        status="unsorted",
+        now="2026-08-27T00:00:00Z",
+        score=8,
+        notes="kept",
+        date_started="2026-01-01",
+        reread_count=2,
+        progress=20,
+        score_provisional=True,
+        suggested_status="completed",
+    )
+    assert {
+        "user_id": row.user_id,
+        "item_id": row.item_id,
+        "status": row.status,
+        "score": row.score,
+        "notes": row.notes,
+        "date_added": row.date_added,
+        "date_started": row.date_started,
+        "date_finished": row.date_finished,
+        "reread_count": row.reread_count,
+        "progress": row.progress,
+        "score_provisional": row.score_provisional,
+        "suggested_status": row.suggested_status,
+        "created_at": row.created_at,
+        "updated_at": row.updated_at,
+    } == {
+        "user_id": 7,
+        "item_id": 9,
+        "status": "unsorted",
+        "score": 8,
+        "notes": "kept",
+        "date_added": "2026-08-27T00:00:00Z",
+        "date_started": "2026-01-01",
+        "date_finished": None,
+        "reread_count": 2,
+        "progress": 20,
+        "score_provisional": 1,
+        "suggested_status": "completed",
+        "created_at": "2026-08-27T00:00:00Z",
+        "updated_at": "2026-08-27T00:00:00Z",
+    }
+
+    tree = ast.parse(inspect.getsource(repositories))
+    constructions = [
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "EntryRow"
+    ]
+    assert len(constructions) == 1
 
 
 def test_exact_item_and_entry_deduplicate(engine: Engine) -> None:
