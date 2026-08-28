@@ -2,7 +2,7 @@
 
 **Plan revision:** 25
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 047 — Letterboxd import for movies
+**Active sprint:** none — every planned sprint is complete
 
 ## Shape of the plan
 
@@ -132,7 +132,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | completed |
 | [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | completed |
 | [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | completed |
-| [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | ready |
+| [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | completed |
 
 ## Sprint contracts
 
@@ -821,7 +821,11 @@ Wikidata enrichment resolves the stored short URI after commit. A neutral title+
 an ambiguity for a movie already added through Wikidata and never auto-merges. Private data remains
 walkthrough input; synthetic fixtures prove every source shape and archive failure.
 
-Three things Sprint 046 settled or found that this sprint inherits. The adapter already accepts a
+**Completed**, and at a reduced verification level the owner directed (DEC-102): the API and
+enrichment path was exercised against the owner's real archive, and Playwright, the walkthrough gate
+and frontend tests for the new declaration were not run. Undo has no coverage in this sprint.
+
+Three things Sprint 046 settled or found that this sprint inherited. The adapter already accepts a
 short URI, a slug and a film URL for the same `letterboxd` identity, so no normalization pass is
 needed at import time (DEC-100). `DomainRepository.match` scans **every** item row with no
 `items.type` filter — tolerable for title+author, wrong for title+year, where a novel and its

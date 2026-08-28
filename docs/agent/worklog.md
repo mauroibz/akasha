@@ -2615,3 +2615,39 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Next: Sprint 047, the Letterboxd importer. Its plan now carries the two constraints this sprint
   found for it — scope the title+year suggestion to the target domain, and store the export's URI as
   it comes because the adapter already accepts all three Letterboxd shapes.
+
+## 2026-08-28 — Sprint 047 complete; the plan is finished, at a reduced gate
+
+- Done in one implementation commit, `a076f0c`: the bounded Letterboxd ZIP reader, the five-table
+  aggregation and mapping, the archive-safety checks, and the scoped title+year matcher seam.
+  DEC-101 and DEC-102.
+- **The owner directed this sprint to skip the in-depth testing pass**, observing it had been taking
+  about two thirds of a sprint. That instruction sits above the protocol in the authority order, so
+  it was followed and the trade is recorded rather than argued (DEC-102).
+- What ran: `test_letterboxd_import.py` **61 passed**; conformance plus every other importer suite
+  **239 passed**, which is what proves Goodreads, Calibre and MyAnimeList are untouched by the
+  matcher change; `make check` clean; `make openapi` no diff; full suites **880 backend / 189
+  frontend**.
+- Real-data pass against the owner's own archive on a disposable data directory, through the running
+  application: preview returned the measured two unique films with exactly doubled scores and both
+  suggesting Watched, zero row errors; commit created 2 items and 2 unsorted entries; **both Wikidata
+  enrichment jobs succeeded**, resolving each `boxd.it` short URI by HEAD and filling directors,
+  runtime and Spanish genres; both films appeared as ordinary unsorted Triage rows, which is the
+  first time any movie has reached Triage; re-uploading the identical archive returned
+  `state: committed` rather than duplicating. The archive is byte-identical at 2,908 bytes and still
+  untracked. No title, URI, rating or review from it is in the repository.
+- **What did not run, and is not evidence:** Playwright; the walkthrough gate through the real
+  screens; frontend tests for the new connector declaration. Nobody has seen the Letterboxd connector
+  rendered on the Import page or approved a movie row from the Triage UI, and **undo has no coverage
+  at any level in this sprint**. The risky logic — archive handling, the mapping matrix, the matcher
+  scope, enrichment — is covered; the screen is not.
+- The matcher change is the only shared behaviour change and it is deliberately narrow: title plus
+  *exact* year, scoped to one item type, offered and never merged. The scope is the load-bearing
+  part — `DomainRepository.match` scanned every row regardless of type, so without it a film diary
+  would have offered to merge films into books.
+- Deviations: none in product or architecture. No migration, no new route, no OpenAPI change, no
+  screen change, no credential.
+- Next: **the plan is finished.** Sprint 047 was the final planned sprint, so project state is
+  `complete` with null active fields. Nothing is tagged, released or pushed. The obvious next pieces
+  of work are the two defects DEC-100 recorded, the untested UI surface DEC-102 names, and a v1.4
+  release for the movie line if the owner wants one.

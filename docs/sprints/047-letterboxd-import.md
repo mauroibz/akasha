@@ -1,6 +1,6 @@
 # Sprint 047 — Letterboxd import for movies
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 046
 **Roadmap revision:** 25
 
@@ -168,4 +168,80 @@ job outcomes and UI/browser errors. Never open the live application database for
 
 ## Outcome
 
-_Not started._
+Delivered, and **verified at a reduced level at the owner's explicit direction.** What that means in
+practice is stated under Verification below; read it before treating any gate here as equivalent to
+Sprint 046's.
+
+### What ships
+
+`domains/movie/letterboxd.py` reads a Letterboxd export ZIP and is registered as the `letterboxd`
+connector on the movie domain. It aggregates the five live tables — `watched`, `ratings`, `diary`,
+`reviews`, `watchlist` — into one record per Letterboxd URI, mapping status, score, dates, rewatches,
+review text and tags exactly as the Sprint 045 measurement specified. Deleted, orphaned, likes,
+lists, comments and the profile are read past deliberately.
+
+The archive is checked before it is opened: encrypted members, names that escape the root, a member
+named twice, non-UTF-8 members, missing columns and declared sizes over the expansion ceiling are
+each refused with a `user_message` and an `action`. Compressed size is never treated as a bound.
+
+The one shared behaviour change is matching rule 5, now in technical spec 6.1: **normalized title
+plus exact year, scoped to one item type**, as an ambiguous suggestion only, and only when the source
+carries no creator. `DomainRepository.match` gained optional `year` and `item_type`; every existing
+connector passes neither and gets the identical query it had.
+
+### Acceptance criteria
+
+1. **The owner's real archive previews as measured.** Two unique films, both suggesting `watched`,
+   scores doubled exactly from their half-star ratings, zero row errors. No title, URI, rating or
+   review from it appears in this repository, its fixtures or its logs.
+2. **The mapping matrix is proved on synthetic archives.** Watched/watchlist precedence, current
+   rating over event rating, latest event rating as fallback, the full half-star scale, blank as
+   unrated, out-of-range as a row error, multiple diary events as rewatches, earliest source date as
+   `date_added`, latest `Watched Date` as Watched, review markup read as text, and tags unioned into
+   shelves across events.
+3. **Archive attacks and malformed inputs are refused; bad rows stay local.** An unusable URI in one
+   row leaves the valid film in the next row untouched and intact.
+4. **Exact identity matches; title and year only offer.** A film held under the export's own URI is
+   an exact match; one held under Wikidata's slug is offered as an ambiguity and never merged; a
+   1977 film is not offered for a 2018 remake; and a *book* named `Dune` from 2021 is never offered
+   as a candidate for the 2021 film.
+5. **Enrichment resolves the stored short URI end to end.** Both jobs from the real archive reached
+   `succeeded`: each `boxd.it` URI was resolved by HEAD, looked up by exact `P6127`, and filled
+   directors, runtime and Spanish genres into an otherwise empty record. No covers, as designed.
+6. **The generic pipeline carries it unchanged.** Preview, commit, Triage and fingerprint replay all
+   work with no connector-specific branch. Re-uploading the same archive returned `state: committed`
+   rather than duplicating anything, and both films appear as ordinary unsorted Triage rows — which
+   is the first time any movie has reached Triage at all.
+7. **The private archive is unmodified and untracked.** 2,908 bytes, unchanged; every committed
+   fixture is invented in `tests/test_letterboxd_import.py`.
+8. **No migration and no new API route.** `make openapi` produced no diff, so the registered
+   connector changed no generated vocabulary.
+
+### Verification — reduced, and here is exactly how
+
+The owner directed this sprint to skip the in-depth testing pass. What was run:
+
+- `tests/test_letterboxd_import.py`: **61 passed** — the mapping matrix, every archive-safety
+  boundary, and the matcher seam including the cross-domain case.
+- Conformance and every other importer suite (`test_domain_conformance.py`, `test_generic_imports.py`,
+  `test_repositories.py`, `test_goodreads_import.py`, `test_myanimelist_import.py`,
+  `test_calibre_import.py`): **239 passed**, so the three connectors this sprint did not touch are
+  provably unchanged by the matcher extension.
+- `make check`: passed. `make openapi`: no diff.
+- Full unit suites: **880 backend**, **189 frontend**.
+- A real end-to-end pass on the owner's archive through the running application: preview → commit →
+  enrichment → Triage → replay, against live Wikidata.
+
+**What was not run, and is therefore not evidence:**
+
+- **The Playwright suite.** No frontend code changed and the Import screen renders connectors from
+  their declaration, but that reasoning is an argument, not a test result.
+- **The walkthrough gate.** The Import → Triage flow was exercised through the **API**, not through
+  the real screens. Nobody has seen the Letterboxd connector rendered on the Import page, approved a
+  movie row from the Triage UI, or undone a movie batch from a browser. Undo in particular has no
+  coverage in this sprint at any level.
+- **Frontend importer/Triage tests** for the new declaration were not added.
+
+### Commits
+
+`a076f0c` read a Letterboxd export into movie records · plus this closure commit.

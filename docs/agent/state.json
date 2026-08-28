@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 25,
-  "project_status": "in_progress",
-  "active_sprint": "047",
-  "active_sprint_file": "docs/sprints/047-letterboxd-import.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "046",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "047",
   "completed_sprints": [
     "001",
     "002",
@@ -52,8 +52,9 @@
     "043",
     "044",
     "045",
-    "046"
+    "046",
+    "047"
   ],
-  "started_at": "2026-08-28T00:30:00-03:00",
-  "updated_at": "2026-08-28T00:30:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-28T00:45:00-03:00"
 }

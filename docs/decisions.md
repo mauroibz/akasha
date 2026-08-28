@@ -3522,3 +3522,49 @@ predictions about mistakes to come.
   to **HTTP 502 `provider_failure`**. A typed `record_not_found` is an answer — that film does not
   exist — and the reader is told the provider failed. It predates this sprint and affects every
   domain equally; a pasted Open Library URL for a withdrawn edition behaves the same way.
+
+## DEC-101 — Title plus exact year is a scoped offer, never a match
+
+- **Date:** 2026-08-28
+- **Status:** accepted
+- **Cross-references:** DEC-076 and DEC-078–083 (the import boundary), DEC-098 and DEC-100 (the
+  Letterboxd seam). Implements technical spec 6.1 rule 5.
+- **Context:** A Letterboxd export identifies a film by a short `boxd.it` URI, a title and a year,
+  and nothing else — there is no director in the file. The same film may already be in the library
+  from a Wikidata search, carrying Letterboxd's *slug* rather than the export's short URI. Those two
+  are not equal until something resolves one into the other, and resolving during a preview would
+  cost one network request per row.
+- **Decision:** `ImportMatcher.match` takes optional `year` and `item_type`. When no exact identity
+  matches and the source offers no creator, normalized title plus **exact** year may return existing
+  item ids as an ambiguity for the owner to accept or reject. It never merges automatically.
+- **Decision:** the offer is **scoped to one item type**, and that scope is the load-bearing part.
+  `DomainRepository.match` scanned every item row regardless of type. Title plus author survives that
+  because sharing both is genuinely rare; title plus year does not, because a novel and the film made
+  of it routinely share a title and a year. Without the scope, importing a film diary would offer to
+  merge films into books.
+- **Consequences:** Every connector that passes neither argument — Goodreads, Calibre, MyAnimeList —
+  executes the identical query it did before, which is asserted by a test rather than argued. A
+  remake stays a separate item, because the year is exact rather than near. A film with no year in
+  the export offers nothing rather than every film sharing its title.
+
+## DEC-102 — Sprint 047 was verified at a reduced level, by owner direction
+
+- **Date:** 2026-08-28
+- **Status:** accepted
+- **Cross-references:** DEC-025 and the walkthrough gate in `AGENTS.md`, which this deliberately
+  departs from for one sprint.
+- **Context:** The owner directed that Sprint 047 skip the in-depth testing pass, observing that it
+  had been consuming roughly two thirds of a sprint's effort. That instruction is the top of the
+  authority order, so it was followed rather than argued.
+- **Decision:** the sprint ran its focused suite, the conformance and every other importer suite,
+  `make check`, `make openapi`, both full unit suites, and a real end-to-end pass on the owner's own
+  archive through the running application. It did **not** run Playwright, did not add frontend tests
+  for the new connector declaration, and did not perform the walkthrough gate through the real
+  screens.
+- **Consequences, stated plainly so nobody reads this sprint's green as Sprint 046's green:** the
+  Letterboxd connector has never been seen rendered on the Import page, no movie row has been
+  approved from the Triage UI, and **undo has no coverage at any level in this sprint**. The
+  Import → Triage flow is proven at the API and the enrichment boundary, which is where the risky
+  logic is, and unproven at the screen. The first person to use this feature in a browser is the
+  first person to test it there. If a UI-level defect turns up, this is why, and it is a recorded
+  trade the owner chose rather than an oversight.

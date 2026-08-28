@@ -1,51 +1,59 @@
-# Handoff — Sprint 047 ready: the Letterboxd importer
+# Handoff — the plan is complete; movies and Letterboxd both ship
 
-Sprint 046 is complete on `sprint-045-movies` in `6e53952`, `1cd443e` and `20fda58`. **Movies ship.**
-`domains/movie/` is the fourth domain and `WikidataMovieProvider` is its one adapter: film-filtered
-search, exact Wikidata/IMDb/TMDB/Letterboxd identity resolution, HEAD-only `boxd.it` resolution,
-Spanish labels with English fallback, and no cover under any circumstance. Nineteen fixtures recorded
-live from Wikidata back every parser branch. DEC-099 and DEC-100 hold what was measured.
+Sprint 047 closed on `sprint-045-movies` in `a076f0c`. It was the last numbered sprint in the
+roadmap, so `docs/agent/state.json` reads `complete` with null active fields. **There is no active
+sprint.** Nothing has been tagged, released or pushed; the movie line is entirely local on this
+branch.
 
-## Next sprint
+Akasha now holds four domains — books, albums, anime and movies — and five connectors: Goodreads,
+Calibre, MyAnimeList and Letterboxd.
 
-Sprint 047 is ready. Read `docs/sprints/047-letterboxd-import.md` and every required source, then
-inspect the actual `domains/movie/` code and the current `ImportMatcher`/`ImportRepository` behaviour.
-It is a user-visible connector sprint with a real Import → Triage walkthrough.
+## Read this before trusting Sprint 047's green
 
-**Two constraints Sprint 046 found for it, already written into its plan:**
+Sprint 047 was verified at a **reduced level, by the owner's explicit direction** (DEC-102). Its
+focused suite, the conformance and every other importer suite, `make check`, both full unit suites
+and a real end-to-end pass on the owner's own archive all ran and passed. Playwright, the walkthrough
+gate through the real screens, and frontend tests for the new connector declaration **did not run**.
 
-- `DomainRepository.match` (`infrastructure/repositories.py:138`) scans **every** item row with no
-  `items.type` filter. Fine for title+author; wrong for title+year with no creator, where a novel
-  and its adaptation routinely share both. Scope the year suggestion to the target domain.
-- `fetch_by_identifier("letterboxd", …)` **already accepts** a bare `P6127` slug, a full
-  `letterboxd.com/film/<slug>/` URL and a `boxd.it` short URI. Store the export's URI as it comes;
-  do not add a normalization pass that spends a network request per row (DEC-100).
+Concretely, and this is the part that matters to whoever goes next:
 
-Sprint 047 also gets Triage's first real movie row. Nothing has produced an unsorted film yet, so
-that half of the domain is genuinely untested until this connector exists.
+- Nobody has seen the Letterboxd connector rendered on the Import page.
+- Nobody has approved a movie row from the Triage UI.
+- **Undo has no coverage in that sprint at any level.**
 
-## Known defects, recorded and not repaired (DEC-100)
+The risky logic is covered — archive handling, the mapping matrix, the matcher scope, enrichment
+against live Wikidata. The screen is not. Treat a UI defect there as expected rather than surprising.
 
-Neither is a movie defect; both predate this sprint and affect every domain.
+## Known defects, recorded and not repaired
 
-- `_backfillable_items` (`application/enrichment.py:428`) counts a null `cover_path` or `year` as
-  "worth a lookup" regardless of the domain's `completeness_fields`. Movies are deliberately
-  coverless, so `POST /api/enrichment/backfill` will re-queue every movie on every call and each job
-  will ask Wikidata for a cover it never returns. Harmless until someone calls that route often.
-- `GET /api/search/resolve` maps every exception from `resolve_input` to HTTP 502
-  `provider_failure`. A typed `record_not_found` is an answer, not an outage, and the reader is told
-  the provider failed.
+From Sprint 046 (DEC-100), neither of them movie-specific:
+
+- `_backfillable_items` (`application/enrichment.py`) counts a null `cover_path` or `year` as "worth
+  a lookup" in every domain, regardless of that domain's `completeness_fields`. Movies are
+  deliberately coverless, so `POST /api/enrichment/backfill` re-queues every movie on every call and
+  each job asks Wikidata for a cover it never returns.
+- `GET /api/search/resolve` maps every exception from `resolve_input` to HTTP 502 `provider_failure`.
+  A typed `record_not_found` is an answer, not an outage, and the reader is told the provider failed.
+
+## If the next session picks something up
+
+Nothing is scheduled. The obvious candidates, in the order they seem worth doing:
+
+1. The UI surface DEC-102 leaves untested — the Import page declaration, a movie Triage approval, and
+   an undo of a Letterboxd batch, driven through the real screens.
+2. The two defects above.
+3. A v1.4 release for the movie line, if the owner wants one. Sprint 018's release procedure and the
+   `make build` / container smoke path are unchanged and were last exercised for v1.3.0.
+
+Any of those needs a new sprint file, a roadmap entry, and `FINAL_SPRINT` in
+`scripts/validate_project.py` moved past 47.
 
 ## Private and operational constraints
 
-- `letterboxd-tomateperitarg-2026-08-27-22-42-utc.zip` remains untracked private data. Sprint 047 may
-  use it as **read-only walkthrough input only** — never a fixture, never committed, never modified.
-  Tests use synthetic archives.
-- Wikidata needs no key, only `USER_AGENT_CONTACT`. It is live and answering; a movie search costs
-  four bounded requests and measured 1.6–2.8 s end to end.
-- Provider fixtures must be freshly recorded, bounded, and given a README row stating the command and
-  date. A synthetic fixture is allowed for an adversarial shape and must say so.
-- `frontend/e2e/scratchpad/movie-walkthrough.spec.ts` is the working reference for driving the movie
-  domain through the real UI. The scratchpad directory is gitignored, so that file is local only.
+- `letterboxd-tomateperitarg-2026-08-27-22-42-utc.zip` is the owner's real export and remains
+  untracked private data, byte-identical at 2,908 bytes. It is read-only walkthrough input and never
+  a fixture. Every committed Letterboxd fixture is invented in `tests/test_letterboxd_import.py`.
+- Wikidata needs no key, only `USER_AGENT_CONTACT`. A movie search costs four bounded requests.
+- `frontend/e2e/scratchpad/movie-walkthrough.spec.ts` drives the movie domain through the real UI and
+  is the place to start on item 1 above. The scratchpad directory is gitignored, so it is local only.
 - The v1.3.0 anime/MyAnimeList release remains merged, tagged and pushed on `main` at `3bce2de`.
-  Nothing in Sprint 046 has been released; the branch is local.
