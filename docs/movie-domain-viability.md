@@ -116,3 +116,93 @@ The one new problem belongs to the later connector rather than the domain: curre
 exports identify films with short `boxd.it` URIs, while Wikidata's `P6127` holds the Letterboxd film
 slug. The importer plan must resolve that relationship at an external boundary or keep it as an
 explicit ambiguity; it must never scrape metadata or silently merge on title/year.
+
+## Letterboxd export measurement
+
+The owner's untracked ZIP was read in place with Python's CSV reader; nothing was extracted,
+rewritten or copied into fixtures. Only structure and aggregates were printed. The archive has 16
+CSV members and 1,022 uncompressed bytes in this small sample:
+
+| Member | Header | Sample rows |
+|---|---|---:|
+| `profile.csv` | Date Joined, Username, Given Name, Family Name, Email Address, Location, Website, Bio, Pronoun, Favorite Films | 1 |
+| `watched.csv` | Date, Name, Year, Letterboxd URI | 2 |
+| `ratings.csv` | Date, Name, Year, Letterboxd URI, Rating | 2 |
+| `diary.csv` | Date, Name, Year, Letterboxd URI, Rating, Rewatch, Tags, Watched Date | 0 |
+| `reviews.csv` | diary fields plus Review | 0 |
+| `watchlist.csv` | Date, Name, Year, Letterboxd URI | 0 |
+| `comments.csv` | Date, Content, Comment | 0 |
+| `deleted/{diary,reviews,comments}.csv` | Same headers as their live equivalents | 0 |
+| `orphaned/{diary,reviews,comments}.csv` | Same headers as their live equivalents | 0 |
+| `likes/films.csv` | Date, Name, Year, Letterboxd URI | 0 |
+| `likes/{reviews,lists}.csv` | Date, Content | 0 |
+
+The two watched identities were distinct and appeared exactly once in `watched.csv` and once in
+`ratings.csv`; the cross-file overlap was complete. Every populated date matched `YYYY-MM-DD`.
+Every film identity was an HTTPS `boxd.it` URL with one path segment. Ratings were populated,
+within Letterboxd's documented 0.5–5 scale and on half-star boundaries. No title, user name, URI,
+rating attached to a title, review or other personal value is reproduced here.
+
+Letterboxd's official [export page](https://letterboxd.com/user/exportdata/) confirms that the ZIP
+contains CSVs for profile, films, reviews, lists and more, including deleted content and reviews of
+deleted titles. Its official [import-format documentation](https://letterboxd.com/about/importing-data/)
+provides the semantics the export page does not spell out: UTF-8 CSV; Letterboxd URI, TMDB id, IMDb
+id, title/year/directors as identity alternatives; rating 0.5–5; `Rating10` 1–10; `WatchedDate` as
+the diary date; a boolean rewatch flag; tags; and review text/HTML. The observed export uses spaced
+headers (`Letterboxd URI`, `Watched Date`) rather than the import template's compact names.
+
+One supplied short URI was probed without logging either the URI or its film slug. Both GET and
+HEAD followed exactly one redirect and ended at HTTPS `letterboxd.com/film/<slug>/` with status
+200. This is identity resolution, not page scraping: the provider needs only the redirect target,
+then searches Wikidata's `P6127` claim for that exact slug. The implementation must refuse any
+redirect outside the two named hosts and must never read or parse the Letterboxd HTML body.
+
+### Initial importer contract
+
+The reader consumes `watched.csv`, `ratings.csv`, `diary.csv`, `reviews.csv` and `watchlist.csv` and
+aggregates them into one record per normalized Letterboxd URI. It deliberately ignores profile,
+comments, likes, lists, deleted and orphaned content. Those are separate product choices; silently
+restoring deleted material or manufacturing a `Liked` shelf is not import fidelity.
+
+The mappings are:
+
+- **Identity:** exact `letterboxd` identifier holding the normalized HTTPS `boxd.it` URI. Re-import
+  therefore matches without provider traffic. The Wikidata provider's enrichment lookup follows a
+  HEAD redirect to the film slug, searches exact `P6127`, and refuses zero or multiple matches.
+- **Status:** any live watched/rating/diary/review evidence suggests `watched`; a film present only
+  in watchlist suggests `watchlist`. Persistence remains `unsorted` until Triage approval.
+- **Score:** current `ratings.csv` wins; otherwise the most recent diary/review rating. A populated
+  0.5–5 value is multiplied by two into Akasha's exact 1–10 integer scale. Blank means unscored;
+  zero and out-of-range values are row errors, not absence.
+- **Dates:** the earliest source `Date` becomes `date_added`. Only `Watched Date` may become the
+  entry's Watched (`date_finished`) value, choosing the latest event. `watched.csv.Date` is not
+  relabelled as a viewing date.
+- **Rewatches:** the count of truthy `Rewatch` diary/review events becomes `reread_count`, rendered
+  by the movie domain as Rewatches. Repeated diary rows are events, not duplicate items.
+- **Review:** the most recently dated nonblank review seeds plain-text notes on a newly created
+  entry. HTML is parsed to text and never rendered as source markup. Re-import never overwrites an
+  existing note.
+- **Tags:** the union of live diary/review tags becomes shelves through the existing safe slug
+  normalizer. Empty or punctuation-only tags are ignored rather than aborting the file.
+- **Metadata:** title and year come from the export; Wikidata background enrichment fills the empty
+  declared fields and optional cover only under the ordinary fill-empty rule.
+
+Files and rows are bounded independently. The ZIP reader refuses encrypted members, duplicate
+member names, unknown paths, path traversal, malformed UTF-8/CSV, missing required headers and an
+excessive total expanded size. It reads the five allowed live members without extracting them.
+Disagreement on title/year for one URI is a visible row error. Duplicate current-state rows resolve
+by latest source `Date` with a recorded warning; diary/review rows remain ordered events.
+
+### The one shared importer seam
+
+An item added through Wikidata carries the Letterboxd slug, while an export carries the short URI.
+Before enrichment those values cannot be exact matches. `ImportMatcher` therefore gains an optional
+neutral `year` input and may offer normalized title + year as an **ambiguous suggestion only** when
+no exact identifier matches. It never auto-merges. Selecting the existing item makes import commit
+attach the exact short URI, after which the ordinary `letterboxd` enrichment key works. This is a
+domain-neutral extension of technical spec 6.1, not an `if movie` branch.
+
+If the owner creates a genuinely distinct film with the same title and year, the preview displays
+the candidates and permits Create new. If no candidate exists, the importer creates the skeletal
+movie and its post-commit enrichment resolves the short URI. A provider miss leaves the valid
+title/year/entry intact with a typed job error; it never sends the importer to scrape a film page.
