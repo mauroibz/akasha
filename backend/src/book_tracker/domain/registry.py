@@ -22,6 +22,7 @@ from book_tracker.domains.book import DOMAIN as BOOK
 from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 from book_tracker.domains.movie import DOMAIN as MOVIE
+from book_tracker.domains.movie.letterboxd import IMPORTER as LETTERBOXD_IMPORTER
 
 DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM, ANIME, MOVIE)}
 
@@ -32,8 +33,7 @@ IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
     BOOK.item_type: (GOODREADS_IMPORTER, CALIBRE_IMPORTER),
     ALBUM.item_type: (),
     ANIME.item_type: (MYANIMELIST_IMPORTER,),
-    # Sprint 047 registers the Letterboxd connector here.
-    MOVIE.item_type: (),
+    MOVIE.item_type: (LETTERBOXD_IMPORTER,),
 }
 IMPORTERS: dict[str, Importer] = {
     importer.name: importer for importers in IMPORTERS_BY_DOMAIN.values() for importer in importers

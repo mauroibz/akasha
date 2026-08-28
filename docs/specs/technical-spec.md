@@ -250,7 +250,10 @@ Matching precedence for imports and add dedupe:
 1. authoritative provider source ID;
 2. canonical ISBN-13 (including validated ISBN-10 conversion-equivalence);
 3. Calibre UUID;
-4. normalized title plus normalized first author as an **ambiguous suggestion only**.
+4. normalized title plus normalized first author as an **ambiguous suggestion only**;
+5. normalized title plus **exact** year, scoped to one item type, as an ambiguous suggestion only, and only for a source that carries no creator at all.
+
+Rule 5 exists for a source that identifies its records by an opaque URI and knows nothing else about them — a Letterboxd export names a film, a year and a link, and the film may already be held under a different form of the same identity. It is deliberately narrower than rule 4 in three ways: the year must be exact rather than near, the caller must name the item type it is matching within, and it applies only when no first creator is available. Title plus year is a much weaker key than title plus author, because a novel and the film made of it routinely share both; scoping it to one domain is what keeps a book out of a film's candidate list. A caller that supplies neither a year nor an item type gets rules 1–4 unchanged.
 
 A fuzzy title/author result never merges automatically because the model is edition-level: translations and reprints commonly share that key. It requires an explicit preview decision or creates a separate item. A match result records rule, confidence, and decision provenance. If two or more exact identities from one record resolve to different existing items, return a typed `identity_conflict`, quarantine that record for explicit resolution, and attach no new identifier or entry automatically.
 

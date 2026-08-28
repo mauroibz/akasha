@@ -142,19 +142,35 @@ class DomainRepository:
         sources: Sequence[SourceIdentity] = (),
         title: str = "",
         first_author: str = "",
+        year: int | None = None,
+        item_type: str | None = None,
     ) -> MatchDecision:
+        """Exact identity first; a near match only as something to be offered.
+
+        Two near-match shapes, and the second is deliberately narrower than the first.
+        Title plus author is strong enough to scan the whole library for. Title plus
+        year is not — `Dune` (2021) is a novel's edition *and* a film — so it applies
+        only within one domain, and only when the source has no creator to offer. A
+        caller that passes neither `year` nor `item_type` gets exactly the old query.
+        """
         with Session(self.engine) as session:
             exact = self._exact_ids(session, identifiers, sources)
             suggestions: set[int] = set()
-            if title and first_author:
-                for item_id, candidate_title, candidate_author in session.execute(
-                    select(ItemRow.id, ItemRow.title, ItemRow.creator_primary)
+            rows = select(ItemRow.id, ItemRow.title, ItemRow.creator_primary, ItemRow.year)
+            if item_type is not None:
+                rows = rows.where(ItemRow.type == item_type)
+            if title and (first_author or year is not None):
+                for item_id, candidate_title, candidate_author, candidate_year in session.execute(
+                    rows
                 ):
-                    if (
-                        candidate_author
-                        and normalize_text(candidate_title) == normalize_text(title)
-                        and normalize_text(candidate_author) == normalize_text(first_author)
-                    ):
+                    if normalize_text(candidate_title) != normalize_text(title):
+                        continue
+                    if first_author:
+                        if candidate_author and normalize_text(candidate_author) == normalize_text(
+                            first_author
+                        ):
+                            suggestions.add(item_id)
+                    elif candidate_year is not None and candidate_year == year:
                         suggestions.add(item_id)
             return decide_match(exact, suggestions)
 

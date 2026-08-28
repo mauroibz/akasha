@@ -1,6 +1,6 @@
 # Sprint 047 — Letterboxd import for movies
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 046
 **Roadmap revision:** 25
 

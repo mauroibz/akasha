@@ -293,7 +293,17 @@ class ImportSnapshot:
 
 
 class ImportMatcher(Protocol):
-    """The narrow library view an importer's matching strategy may use."""
+    """The narrow library view an importer's matching strategy may use.
+
+    `year` and `item_type` were added for a source that carries no creator at all. A
+    Letterboxd export names a film by title and year, and the film it means may already
+    be in the library under a Wikidata slug rather than the export's short URI — so
+    title plus **exact** year may be offered as an ambiguity, never as a match.
+
+    `item_type` scopes that offer, and exists because title plus year is a far weaker
+    signal than title plus author: a novel and the film made of it routinely share both.
+    An importer that passes neither behaves exactly as it did before (technical spec 6.1).
+    """
 
     def match(
         self,
@@ -301,6 +311,8 @@ class ImportMatcher(Protocol):
         identifiers: Sequence[Identifier],
         title: str,
         first_author: str,
+        year: int | None = None,
+        item_type: str | None = None,
     ) -> MatchDecision: ...
 
 
