@@ -258,17 +258,54 @@ class TestBoundsAndAbsence:
         assert payload.creator_sort is None
 
 
-class TestNoCover:
-    async def test_a_film_with_no_image_gets_no_cover(self) -> None:
-        payload = await wikidata(FETCH_1977).fetch("Q546900")
-        assert payload.cover_url is None
+class TestCoverNeverComesFromWikidata:
+    """Sprint 048 gave movies posters; it did **not** give Wikidata a say in them.
 
-    async def test_an_image_that_exists_is_still_not_a_poster(self) -> None:
-        """Metropolis' only `P18` is `Horst von Harbou - Metropolis set photograph 05`.
-        Promoting a set photograph to a poster is worse than a blank tile (DEC-098)."""
+    `P18` stays unread. It is a general image property, and the two values measured were
+    a set photograph and a festival photo of the cast — promoting either to a poster is
+    worse than a blank tile (DEC-098). What changed is where a poster comes from, not
+    what counts as one.
+    """
+
+    async def test_the_poster_is_built_from_the_imdb_id_and_not_from_p18(self) -> None:
+        payload = await wikidata(FETCH_1977).fetch("Q546900")
+        assert payload.cover_url == "https://images.metahub.space/poster/medium/tt0076786/img"
+
+    async def test_metropolis_gets_a_poster_rather_than_its_set_photograph(self) -> None:
+        """`Q151599` really does carry a `P18`: `Horst von Harbou - Metropolis set
+        photograph 05.jpg`. The cover must not be it."""
         rows = await wikidata(METROPOLIS_SEARCH).search("Metropolis", limit=1)
-        assert rows[0].cover_url is None
+        assert rows[0].cover_url == "https://images.metahub.space/poster/medium/tt0017136/img"
+        assert "harbou" not in (rows[0].cover_url or "").casefold()
         assert rows[0].cover_fallback_urls == ()
+
+    async def test_a_film_with_no_imdb_claim_and_no_fallback_stays_coverless(self) -> None:
+        routes: dict[str, Route] = {
+            entities_key("Q546900"): (
+                200,
+                {
+                    "entities": {
+                        "Q546900": {
+                            "id": "Q546900",
+                            "labels": {"es": {"language": "es", "value": "Suspiria"}},
+                            "claims": {
+                                "P31": [
+                                    {
+                                        "rank": "normal",
+                                        "mainsnak": {
+                                            "snaktype": "value",
+                                            "datavalue": {"value": {"id": "Q11424"}},
+                                        },
+                                    }
+                                ]
+                            },
+                        }
+                    }
+                },
+            )
+        }
+        payload = await wikidata(routes).fetch("Q546900")
+        assert payload.cover_url is None
 
 
 class TestIdentifiers:

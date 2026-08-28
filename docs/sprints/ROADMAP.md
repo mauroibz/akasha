@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 25
+**Plan revision:** 26
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — every planned sprint is complete
+**Active sprint:** 048 — Movie posters, without a setup step
 
 ## Shape of the plan
 
@@ -133,6 +133,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | completed |
 | [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | completed |
 | [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | completed |
+| [048](048-movie-posters.md) | Movie posters, without a setup step | 047 | in_progress |
 
 ## Sprint contracts
 
@@ -832,6 +833,15 @@ needed at import time (DEC-100). `DomainRepository.match` scans **every** item r
 adaptation routinely share both — so the year suggestion must be scoped to the importer's target
 domain. And Triage has never been exercised with a movie row, because nothing produced an unsorted
 film before this connector; the walkthrough here is its first real test.
+
+### [Sprint 048 — Movie posters, without a setup step](048-movie-posters.md)
+
+Added at plan revision 26 from the owner's first real Letterboxd import: the films arrived, and every
+one of them was a blank tile. Sprint 046 shipped movies coverless because Wikidata has no posters,
+which was correct about Wikidata and wrong about what the owner would see. Posters come from
+Stremio's keyless image service, measured at 14 of 14 on a deliberately hard sample and costing zero
+API calls because its URL is deterministic from the IMDb id already stored. TMDB fills only the ~2%
+of films that carry a TMDB id and no IMDb id.
 
 ## Future epics, after this plan
 

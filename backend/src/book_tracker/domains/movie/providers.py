@@ -30,12 +30,14 @@ import asyncio
 import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import replace
 from typing import Any
 from urllib.parse import parse_qsl, urlsplit
 
 import httpx
 
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
+from book_tracker.domains.movie.posters import TmdbPosters, poster_for
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
@@ -313,10 +315,15 @@ class WikidataMovieProvider:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         min_interval_seconds: float = MIN_INTERVAL_SECONDS,
         entity_batch_size: int = ENTITY_BATCH_SIZE,
+        posters: TmdbPosters | None = None,
     ) -> None:
         self.client = client
         self.contact = contact
         self.entity_batch_size = max(1, entity_batch_size)
+        # Wikidata has no posters and cannot have them (DEC-098). Sprint 048 supplies
+        # them from the identifiers this adapter already extracts, without asking
+        # Wikidata for anything more.
+        self.posters = posters
         self._paced = _Paced(min_interval_seconds, sleep)
 
     # -- the boundary ---------------------------------------------------------------
@@ -486,7 +493,10 @@ class WikidataMovieProvider:
         linked = self._linked_ids(ordered)
         labels = await self._entities(linked, "labels") if linked else {}
         rows = [self._candidate(entity, labels) for entity in ordered]
-        return [row for row in rows if row is not None]
+        found = [row for row in rows if row is not None]
+        return [
+            replace(row, cover_url=await poster_for(row.identifiers, self.posters)) for row in found
+        ]
 
     # -- the Provider protocol --------------------------------------------------------
 

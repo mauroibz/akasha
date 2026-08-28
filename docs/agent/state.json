@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 25,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 26,
+  "project_status": "in_progress",
+  "active_sprint": "048",
+  "active_sprint_file": "docs/sprints/048-movie-posters.md",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "047",
   "completed_sprints": [
     "001",
@@ -55,6 +55,6 @@
     "046",
     "047"
   ],
-  "started_at": null,
-  "updated_at": "2026-08-28T00:45:00-03:00"
+  "started_at": "2026-08-28T01:10:00-03:00",
+  "updated_at": "2026-08-28T01:10:00-03:00"
 }
