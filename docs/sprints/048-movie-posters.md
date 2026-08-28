@@ -1,6 +1,6 @@
 # Sprint 048 — Movie posters, without a setup step
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 047
 **Roadmap revision:** 26
 
@@ -119,4 +119,56 @@ sprint exists to fix, so "the field is populated" is not the standard — a visi
 
 ## Outcome
 
-_Not started._
+Movies have posters. Verified where the last sprint did not look: on a screen.
+
+### What ships
+
+`domains/movie/posters.py` builds a Stremio poster URL from the IMDb id the Wikidata
+adapter already extracts — no request, no key, no configuration. `WikidataMovieProvider`
+attaches it as `cover_url`, and the shared cover pipeline owns everything after that.
+`TmdbPosters` is consulted only when a film has no IMDb id and a token is configured.
+Two hosts joined `ALLOWED_COVER_HOSTS`; no bound, redirect rule or aspect guard changed.
+
+### Acceptance criteria
+
+1. A film carrying an IMDb id gets a built poster URL with no extra request.
+2. A film with only a TMDB id uses the fallback when a token exists and stays coverless
+   without one. A film with both **never** spends a TMDB request — asserted with a
+   transport that fails the test if it is called.
+3. The pipeline installs it unchanged: both hosts are named explicitly, and a 500×750
+   WebP arrives as a 400×600 JPEG through the existing downscale.
+4. A 404 leaves the item coverless and fails nothing.
+5. **Posters are visible in Library and Triage**, verified in a browser against the
+   owner's own imported films.
+6. No migration, no route, no screen change, no OpenAPI diff.
+
+### Verification
+
+- `tests/test_movie_posters.py` **22 passed**; `tests/test_wikidata_provider.py` **60**;
+  conformance, covers and enrichment suites pass.
+- `make check` clean, `make openapi` no diff, full suites **903 backend / 189 frontend**.
+- Real data: the owner's Letterboxd archive re-imported on a disposable data directory
+  with the real configuration. Both enrichment jobs succeeded and both films installed a
+  400×600 JPEG poster; each was opened and confirmed to be that film's actual poster art.
+- `frontend/e2e/scratchpad/movie-posters.spec.ts`, **2 passed**: an `<img>` pointing at
+  the cover endpoint, with a non-zero `naturalWidth`, in **Triage** and in the
+  **Library**. The width assertion is the point — an element whose image failed to load
+  still has a `src`, which is exactly what a field-level check would have missed.
+
+### The two `NoCover` tests from Sprint 046
+
+Rewritten rather than deleted. They encoded a decision this sprint deliberately reverses,
+but the invariant inside them still holds and still matters: `P18` is never read, and
+`Q151599` must not wear its set photograph. Those assertions are now stronger — they name
+the poster the film should have instead.
+
+### Deliberately not built
+
+The six-month TMDB cache refresh and the TMDB attribution notice its terms request. The
+owner considered both and directed that they be left out (DEC-103). With TMDB reduced to
+a ~2% fallback this is a narrower exposure than it would have been under the original
+TMDB-primary design, but it is a real one and it is recorded rather than glossed.
+
+### Commits
+
+`beb4427` give movies posters from a keyless source · plus this closure commit.

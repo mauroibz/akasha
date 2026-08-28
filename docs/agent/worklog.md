@@ -2651,3 +2651,43 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   `complete` with null active fields. Nothing is tagged, released or pushed. The obvious next pieces
   of work are the two defects DEC-100 recorded, the untested UI surface DEC-102 names, and a v1.4
   release for the movie line if the owner wants one.
+
+## 2026-08-28 — Sprint 048 complete; v1.4.0 prepared
+
+- Done in one implementation commit, `beb4427`: movie posters from Stremio's keyless image service,
+  with TMDB as a narrow fallback. DEC-103.
+- The trigger was the owner's own report: the Letterboxd import worked and every film was a blank
+  tile. Sprint 046's gate had passed while producing exactly that, because it asserted `cover_url`
+  was null *on purpose* and nobody looked at a screen. The lesson is in this sprint's verification.
+- Measured live before writing code: Stremio answered **14 of 14** films on a deliberately hard
+  sample (Argentine cinema, `Sátántangó`, `Tokyo Story`, `Cure`, `La flor`); its URL is
+  **deterministic from the IMDb id** so a poster costs zero requests; a miss is a clean **404**, not
+  a placeholder; `medium` is 500×750, inside the existing cover bounds; and **49 of 50** films
+  carrying a TMDB id also carry an IMDb id, which is what reduced TMDB to a ~2% fallback.
+- Also measured and worth keeping: Wikidata's own `P3383` film-poster property was present on **one
+  of eight** sampled films, and that one is a 1927 lithograph that is public domain by age. There is
+  no permissively-licensed poster archive because posters are copyrighted; the choice was never
+  "free or paid" but "whose terms".
+- Gates: `test_movie_posters.py` **22**; `test_wikidata_provider.py` **60**; `make check` clean;
+  `make openapi` no diff beyond the version; full suites **903 backend / 189 frontend**;
+  `make build` produced the 1.4.0 wheel and the frontend bundle.
+- **Verified on a screen**, which is the point of this sprint: the owner's archive re-imported on a
+  disposable data directory with the real configuration; both enrichment jobs succeeded; both films
+  installed a 400×600 JPEG; each image was opened and confirmed to be that film's real poster art;
+  and `frontend/e2e/scratchpad/movie-posters.spec.ts` asserted an `<img>` pointing at the cover
+  endpoint with non-zero `naturalWidth` in **Triage** and the **Library**. The width assertion is
+  deliberate — an element whose image failed to load still has a `src`.
+- Sprint 046's two `NoCover` tests were rewritten rather than deleted. The decision they encoded is
+  reversed; the invariant inside them is not. `P18` is still never read, and `Q151599` must still not
+  wear its set photograph, so those assertions now name the poster the film should have instead.
+- Owner-directed omission, recorded in DEC-103: no six-month TMDB cache refresh and no TMDB
+  attribution notice. The owner accepted the refresh when it was costed, then reversed. Akasha
+  therefore sits outside TMDB's API terms for the ~2% of films that path serves.
+- Release preparation for **v1.4.0**: all four version surfaces bumped together, README coverage
+  extended to Movies and Letterboxd, `docs/operations/release-notes-v1.4.md` added with a
+  **Known limitations** section naming all six recorded defects and omissions, and the generated
+  OpenAPI contract refreshed. **No migration in this release at all** — the movie domain, its
+  importer and its posters are entirely application-level.
+- Not run: the container smoke drill, per the owner's standing request not to re-investigate a
+  working container, and no packaging behaviour changed in this release.
+- Next: merge to `main`, tag `v1.4.0`, push — all three explicitly authorized by the owner.

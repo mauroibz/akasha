@@ -3568,3 +3568,38 @@ predictions about mistakes to come.
   logic is, and unproven at the screen. The first person to use this feature in a browser is the
   first person to test it there. If a UI-level defect turns up, this is why, and it is a recorded
   trade the owner chose rather than an oversight.
+
+## DEC-103 — Posters come from a keyless source; TMDB is a 2% fallback, uncompliant by choice
+
+- **Date:** 2026-08-28
+- **Status:** accepted
+- **Cross-references:** DEC-098 (why movies launched coverless), DEC-025 (measure, do not assume).
+  Supersedes DEC-098's "launch is intentionally coverless" for the cover question only; its provider
+  verdict for *metadata* stands unchanged.
+- **Context:** the owner's first real Letterboxd import produced a library of blank tiles. Sprint 046
+  was right that Wikidata has no posters — its own `P3383` film-poster property was on one of eight
+  sampled films, a 1927 lithograph that is public domain by age — and wrong about the consequence
+  being acceptable. Posters are copyrighted, so no permissively-licensed archive exists at all; the
+  choice was never "free or paid" but "whose terms".
+- **Measurement, 2026-08-28:** Stremio's `images.metahub.space` returned a poster for **14 of 14**
+  films chosen to be hard (Argentine cinema, `Sátántangó`, `Tokyo Story`, `Cure`, a 14-hour film),
+  with no key. Its URL is **deterministic from the IMDb id**, so a poster costs zero requests, where
+  TMDB needs one per film for an opaque `poster_path`. A miss is a clean **404**, not a placeholder.
+  `medium` is 500×750, inside the existing cover bounds. Of **50** films carrying a TMDB id, **49**
+  also carry an IMDb id.
+- **Decision:** Stremio is primary and TMDB is the fallback for the ~2% of films with a TMDB id and
+  no IMDb id. This inverts the order first proposed. The reasoning is the owner's own requirement —
+  a fresh install should show posters with no setup — plus the measurement above: with both ids
+  present, asking TMDB spends a request to duplicate an answer already in hand.
+- **Known risk, accepted:** metahub is Stremio's internal CDN, not a documented API. It publishes no
+  terms, no license and no support commitment, and could change shape or block non-Stremio clients
+  without notice. Provenance is murkier than TMDB's, not cleaner. The mitigation is that a poster is
+  a nicety on a complete record: if it disappears, films go back to being coverless and nothing else
+  breaks.
+- **Decision, owner-directed:** the six-month TMDB cache refresh and the TMDB attribution notice are
+  **not** built. The owner was shown the trade twice — once with a costing that put the refresh at
+  roughly a fifth of a sprint reusing existing machinery — first accepted it, then reversed. That
+  reversal is recorded here as a deliberate choice, not an oversight. Akasha therefore caches TMDB
+  poster images past six months and shows no TMDB attribution, which is outside TMDB's API terms for
+  the ~2% of films that path serves. Anyone revisiting this should treat it as a known, dated
+  position rather than as something nobody thought about.
