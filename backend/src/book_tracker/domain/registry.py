@@ -21,8 +21,9 @@ from book_tracker.domains.anime.myanimelist import IMPORTER as MYANIMELIST_IMPOR
 from book_tracker.domains.book import DOMAIN as BOOK
 from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
+from book_tracker.domains.movie import DOMAIN as MOVIE
 
-DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM, ANIME)}
+DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM, ANIME, MOVIE)}
 
 # The same code-owned registration model as domains and providers: no discovery or
 # plugin runtime.  Connectors live in the package of the domain they target; the shared
@@ -31,6 +32,8 @@ IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
     BOOK.item_type: (GOODREADS_IMPORTER, CALIBRE_IMPORTER),
     ALBUM.item_type: (),
     ANIME.item_type: (MYANIMELIST_IMPORTER,),
+    # Sprint 047 registers the Letterboxd connector here.
+    MOVIE.item_type: (),
 }
 IMPORTERS: dict[str, Importer] = {
     importer.name: importer for importers in IMPORTERS_BY_DOMAIN.values() for importer in importers
@@ -83,6 +86,8 @@ class EntryStatus(StrEnum):
     COMPLETED = "completed"
     ON_HOLD = "on_hold"
     PLAN_TO_WATCH = "plan_to_watch"
+    WATCHLIST = "watchlist"
+    WATCHED = "watched"
 
 
 class EntryFormat(StrEnum):
@@ -95,6 +100,7 @@ class EntryFormat(StrEnum):
     CD = "cd"
     STREAMING = "streaming"
     BLURAY = "bluray"
+    DVD = "dvd"
 
 
 class ItemTypeName(StrEnum):
@@ -108,3 +114,4 @@ class ItemTypeName(StrEnum):
     BOOK = "book"
     ALBUM = "album"
     ANIME = "anime"
+    MOVIE = "movie"

@@ -27,6 +27,7 @@ from book_tracker.domain.registry import DOMAINS
 from book_tracker.domains.album.providers import MusicBrainzProvider
 from book_tracker.domains.anime.providers import AniListProvider, KitsuProvider
 from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
+from book_tracker.domains.movie.providers import WikidataMovieProvider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
@@ -177,6 +178,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 KitsuProvider(
                     provider_client, configured.user_agent_contact or "local@example.invalid"
                 ),
+            )
+        )
+        # The movie domain. Wikidata needs no key either: a descriptive User-Agent, a
+        # `maxlag` tolerance and small bounded reads are the whole contract (DEC-098).
+        # It is deliberately the only movie provider — TMDB's six-month cache term is
+        # incompatible with this application's permanent, owner-editable metadata.
+        catalog.append(
+            WikidataMovieProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
             )
         )
         app.state.provider_catalog = {provider.name: provider for provider in catalog}

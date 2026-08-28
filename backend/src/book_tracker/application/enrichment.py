@@ -40,6 +40,7 @@ PROVIDER_LABELS = {
     "googlebooks": "Google Books",
     "anilist": "AniList",
     "kitsu": "Kitsu",
+    "wikidata": "Wikidata",
 }
 
 
