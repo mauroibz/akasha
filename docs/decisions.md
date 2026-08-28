@@ -3402,3 +3402,25 @@ predictions about mistakes to come.
   drafts do not leak into another browser tab or become durable library data before approval. No
   backend, API, schema, migration or dependency changes. Plan revision 23 records this as Sprint
   043, moves the DEC-094 work unchanged to Sprint 044, and moves `FINAL_SPRINT` to 44.
+
+## DEC-097 — Known domain-addition mistakes fail early; movies begin with measurement
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Implements:** DEC-094. Preserves DEC-052, DEC-067, DEC-077 and DEC-089.
+- **Context:** Anime validated the domain architecture but exposed repeatable mechanical failures:
+  unknown entry values could cross write boundaries, provider declarations could outpace lifespan
+  wiring, application vocabularies had twice been frozen in schema CHECKs, and one entry-row column
+  required three repository edits. The owner then selected movies and a Letterboxd export as the
+  next domain line, with an explicit requirement to test providers before planning implementation.
+- **Decision:** Entry values are now allowlisted once for all three write paths; the conformance
+  suite has a built-application wiring tier; the head schema rejects string-valued application
+  vocabularies; and `EntryRow` is constructed in one factory. `jobs.ck_jobs_state` is the narrow
+  schema-owned exception: job state is a durable finite-state machine, not registry vocabulary.
+  Alembic's foreign-key silence and the proven table/UI recipes are documentation contracts.
+- **Consequences:** Sprint 044 closes with no migration, API or visible behavior change. The next
+  line does not begin by coding the historical TMDB recommendation. Plan revision 24 and
+  `FINAL_SPRINT` 45 add a documentation-only movies gate that measures current official provider
+  constraints, live responses and the private Letterboxd export. That gate must contract at least
+  two later sprints in order—movie domain/providers, then Letterboxd importer—and may identify an
+  owner-only credential or terms action rather than accepting it on the owner's behalf.

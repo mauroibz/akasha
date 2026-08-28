@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
-  "plan_revision": 23,
-  "project_status": "in_progress",
-  "active_sprint": "044",
-  "active_sprint_file": "docs/sprints/044-sharpening-the-domain-contract.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "043",
+  "plan_revision": 24,
+  "project_status": "ready",
+  "active_sprint": "045",
+  "active_sprint_file": "docs/sprints/045-movies-viability.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "044",
   "completed_sprints": [
     "001",
     "002",
@@ -49,8 +49,9 @@
     "040",
     "041",
     "042",
-    "043"
+    "043",
+    "044"
   ],
-  "started_at": "2026-08-27T21:06:52-03:00",
-  "updated_at": "2026-08-27T21:06:52-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-27T21:37:33-03:00"
 }

@@ -2513,3 +2513,25 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   push remain the next authorized release actions.
 - Next: merge/tag/push v1.3.0, then execute Sprint 044. The owner's root Letterboxd archive is
   private feasibility input for the subsequent movies line and remains uncommitted.
+
+## 2026-08-27 — Sprint 044 complete; domain-addition QOL gates green
+
+- Done in five implementation commits: all entry write paths share an allowlisting validator;
+  conformance has a built-application wiring tier; the live schema is guarded against frozen
+  application vocabularies; `EntryRow` has one constructor; and the migration/UI-driving recipes
+  that cost the anime line time are documented. DEC-097.
+- TDD evidence: each slice first failed at its intended boundary. The expanded focused suite passed
+  **265 tests**. `make openapi` generated no diff, `make check` passed, full backend passed **710**,
+  full frontend passed **189**, and Playwright passed **106 with 2 intentional skips**.
+- Deviation: the sprint baseline said the live head had no string-valued CHECK. Inspection found
+  `jobs.ck_jobs_state`, which is a schema-owned durable state machine rather than an extensible
+  registry vocabulary. The guard allows that one named constraint and an in-test temporary table
+  proved it rejects the class the sprint intended.
+- Environment note: one combined backend run in the filesystem sandbox hit the already-documented
+  TestClient deadlock after 227 tests; the same suite outside it passed. After the owner questioned
+  the time spent on an already-working container, no container/build rerun was done: this sprint was
+  nonvisual and did not touch deployment behavior.
+- No walkthrough by contract, no migration, no API change and no screen change. Post-gate closure
+  is documentation/state only and was checked with the validator and `git diff --check`.
+- Next: Sprint 045 on a separate movies branch. Measure current providers and the private
+  Letterboxd ZIP, then plan movie domain/provider and Letterboxd importer sprints in that order.

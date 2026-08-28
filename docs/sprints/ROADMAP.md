@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 23
+**Plan revision:** 24
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 044 — Sharpening the domain contract
+**Active sprint:** 045 — Movies viability: providers and Letterboxd shape
 
 ## Shape of the plan
 
@@ -39,7 +39,8 @@ Post-v1 work branches:
                                                            └─ 041 The MyAnimeList import  ✓
                                                                └─ 042 One decision per Triage row  ✓
                                                                    └─ 043 Row-only Triage decisions  ✓
-                                                                      └─ 044 Sharpening the domain contract
+                                                                      └─ 044 Sharpening the domain contract  ✓
+                                                                          └─ 045 Movies viability  [GATED]
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -126,7 +127,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [041](041-myanimelist-import.md) | The MyAnimeList import | 039, 040 | completed |
 | [042](042-one-decision-per-triage-row.md) | One decision per Triage row | 041 | completed |
 | [043](043-row-only-triage-decisions.md) | Row-only Triage decisions | 042 | completed |
-| [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | ready |
+| [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | completed |
+| [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | ready |
 
 ## Sprint contracts
 
@@ -768,13 +770,30 @@ commits it, and exercised direct and overridden anime targets without console or
 
 ### [Sprint 044 — Sharpening the domain contract](044-sharpening-the-domain-contract.md)
 
-The anime-line retrospective originally planned as Sprint 042 moves one place without changing its
-scope. It follows the owner-visible Triage corrections and remains deliberately non-visual.
+The anime-line retrospective originally planned as Sprint 042 moved twice without changing its
+scope. It followed the owner-visible Triage corrections and remained deliberately non-visual.
+
+**Delivered 2026-08-27 (DEC-097).** Every entry write path now shares an allowlisting validator;
+the conformance suite proves built provider/recognizer/cover wiring; the head-schema suite rejects
+application vocabularies frozen into CHECK constraints; `EntryRow` has one construction site; and
+the load-bearing migration and UI-driving recipes are recorded. No runtime behavior, migration,
+API contract or screen changed.
+
+### [Sprint 045 — Movies viability: providers and Letterboxd shape](045-movies-viability.md)
+
+**Gated.** The historical metadata survey calls TMDB the strongest next provider, but that report is
+not current live evidence. This sprint tests credible movie providers against real responses and
+current official constraints, walks flat films through the domain contract, and measures the
+owner's private Letterboxd export structurally. It writes no movie runtime code.
+
+The gate closes by planning at least two ordered implementation sprints: movie domain and valid
+providers first, Letterboxd importer second. A credential or terms decision that only the owner can
+make is reported explicitly rather than worked around with scraping.
 
 ## Future epics, after this plan
 
-Not sprints, and deliberately not numbered (DEC-058). Each becomes an epic on top of Sprint 028's
-contract and Sprint 031's import boundary, developed in parallel without interfering with the others.
+Except for the owner-scheduled movies gate, these are not sprints and remain deliberately unnumbered
+(DEC-058). Each becomes an epic on top of Sprint 028's contract and Sprint 031's import boundary.
 
 Each of these inherits the **extended** import contract (DEC-080): a connector declares its own
 guide, empty state, help link, browsability and error vocabulary, so it is a package rather than a
@@ -785,6 +804,9 @@ its `action` sentences beside its reader, and the shared screen renders them wit
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
   Twitch OAuth client credentials and token refresh, where every provider so far has needed at most a
   static API key. `steam → games` is the import.
+- **Movies — provider selected by Sprint 045; Letterboxd import.** A film is a flat item and does
+  not inherit television's hierarchy problem. The historical survey proposes TMDB, but Sprint 045
+  now measures that claim and the real export before two implementation sprints receive numbers.
 - **Series — TMDB.** Gated on a product decision rather than an integration. The entry model is one
   score, one status, one `reread_count` per item (product spec section 10, item 4), and a television
   series does not fit it: either a series is one entry and "watched through season 3" is not

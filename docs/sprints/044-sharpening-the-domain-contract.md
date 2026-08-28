@@ -1,6 +1,6 @@
 # Sprint 044 — Sharpening the domain contract
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 043
 **Roadmap revision:** 23
 
@@ -206,4 +206,32 @@ that is a scope error — stop and re-plan rather than adding a gate.
 
 ## Outcome
 
-_Not started._
+Completed 2026-08-27.
+
+- Replaced the entry-value denylist with one allowlisting `validate_entry_values` boundary used by
+  PATCH, cached add and import. Declared passage fields and progress retain their domain validation;
+  neutral entry operations are explicit; unknown or undeclared values return a domain-naming 422.
+  `null` progress remains a valid clear on every domain. Commit `16461c4`.
+- Added an application-level conformance tier. It proves each declared identity/enrichment provider
+  is constructed for the domain, every recognizer route exists, and a cover-choosing domain has a
+  candidate-capable provider. A broken fixture proves each check fails. Commit `2718ac6`.
+- Added a head-schema test against string-valued CHECK vocabularies. The only live exception is
+  `jobs.ck_jobs_state`: unlike domain-owned statuses and connector ids, it is a schema-owned durable
+  state machine. An in-test probe proved the guard bites. This corrects the sprint baseline, which
+  had described the head as having no string enumeration at all. Commit `34cee3c`.
+- Reduced `EntryRow` construction to one factory while preserving the three call sites' distinct
+  progress reasons. A behavior test and an AST guard hold that shape. Commit `add4124`.
+- Documented Alembic's load-bearing foreign-key silence, the safe table-rebuild recipe, the new
+  conformance tier and the current UI-driving idioms. Commit `f4bacec`.
+
+TDD failures were observed before each implementation slice. The required focused suite passed
+**265 tests**. Frozen-tree gates passed: `make openapi` with no generated diff; `make check`; full
+backend **710 passed**; full frontend **189 passed**; full Playwright **106 passed, 2 intentionally
+skipped**. `git diff --check` and `python scripts/validate_project.py` passed before closure. There
+was no migration, API contract change or screen change, so the sprint-prescribed walkthrough gate
+did not apply.
+
+The first combined backend run inside the filesystem sandbox hit the repository's documented
+TestClient deadlock after 227 tests; the same suite outside that sandbox passed. No container or
+build rerun was performed: this was a nonvisual contract refactor, and the already-working release
+container was unrelated to its acceptance criteria.
