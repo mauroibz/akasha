@@ -6,6 +6,8 @@ import httpx
 import pytest
 from PIL import Image
 
+from book_tracker.application.add import AddService
+from book_tracker.application.library import LibraryError
 from book_tracker.config import Settings
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.matching import MatchKind
@@ -563,3 +565,40 @@ async def test_adding_refuses_a_field_the_domain_does_not_have(tmp_path: Path) -
     # Refused before the write, so no half-added record is left behind.
     assert listed.json()["total"] == 0
     assert everything.json()["total"] == 0
+
+
+@pytest.mark.anyio
+async def test_add_service_allowlists_entry_values_and_still_allows_clearing(
+    tmp_path: Path,
+) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        service = AddService(app.state.engine, {"openlibrary": Provider()})
+        cleared = await service.add(
+            manual=None,
+            source="openlibrary",
+            source_id="clear-progress",
+            supplied_refs=(),
+            status=None,
+            score=None,
+            shelf_ids=(),
+            idempotency_key=None,
+            entry_values={"progress": None},
+        )
+        with pytest.raises(LibraryError) as refused:
+            await service.add(
+                manual=None,
+                source="openlibrary",
+                source_id="unknown-value",
+                supplied_refs=(),
+                status=None,
+                score=None,
+                shelf_ids=(),
+                idempotency_key=None,
+                entry_values={"future_domain_value": "would otherwise reach storage"},
+            )
+
+    assert cleared["entry"]["progress"] is None
+    assert refused.value.status_code == 422
+    assert refused.value.code == "invalid_entry_field"
+    assert "Book" in refused.value.message

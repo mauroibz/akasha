@@ -15,8 +15,10 @@ from book_tracker.domain.registry import (
 from book_tracker.domain.spec import (
     InvalidEntryField,
     InvalidFormat,
+    InvalidProgress,
     InvalidStatus,
     validate_entry_fields,
+    validate_entry_values,
     validate_formats,
     validate_status,
 )
@@ -209,6 +211,24 @@ def test_an_album_has_no_reread_count_and_no_dates() -> None:
     assert "Album" in str(refused.value)
     # Fields every domain has are never refused by this check.
     assert validate_entry_fields(ALBUM, {"score": 8, "notes": "x"}) == {"score": 8, "notes": "x"}
+
+
+def test_entry_values_are_allowlisted_by_the_domain_that_owns_them() -> None:
+    from book_tracker.domains.anime import DOMAIN as ANIME
+
+    values = {"notes": "kept", "date_finished": "2026-08-27", "progress": 20}
+    assert validate_entry_values(ANIME, values) == values
+
+    with pytest.raises(InvalidEntryField, match="Album"):
+        validate_entry_values(ALBUM, {"date_finished": "2026-08-27"})
+    with pytest.raises(InvalidProgress, match="Book"):
+        validate_entry_values(BOOK, {"progress": 1})
+
+    # Clearing is recovery, even if a domain no longer declares the value.
+    assert validate_entry_values(BOOK, {"progress": None}) == {"progress": None}
+
+    with pytest.raises(InvalidEntryField, match="Book"):
+        validate_entry_values(BOOK, {"future_domain_value": "silent without an allowlist"})
 
 
 def test_the_status_union_is_ordered_and_covers_every_domain() -> None:

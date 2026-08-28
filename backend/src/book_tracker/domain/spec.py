@@ -99,6 +99,25 @@ UNSORTED = StatusSpec("unsorted", "Inbox", choosable=False, hotkey="u")
 #: of them it has; DEC-057 says an album has none of them.
 PASSAGE_FIELDS = frozenset({"date_started", "date_finished", "reread_count"})
 
+# Entry values the neutral core owns rather than any one domain. Domain-specific
+# values are the declared passage fields plus optional progress below. Keep this list
+# beside the validator: a new write surface must either use one of these meanings or
+# extend `Domain` so the owning domain can declare it.
+NEUTRAL_ENTRY_VALUES = frozenset(
+    {
+        "status",
+        "score",
+        "notes",
+        "shelf_ids",
+        "formats",
+        "add_shelves",
+        "remove_shelves",
+        "add_formats",
+        "remove_formats",
+        "clear_provisional",
+    }
+)
+
 
 @dataclass(frozen=True)
 class ProgressSpec:
@@ -299,6 +318,25 @@ def validate_progress(domain: Domain, value: int | None) -> int | None:
     if value < 0:
         raise InvalidProgress(f"{domain.label} progress cannot be negative")
     return value
+
+
+def validate_entry_values(domain: Domain, values: Mapping[str, Any]) -> dict[str, Any]:
+    """Allow only neutral values and the entry values this domain declares.
+
+    The old passage-field denylist was silent about every name it had never heard of.
+    That is how `progress` reached storage before its domain guard was wired. This is
+    the single entry-value boundary for PATCH, add and import: an unfamiliar name is a
+    refusal, never an implicit new storage contract.
+    """
+    validated = validate_entry_fields(domain, values)
+    allowed = NEUTRAL_ENTRY_VALUES | domain.entry_fields | {"progress"}
+    unknown = set(validated) - allowed
+    if unknown:
+        names = ", ".join(repr(name) for name in sorted(unknown))
+        raise InvalidEntryField(f"{domain.label} entries have no declared value {names}")
+    if "progress" in validated:
+        validated["progress"] = validate_progress(domain, validated["progress"])
+    return validated
 
 
 @dataclass(frozen=True)

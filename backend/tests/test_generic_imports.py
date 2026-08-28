@@ -228,6 +228,11 @@ async def test_generic_routes_round_trip_each_registered_book_importer(tmp_path:
             {"reread_count": 2},
             "entries have no 'reread_count'",
         ),
+        (
+            {"creators": []},
+            {"future_domain_value": "would otherwise reach storage"},
+            "Album entries have no declared value 'future_domain_value'",
+        ),
     ],
 )
 async def test_normalized_records_are_validated_against_the_target_domain(
@@ -1157,5 +1162,6 @@ async def test_the_import_path_refuses_a_progress_the_domain_does_not_record(
         service = ImportService(app.state.engine, tmp_path, tmp_path, IMPORTERS["goodreads"])
         with pytest.raises(LibraryError) as refused:
             service._validate(record(3))
+        assert service._validate(record(None)) == {"progress": None}
     assert refused.value.status_code == 422
     assert "progress" in str(refused.value).lower() or "Book" in str(refused.value)

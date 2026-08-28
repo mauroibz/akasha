@@ -4,6 +4,7 @@ import httpx
 import pytest
 from sqlalchemy import text
 
+from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.config import Settings
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
@@ -16,6 +17,25 @@ def settings(tmp_path: Path) -> Settings:
 @pytest.fixture
 def anyio_backend() -> str:
     return "asyncio"
+
+
+@pytest.mark.anyio
+async def test_patch_service_refuses_an_unknown_entry_value_naming_the_domain(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        created = DomainRepository(app.state.engine).create_or_get_entry(
+            title="Unknown value", creators=("Nobody",)
+        )
+        with pytest.raises(LibraryError) as refused:
+            LibraryService(app.state.engine).update_entry(
+                created.entry_id, {"future_domain_value": "would otherwise be ignored"}
+            )
+
+    assert refused.value.status_code == 422
+    assert refused.value.code == "invalid_entry_field"
+    assert "Book" in refused.value.message
 
 
 @pytest.mark.anyio

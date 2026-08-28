@@ -1,6 +1,7 @@
 import json
 import uuid
 from collections.abc import Mapping
+from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
@@ -23,9 +24,8 @@ from book_tracker.domain.spec import (
     InvalidMetadata,
     InvalidProgress,
     InvalidStatus,
-    validate_entry_fields,
+    validate_entry_values,
     validate_metadata_patch,
-    validate_progress,
     validate_status,
 )
 from book_tracker.infrastructure.covers import CoverError, install_cover
@@ -135,7 +135,7 @@ class ImportService:
         self.library = DomainRepository(engine)
         self.imports = ImportRepository(engine)
 
-    def _validate(self, record: NormalizedImportRecord) -> None:
+    def _validate(self, record: NormalizedImportRecord) -> dict[str, Any]:
         unknown_identities = set(record.item.identifiers) - self.importer.identity_kinds
         if unknown_identities:
             raise LibraryError(
@@ -154,12 +154,7 @@ class ImportService:
             )
         try:
             validate_metadata_patch(self.domain, record.item.metadata)
-            validate_entry_fields(self.domain, record.entry.values)
-            # `validate_entry_fields` is a denylist over `PASSAGE_FIELDS`, and `progress`
-            # is deliberately not one of them — so it passed straight through here and
-            # reached the column unvalidated. Sprint 040 wired the write and not this.
-            if "progress" in record.entry.values:
-                validate_progress(self.domain, record.entry.values["progress"])
+            entry_values = validate_entry_values(self.domain, record.entry.values)
             if record.entry.suggested_status is not None:
                 validate_status(self.domain, record.entry.suggested_status)
         except (InvalidMetadata, InvalidEntryField, InvalidProgress, InvalidStatus) as error:
@@ -169,14 +164,20 @@ class ImportService:
                 status_code=422,
                 details={"row_number": record.row_number},
             ) from error
+        return entry_values
 
     def preview(self, source: ImportSource) -> dict[str, Any]:
         snapshot = self.importer.read(source, ImportReadContext(path_root=self.source_root))
         existing = self.imports.get_batch_by_fingerprint(self.importer.name, snapshot.fingerprint)
         if existing is not None:
             return self.get_preview(existing)
-        for record in snapshot.records:
-            self._validate(record)
+        snapshot = replace(
+            snapshot,
+            records=tuple(
+                replace(record, entry=replace(record.entry, values=self._validate(record)))
+                for record in snapshot.records
+            ),
+        )
 
         batch_id = str(uuid.uuid4())
         directory = self.data_dir / "imports" / batch_id

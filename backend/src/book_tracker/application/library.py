@@ -19,9 +19,8 @@ from book_tracker.domain.spec import (
     InvalidFormat,
     InvalidProgress,
     InvalidStatus,
-    validate_entry_fields,
+    validate_entry_values,
     validate_formats,
-    validate_progress,
     validate_status,
 )
 from book_tracker.infrastructure.attachments import (
@@ -160,13 +159,7 @@ class LibraryService:
         rule the third quietly breaks.
         """
         try:
-            validated = validate_entry_fields(domain, changes)
-            # Membership, not `.get(...) is not None`: an explicit `null` clears the
-            # value and must still be validated rather than skipped. `validate_progress`
-            # permits `None` on every domain, which is the only way to remove a count a
-            # retyped item or a withdrawn declaration left stranded.
-            if "progress" in changes:
-                validated["progress"] = validate_progress(domain, changes["progress"])
+            validated = validate_entry_values(domain, changes)
             if changes.get("status") is not None:
                 validate_status(domain, changes["status"])
             if changes.get("formats") is not None:
