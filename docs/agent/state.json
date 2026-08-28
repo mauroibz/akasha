@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 25,
-  "project_status": "in_progress",
-  "active_sprint": "046",
-  "active_sprint_file": "docs/sprints/046-movie-domain.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "045",
+  "project_status": "ready",
+  "active_sprint": "047",
+  "active_sprint_file": "docs/sprints/047-letterboxd-import.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "046",
   "completed_sprints": [
     "001",
     "002",
@@ -51,8 +51,9 @@
     "042",
     "043",
     "044",
-    "045"
+    "045",
+    "046"
   ],
-  "started_at": "2026-08-27T22:55:00-03:00",
-  "updated_at": "2026-08-27T22:55:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-08-28T00:05:00-03:00"
 }

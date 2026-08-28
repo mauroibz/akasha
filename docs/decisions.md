@@ -3464,3 +3464,61 @@ predictions about mistakes to come.
   provider and Sprint 047 for the bounded Letterboxd importer. `FINAL_SPRINT` moves 45 to 47.
   Sprint 046 has no migration or shared screen; Sprint 047's only shared behavior is the neutral
   optional year ambiguity. The private archive stays untracked and is walkthrough input only.
+
+## DEC-099 — A Wikidata search is several bounded reads, and a claim is read by rank
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-025 (recorded responses, not mocks), DEC-098 (the provider choice),
+  DEC-067 row 3 (per-domain enrichment). Evidence: `backend/tests/fixtures/providers/README.md`
+  and the Sprint 046 Outcome.
+- **Context:** Sprint 045 established that Wikidata answers the four representative movie queries
+  and carries the structured claims a film needs. What it did not measure was the cost and the
+  shape of reading them, and both turned out to constrain the adapter.
+- **Measurement:** `wbgetentities` with `props=labels|descriptions|claims` returns ~113 KB for one
+  film, up to 1.15 MB for five and **1.9 MB for ten**, against `MAX_PROVIDER_BYTES` of 2 MiB. A
+  twenty-result search in one request would be refused by the shared HTTP boundary, and a
+  five-result one is already within a factor of two of the limit.
+- **Decision:** A movie search is bounded to six candidates and reads entities three at a time,
+  followed by one `props=labels` batch of at most fifty linked ids. Measured live: 1 search +
+  2 entity reads + 1 label read in ~2.0 s, and 2.8 s for the six-result `Metropolis` case, inside
+  the shared five-second interactive search budget.
+- **Decision:** Claims are read through a rank filter, never by first value. `Q546900` lists four
+  original languages with the *preferred* one third, so a first-value parser calls Dario Argento's
+  film German. `Q151599` opens with a **deprecated** country Wikidata has explicitly retired and a
+  `P364` whose snaktype is `somevalue` — known to exist, unknown which. Publication dates arrive up
+  to thirty times per film at mixed precision, including `+1977-03-00T00:00:00Z`, so the year is
+  the earliest best-ranked statement read as text rather than parsed as a date.
+- **Decision:** A search hit is not proof of a claim. `haswbstatement:P345=tt0000000` returns a real
+  film, because that entity genuinely carries the placeholder id — Wikidata is edited by people. An
+  identity lookup therefore re-checks the value on the fetched entity, and zero or more than one hit
+  is a typed miss or ambiguity rather than a title guess.
+- **Consequences:** A movie search costs four bounded requests instead of one large one, and returns
+  six candidates rather than twenty. The parser is longer than a first-value reader would be, and
+  every branch of it is pinned by a committed recording of the response that forced it.
+
+## DEC-100 — The `letterboxd` identity holds two shapes, and coverless movies stay backfillable
+
+- **Date:** 2026-08-27
+- **Status:** accepted
+- **Cross-references:** DEC-067 row 3 (per-domain enrichment), DEC-098 (the Letterboxd seam).
+  Supersedes nothing; records two consequences of the movie domain that Sprint 047 inherits.
+- **Context:** The movie domain enriches on a `letterboxd` identity. Sprint 046 stores what Wikidata
+  publishes — the `P6127` film slug — while Sprint 047's export identifies films by short `boxd.it`
+  URI. One declared `identity_kind` therefore holds two value shapes.
+- **Decision:** `fetch_by_identifier("letterboxd", …)` accepts a bare slug, a full
+  `letterboxd.com/film/<slug>/` URL and a `boxd.it` short URI. The short URI is resolved with HEAD
+  requests only, bounded to three hops, and accepted only when it ends at an HTTPS Letterboxd film
+  page. The body is never requested. Normalizing the export's URI to a slug at import time is
+  rejected for Sprint 047: it would cost one network request per row during a preview.
+- **Observed and not repaired:** `_backfillable_items` treats a null `cover_path` or `year` as
+  "worth a lookup" in every domain, independently of the domain's `completeness_fields`. Movies ship
+  deliberately coverless, so every movie is permanently backfillable. This is harmless today —
+  interactive add never enqueues, and only an import commit or an explicit
+  `POST /api/enrichment/backfill` does — but the explicit route will re-queue every movie on every
+  call, and each job will ask Wikidata for a cover it will never return. The fix belongs with
+  whichever sprint gives a domain a way to say "a cover is not something I have", not here.
+- **Observed and not repaired:** `GET /api/search/resolve` maps every exception from `resolve_input`
+  to **HTTP 502 `provider_failure`**. A typed `record_not_found` is an answer — that film does not
+  exist — and the reader is told the provider failed. It predates this sprint and affects every
+  domain equally; a pasted Open Library URL for a withdrawn edition behaves the same way.

@@ -1,6 +1,6 @@
 # Sprint 047 — Letterboxd import for movies
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 046
 **Roadmap revision:** 25
 
@@ -55,6 +55,13 @@ unusable URI are visible row errors. One bad row never aborts valid rows.
 
 ### 3. A neutral title/year ambiguity seam
 
+**Scope the suggestion to the target domain.** `DomainRepository.match`
+(`infrastructure/repositories.py`) scans every item row with no `items.type` filter. That is
+tolerable for title+author, where a shared title *and* a shared creator is genuinely rare; it is
+wrong for title+year with no creator, because a novel and its film adaptation routinely share both.
+The optional year path must therefore also take the item type it is matching within, and a test must
+prove a book named `Dune` published in 2021 is never offered as a candidate for the 2021 film.
+
 Extend `ImportMatcher.match` with optional year. When no exact identity matches and no creator is
 available, normalized title + exact year may return existing item ids as **ambiguous suggestions**.
 It never auto-merges, and every importer not passing year behaves identically. Update technical
@@ -65,6 +72,11 @@ This lets an export recognize a movie previously added through Wikidata even tho
 a short URI and the other a Letterboxd slug. Creating new remains an explicit preview choice.
 
 ### 4. Provider enrichment and lifecycle
+
+**Already built in Sprint 046, and not to be rebuilt here:** `fetch_by_identifier("letterboxd", …)`
+accepts a bare `P6127` slug, a full `letterboxd.com/film/<slug>/` URL and a `boxd.it` short URI
+alike, resolving the last with HEAD requests only through a three-hop bound (DEC-100). Store the
+export's URI as it comes; do not add a normalization pass that spends a request per row.
 
 On commit, the existing domain enrichment uses the stored Letterboxd URI. The Wikidata adapter
 performs HEAD-only short-URI resolution, exact `P6127` lookup and normal fetch. It fills empty movie

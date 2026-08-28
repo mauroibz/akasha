@@ -1,6 +1,6 @@
 # Sprint 046 — Movies: the fourth domain on Wikidata
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 045
 **Roadmap revision:** 25
 
@@ -156,4 +156,93 @@ health and browser/console errors. Do not use or mutate the private Letterboxd Z
 
 ## Outcome
 
-_Not started._
+Delivered as planned, with one measured deviation from the search shape this plan assumed and two
+defects observed and recorded rather than repaired.
+
+### What ships
+
+`domains/movie/` is the fourth domain: eight declared fields, three statuses (`unsorted`,
+`watchlist` default, `watched`), four formats, `date_finished` labelled Watched and `reread_count`
+labelled Rewatches with no start date and no progress, identity on the Wikidata `Q` id, and
+enrichment keyed on `letterboxd`. `WikidataMovieProvider` is its one adapter: film-filtered search,
+fetch by `Q` id, exact IMDb/TMDB/Letterboxd claim resolution, HEAD-only `boxd.it` resolution, Spanish
+labels with English fallback, and no cover URL under any circumstance.
+
+Shared edits are the documented registration points and nothing else: `domain/registry.py` (import,
+`DOMAINS`, empty importer tuple, `EntryStatus.WATCHLIST/WATCHED`, `EntryFormat.DVD`,
+`ItemTypeName.MOVIE`), `main.py` lifespan, `frontend/src/api/library.ts`, the regenerated
+`frontend/openapi.json`, one `PROVIDER_LABELS` row, and the fixtures with their README. One shared
+test helper changed: `tests/recordings.py:replay` gained an optional `key` callable, because Wikidata
+answers search, entity and label reads at one path and a path is therefore not a route. No existing
+caller changed. No migration, no screen change, no credential.
+
+### Deviation: a search is six candidates in bounded batches, not twenty in one read
+
+The plan said "batch-fetches entities and linked labels" without a size. Measured live before
+building: one entity is ~113 KB, five up to 1.15 MB and ten **1.9 MB**, against `MAX_PROVIDER_BYTES`
+of 2 MiB. A twenty-result search cannot be read at all, and a ten-result one would sit on the limit.
+Search is therefore capped at six candidates and reads entities three at a time, plus one label
+batch. Measured end to end through the running app: 1.6 s for a one-result query, 2.8 s for the
+six-result `Metropolis` query, inside the shared five-second interactive budget. DEC-099.
+
+### Acceptance criteria
+
+1. **Film-only, relevance-preserving, localized.** `Metropolis` returns six films with Fritz Lang's
+   1927 one first and `Metrópolis` as its title; `Suspiria` returns exactly the 1977 and 2018 films.
+   Proved against four recorded query classes and confirmed live in the walkthrough.
+2. **Every identity resolves, and the wrong ones are refused.** `Q` id, IMDb, TMDB and Letterboxd
+   slug each reach `Q546900`; a short URI reaches it through HEAD only. Zero hits are
+   `record_not_found`, two are `identity_ambiguous`, a redirect off Letterboxd, a downgrade to
+   plaintext, a loop and a non-film destination are `unsafe_redirect`, and nine malformed identity
+   shapes never reach the network at all. A search hit is additionally re-checked against the fetched
+   entity's claim, because `haswbstatement:P345=tt0000000` returns a real film.
+3. **Ranks, snaktypes, precision and units are read deliberately.** The preferred-rank `P364`, the
+   deprecated `P495`, the `somevalue` language, thirty mixed-precision `P577` statements and a
+   unit-bearing `P2047` each have a test that fails against a first-value parser.
+4. **No arbitrary image becomes a cover.** `cover_url` is `None` for every path, `P18` is never read,
+   and the walkthrough's three added films all have `cover_url: null`. Manual upload is untouched.
+5. **The declaration reaches every surface.** Item types, filters, add, detail, metadata edit,
+   statuses, formats and OpenAPI, with no `if movie` anywhere above the registry.
+6. **Enrichment is live and needs no redundant job.** A movie carrying a `letterboxd` identity queues
+   with that kind; one carrying only an `imdb` id queues nothing; the handler fills empty fields only
+   from the recorded Wikidata boundary and leaves the owner's title and description intact. Adding
+   through search enqueues nothing, because only an import commit or the explicit backfill route
+   does.
+7. **No migration and no shared screen change.** Every edit outside `domains/movie/` is a documented
+   registration point, the test-helper extension above, or a fixture.
+
+### Verification
+
+- Focused suite: **239 passed** (`test_movie_domain.py` 30, `test_wikidata_provider.py` 59,
+  `test_domain_conformance.py`, `test_enrichment_pipeline.py`).
+- `make openapi` then `make check`: passed, including `openapi-check` and the frontend type check.
+- `make test`: **818 backend**, **189 frontend**.
+- `npm run test:e2e`: **106 passed, 2 intentional skips**.
+- Walkthrough: `frontend/e2e/scratchpad/movie-walkthrough.spec.ts`, **12 passed** against a
+  disposable `BOOK_TRACKER_DATA_DIR` and the **live** Wikidata API at 390×844. Added the Argentine
+  film, the 1927 film and Suspiria 1977 through the real add box; verified Spanish labels, director,
+  runtime, countries, genres, cast, `Your viewing data`, Rewatches with no Started, no Rereads, the
+  three exact identities on Detail, default Watchlist, a status change to Watched, the four declared
+  formats with `dvd` applied independently of status, status filtering, and a pasted IMDb link
+  resolving to Suspiria 1977. Final disposable library: three films, facets
+  `{watched: 1, watchlist: 2}` and `{dvd: 1}`, all three with `cover_url: null`. No 500s, no
+  unexplained console or page errors.
+
+### Observed, out of scope, recorded (DEC-100)
+
+- **A coverless domain is permanently backfillable.** `_backfillable_items` counts a null
+  `cover_path` as incomplete in every domain regardless of `completeness_fields`, so the explicit
+  `POST /api/enrichment/backfill` route will re-queue every movie on every call, each job asking
+  Wikidata for a cover it will never return. Harmless today; it needs a way for a domain to say a
+  cover is not something it has.
+- **A miss is reported as an outage.** `GET /api/search/resolve` maps every exception from
+  `resolve_input` to HTTP 502 `provider_failure`, so pasting a Letterboxd URL for a film that does
+  not exist tells the reader the provider failed. Predates this sprint and affects every domain.
+- **Triage could not be exercised for movies.** A film added by hand lands in Watchlist, never in
+  the inbox, and the domain chooser is absent from Triage entirely while the inbox is empty. The
+  only producer of unsorted movies is Sprint 047's importer.
+
+### Commits
+
+`6e53952` declare the movie domain · `1cd443e` add the recorded Wikidata movie provider ·
+`20fda58` resolve exact movie identities and enrichment · plus this closure commit.

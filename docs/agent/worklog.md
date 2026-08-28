@@ -2559,3 +2559,59 @@ export carries attachment bytes, references, or neither; put it to the owner at 
   contract and in response to the owner's request to stop debugging an unrelated working container.
 - Next: Sprint 046 is ready on this branch. No owner key/account/payment is needed for Wikidata.
   The private ZIP remains untracked for Sprint 047 walkthrough only.
+
+## 2026-08-27 — Sprint 046 complete; movies ship as the fourth domain
+
+- Done in three implementation commits: the movie declaration (`6e53952`), the recorded Wikidata
+  adapter with its registration (`1cd443e`), and exact identity resolution plus enrichment
+  (`20fda58`). DEC-099 and DEC-100.
+- Validated the two new sprint plans against the code before starting. Everything Sprint 046 assumed
+  held; three things did not, and all three are now recorded rather than discovered later.
+- **Measured before building, and it changed the design.** `wbgetentities` with claims costs ~113 KB
+  for one film, up to 1.15 MB for five and **1.9 MB for ten**, against `MAX_PROVIDER_BYTES` of
+  2 MiB. A twenty-result search is unreadable through the shared boundary. Search is now six
+  candidates, entities three at a time, one label batch: measured 1.6 s for one result and 2.8 s for
+  the six-result `Metropolis` query through the running app, inside the five-second search budget.
+- **The rank traps the plan predicted are real and are now pinned by fixtures.** `Q546900` lists
+  four original languages with the preferred one third, so a first-value parser calls Dario Argento's
+  film German. `Q151599` opens with a deprecated country and a `somevalue` language. `P577` arrives
+  up to thirty times per film at mixed precision including `+1977-03-00T00:00:00Z`, which is day
+  zero and unparseable as a date.
+- **A `haswbstatement` hit is not proof of the claim.** `P345=tt0000000` returns a real film, because
+  that entity genuinely carries the placeholder id. The adapter now re-checks the value on the
+  fetched entity. Found while recording a zero-hit fixture; the fixture was re-recorded against a
+  value that truly matches nothing.
+- Nineteen fixtures recorded live today (~940 KB), one of them synthetic and labelled as such, with
+  a README row each. The only shared test change is `recordings.py:replay` gaining an optional route
+  key, because Wikidata answers search, entity and label reads at one path.
+- TDD evidence: each slice first failed at its intended boundary — the declaration on a missing
+  module, the adapter on a missing module then on eighteen behavioural assertions, enrichment on a
+  handler that queued nothing for a `letterboxd` key.
+- Gates: focused suite **239**; `make openapi` then `make check` clean; `make test` **818 backend /
+  189 frontend**; Playwright **106 passed, 2 intentional skips**.
+- Walkthrough: `frontend/e2e/scratchpad/movie-walkthrough.spec.ts`, **12 passed** at 390×844 against
+  a disposable `BOOK_TRACKER_DATA_DIR` and the **live** Wikidata API, launched with
+  `BOOK_TRACKER_DATA_DIR=/tmp/akasha-movie-walkthrough USER_AGENT_CONTACT=<contact> uv run uvicorn
+  book_tracker.main:app --host 127.0.0.1 --port 8100` and
+  `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 BOOK_TRACKER_E2E_BACKEND=http://127.0.0.1:8100`. Added the
+  Argentine film, the 1927 film and Suspiria 1977 through the real add box. Verified Spanish labels
+  (`Metrópolis`, `El secreto de sus ojos`), Juan José Campanella as the credit, runtimes 129/153/94,
+  countries, genres, cast, `Your viewing data`, Rewatches with no Started and no Rereads, the exact
+  identities on Detail, default Watchlist, a status change to Watched, the four declared formats
+  with `dvd` applied while the film stayed on the Watchlist, status filtering, and a pasted IMDb
+  link resolving to Suspiria 1977. Final library: 3 films, facets `{watched: 1, watchlist: 2}` and
+  `{dvd: 1}`, all three `cover_url: null`. Provider health lists `wikidata` available; `degraded` is
+  true only for the long-standing missing Google Books key. No 500s and no unexplained console or
+  page errors.
+- Observed and left out of scope, all three recorded in DEC-100 and the sprint Outcome:
+  `_backfillable_items` counts a null cover as incomplete in every domain regardless of
+  `completeness_fields`, so the explicit backfill route will re-queue every (deliberately coverless)
+  movie forever; `GET /api/search/resolve` reports a typed `record_not_found` as HTTP 502
+  `provider_failure`, so a link to a film that does not exist tells the reader the provider failed;
+  and Triage could not be exercised with a movie row at all, because nothing yet produces an
+  unsorted film and the domain chooser is absent from Triage while the inbox is empty.
+- Deviations: one, and it is the search-shape bound above. No product or architecture deviation, no
+  migration, no screen change, no credential, no container work.
+- Next: Sprint 047, the Letterboxd importer. Its plan now carries the two constraints this sprint
+  found for it — scope the title+year suggestion to the target domain, and store the export's URI as
+  it comes because the adapter already accepts all three Letterboxd shapes.

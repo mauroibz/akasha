@@ -2,7 +2,7 @@
 
 **Plan revision:** 25
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 046 — Movies: the fourth domain on Wikidata
+**Active sprint:** 047 — Letterboxd import for movies
 
 ## Shape of the plan
 
@@ -131,8 +131,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [043](043-row-only-triage-decisions.md) | Row-only Triage decisions | 042 | completed |
 | [044](044-sharpening-the-domain-contract.md) | Sharpening the domain contract | 043 | completed |
 | [045](045-movies-viability.md) | Movies viability: providers and Letterboxd shape **[GATED]** | 044 | completed |
-| [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | ready |
-| [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | planned |
+| [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | completed |
+| [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | ready |
 
 ## Sprint contracts
 
@@ -802,11 +802,16 @@ without committing personal data. Sprints 046 and 047 are the executable result.
 
 ### [Sprint 046 — Movies: the fourth domain on Wikidata](046-movie-domain.md)
 
-The flat movie domain and the keyless provider Sprint 045 measured live. Wikidata supplies stable
-cross-catalogue identities, Spanish/English labels and structured film metadata through its official
-API. Arbitrary `P18` photography is not called a poster. External Wikidata, IMDb, TMDB and
-Letterboxd URLs resolve through exact claims; short Letterboxd URLs use HEAD only and no page scrape.
-No migration and no movie-specific screen.
+**Completed.** The flat movie domain and the keyless provider Sprint 045 measured live. Wikidata
+supplies stable cross-catalogue identities, Spanish/English labels and structured film metadata
+through its official API. Arbitrary `P18` photography is not called a poster. External Wikidata,
+IMDb, TMDB and Letterboxd URLs resolve through exact claims; short Letterboxd URLs use HEAD only and
+no page scrape. No migration and no movie-specific screen.
+
+Two things the plan did not know, both now measured and recorded in DEC-099: a search is six
+candidates in bounded batches rather than twenty in one read, because ten entities are 1.9 MB against
+a 2 MiB response limit; and a `haswbstatement` hit is not proof of the claim, so an identity lookup
+re-checks the value on the fetched entity.
 
 ### [Sprint 047 — Letterboxd import for movies](047-letterboxd-import.md)
 
@@ -815,6 +820,14 @@ half-star-to-ten-point scores, dates, rewatches, plain-text reviews and tags map
 Wikidata enrichment resolves the stored short URI after commit. A neutral title+year matcher offers
 an ambiguity for a movie already added through Wikidata and never auto-merges. Private data remains
 walkthrough input; synthetic fixtures prove every source shape and archive failure.
+
+Three things Sprint 046 settled or found that this sprint inherits. The adapter already accepts a
+short URI, a slug and a film URL for the same `letterboxd` identity, so no normalization pass is
+needed at import time (DEC-100). `DomainRepository.match` scans **every** item row with no
+`items.type` filter — tolerable for title+author, wrong for title+year, where a novel and its
+adaptation routinely share both — so the year suggestion must be scoped to the importer's target
+domain. And Triage has never been exercised with a movie row, because nothing produced an unsorted
+film before this connector; the walkthrough here is its first real test.
 
 ## Future epics, after this plan
 
