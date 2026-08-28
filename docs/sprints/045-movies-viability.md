@@ -1,6 +1,6 @@
 # Sprint 045 — Movies viability: providers and Letterboxd shape
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 044
 **Roadmap revision:** 24
 
