@@ -24,7 +24,7 @@ the wiring gap the anime line exposed:
   the domain names, for the same domain and with the capabilities its routes require.
 """
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import replace
 from pathlib import Path
 
@@ -34,6 +34,8 @@ from fastapi import FastAPI
 from sqlalchemy import Engine, text
 from sqlalchemy.exc import IntegrityError
 
+from book_tracker.application.imports import ImportService
+from book_tracker.application.library import LibraryError
 from book_tracker.application.providers import resolve_input
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
@@ -684,23 +686,87 @@ def test_a_registered_importer_satisfies_the_contract(importer: object) -> None:
     assert_importer_contract(importer)
 
 
-def test_importers_are_registered_under_every_domain_they_target() -> None:
-    """The index is a relation now, not a function: one connector, N domains.
+def assert_registration_matches_declaration(
+    by_domain: Mapping[str, tuple[Importer, ...]], importers: Mapping[str, Importer]
+) -> None:
+    """The index and the declarations agree, in both directions.
 
-    A connector that declares two domains is reachable from both, and a connector
-    indexed under a domain it never declared would publish a library it cannot fill.
+    A connector missing from a domain it declares is unreachable from that library;
+    one indexed under a domain it does not declare is offered for a library it cannot
+    fill. Both were impossible while a connector had exactly one target and are
+    possible now, so both are checked.
     """
     registered: dict[str, set[str]] = {}
-    for item_type, importers in IMPORTERS_BY_DOMAIN.items():
-        for importer in importers:
+    for item_type, group in by_domain.items():
+        for importer in group:
             registered.setdefault(importer.name, set()).add(item_type)
-    assert registered == {name: set(importer.item_types) for name, importer in IMPORTERS.items()}
+    assert registered == {name: set(importer.item_types) for name, importer in importers.items()}
+
+
+def test_importers_are_registered_under_every_domain_they_target() -> None:
+    """The index is a relation now, not a function: one connector, N domains."""
+    assert_registration_matches_declaration(IMPORTERS_BY_DOMAIN, IMPORTERS)
     assert {importer.name for importer in IMPORTERS_BY_DOMAIN["book"]} == {
         "goodreads",
         "calibre",
     }
     # Indexing a two-domain connector twice must not publish it twice.
     assert len(IMPORTERS) == len({importer.name for importer in IMPORTERS.values()})
+
+
+class _TargetingAnime:
+    """A declaration used only to prove the index check can fail."""
+
+    name = "targeting_anime"
+    item_types = ("anime",)
+
+
+_TARGETING_ANIME = _TargetingAnime()
+
+
+@pytest.mark.parametrize(
+    ("name", "by_domain"),
+    [
+        # Offered for a library it cannot fill.
+        ("undeclared", {"book": (_TARGETING_ANIME,), "anime": ()}),
+        # Unreachable from a library it says it fills.
+        ("missing", {"book": (), "anime": ()}),
+    ],
+)
+def test_the_suite_rejects_an_index_that_disagrees_with_a_declaration(
+    name: str, by_domain: dict[str, tuple[object, ...]]
+) -> None:
+    """A conformance suite that cannot fail is decoration."""
+    with pytest.raises(AssertionError):
+        assert_registration_matches_declaration(
+            by_domain,  # type: ignore[arg-type]
+            {"targeting_anime": _TARGETING_ANIME},  # type: ignore[dict-item]
+        )
+
+
+@pytest.mark.parametrize("importer", list(IMPORTERS.values()), ids=lambda row: str(row.name))
+def test_the_shared_service_applies_every_connectors_target_filter(
+    importer: Importer, tmp_path: Path
+) -> None:
+    """Target selection is one shared rule, inherited rather than implemented.
+
+    A connector cannot get this wrong because it never gets to be right: the service
+    resolves the choice, so this holds for every connector present and future — which
+    is the whole reason the filter lives above the readers (DEC-106).
+    """
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+    service = ImportService(create_engine(configured), tmp_path, tmp_path, importer)
+
+    assert service.chosen_targets(None) == importer.item_types
+    for item_type in importer.item_types:
+        assert service.chosen_targets([item_type]) == (item_type,)
+    with pytest.raises(LibraryError) as refused:
+        service.chosen_targets(["not_a_domain"])
+    assert refused.value.code == "invalid_import_targets"
+    with pytest.raises(LibraryError):
+        service.chosen_targets([])
 
 
 def test_the_importer_suite_rejects_a_missing_contract_member() -> None:
