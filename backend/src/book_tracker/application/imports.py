@@ -20,6 +20,7 @@ from book_tracker.domain.importers import (
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import (
+    Domain,
     InvalidEntryField,
     InvalidMetadata,
     InvalidProgress,
@@ -75,6 +76,9 @@ def _stored_record(record: NormalizedImportRecord) -> dict[str, Any]:
         },
         "shelves": list(record.shelves),
         "source_fields": dict(record.source_fields),
+        # Which library this row lands in. Written at preview time because commit
+        # never re-reads the source: the snapshot is the stable result (DEC-106).
+        "item_type": record.item_type,
         "cover_stage": record.cover_stage,
         # Kept so a file arriving after the commit can be resolved back to the record
         # it belongs to, without the route knowing what any source looks like on disk.
@@ -107,6 +111,7 @@ def _preview_record(row: ImportRecordRow) -> dict[str, Any]:
         "entry": entry,
         "source_fields": source_fields,
         "cover_staged": payload.get("cover_stage") is not None,
+        "item_type": payload.get("item_type"),
         # Compatibility for the two readers that predate the neutral nested shape:
         # flatten what they actually supplied without naming any domain's fields here.
         **metadata,
@@ -131,11 +136,36 @@ class ImportService:
         self.data_dir = data_dir
         self.source_root = source_root
         self.importer = importer
-        self.domain = DOMAINS[importer.item_types[0]]
+        #: The domains this connector declared, in declaration order. A batch has no
+        #: one domain any more (DEC-106): each record resolves its own, and the first
+        #: entry is what a record naming no type of its own becomes.
+        self.domains = {item_type: DOMAINS[item_type] for item_type in importer.item_types}
         self.library = DomainRepository(engine)
         self.imports = ImportRepository(engine)
 
+    def _domain_for(self, record: NormalizedImportRecord) -> Domain:
+        """The domain this row targets, refusing one the connector never declared.
+
+        A record naming an undeclared type is a defect in the connector, so it is
+        refused at the same boundary and under the same code as an undeclared identity
+        kind — rather than reaching the registry as a `KeyError` with a batch already
+        staged behind it.
+        """
+        if record.item_type is None:
+            return next(iter(self.domains.values()))
+        domain = self.domains.get(record.item_type)
+        if domain is None:
+            raise LibraryError(
+                "invalid_import_record",
+                f"{self.importer.label} produced a record targeting {record.item_type!r}, "
+                f"which it does not declare",
+                status_code=422,
+                details={"row_number": record.row_number},
+            )
+        return domain
+
     def _validate(self, record: NormalizedImportRecord) -> dict[str, Any]:
+        domain = self._domain_for(record)
         unknown_identities = set(record.item.identifiers) - self.importer.identity_kinds
         if unknown_identities:
             raise LibraryError(
@@ -153,10 +183,10 @@ class ImportService:
                 details={"row_number": record.row_number},
             )
         try:
-            validate_metadata_patch(self.domain, record.item.metadata)
-            entry_values = validate_entry_values(self.domain, record.entry.values)
+            validate_metadata_patch(domain, record.item.metadata)
+            entry_values = validate_entry_values(domain, record.entry.values)
             if record.entry.suggested_status is not None:
-                validate_status(self.domain, record.entry.suggested_status)
+                validate_status(domain, record.entry.suggested_status)
         except (InvalidMetadata, InvalidEntryField, InvalidProgress, InvalidStatus) as error:
             raise LibraryError(
                 "invalid_import_record",
@@ -342,7 +372,7 @@ class ImportService:
             batch_id,
             choices,
             kind=self.importer.name,
-            domain=self.domain,
+            domains=self.domains,
             identity_kinds=self.importer.identity_kinds,
         )
         with Session(self.engine) as session:
@@ -365,7 +395,10 @@ class ImportService:
                 self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")
             except CoverError:
                 pass
-        if self.domain.enriches:
+        # Any domain this connector can produce, rather than the one it happened to
+        # declare first: a mixed batch has no single domain to ask, and asking the
+        # wrong one would silently skip half the library's backfill.
+        if any(domain.enriches for domain in self.domains.values()):
             enqueue_enrichment_backfill(
                 self.engine,
                 batch_id=batch_id,

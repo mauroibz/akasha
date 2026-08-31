@@ -614,9 +614,17 @@ class ImportRepository:
         user_id: int = 1,
         *,
         kind: str,
-        domain: Domain,
+        domains: Mapping[str, Domain],
         identity_kinds: frozenset[str],
     ) -> dict[str, Any]:
+        """Commit a staged batch, resolving each row's domain from its own payload.
+
+        `domains` is ordered as the connector declared its targets, and holds exactly
+        those. A payload written before a connector could target more than one names
+        no type at all, so it falls back to the first — which for every connector that
+        existed then was the only one it had.
+        """
+        default_domain = next(iter(domains.values()))
         with DomainRepository(self.engine)._write() as session:
             batch = session.get(ImportBatchRow, batch_id)
             if batch is None or batch.kind != kind:
@@ -650,6 +658,7 @@ class ImportRepository:
                 if row.planned_action in {"error", "identity_conflict"}:
                     continue
                 payload = json.loads(row.normalized_payload)
+                domain = domains.get(payload.get("item_type") or "", default_domain)
                 choice = choices.get(row.id, {})
                 item_id = row.matched_item_id
                 if row.planned_action == "ambiguous":
