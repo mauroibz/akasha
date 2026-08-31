@@ -92,7 +92,7 @@ ANIME_IDENTITY = IdentityStrategy(mal_identity, ("anilist", "kitsu"))
 # This is the case DEC-067 row 3 reserved the seam for: the key is a MyAnimeList id
 # and not an ISBN, and both providers resolve it (DEC-088).
 ANIME_ENRICHMENT = EnrichmentSpec(
-    identity_kind="mal",
+    identity_kinds=("mal",),
     provider_order=("anilist", "kitsu"),
     # What an imported row is missing. Deliberately not every field: `season` and
     # `episode_minutes` are legitimately absent on plenty of records, and a rule

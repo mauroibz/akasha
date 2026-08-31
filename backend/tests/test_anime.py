@@ -144,7 +144,7 @@ class TestEnrichment:
 
     def test_it_enriches_on_the_myanimelist_id(self) -> None:
         assert DOMAIN.enrichment is not None
-        assert DOMAIN.enrichment.identity_kind == "mal"
+        assert DOMAIN.enrichment.identity_kinds == ("mal",)
 
     def test_it_names_the_providers_that_answer_that_key(self) -> None:
         assert DOMAIN.enrichment is not None

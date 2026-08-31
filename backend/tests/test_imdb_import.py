@@ -453,3 +453,460 @@ def test_parse_returns_rows_in_file_order() -> None:
         )
     )
     assert [row.title for row in rows.rows] == ["One", "Two", "Three"]
+
+
+# ---------------------------------------------------------------------------------
+# Through the shared pipeline. Sprint 052 built the seam; these are the criteria that
+# say whether it actually holds for a connector it was not built for.
+# ---------------------------------------------------------------------------------
+
+
+def library(tmp_path: Path) -> Any:
+    from sqlalchemy import text
+
+    from book_tracker.config import Settings
+    from book_tracker.database import create_engine
+    from book_tracker.infrastructure.repositories import DomainRepository
+    from book_tracker.migrations import upgrade
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+    engine = create_engine(configured)
+
+    def add(title: str, item_type: str, year: int | None, **identifiers: str) -> int:
+        with engine.begin() as connection:
+            item_id = connection.execute(
+                text(
+                    "INSERT INTO items(type,title,year,identifiers,metadata,"
+                    "created_at,updated_at) VALUES(:type,:title,:year,'{}','{}','n','n') "
+                    "RETURNING id"
+                ),
+                {"type": item_type, "title": title, "year": year},
+            ).scalar_one()
+            for kind, value in identifiers.items():
+                connection.execute(
+                    text(
+                        "INSERT INTO item_identifiers(item_id,kind,normalized_value,value,"
+                        "created_at,updated_at) VALUES(:item,:kind,:value,:value,'n','n')"
+                    ),
+                    {"item": item_id, "kind": kind, "value": value},
+                )
+        return item_id
+
+    return DomainRepository(engine), add
+
+
+class TestMatching:
+    def test_the_imdb_id_matches_exactly_in_either_library(self, tmp_path: Path) -> None:
+        matcher, add = library(tmp_path)
+        film = add("The Shawshank Redemption", "movie", 1994, imdb="tt0111161")
+        show = add("Breaking Bad", "series", 2008, imdb="tt0903747")
+        for record, expected in (
+            (only(ratings(rating_row())), film),
+            (only(ratings(rating_row(const="tt0903747", kind="TV Series"))), show),
+        ):
+            decision = IMPORTER.match(record, matcher)
+            assert decision.kind.value == "exact"
+            assert decision.item_id == expected
+
+    def test_a_letterboxd_film_that_wikidata_gave_an_imdb_id_matches_exactly(
+        self, tmp_path: Path
+    ) -> None:
+        """AC5, and the reason `imdb` is the right identity for this connector.
+
+        The film arrived from a Letterboxd import under its `boxd.it` URI, and
+        background enrichment then added Wikidata's `P345` claim. That second
+        identifier is what makes this an exact match rather than an ambiguity the
+        owner has to resolve by hand.
+        """
+        matcher, add = library(tmp_path)
+        existing = add(
+            "The Shawshank Redemption",
+            "movie",
+            1994,
+            letterboxd="https://boxd.it/2b3c",
+            imdb="tt0111161",
+        )
+        decision = IMPORTER.match(only(ratings(rating_row())), matcher)
+        assert decision.kind.value == "exact"
+        assert decision.item_id == existing
+
+    def test_a_near_match_is_scoped_to_the_rows_own_library(self, tmp_path: Path) -> None:
+        """A series and the film made from it share a title and a year. The offer is
+        scoped by the row's own type, not by the connector's first (DEC-101)."""
+        matcher, add = library(tmp_path)
+        add("Fargo", "movie", 1996)
+        record = only(
+            ratings(rating_row(const="tt2802850", kind="TV Series", title="Fargo", year="1996"))
+        )
+        assert IMPORTER.match(record, matcher).candidates == ()
+
+    def test_title_and_year_are_offered_never_merged(self, tmp_path: Path) -> None:
+        matcher, add = library(tmp_path)
+        existing = add("The Shawshank Redemption", "movie", 1994)
+        decision = IMPORTER.match(only(ratings(rating_row())), matcher)
+        assert decision.kind.value == "ambiguous"
+        assert decision.candidates == (existing,)
+        assert decision.item_id is None
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
+
+def _app(tmp_path: Path) -> Any:
+    from book_tracker.config import Settings
+    from book_tracker.main import create_app
+
+    return create_app(
+        Settings(data_dir=tmp_path / "data", user_agent_contact="test@example.invalid")
+    )
+
+
+async def _preview(client: Any, data: bytes, targets: str | None = None) -> Any:
+    form = {"targets": targets} if targets else None
+    return await client.post(
+        "/api/import/imdb/preview",
+        files={"file": ("ratings.csv", data, "text/csv")},
+        data=form,
+    )
+
+
+def _types(engine: Any) -> dict[str, int]:
+    from sqlalchemy import text
+    from sqlalchemy.orm import Session
+
+    with Session(engine) as session:
+        return {
+            str(row[0]): int(row[1])
+            for row in session.execute(text("SELECT type, count(*) FROM items GROUP BY type"))
+        }
+
+
+MIXED = (
+    rating_row(const="tt0111161", kind="Movie", title="The Shawshank Redemption"),
+    rating_row(const="tt0903747", kind="TV Series", title="Breaking Bad", runtime="49"),
+    rating_row(const="tt0000010", kind="TV Episode", title="Ozymandias"),
+    rating_row(const="tt0000011", kind="Podcast Episode", title="A podcast"),
+)
+
+
+@pytest.mark.anyio
+async def test_one_export_lands_in_both_libraries(tmp_path: Path) -> None:
+    """AC2. Two libraries, one file, one batch."""
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await _preview(client, ratings(*MIXED))
+        assert preview.status_code == 201, preview.text
+        body = preview.json()
+        assert body["summary"]["total"] == 2
+        assert body["summary"]["skipped_unsupported"] == 2
+        assert body["summary"]["errors"] == 0
+        assert {row["reason"] for row in body["summary"]["skipped_reasons"]} == {
+            "TV Episode",
+            "Podcast Episode",
+        }
+        assert [row["item_type"] for row in body["records"]] == ["movie", "series"]
+
+        committed = await client.post(
+            "/api/import/imdb/commit", json={"batch_id": body["batch_id"]}
+        )
+        assert committed.status_code == 200, committed.text
+        assert committed.json()["created_items"] == 2
+
+    assert _types(app.state.engine) == {"movie": 1, "series": 1}
+
+
+@pytest.mark.anyio
+async def test_re_importing_the_same_export_reports_every_row_unchanged(tmp_path: Path) -> None:
+    """AC4. Matched on `imdb:` with no provider asked anything."""
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        first = await _preview(client, ratings(*MIXED))
+        await client.post("/api/import/imdb/commit", json={"batch_id": first.json()["batch_id"]})
+
+        # A different file with the same rows, so the fingerprint does not simply
+        # replay the first batch — this has to match on identity, not on bytes.
+        again = await _preview(client, ratings(*MIXED, rating_row(const="tt0000012", kind="Short")))
+        assert [row["planned_action"] for row in again.json()["records"]] == [
+            "reuse_item",
+            "reuse_item",
+        ]
+        committed = await client.post(
+            "/api/import/imdb/commit", json={"batch_id": again.json()["batch_id"]}
+        )
+
+    assert committed.json()["created_items"] == 0
+    assert committed.json()["unchanged_entries"] == 2
+    assert _types(app.state.engine) == {"movie": 1, "series": 1}
+
+
+@pytest.mark.anyio
+async def test_unticking_movies_leaves_only_series_and_counts_what_it_left(
+    tmp_path: Path,
+) -> None:
+    """AC7. The service applies the choice; this connector never sees it."""
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await _preview(client, ratings(*MIXED), targets="series")
+        body = preview.json()
+        assert [row["item_type"] for row in body["records"]] == ["series"]
+        assert body["summary"]["skipped_not_requested"] == 1
+        # Still counted separately: a library you did not choose and a kind nothing
+        # here holds are different answers (DEC-112).
+        assert body["summary"]["skipped_unsupported"] == 2
+
+        await client.post("/api/import/imdb/commit", json={"batch_id": body["batch_id"]})
+
+    assert _types(app.state.engine) == {"series": 1}
+
+
+@pytest.mark.anyio
+async def test_the_same_export_as_films_and_then_as_shows_is_two_imports(
+    tmp_path: Path,
+) -> None:
+    """The Sprint 052 trap, on the connector it was built for."""
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        films = await _preview(client, ratings(*MIXED), targets="movie")
+        shows = await _preview(client, ratings(*MIXED), targets="series")
+
+    assert films.json()["batch_id"] != shows.json()["batch_id"]
+    assert [row["item_type"] for row in films.json()["records"]] == ["movie"]
+    assert [row["item_type"] for row in shows.json()["records"]] == ["series"]
+
+
+@pytest.mark.anyio
+async def test_a_bad_row_costs_a_row_and_the_rest_still_commit(tmp_path: Path) -> None:
+    """AC8, through the whole pipeline rather than at the reader alone."""
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await _preview(
+            client,
+            ratings(
+                rating_row(const="tt0000013", score="11"),
+                rating_row(const="tt0000014", title="", runtime="0"),
+                rating_row(const="tt0111161"),
+            ),
+        )
+        body = preview.json()
+        assert body["summary"]["total"] == 3
+        assert body["summary"]["errors"] == 2
+        assert body["summary"]["ready"] == 1
+        committed = await client.post(
+            "/api/import/imdb/commit", json={"batch_id": body["batch_id"]}
+        )
+
+    assert committed.status_code == 200, committed.text
+    assert committed.json()["created_items"] == 1
+
+
+@pytest.mark.anyio
+async def test_undo_takes_back_both_libraries(tmp_path: Path) -> None:
+    import httpx
+    from sqlalchemy import text
+    from sqlalchemy.orm import Session
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await _preview(client, ratings(*MIXED))
+        batch_id = preview.json()["batch_id"]
+        await client.post("/api/import/imdb/commit", json={"batch_id": batch_id})
+        undone = await client.delete(f"/api/import/batches/{batch_id}")
+
+    assert undone.status_code == 200, undone.text
+    with Session(app.state.engine) as session:
+        assert session.execute(text("SELECT count(*) FROM items")).scalar_one() == 0
+        assert session.execute(text("SELECT count(*) FROM entries")).scalar_one() == 0
+
+
+@pytest.mark.anyio
+async def test_the_connector_is_published_with_both_of_its_libraries(tmp_path: Path) -> None:
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        published = {row["id"]: row for row in (await client.get("/api/importers")).json()}
+
+    assert published["imdb"]["item_types"] == ["movie", "series"]
+    assert published["imdb"]["input"]["accept"] == ".csv,text/csv"
+
+
+# ---------------------------------------------------------------------------------
+# AC9's precondition: a film imported from IMDb carries no Letterboxd id, so the movie
+# domain has to be able to enrich on the key its own export actually supplies.
+# ---------------------------------------------------------------------------------
+
+
+def _engine(tmp_path: Path) -> Any:
+    from book_tracker.config import Settings
+    from book_tracker.database import create_engine
+    from book_tracker.migrations import upgrade
+
+    configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+    return create_engine(configured)
+
+
+def _typed_item(engine: Any, item_type: str, **identifiers: str) -> int:
+    from sqlalchemy import text
+
+    with engine.begin() as connection:
+        item_id = connection.execute(
+            text(
+                "INSERT INTO items(type,title,identifiers,metadata,created_at,updated_at) "
+                "VALUES(:type,'A title','{}','{}','n','n') RETURNING id"
+            ),
+            {"type": item_type},
+        ).scalar_one()
+        for kind, value in identifiers.items():
+            connection.execute(
+                text(
+                    "INSERT INTO item_identifiers(item_id,kind,normalized_value,value,"
+                    "created_at,updated_at) VALUES(:item,:kind,:value,:value,'n','n')"
+                ),
+                {"item": item_id, "kind": kind, "value": value},
+            )
+    return item_id
+
+
+def _queued(engine: Any) -> list[tuple[int, str, str]]:
+    import json
+
+    from sqlalchemy import text
+
+    with engine.connect() as connection:
+        rows = [
+            json.loads(str(row[0]))
+            for row in connection.execute(
+                text("SELECT payload FROM jobs WHERE kind = 'enrich_item' ORDER BY id")
+            )
+        ]
+    return [(row["item_id"], row["kind"], row["value"]) for row in rows]
+
+
+class TestTheMovieDomainEnrichesOnWhatItsSourcesSupply:
+    """A domain may be reachable by more than one identity, because its sources are.
+
+    Letterboxd supplies a `boxd.it` URI and no IMDb id; IMDb supplies a `tt` id and no
+    Letterboxd URI. A single declared key means whichever source was not chosen when the
+    domain was written silently gets no enrichment at all — no poster, no genres, no
+    runtime — while every gate stays green.
+    """
+
+    def test_a_film_from_letterboxd_still_enriches_on_its_letterboxd_uri(
+        self, tmp_path: Path
+    ) -> None:
+        from book_tracker.application.enrichment import enqueue_enrichment_backfill
+
+        engine = _engine(tmp_path)
+        film = _typed_item(engine, "movie", letterboxd="https://boxd.it/2b3c")
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert _queued(engine) == [(film, "letterboxd", "https://boxd.it/2b3c")]
+
+    def test_a_film_from_imdb_enriches_on_its_imdb_id(self, tmp_path: Path) -> None:
+        from book_tracker.application.enrichment import enqueue_enrichment_backfill
+
+        engine = _engine(tmp_path)
+        film = _typed_item(engine, "movie", imdb="tt0111161")
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert _queued(engine) == [(film, "imdb", "tt0111161")]
+
+    def test_a_film_carrying_both_keys_is_queued_once_under_the_preferred_one(
+        self, tmp_path: Path
+    ) -> None:
+        """Order is a preference, and one item is one job however many ways it can be
+        looked up."""
+        from book_tracker.application.enrichment import enqueue_enrichment_backfill
+
+        engine = _engine(tmp_path)
+        film = _typed_item(engine, "movie", letterboxd="https://boxd.it/2b3c", imdb="tt0111161")
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert _queued(engine) == [(film, "letterboxd", "https://boxd.it/2b3c")]
+
+    def test_a_series_is_unaffected(self, tmp_path: Path) -> None:
+        from book_tracker.application.enrichment import enqueue_enrichment_backfill
+
+        engine = _engine(tmp_path)
+        show = _typed_item(engine, "series", imdb="tt0903747")
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert _queued(engine) == [(show, "imdb", "tt0903747")]
+
+    @pytest.mark.anyio
+    async def test_the_movie_adapter_answers_a_lookup_by_imdb_id(self) -> None:
+        """The declaration is only half of it: the provider has to accept the key.
+
+        Wikidata already resolves `P345` exactly — `fetch` has taken `imdb:tt…` since
+        Sprint 046 — so this is a guard being opened, not a lookup being written.
+        """
+        from book_tracker.domains.movie.providers import WikidataMovieProvider
+        from book_tracker.infrastructure.providers import ProviderPayloadError
+
+        provider = WikidataMovieProvider.__new__(WikidataMovieProvider)
+        asked: list[str] = []
+
+        async def fetch(source_id: str) -> str:
+            asked.append(source_id)
+            return "payload"
+
+        provider.fetch = fetch  # type: ignore[method-assign]
+        assert await provider.fetch_by_identifier("imdb", "tt0111161") == "payload"
+        assert asked == ["imdb:tt0111161"]
+
+        with pytest.raises(ProviderPayloadError) as refused:
+            await provider.fetch_by_identifier("tmdb", "1396")
+        assert refused.value.code == "unsupported_identity_kind"
+
+
+@pytest.mark.anyio
+async def test_committing_an_imdb_export_queues_enrichment_for_both_libraries(
+    tmp_path: Path,
+) -> None:
+    """AC9's own criterion: both halves of a mixed batch get a lookup queued."""
+    import httpx
+
+    app = _app(tmp_path)
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await _preview(client, ratings(*MIXED))
+        await client.post("/api/import/imdb/commit", json={"batch_id": preview.json()["batch_id"]})
+        queued = _queued(app.state.engine)
+
+    assert sorted(kind for _, kind, _ in queued) == ["imdb", "imdb"]
+    assert sorted(value for _, _, value in queued) == ["tt0111161", "tt0903747"]

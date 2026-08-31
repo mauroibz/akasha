@@ -165,9 +165,18 @@ class EnrichmentSpec:
 
     All three parts are per-domain, because all three were book-shaped:
 
-    - **`identity_kind`** is the `item_identifiers.kind` the lookup is keyed on:
-      `isbn` for a book, `mal` for an anime. An item carrying no identifier of this
-      kind is never queued, because there is nothing to look it up by.
+    - **`identity_kinds`** are the `item_identifiers.kind` values the lookup may be
+      keyed on, in order of preference: `isbn` for a book, `mal` for an anime,
+      `letterboxd` then `imdb` for a film. An item carrying none of them is never
+      queued, because there is nothing to look it up by; an item carrying several is
+      queued **once**, under the first it has.
+
+      More than one because a domain's *sources* supply different keys and the domain
+      does not get to choose which one the owner used. A Letterboxd export names a film
+      by a `boxd.it` URI and carries no IMDb id; an IMDb export names it by `tt` and
+      carries no Letterboxd URI. Under a single declared key, whichever source was not
+      the one in mind when the domain was written gets no enrichment at all — no
+      poster, no genres, no runtime — while every gate stays green (DEC-113).
     - **`provider_order`** is which adapters are asked, in order. The first usable
       payload wins; a provider that is not wired contributes a sentence to the
       recorded reason rather than being skipped silently.
@@ -177,7 +186,7 @@ class EnrichmentSpec:
       A missing cover or year always counts, in every domain, and is not listed here.
     """
 
-    identity_kind: str
+    identity_kinds: tuple[str, ...]
     provider_order: tuple[str, ...]
     completeness_fields: tuple[str, ...]
 

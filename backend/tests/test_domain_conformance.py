@@ -335,8 +335,13 @@ def enrichment_is_answerable_by_this_domain(domain: Domain) -> None:
     spec = domain.enrichment
     if spec is None:
         return
-    assert spec.identity_kind and spec.identity_kind.strip(), (
+    assert spec.identity_kinds, f"{domain.item_type} enriches on no identifier kind at all"
+    assert all(kind and kind.strip() for kind in spec.identity_kinds), (
         f"{domain.item_type} enriches on an unnamed identifier kind"
+    )
+    assert len(spec.identity_kinds) == len(set(spec.identity_kinds)), (
+        f"{domain.item_type} names one enrichment key twice; order is a preference and "
+        "a repeat has no meaning"
     )
     assert spec.provider_order, f"{domain.item_type} enriches but names no provider to ask"
     assert all(name and name.strip() for name in spec.provider_order), (

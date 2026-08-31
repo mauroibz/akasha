@@ -211,7 +211,7 @@ class EnrichmentHandler:
         # `{item_id, kind, value}`. Jobs survive restart by design, so a row queued
         # before the upgrade is still here afterwards; it is read as the domain's own
         # key rather than failing silently in a queue nobody is watching.
-        kind = str(payload.get("kind") or spec.identity_kind)
+        kind = str(payload.get("kind") or spec.identity_kinds[0])
         value = payload.get("value") or payload.get("isbn")
         if not value:
             return {
@@ -408,7 +408,8 @@ def _backfillable_items(
         spec = domain.enrichment
         if spec is None:
             continue
-        parameters: dict[str, Any] = {"type": domain.item_type, "kind": spec.identity_kind}
+        claimed: set[int] = set()
+        parameters: dict[str, Any] = {"type": domain.item_type}
         # The field names reach SQLite as *bound* `json_extract` paths rather than as
         # interpolated SQL, so a domain cannot spell its way into the statement.
         incomplete = []
@@ -421,10 +422,15 @@ def _backfillable_items(
             placeholders = ", ".join(f":item_{index}" for index, _ in enumerate(item_ids))
             scope = f"AND items.id IN ({placeholders})"
             parameters.update({f"item_{index}": value for index, value in enumerate(item_ids)})
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"""
+        # One statement per declared key, in the domain's own order of preference. An
+        # item reachable by several is queued once, under the first it actually has:
+        # the alternative — one statement with `kind IN (…)` — cannot say which kind
+        # the value it returned belongs to, and the handler needs both.
+        for kind in spec.identity_kinds:
+            with engine.connect() as connection:
+                result = connection.execute(
+                    text(
+                        f"""
                     SELECT items.id AS item_id, MIN(ident.normalized_value) AS value
                     FROM items
                     JOIN item_identifiers AS ident
@@ -446,8 +452,12 @@ def _backfillable_items(
                     GROUP BY items.id
                     ORDER BY items.id
                     """
-                ),
-                parameters,
-            )
-            rows.extend((row.item_id, spec.identity_kind, row.value) for row in result)
+                    ),
+                    {**parameters, "kind": kind},
+                )
+                for row in result:
+                    if row.item_id in claimed:
+                        continue
+                    claimed.add(row.item_id)
+                    rows.append((row.item_id, kind, row.value))
     return sorted(rows)

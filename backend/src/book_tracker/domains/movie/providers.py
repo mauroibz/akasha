@@ -37,6 +37,7 @@ from urllib.parse import parse_qsl, urlsplit
 import httpx
 
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
+from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.movie.posters import TmdbPosters, poster_for
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
@@ -86,6 +87,12 @@ P_PUBLICATION_DATE = "P577"
 P_ORIGINAL_TITLE = "P1476"
 P_IMDB = "P345"
 P_TMDB_MOVIE = "P4947"
+
+#: The keys background enrichment may hand this adapter, taken from the domain's own
+#: declaration so the guard and the declaration cannot drift apart.
+ENRICHMENT_KEYS: tuple[str, ...] = (
+    MOVIE.enrichment.identity_kinds if MOVIE.enrichment is not None else ()
+)
 P_LETTERBOXD = "P6127"
 
 Q_FILM = "Q11424"
@@ -571,16 +578,21 @@ class WikidataMovieProvider:
     async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
         """Background enrichment's entry point (DEC-067 row 3).
 
-        The movie domain's declared key is `letterboxd`, and it arrives in two shapes: a
-        bare `P6127` slug for a film added through search, and the short `boxd.it` URI a
-        Letterboxd export stores. Both name one film, so both are accepted.
+        The movie domain declares two keys, because its two sources supply different
+        ones: a Letterboxd export names a film by a short `boxd.it` URI and an IMDb
+        export by its `tt` id, and neither carries the other's (DEC-113). Wikidata holds
+        both as exact claims — `P6127` and `P345` — so this is one film reachable two
+        ways rather than two lookups.
+
+        `letterboxd` additionally arrives in two shapes: a bare slug for a film added
+        through search, and the short URI the export stores. Both name one film.
         """
-        if kind != "letterboxd":
+        if kind not in ENRICHMENT_KEYS:
             raise ProviderPayloadError(
                 f"Wikidata's movie adapter cannot look a film up by {kind!r}",
                 code="unsupported_identity_kind",
             )
-        return await self.fetch(f"letterboxd:{value.strip()}")
+        return await self.fetch(f"{kind}:{value.strip()}")
 
     # -- Letterboxd identity, and nothing else ----------------------------------------
 

@@ -67,7 +67,7 @@ SOURCE_PREFERENCE = ("openlibrary", "googlebooks")
 # background enrichment was built for. The three fields below were the incompleteness
 # rule for *every* domain until Sprint 039; they are books' own now (DEC-067 row 3).
 BOOK_ENRICHMENT = EnrichmentSpec(
-    identity_kind="isbn",
+    identity_kinds=("isbn",),
     provider_order=SOURCE_PREFERENCE,
     completeness_fields=("publisher", "page_count", "description"),
 )

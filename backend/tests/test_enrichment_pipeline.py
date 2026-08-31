@@ -568,12 +568,33 @@ async def test_a_movie_is_queued_on_its_letterboxd_film(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
-async def test_a_movie_with_no_letterboxd_film_is_never_queued(tmp_path: Path) -> None:
-    """A film added by hand and never matched to Letterboxd has nothing to look up by."""
+async def test_a_movie_known_only_by_its_imdb_id_is_queued_on_that(tmp_path: Path) -> None:
+    """This asserted the opposite until Sprint 053, and the opposite was the defect.
+
+    The movie domain declared `letterboxd` alone, so a film that arrived from an IMDb
+    export — carrying a `tt` id and no Letterboxd URI, because IMDb does not publish
+    one — was never queued for anything: no poster, no genres, no runtime, and every
+    gate green. The domain declares both keys now (DEC-113).
+    """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         engine = app.state.engine
-        create_typed_item(engine, "Untitled", "movie", ("imdb", "tt0076786"))
+        movie = create_typed_item(engine, "Untitled", "movie", ("imdb", "tt0076786"))
+        assert enqueue_enrichment_backfill(engine) == 1
+        payloads = {row["item_id"]: row for row in queued_payloads(engine)}
+
+    assert payloads[movie]["kind"] == "imdb"
+    assert payloads[movie]["value"] == "tt0076786"
+
+
+@pytest.mark.anyio
+async def test_a_movie_with_neither_key_is_never_queued(tmp_path: Path) -> None:
+    """The negative that still holds: a film added by hand and matched to nothing has
+    nothing to look it up by, and a job with no key is a job that can only fail."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        create_typed_item(engine, "Untitled", "movie", ("tmdb", "1396"))
         assert enqueue_enrichment_backfill(engine) == 0
 
 

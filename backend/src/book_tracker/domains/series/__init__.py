@@ -102,7 +102,7 @@ SERIES_IDENTITY = IdentityStrategy(imdb_identity, ("wikidata-series", "tvmaze"))
 # field a person wants to look at still empty. The key is an IMDb id because that is
 # the only identity both exports carry (docs/series-domain-viability.md).
 SERIES_ENRICHMENT = EnrichmentSpec(
-    identity_kind="imdb",
+    identity_kinds=("imdb",),
     provider_order=("wikidata-series", "tvmaze"),
     # `creators`, `genres` and the description were present on 13/13 measured entities.
     # `seasons` (absent 2/13) and `cast` (absent 4/13, every animated series) are

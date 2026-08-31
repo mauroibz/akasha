@@ -113,7 +113,7 @@ def test_identity_is_the_imdb_id() -> None:
 def test_enrichment_is_keyed_on_imdb_and_excludes_measured_gaps() -> None:
     spec = DOMAIN.enrichment
     assert spec is not None
-    assert spec.identity_kind == "imdb"
+    assert spec.identity_kinds == ("imdb",)
     assert spec.provider_order == ("wikidata-series", "tvmaze")
     # Measured 2026-08-31: `seasons` absent on 2/13, `cast` on 4/13 (every animated
     # series). Naming either re-queues those rows on every backfill for ever.
