@@ -25,7 +25,7 @@ const importers = [
   {
     id: "goodreads",
     label: "Goodreads",
-    item_type: "book",
+    item_types: ["book"],
     attachment_max_bytes: 25 * 1024 * 1024,
     input: {
       kind: "upload",
@@ -51,7 +51,7 @@ const importers = [
   {
     id: "calibre",
     label: "Calibre",
-    item_type: "book",
+    item_types: ["book"],
     attachment_max_bytes: 25 * 1024 * 1024,
     input: {
       kind: "directory",
@@ -121,7 +121,7 @@ describe("ImportPage", () => {
           {
             id: "storygraph",
             label: "StoryGraph",
-            item_type: "book",
+            item_types: ["book"],
             input: {
               kind: "upload",
               label: "StoryGraph CSV",
@@ -1064,5 +1064,200 @@ describe("ImportPage", () => {
     renderImportPage();
 
     expect(await screen.findByLabelText("Calibre folder")).toBeVisible();
+  });
+
+  /**
+   * One source, many libraries (DEC-106).
+   *
+   * The reader chooses the source; what the source contains is the connector's
+   * declaration, and what comes in is a checkbox. The service applies the choice,
+   * so these tests assert what the screen *sends*, never what it filters.
+   */
+  describe("choosing what an import brings in", () => {
+    const twoDomains = {
+      id: "imdb",
+      label: "IMDb",
+      item_types: ["movie", "series"],
+      attachment_max_bytes: 25 * 1024 * 1024,
+      input: {
+        kind: "upload",
+        label: "IMDb CSV",
+        field: "file",
+        accept: ".csv,text/csv",
+        placeholder: null,
+        help: null,
+        guide: ["Export your ratings from imdb.com."],
+        empty_state: "Drop the IMDb export here.",
+        help_url: "https://www.imdb.com/exports/",
+        browsable: false,
+        incremental: false,
+        accepts_files: false,
+        max_bytes: null,
+        max_files: null,
+        alternate: null,
+      },
+    };
+
+    const itemTypes = [
+      { id: "movie", label: "Movies" },
+      { id: "series", label: "Series" },
+      { id: "book", label: "Books" },
+    ];
+
+    function stubTwoDomains(
+      handler: (
+        input: string,
+        init?: RequestInit,
+      ) => Response | undefined = () => undefined,
+    ) {
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+        const url = String(input);
+        const answered = handler(url, init);
+        if (answered) return answered;
+        if (url === "/api/importers")
+          return new Response(JSON.stringify([twoDomains, ...importers]));
+        if (url.startsWith("/api/item-types"))
+          return new Response(JSON.stringify(itemTypes));
+        return new Response(JSON.stringify({}), { status: 404 });
+      });
+    }
+
+    it("offers one target per declared domain, all chosen, named as the library is", async () => {
+      stubTwoDomains();
+      renderImportPage();
+
+      const movies = await screen.findByRole("checkbox", { name: "Movies" });
+      expect(movies).toBeChecked();
+      expect(screen.getByRole("checkbox", { name: "Series" })).toBeChecked();
+      // Named from the registry, not from a literal in this screen.
+      expect(screen.queryByRole("checkbox", { name: "movie" })).toBeNull();
+    });
+
+    it("offers no choice at all when a connector fills one library", async () => {
+      // Goodreads and Calibre look exactly as they did: a choice of one is not a
+      // choice, and rendering it would be a control that cannot do anything.
+      stubRegistry((url) =>
+        url.startsWith("/api/item-types")
+          ? new Response(JSON.stringify(itemTypes))
+          : undefined,
+      );
+      renderImportPage();
+
+      expect(await screen.findByLabelText("Goodreads CSV")).toBeVisible();
+      expect(
+        screen.queryByRole("group", { name: /what should this import/i }),
+      ).toBeNull();
+      expect(screen.queryByRole("checkbox", { name: "Books" })).toBeNull();
+    });
+
+    it("sends only the targets left ticked", async () => {
+      const sent: FormData[] = [];
+      stubTwoDomains((url, init) => {
+        if (!url.endsWith("imdb/preview")) return undefined;
+        sent.push(init?.body as FormData);
+        return new Response(
+          JSON.stringify({
+            batch_id: "imdb-1",
+            fingerprint: "csv#movie",
+            state: "previewed",
+            summary: {
+              total: 1,
+              ready: 1,
+              errors: 0,
+              ambiguous: 0,
+              skipped_not_requested: 2,
+              skipped_unsupported: 0,
+              skipped_reasons: [],
+            },
+            records: [
+              {
+                record_id: 1,
+                row_number: 1,
+                title: "Arrival",
+                creators: [],
+                suggested_status: "watchlist",
+                score: null,
+                score_provisional: false,
+                shelves: [],
+                errors: [],
+                planned_action: "create_item",
+                match_kind: "new",
+                candidates: [],
+                item: {},
+                entry: {},
+                source_fields: {},
+              },
+            ],
+          }),
+          { status: 201 },
+        );
+      });
+      renderImportPage();
+
+      await userEvent.click(
+        await screen.findByRole("checkbox", { name: "Series" }),
+      );
+      await userEvent.upload(
+        screen.getByLabelText("IMDb CSV"),
+        new File(["Const,Title\n"], "ratings.csv", { type: "text/csv" }),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Preview import" }),
+      );
+
+      expect(await screen.findByText(/Preview: 1 rows/)).toBeVisible();
+      expect(sent).toHaveLength(1);
+      expect(sent[0].get("targets")).toBe("movie");
+    });
+
+    it("says what it left out, on both counts, without calling either an error", async () => {
+      // Somebody who exports their whole account should meet a number, not forty
+      // red rows for podcasts they once rated.
+      stubTwoDomains((url) =>
+        url.endsWith("imdb/preview")
+          ? new Response(
+              JSON.stringify({
+                batch_id: "imdb-2",
+                fingerprint: "csv",
+                state: "previewed",
+                summary: {
+                  total: 1,
+                  ready: 1,
+                  errors: 0,
+                  ambiguous: 0,
+                  skipped_not_requested: 2,
+                  skipped_unsupported: 44,
+                  skipped_reasons: [
+                    { reason: "TV Episode", count: 40 },
+                    { reason: "Podcast Episode", count: 4 },
+                  ],
+                },
+                records: [],
+              }),
+              { status: 201 },
+            )
+          : undefined,
+      );
+      renderImportPage();
+
+      await userEvent.click(
+        await screen.findByRole("checkbox", { name: "Series" }),
+      );
+      await userEvent.upload(
+        screen.getByLabelText("IMDb CSV"),
+        new File(["Const,Title\n"], "ratings.csv", { type: "text/csv" }),
+      );
+      await userEvent.click(
+        screen.getByRole("button", { name: "Preview import" }),
+      );
+
+      const skipped = await screen.findByTestId("import-skipped");
+      expect(skipped).toHaveTextContent(
+        "2 rows are for libraries you did not choose",
+      );
+      expect(skipped).toHaveTextContent("40 TV Episode");
+      expect(skipped).toHaveTextContent("4 Podcast Episode");
+      expect(screen.getByText(/0 have errors/)).toBeVisible();
+    });
   });
 });

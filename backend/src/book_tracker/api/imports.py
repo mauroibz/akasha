@@ -134,7 +134,10 @@ class ImportBrowseResponse(BaseModel):
 class ImporterResponse(BaseModel):
     id: str
     label: str
-    item_type: str
+    #: Every domain this connector can produce, ordered, first-declared first. A list
+    #: rather than a string because one source may carry films and shows (DEC-106);
+    #: the screen renders a target checkbox per entry, and none at all for one.
+    item_types: list[str]
     input: ImportInputResponse
     #: The per-file ceiling on anything this import attaches, so the screen can name
     #: a file it will not send instead of spending the upload to be refused (DEC-083).
@@ -155,7 +158,7 @@ async def available_importers(request: Request) -> list[ImporterResponse]:
         ImporterResponse(
             id=importer.name,
             label=importer.label,
-            item_type=importer.item_types[0],
+            item_types=list(importer.item_types),
             input=_published_input(importer.input),
             attachment_max_bytes=int(request.app.state.attachment_max_bytes),
         )
@@ -184,11 +187,24 @@ class ImportRecordResponse(BaseModel):
     cover_staged: bool = False
 
 
+class SkippedReason(BaseModel):
+    reason: str
+    count: int
+
+
 class PreviewSummary(BaseModel):
     total: int
     ready: int
     errors: int
     ambiguous: int
+    #: Rows for a library the reader did not tick. Their own count, never folded into
+    #: `errors`: choosing not to import something is not a failure to import it.
+    skipped_not_requested: int = 0
+    #: Rows whose source kind maps to no registered domain at all, with the source's
+    #: own word for each kind, so a title type IMDb has not published yet appears as a
+    #: number on this screen rather than as a failed import.
+    skipped_unsupported: int = 0
+    skipped_reasons: list[SkippedReason] = Field(default_factory=list)
 
 
 class PreviewResponse(BaseModel):
@@ -298,11 +314,36 @@ def _chosen_input(importer: object, request: Request) -> ImportInputSpec:
     )
 
 
-async def _source(request: Request, importer_name: str) -> ImportSource:
+def _targets(value: object) -> tuple[str, ...] | None:
+    """Which libraries this import is for, as the request stated them.
+
+    Absent means every domain the connector declares, which is what the screen ticks
+    by default and the only thing a single-domain connector can mean. A multipart
+    request states them as one comma-separated field so the folder bundle and the
+    file upload say it the same way; a JSON body states them as a list.
+
+    What they *mean* is the service's business, not this route's — the service applies
+    the selection so that no connector can get the filter wrong (DEC-106).
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return tuple(part.strip() for part in value.split(",") if part.strip())
+    if isinstance(value, list) and all(isinstance(part, str) for part in value):
+        return tuple(part.strip() for part in value if part.strip())
+    raise LibraryError(
+        "invalid_import_targets", "Import targets must be a list of item types", status_code=422
+    )
+
+
+async def _source(
+    request: Request, importer_name: str
+) -> tuple[ImportSource, tuple[str, ...] | None]:
     importer = IMPORTERS[importer_name]
     spec = _chosen_input(importer, request)
     if spec.kind == "directory":
-        return await _bundle(request, spec)
+        source, extras = await _bundle(request, spec, form_extras=("manifest", "targets"))
+        return source, _targets(extras.get("targets"))
     if spec.kind == "upload":
         form = await request.form()
         upload = form.get(spec.field)
@@ -310,6 +351,7 @@ async def _source(request: Request, importer_name: str) -> ImportSource:
             raise LibraryError(
                 "invalid_import_source", "An import file is required", status_code=422
             )
+        targets = _targets(form.get("targets"))
         chunks: list[bytes] = []
         size = 0
         while chunk := await upload.read(64 * 1024):
@@ -321,7 +363,7 @@ async def _source(request: Request, importer_name: str) -> ImportSource:
                     status_code=413,
                 )
             chunks.append(chunk)
-        return ImportSource(data=b"".join(chunks), filename=upload.filename)
+        return ImportSource(data=b"".join(chunks), filename=upload.filename), targets
     try:
         body = await request.json()
         value = body.get(spec.field) if isinstance(body, dict) else None
@@ -331,12 +373,12 @@ async def _source(request: Request, importer_name: str) -> ImportSource:
         raise LibraryError(
             "invalid_import_source", "A library path is required", status_code=422
         ) from error
-    return ImportSource(path=value)
+    return ImportSource(path=value), _targets(body.get("targets"))
 
 
 async def _bundle(
     request: Request, spec: ImportInputSpec, *, form_extras: tuple[str, ...] = ()
-) -> ImportSource:
+) -> tuple[ImportSource, dict[str, str]]:
     """Stream an uploaded folder to disk as a library the reader already understands.
 
     Members land under `<bundle>/library/...` rather than at the root so the connector
@@ -388,7 +430,7 @@ async def _bundle(
                     "calls your Calibre Library."
                 ),
             )
-        return ImportSource(directory=bundle, manifest=extras.get("manifest"))
+        return ImportSource(directory=bundle, manifest=extras.get("manifest")), extras
     except BaseException:
         shutil.rmtree(bundle, ignore_errors=True)
         raise
@@ -410,9 +452,9 @@ def _too_large(spec: ImportInputSpec) -> LibraryError:
 @router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)
 async def preview(importer_name: str, request: Request) -> PreviewResponse:
     import_service = service(request, importer_name)
-    source = await _source(request, importer_name)
+    source, targets = await _source(request, importer_name)
     try:
-        result = import_service.preview(source)
+        result = import_service.preview(source, targets)
     except ImportReadError as error:
         raise read_failure(IMPORTERS[importer_name], error) from error
     finally:
@@ -445,7 +487,7 @@ async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
             status_code=404,
         )
     spec = _chosen_input(importer, request)
-    source = await _bundle(request, spec, form_extras=("manifest",))
+    source, _extras = await _bundle(request, spec, form_extras=("manifest",))
     try:
         candidates = _candidates(source.manifest, spec)
         result = planned_upload(

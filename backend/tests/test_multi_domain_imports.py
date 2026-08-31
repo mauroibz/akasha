@@ -357,3 +357,138 @@ async def test_a_batch_previewed_before_this_contract_still_commits(tmp_path: Pa
 
     assert committed["created_items"] == 1
     assert _types(app.state.engine) == {"movie": 1}
+
+
+@pytest.mark.anyio
+async def test_unticking_a_target_excludes_its_rows_and_says_how_many(tmp_path: Path) -> None:
+    """AC7. The service applies the selection, so no connector can get it wrong."""
+    app = _app(tmp_path)
+    async with app.router.lifespan_context(app):
+        service = _service(app, TwoDomainImporter())
+        preview = service.preview(
+            ImportSource(data=b"one", filename="export.csv"), targets=("movie",)
+        )
+        assert preview["summary"]["total"] == 2
+        assert {row["item_type"] for row in preview["records"]} == {"movie"}
+        assert preview["summary"]["skipped_not_requested"] == 2
+
+        committed = service.commit(preview["batch_id"], {})
+
+    assert committed["created_items"] == 2
+    assert _types(app.state.engine) == {"movie": 2}
+
+
+@pytest.mark.anyio
+async def test_the_same_source_with_different_targets_is_a_different_import(
+    tmp_path: Path,
+) -> None:
+    """AC8. The trap DEC-106 names: idempotency is on `(connector, fingerprint)`.
+
+    Without the target set folded in, importing an export as films and then as shows
+    returns the *first* preview — a wrong answer that looks like a working feature.
+    """
+    app = _app(tmp_path)
+    async with app.router.lifespan_context(app):
+        service = _service(app, TwoDomainImporter())
+        films = service.preview(ImportSource(data=b"same", filename="export.csv"), ("movie",))
+        shows = service.preview(ImportSource(data=b"same", filename="export.csv"), ("series",))
+        both = service.preview(ImportSource(data=b"same", filename="export.csv"), None)
+        again = service.preview(ImportSource(data=b"same", filename="export.csv"), ("movie",))
+
+    assert films["batch_id"] != shows["batch_id"] != both["batch_id"]
+    assert {row["item_type"] for row in films["records"]} == {"movie"}
+    assert {row["item_type"] for row in shows["records"]} == {"series"}
+    assert both["summary"]["total"] == 4
+    # Still idempotent within one target set: the same request returns its own batch.
+    assert again["batch_id"] == films["batch_id"]
+
+
+@pytest.mark.anyio
+async def test_selecting_every_target_keeps_the_fingerprint_a_source_already_has(
+    tmp_path: Path,
+) -> None:
+    """A batch previewed before targets existed must keep resolving.
+
+    Every connector that shipped before this sprint declares one domain, so it always
+    selects all of them — and the fingerprint it computes is unchanged. That is why
+    this needs no migration: the composition only applies to a strict subset.
+    """
+    app = _app(tmp_path)
+    async with app.router.lifespan_context(app):
+        service = _service(app, TwoDomainImporter())
+        preview = service.preview(ImportSource(data=b"same", filename="export.csv"))
+
+    assert preview["fingerprint"] == "two-domains:same"
+
+
+@pytest.mark.anyio
+async def test_rows_the_reader_could_not_target_are_counted_not_failed(tmp_path: Path) -> None:
+    """AC9. Somebody who exports a whole account meets a number, not red rows.
+
+    A count with the source's own word for the thing, so a title type IMDb has not
+    published yet reads as "40 Podcast Episode" rather than as forty failed imports.
+    """
+    app = _app(tmp_path)
+    async with app.router.lifespan_context(app):
+        service = _service(
+            app,
+            TwoDomainImporter(
+                skipped=(
+                    ImportSkip(reason="TV Episode", count=40),
+                    ImportSkip(reason="Podcast Episode", count=4),
+                )
+            ),
+        )
+        preview = service.preview(ImportSource(data=b"one", filename="export.csv"))
+
+    summary = preview["summary"]
+    assert summary["skipped_unsupported"] == 44
+    assert summary["errors"] == 0
+    assert summary["skipped_reasons"] == [
+        {"reason": "TV Episode", "count": 40},
+        {"reason": "Podcast Episode", "count": 4},
+    ]
+    assert all(not row["errors"] for row in preview["records"])
+
+
+@pytest.mark.anyio
+async def test_the_registry_publishes_every_domain_a_connector_targets(
+    tmp_path: Path, two_domains: TwoDomainImporter
+) -> None:
+    """AC10. The published field is a list now, and the screen renders from it."""
+    app = _app(tmp_path)
+    async with app.router.lifespan_context(app):
+        async for client in _client(app):
+            response = await client.get("/api/importers")
+
+    published = {row["id"]: row["item_types"] for row in response.json()}
+    assert published["two_domains"] == ["movie", "series"]
+    assert published["goodreads"] == ["book"]
+    assert published["letterboxd"] == ["movie"]
+
+
+@pytest.mark.anyio
+async def test_the_chosen_targets_travel_with_the_preview_request(
+    tmp_path: Path, two_domains: TwoDomainImporter
+) -> None:
+    """The selection is part of the request, not state the screen holds."""
+    app = _app(tmp_path)
+    async with app.router.lifespan_context(app):
+        async for client in _client(app):
+            response = await client.post(
+                "/api/import/two_domains/preview",
+                files={"file": ("export.csv", b"one", "text/csv")},
+                data={"targets": "series"},
+            )
+            assert response.status_code == 201, response.text
+            assert response.json()["summary"]["total"] == 2
+            assert response.json()["summary"]["skipped_not_requested"] == 2
+
+            refused = await client.post(
+                "/api/import/two_domains/preview",
+                files={"file": ("export.csv", b"two", "text/csv")},
+                data={"targets": "album"},
+            )
+
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["error"]["code"] == "invalid_import_targets"

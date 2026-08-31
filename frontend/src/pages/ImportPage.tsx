@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -34,6 +35,7 @@ import {
   narrowedTo,
 } from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
+import { useItemTypes } from "@/features/library/useItemTypes";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
@@ -97,6 +99,14 @@ export function ImportPage() {
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
   const [showAlternate, setShowAlternate] = useState(false);
+  /**
+   * Which libraries this import is for, per connector.
+   *
+   * Keyed by connector so switching tabs does not carry one source's answer over to
+   * another, and absent means "everything it declares" — which is what the boxes show
+   * ticked and the only thing a single-domain connector can mean.
+   */
+  const [targets, setTargets] = useState<Record<string, string[]>>({});
   const [skipped, setSkipped] = useState<{
     held: number;
     reason: string | null;
@@ -211,6 +221,71 @@ export function ImportPage() {
   const ready =
     (preview?.summary.ready ?? 0) + (preview?.summary.ambiguous ?? 0);
   const activeImporter = importers.find((importer) => importer.id === source);
+  // Only a connector that can fill more than one library needs their names, and
+  // none of the four that ship today can.
+  const itemTypes = useItemTypes(
+    importers.some((importer) => importer.item_types.length > 1),
+  );
+
+  /** What this connector is currently set to bring in. Everything, by default. */
+  const chosenFor = (importer: ImporterDefinition) =>
+    targets[importer.id] ?? importer.item_types;
+
+  /** The library's own name for a domain, falling back to its id (DEC-080). */
+  const libraryLabel = (itemType: string) =>
+    itemTypes.data?.find((type) => type.id === itemType)?.label ?? itemType;
+
+  /**
+   * A checkbox per declared domain, and nothing at all for a connector with one.
+   *
+   * The connector declares what it can produce and the screen renders that
+   * declaration; unticking a box narrows what the *request* asks for, and the
+   * server drops the rest (DEC-106). A choice of one is not a choice, so Goodreads
+   * and Calibre look exactly as they always did.
+   */
+  const renderTargets = (importer: ImporterDefinition) => {
+    if (importer.item_types.length < 2) return null;
+    const chosen = chosenFor(importer);
+    return (
+      <fieldset className="rounded-2xl border border-border px-4 py-3">
+        <legend className="px-1 text-sm font-semibold">
+          What should this import?
+        </legend>
+        <div className="mt-1 flex flex-wrap gap-x-6 gap-y-2">
+          {importer.item_types.map((itemType) => {
+            const id = `${importer.id}-target-${itemType}`;
+            const ticked = chosen.includes(itemType);
+            return (
+              <div key={itemType} className="flex items-center gap-2">
+                <Checkbox
+                  id={id}
+                  checked={ticked}
+                  // The last box may not be unticked: an import that brings in
+                  // nothing is a refusal the server would have to make anyway,
+                  // and meeting it after choosing a file is worse than not
+                  // being offered it.
+                  disabled={ticked && chosen.length === 1}
+                  onCheckedChange={() =>
+                    setTargets((current) => ({
+                      ...current,
+                      [importer.id]: ticked
+                        ? chosen.filter((row) => row !== itemType)
+                        : importer.item_types.filter(
+                            (row) => row === itemType || chosen.includes(row),
+                          ),
+                    }))
+                  }
+                />
+                <Label htmlFor={id} className="font-normal">
+                  {libraryLabel(itemType)}
+                </Label>
+              </div>
+            );
+          })}
+        </div>
+      </fieldset>
+    );
+  };
 
   /**
    * Which of a connector's inputs the reader actually filled in, if any.
@@ -439,7 +514,12 @@ export function ImportPage() {
                     const importer = activeImporter as ImporterDefinition;
                     void sendable(importer, submission)
                       .then((source) =>
-                        previewImport(importer, submission.spec, source),
+                        previewImport(
+                          importer,
+                          submission.spec,
+                          source,
+                          chosenFor(importer),
+                        ),
                       )
                       .then(setPreview)
                       .catch((reason: Error) => setError(asFailure(reason)))
@@ -453,6 +533,7 @@ export function ImportPage() {
                       className="mt-0 space-y-5"
                     >
                       <ConnectorGuide importer={importer} />
+                      {renderTargets(importer)}
                       {renderInput(importer, importer.input, "")}
                       {/* The second way in, beneath the first. One deep by contract,
                       so this never recurses further (DEC-081). */}
@@ -534,6 +615,32 @@ export function ImportPage() {
                   {preview.summary.ready} ready · {preview.summary.ambiguous}{" "}
                   need a choice · {preview.summary.errors} have errors
                 </p>
+                {/* What the import left behind, on its own line and never counted
+                as an error. The two are kept apart because they are different
+                answers: one is a library you did not choose, the other is a kind
+                of thing no library here holds (DEC-106). */}
+                {(preview.summary.skipped_not_requested > 0 ||
+                  preview.summary.skipped_unsupported > 0) && (
+                  <p
+                    className="mt-1 text-sm text-muted-foreground"
+                    data-testid="import-skipped"
+                  >
+                    {[
+                      preview.summary.skipped_not_requested > 0
+                        ? `${preview.summary.skipped_not_requested} ${preview.summary.skipped_not_requested === 1 ? "row is" : "rows are"} for libraries you did not choose`
+                        : null,
+                      preview.summary.skipped_reasons.length > 0
+                        ? `${preview.summary.skipped_reasons
+                            .map((row) => `${row.count} ${row.reason}`)
+                            .join(", ")} — not a kind this tracks`
+                        : preview.summary.skipped_unsupported > 0
+                          ? `${preview.summary.skipped_unsupported} rows are not a kind this tracks`
+                          : null,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                )}
                 <div className="mt-5 space-y-3">
                   {preview.records.map((record) => (
                     <article

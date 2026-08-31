@@ -1484,9 +1484,12 @@
           "input": {
             "$ref": "#/components/schemas/ImportInputResponse"
           },
-          "item_type": {
-            "title": "Item Type",
-            "type": "string"
+          "item_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Item Types",
+            "type": "array"
           },
           "label": {
             "title": "Label",
@@ -1496,7 +1499,7 @@
         "required": [
           "id",
           "label",
-          "item_type",
+          "item_types",
           "input",
           "attachment_max_bytes"
         ],
@@ -1970,6 +1973,23 @@
             "title": "Ready",
             "type": "integer"
           },
+          "skipped_not_requested": {
+            "default": 0,
+            "title": "Skipped Not Requested",
+            "type": "integer"
+          },
+          "skipped_reasons": {
+            "items": {
+              "$ref": "#/components/schemas/SkippedReason"
+            },
+            "title": "Skipped Reasons",
+            "type": "array"
+          },
+          "skipped_unsupported": {
+            "default": 0,
+            "title": "Skipped Unsupported",
+            "type": "integer"
+          },
           "total": {
             "title": "Total",
             "type": "integer"
@@ -2244,6 +2264,24 @@
           "slug"
         ],
         "title": "ShelfResponse",
+        "type": "object"
+      },
+      "SkippedReason": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "reason",
+          "count"
+        ],
+        "title": "SkippedReason",
         "type": "object"
       },
       "SourceRefBody": {
