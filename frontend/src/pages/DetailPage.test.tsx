@@ -148,7 +148,8 @@ describe("DetailPage", () => {
       ],
       reason: null,
     };
-    const request = mockApi(async (input, init) => {
+    const request = mockApi(
+      async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
         if (url === "/api/item-types")
@@ -162,7 +163,9 @@ describe("DetailPage", () => {
               cover_url: "/api/items/3/cover",
             }),
           );
-      }, { fallback: entry });
+      },
+      { fallback: entry },
+    );
     renderPage();
     expect(
       await screen.findByRole("heading", { name: "Rayuela" }),
@@ -201,16 +204,19 @@ describe("DetailPage", () => {
   });
 
   it("explains an empty chooser instead of showing an empty grid", async () => {
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (url.includes("/cover-candidates"))
-        return new Response(
-          JSON.stringify({ candidates: [], reason: "no_provider_reference" }),
-        );
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (url.includes("/cover-candidates"))
+          return new Response(
+            JSON.stringify({ candidates: [], reason: "no_provider_reference" }),
+          );
+      },
+      { fallback: entry },
+    );
     renderPage();
     expect(
       await screen.findByRole("heading", { name: "Rayuela" }),
@@ -263,11 +269,14 @@ describe("DetailPage", () => {
   });
 
   it("renders all standard metadata fields", async () => {
-    mockApi(async (input) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     expect(screen.getByText("Sudamericana")).toBeVisible();
@@ -320,12 +329,15 @@ describe("DetailPage", () => {
         },
       },
     };
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(albumTypes));
-    }, { fallback: album });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(albumTypes));
+      },
+      { fallback: album },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Discovery" });
@@ -387,12 +399,15 @@ describe("DetailPage", () => {
       formats: ["vinyl"],
       item: { ...entry.item, type: "album", title: "Discovery", metadata: {} },
     };
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(albumTypes));
-    }, { fallback: album });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(albumTypes));
+      },
+      { fallback: album },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Discovery" });
 
@@ -429,12 +444,15 @@ describe("DetailPage", () => {
         chooses_covers: true,
       },
     ];
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(bookTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(bookTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
@@ -444,11 +462,14 @@ describe("DetailPage", () => {
   });
 
   it("keeps a book's reading data, the half DEC-057 did not touch", async () => {
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types") return new Response("[]");
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types") return new Response("[]");
+      },
+      { fallback: entry },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
@@ -461,16 +482,19 @@ describe("DetailPage", () => {
 
   it("corrects the creator sort name and clears it back to the automatic value", async () => {
     const bodies: string[] = [];
-    mockApi(async (input, init) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (init?.method === "PATCH") {
-        bodies.push(String(init.body));
-        return new Response(JSON.stringify(entry.item));
-      }
-    }, { fallback: entry });
+    mockApi(
+      async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (init?.method === "PATCH") {
+          bodies.push(String(init.body));
+          return new Response(JSON.stringify(entry.item));
+        }
+      },
+      { fallback: entry },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
@@ -494,16 +518,19 @@ describe("DetailPage", () => {
       ...entry,
       item: { ...entry.item, creator_sort_override: "Anything At All" },
     };
-    mockApi(async (input, init) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (init?.method === "PATCH") {
-        bodies.push(String(init.body));
-        return new Response(JSON.stringify(corrected.item));
-      }
-    }, { fallback: corrected });
+    mockApi(
+      async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (init?.method === "PATCH") {
+          bodies.push(String(init.body));
+          return new Response(JSON.stringify(corrected.item));
+        }
+      },
+      { fallback: corrected },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
@@ -516,15 +543,18 @@ describe("DetailPage", () => {
 
   it("confirmed deletion calls DELETE and returns to library", async () => {
     const requests: Array<[string, RequestInit?]> = [];
-    mockApi(async (input, init) => {
-      const url = String(input);
-      requests.push([url, init]);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (init?.method === "DELETE" && url === "/api/entries/7")
-        return new Response(null, { status: 204 });
-    }, { fallback: entry });
+    mockApi(
+      async (input, init) => {
+        const url = String(input);
+        requests.push([url, init]);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (init?.method === "DELETE" && url === "/api/entries/7")
+          return new Response(null, { status: 204 });
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -556,13 +586,16 @@ describe("DetailPage", () => {
 
   it("cancel preserves the entry and does not call DELETE", async () => {
     const requests: Array<[string, RequestInit?]> = [];
-    mockApi(async (input, init) => {
-      const url = String(input);
-      requests.push([url, init]);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input, init) => {
+        const url = String(input);
+        requests.push([url, init]);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -577,17 +610,20 @@ describe("DetailPage", () => {
   });
 
   it("delete failure preserves the entry with an error", async () => {
-    mockApi(async (input, init) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (init?.method === "DELETE" && url === "/api/entries/7")
-        return new Response(
-          JSON.stringify({ error: { code: "entry_not_found" } }),
-          { status: 404 },
-        );
-    }, { fallback: entry });
+    mockApi(
+      async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (init?.method === "DELETE" && url === "/api/entries/7")
+          return new Response(
+            JSON.stringify({ error: { code: "entry_not_found" } }),
+            { status: 404 },
+          );
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -613,12 +649,15 @@ describe("DetailPage", () => {
   });
 
   it("refuses an impossible date range and keeps the typed values", async () => {
-    mockApi(async (input, init) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (init?.method === "PATCH") throw new Error("must not be reached");
-    }, { fallback: entry });
+    mockApi(
+      async (input, init) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (init?.method === "PATCH") throw new Error("must not be reached");
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -645,11 +684,14 @@ describe("DetailPage", () => {
   });
 
   it("refuses an out-of-range reread count", async () => {
-    mockApi(async (input) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -664,15 +706,18 @@ describe("DetailPage", () => {
   });
 
   it("keeps typed metadata when the write fails", async () => {
-    mockApi(async (input, init) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-      if (init?.method === "PATCH")
-        return new Response(JSON.stringify({ error: { code: "conflict" } }), {
-          status: 409,
-        });
-    }, { fallback: entry });
+    mockApi(
+      async (input, init) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+        if (init?.method === "PATCH")
+          return new Response(JSON.stringify({ error: { code: "conflict" } }), {
+            status: 409,
+          });
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -691,11 +736,14 @@ describe("DetailPage", () => {
   });
 
   it("rejects an empty title on the metadata form", async () => {
-    mockApi(async (input) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -708,11 +756,14 @@ describe("DetailPage", () => {
   });
 
   it("Escape closes dialogs", async () => {
-    mockApi(async (input) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -728,11 +779,14 @@ describe("DetailPage", () => {
   it("shows the score as a filled chip, the same treatment as the library", () => {
     // DEC-026: the ramp means the same thing wherever the eye lands, so the
     // detail page carries the chip rather than the coloured text it used to.
-    mockApi(async (input) => {
-      if (String(input) === "/api/shelves") return new Response("[]");
-      if (String(input) === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        if (String(input) === "/api/shelves") return new Response("[]");
+        if (String(input) === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     return waitFor(() => {
       const score = document.querySelector("[data-fact='score'] span");
@@ -751,7 +805,8 @@ describe("DetailPage", () => {
       { id: 1, name: "Favorites", slug: "favorites", entry_count: 4 },
     ],
   ) {
-    return mockApi(async (input, init) => {
+    return mockApi(
+      async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves" && init?.method === "POST") {
           const body = JSON.parse(String(init.body)) as { name: string };
@@ -783,7 +838,9 @@ describe("DetailPage", () => {
             }),
           );
         }
-      }, { fallback: entry });
+      },
+      { fallback: entry },
+    );
   }
 
   it("gives files a region of their own rather than a corner of the edition facts", async () => {
@@ -907,24 +964,27 @@ describe("DetailPage", () => {
     stubShelves();
     // Re-stub with a domain that declares formats, so the assertion that the
     // format control *stayed* is about the dialog and not about the fixture.
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(
-          JSON.stringify([
-            {
-              ...itemTypes[0],
-              formats: [
-                { value: "physical", label: "Physical" },
-                { value: "digital", label: "Digital" },
-              ],
-            },
-          ]),
-        );
-      if (url.includes("/attachments"))
-        return new Response('{"attachments":[]}');
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(
+            JSON.stringify([
+              {
+                ...itemTypes[0],
+                formats: [
+                  { value: "physical", label: "Physical" },
+                  { value: "digital", label: "Digital" },
+                ],
+              },
+            ]),
+          );
+        if (url.includes("/attachments"))
+          return new Response('{"attachments":[]}');
+      },
+      { fallback: entry },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
@@ -966,7 +1026,8 @@ describe("DetailPage", () => {
       async (input) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
-        if (url === "/api/item-types") return new Response(JSON.stringify(types));
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(types));
       },
       { fallback: anime },
     );
@@ -978,12 +1039,15 @@ describe("DetailPage", () => {
   });
 
   it("offers no progress control to a domain that counts nothing", async () => {
-    mockApi(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types")
-        return new Response(JSON.stringify(itemTypes));
-    }, { fallback: entry });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 

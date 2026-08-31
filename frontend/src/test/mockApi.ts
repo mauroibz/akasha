@@ -41,7 +41,10 @@ const DEFAULTS: Array<[string, () => Response]> = [
   ["/attachments", () => json({ attachments: [] })],
 ];
 
-export function mockApi(router: ApiHandler, options: { fallback?: unknown } = {}) {
+export function mockApi(
+  router: ApiHandler,
+  options: { fallback?: unknown } = {},
+) {
   return vi
     .spyOn(globalThis, "fetch")
     .mockImplementation(async (input, init) => {
