@@ -669,7 +669,7 @@ release fetch already returns everything an album has.
 
 ```python
 ANIME_ENRICHMENT = EnrichmentSpec(
-    identity_kind="mal",                     # the item_identifiers.kind to look up by
+    identity_kinds=("mal",),                 # the item_identifiers.kinds to look up by
     provider_order=("anilist", "kitsu"),     # who to ask, in order
     completeness_fields=("creators", "genres", "synopsis"),  # what "still thin" means
 )
@@ -678,9 +678,18 @@ ANIME_ENRICHMENT = EnrichmentSpec(
 All three are per-domain because all three used to be books'. The third is the subtle one, so it is
 worth saying what each does:
 
-- **`identity_kind`** is the `item_identifiers.kind` the lookup is keyed on. An item carrying no
-  identifier of this kind is never queued, because there is nothing to look it up by. Your importer's
-  `identity_kinds` and this value are usually the same word, and should be.
+- **`identity_kinds`** are the `item_identifiers.kind` values the lookup may be keyed on, in order
+  of preference. An item carrying none of them is never queued, because there is nothing to look it
+  up by; an item carrying several is queued once, under the first it has. Your importer's
+  `identity_kinds` should be among them.
+
+  Declare more than one only when your domain's **sources** genuinely supply different keys and the
+  owner does not choose which. Movies declare `("letterboxd", "imdb")` for exactly that reason: a
+  Letterboxd export names a film by a `boxd.it` URI and an IMDb export by its `tt` id, and neither
+  carries the other's (DEC-113). If you declare two, **every provider in your `provider_order` must
+  answer both** — a fallback that only answers the first key silently stops being a fallback for
+  rows that arrived under the second. Conformance cannot check that for you; it is a runtime
+  property of your adapters.
 - **`provider_order`** is which adapters are asked and in what order. The first usable payload wins.
   A provider that is not wired contributes a sentence to the reason recorded on the job rather than
   being skipped in silence, so a missing key reads as a missing key.
@@ -762,20 +771,24 @@ On entry shape they are **identical**. That is not an argument for merging them.
 
 ### The test that actually decides it
 
-`EnrichmentSpec.identity_kind` is **one string per domain**. Anime's is `mal` and series' is `imdb`,
-and the two provider sets do not overlap at all — AniList resolves a MyAnimeList id, not an IMDb id,
-and Wikidata resolves an IMDb id, not a MyAnimeList one. Nothing bridges them.
+Anime enriches on `mal` and series on `imdb`, and **the two provider sets do not overlap at all** —
+AniList resolves a MyAnimeList id and not an IMDb id; Wikidata resolves an IMDb id and not a
+MyAnimeList one. Nothing bridges them.
 
-So a merged domain would have to enrich on one key, and **every row that arrived under the other key
-would never be enriched at all**. A MyAnimeList export speaks `mal:`; IMDb and Trakt exports speak
-`imdb:`. Half the library would be permanently thin, and the failure would be silent — the rows would
-simply never be queued.
+A domain may declare several `identity_kinds` (DEC-113), so the objection is not that a merged domain
+could not *name* both keys. It is that no `provider_order` could serve them: whichever adapters it
+listed, every row that arrived under the key they do not answer would fail its lookup, or — before
+the key was declared at all — never be queued. A MyAnimeList export speaks `mal:`; IMDb and Trakt
+exports speak `imdb:`. Half the library would be permanently thin, and silently so.
 
 **That is the test, and it generalises:**
 
-> Two candidate domains are one domain when a single `identity_kind` and a single `provider_order`
-> can serve every record either of them would hold. They are two domains when they cannot, however
-> similar their fields, statuses and entry shapes look.
+> Two candidate domains are one domain when a single `provider_order` can answer every identity key
+> either of them would hold. They are two domains when it cannot, however similar their fields,
+> statuses and entry shapes look.
+
+Movies pass that test with two keys and one provider: Wikidata holds `P6127` and `P345` as exact
+claims, so one adapter answers both. Anime and series fail it with one key each.
 
 Field overlap is the weakest signal and the most tempting one. Six identical fields out of twelve
 still leaves five that only make sense for anime — the studio, the Japanese title, what it was

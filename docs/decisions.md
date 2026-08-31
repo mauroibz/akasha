@@ -3863,3 +3863,49 @@ predictions about mistakes to come.
   path body states it as a list. An undeclared or empty target set is a 422 `invalid_import_targets`
   rather than a silent narrowing, because an import that quietly brings in nothing is worse than one
   that says it cannot.
+
+## DEC-113 — A domain enriches on every key its sources supply, not on the one it was written for
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-067 row 3 (enrichment is per-domain), DEC-100 (the movie domain's two
+  Letterboxd shapes), DEC-106 and DEC-112 (the multi-domain import boundary this surfaced it),
+  DEC-093 (a reader tested against one file is tested against one file — the same shape, one layer up).
+- **Context:** `EnrichmentSpec.identity_kind` was a single string. The movie domain declared
+  `letterboxd`, because Letterboxd was the source it was built for. An IMDb export names a film by
+  its `tt` id and carries **no** Letterboxd URI — IMDb does not publish one — so every film imported
+  from IMDb would have had no identifier of the declared kind, would never have been queued, and
+  would have sat in the library for ever with no poster, no genres and no runtime. Nothing would have
+  failed: the backfill's join simply matches no rows. Sprint 052 found it while costing Sprint 053
+  and refused to let it pass as a silent gap.
+- **The alternatives, costed:**
+  - *Change the movie key to `imdb`.* Rejected: it regresses the delivered Letterboxd path, whose
+    films carry only a `boxd.it` URI until an enrichment they would no longer get adds an IMDb id.
+  - *Narrow the acceptance criterion and record it.* Rejected: it ships a visibly broken library —
+    a Movies shelf of grey tiles — in exchange for saving a contract change of about forty lines.
+  - *Have the IMDb reader also write a `letterboxd` identifier.* Rejected outright: it would be a
+    connector inventing an identity its source does not carry, which is the opposite of what an
+    identity is for.
+- **Decision:** `EnrichmentSpec.identity_kinds` is an ordered tuple. The backfill runs one statement
+  per key in declaration order and queues an item **once**, under the first key it actually has;
+  the pair travels in the job payload as it already did, so the handler is unchanged. Movies declare
+  `("letterboxd", "imdb")`; every other domain declares a one-element tuple and changes in no other
+  way. Wikidata's movie adapter accepts either, resolving `P6127` and `P345` as exact claims, so this
+  is one film reachable two ways rather than two lookups.
+- **Why one statement per key rather than `kind IN (…)`:** the query returns a value, and the handler
+  needs to know which kind that value *is*. A single statement cannot say, and guessing would hand a
+  `boxd.it` URI to a lookup expecting a `tt` id.
+- **The obligation this creates, stated because conformance cannot check it:** every provider in a
+  domain's `provider_order` must answer every key it declares. A fallback that answers only the first
+  stops being a fallback for rows that arrived under the second — silently, in the same way this
+  defect was silent. `docs/guides/adding-a-domain.md` says so where a domain is declared.
+- **What it changes about the anime/series merge argument**, which the guide made on this field: the
+  test is no longer "one `identity_kind` per domain" but "one `provider_order` that answers every key
+  the domain declares". Anime and series still fail it — AniList cannot resolve an IMDb id and
+  Wikidata cannot resolve a MyAnimeList one — so the verdict is unchanged and now rests on the thing
+  that was actually load-bearing. Movies pass it with two keys and one provider.
+- **Measured, 2026-08-31, against the live boundary:** an IMDb ratings export of one film and one
+  show committed and enriched in about six seconds — the film to Christopher Nolan, three genres, a
+  172-minute runtime, a description and a poster; the show to its creator, three genres, a synopsis,
+  Netflix, `Ended`, 77 episodes, 6 seasons and a poster. Before this change the film half of that was
+  empty and would have stayed empty.

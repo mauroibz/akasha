@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 28,
-  "project_status": "in_progress",
-  "active_sprint": "053",
-  "active_sprint_file": "docs/sprints/053-imdb-import.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "052",
+  "project_status": "ready",
+  "active_sprint": "054",
+  "active_sprint_file": "docs/sprints/054-trakt-import.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "053",
   "completed_sprints": [
     "001",
     "002",
@@ -58,8 +58,9 @@
     "049",
     "050",
     "051",
-    "052"
+    "052",
+    "053"
   ],
-  "started_at": "2026-08-31T23:40:00-03:00",
-  "updated_at": "2026-08-31T23:20:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-01T00:05:00-03:00"
 }

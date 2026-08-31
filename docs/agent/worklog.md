@@ -2952,3 +2952,57 @@ so 050 adds an adapter, not a declaration.
   routing onto the skip channel this sprint built, and the negative criterion that decides whether
   the seam actually held: no change to `application/imports.py`, `api/imports.py`, `ImportPage.tsx`
   or `TriagePage.tsx`. Read `docs/sprints/053-imdb-import.md`.
+
+## 2026-08-31 — Sprint 053 (complete): the IMDb import
+
+- **Done.** One connector, `imdb`, declaring `("movie", "series")`, over both export shapes — a
+  ratings CSV and a list CSV, told apart by their headers rather than by column position.
+  `Title Type` routes each row through a declared table whose default is skip-and-count.
+  `Runtime (mins)` lands in `runtime` for a film and `episode_minutes` for a show. Ratings map 1:1
+  with no doubling; neither date column becomes a viewing date. Two commits, `60b7a1a` and `3d464e6`.
+- **The sprint's negative criterion held.** The whole connector is
+  `backend/src/book_tracker/domains/movie/imdb.py` plus one line in `REGISTERED_IMPORTERS`.
+  `application/imports.py`, `api/imports.py`, `ImportPage.tsx` and `TriagePage.tsx` are untouched,
+  and so is the entire frontend. Sprint 052's seam held for a connector it was not built for.
+- **The one thing that did not hold was enrichment, and it is now DEC-113.** The movie domain
+  enriched on `letterboxd` alone; an IMDb export carries no Letterboxd URI, so every film from it
+  would have been permanently thin — no poster, no genres, no runtime — with nothing failing.
+  `EnrichmentSpec.identity_kind` becomes `identity_kinds`, ordered; movies declare
+  `("letterboxd", "imdb")`; the backfill runs one statement per key and queues an item once under the
+  first it has. A pre-existing test asserted the defect as intended behaviour and was rewritten.
+- **Verified.** `tests/test_imdb_import.py` 75 passed. `make test` 1090 backend + 194 frontend.
+  `make check` green, `make openapi` no diff. Playwright serial 106 passed + 2 skipped.
+- **Walkthrough gate, on the owner's real exports, live boundary.** Fresh backend per attempt via
+  `scripts/walkthrough.py`; spec at `frontend/e2e/scratchpad/sprint53-walkthrough.spec.ts` with
+  `IMDB_RATINGS` and `IMDB_LIST` in the environment. Passed in 8.2 s. Exercised: the IMDb tab with
+  both target checkboxes; 2 rows, 0 errors; commit; Triage showing the film's `Watchlist`/`Watched`
+  and the show's five words, scores 8 and 10 unmarked; **both rows approved through the UI**, inbox
+  cleared; the list export as a second batch; undo taking it back and leaving the first alone.
+  **This pays Sprint 047's debt (DEC-102)** — a movie has now been previewed, approved and undone
+  through the real screens.
+- **AC9 proved separately, because enrichment is a background job a browser test would race.** A
+  scripted live run committed the real ratings export and polled: enriched in about 6 seconds, the
+  film to Christopher Nolan, three genres, runtime 172, a description and a poster; the show to its
+  creator, three genres, episode_minutes 25, a synopsis, Netflix, `Ended`, 77 episodes, 6 seasons and
+  a poster. Before DEC-113 the film half of that was empty.
+- **Deviations.** (1) The Verification block named `tests/test_imports.py` again; corrected. (2)
+  DEC-093's fifth trap (`shelf_slug` on a punctuation tag) does not apply — this source has no tags
+  and creates no shelves; a malformed `Year` and a truncated row are proved instead. (3) A
+  structurally short row is a visible row error rather than a skip, so file damage is not hidden
+  inside the "not a kind this tracks" count. (4) DEC-113 is a shared-contract change, which the
+  sprint's baseline explicitly required be settled rather than left silent. (5) The guide's
+  anime/series merge argument rested on `identity_kind` being one string; the verdict is unchanged
+  but now rests on `provider_order`, which was the load-bearing half.
+- **Harness lesson worth keeping.** Three walkthrough attempts failed on *state carried between
+  runs*, not on the product: the launcher gives a fresh data dir per **launch**, and I reran the spec
+  three times against one launch. A committed batch replays by fingerprint and approved rows leave an
+  empty inbox, so every symptom looked like a product bug. One clean backend per attempt is the rule;
+  a two-line wrapper that restarts it makes iteration cheap.
+- **Also observed, out of scope.** The show's synopsis came back as Wikidata's one-line description
+  ("serie de televisión animada") rather than TVmaze's real synopsis — the designed fill-empty rule
+  working (DEC-110), but a poor synopsis on a real record; worth a scoped decision. An IMDb list row
+  carries a `Description` this deliberately drops. The intermittent parallel-Playwright
+  `color-contrast` finding on `VirtualLibrary.tsx:100` from Sprint 052 is unchanged.
+- **Next.** Sprint 054 — the Trakt import, the last planned sprint. Read
+  `docs/sprints/054-trakt-import.md`; its baseline was rewritten at this closure with what 053
+  established.

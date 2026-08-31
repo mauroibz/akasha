@@ -115,7 +115,8 @@ Use the controls the application actually exposes when adapting a walkthrough:
 - the Library status filter is a popover whose option names include live facet counts;
 - Library-row status controls are popovers, while Triage-row status controls are native selects
   (DEC-086);
-- the Triage heading reads `Inbox N unsorted`; and
+- the Triage heading reads `Inbox N unsorted` while rows remain, and `Inbox is clear` once they
+  are all approved;
 - Detail remains `/books/:id` for every domain, a deliberate cosmetic coupling (DEC-067 row 8).
 
 `frontend/e2e/scratchpad/anime-walkthrough.spec.ts` is the working reference for the domain chooser,

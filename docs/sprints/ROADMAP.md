@@ -2,7 +2,7 @@
 
 **Plan revision:** 28
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [053 — The IMDb import](053-imdb-import.md)
+**Active sprint:** [054 — The Trakt import](054-trakt-import.md)
 
 ## Shape of the plan
 
@@ -156,7 +156,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | completed |
 | [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | completed |
 | [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | completed |
-| [053](053-imdb-import.md) | The IMDb import | 049, 052 | planned |
+| [053](053-imdb-import.md) | The IMDb import | 049, 052 | completed |
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | planned |
 
 ## Sprint contracts
@@ -957,6 +957,12 @@ IMDb has not published yet must appear as a number on the preview screen, never 
 Its sharpest acceptance criterion is the negative one Sprint 041 established: **no change to
 `application/imports.py`, `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.** If that cannot be
 met, the finding is the deliverable and Sprint 052 was incomplete.
+
+**Delivered, and the negative criterion held**: the connector is one new module plus one line in the
+registry, and no shared file changed. What did not hold was enrichment — the movie domain enriched on
+`letterboxd` alone, so every film from an IMDb export would have stayed permanently thin in silence.
+`EnrichmentSpec.identity_kinds` is a tuple now (DEC-113). The walkthrough ran against the owner's real
+exports and paid Sprint 047's debt (DEC-102) on the way.
 
 ### [Sprint 054 — The Trakt import](054-trakt-import.md)
 

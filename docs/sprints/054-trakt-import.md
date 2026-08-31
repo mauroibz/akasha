@@ -1,6 +1,6 @@
 # Sprint 054 — The Trakt import
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 049, 052, 053
 
 **Roadmap revision:** 28
@@ -25,8 +25,22 @@ show's watched episodes rolled up into the entry-progress count Sprint 040 built
 
 ## Current implementation baseline
 
-To be observed at activation. Expected: a multi-domain connector is a solved problem, and IMDb has
-proved it once.
+Observed at Sprint 053's closure, 2026-08-31: a multi-domain connector **is** a solved problem, and
+IMDb proved it once. That connector is one module plus one line in `REGISTERED_IMPORTERS`, with no
+change to `application/imports.py`, `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`. Read
+`backend/src/book_tracker/domains/movie/imdb.py` as the worked example; it is the nearest shape to
+this one.
+
+Three things it established that this sprint inherits rather than rebuilds:
+
+- **Rows a reader cannot target are an `ImportSnapshot.skipped` tally by reason**, in the source's own
+  word, reaching the preview as a count and never as a row error (DEC-112). Trakt's season and episode
+  ratings map onto it the way IMDb's `Title Type` did.
+- **A row names its own domain** through `NormalizedImportRecord.item_type`, and `match` should pass
+  that row's type — not the connector's first — so a near-match offer is scoped correctly.
+- **A domain enriches on every key its sources supply** (DEC-113). Both target domains resolve
+  `imdb`, and a Trakt archive carries IMDb ids, so nothing further is owed here — but check it rather
+  than assume it, which is what Sprint 053 had to do.
 
 ## Deliverables
 
