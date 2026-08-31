@@ -2,7 +2,7 @@
 
 **Plan revision:** 28
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [052 — One source, many libraries](052-multi-domain-imports.md)
+**Active sprint:** [053 — The IMDb import](053-imdb-import.md)
 
 ## Shape of the plan
 
@@ -155,7 +155,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [049](049-series-domain.md) | Series: the fifth domain, with posters on day one | 048 | completed |
 | [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | completed |
 | [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | completed |
-| [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | ready |
+| [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | completed |
 | [053](053-imdb-import.md) | The IMDb import | 049, 052 | planned |
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | planned |
 
@@ -936,6 +936,12 @@ without which the same file imported as films and then as series silently return
 
 Built and proved against a **test** connector, not against IMDb. A seam proved only by the connector
 it was built for is not proved, which is DEC-093's lesson applied ahead of the failure this time.
+
+**Delivered as planned.** Per-record resolution reached exactly the call sites the plan named and no
+further — Triage and undo needed no change at all, only proof. The two mechanisms DEC-106 left open
+became DEC-112: a reader reports what it cannot target as a tally rather than as discarded records,
+and the chosen target set folds into the fingerprint only when it is a strict subset, which is what
+makes the change migration-free.
 
 ### [Sprint 053 — The IMDb import](053-imdb-import.md)
 

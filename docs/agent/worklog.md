@@ -2890,3 +2890,65 @@ so 050 adds an adapter, not a declaration.
   050, unchanged.
 - Next: Sprint 052 — One source, many libraries. Read `docs/sprints/052-multi-domain-imports.md`.
   Its walkthrough gate should use `scripts/walkthrough.py` rather than hand-rolling a fourth runner.
+
+## 2026-08-31 — Sprint 052 (complete): one source, many libraries
+
+- **Done.** The shared import boundary now holds N domains. `Importer.item_types` is an ordered
+  tuple; `NormalizedImportRecord.item_type` names a row's own domain (`None` = the first declared);
+  `ImportService.domains` replaces `.domain` and three call sites resolve per record — `_validate`,
+  `ImportRepository.commit`/`commit_batch` (now `domains: Mapping[str, Domain]`, reading the type
+  from the stored payload), and the enrichment guard (`any(... .enriches)`). `IMPORTERS_BY_DOMAIN`
+  is derived from declarations rather than written out. The screen renders a checkbox per declared
+  type, named from `/api/item-types`, none at all for a connector with one; the **service** applies
+  the choice and drops unwanted rows before staging. `ImportSnapshot.skipped` is the reader's tally
+  of rows no domain holds. Five commits, `8c05dbe` → `d91aaad`.
+- **Verified.** Focused suites 319 passed (307 before). `make test` 1012 backend + 194 frontend.
+  `make check` green. `make openapi` regenerated — `item_types` plus three `PreviewSummary` fields
+  is the whole diff. Playwright serial 106 passed + 2 skipped in 1 m 43 s, the historical baseline.
+- **Walkthrough gate, and Sprint 051's owed flow-through proof discharged with it.** Ran
+  `cd backend && uv run python ../scripts/walkthrough.py --replay ../scripts/walkthrough_two_domains.py`
+  (backend on an ephemeral port, fresh temp data dir, live provider boundary), then
+  `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 BOOK_TRACKER_E2E_BACKEND=http://127.0.0.1:<port> npx playwright
+  test --project=chromium --workers=1 e2e/scratchpad/sprint52-walkthrough.spec.ts` — passed in 8.1 s.
+  **This is the first Playwright flow to run through the tracked launcher**, which is what Sprint 051
+  left owed. Exercised: `/api/importers` publishing `two_domains → ["movie","series"]`; both
+  checkboxes ticked and named "Movie"/"Series" from the registry; unticking Series giving 2 rows with
+  "2 rows are for libraries you did not choose · 3 TV Episode — not a kind this tracks" and 0 errors;
+  the **same file** previewed again with both ticked giving 4 rows rather than the cached 2 (the
+  fingerprint trap, proved in a browser); one commit reporting "4 entries added; 0 already present";
+  Triage showing `Apply Watchlist to Arrival`, `Apply Watchlist to Sicario`, `Apply Plan to watch to
+  The Wire`, `Apply Watching to Breaking Bad` — each row its own domain's words in one inbox; a
+  status change persisting on a series row; undo leaving items, entries and identifiers all at zero.
+- **Sprint 050's owed live series search, discharged.** `GET /api/search?q=Breaking Bad&type=series`
+  against live Wikidata and TVmaze returned 10 candidates; the top hit carried
+  `{wikidata: Q1079, imdb: tt0903747, tmdb: 1396, tvmaze: 169, thetvdb: 81189}` — both adapters
+  answered and merged on the IMDb id, so their request shape is still what those APIs answer today.
+  DEC-108's carried debt is closed.
+- **Deviations.** (1) The sprint named `tests/test_imports.py`, which does not exist — the suite is
+  `tests/test_generic_imports.py`, and the new seam tests are `tests/test_multi_domain_imports.py`;
+  corrected in the file. (2) The client mirror is `api/imports.ts`, not `api/library.ts`; corrected.
+  (3) `test_goodreads_import.py` compared the whole `summary` for equality and the summary grew three
+  fields, so that one assertion now names all seven — same strength, no behaviour changed. (4)
+  `useItemTypes` gained an `enabled` flag so the Import screen fetches the registry only when a
+  connector can fill more than one library. (5) DEC-112 records the two mechanisms DEC-106 left open.
+  (6) The checkboxes read "Movie"/"Series" — the registry's own labels — not the plan's mock copy.
+- **Two runner findings worth keeping.** The `--replay` seam is the launcher's only in-application
+  hook, so `scripts/walkthrough_two_domains.py` uses it to *register* the fixture connector and
+  returns the live transport unchanged; it imports `TwoDomainImporter` from the test suite so the
+  browser flow and the unit suite exercise one definition. And navigating to `/import?tab=<id>` by
+  URL does not record the source preference, so returning from Triage lands on the remembered
+  connector and discards the batch — click the tab instead. Designed behaviour, not a defect
+  (`ImportPage.tsx` comments it), but it cost a walkthrough iteration.
+- **Also observed, out of scope.** Under six Playwright workers, axe intermittently reports
+  `color-contrast [serious]` on `.text-muted-foreground/80` — one class, used once, at
+  `frontend/src/features/library/VirtualLibrary.tsx:100`. Green every time serially; the failing
+  spec moves between the two that render that caption. Computed statically it is 5.26:1 on the page
+  background and 4.88:1 on a surface, both above the 4.5:1 that text size needs — so this looks like
+  a sample taken mid-fade, surfaced by Sprint 051's parallel projects rather than caused by them.
+  This sprint touches none of that file, class, palette or motion code. Separately:
+  `movie.enrichment.identity_kind` is `letterboxd` while `series` is `imdb`, so an IMDb export will
+  enrich shows and not films — carried into Sprint 053's baseline as a question it must answer.
+- **Next.** Sprint 053 — the IMDb import. Two CSV shapes detected from the header, `Title Type`
+  routing onto the skip channel this sprint built, and the negative criterion that decides whether
+  the seam actually held: no change to `application/imports.py`, `api/imports.py`, `ImportPage.tsx`
+  or `TriagePage.tsx`. Read `docs/sprints/053-imdb-import.md`.

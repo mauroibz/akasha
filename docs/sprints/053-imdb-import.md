@@ -1,6 +1,6 @@
 # Sprint 053 — The IMDb import
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 049, 052
 
 **Roadmap revision:** 28
@@ -25,9 +25,28 @@ use.
 
 ## Current implementation baseline
 
-To be observed at activation. Expected: `Importer.item_types` exists, records carry an `item_type`,
-the target selector ships, and both the movie and series domains resolve an `imdb` identity through
-their providers.
+Sprint 052 delivered the seam; observed at its closure, 2026-08-31:
+
+- `Importer.item_types` is an ordered tuple and `NormalizedImportRecord.item_type` names the row's
+  own domain, `None` meaning the first declared. A type the connector did not declare is refused at
+  the boundary with `invalid_import_record`.
+- The shared service resolves the domain per record at validation, at commit and in the enrichment
+  guard. `IMPORTERS_BY_DOMAIN` is derived from declarations, so registration is one entry in
+  `REGISTERED_IMPORTERS` and nothing else.
+- **The skip channel this sprint's `Title Type` table needs already exists**:
+  `ImportSnapshot.skipped` is a tuple of `ImportSkip(reason, count)`, where `reason` is the source's
+  own word — so `Title Type` maps straight onto it, `"TV Episode"` and all. It reaches the preview
+  summary as `skipped_unsupported` and `skipped_reasons`, never as row errors (DEC-112).
+- The target selector ships and renders from `item_types`; unticked rows are dropped by the service
+  and counted as `skipped_not_requested`. The chosen set folds into the fingerprint on a strict
+  subset, so the same export previewed as films and then as shows is two imports.
+- Both domains resolve an `imdb` identity through their providers.
+
+**One thing this sprint has to answer, found while building 052:** `movie.enrichment.identity_kind`
+is `letterboxd`, while `series` is `imdb`. An IMDb export carries no Letterboxd id, so post-commit
+enrichment will queue the series rows and **not** the films unless something changes — either the
+movie domain learns to enrich on `imdb` (which its Wikidata provider already resolves), or AC9 is
+narrowed with the reason recorded. Decide it explicitly; do not let it pass as a silent gap.
 
 ## Deliverables
 
@@ -111,7 +130,8 @@ The reader is bounded independently on rows and on bytes. The upload cap is on c
 6. Ratings map 1:1; a blank rating is unscored; `0` and `11` are row errors.
 7. Unticking Movies leaves only series rows, and the excluded count is shown.
 8. One bad row costs a row. The five documented traps are each proved with a synthetic fixture.
-9. Post-commit enrichment fills both domains' records and installs posters for both.
+9. Post-commit enrichment fills both domains' records and installs posters for both — see the
+   baseline note on `movie.enrichment.identity_kind`, which must be settled before this can pass.
 10. **No change to `application/imports.py`, `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.**
     If this criterion cannot be met, the finding is the deliverable and Sprint 052 was incomplete.
 

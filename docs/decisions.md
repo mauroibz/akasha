@@ -3820,3 +3820,46 @@ predictions about mistakes to come.
   closure because nothing is left in it. Sprints 052–054's contracts are unchanged in every
   other respect; 052 now additionally depends on 051 so the gates it runs against are the
   optimized ones.
+
+## DEC-112 — What a reader cannot target, and what a chosen target does to the fingerprint
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Implements:** DEC-106 (a connector may target more than one domain). **Cross-references:**
+  DEC-080 (a connector declares its own guidance), DEC-093 (what the connector boundary cost the
+  first time somebody who had not written it tried to use it).
+- **Context:** DEC-106 settled the shape — a connector declares `item_types`, a record carries its
+  own, the service resolves per record, and the screen renders a checkbox per declared type — and
+  left two mechanisms unspecified that Sprint 052 could not build without. Both are contract
+  surface that Sprints 053 and 054 inherit, so both are recorded rather than left in the code.
+- **Decision 1 — a reader reports what it could not target as a tally, not as records.**
+  `ImportSnapshot.skipped` is a tuple of `ImportSkip(reason, count)`, where `reason` is the
+  **source's own word** for the kind ("TV Episode", "Podcast Episode"). A reader never emits a
+  record for a row no registered domain holds. The two alternatives were costed: a `skip_reason`
+  flag on a full `NormalizedImportRecord` keeps per-row detail but parses and holds a record for
+  every discarded row — on the owner's IMDb account that is hundreds of objects nothing will ever
+  read — and silent filtering was refused outright, because a title type IMDb has not published yet
+  must appear as a number on a screen rather than vanish. The tally is bounded by the number of
+  distinct reasons rather than by the size of the export.
+- **Consequence:** the preview summary carries `skipped_not_requested` and `skipped_unsupported` as
+  **separate** counts, and neither is ever folded into `errors`. They are different answers: one is
+  a library you did not ask for, the other is a kind of thing this application does not hold.
+  Somebody who exports their whole account should meet a number, not forty red rows for podcasts
+  they once rated.
+- **Decision 2 — the chosen target set folds into the fingerprint only when it is a strict subset.**
+  Preview is idempotent on `(connector, fingerprint)`, and DEC-106 named the trap: without the
+  targets in it, an export previewed as films and then as shows silently returns the first preview.
+  The composition is `<reader fingerprint>#<types in declaration order>`, and it is applied **only**
+  when the selection is narrower than what the connector declares.
+- **Why that condition, rather than always composing:** every connector that shipped before this
+  sprint declares exactly one domain, so it always selects all of it and its sources fingerprint
+  exactly as they always did. A batch left in `previewed` across the upgrade still resolves, and the
+  change needs no migration. The alternative — always composing — would have orphaned every staged
+  batch in the owner's database for the sake of a uniformity nothing reads.
+- **Also decided, smaller:** the target selection travels on the **request**, not on `ImportSource`.
+  `ImportSource` is what reaches the reader, and the whole point of DEC-106 is that the service
+  applies the selection so no connector can get the filter wrong. A multipart request states it as
+  one comma-separated `targets` field, so an upload and a folder bundle say it the same way; a JSON
+  path body states it as a list. An undeclared or empty target set is a 422 `invalid_import_targets`
+  rather than a silent narrowing, because an import that quietly brings in nothing is worse than one
+  that says it cannot.

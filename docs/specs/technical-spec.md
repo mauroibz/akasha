@@ -303,13 +303,34 @@ Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the
 ### 6.5 Imports
 
 An importer is a domain-owned connector implementing the `Importer` protocol in
-`domain/importers.py`. It declares a permanent `name`, user-facing `label`, target `item_type`, an
-`ImportInputSpec` (`upload`, `path` or `directory`), the exact `identity_kinds` it trusts, and the closed set of
-`error_codes` its reader may raise. Its `read` method normalizes the source into an
-`ImportSnapshot`; `stage` archives the source or prepares local assets after fingerprint replay has
-been ruled out; and `match` applies its source-specific identity and near-match strategy through the
-narrow `ImportMatcher` view. Importers live under `domains/<item_type>/` and are registered in
-`IMPORTERS_BY_DOMAIN`; the shared pipeline never imports or branches on one.
+`domain/importers.py`. It declares a permanent `name`, user-facing `label`, the ordered
+`item_types` it can produce, an `ImportInputSpec` (`upload`, `path` or `directory`), the exact
+`identity_kinds` it trusts, and the closed set of `error_codes` its reader may raise. Its `read`
+method normalizes the source into an `ImportSnapshot`; `stage` archives the source or prepares local
+assets after fingerprint replay has been ruled out; and `match` applies its source-specific identity
+and near-match strategy through the narrow `ImportMatcher` view. Importers live under the package of
+the domain they lead with; `IMPORTERS_BY_DOMAIN` is **derived** from their declarations, indexing a
+connector under every domain it targets, and `IMPORTERS` is keyed by name so one is published once.
+The shared pipeline never imports or branches on one.
+
+**A connector may target more than one domain** (DEC-106), because a television export carries films
+and shows in one file. `NormalizedImportRecord.item_type` is the domain one row targets, `None`
+meaning the connector's first declared type; a record naming a type the connector did not declare is
+refused at the boundary, as an undeclared identity kind already is. The shared service resolves the
+domain **per record** — at validation, at commit, and in the enrichment guard — so nothing above the
+registry branches on which domain it is holding.
+
+**The service applies the target selection, not the reader.** A reader always emits every row it can
+parse; `POST /import/{importer}/preview` carries the chosen subset of the connector's declared types,
+and the service drops the rest before staging and counts what it dropped. The chosen set folds into
+the preview fingerprint whenever it is a strict subset, so the same source imported as one domain and
+then as another is two imports rather than a replay of the first; a connector declaring one domain
+always selects all of it and so fingerprints exactly as it always did.
+
+Rows a reader cannot target at all — a source kind no registered domain holds — are returned as
+`ImportSnapshot.skipped`, a tally of `ImportSkip(reason, count)` keyed on the source's own word for
+the kind. They are counted and reported, never row errors, and never conflated with rows excluded by
+the target selection: the preview summary carries both counts separately.
 
 **A connector guides its own users.** `ImportInputSpec` also carries `guide` (ordered steps, plain
 strings — deliberately not markdown, so the screen needs no renderer and a connector cannot ship
@@ -557,13 +578,17 @@ The product-spec route list is authoritative, with these refinements:
   somebody is waiting for it.
 - `POST /items/{id}/cover` accepts one JPEG, PNG, or WebP multipart upload, applies the shared
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
-- `GET /importers` publishes `{id, label, item_type, input, attachment_max_bytes}` from the importer registry, where
+- `GET /importers` publishes `{id, label, item_types, input, attachment_max_bytes}` from the importer registry, where
   `input` carries the connector's declared `guide`, `empty_state`, `help_url`, `browsable`,
   `incremental`, `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternate`, alongside
   `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
   `POST /import/{importer}/preview` accepts the declared upload field, path field, or — for a
   `directory` input — repeated file parts whose filenames are relative paths inside the chosen
   folder. A connector with an `alternate` accepts either on the same route, chosen by content type.
+  It also accepts an optional `targets` — a comma-separated multipart field or a JSON list — naming
+  which of the connector's `item_types` this import is for; absent means all of them, and a type the
+  connector does not declare is a 422 `invalid_import_targets`. Its `summary` carries
+  `skipped_not_requested`, `skipped_unsupported` and `skipped_reasons` beside the existing counts.
   An oversize bundle is a 413 naming the alternate; a member outside the declared shape is a 422
   that names what to choose instead.
   `POST /import/{importer}/commit` accepts only the durable preview batch ID and ambiguity choices,

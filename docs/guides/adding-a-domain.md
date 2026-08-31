@@ -322,7 +322,10 @@ domain package and implement `Importer` from `domain/importers.py`:
 class SteamImporter:
     name = "steam"                 # permanent route and batch kind
     label = "Steam"                # user-facing tab
-    item_type = DOMAIN.item_type    # the domain every normalized row must satisfy
+    # Every domain this connector can fill, ordered. One entry is the ordinary
+    # case; a source carrying two kinds of thing declares both, and each row
+    # names its own with `NormalizedImportRecord.item_type` (DEC-106).
+    item_types: tuple[str, ...] = (DOMAIN.item_type,)
     input = ImportInputSpec(
         kind="upload",             # or "path" for a configured host mount
         label="Steam export",
@@ -450,11 +453,15 @@ connector:
 # domain/registry.py
 from book_tracker.domains.game.steam import IMPORTER as STEAM_IMPORTER
 
-IMPORTERS_BY_DOMAIN = {
+REGISTERED_IMPORTERS = (
     # ...
-    GAME.item_type: (STEAM_IMPORTER,),
-}
+    STEAM_IMPORTER,
+)
 ```
+
+`IMPORTERS_BY_DOMAIN` is derived from what each connector declares, so a connector is
+reachable from every library it targets and from none it does not; adding one is a single
+tuple entry and nothing else.
 
 That one entry publishes the tab — with your guide, your empty state and your help link — through
 `GET /api/importers`, and serves preview/commit at

@@ -1,6 +1,6 @@
 # Sprint 052 — One source, many libraries
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 049, 051
 **Roadmap revision:** 28
 
@@ -100,8 +100,9 @@ A connector declaring one type renders no checkboxes at all — Goodreads and Ca
 they do today.
 
 `ImporterResponse.item_type: str` becomes `item_types: list[str]`, mirrored in
-`frontend/src/api/library.ts`. This is a breaking change to a published response shape; the OpenAPI
-regeneration and the client test that pins it are the guard.
+`frontend/src/api/imports.ts` (planning named `library.ts`; the importer client is `imports.ts`).
+This is a breaking change to a published response shape; the OpenAPI regeneration and the client
+test that pins it — `frontend/scripts/check-openapi-types.mjs` — are the guard.
 
 ### 4. The fingerprint has to know about targets
 
@@ -165,7 +166,8 @@ connector under **every** domain it declares, and `IMPORTERS` stays keyed by nam
 ## Verification
 
 ```bash
-cd backend && uv run pytest tests/test_imports.py tests/test_domain_conformance.py \
+cd backend && uv run pytest tests/test_generic_imports.py tests/test_multi_domain_imports.py \
+  tests/test_domain_conformance.py \
   tests/test_goodreads_import.py tests/test_calibre_import.py \
   tests/test_myanimelist_import.py tests/test_letterboxd_import.py -q
 cd frontend && npm run test
@@ -206,4 +208,93 @@ untick a target and preview again, commit, approve rows of both types in Triage,
 
 ## Outcome
 
-_Not started._
+**Completed 2026-08-31.** Every acceptance criterion is implemented and verified; no criterion was
+reduced and nothing is owed.
+
+### What was delivered, against the plan
+
+| # | Criterion | How it was proved |
+|---|---|---|
+| 1 | Two domains from one source, both committed | `test_one_source_previews_and_commits_rows_of_both_types`; and in a browser — one commit, `{"movie": 2, "series": 2}` |
+| 2 | Existing connectors behave identically | Their four suites pass with only the one-element tuple changed; one summary-equality assertion widened, see deviations |
+| 3 | Each row validated against its own domain | `test_each_row_is_validated_against_its_own_domain` — `watching` refused on the film row, accepted on the show |
+| 4 | Triage renders a mixed batch per row | Walkthrough: `Apply Watchlist to Arrival`, `Apply Plan to watch to The Wire`, one inbox |
+| 5 | Undo removes both domains, leaves nothing | `test_undo_of_a_mixed_batch_leaves_nothing_behind`; and live — items, entries and identifiers all zero after undo |
+| 6 | Enrichment per enriching domain, scoped | `test_enrichment_is_queued_for_every_domain_the_batch_touched` — 4 jobs, kinds `{letterboxd, imdb}` |
+| 7 | Unticking a target excludes and counts | `test_unticking_a_target_excludes_its_rows_and_says_how_many`; rendered as "2 rows are for libraries you did not choose" |
+| 8 | Same file, different targets, different batch | `test_the_same_source_with_different_targets_is_a_different_import`; and in a browser — 2 rows, then 4 from the same file |
+| 9 | Untargetable rows counted, not errors | `test_rows_the_reader_could_not_target_are_counted_not_failed` — 44 skipped, 0 errors |
+| 10 | `GET /api/importers` publishes `item_types` | `test_the_registry_publishes_every_domain_a_connector_targets`; OpenAPI regenerated, `check-openapi-types.mjs` updated |
+| 11 | No migration | None added; the fingerprint rule is why none is needed |
+
+### Commits
+
+- `8c05dbe [ADD] A connector declares the domains it produces`
+- `fecff78 [ADD] Resolve the target domain per import record`
+- `79ffc97 [ADD] Choose what an import brings in`
+- `2b2fe54 [TEST] Conformance for multi-domain connectors`
+- `d91aaad [TEST] A two-domain walkthrough runner`
+
+### The stop condition was not triggered
+
+Per-record domain resolution reached **exactly** the call sites the plan named and no further:
+`ImportService._validate`, `ImportRepository.commit`/`commit_batch`, and the enrichment guard.
+`application/undo.py` names no domain at all and needed no change — only proof. `TriagePage.tsx`
+needed no change: it already resolved statuses and hotkeys from each row's own `item.type`.
+
+### Verification
+
+- Focused: `tests/test_generic_imports.py tests/test_multi_domain_imports.py
+  tests/test_domain_conformance.py` plus the four connector suites — **319 passed** (307 before this
+  sprint; 12 of the new tests are the two-domain seam).
+- `make test` — **1012 backend + 194 frontend**, one pre-existing Letterboxd zipfile warning.
+- `make check` — lint, typecheck, OpenAPI-type parity and project validation all green.
+- `make openapi` — regenerated; `ImporterResponse.item_types` and the three `PreviewSummary` fields
+  are the whole diff.
+- Playwright, serial — **106 passed, 2 skipped** in 1 m 43 s, the historical baseline exactly.
+  Parallel, one intermittent pre-existing failure; see below.
+- **Walkthrough gate**, against a real backend on a disposable data directory with a live provider
+  boundary: `scripts/walkthrough.py --replay ../scripts/walkthrough_two_domains.py`, then
+  `sprint52-walkthrough.spec.ts`. Passed. It exercised the target checkboxes named from the domain
+  registry, unticking one, the skipped counts, the same file answering 4 rows after answering 2, one
+  commit into two libraries, Triage's per-row vocabularies, a status change on a series row, and
+  undo leaving an empty library.
+
+### Deviations
+
+1. **The sprint's Verification block named `tests/test_imports.py`, which does not exist.** The
+   generic pipeline suite is `tests/test_generic_imports.py`. Corrected above; the sprint's own
+   two-domain tests live in the new `tests/test_multi_domain_imports.py`.
+2. **The client mirror is `frontend/src/api/imports.ts`, not `library.ts`.** Corrected above.
+3. **`test_goodreads_import.py` changed by more than the tuple.** One assertion compared the whole
+   `summary` object for equality, and the summary grew three fields by deliverable 5. It now asserts
+   all seven, including that a single-domain connector skips nothing on either count — the same
+   exhaustive strength, not a weakened test. No Goodreads behaviour changed.
+4. **`useItemTypes` gained an `enabled` flag.** The Import screen needs domain labels only when a
+   connector can fill more than one library, and none of the four that ship today can. Not in the
+   plan; it keeps the screen from fetching the registry on every visit for nothing.
+5. **The two new mechanisms DEC-106 left open are recorded as DEC-112** — the skip channel
+   (`ImportSnapshot.skipped`, chosen by the owner over a per-row flag) and the fingerprint's
+   strict-subset condition, which is what makes this migration-free.
+6. **The domain checkboxes read "Movie" and "Series", not the plan's "Movies"/"TV series".** They
+   are the registry's own labels, the same words the Add page's domain chooser uses. Introducing a
+   second, plural set of domain names for one screen would be the kind of copy drift DEC-080 exists
+   to prevent.
+
+### Also observed, out of scope, recorded for the owner
+
+- **A pre-existing intermittent accessibility failure, surfaced by Sprint 051's parallel Playwright.**
+  Under six workers, axe reports `color-contrast [serious]` on `.text-muted-foreground/80` — one
+  class, used once, at `frontend/src/features/library/VirtualLibrary.tsx:100` (the web-results
+  caption). It passes every time serially, and it moves between the accessibility specs that render
+  that caption, which is the signature of a sample taken mid-fade rather than of a genuine palette
+  defect. Computed statically the composite is 5.26:1 on the page background and 4.88:1 on a
+  surface, both above the 4.5:1 this text size needs. This sprint touches neither that file, that
+  class, the palette nor the motion helpers. Worth a scoped look: either the caption should not fade
+  before axe reads it, or that opacity should go.
+- **Movie enrichment is keyed on `letterboxd`, and an IMDb export carries no Letterboxd id.**
+  `movie.enrichment.identity_kind` is `letterboxd` while `series` is `imdb`. Sprint 053's IMDb rows
+  will therefore enrich shows and not films, through no fault of this seam. Named here so 053 meets
+  it as a known question rather than as a surprise.
+- The `/api/search/resolve` 502-for-a-miss defect and the `_backfillable_items` completeness-field
+  defect, both from Sprint 046 (DEC-100), are still open and still not domain-specific.
