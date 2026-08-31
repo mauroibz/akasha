@@ -31,6 +31,7 @@ dev = [
   "mypy>=1.14,<2",
   "pytest>=8.3,<9",
   "pytest-cov>=6,<7",
+  "pytest-timeout>=2.3,<3",
   "ruff>=0.9,<1",
 ]
 
@@ -38,7 +39,11 @@ dev = [
 packages = ["src/book_tracker"]
 
 [tool.pytest.ini_options]
-addopts = "--strict-markers --cov=book_tracker --cov-report=term-missing"
+# Every test is bounded: a deadlock fails with the test's name instead of
+# looking like slow work (TESTING.md's Sprint 035 triage lesson). 30 s is
+# measured headroom, not a guess — the slowest current test is 11.7 s
+# (test_generic_imports.py's declared-caps refusal); nothing else exceeds 1.5 s.
+addopts = "--strict-markers --cov=book_tracker --cov-report=term-missing --timeout=30"
 testpaths = ["tests"]
 
 [tool.ruff]

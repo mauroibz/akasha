@@ -99,5 +99,9 @@ export default defineConfig({
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test/setup.ts"],
+    // Bounded like the backend: a wedged test fails with its name instead of
+    // looking like slow work. 15 s is measured headroom — the slowest current
+    // test is ~2.4 s (HomePage's provider-search cases).
+    testTimeout: 15_000,
   },
 });
