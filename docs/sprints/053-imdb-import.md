@@ -1,9 +1,9 @@
-# Sprint 052 — The IMDb import
+# Sprint 053 — The IMDb import
 
 **Status:** planned
-**Depends on:** 049, 051
+**Depends on:** 049, 052
 
-**Roadmap revision:** 27
+**Roadmap revision:** 28
 
 ## Objective
 
@@ -15,7 +15,7 @@ use.
 
 - `docs/series-domain-viability.md`, the "IMDb — two CSV shapes, not one" section: the two headers,
   the `Title Type` routing table and the mappings, all measured on the owner's real files.
-- Sprint 051's Outcome — the multi-domain contract as built.
+- Sprint 052's Outcome — the multi-domain contract as built.
 - `docs/guides/adding-a-domain.md`, "Optional step — Add an importer", and in particular its list of
   five ways a reader takes a whole file down with one row.
 - `docs/decisions.md`: DEC-080, DEC-093 (the seven defects the owner's own export did not exercise),
@@ -84,7 +84,7 @@ number on the preview screen, never as a failed import.
 
 A guide in ordered steps naming both exports by where they actually live (Your Ratings → Export; Your
 Watchlist → Export), an empty state, an `https` help link, the closed error vocabulary, and the two
-target checkboxes Sprint 051 renders from `item_types`. No change to `ImportPage.tsx`.
+target checkboxes Sprint 052 renders from `item_types`. No change to `ImportPage.tsx`.
 
 ### 3. Row-level failure, not file-level
 
@@ -113,7 +113,7 @@ The reader is bounded independently on rows and on bytes. The upload cap is on c
 8. One bad row costs a row. The five documented traps are each proved with a synthetic fixture.
 9. Post-commit enrichment fills both domains' records and installs posters for both.
 10. **No change to `application/imports.py`, `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.**
-    If this criterion cannot be met, the finding is the deliverable and Sprint 051 was incomplete.
+    If this criterion cannot be met, the finding is the deliverable and Sprint 052 was incomplete.
 
 ## Required tests (TDD)
 
@@ -143,7 +143,7 @@ movies; this is where that debt is paid.
 
 ## Explicit non-scope
 
-- Trakt. Sprint 053.
+- Trakt. Sprint 054.
 - IMDb's `TV Episode` rows, in any form.
 - Anything from an IMDb list beyond the columns named above — no list name, no list description, no
   ordering imported as a shelf.
@@ -153,7 +153,7 @@ movies; this is where that debt is paid.
 
 1. `[ADD] Read both IMDb export shapes`
 2. `[ADD] Route IMDb rows to movies and series`
-3. `[DOCS] Close sprint 052 and hand off`
+3. `[DOCS] Close sprint 053 and hand off`
 
 ## Risks and decisions to surface
 

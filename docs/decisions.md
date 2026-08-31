@@ -3791,3 +3791,32 @@ predictions about mistakes to come.
   and the next provider with a non-object response follows the same pattern — widen the boundary, add
   a companion, do not weaken the callers. The technique is written up for reuse in the
   seeds-methodology skill's `widening-a-shared-boundary-return-type` reference.
+
+## DEC-111 — The gate-optimization backlog becomes Sprint 051; the import line renumbers to 052–054
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-084 (the verification playbook whose backlog this implements),
+  DEC-104/DEC-106 (the series line it inserts ahead of).
+- **Context:** `docs/agent/TESTING.md` has carried an *Optimization backlog* section since
+  DEC-084 — four registered observations about the gates: Playwright runs the whole suite at one
+  worker because two `library.spec.ts` invariants are load-sensitive; Vitest green output is
+  buried under harness noise (21 `Query data cannot be undefined` warnings on the attachments
+  query, measured 2026-08-31); the realistic-data walkthrough is per-sprint folklore with two
+  hand-rolled runners; and no test anywhere has a timeout, so a deadlock looks like slow work
+  (the Sprint 035 futex stall). The owner directed this backlog to run as a sprint now, before
+  the remaining roadmap, so each of the three import sprints after it pays cheaper gates.
+- **Decision:** Insert the work as **Sprint 051 — The verification gates get faster**, depending
+  on 050. The validator requires the active sprint to follow `completed_sprints` sequentially
+  (`scripts/validate_project.py`), so an unnumbered insertion is impossible and the planned
+  import line renumbers: 051 → 052 (multi-domain imports), 052 → 053 (IMDb), 053 → 054 (Trakt).
+  `FINAL_SPRINT` moves 53 → 54. The renumbering is mechanical: three `git mv`s, Depends-on
+  chains, every ROADMAP reference, and the two historical mentions in the renumbered files
+  updated; append-only records (old worklog entries, prior DEC entries, the dated viability
+  report) keep their original numbers, as they describe the plan on the day it was written.
+- **Consequences:** Plan revision 28. The sprint's acceptance criteria are gate properties, not
+  application behavior — no code under `backend/src/book_tracker/` or `frontend/src/` outside
+  test configuration, mocks and setup. The backlog section is removed from TESTING.md at
+  closure because nothing is left in it. Sprints 052–054's contracts are unchanged in every
+  other respect; 052 now additionally depends on 051 so the gates it runs against are the
+  optimized ones.

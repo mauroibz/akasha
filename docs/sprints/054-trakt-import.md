@@ -1,9 +1,9 @@
-# Sprint 053 — The Trakt import
+# Sprint 054 — The Trakt import
 
 **Status:** planned
-**Depends on:** 049, 051, 052
+**Depends on:** 049, 052, 053
 
-**Roadmap revision:** 27
+**Roadmap revision:** 28
 
 ## Objective
 
@@ -14,7 +14,7 @@ show's watched episodes rolled up into the entry-progress count Sprint 040 built
 
 - `docs/series-domain-viability.md`, "Trakt — an archive of raw API responses": the member table, the
   identity blocks, the roll-up measurement and the list of members that must never be read.
-- Sprints 051 and 052 Outcomes.
+- Sprints 052 and 053 Outcomes.
 - `docs/decisions.md`: DEC-077 and DEC-092 (progress is one number with a floor and no ceiling),
   DEC-093, DEC-106.
 - `backend/src/book_tracker/domains/movie/letterboxd.py` — the existing bounded-ZIP reader. Its
@@ -139,7 +139,7 @@ make test
 Then the walkthrough gate against the owner's real archive in `exports/`: preview, confirm the two
 shows arrive with 76 and 38 episodes watched against their totals, commit, approve in Triage, see the
 progress control render on the series detail page, and undo. Then re-import the IMDb export from
-Sprint 052 and confirm the overlapping titles match rather than duplicate — the two sources describe
+Sprint 053 and confirm the overlapping titles match rather than duplicate — the two sources describe
 the same library and that is the interesting case, not the happy path.
 
 ## Explicit non-scope
@@ -154,7 +154,7 @@ the same library and that is the interesting case, not the happy path.
 
 1. `[ADD] Read a Trakt archive into movie and series records`
 2. `[ADD] Roll watched episodes up into entry progress`
-3. `[DOCS] Close sprint 053 and release`
+3. `[DOCS] Close sprint 054 and release`
 
 ## Risks and decisions to surface
 

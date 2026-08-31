@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "plan_revision": 27,
+  "plan_revision": 28,
   "project_status": "ready",
   "active_sprint": "051",
-  "active_sprint_file": "docs/sprints/051-multi-domain-imports.md",
+  "active_sprint_file": "docs/sprints/051-verification-gate-optimization.md",
   "active_sprint_status": "ready",
   "last_completed_sprint": "050",
   "completed_sprints": [

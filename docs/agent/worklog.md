@@ -2845,3 +2845,21 @@ so 050 adds an adapter, not a declaration.
   (`Importer.item_types`), the shared service resolves the domain per record, the screen renders a
   target checkbox per declared type, and the chosen targets fold into the preview fingerprint. Built
   and proved against a test connector, not IMDb. Read `docs/sprints/051-multi-domain-imports.md`.
+
+## 2026-08-31 — Planning session: the gate-optimization sprint (Sprint 051), plan revision 28
+
+- Done: no runtime code. The owner directed TESTING.md's *Optimization backlog* to run as a sprint
+  before the remaining roadmap. Inserted **Sprint 051 — The verification gates get faster**
+  (file expanded from TEMPLATE.md, status `ready`) and renumbered the import line 051→052,
+  052→053, 053→054 (three `git mv`s plus every reference). Moved `FINAL_SPRINT` 53→54, bumped
+  `plan_revision` to 28, recorded DEC-111, rewrote HANDOFF. Measured the baseline the sprint
+  file carries: Playwright 106 passed + 2 skipped in 49.4 s at one worker; Vitest 190 passed in
+  23.3 s with 21 `Query data cannot be undefined` warnings on `["attachments",3]`; no timeouts
+  configured anywhere; the scrollTo shim already present at `frontend/src/test/setup.ts:30`.
+- Verified: `python scripts/validate_project.py` green; `git diff --check` clean. `make test`
+  not owed — no application code changed (plan revision, per the playbook).
+- Deviations: none beyond the renumbering itself, which DEC-111 records. Append-only records
+  (old worklog entries, prior DEC entries, the dated viability report) keep their original
+  sprint numbers on purpose.
+- Blocked/open: nothing.
+- Next: execute Sprint 051 — read `docs/sprints/051-verification-gate-optimization.md`.

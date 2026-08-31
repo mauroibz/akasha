@@ -1,8 +1,8 @@
-# Sprint 051 — One source, many libraries
+# Sprint 052 — One source, many libraries
 
-**Status:** ready
-**Depends on:** 049
-**Roadmap revision:** 27
+**Status:** planned
+**Depends on:** 049, 051
+**Roadmap revision:** 28
 
 ## Objective
 
@@ -153,7 +153,7 @@ connector under **every** domain it declares, and `IMPORTERS` stays keyed by nam
 
 - A two-domain test connector, registered only in tests, exercising preview, commit, undo, target
   filtering and the undeclared-type refusal. Building the seam against a fixture connector rather
-  than against IMDb is what keeps Sprints 052 and 053 honest about whether the seam holds.
+  than against IMDb is what keeps Sprints 053 and 054 honest about whether the seam holds.
 - Per-record validation, with a status legal in one target domain and illegal in the other.
 - Fingerprint divergence across target sets.
 - Enrichment enqueued per domain, scoped to the batch.
@@ -179,7 +179,7 @@ untick a target and preview again, commit, approve rows of both types in Triage,
 
 ## Explicit non-scope
 
-- **The IMDb and Trakt readers.** Sprints 052 and 053. This sprint's own connector is a test fixture,
+- **The IMDb and Trakt readers.** Sprints 053 and 054. This sprint's own connector is a test fixture,
   on purpose: a seam proved only by the connector it was built for is not proved.
 - Mixed-domain *sources* other than imports — search, add-by-URL and export are unaffected.
 - Any change to how Triage groups or filters rows.
@@ -191,7 +191,7 @@ untick a target and preview again, commit, approve rows of both types in Triage,
 2. `[ADD] Resolve the target domain per import record`
 3. `[ADD] Choose what an import brings in`
 4. `[TEST] Conformance for multi-domain connectors`
-5. `[DOCS] Close sprint 051 and hand off`
+5. `[DOCS] Close sprint 052 and hand off`
 
 ## Risks and decisions to surface
 

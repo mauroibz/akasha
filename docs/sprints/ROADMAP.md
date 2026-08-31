@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 27
+**Plan revision:** 28
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [051 — One source, many libraries](051-multi-domain-imports.md)
+**Active sprint:** [051 — The verification gates get faster](051-verification-gate-optimization.md)
 
 ## Shape of the plan
 
@@ -46,9 +46,10 @@ Post-v1 work branches:
                                                                                       └─ 048 Movie posters  ✓
                                                                                           └─ 049 Series domain on Wikidata
                                                                                               ├─ 050 TVmaze, the second provider
-                                                                                              └─ 051 One source, many libraries
-                                                                                                  └─ 052 The IMDb import
-                                                                                                      └─ 053 The Trakt import
+                                                                                              └─ 051 The verification gates get faster
+                                                                                                  └─ 052 One source, many libraries
+                                                                                                      └─ 053 The IMDb import
+                                                                                                          └─ 054 The Trakt import
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -76,14 +77,16 @@ tuple entry and one migration whose only purpose was removing a constraint that 
 existed. Everything else the line spent went on two seams the owner's export forced, both of which
 earlier decisions had already foreseen and priced (DEC-090, DEC-091, DEC-092, DEC-093).
 
-**Sprints 049–053 are the fifth domain and the last new one planned.** Series were an unnumbered
-epic from Sprint 028 until plan revision 27, described as gated on a product decision about entry
-hierarchy — a decision DEC-077 had already made and Sprint 040 had already built. What was left was
-measurement, and it was done before this line was written: two keyless providers, a poster source
-already allowlisted, and both of the owner's real exports parsed (DEC-104,
-`docs/series-domain-viability.md`). The line's centre is not the domain, which the contract makes
-cheap; it is Sprint 051, where the shared import pipeline learns to hold more than one domain at once
-because a television tracker tracks films too (DEC-106).
+**Sprints 049–054 are the fifth domain and the last new one planned, plus one infrastructure
+sprint.** Series were an unnumbered epic from Sprint 028 until plan revision 27, described as gated
+on a product decision about entry hierarchy — a decision DEC-077 had already made and Sprint 040 had
+already built. What was left was measurement, and it was done before this line was written: two
+keyless providers, a poster source already allowlisted, and both of the owner's real exports parsed
+(DEC-104, `docs/series-domain-viability.md`). The line's centre is not the domain, which the contract
+makes cheap; it is Sprint 052, where the shared import pipeline learns to hold more than one domain
+at once because a television tracker tracks films too (DEC-106). Sprint 051, inserted at plan
+revision 28 (DEC-111), is not series work at all: it implements the four items in TESTING.md's
+optimization backlog so the three import sprints after it run against faster, quieter gates.
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -151,9 +154,10 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [048](048-movie-posters.md) | Movie posters, without a setup step | 047 | completed |
 | [049](049-series-domain.md) | Series: the fifth domain, with posters on day one | 048 | completed |
 | [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | completed |
-| [051](051-multi-domain-imports.md) | One source, many libraries | 049 | ready |
-| [052](052-imdb-import.md) | The IMDb import | 049, 051 | planned |
-| [053](053-trakt-import.md) | The Trakt import | 049, 051, 052 | planned |
+| [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | ready |
+| [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | planned |
+| [053](053-imdb-import.md) | The IMDb import | 049, 052 | planned |
+| [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | planned |
 
 ## Sprint contracts
 
@@ -896,7 +900,24 @@ It ships a credit line. TVmaze's licence asks for one and the owner chose to giv
 TMDB's three days earlier — DEC-105 records why the two are different questions, and defers CC BY-SA's
 share-alike half explicitly so that it is found if sharing is ever built.
 
-### [Sprint 051 — One source, many libraries](051-multi-domain-imports.md)
+### [Sprint 051 — The verification gates get faster](051-verification-gate-optimization.md)
+
+The four items in `docs/agent/TESTING.md`'s *Optimization backlog*, implemented as a sprint so the
+three import sprints after it pay cheaper gates. Owner-directed at plan revision 28 (DEC-111).
+
+The backlog items, verbatim from TESTING.md: split Playwright into a parallel ordinary project and a
+serial heavy-library project (today the whole suite uses one worker because two `library.spec.ts`
+invariants are load-sensitive); remove the known Vitest harness noise (a deliberate
+`window.scrollTo` shim — already present — defined attachment-query fixtures, and properly awaited
+Radix/motion state updates), preserving real console failures; promote the local realistic-data
+flow to a tracked, sanitized launcher that creates a temporary data directory, starts and stops the
+backend, and accepts the library path in one command; and add bounded test timeouts or phase timing
+where a deadlock currently looks like slow work.
+
+No application behavior changes; every acceptance criterion is a gate property. The backlog section
+is removed from TESTING.md at closure because nothing is left in it.
+
+### [Sprint 052 — One source, many libraries](052-multi-domain-imports.md)
 
 The seam both importers force, built before either of them. A television tracker tracks films too:
 IMDb's CSVs and Trakt's archive each carry films and shows in one file, and `Importer.item_type` is a
@@ -916,7 +937,7 @@ without which the same file imported as films and then as series silently return
 Built and proved against a **test** connector, not against IMDb. A seam proved only by the connector
 it was built for is not proved, which is DEC-093's lesson applied ahead of the failure this time.
 
-### [Sprint 052 — The IMDb import](052-imdb-import.md)
+### [Sprint 053 — The IMDb import](053-imdb-import.md)
 
 The owner's real exports, measured at planning time: **two different CSV shapes**, a ratings export
 and a list export (the Watchlist is one), sharing a core of columns but differing in header and in
@@ -929,9 +950,9 @@ IMDb has not published yet must appear as a number on the preview screen, never 
 
 Its sharpest acceptance criterion is the negative one Sprint 041 established: **no change to
 `application/imports.py`, `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.** If that cannot be
-met, the finding is the deliverable and Sprint 051 was incomplete.
+met, the finding is the deliverable and Sprint 052 was incomplete.
 
-### [Sprint 053 — The Trakt import](053-trakt-import.md)
+### [Sprint 054 — The Trakt import](054-trakt-import.md)
 
 A ZIP of 43 verbatim `/sync/*` responses, 26 of them empty in the owner's archive. The interesting
 half is the roll-up: `watched-history.json` is the only member with episode detail, and distinct
@@ -959,7 +980,7 @@ its `action` sentences beside its reader, and the shared screen renders them wit
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
   Twitch OAuth client credentials and token refresh, where every provider so far has needed at most a
   static API key. `steam → games` is the import.
-- **Series — ~~TMDB~~.** **No longer an epic: scheduled as Sprints 049–053** at plan revision 27.
+- **Series — ~~TMDB~~.** **No longer an epic: scheduled as Sprints 049–054** at plan revisions 27–28.
   The product decision this was gated on had already been made — DEC-077 priced entry hierarchy across
   nine shared surfaces, rejected it, and chose a per-domain `progress` field, which Sprint 040 built
   and anime has used since Sprint 041. What remained was a provider question, and the answer is not
