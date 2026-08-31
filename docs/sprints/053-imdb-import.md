@@ -1,6 +1,6 @@
 # Sprint 053 — The IMDb import
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 049, 052
 
 **Roadmap revision:** 28
