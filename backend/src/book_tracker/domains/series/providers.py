@@ -31,7 +31,7 @@ from book_tracker.infrastructure.posters import metahub_poster_url
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
-    bounded_json,
+    bounded_json_object,
 )
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
@@ -270,7 +270,8 @@ def _airing_status(claims: Mapping[str, Any]) -> str | None:
     """`Running` or `Ended`, derived from the presence of an end-time claim.
 
     Wikidata expresses an airing state only as the presence or absence of `P582`;
-    TVmaze replaces this derivation with a real status in Sprint 050.
+    TVmaze (Sprint 050) supplies a real status through the shared merge, which fills
+    this only when the derivation found nothing.
     """
     if not _statements(claims, P_START_TIME):
         return None
@@ -319,11 +320,12 @@ def _http_failure(error: httpx.HTTPStatusError) -> ProviderPayloadError:
 
 
 class WikidataSeriesProvider:
-    """The series domain's one adapter in this sprint (DEC-104). Keyless, CC0.
+    """The series domain's primary adapter (DEC-104). Keyless, CC0.
 
     Registered as `wikidata-series` rather than `wikidata`: the provider catalog is
     keyed by name, and a second adapter answering to `wikidata` would silently replace
-    the movie domain's.
+    the movie domain's. TVmaze (Sprint 050) is the second source, filling what this
+    adapter leaves empty through the shared merge.
     """
 
     name = "wikidata-series"
@@ -349,7 +351,7 @@ class WikidataSeriesProvider:
         """One paced, retrying, bounded read. Every call to Wikidata goes through here."""
         await self._paced.wait()
         try:
-            body = await bounded_json(
+            body = await bounded_json_object(
                 self.client,
                 WIKIDATA_API,
                 params={
@@ -542,18 +544,18 @@ class WikidataSeriesProvider:
     async def fetch(self, source_id: str) -> ItemPayload:
         """A series by `Q` id, or by an exact IMDb or TMDB series claim.
 
-        Only Wikidata is registered, so a link to one of the other catalogues resolves
-        through the claim Wikidata already holds rather than through a scrape of a site
-        we have no adapter for. A TVDB slug or a TVmaze id names no Wikidata claim this
-        sprint measures, so both are refused honestly rather than guessed; Sprint 050's
-        TVmaze adapter is where a TVmaze id becomes resolvable.
+        Only Wikidata and TVmaze are registered. An IMDb, TMDB or TVDB link resolves
+        through the exact `P345`, `P4983` or `P4835` claim rather than through a scrape
+        of a site we have no adapter for. A TVmaze id names no Wikidata claim, so it is
+        refused honestly here — it resolves through the TVmaze adapter, which the
+        recognizer routes a `tvmaze.com` link to.
         """
         value = source_id.strip()
         for prefix in ("tvdb:", "tvmaze:"):
             if value.startswith(prefix):
                 raise ProviderPayloadError(
-                    f"A {prefix[:-1]} identifier names no Wikidata claim yet; "
-                    "it becomes resolvable with Sprint 050's TVmaze adapter",
+                    f"A {prefix[:-1]} identifier names no Wikidata claim; "
+                    "a TVmaze id resolves through the TVmaze adapter",
                     code="record_not_found",
                 )
         for kind, (prop, pattern) in IDENTITY_CLAIMS.items():

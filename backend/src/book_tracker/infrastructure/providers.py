@@ -84,7 +84,7 @@ async def bounded_json(
     attempts: int = PROVIDER_ATTEMPTS,
     method: str = "GET",
     json_body: Mapping[str, Any] | None = None,
-) -> Mapping[str, Any]:
+) -> Any:
     """Fetch and decode a bounded JSON body, retrying a provider that is unwell.
 
     Only transport failures and `RETRYABLE_STATUSES` are retried. A 404 is an answer,
@@ -99,6 +99,11 @@ async def bounded_json(
     request loop and quietly losing the retry policy, the byte bound and the streaming
     read that are the whole reason this function exists. Nothing here branches on which
     provider is calling — the boundary gained a verb, not a special case.
+
+    The return is any decoded JSON, not only an object: TVmaze's search answers a JSON
+    **array**, the first list-shaped response this boundary has met. The malformed-JSON
+    and byte-bound guards are unchanged; the shape of a valid answer is the caller's to
+    judge, exactly as the verb is.
     """
     for attempt in range(attempts):
         try:
@@ -122,6 +127,39 @@ async def bounded_json(
     raise AssertionError("unreachable")  # pragma: no cover
 
 
+async def bounded_json_object(
+    client: httpx.AsyncClient,
+    url: str,
+    *,
+    params: Mapping[str, str | int],
+    headers: Mapping[str, str] | None = None,
+    timeout: float | None = None,
+    attempts: int = PROVIDER_ATTEMPTS,
+    method: str = "GET",
+    json_body: Mapping[str, Any] | None = None,
+) -> Mapping[str, Any]:
+    """`bounded_json` for the common case: the answer must be a JSON object.
+
+    Every provider before TVmaze answered an object, and most still do — this keeps
+    the non-object guard those callers always had, rather than dropping it silently
+    when the boundary widened for a list-shaped search. A provider that answers a
+    list or a scalar here is malformed, exactly as it was before.
+    """
+    decoded = await bounded_json(
+        client,
+        url,
+        params=params,
+        headers=headers,
+        timeout=timeout,
+        attempts=attempts,
+        method=method,
+        json_body=json_body,
+    )
+    if not isinstance(decoded, Mapping):
+        raise ProviderPayloadError("Provider returned a non-object payload")
+    return decoded
+
+
 async def _read_json(
     client: httpx.AsyncClient,
     url: str,
@@ -131,7 +169,7 @@ async def _read_json(
     timeout: float | None = None,
     method: str = "GET",
     json_body: Mapping[str, Any] | None = None,
-) -> Mapping[str, Any]:
+) -> Any:
     extra: dict[str, Any] = {} if timeout is None else {"timeout": timeout}
     if json_body is not None:
         extra["json"] = json_body
@@ -149,8 +187,6 @@ async def _read_json(
         decoded = json.loads(body)
     except (UnicodeDecodeError, json.JSONDecodeError) as error:
         raise ProviderPayloadError("Provider returned malformed JSON") from error
-    if not isinstance(decoded, dict):
-        raise ProviderPayloadError("Provider returned a non-object payload")
     return decoded
 
 

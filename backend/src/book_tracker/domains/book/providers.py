@@ -21,7 +21,7 @@ from book_tracker.infrastructure.providers import (
     NO_RETRY,
     PROVIDER_ATTEMPTS,
     ProviderPayloadError,
-    bounded_json,
+    bounded_json_object,
     parse_year,
 )
 
@@ -132,7 +132,7 @@ class OpenLibraryProvider:
         attempts: int = PROVIDER_ATTEMPTS,
         **params: str | int,
     ) -> Mapping[str, Any]:
-        return await bounded_json(
+        return await bounded_json_object(
             self.client,
             url,
             params=params,
@@ -529,7 +529,7 @@ class GoogleBooksProvider:
     ) -> Mapping[str, Any]:
         if not self.enabled:
             raise RuntimeError("Google Books is disabled")
-        return await bounded_json(
+        return await bounded_json_object(
             self.client, url, params={**params, "key": self.api_key}, attempts=attempts
         )
 

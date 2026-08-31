@@ -41,7 +41,7 @@ from book_tracker.domains.movie.posters import TmdbPosters, poster_for
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
-    bounded_json,
+    bounded_json_object,
 )
 
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
@@ -332,7 +332,7 @@ class WikidataMovieProvider:
         """One paced, retrying, bounded read. Every call to Wikidata goes through here."""
         await self._paced.wait()
         try:
-            body = await bounded_json(
+            body = await bounded_json_object(
                 self.client,
                 WIKIDATA_API,
                 params={

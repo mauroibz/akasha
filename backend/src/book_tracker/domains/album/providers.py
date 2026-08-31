@@ -33,7 +33,7 @@ from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRe
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
-    bounded_json,
+    bounded_json_object,
     parse_year,
 )
 
@@ -144,7 +144,7 @@ class MusicBrainzProvider:
                 if waiting > 0:
                     await self._sleep(waiting)
             self._last_request = time.monotonic()
-        return await bounded_json(
+        return await bounded_json_object(
             self.client,
             f"{MUSICBRAINZ_BASE}{path}",
             params={**params, "fmt": "json"},

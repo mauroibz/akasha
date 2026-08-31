@@ -33,7 +33,7 @@ from collections.abc import Mapping
 import httpx
 
 from book_tracker.infrastructure.posters import METAHUB_POSTER, metahub_poster_url
-from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS, bounded_json
+from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS, bounded_json_object
 
 __all__ = ["METAHUB_POSTER", "TmdbPosters", "metahub_poster_url", "poster_for"]
 #: `medium` measured 500x750. `small` is 300x450 and would upscale to the 600 the cover
@@ -73,7 +73,7 @@ class TmdbPosters:
         if not self.enabled or not _TMDB_ID.fullmatch(value):
             return None
         try:
-            body = await bounded_json(
+            body = await bounded_json_object(
                 self.client,
                 f"{TMDB_API}/movie/{value}",
                 params={},

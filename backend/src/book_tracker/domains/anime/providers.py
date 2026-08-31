@@ -34,7 +34,7 @@ from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRe
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
-    bounded_json,
+    bounded_json_object,
     parse_year,
 )
 
@@ -232,7 +232,7 @@ class AniListProvider:
         """
         await self._paced.wait()
         try:
-            body = await bounded_json(
+            body = await bounded_json_object(
                 self.client,
                 ANILIST_ENDPOINT,
                 params={},
@@ -381,7 +381,7 @@ class KitsuProvider:
     async def _json(self, path: str, params: Mapping[str, str | int]) -> Mapping[str, Any]:
         await self._paced.wait()
         try:
-            return await bounded_json(
+            return await bounded_json_object(
                 self.client,
                 f"{KITSU_BASE}{path}",
                 params=params,
