@@ -114,7 +114,7 @@ def test_enrichment_is_keyed_on_imdb_and_excludes_measured_gaps() -> None:
     spec = DOMAIN.enrichment
     assert spec is not None
     assert spec.identity_kind == "imdb"
-    assert spec.provider_order == ("wikidata-series",)
+    assert spec.provider_order == ("wikidata-series", "tvmaze")
     # Measured 2026-08-31: `seasons` absent on 2/13, `cast` on 4/13 (every animated
     # series). Naming either re-queues those rows on every backfill for ever.
     assert "seasons" not in spec.completeness_fields
@@ -136,11 +136,17 @@ def test_no_cover_chooser() -> None:
         ("https://www.themoviedb.org/tv/1399-game-of-thrones", "tmdb:1399"),
         ("https://www.themoviedb.org/tv/1399", "tmdb:1399"),
         ("https://thetvdb.com/series/game-of-thrones", "tvdb:game-of-thrones"),
-        ("https://www.tvmaze.com/shows/82/game-of-thrones", "tvmaze:82"),
     ],
 )
 def test_series_urls_route_to_the_wikidata_adapter(url: str, value: str) -> None:
     assert recognize_series_url(url) == UrlMatch("wikidata-series", "fetch", value)
+
+
+def test_a_tvmaze_url_routes_to_the_tvmaze_adapter() -> None:
+    """Sprint 050: a TVmaze id resolves through the TVmaze adapter, not Wikidata."""
+    assert recognize_series_url("https://www.tvmaze.com/shows/82/game-of-thrones") == UrlMatch(
+        "tvmaze", "fetch", "82"
+    )
 
 
 @pytest.mark.parametrize(

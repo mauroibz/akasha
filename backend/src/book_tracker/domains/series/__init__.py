@@ -11,10 +11,12 @@ Two names here are decisions, not omissions:
   and `P57` (director) was present on a minority of measured entities. A creator is a
   person and inverts, so `creator_sort` is left unset and the DEC-051 heuristic runs,
   exactly as for movies.
-- **`synopsis` holds Wikidata's one-line identification sentence in this sprint** —
-  what movies call `description`. It is named for its purpose because Sprint 050 fills
-  it with a real synopsis from TVmaze, and renaming a published field later is worse
-  than naming it for its purpose now.
+- **`synopsis` is named for its purpose.** The Wikidata adapter fills it with the
+  one-line identification sentence — what movies call `description` — and the TVmaze
+  adapter (Sprint 050) fills it with a real synopsis through the shared merge, which
+  never overwrites the one already there. It is called `synopsis` rather than
+  `description` because the real one is the point, and renaming a published field
+  later is worse than naming it for its purpose from the start.
 """
 
 import re
@@ -101,7 +103,7 @@ SERIES_IDENTITY = IdentityStrategy(imdb_identity, ("wikidata-series", "tvmaze"))
 # the only identity both exports carry (docs/series-domain-viability.md).
 SERIES_ENRICHMENT = EnrichmentSpec(
     identity_kind="imdb",
-    provider_order=("wikidata-series",),
+    provider_order=("wikidata-series", "tvmaze"),
     # `creators`, `genres` and the description were present on 13/13 measured entities.
     # `seasons` (absent 2/13) and `cast` (absent 4/13, every animated series) are
     # deliberately absent: naming a legitimately empty field re-queues its row on
@@ -132,12 +134,13 @@ TVMAZE_PREFIX = "tvmaze:"
 
 
 def recognize_series_url(value: str) -> UrlMatch | None:
-    """A Wikidata, IMDb, TMDB, TVDB or TVmaze series URL, spent on the Wikidata adapter.
+    """A Wikidata, IMDb, TMDB, TVDB or TVmaze series URL, spent on the right adapter.
 
-    Only Wikidata is a registered provider in this sprint. An IMDb, TMDB or TVDB link
-    resolves through the exact `P345`, `P4983` or `P4835` claim instead, which is
-    identity resolution against a source we do have rather than a scrape of one we do
-    not. TMDB's `/movie/` path is a film and stays the movie domain's.
+    Only Wikidata is registered in Sprint 049; Sprint 050 adds TVmaze. An IMDb, TMDB
+    or TVDB link resolves through the exact `P345`, `P4983` or `P4835` claim instead,
+    which is identity resolution against a source we do have rather than a scrape of
+    one we do not. A TVmaze link resolves through the TVmaze adapter. TMDB's `/movie/`
+    path is a film and stays the movie domain's.
 
     Parsed through `split_url` rather than `urlsplit`, which raises on a malformed
     authority: `resolve_input` asks every registered domain in turn, so a recognizer
@@ -168,7 +171,8 @@ def recognize_series_url(value: str) -> UrlMatch | None:
     if host in _TVMAZE_HOSTS:
         match = _TVMAZE_SHOW.fullmatch(parsed.path)
         if match:
-            return UrlMatch("wikidata-series", "fetch", f"{TVMAZE_PREFIX}{match.group(1)}")
+            # A TVmaze id resolves through the TVmaze adapter, registered in Sprint 050.
+            return UrlMatch("tvmaze", "fetch", match.group(1))
         return None
     return None
 

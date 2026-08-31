@@ -41,6 +41,8 @@ PROVIDER_LABELS = {
     "anilist": "AniList",
     "kitsu": "Kitsu",
     "wikidata": "Wikidata",
+    "wikidata-series": "Wikidata",
+    "tvmaze": "TVmaze",
 }
 
 
