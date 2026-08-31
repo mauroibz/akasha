@@ -20,6 +20,15 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined;
 }
 /**
+ * jsdom *defines* `window.scrollTo` but makes it throw `Not implemented`, so
+ * unlike the shims above this cannot be guarded on absence — it has to replace
+ * the throwing stub outright. @tanstack/react-virtual calls it on every mount
+ * of a virtualized list, and each call printed a full stack trace to stderr:
+ * harmless, but it buried real output under pages of noise. Scrolling is not
+ * what these tests assert; the Playwright suite exercises the real thing.
+ */
+window.scrollTo = () => undefined;
+/**
  * jsdom has no `ResizeObserver` at all, and cmdk constructs one as it mounts, so
  * the shelf picker's list throws before it can render. Nothing here measures
  * anything — every layout assertion lives in the Playwright suite, which runs in a

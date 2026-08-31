@@ -800,7 +800,11 @@ async function openConfirmDialog(user: ReturnType<typeof userEvent.setup>) {
   return screen.findByRole("dialog");
 }
 
-const settle = (ms = 1400) => new Promise((r) => setTimeout(r, ms));
+// The debounce window runs inside act: a raw setTimeout promise lets everything
+// React does while it elapses — the debounce firing, the provider search
+// landing, result rows mounting, Radix positioning their selects — happen
+// outside act, which is where the suite's act(...) warnings came from.
+const settle = (ms = 1400) => act(() => new Promise((r) => setTimeout(r, ms)));
 
 test("a library hit reaches no provider, however long the query gets", async () => {
   const bar = stubBar({ libraryHasRows: true });
