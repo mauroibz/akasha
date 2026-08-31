@@ -52,3 +52,11 @@ frontend/e2e/scratchpad/
 # commit picked it up through `git add -A`, which is why the pattern is here
 # rather than relying on anyone remembering.
 letterboxd-*.zip
+
+# Where the owner now drops every private source export before an importer
+# walkthrough: Letterboxd, MyAnimeList, IMDb, Trakt, Spotify. Every one of them
+# carries account ids, usernames, email addresses and personal ratings. The
+# directory is ignored wholesale rather than pattern by pattern, because IMDb
+# names its CSVs after a list UUID and no pattern would have caught them. Test
+# fixtures stay trimmed and anonymised under backend/tests/fixtures/imports/.
+exports/
