@@ -1,6 +1,6 @@
 # Sprint 052 — One source, many libraries
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 049, 051
 **Roadmap revision:** 28
 

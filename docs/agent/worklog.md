@@ -2863,3 +2863,30 @@ so 050 adds an adapter, not a declaration.
   sprint numbers on purpose.
 - Blocked/open: nothing.
 - Next: execute Sprint 051 — read `docs/sprints/051-verification-gate-optimization.md`.
+
+## 2026-08-31 — Sprint 051 (complete): the verification gates get faster
+
+- Done: implemented all four TESTING.md optimization-backlog items. (1) Playwright split into a
+  parallel `chromium` project and a serial `heavy-library` project holding the two load-sensitive
+  10,000-entry invariants (`library.spec.ts:75`, `:125`); 49.4 s → 38.2 s, the modest gain recorded
+  as boot-dominated. (2) New shared `frontend/src/test/mockApi.ts` with defined-by-default answers;
+  all 24 DetailPage mocks migrated; 21 `Query data cannot be undefined` warnings → 0. The mechanism
+  was mocks answering the attachments query with the *entry* JSON, not `fetch` returning undefined.
+  (3) `scripts/walkthrough.py` launcher: fresh temp data dir, ephemeral port, readiness wait,
+  clean stop, `--replay <module>` seam inside the lifespan. (4) `pytest-timeout` 30 s backend,
+  Vitest `testTimeout` 15 s, Playwright `timeout` 60 s stated; backend and frontend bounds proven
+  with throwaway sleeping tests (30.06 s, 15.01 s).
+- Verified: `npm run test:e2e` 106 passed + 2 skipped in 39.5 s; `npm test` 190 passed, 0 warnings;
+  `uv run pytest -q` 989 passed; `make check` green; `make test` 989 + 190; `make openapi` no diff.
+  The mockApi guard (un-routed endpoint rejects loudly) and both timeout bounds proven with
+  throwaway tests, run and removed.
+- Deviations: (1) AC3's flow-through run — one Playwright flow through the launcher — is NOT done;
+  the owner stopped further server launches after the harness foreground-timeout loop. The launcher
+  is proven to boot and serve in live and replay modes; the flow run is owed and carried into the
+  handoff. (2) The Playwright speedup is 23%, not a transformation. (3) The e2e `ECONNREFUSED`
+  proxy noise (dev server proxies `/api` to a non-running backend) observed and left, not one of
+  the four items.
+- Blocked/open: the flow-through proof (above). One live series search is still owed from Sprint
+  050, unchanged.
+- Next: Sprint 052 — One source, many libraries. Read `docs/sprints/052-multi-domain-imports.md`.
+  Its walkthrough gate should use `scripts/walkthrough.py` rather than hand-rolling a fourth runner.

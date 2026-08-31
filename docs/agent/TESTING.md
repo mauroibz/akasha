@@ -45,19 +45,27 @@ not “text only.” Classify by effect, not extension.
 
 ## Time and environment triage
 
-Measured on this workstation at Sprint 035 closure:
+Measured on this workstation at Sprint 051 closure (the Sprint 035 baselines they replace were:
+`make check` 8 s; backend 559 tests 60 s; Vitest 179 tests 25 s; `make test` 85 s; full Playwright at
+one worker 1 min 40 s):
 
 | Gate | Normal duration |
 |---|---:|
-| `make check` | about 8 seconds |
-| backend pytest, 559 tests | about 60 seconds |
-| frontend Vitest, 179 tests | about 25 seconds |
+| `make check` | about 10 seconds |
+| backend pytest, 989 tests | about 62 seconds |
+| frontend Vitest, 190 tests | about 23 seconds |
 | `make test` combined | about 85 seconds |
-| full Playwright, one worker | about 1 minute 40 seconds |
+| full Playwright, parallel ordinary + serial heavy-library | about 39 seconds |
 | Sprint 035 realistic-data walkthrough | about 13 seconds after services are ready |
 
-These are diagnostic baselines, not performance acceptance criteria. If a normally chatty command
-produces no output through twice the expected phase duration:
+Playwright was 49.4 s at one worker when Sprint 051 measured it; the parallel split bought the
+remainder over boot (two web servers, one a full production build, dominate the gate).
+
+These are diagnostic baselines, not performance acceptance criteria. Every test is bounded, so a
+deadlock no longer looks like slow work: the bound fires and names the test — backend pytest at 30 s
+(`--timeout=30` in `backend/pyproject.toml`), frontend Vitest at 15 s (`testTimeout` in
+`frontend/vite.config.ts`), Playwright at 60 s (`timeout` in `frontend/playwright.config.ts`). If a
+normally chatty command still produces no output through twice the expected phase duration:
 
 1. inspect the process and identify the exact test or phase;
 2. reproduce that unit once, with verbose naming and a bounded timeout;
@@ -77,6 +85,13 @@ failure that reproduces outside the sandbox.
 
 Before writing a walkthrough, search the active sprint, `frontend/e2e/`,
 `frontend/e2e/scratchpad/`, the last worklog entry and the handoff. Adapt the nearest existing flow.
+
+`scripts/walkthrough.py` is the tracked launcher: one command creates a fresh temporary data
+directory, starts the backend on an ephemeral port, waits for readiness, and stops it cleanly.
+`--replay <module>` installs a module's `walkthrough_transport(live)` seam (the pattern
+`scripts/walkthrough_series_050.py` defines) so provider responses replay from fixtures while the
+rest of the boundary stays live; `--keep` preserves the data dir for inspection. A flow runs against
+the base URL the launcher prints.
 
 - Keep owner-specific paths and destructive data targets in environment variables.
 - Use a clean temporary application data directory; realistic source data is input, never the live
@@ -119,16 +134,3 @@ walkthrough does not count as having exercised the flow.
 - Poll a long-running command at sensible phase boundaries. Silence alone is not evidence of a
   hang, but silence beyond the baseline requires diagnosis.
 - Never weaken a test to shorten a gate. Optimize scheduling, isolation and signal quality instead.
-
-## Optimization backlog—not implemented yet
-
-These observations are registered so a future sprint can cost and implement them deliberately:
-
-1. Split Playwright into a parallel ordinary project and a serial heavy-library project. Today the
-   whole suite uses one worker because two `library.spec.ts` invariants are load-sensitive.
-2. Remove known Vitest harness noise: provide a deliberate `window.scrollTo` test shim, return
-   defined attachment-query fixtures, and await Radix/motion state updates correctly. Preserve real
-   console failures while making green output readable.
-3. Promote the local realistic-data flow to a tracked, sanitized launcher that creates a temporary
-   data directory, starts and stops the backend, and accepts the library path in one command.
-4. Add bounded test timeouts or phase timing where a deadlock currently looks like slow work.

@@ -2,7 +2,7 @@
 
 **Plan revision:** 28
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [051 — The verification gates get faster](051-verification-gate-optimization.md)
+**Active sprint:** [052 — One source, many libraries](052-multi-domain-imports.md)
 
 ## Shape of the plan
 
@@ -154,8 +154,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [048](048-movie-posters.md) | Movie posters, without a setup step | 047 | completed |
 | [049](049-series-domain.md) | Series: the fifth domain, with posters on day one | 048 | completed |
 | [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | completed |
-| [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | ready |
-| [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | planned |
+| [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | completed |
+| [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | ready |
 | [053](053-imdb-import.md) | The IMDb import | 049, 052 | planned |
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | planned |
 

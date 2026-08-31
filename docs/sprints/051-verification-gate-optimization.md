@@ -1,6 +1,6 @@
 # Sprint 051 — The verification gates get faster
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 050
 **Roadmap revision:** 28
 
@@ -205,4 +205,68 @@ make test
 
 ## Outcome
 
-_Not started._
+Delivered 2026-08-31. All four backlog items implemented; the backlog section is removed from
+TESTING.md.
+
+**1. Playwright split (commit `326cdb0`).** `frontend/playwright.config.ts` now runs three projects:
+`chromium` (ordinary specs, `fullyParallel: true`), `heavy-library` (the two load-sensitive
+10,000-entry DOM-budget invariants at `library.spec.ts:75` and `:125`, selected by a title grep with
+the reason stated, `workers: 1`), and the unchanged `production-bundle`. Every spec stubs its own
+API per test via `page.route`, so no worker shares state — the baseline already passed with no
+backend running. Measured: **49.4 s → 38.2 s** (−23%) for 106 passed + 2 skipped. The gain is
+modest because the gate is boot-dominated (two web servers, one a full production build), which the
+sprint's risk note foresaw; the split's real value is that the next load-sensitive test has a named
+home instead of silently re-serializing the suite.
+
+**2. Vitest noise (commits `d4b98dd`, `8f35fa6`).** New shared `frontend/src/test/mockApi.ts`: a
+fetch mock that answers every endpoint the app queries with a *defined* value in three layers — the
+test's router, specific defaults (`/api/shelves` → `[]`, `/api/item-types` → `[]`, `…/attachments`
+→ `{ attachments: [] }`), then an optional `fallback` payload. All 24 `DetailPage.test.tsx` mocks
+migrated onto it. The mechanism was not mocks returning `undefined` from `fetch` — it was mocks
+answering the attachments query with the *entry* JSON, so `body.attachments` was `undefined` and
+React Query warned. Result: **21 `Query data cannot be undefined` warnings → 0**; no `act(...)`
+warnings existed (that half of the item was already clean, as was the `window.scrollTo` shim at
+`src/test/setup.ts:30`). Guard proven, not blanket suppression: an un-routed endpoint rejects loudly
+(`mockApi: no route answered …`), demonstrated with a throwaway probe test.
+
+**3. Walkthrough launcher (commit `c7e3716`).** `scripts/walkthrough.py`: one command creates a
+fresh temporary data dir, starts the backend on an ephemeral port, waits for readiness, stops
+cleanly on SIGINT/SIGTERM, and cleans up (`--keep` preserves). `--replay <module>` installs a
+module's `walkthrough_transport(live)` seam inside the lifespan (`lifespan="off"` on uvicorn, the
+Sprint 050 trap) so every provider and the enrichment cover client replay through it. Proven: boots
+in live mode (served all five domains from a fresh DB: `/api/item-types`, `/api/entries`,
+`/api/importers` all 200) and in replay mode with `walkthrough_series_050.py` (readiness line
+printed, seam installed). **Not proven: a Playwright flow run through it** — the owner stopped
+further launches during the session, so the flow-through run is owed. The two existing series
+runners are left as-is; the launcher generalizes their machinery.
+
+**4. Bounded timeouts (commit `68b661f`).** Backend: `pytest-timeout` added, `--timeout=30` in
+`backend/pyproject.toml` — measured headroom, the slowest current test is 11.7 s
+(`test_generic_imports.py`'s declared-caps refusal). Frontend: `testTimeout: 15_000` in
+`frontend/vite.config.ts` (slowest current ~2.4 s). Playwright: `timeout: 60_000` stated in the
+config rather than the unstated default. Both backend and frontend bounds proven with a throwaway
+sleeping test: the backend probe failed at 30.06 s, the frontend at 15.01 s, each naming the test.
+
+**Tests run.** Focused: `npx playwright test --list` (108 tests, split verified — 2 heavy in the
+serial project, 0 in chromium). Exhaustive gate: `npm run test:e2e` 106 passed + 2 skipped in 39.5 s;
+`npm test` 190 passed, 0 warnings; `uv run pytest -q` 989 passed; `make check` green (lint,
+typecheck, format, OpenAPI-type parity, project validation); `make test` 989 backend + 190 frontend;
+`make openapi` no diff. The timeout proofs and the mockApi guard proof used throwaway tests, run and
+removed.
+
+**Deviations.**
+
+- AC3 asked for one existing walkthrough flow run green through the launcher. The owner stopped
+  further server launches during the session (the harness foreground-timeout loop), so the launcher
+  is proven to boot and serve in both modes but the flow-through run is **not** done. Recorded as
+  owed proof in the handoff; the next walkthrough gate (Sprint 052's) is where it is discharged.
+- The Playwright speedup is 23%, not a transformation — the gate is boot-dominated. Recorded
+  honestly rather than claimed as more.
+- The e2e `ECONNREFUSED` proxy noise (the dev server proxies `/api` to a backend that is not
+  running) was observed during the baseline and left as-is; it is not one of the four backlog items.
+  Recorded in the handoff.
+
+**Impact on future sprints.** Sprints 052–054 now run against the faster, quieter, bounded gates.
+Sprint 052's walkthrough gate should use `scripts/walkthrough.py` rather than hand-rolling a fourth
+runner, and its owed live-search proof is unchanged. No application code changed; no migration; no
+API contract changed.

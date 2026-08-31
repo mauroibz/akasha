@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 28,
-  "project_status": "in_progress",
-  "active_sprint": "051",
-  "active_sprint_file": "docs/sprints/051-verification-gate-optimization.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "050",
+  "project_status": "ready",
+  "active_sprint": "052",
+  "active_sprint_file": "docs/sprints/052-multi-domain-imports.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "051",
   "completed_sprints": [
     "001",
     "002",
@@ -56,8 +56,9 @@
     "047",
     "048",
     "049",
-    "050"
+    "050",
+    "051"
   ],
-  "started_at": "2026-08-31T18:45:00-03:00",
-  "updated_at": "2026-08-31T18:05:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-08-31T19:10:00-03:00"
 }
