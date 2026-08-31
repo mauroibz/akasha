@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
+import { mockApi } from "@/test/mockApi";
 import { findToast } from "@/test/toast";
 import { DetailPage } from "./DetailPage";
 
@@ -147,9 +148,7 @@ describe("DetailPage", () => {
       ],
       reason: null,
     };
-    const request = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input, init) => {
+    const request = mockApi(async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
         if (url === "/api/item-types")
@@ -163,8 +162,7 @@ describe("DetailPage", () => {
               cover_url: "/api/items/3/cover",
             }),
           );
-        return new Response(JSON.stringify(entry));
-      });
+      }, { fallback: entry });
     renderPage();
     expect(
       await screen.findByRole("heading", { name: "Rayuela" }),
@@ -203,7 +201,7 @@ describe("DetailPage", () => {
   });
 
   it("explains an empty chooser instead of showing an empty grid", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
@@ -212,8 +210,7 @@ describe("DetailPage", () => {
         return new Response(
           JSON.stringify({ candidates: [], reason: "no_provider_reference" }),
         );
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     expect(
       await screen.findByRole("heading", { name: "Rayuela" }),
@@ -227,20 +224,21 @@ describe("DetailPage", () => {
   });
 
   it("renders cached detail and persists opinion and metadata edits", async () => {
-    const request = vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input, init) => {
+    const request = mockApi(
+      async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves") return new Response("[]");
         if (url === "/api/item-types")
           return new Response(JSON.stringify(itemTypes));
-        if (!init) return new Response(JSON.stringify(entry));
+        if (!init) return undefined;
         if (url.includes("/entries/"))
           return new Response(JSON.stringify({ ...entry, notes: "Loved it" }));
         return new Response(
           JSON.stringify({ ...entry.item, title: "Rayuela corregida" }),
         );
-      });
+      },
+      { fallback: entry },
+    );
     renderPage();
     expect(
       await screen.findByRole("heading", { name: "Rayuela" }),
@@ -265,12 +263,11 @@ describe("DetailPage", () => {
   });
 
   it("renders all standard metadata fields", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     expect(screen.getByText("Sudamericana")).toBeVisible();
@@ -323,13 +320,12 @@ describe("DetailPage", () => {
         },
       },
     };
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
         return new Response(JSON.stringify(albumTypes));
-      return new Response(JSON.stringify(album));
-    });
+    }, { fallback: album });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Discovery" });
@@ -391,13 +387,12 @@ describe("DetailPage", () => {
       formats: ["vinyl"],
       item: { ...entry.item, type: "album", title: "Discovery", metadata: {} },
     };
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
         return new Response(JSON.stringify(albumTypes));
-      return new Response(JSON.stringify(album));
-    });
+    }, { fallback: album });
     renderPage();
     await screen.findByRole("heading", { name: "Discovery" });
 
@@ -434,13 +429,12 @@ describe("DetailPage", () => {
         chooses_covers: true,
       },
     ];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
         return new Response(JSON.stringify(bookTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
@@ -450,12 +444,11 @@ describe("DetailPage", () => {
   });
 
   it("keeps a book's reading data, the half DEC-057 did not touch", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types") return new Response("[]");
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
@@ -468,7 +461,7 @@ describe("DetailPage", () => {
 
   it("corrects the creator sort name and clears it back to the automatic value", async () => {
     const bodies: string[] = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
@@ -477,8 +470,7 @@ describe("DetailPage", () => {
         bodies.push(String(init.body));
         return new Response(JSON.stringify(entry.item));
       }
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
@@ -502,7 +494,7 @@ describe("DetailPage", () => {
       ...entry,
       item: { ...entry.item, creator_sort_override: "Anything At All" },
     };
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
@@ -511,8 +503,7 @@ describe("DetailPage", () => {
         bodies.push(String(init.body));
         return new Response(JSON.stringify(corrected.item));
       }
-      return new Response(JSON.stringify(corrected));
-    });
+    }, { fallback: corrected });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
@@ -525,7 +516,7 @@ describe("DetailPage", () => {
 
   it("confirmed deletion calls DELETE and returns to library", async () => {
     const requests: Array<[string, RequestInit?]> = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       const url = String(input);
       requests.push([url, init]);
       if (url === "/api/shelves") return new Response("[]");
@@ -533,8 +524,7 @@ describe("DetailPage", () => {
         return new Response(JSON.stringify(itemTypes));
       if (init?.method === "DELETE" && url === "/api/entries/7")
         return new Response(null, { status: 204 });
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -566,14 +556,13 @@ describe("DetailPage", () => {
 
   it("cancel preserves the entry and does not call DELETE", async () => {
     const requests: Array<[string, RequestInit?]> = [];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       const url = String(input);
       requests.push([url, init]);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -588,7 +577,7 @@ describe("DetailPage", () => {
   });
 
   it("delete failure preserves the entry with an error", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
@@ -598,8 +587,7 @@ describe("DetailPage", () => {
           JSON.stringify({ error: { code: "entry_not_found" } }),
           { status: 404 },
         );
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -625,13 +613,12 @@ describe("DetailPage", () => {
   });
 
   it("refuses an impossible date range and keeps the typed values", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
       if (init?.method === "PATCH") throw new Error("must not be reached");
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -658,12 +645,11 @@ describe("DetailPage", () => {
   });
 
   it("refuses an out-of-range reread count", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -678,7 +664,7 @@ describe("DetailPage", () => {
   });
 
   it("keeps typed metadata when the write fails", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    mockApi(async (input, init) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
@@ -686,8 +672,7 @@ describe("DetailPage", () => {
         return new Response(JSON.stringify({ error: { code: "conflict" } }), {
           status: 409,
         });
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -706,12 +691,11 @@ describe("DetailPage", () => {
   });
 
   it("rejects an empty title on the metadata form", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -724,12 +708,11 @@ describe("DetailPage", () => {
   });
 
   it("Escape closes dialogs", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -745,12 +728,11 @@ describe("DetailPage", () => {
   it("shows the score as a filled chip, the same treatment as the library", () => {
     // DEC-026: the ramp means the same thing wherever the eye lands, so the
     // detail page carries the chip rather than the coloured text it used to.
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       if (String(input) === "/api/shelves") return new Response("[]");
       if (String(input) === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     return waitFor(() => {
       const score = document.querySelector("[data-fact='score'] span");
@@ -769,9 +751,7 @@ describe("DetailPage", () => {
       { id: 1, name: "Favorites", slug: "favorites", entry_count: 4 },
     ],
   ) {
-    return vi
-      .spyOn(globalThis, "fetch")
-      .mockImplementation(async (input, init) => {
+    return mockApi(async (input, init) => {
         const url = String(input);
         if (url === "/api/shelves" && init?.method === "POST") {
           const body = JSON.parse(String(init.body)) as { name: string };
@@ -803,15 +783,14 @@ describe("DetailPage", () => {
             }),
           );
         }
-        return new Response(JSON.stringify(entry));
-      });
+      }, { fallback: entry });
   }
 
   it("gives files a region of their own rather than a corner of the edition facts", async () => {
     // Attaching a file is a feature of the entry, not a footnote on its publisher.
     // It was a small outline button inside Edition facts; it is its own region at
     // the weight of Edit opinion now, with the list it produces still beside it.
-    vi.spyOn(globalThis, "fetch").mockImplementation(
+    mockApi(
       async (request: string | URL | Request) => {
         const url = String(request);
         if (url === "/api/item-types")
@@ -819,8 +798,8 @@ describe("DetailPage", () => {
         if (url.startsWith("/api/shelves")) return new Response("[]");
         if (url.includes("/attachments"))
           return new Response('{"attachments":[]}');
-        return new Response(JSON.stringify(entry));
       },
+      { fallback: entry },
     );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
@@ -928,7 +907,7 @@ describe("DetailPage", () => {
     stubShelves();
     // Re-stub with a domain that declares formats, so the assertion that the
     // format control *stayed* is about the dialog and not about the fixture.
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
@@ -945,8 +924,7 @@ describe("DetailPage", () => {
         );
       if (url.includes("/attachments"))
         return new Response('{"attachments":[]}');
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
     const user = userEvent.setup();
@@ -984,12 +962,14 @@ describe("DetailPage", () => {
         },
       },
     ];
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      const url = String(input);
-      if (url === "/api/shelves") return new Response("[]");
-      if (url === "/api/item-types") return new Response(JSON.stringify(types));
-      return new Response(JSON.stringify(anime));
-    });
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types") return new Response(JSON.stringify(types));
+      },
+      { fallback: anime },
+    );
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
@@ -998,13 +978,12 @@ describe("DetailPage", () => {
   });
 
   it("offers no progress control to a domain that counts nothing", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+    mockApi(async (input) => {
       const url = String(input);
       if (url === "/api/shelves") return new Response("[]");
       if (url === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
-      return new Response(JSON.stringify(entry));
-    });
+    }, { fallback: entry });
     renderPage();
     await screen.findByRole("heading", { name: "Rayuela" });
 
