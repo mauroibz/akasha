@@ -32,11 +32,10 @@ from collections.abc import Mapping
 
 import httpx
 
+from book_tracker.infrastructure.posters import METAHUB_POSTER, metahub_poster_url
 from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS, bounded_json
 
-#: Stremio's image service. Keyed on IMDb id, keyless, and deterministic — which is the
-#: whole reason it is primary: a poster for every film costs zero requests.
-METAHUB_POSTER = "https://images.metahub.space/poster/medium/{imdb_id}/img"
+__all__ = ["METAHUB_POSTER", "TmdbPosters", "metahub_poster_url", "poster_for"]
 #: `medium` measured 500x750. `small` is 300x450 and would upscale to the 600 the cover
 #: pipeline targets; `large` is 780x1170 and is bytes nobody sees. Same reasoning the
 #: anime adapter used to pick Kitsu's `large` over its `original`.
@@ -44,19 +43,7 @@ TMDB_API = "https://api.themoviedb.org/3"
 #: TMDB's own published image base. `w500` is 500 wide for the same reason as above.
 TMDB_IMAGE = "https://image.tmdb.org/t/p/w500{poster_path}"
 
-_IMDB_ID = re.compile(r"tt[0-9]{7,10}")
 _TMDB_ID = re.compile(r"[0-9]{1,12}")
-
-
-def metahub_poster_url(imdb_id: str | None) -> str | None:
-    """The Stremio poster URL for an IMDb id, or `None` if there is no usable id.
-
-    Built rather than fetched. There is no request here and no failure mode: if the film
-    has no poster the URL 404s when the cover pipeline tries it, and a film that fails to
-    get a cover is exactly as it was before.
-    """
-    value = (imdb_id or "").strip()
-    return METAHUB_POSTER.format(imdb_id=value) if _IMDB_ID.fullmatch(value) else None
 
 
 class TmdbPosters:

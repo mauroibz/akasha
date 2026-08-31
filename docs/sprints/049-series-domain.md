@@ -1,6 +1,6 @@
 # Sprint 049 — Series: the fifth domain, with posters on day one
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 048
 **Roadmap revision:** 27
 
