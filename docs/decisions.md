@@ -3603,3 +3603,118 @@ predictions about mistakes to come.
   poster images past six months and shows no TMDB attribution, which is outside TMDB's API terms for
   the ~2% of films that path serves. Anyone revisiting this should treat it as a known, dated
   position rather than as something nobody thought about.
+
+## DEC-104 — Series launch on two keyless providers, and the movie search filter does not transfer
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-098 and DEC-099 (the Wikidata movie adapter and what its search costs),
+  DEC-088 (measure providers, do not read their documentation), DEC-077 and DEC-092 (progress is one
+  number with a floor and no ceiling), DEC-103 (Stremio posters). Evidence:
+  `docs/series-domain-viability.md`.
+- **Context:** the roadmap has carried "Series — TMDB" as an unnumbered epic since Sprint 028,
+  described as gated on a product decision about entry hierarchy. That decision was already made —
+  DEC-077 rejected child entities and chose a per-domain `progress` field, and Sprint 040 built it —
+  so what remained was a provider question and an importer question. The owner asked for a primary
+  and a fallback that need no setup.
+- **Measurement, 2026-08-31, keyless and live:** Wikidata resolved **13 of 13** series by IMDb id
+  through `haswbstatement:P345=`, and every fetched entity carried IMDb, TMDB and TVDB ids, an
+  episode count, a start date and at least one genre. TVmaze answered **13 of 13** of the same series
+  by IMDb id, with a real synopsis and an airing status on every one. Stremio's already-allowlisted
+  poster URL answered **15 of 16**. Fourteen anime series spanning the popular and the obscure were
+  covered by the same three sources at 14/14, 14/14 and 13/14.
+- **Decision:** Wikidata is the primary provider and TVmaze the fallback. Both are keyless. The
+  cross-provider identity is the **IMDb id**, which both publish and both planned importers carry —
+  the strongest identity position of any domain so far. Posters need no new source and no new
+  allowlist entry.
+- **The finding worth carrying forward:** the movie adapter's search filter **does not transfer**. A
+  single `haswbstatement:P31=Q5398426` returned the right series at rank 1 for only **9 of 14**
+  titles and returned *nothing at all* for two; a five-class filter adding animated series,
+  anime series, miniseries and animated series returned **14 of 14**. `BoJack Horseman`,
+  `Rick and Morty`, `Avatar: The Last Airbender`, `Chainsaw Man` and `Chernobyl` are the ones the
+  copied filter loses. Copying a working adapter is the right instinct and this is where it fails.
+- **Consequence:** episode totals disagree between sources and move over time — 77/76/76 for one
+  series, 38/44/38 for another. This is not reconciled. DEC-092 already made `total_field` display
+  only and gave `validate_progress` no ceiling, precisely so a refresh cannot invalidate a count that
+  was correct when written. Series is the case that decision was made for.
+- **Not selected:** TMDB (key, plus the six-month cache limit Sprint 045 measured), TheTVDB v4
+  (subscriber key), OMDb (key, CC BY-NC, no localization), the Trakt API (key, and it would only
+  re-fetch what the export already holds), and Wikipedia REST extracts (keyless and genuinely good
+  for Spanish synopses, 9 of 9, but a third source to fill one field TVmaze already fills).
+
+## DEC-105 — TVmaze is credited; CC BY-SA's other half is deferred, not ignored
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-103 (where the owner declined TMDB's attribution notice), DEC-104.
+- **Context:** TVmaze's published terms are unambiguous — *"Use of the TVmaze API is licensed by
+  CC BY-SA. This means the data can freely be used for any purpose, as long as TVmaze is properly
+  credited as source."* No key, no account, no cache expiry, and images explicitly cacheable
+  indefinitely. The only obligation is credit. The owner was asked directly, having declined TMDB's
+  attribution notice three days earlier, and chose to give it.
+- **Decision:** Sprint 050 ships a permanent, visible credit line naming Wikidata and TVmaze as the
+  sources of series data. One line of copy and one line of markup, and a deliverable rather than a
+  footnote because the alternative was chosen against on purpose.
+- **Why this differs from DEC-103:** TMDB's terms ask for attribution *and* a six-month cache purge
+  that Akasha's permanent, owner-editable store cannot honour without an architecture that does not
+  exist. There was no compliant option short of building it. TVmaze asks for one thing, and that
+  thing costs a line.
+- **Deferred, and named so it is found:** CC BY-SA is share-alike as well as attribution. Akasha is
+  LAN-only with no auth and no publishing surface (product spec §9), so nothing is redistributed
+  today and the share-alike clause has nothing to bite on. **If sharing, multiuser, a public
+  deployment or a public export is ever built, this needs revisiting before it ships.**
+
+## DEC-106 — A connector may target more than one domain; the reader chooses the source
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-071 and DEC-080 (the per-domain import boundary and the self-describing
+  connector), DEC-081 (one source, one tab), DEC-093 (what the boundary cost the first time somebody
+  else tested it), DEC-104.
+- **Context:** a television tracker tracks films too. Both exports the owner supplied — IMDb's CSVs
+  and Trakt's archive — carry films and shows in one file, and `Importer.item_type` is a single
+  string that the shared service resolves once per batch. Neither source can be read correctly under
+  that contract.
+- **The alternative, costed and rejected:** register two connectors per source, one per domain, each
+  keeping only its own rows. It changes nothing shared and costs no sprint. It was put to the owner
+  with that costing and **the owner chose against it**: importers should support multi-domain sources
+  properly, with a real flow for choosing what comes in, and *"users choose the importer SOURCE, not
+  the target type, that is decided downstream."*
+- **What that turned out to cost, measured against the code rather than estimated:** less than it
+  looked. The Import screen is **already** source-shaped — `ImportPage.tsx` renders one tab per
+  connector and ignores `item_type` entirely — so the UX the owner asked to keep is the UX that
+  already ships. Triage **already** resolves statuses, hotkeys and labels from each row's own
+  `item.type`, so a mixed batch renders correctly today. `_backfillable_items` **already** loops over
+  every registered domain. The real work is the declaration, per-record domain resolution at three
+  call sites, the commit signature, the target selector, and the fingerprint.
+- **Decision:** `Importer.item_types` is a tuple; a record carries its own `item_type`, defaulting to
+  the connector's first; the shared service resolves the domain per record; the connector declares
+  what it can produce and the screen renders a checkbox per type; and **the service, not the reader,
+  applies the selection**, so no connector can get the filter wrong. Sprint 051 builds this against a
+  **test** connector rather than against IMDb — a seam proved only by the connector it was built for
+  is not proved (DEC-093's lesson, applied before the fact this time).
+- **The trap worth writing down:** preview is idempotent on `(connector, fingerprint)`. The chosen
+  target set must be folded into the fingerprint, or importing a file as films and then as series
+  silently returns the first preview — a wrong answer that looks like a working feature.
+
+## DEC-107 — Anime rows from a TV source stay series; the metadata switch was measured and dropped
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-088 (the anime domain and its MyAnimeList identity), DEC-104, DEC-106.
+- **Context:** IMDb and Trakt exports contain anime, and Akasha already has an anime domain. The
+  owner asked for a default of series, and asked whether a row could switch to the anime domain when
+  the television providers cannot serve it — with the explicit instruction to evaluate that
+  independently and drop it if it was not viable.
+- **Measurement, 2026-08-31,** over fourteen anime series chosen to span the popular and the obscure
+  and to include sequel seasons: Stremio returned a poster for **14 of 14**, Wikidata returned an entity with an episode
+  count for **14 of 14**, and TVmaze returned a record with a synopsis for **13 of 14**. The one gap
+  still had a poster and a Wikidata entity.
+- **Decision: dropped.** The condition the switch would fire on did not occur once in fourteen tries
+  and would have fired partially in one. An anime row from IMDb or Trakt becomes a **series** item.
+  Somebody who wants that show in the Anime library adds it there through the existing anime search,
+  which is one step and needs no heuristic and no cross-domain library lookup the importer contract
+  deliberately scopes away.
+- **Consequence, accepted and stated rather than hidden:** a show may exist as both an anime item and
+  a series item. They share no identity — anime is keyed on `mal:` and series on `imdb:` — so nothing
+  merges them silently, and the duplicate is visible.
