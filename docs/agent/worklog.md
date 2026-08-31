@@ -2691,3 +2691,66 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Not run: the container smoke drill, per the owner's standing request not to re-investigate a
   working container, and no packaging behaviour changed in this release.
 - Next: merge to `main`, tag `v1.4.0`, push — all three explicitly authorized by the owner.
+
+## 2026-08-31 — Planning session: the series line (Sprints 049–053), plan revision 27
+
+**Done.** No runtime code. Extended the roadmap from 48 sprints to 53 and moved the project from
+`complete` back to `ready` on Sprint 049.
+
+Measured first, planned second, in that order:
+
+- **Wikidata as the series primary.** 13/13 series resolved by IMDb id through
+  `haswbstatement:P345=`; every fetched entity carried IMDb, TMDB and TVDB ids, an episode count, a
+  start date and at least one genre. Seasons absent on 2/13, cast absent on 4/13 (every animated
+  series measured), poster property absent on 13/13. Thirteen entities weighed 1.37 MB, so DEC-099's
+  bounded batching applies unchanged.
+- **The movie search filter does not transfer**, which is the finding of the session. A single
+  `P31=Q5398426` filter returned the right series at rank 1 for 9 of 14 titles and *nothing at all*
+  for `Chainsaw Man` and `Rick and Morty`; a five-class filter returned 14/14.
+- **TVmaze as the fallback.** Keyless, 13/13 by IMDb id, a synopsis and an airing status on every hit,
+  and it covers Spanish-language shows Wikidata's title search does not surface. Its images are the
+  wrong sizes for the cover pipeline (210×295 and 2000×3000), so it is not a cover source.
+- **Posters need no new work.** `images.metahub.space` answered 15/16 series and is already
+  allowlisted; the miss was a clean 404.
+- **Both exports parsed in place.** IMDb turned out to be *two* CSV shapes with different headers, not
+  one. Trakt is a ZIP of 43 verbatim `/sync/*` responses, 26 of them empty, with `imdb` on every movie,
+  show and episode object, and episode detail only in `watched-history.json`.
+- **The anime-overlap switch the owner asked me to evaluate: measured and dropped.** Over fourteen
+  anime spanning the popular and the obscure, Stremio answered 14/14, Wikidata 14/14 and
+  TVmaze 13/14 — the condition the switch would fire on did not occur.
+
+**Owner decisions taken during the session.** Three questions were put and all three answered:
+multi-domain importers rather than two connectors per source, with the source chosen and the target
+decided downstream (DEC-106); TVmaze taken **with** a credit line, unlike TMDB three days earlier
+(DEC-105); and the anime switch evaluated independently and dropped if not viable, which it was not
+(DEC-107).
+
+**Verified.** `python scripts/validate_project.py` passes. No code, tests, migrations or generated
+contracts were touched, so no product gate applies.
+
+**Deviations.** None from the protocol. One change outside the plan, at the owner's explicit
+instruction: `exports/` is now gitignored as a whole directory. It was untracked and unignored, and
+it holds five private source archives including one carrying the owner's email address.
+
+**Also written, at the owner's request, after reviewing the plan.** Two questions came back and both
+produced documentation rather than sprints:
+
+- Auditing the sprint files against the code found **two real defects in what had just been written**,
+  both now fixed. Sprint 050 specified a "consult TVmaze when Wikidata returns nothing" fallback that
+  does not exist — `search_providers` fans out to every provider in parallel and `_merge_group`
+  already does identity grouping and fill-empty by `source_preference`, so the sprint would have sent
+  an implementer to build a second merge mechanism competing with the shared one. Sprint 051 left the
+  commit signature as "a mapping or per-record resolution, either is acceptable", which is not a
+  specification; it now names the exact change.
+- **Why anime and series are two domains** is now `docs/guides/adding-a-domain.md` §8, because that
+  question is bound to be asked again. The deciding test is not field overlap — 6 of 12 fields, and
+  identical statuses, formats and entry shape — it is that `EnrichmentSpec.identity_kind` is one
+  string per domain and the two provider sets share nothing: a merged domain would silently never
+  enrich whichever half arrived under the other key. The section generalises the test and states the
+  accepted cost. The guide's stale intro and file map (movies missing since Sprint 046) were fixed in
+  passing. The "move to anime" button the owner asked about is costed there and recorded under **Not
+  scheduled** in the roadmap as a general *re-file* feature — it is not a button, because `items.type`
+  is written at creation only and a moved item would strand itself from every anime provider.
+
+**Next.** Sprint 049 — the series domain on Wikidata, with posters in the same sprint rather than a
+sprint later. Nothing is implemented.

@@ -4,8 +4,9 @@
 [technical spec §6.6](../specs/technical-spec.md). Where they disagree, the spec wins and this
 document is wrong.
 
-A **domain** is a kind of thing the library holds. Books, albums and anime ship today. A fourth one —
-games, films, board games — is built by following this guide, and **you should not need to read how
+A **domain** is a kind of thing the library holds. Books, albums, anime and movies ship today, and
+television series are planned. The next one — games, board games — is built by following this guide,
+and **you should not need to read how
 albums were built to do it.** If you find yourself reading Sprints 025–028 to answer a question this
 guide does not, that is a defect in this guide; say so.
 
@@ -728,7 +729,89 @@ cite it as measurement; it carries its own list of what to verify first.
 
 ---
 
-## 8. File map
+## 8. When two domains look like the same thing
+
+Sooner or later two candidate domains will overlap enough that somebody asks whether they should be
+one. **Anime and television series are the sharpest case in this repository and the question will be
+asked again**, so the analysis is written down here rather than re-derived.
+
+### The measurement
+
+| | Anime | Series |
+|---|---|---|
+| Providers | AniList, Kitsu | Wikidata, TVmaze |
+| Enrichment identity | `mal:` | `imdb:` |
+| Statuses | watching, completed, on hold, dropped, plan to watch | **the same five** |
+| Formats | streaming, digital, Blu-ray | the same, **plus DVD** |
+| Progress | episodes watched | **episodes watched** |
+| Metadata fields | 11 | 12, of which **6 are the same** |
+
+Shared fields: `creators`, `episodes`, `episode_minutes`, `genres`, `airing_status`, `synopsis`.
+Anime-only: `english_title`, `japanese_title`, `kind`, `season` (the seasonal cour), `source`
+(adapted from). Series-only: `original_title`, `countries`, `languages`, `seasons`, `network`,
+`cast`.
+
+On entry shape they are **identical**. That is not an argument for merging them.
+
+### The test that actually decides it
+
+`EnrichmentSpec.identity_kind` is **one string per domain**. Anime's is `mal` and series' is `imdb`,
+and the two provider sets do not overlap at all — AniList resolves a MyAnimeList id, not an IMDb id,
+and Wikidata resolves an IMDb id, not a MyAnimeList one. Nothing bridges them.
+
+So a merged domain would have to enrich on one key, and **every row that arrived under the other key
+would never be enriched at all**. A MyAnimeList export speaks `mal:`; IMDb and Trakt exports speak
+`imdb:`. Half the library would be permanently thin, and the failure would be silent — the rows would
+simply never be queued.
+
+**That is the test, and it generalises:**
+
+> Two candidate domains are one domain when a single `identity_kind` and a single `provider_order`
+> can serve every record either of them would hold. They are two domains when they cannot, however
+> similar their fields, statuses and entry shapes look.
+
+Field overlap is the weakest signal and the most tempting one. Six identical fields out of twelve
+still leaves five that only make sense for anime — the studio, the Japanese title, what it was
+adapted from, which cour it aired in — and none of them is something a series provider carries
+usefully. But the fields are the secondary argument. The identity is the deciding one.
+
+### What the separation costs, stated plainly
+
+One show can exist as both an anime item and a series item — the same title imported from a
+MyAnimeList export and from a Trakt archive. They share no identity, so nothing merges them silently
+and the duplicate is visible rather than hidden. This is accepted, not overlooked (DEC-107), and it
+is the price of the enrichment guarantee above.
+
+### "Re-file as anime" — why it is not a button
+
+The obvious repair for that duplicate is a button on a series that moves it to the anime library.
+**It does not work as a button, and the reason is the same contract.** Anyone reaching for it should
+know what they are actually proposing:
+
+- **There is no item-type change path anywhere in the application.** `items.type` is written at
+  creation only — import commit and add — and there is no route and no repository method that changes
+  it afterwards.
+- Status survives a move, because the five values are identical. Progress survives, because both
+  domains declare it.
+- Format does not always survive: a series marked `DVD` becomes an anime holding a format the anime
+  domain does not declare.
+- **Six of the twelve series fields have no home in anime.** They would sit orphaned in
+  `metadata_json` — not a crash, since the detail page renders only declared fields, but silently
+  dead data that no screen shows and no validator would ever catch.
+- **The blocker:** the item carries an `imdb:` identifier and anime enrichment looks for `mal:`.
+  Nothing resolves one to the other. A moved show would keep its series metadata for ever and no
+  anime provider would ever touch it — an anime item that is not really in the anime system.
+
+The feature that *does* work is a different one, and it is a feature rather than a button: search the
+target domain's providers by title, have the person confirm the match (the ambiguity-confirm shape
+Triage already uses), create the item properly in the target domain, transfer the **entry** — status,
+score, progress, dates, shelves, notes — and remove the old item, with an undo effect. It is
+generally useful beyond this case, because it is also the answer to "I imported this into the wrong
+library." It is recorded under **Not scheduled** in `docs/sprints/ROADMAP.md` with its costing.
+
+---
+
+## 9. File map
 
 | Path | What it is |
 |---|---|
@@ -739,13 +822,14 @@ cite it as measurement; it carries its own list of what to verify first.
 | `domains/book/` | Books: declaration, Open Library and Google Books adapters, Goodreads and Calibre importers |
 | `domains/album/` | Albums: declaration, MusicBrainz and Cover Art Archive adapter |
 | `domains/anime/` | Anime: declaration, AniList and Kitsu adapters, MyAnimeList importer |
+| `domains/movie/` | Movies: declaration, Wikidata adapter, Stremio/TMDB posters, Letterboxd importer |
 | `infrastructure/providers.py` | The shared HTTP boundary only: `bounded_json`, `parse_year`, retry policy, the client |
 | `backend/tests/test_domain_conformance.py` | The suite every domain passes by existing |
 | `backend/tests/fixtures/providers/` | Pinned real provider responses. **Never re-record one to make a test pass** |
 
 ---
 
-## 9. Where the reasoning lives
+## 10. Where the reasoning lives
 
 This guide says *how*. The reasoning behind each rule is in `docs/decisions.md`, and the entries
 worth reading before you design a domain are:
@@ -758,4 +842,7 @@ worth reading before you design a domain are:
   every coupling that remains.
 - **DEC-068** — the IGDB walk.
 - **DEC-069** — what moving the code found that reading it could not.
+- **DEC-104 / DEC-107** — why series and anime are two domains rather than one, and the anime
+  overlap measured rather than argued. §8 above is the short version.
+- **DEC-106** — when one connector legitimately targets more than one domain.
 - **DEC-076 / DEC-078** — why importers are domain-owned, and the concrete boundary that shipped.
