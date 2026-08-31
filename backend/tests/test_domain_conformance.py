@@ -93,7 +93,7 @@ def assert_importer_contract(importer: object) -> None:
     assert isinstance(importer, Importer)
     assert importer.name and importer.name.isidentifier() and importer.name.islower()
     assert importer.label
-    assert importer.item_type in DOMAINS
+    assert_declared_targets(importer)
     assert isinstance(importer.input, ImportInputSpec)
     assert importer.input.field and importer.input.field.isidentifier()
     assert importer.identity_kinds, f"{importer.name} declares no authoritative identity kinds"
@@ -102,6 +102,25 @@ def assert_importer_contract(importer: object) -> None:
     assert callable(importer.stage), f"{importer.name} declares no staging strategy"
     assert callable(importer.match), f"{importer.name} declares no match strategy"
     assert_declared_guidance(importer)
+
+
+def assert_declared_targets(importer: Importer) -> None:
+    """What a connector says it can produce, checked before anything reads it.
+
+    A connector may target more than one domain (DEC-106), so the declaration is an
+    ordered tuple rather than a string, and order is meaningful: the first entry is
+    what a record that names no type of its own becomes. Everything here is a
+    declaration defect that would otherwise surface as a `KeyError` deep inside the
+    shared service, holding a batch it has already staged.
+    """
+    types = importer.item_types
+    assert isinstance(types, tuple), (
+        f"{importer.name} declares item_types as {type(types).__name__}, not an ordered tuple"
+    )
+    assert types, f"{importer.name} declares no target domain"
+    assert len(types) == len(set(types)), f"{importer.name} declares one target domain twice"
+    unknown = [item_type for item_type in types if item_type not in DOMAINS]
+    assert not unknown, f"{importer.name} targets domains that are not registered: {unknown}"
 
 
 def assert_declared_guidance(importer: Importer) -> None:
@@ -665,17 +684,23 @@ def test_a_registered_importer_satisfies_the_contract(importer: object) -> None:
     assert_importer_contract(importer)
 
 
-def test_importers_are_registered_under_the_domain_they_target() -> None:
-    registered = {
-        importer.name: item_type
-        for item_type, importers in IMPORTERS_BY_DOMAIN.items()
-        for importer in importers
-    }
-    assert registered == {name: importer.item_type for name, importer in IMPORTERS.items()}
+def test_importers_are_registered_under_every_domain_they_target() -> None:
+    """The index is a relation now, not a function: one connector, N domains.
+
+    A connector that declares two domains is reachable from both, and a connector
+    indexed under a domain it never declared would publish a library it cannot fill.
+    """
+    registered: dict[str, set[str]] = {}
+    for item_type, importers in IMPORTERS_BY_DOMAIN.items():
+        for importer in importers:
+            registered.setdefault(importer.name, set()).add(item_type)
+    assert registered == {name: set(importer.item_types) for name, importer in IMPORTERS.items()}
     assert {importer.name for importer in IMPORTERS_BY_DOMAIN["book"]} == {
         "goodreads",
         "calibre",
     }
+    # Indexing a two-domain connector twice must not publish it twice.
+    assert len(IMPORTERS) == len({importer.name for importer in IMPORTERS.values()})
 
 
 def test_the_importer_suite_rejects_a_missing_contract_member() -> None:
@@ -684,7 +709,7 @@ def test_the_importer_suite_rejects_a_missing_contract_member() -> None:
     class MissingMatch:
         name = "missing"
         label = "Missing"
-        item_type = "book"
+        item_types = ("book",)
         input = ImportInputSpec(kind="upload", label="File", field="file")
         identity_kinds = frozenset({"isbn"})
 
@@ -700,7 +725,7 @@ class _DeclaringImporter:
 
     name = "declaring"
     label = "Declaring"
-    item_type = "book"
+    item_types = ("book",)
     input = ImportInputSpec(
         kind="upload",
         label="File",
@@ -724,6 +749,39 @@ class _DeclaringImporter:
 
 def test_a_well_formed_declaration_passes() -> None:
     assert_declared_guidance(_DeclaringImporter())
+
+
+def test_a_connector_may_declare_more_than_one_target() -> None:
+    """The control for the malformed target declarations below (DEC-106)."""
+
+    class TwoDomains(_DeclaringImporter):
+        item_types = ("movie", "series")
+
+    assert_declared_targets(TwoDomains())
+
+
+@pytest.mark.parametrize(
+    ("name", "item_types"),
+    [
+        # A connector that targets nothing stages a batch nothing can commit.
+        ("empty", ()),
+        # Order is meaningful — the first entry is the default for a record that
+        # names no type — so a repeat is a declaration nobody can read.
+        ("duplicate", ("movie", "movie")),
+        # Caught here rather than as a KeyError inside the shared service.
+        ("unregistered", ("movie", "podcast")),
+        # A string is iterable, so this would silently declare five domains named
+        # "m", "o", "v", "i" and "e" if the shape were not checked.
+        ("not_a_tuple", "movie"),
+    ],
+)
+def test_the_suite_rejects_a_malformed_target_declaration(name: str, item_types: object) -> None:
+    class Malformed(_DeclaringImporter):
+        pass
+
+    Malformed.item_types = item_types  # type: ignore[assignment]
+    with pytest.raises(AssertionError):
+        assert_declared_targets(Malformed())
 
 
 def test_a_connector_may_declare_a_second_way_in() -> None:

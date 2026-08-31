@@ -271,6 +271,11 @@ class NormalizedImportRecord:
     shelves: tuple[str, ...]
     errors: tuple[Mapping[str, Any], ...]
     source_fields: Mapping[str, Any]
+    #: The domain **this row** targets, when the connector produces more than one.
+    #: `None` means the connector's first declared type, so a single-domain reader
+    #: emits exactly what it always emitted. A value the connector did not declare
+    #: is refused at the boundary, the way an undeclared identity already is.
+    item_type: str | None = None
     cover_source: str | None = None
     cover_stage: str | None = None
     #: The files that belong to this record, by relative path under the source root.
@@ -278,6 +283,23 @@ class NormalizedImportRecord:
     #: uploaded path back to the record it belongs to without knowing what any
     #: particular source looks like on disk.
     source_files: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
+class ImportSkip:
+    """Rows the reader saw and deliberately did not emit, tallied by reason.
+
+    A source carries kinds no domain tracks — an IMDb `TV Episode`, a Trakt season
+    rating — and somebody who exports their whole account should not meet forty red
+    rows for podcasts they once rated. This is a count, never a row error, and the
+    reason is the source's own word for the thing so the screen can name it.
+
+    A tally rather than a record per row on purpose: the count is bounded by the
+    number of distinct reasons, not by the size of the export.
+    """
+
+    reason: str
+    count: int
 
 
 @dataclass(frozen=True)
@@ -290,6 +312,10 @@ class ImportSnapshot:
     records: tuple[NormalizedImportRecord, ...]
     archive_name: str | None = None
     archive_data: bytes | None = None
+    #: What the reader dropped because no registered domain holds it. Distinct from
+    #: what the *service* drops because the reader unticked its target, which is the
+    #: reader's choice rather than the source's shape.
+    skipped: tuple[ImportSkip, ...] = ()
 
 
 class ImportMatcher(Protocol):
@@ -318,17 +344,22 @@ class ImportMatcher(Protocol):
 
 @runtime_checkable
 class Importer(Protocol):
-    """A connector registered by the domain it targets.
+    """A connector registered by the domains it targets.
 
     The declaration is intentionally small but explicit about the four choices that
     make a connector portable: its reader, matching strategy, authoritative identity
-    kinds and target domain.  `stage` copies any source/assets only after fingerprint
+    kinds and target domains.  `stage` copies any source/assets only after fingerprint
     replay has been checked, so a duplicate preview leaves no orphan directory.
+
+    `item_types` is ordered and may name more than one domain, because a television
+    tracker tracks films too: one IMDb or Trakt export carries both, and a connector
+    that could target only one could not read either source correctly (DEC-106). The
+    first entry is what a record naming no type of its own becomes.
     """
 
     name: str
     label: str
-    item_type: str
+    item_types: tuple[str, ...]
     input: ImportInputSpec
     identity_kinds: frozenset[str]
     #: Every code this connector's reader may raise. Closed, so a screen can decide

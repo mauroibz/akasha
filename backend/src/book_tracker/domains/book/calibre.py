@@ -345,7 +345,7 @@ def _holding_reason(covers: int, files: int) -> str | None:
 class CalibreImporter:
     name = "calibre"
     label = "Calibre"
-    item_type = DOMAIN.item_type
+    item_types: tuple[str, ...] = (DOMAIN.item_type,)
     input = ImportInputSpec(
         # The folder on your own machine, chosen in the browser. No mount, no
         # CALIBRE_DIR, no restart, and nothing holds your library open while

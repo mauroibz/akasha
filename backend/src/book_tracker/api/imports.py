@@ -155,7 +155,7 @@ async def available_importers(request: Request) -> list[ImporterResponse]:
         ImporterResponse(
             id=importer.name,
             label=importer.label,
-            item_type=importer.item_type,
+            item_type=importer.item_types[0],
             input=_published_input(importer.input),
             attachment_max_bytes=int(request.app.state.attachment_max_bytes),
         )

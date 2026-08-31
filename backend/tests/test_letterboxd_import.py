@@ -423,7 +423,7 @@ class TestWhatIsDeliberatelyIgnored:
 
 class TestDeclaration:
     def test_it_targets_the_movie_domain_and_trusts_one_identity(self) -> None:
-        assert IMPORTER.item_type == "movie"
+        assert IMPORTER.item_types == ("movie",)
         assert IMPORTER.identity_kinds == frozenset({"letterboxd"})
 
     def test_its_guidance_points_at_letterboxd_and_says_it_is_a_snapshot(self) -> None:

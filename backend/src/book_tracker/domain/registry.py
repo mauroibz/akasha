@@ -30,18 +30,27 @@ DOMAINS: dict[str, Domain] = {
 }
 
 # The same code-owned registration model as domains and providers: no discovery or
-# plugin runtime.  Connectors live in the package of the domain they target; the shared
-# registry only builds the two indexes it needs to publish and dispatch them.
+# plugin runtime.  Connectors live in the package of the domain they lead with; the
+# shared registry only builds the two indexes it needs to publish and dispatch them.
+#
+# One connector may target several domains (DEC-106), so the by-domain index is a
+# relation rather than a function: it is *derived* from what each connector declares
+# rather than written out, because a hand-maintained index and a declaration
+# disagreeing is a connector reachable from a library it cannot fill.
+REGISTERED_IMPORTERS: tuple[Importer, ...] = (
+    GOODREADS_IMPORTER,
+    CALIBRE_IMPORTER,
+    MYANIMELIST_IMPORTER,
+    LETTERBOXD_IMPORTER,
+)
 IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
-    BOOK.item_type: (GOODREADS_IMPORTER, CALIBRE_IMPORTER),
-    ALBUM.item_type: (),
-    ANIME.item_type: (MYANIMELIST_IMPORTER,),
-    MOVIE.item_type: (LETTERBOXD_IMPORTER,),
-    SERIES.item_type: (),
+    item_type: tuple(
+        importer for importer in REGISTERED_IMPORTERS if item_type in importer.item_types
+    )
+    for item_type in DOMAINS
 }
-IMPORTERS: dict[str, Importer] = {
-    importer.name: importer for importers in IMPORTERS_BY_DOMAIN.values() for importer in importers
-}
+#: Keyed by name, so a connector indexed under two domains is still published once.
+IMPORTERS: dict[str, Importer] = {importer.name: importer for importer in REGISTERED_IMPORTERS}
 
 # Every route, importer and repository that predates the second domain works on books;
 # naming that here keeps `"book"` out of those call sites as a literal.

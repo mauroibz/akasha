@@ -59,7 +59,7 @@ def _calibre_library(root: Path) -> None:
 class _InvalidAlbumImporter:
     name = "invalid_album"
     label = "Invalid album"
-    item_type = "album"
+    item_types = ("album",)
     input = ImportInputSpec(kind="upload", label="Fixture", field="file")
     identity_kinds = frozenset({"fixture_id"})
 

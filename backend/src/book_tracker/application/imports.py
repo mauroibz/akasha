@@ -131,7 +131,7 @@ class ImportService:
         self.data_dir = data_dir
         self.source_root = source_root
         self.importer = importer
-        self.domain = DOMAINS[importer.item_type]
+        self.domain = DOMAINS[importer.item_types[0]]
         self.library = DomainRepository(engine)
         self.imports = ImportRepository(engine)
 
