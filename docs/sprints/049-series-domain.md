@@ -196,10 +196,10 @@ passed a green gate while producing a wall of blank tiles; a populated field is 
 
 ## Commit checkpoints
 
-1. `refactor(sprint-049): promote the poster URL builder to shared infrastructure`
-2. `feat(sprint-049): declare the series domain`
-3. `feat(sprint-049): read series from Wikidata on a five-class filter`
-4. `docs(sprint-049): close sprint and hand off`
+1. `[REF] Promote the poster URL builder to shared infrastructure`
+2. `[ADD] Declare the series domain`
+3. `[ADD] Read series from Wikidata on a five-class filter`
+4. `[DOCS] Close sprint 049 and hand off`
 
 ## Risks and decisions to surface
 

@@ -151,9 +151,9 @@ movies; this is where that debt is paid.
 
 ## Commit checkpoints
 
-1. `feat(sprint-052): read both IMDb export shapes`
-2. `feat(sprint-052): route IMDb rows to movies and series`
-3. `docs(sprint-052): close sprint and hand off`
+1. `[ADD] Read both IMDb export shapes`
+2. `[ADD] Route IMDb rows to movies and series`
+3. `[DOCS] Close sprint 052 and hand off`
 
 ## Risks and decisions to surface
 

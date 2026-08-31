@@ -164,10 +164,10 @@ find the credit line.
 
 ## Commit checkpoints
 
-1. `feat(sprint-050): read series from TVmaze`
-2. `feat(sprint-050): merge Wikidata and TVmaze on the IMDb id`
-3. `feat(sprint-050): credit the series data sources`
-4. `docs(sprint-050): close sprint and hand off`
+1. `[ADD] Read series from TVmaze`
+2. `[ADD] Merge Wikidata and TVmaze on the IMDb id`
+3. `[ADD] Credit the series data sources`
+4. `[DOCS] Close sprint 050 and hand off`
 
 ## Risks and decisions to surface
 

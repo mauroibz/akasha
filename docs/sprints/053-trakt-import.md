@@ -152,9 +152,9 @@ the same library and that is the interesting case, not the happy path.
 
 ## Commit checkpoints
 
-1. `feat(sprint-053): read a Trakt archive into movie and series records`
-2. `feat(sprint-053): roll watched episodes up into entry progress`
-3. `docs(sprint-053): close sprint and release`
+1. `[ADD] Read a Trakt archive into movie and series records`
+2. `[ADD] Roll watched episodes up into entry progress`
+3. `[DOCS] Close sprint 053 and release`
 
 ## Risks and decisions to surface
 

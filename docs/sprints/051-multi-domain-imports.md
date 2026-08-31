@@ -187,11 +187,11 @@ untick a target and preview again, commit, approve rows of both types in Triage,
 
 ## Commit checkpoints
 
-1. `feat(sprint-051): a connector declares the domains it produces`
-2. `feat(sprint-051): resolve the target domain per import record`
-3. `feat(sprint-051): choose what an import brings in`
-4. `test(sprint-051): conformance for multi-domain connectors`
-5. `docs(sprint-051): close sprint and hand off`
+1. `[ADD] A connector declares the domains it produces`
+2. `[ADD] Resolve the target domain per import record`
+3. `[ADD] Choose what an import brings in`
+4. `[TEST] Conformance for multi-domain connectors`
+5. `[DOCS] Close sprint 051 and hand off`
 
 ## Risks and decisions to surface
 
