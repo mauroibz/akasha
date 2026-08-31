@@ -1690,7 +1690,8 @@
           "book",
           "album",
           "anime",
-          "movie"
+          "movie",
+          "series"
         ],
         "title": "ItemTypeName",
         "type": "string"

@@ -23,8 +23,11 @@ from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.movie.letterboxd import IMPORTER as LETTERBOXD_IMPORTER
+from book_tracker.domains.series import DOMAIN as SERIES
 
-DOMAINS: dict[str, Domain] = {domain.item_type: domain for domain in (BOOK, ALBUM, ANIME, MOVIE)}
+DOMAINS: dict[str, Domain] = {
+    domain.item_type: domain for domain in (BOOK, ALBUM, ANIME, MOVIE, SERIES)
+}
 
 # The same code-owned registration model as domains and providers: no discovery or
 # plugin runtime.  Connectors live in the package of the domain they target; the shared
@@ -34,6 +37,7 @@ IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
     ALBUM.item_type: (),
     ANIME.item_type: (MYANIMELIST_IMPORTER,),
     MOVIE.item_type: (LETTERBOXD_IMPORTER,),
+    SERIES.item_type: (),
 }
 IMPORTERS: dict[str, Importer] = {
     importer.name: importer for importers in IMPORTERS_BY_DOMAIN.values() for importer in importers
@@ -115,3 +119,4 @@ class ItemTypeName(StrEnum):
     ALBUM = "album"
     ANIME = "anime"
     MOVIE = "movie"
+    SERIES = "series"
