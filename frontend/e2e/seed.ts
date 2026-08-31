@@ -185,7 +185,7 @@ export async function stubImporters(page: Page) {
         {
           id: "goodreads",
           label: "Goodreads",
-          item_type: "book",
+          item_types: ["book"],
           attachment_max_bytes: 25 * 1024 * 1024,
           input: {
             kind: "upload",
@@ -212,7 +212,7 @@ export async function stubImporters(page: Page) {
         {
           id: "calibre",
           label: "Calibre",
-          item_type: "book",
+          item_types: ["book"],
           attachment_max_bytes: 25 * 1024 * 1024,
           input: {
             kind: "directory",
