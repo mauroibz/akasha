@@ -2818,3 +2818,30 @@ name". The walkthrough tolerates it; a future sprint may want to map a miss to a
 **Next.** Sprint 050 — TVmaze, the second series provider: a real synopsis, an airing status, and
 the shows Wikidata's search misses. The identity strategy already declares `("wikidata", "tvmaze")`,
 so 050 adds an adapter, not a declaration.
+
+## 2026-08-31 — Sprint 050 (complete)
+- Done: closed Sprint 050 (TVmaze, the second series provider). The implementation was already
+  committed by the prior session (`0e96e9a` adapter, `e094a4b` merge/registration, `ff4ec35` credit,
+  `d279341` provenance, `e1f8719` format). This session fixed the walkthrough spec's wrong assertion,
+  resolved the unexplained 422, wrote the Outcome, added DEC-110, advanced the roadmap and state to
+  Sprint 051, and rewrote the handoff.
+- Verified: focused backend suites 229 passed; `make check` green (lint, typecheck, format,
+  OpenAPI-type parity, project validation); `make test` 989 backend + 190 frontend, the single warning
+  a pre-existing Letterboxd zipfile duplicate-name; `make openapi` clean. The walkthrough spec ran
+  5/5 green earlier in the session against recorded Wikidata+TVmaze with a live Stremio cover fetch.
+- Deviations: (1) The walkthrough spec asserted TVmaze's synopsis would appear on the merged record —
+  a misread of `fill_empty`, which only fills empty fields; Breaking Bad's Wikidata synopsis is
+  non-empty so it correctly survives. Corrected the assertion to the designed rule (fill when empty,
+  overwrite nothing); the merge was already right. The spec is gitignored scratchpad, so the fix is
+  local-only. (2) The intermittent `422 POST /api/entries` was identified by static analysis as the
+  designed `near_match_confirmation_required` guard (`application/add.py:197-202`) firing on a
+  leftover row when two add-tests ran back-to-back against a reused walkthrough data dir; it does not
+  reproduce on a fresh data dir. Recorded as a harness state artifact, not a product defect. (3) The
+  `bounded_json` widening to `Any` plus the `bounded_json_object` companion is recorded as DEC-110.
+- Blocked/open: the walkthrough gate ran against recorded provider responses, not live (DEC-108); one
+  live series search is still owed to prove the adapters' request shape is still what live Wikidata
+  and TVmaze answer today. Carried into the handoff.
+- Next: Sprint 051 — One source, many libraries. A connector declares the domains it can produce
+  (`Importer.item_types`), the shared service resolves the domain per record, the screen renders a
+  target checkbox per declared type, and the chosen targets fold into the preview fingerprint. Built
+  and proved against a test connector, not IMDb. Read `docs/sprints/051-multi-domain-imports.md`.

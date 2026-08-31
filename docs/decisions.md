@@ -3764,3 +3764,30 @@ predictions about mistakes to come.
 - **Consequences:** A domain may declare its full identity strategy ahead of the providers that
   satisfy it, which is what lets a later provider land as an adapter alone. The two contracts are
   now checked separately rather than one strictness serving both.
+
+## DEC-110 — A shared boundary may widen its return shape; a typed companion keeps the old guard
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-025 (prove a provider boundary against recorded real responses), the
+  AniList precedent where the same boundary gained a verb (POST) rather than a special case.
+- **Context:** The shared provider HTTP boundary, `bounded_json`, historically returned
+  `Mapping[str, Any]` and enforced it — every provider before TVmaze answered a JSON object. TVmaze's
+  `/search/shows` answers a JSON **array**, the first list-shaped response the boundary had met.
+  Widening the return to `Any` and deleting the object guard makes the new caller typecheck, but it
+  silently drops the malformed-shape guard the seven existing object callers relied on (mypy then
+  surfaces six `no-any-return` errors where `Any` flows into a `Mapping` wrapper). Weakening every
+  wrapper to `-> Any` throws the guard away; special-casing the list caller inside the boundary
+  (`if "tvmaze" in url`) is the seam violation the shared layer forbids.
+- **Decision:** Widen the boundary and add a typed companion, rather than weaken every caller.
+  `bounded_json` returns `Any` for the one list-shaped caller; a new `bounded_json_object` re-asserts
+  the object shape (`if not isinstance(decoded, Mapping): raise ProviderPayloadError`) and the seven
+  existing callers migrate to it. The list caller keeps its own `isinstance(body, list)` check. The
+  new shape is the caller's to judge — exactly as the HTTP verb was when the boundary gained POST for
+  AniList — and the old shape's guard is the companion's to keep. The boundary gained a shape, not a
+  special case.
+- **Consequences:** `make typecheck` clears with no caller's guard weakened; the migrated object
+  callers behave identically under the companion (the full provider regression suites stay green);
+  and the next provider with a non-object response follows the same pattern — widen the boundary, add
+  a companion, do not weaken the callers. The technique is written up for reuse in the
+  seeds-methodology skill's `widening-a-shared-boundary-return-type` reference.

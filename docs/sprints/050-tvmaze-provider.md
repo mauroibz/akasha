@@ -1,6 +1,6 @@
 # Sprint 050 — TVmaze: a real synopsis, an airing status, and the shows Wikidata's search misses
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 049
 **Roadmap revision:** 27
 
@@ -181,4 +181,67 @@ find the credit line.
 
 ## Outcome
 
-_Not started._
+**Delivered.** The series domain has its second keyless provider. A series search now reaches both
+Wikidata and TVmaze and returns one merged list; the shows Wikidata's title index does not surface
+resolve through TVmaze with the right year; and a permanent credit line naming both sources sits in
+the application footer.
+
+- `backend/src/book_tracker/domains/series/tvmaze.py` — `TvmazeSeriesProvider`, the three official
+  endpoints and nothing else. `summary` HTML is parsed to plain text; `network` falls back to
+  `webChannel`; `episode_minutes` reads `averageRuntime` then `runtime`; `episodes` and covers are
+  never emitted (the two deliberate refusals, AC5 and AC7). The `/lookup/shows?imdb=` hit is a 301
+  the shared client follows; a miss is a 404 with a `null` body, read as `record_not_found`.
+- The shared `bounded_json` boundary was widened from `Mapping[str, Any]` to `Any` for TVmaze's
+  list-shaped `/search/shows`, and a typed `bounded_json_object` companion was added so the seven
+  existing object callers keep their malformed-shape guard. No caller was weakened; the list caller
+  judges its own shape. Recorded as DEC-110.
+- The merge is the shared `merge_and_rank` + `fill_empty`, nothing local. The series identity
+  strategy already declared `("wikidata", "tvmaze")`, so this sprint registered the adapter and let
+  the shared layer group both candidates on `imdb:tt…`. `EnrichmentSpec.provider_order` is now
+  `("wikidata", "tvmaze")`. The recognizer routes `tvmaze.com` URLs to the adapter.
+- `frontend/src/.../DataCredit.tsx` — the credit line, mounted in the AppShell footer (AC9). A
+  Detail-panel variant that branched on `item.type === "series"` was reverted: that is the forbidden
+  seam violation, and the footer is the domain-neutral surface.
+
+**Acceptance criteria, verified.** 1 — both providers answer one search into one merged list, against
+recorded responses (`test_a_candidate_from_each_provider_merges_into_one_record`, and the walkthrough's
+single Breaking Bad row). 2 — `Los Simuladores` (2002) and `Okupas` (2000) resolve through TVmaze
+(`test_the_shows_wikidata_s_title_search_misses`, and the walkthrough). 3 — one record on `imdb:tt…`
+through `merge_and_rank`, no domain-specific merge code. 4 — TVmaze fills empty `synopsis`,
+`airing_status` and `network` and overwrites nothing Wikidata supplied
+(`test_tvmaze_fills_what_wikidata_left_empty_and_overwrites_nothing`); the walkthrough asserts the
+designed rule. 5 — `episodes` is never sourced from TVmaze (`test_it_emits_no_cover_and_no_episode_count`;
+the merged record keeps Wikidata's P1113 = 62). 6 — `summary` HTML reaches the field as plain text, no
+markup stored (`test_the_synopsis_arrives_as_plain_text`). 7 — `static.tvmaze.com` is not in
+`ALLOWED_COVER_HOSTS` and the cover still comes from Stremio (`test_tvmaze_s_host_is_not_allowlisted`;
+the walkthrough fetches the real poster). 8 — a 429 is retried under the shared `bounded_json` policy
+and never fails the search (`test_a_429_is_retried_under_the_existing_policy`,
+`test_a_search_is_not_failed_by_one_provider_s_429`). 9 — the credit naming both sources is visible in
+the running application, verified in a browser. 10 — no migration, no new route, no new published
+vocabulary (`make openapi` is clean).
+
+**Verification.** Focused backend suites — 229 passed. `make check` — lint, typecheck, format,
+OpenAPI-type parity, project validation all pass. `make test` — 989 backend + 190 frontend, zero
+warnings from this sprint (the one warning is a pre-existing Letterboxd zipfile duplicate-name in
+`test_letterboxd_import.py`). `make openapi` — no diff. The walkthrough
+(`frontend/e2e/scratchpad/series-050-walkthrough.spec.ts`, local-only) ran 5/5 green against recorded
+Wikidata and TVmaze with a live Stremio cover fetch: one merged row, Los Simuladores by year, the
+merged record's fill-empty rule, the credit line, and a real >10 KB poster.
+
+**Deviations and notes.**
+
+- The walkthrough ran against **recorded** provider responses, not live (DEC-108's substitution rule):
+  what is proven is the rendered flow, the merge, the credit and the poster pipeline; what is not
+  proven is that the adapters' request shape is still what live Wikidata and TVmaze answer today.
+- One intermittent `422 POST /api/entries` appeared during the add-tests only when two adds ran
+  back-to-back against a reused walkthrough data dir. Static analysis (`application/add.py:197-202`)
+  identifies it as the designed `near_match_confirmation_required` guard firing on a leftover row from
+  a prior run; it does not reproduce on a fresh data dir and all five tests pass clean. Recorded as a
+  walkthrough-harness state artifact, not a product defect.
+- The walkthrough spec initially asserted TVmaze's synopsis would appear on the merged record. That
+  misread the contract: `fill_empty` only fills empty fields, and Breaking Bad's Wikidata synopsis is
+  non-empty, so Wikidata's sentence correctly survives. The assertion was corrected to the designed
+  rule (fill when empty, overwrite nothing); the merge was already correct.
+
+**Commits.** `0e96e9a` Read series from TVmaze · `e094a4b` Merge Wikidata and TVmaze on the IMDb id ·
+`ff4ec35` Credit the series data sources · `d279341` fixture provenance · `e1f8719` format.
