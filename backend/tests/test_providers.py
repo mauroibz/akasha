@@ -9,7 +9,7 @@ from book_tracker.application.providers import (
     resolve_input,
     search_providers,
 )
-from book_tracker.domain.providers import SearchCandidate, SourceRef, merge_and_rank
+from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef, merge_and_rank
 from book_tracker.domains.book import BOOK_IDENTITY
 from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.infrastructure.providers import MAX_PROVIDER_BYTES, ProviderPayloadError
@@ -337,3 +337,103 @@ async def test_a_pasted_film_link_reaches_the_movie_adapter(tmp_path_factory: ob
     assert [row.source_id for row in resolved] == ["Q546900"]
     assert resolved[0].title == "Suspiria"
     assert resolved[0].year == 1977
+
+
+@pytest.mark.anyio
+async def test_a_url_the_first_domain_refuses_falls_through_to_the_next() -> None:
+    """A series IMDb URL must reach the series adapter, not die on the movie guard.
+
+    The movie recognizer claims every `imdb.com/title/tt…` URL because it is
+    registered first; its provider then refuses a series entity with
+    `record_not_found`. That refusal is an answer about *its* catalogue, not about
+    the URL, so the loop must offer the next domain its turn rather than returning
+    the first domain's miss as the resolve's failure.
+    """
+    calls: list[str] = []
+
+    class MovieStub(StubProvider):
+        item_type = "movie"
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            calls.append(f"movie:{source_id}")
+            raise ProviderPayloadError(
+                f"Wikidata has no usable film at {source_id}", code="record_not_found"
+            )
+
+    class SeriesStub(StubProvider):
+        item_type = "series"
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            calls.append(f"series:{source_id}")
+            return ItemPayload(**vars(candidate(self.name, "Q1079", title="Breaking Bad")))
+
+    resolved = await resolve_input(
+        "https://www.imdb.com/title/tt0903747/",
+        {"wikidata": MovieStub("wikidata"), "wikidata-series": SeriesStub("wikidata-series")},
+    )
+    assert [row.source_id for row in resolved] == ["Q1079"]
+    # The movie adapter was asked first and refused; the series adapter then got its turn.
+    assert calls == ["movie:imdb:tt0903747", "series:imdb:tt0903747"]
+
+
+@pytest.mark.anyio
+async def test_a_url_every_domain_refuses_is_a_miss_not_an_outage() -> None:
+    """When no domain holds the record, the last refusal is the answer.
+
+    Continuing on `record_not_found` must not turn a genuine miss into a success,
+    and must not swallow a real provider outage: only the typed miss falls through.
+    """
+
+    class RefusingMovie(StubProvider):
+        item_type = "movie"
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            raise ProviderPayloadError("no film here", code="record_not_found")
+
+    class RefusingSeries(StubProvider):
+        item_type = "series"
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            raise ProviderPayloadError("no series here", code="record_not_found")
+
+    with pytest.raises(ProviderPayloadError, match="no series here"):
+        await resolve_input(
+            "https://www.imdb.com/title/tt9999999/",
+            {
+                "wikidata": RefusingMovie("wikidata"),
+                "wikidata-series": RefusingSeries("wikidata-series"),
+            },
+        )
+
+
+@pytest.mark.anyio
+async def test_a_provider_outage_does_not_fall_through() -> None:
+    """An outage is not a miss: the first domain being unwell is the answer.
+
+    `record_not_found` is the only code that falls through. Anything else — the
+    provider unreachable, throttled, or returning garbage — must surface as the
+    failure it is rather than quietly asking the next domain to guess.
+    """
+    calls: list[str] = []
+
+    class UnwellMovie(StubProvider):
+        item_type = "movie"
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            calls.append("movie")
+            raise ProviderPayloadError("Wikidata could not be reached", code="provider_unreachable")
+
+    class SeriesStub(StubProvider):
+        item_type = "series"
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            calls.append("series")
+            return ItemPayload(**vars(candidate(self.name, "Q1079")))
+
+    with pytest.raises(ProviderPayloadError, match="could not be reached"):
+        await resolve_input(
+            "https://www.imdb.com/title/tt0903747/",
+            {"wikidata": UnwellMovie("wikidata"), "wikidata-series": SeriesStub("wikidata-series")},
+        )
+    # The series adapter was never asked: an outage is not an invitation to guess.
+    assert calls == ["movie"]
