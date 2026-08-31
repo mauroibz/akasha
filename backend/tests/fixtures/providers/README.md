@@ -183,3 +183,29 @@ not `maxlag`, so the bodies are interchangeable with what the adapter requests.
 | `wikidata_series_entity_Q4500_vince_gilligan.json` | `Q4500`, a human (`P31=Q5`). The most legible thing to paste into the add box by mistake; the `_is_series` guard refuses it. |
 | `wikidata_series_labels_bojack_pair.json`, `wikidata_series_labels_Q104211858_chainsaw.json`, `wikidata_series_labels_Q48741246_chernobyl.json`, `wikidata_series_labels_Q1079_breaking_bad.json`, `wikidata_series_labels_chernobyl_search.json` | `action=wbgetentities&props=labels` for exactly the linked creators, countries, languages, genres, networks and bounded cast of the entity files above, in the order the adapter asks for them. The `chernobyl_search` one spans both entity batches. |
 | `letterboxd_boxd_it_redirect.headers` | `HEAD https://boxd.it/2b0k` — response headers only. Status **302**, `Location: https://letterboxd.com/film/the-dark-knight/`. A public short link, not the owner's export. One hop, HEAD only, and the body is never requested: this is identity resolution, and parsing the destination's HTML would cross the boundary the movie design deliberately avoids. |
+## TVmaze (Sprint 050, captured 2026-08-31)
+
+Twelve files for the series domain's second adapter, captured live with
+`User-Agent: Akasha/1.4 (local@example.invalid)` and paced at ~0.6 s between
+requests. Nothing was re-recorded. The two shapes an implementation would
+otherwise guess wrong are pinned here:
+
+- `/lookup/shows?imdb=` answers a hit with **301 → /shows/<id>** and a `null`
+  body; the shared client follows the redirect, so a hit *is* the show record.
+  A miss answers **404** with a `null` body — an answer, never an outage.
+- `summary` arrives as HTML and is parsed to plain text at the boundary.
+
+| File | What it is and why it was chosen |
+| --- | --- |
+| `tvmaze_search_breaking_bad.json` | `GET /search/shows?q=Breaking+Bad` — the merge case: TVmaze id 169 carries `externals.imdb = tt0903747`, the same IMDb id Wikidata's `Q1079` carries, so the two candidates group on `imdb:tt0903747`. `status: Ended`, genres, network `AMC`, `averageRuntime` 60, `premiered` 2008-01-20, and an HTML `summary`. |
+| `tvmaze_search_los_simuladores.json` | `GET /search/shows?q=Los+Simuladores` — one hit, the Argentine series Wikidata's title search does not surface (AC2). `premiered` 2002-03-21, `externals.imdb = tt0316613`. |
+| `tvmaze_search_okupas.json` | `GET /search/shows?q=Okupas` — the second AC2 case: `Okupas` at rank 1, `premiered` 2000-10-18, `externals.imdb = tt0289649`, plus three unrelated rows (`Okura`, `Samantha Oups`, `Lieutenant Opas`) as search noise. |
+| `tvmaze_search_mandalorian.json` | `GET /search/shows?q=The+Mandalorian` — the `webChannel` case: `network` is null, `webChannel.name` is `Disney+`, so the network field falls back to the streamer. `runtime` is null and `averageRuntime` is 40, the runtime-fallback direction. |
+| `tvmaze_search_hot_ones.json` | `GET /search/shows?q=Hot+Ones` — ten rows: a YouTube `webChannel` original, a `Canal+` network namesake, and one row with `externals.imdb` null, so the no-identity path is exercised. |
+| `tvmaze_lookup_tt0903747.json` | `GET /lookup/shows?imdb=tt0903747` followed to `/shows/169` — the body of the 301's target, i.e. what the shared client returns for a hit. The IMDb-resolution path both importers depend on. |
+| `tvmaze_lookup_no_match.json` | `GET /lookup/shows?imdb=tt9999999` — **404** with a literal `null` body. A miss is an answer (`record_not_found`), not an outage. |
+| `tvmaze_show_169_breaking_bad.json` | `GET /shows/169` — the fetch-by-id path, same record as the lookup target. |
+| `tvmaze_show_38963_mandalorian.json` | `GET /shows/38963` — the `webChannel`-only, `runtime: null` fetch case. |
+| `tvmaze_show_76954_samantha_oups.json` | `GET /shows/76954` — both `runtime` and `averageRuntime` null, so `episode_minutes` stays empty; `network.name` is `France 2`. |
+| `tvmaze_show_10577_los_simuladores.json` | `GET /shows/10577` — the AC2 series' full record. |
+| `tvmaze_show_45942_okupas.json` | `GET /shows/45942` — the second AC2 series' full record. |
