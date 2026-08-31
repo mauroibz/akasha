@@ -1,6 +1,6 @@
 # Sprint 051 — The verification gates get faster
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 050
 **Roadmap revision:** 28
 
