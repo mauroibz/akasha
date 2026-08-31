@@ -1,50 +1,59 @@
-# Handoff — the plan is extended; Sprint 049 is ready and nothing is implemented yet
+# Handoff — Sprint 049 is complete; Sprint 050 (TVmaze) is ready
 
-Plan revision 27 added five sprints, 049–053, for **television series** and the two importers the
-owner asked for. `docs/agent/state.json` names **049** as active with status `ready`. No runtime code
-for any of it exists.
+Sprint 049 shipped **series as the fifth domain** on keyless Wikidata, with a working poster and a
+working episode-progress control from the first commit. `docs/agent/state.json` names **050** as
+active with status `ready`. No runtime code for TVmaze exists yet.
 
-The whole planning session is evidence-backed: `docs/series-domain-viability.md` holds live provider
-measurements, the poster measurement, both of the owner's real exports parsed structurally, and the
-anime-overlap question measured and answered. DEC-104 through DEC-107 hold the decisions. **Read the
-viability document before Sprint 049 — the sprint file leans on it rather than repeating it.**
+The series domain is registered, its provider is constructed into the catalog as `wikidata-series`,
+and every screen renders it from `GET /api/item-types` with no frontend change. `make test` is 967
+backend + 189 frontend, green; `make check` is green. Nothing is tagged, released or pushed — the
+whole series line is local on this branch.
 
 ## What the next session is picking up
 
-Sprint 049 builds the series domain on keyless Wikidata with posters from day one. The three things
-most likely to be got wrong, all of them recorded:
+Sprint 050 adds **TVmaze** as the second series provider: a real synopsis (the sprint's `synopsis`
+field currently holds Wikidata's one-line description, named for its purpose now), a real airing
+status, and the shows Wikidata's search misses. Read `docs/sprints/050-tvmaze-provider.md` first.
 
-- **The movie search filter does not transfer.** A single `haswbstatement:P31=Q5398426` — the shape
-  `domains/movie/providers.py` uses — found the right series at rank 1 for 9 of 14 measured titles and
-  returned nothing at all for two. Five classes are needed. Copying the movie adapter is the right
-  instinct; this is the one line where it fails.
-- **`seasons` and `cast` must not be enrichment completeness fields.** They were absent on 2 of 13 and
-  4 of 13 measured entities. Naming a legitimately empty field re-queues its row on every backfill
-  for ever.
-- **The domain introduces no new status and no new format.** Anime's five statuses and the movie four
-  formats are already published and already mirrored client-side. `ItemTypeName` is the only
-  published-vocabulary change, and adding an `EntryStatus` member would be a mistake, not a step.
+The seam is already in place, deliberately:
 
-`metahub_poster_url` currently lives in `domains/movie/posters.py` and Sprint 049 moves it to
-`infrastructure/posters.py`, because a domain package may not import another domain package and
-duplicating a ten-line URL builder is the worse answer.
+- The series identity strategy declares `("wikidata", "tvmaze")` **now**, so 050 adds an adapter,
+  not a declaration. DEC-109 records why the conformance check lets a domain name a provider the
+  registry does not yet hold: `source_preference` is a ranking, `enrichment.provider_order` is strict.
+- `EnrichmentSpec.provider_order` for series is `("wikidata",)`; 050 extends it.
+- TVmaze needs no key, only `USER_AGENT_CONTACT`. Its published rate limit is at least 20 calls per
+  10 seconds per IP, with HTTP 429 on breach.
+
+## The walkthrough pattern, proven this sprint
+
+Sprint 049's walkthrough ran against **recorded** Wikidata because the replicas were maxlag-shedding
+all day and the adapter's contractual `maxlag=5` refuses every live search. DEC-108 records the
+substitution rule: replay the provider half at the transport seam, leave the cover pipeline live,
+and record explicitly what is and is not proven. `scripts/walkthrough_series.py` is the reusable
+harness. Two runner traps cost time and are now documented in the worklog: uvicorn's own lifespan
+pass re-runs and undoes a seam installed inside the lifespan (drive it yourself, `lifespan="off"`),
+and the add path fetches the chosen entity alone rather than as the search batch (the replay needs
+single-entity routes, derivable from the batch fixtures).
+
+**One live search is still owed.** The recorded walkthrough proves the rendered flow, the poster
+pipeline and the progress control; it does not prove the adapter's request shape is still what live
+Wikidata answers today. When the replicas recover, run one live series search before Sprint 050's
+own walkthrough leans on the same assumption.
 
 ## Still true from before, and still not repaired
 
 Sprint 047 was verified at a reduced level by owner direction (DEC-102): nobody has seen the
 Letterboxd connector rendered on the Import page, nobody has approved a movie row through the Triage
 UI, and **undo has no coverage in that sprint at any level**. Sprint 052's walkthrough gate is where
-that debt is scheduled to be paid, because it exercises the same screens with the same domain.
+that debt is scheduled to be paid.
 
 Two recorded defects from Sprint 046 (DEC-100) are still open and neither is movie-specific:
 
 - `_backfillable_items` counts a null `cover_path` or `year` as "worth a lookup" in every domain,
   regardless of that domain's `completeness_fields`.
 - `GET /api/search/resolve` maps every exception from `resolve_input` to HTTP 502 `provider_failure`,
-  so a typed `record_not_found` is reported as an outage.
-
-Nothing has been tagged, released or pushed. The movie line, v1.4.0 included, is entirely local on
-this branch.
+  so a typed `record_not_found` is reported as an outage. The walkthrough re-confirmed this: a link
+  naming no series still reads as a provider outage rather than a clean "no series by that name".
 
 ## Private data and operational constraints
 
@@ -53,9 +62,6 @@ this branch.
   Every one carries account ids, usernames or ratings; the Trakt archive carries the owner's **email
   address** in `user-settings.json` and `user-profile.json`. These are read-only walkthrough input.
   **No fixture may be cut from any of them** — every committed importer fixture is invented.
-- The directory is ignored wholesale rather than by pattern because IMDb names its CSVs after a list
-  UUID and no pattern would have caught them.
 - Wikidata and TVmaze both need no key, only `USER_AGENT_CONTACT`. Stremio's poster host is already
   in `ALLOWED_COVER_HOSTS`; series need no allowlist change.
-- TVmaze's published rate limit is at least 20 calls per 10 seconds per IP, with HTTP 429 on breach.
-- `frontend/e2e/scratchpad/` is gitignored; the movie walkthrough spec there is local only.
+- `frontend/e2e/scratchpad/` is gitignored; the series walkthrough spec there is local only.

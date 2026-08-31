@@ -1,6 +1,6 @@
 # Sprint 050 — TVmaze: a real synopsis, an airing status, and the shows Wikidata's search misses
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 049
 **Roadmap revision:** 27
 

@@ -1,6 +1,6 @@
 # Sprint 049 — Series: the fifth domain, with posters on day one
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 048
 **Roadmap revision:** 27
 
@@ -214,4 +214,90 @@ passed a green gate while producing a wall of blank tiles; a populated field is 
 
 ## Outcome
 
-_Not started._
+**Status: completed 2026-08-31.** Series is the fifth domain, on keyless Wikidata, with a working
+poster and a working episode-progress control from the first commit. No migration, no new status,
+no new format, no screen.
+
+**Delivered.**
+
+- `infrastructure/posters.py` — `metahub_poster_url` promoted out of `domains/movie/posters.py`,
+  unchanged; the movie suite passes with only the import path updated. (`9e52e0b [REF]`)
+- `domains/series/` — the declaration (12 measured fields, anime's five statuses plus `unsorted`,
+  the movie four formats, `ProgressSpec("Episodes watched", "episode", total_field="episodes")`,
+  entry panel "Your watch data", default `plan_to_watch`, `imdb_identity`, `EnrichmentSpec` with
+  `seasons`/`cast` deliberately absent from completeness fields), the recognizer (all five URL
+  shapes, TMDB `/movie/` and malformed authorities returning `None`), and `WikidataSeriesProvider`
+  with the five-class `P31` filter, the `P170`→`P58` creator fallback, the `_is_series` guard, the
+  claim re-check, `fetch_by_identifier("imdb")` and Stremio `cover_url`. Registered into
+  `domain/registry.py` (`ItemTypeName.SERIES`, `IMPORTERS_BY_DOMAIN` of `()`) and constructed into
+  the provider catalog in `main.py` as `wikidata-series`. (`566dcb9 [ADD]`, `1b04d6c [ADD]`)
+- The shared resolve, repaired as a walkthrough finding: `resolve_input` was first-match-wins, and
+  the movie domain (registered before series) claims every `wikidata.org/wiki/Q…` and
+  `imdb.com/title/tt…` URL, so a pasted series link was intercepted by the movie provider, refused
+  by its film guard, and never reached the series recognizer. A typed `record_not_found` is an
+  answer about that domain's catalogue, not about the URL, so the loop now offers the next domain
+  its turn; any other error still propagates, and when every recognizing domain refuses, the last
+  refusal is the answer. (`eb0a316 [FIX]`, three tests)
+- The walkthrough runner `scripts/walkthrough_series.py`, which boots the real application on a
+  disposable data directory and replays the Wikidata half of the boundary from the sprint's own
+  live captures while the Stremio poster fetch and the whole cover pipeline stay live.
+  (`7b8f0f8 [ADD]`)
+
+**Acceptance criteria, verified.**
+
+1. `GET /api/item-types` publishes `series` and every screen renders from it with no frontend
+   change — proven by the walkthrough, which renders the domain, its statuses, its detail layout and
+   its progress control with nothing written for series. `test_domain_conformance.py` passes
+   unmodified (AC9).
+2. Search candidates carry `imdb:tt…` identity, against recorded responses (19 provider tests).
+3. The five-class filter is exercised by a test that fails under a single-class filter; BoJack
+   Horseman (animated), an anime series and a miniseries each resolve at rank 1.
+4. `fetch_by_identifier("imdb", …)` returns the series; a `haswbstatement` hit whose fetched entity
+   does not carry the claim is refused.
+5. A series with an IMDb id emits a Stremio poster URL with no extra request; the cover pipeline
+   installs it with no bound, host or redirect rule changed.
+6. Episode progress stores and renders `20 / 62 episodes` against the item's own `P1113`; a count
+   above the total is stored and displayed, not refused (DEC-092) — walkthrough tests 7 and 8.
+7. `EntryStatus`/`EntryFormat` unchanged; `ItemTypeName` gains exactly one member.
+8. No migration, no new route, no screen change. `make openapi` produced no diff beyond the
+   already-committed `ItemTypeName` addition (the resolve fix is internal).
+
+**Tests run.** The sprint's focused suites (`test_series_domain`, `test_wikidata_series_provider`,
+`test_domain_conformance`, `test_movie_posters`, `test_covers`, `test_providers`,
+`test_provider_api`) — 252 passed. `make check` — lint, typecheck, format, OpenAPI-type parity,
+project validation all pass. `make test` — 967 backend + 189 frontend, zero warnings from this
+sprint (one pre-existing intentional duplicate-name ZIP warning in the Letterboxd import suite).
+
+**Walkthrough gate.** Run against recorded Wikidata (deviation below). 12/12 browser tests pass:
+the Series tab and its five status words render from the registry; searching "BoJack Horseman"
+finds the animated series a single-class filter would miss; a pasted IMDb link resolves through the
+exact `P345` claim to Breaking Bad; the detail page renders the domain's fields and its own words;
+the poster is the series' actual poster art (two ~60 KB JPEGs fetched live from
+`images.metahub.space`, asserted non-trivial — the Sprint 046 blank-tile failure mode); an episode
+count stores and renders against the series' own total and a count above it is stored; a hand-added
+series lands in Plan to watch and moves between statuses; the opinion form offers this domain's
+formats and no book's; filtering the library by status finds the series; a link naming no series
+says so rather than guessing.
+
+**Deviations.**
+
+- **The walkthrough ran against recorded Wikidata, not live.** Wikidata's query-service replicas
+  were maxlag-shedding for the whole day (lag 24 s → 47 s and climbing) and the adapter's
+  contractual `maxlag=5` means every live search is refused. At the owner's direction the gate ran
+  against the sprint's own live captures (taken earlier the same day), with the poster fetch and
+  cover pipeline left live. What is not proven is that the adapter's request shape is still what
+  live Wikidata answers today; the fixtures pin the 2026-08-31 contract and the provider suite
+  already proves the adapter parses them. When the replicas recover, one live search is the whole
+  remaining proof. Recorded as DEC-108.
+- **Fixtures were captured without `maxlag`** (the replay keys on `srsearch`/`ids`/`props`, and the
+  bodies are interchangeable). `tt0000001` turned out to be a real film, so the miss fixture uses
+  `tt9999999`. `Q87484192` (the BoJack show-within-a-show) carries `P31=Q5398426` itself.
+- **The conformance check was refined**: `source_preference` is a ranking, not a strict order, so
+  the check no longer requires it to be a subsequence of the registry; `enrichment.provider_order`
+  stays strict. Recorded as DEC-109.
+- **The shared resolve repair** (`eb0a316`) is a behaviour change outside the sprint's listed
+  deliverables, surfaced to and approved by the owner during the walkthrough (option 1,
+  continue-on-miss). It is a prerequisite for add-by-URL working for series at all.
+
+**Commits.** `9e52e0b [REF]`, `566dcb9 [ADD]`, `1b04d6c [ADD]`, `df6f18c [TEST]`,
+`eb0a316 [FIX]`, `7b8f0f8 [ADD]`, and the closure commit.

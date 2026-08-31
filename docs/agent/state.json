@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 27,
-  "project_status": "in_progress",
-  "active_sprint": "049",
-  "active_sprint_file": "docs/sprints/049-series-domain.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "048",
+  "project_status": "ready",
+  "active_sprint": "050",
+  "active_sprint_file": "docs/sprints/050-tvmaze-provider.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "049",
   "completed_sprints": [
     "001",
     "002",
@@ -54,8 +54,9 @@
     "045",
     "046",
     "047",
-    "048"
+    "048",
+    "049"
   ],
-  "started_at": "2026-08-31T10:56:00-03:00",
-  "updated_at": "2026-08-31T10:56:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-08-31T13:45:00-03:00"
 }

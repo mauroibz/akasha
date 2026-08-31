@@ -3718,3 +3718,49 @@ predictions about mistakes to come.
 - **Consequence, accepted and stated rather than hidden:** a show may exist as both an anime item and
   a series item. They share no identity — anime is keyed on `mal:` and series on `imdb:` — so nothing
   merges them silently, and the duplicate is visible.
+
+## DEC-108 — A walkthrough gate may run against recorded provider responses when the live boundary is down
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Context:** Sprint 049's walkthrough gate requires running the application and performing the
+  series search/add flow end to end against realistic data. On the day the gate was due, Wikidata's
+  query-service replicas had been maxlag-shedding for over three hours (measured lag climbing from
+  24 s to 47 s and still rising), and the adapter's contractual `maxlag=5` means every live search
+  is refused with a rate-limit error. The incident had no ETA, and the gate cannot wait on an
+  external outage indefinitely. DEC-025 already establishes that provider-boundary behavior is
+  proven against recorded real responses, and the sprint had captured exactly such responses live
+  earlier the same day.
+- **Decision:** At the owner's direction, the walkthrough ran against the sprint's own recorded
+  Wikidata responses, replayed at the transport seam by `scripts/walkthrough_series.py`, while the
+  Stremio poster fetch and the whole cover pipeline were left live — a blank tile being the
+  specific failure mode (Sprint 046) the gate exists to catch. The substitution is recorded
+  explicitly in the sprint Outcome and the worklog, including what is and is not proven: the
+  rendered flow, the poster pipeline and the progress control are proven; that the adapter's
+  request shape is still what live Wikidata answers today is not, and is discharged by one live
+  search once the replicas recover. This is a gate-level substitution made visible, not a silent
+  weakening of the walkthrough standard.
+- **Consequences:** A walkthrough blocked by a provider outage is not a reason to close a sprint
+  without exercising the product, nor a reason to wait indefinitely. The runner drives the
+  lifespan itself because uvicorn's own lifespan pass would rebuild every provider on a live
+  client and silently undo the replay — a substitution that is not asserted is a substitution that
+  did not happen. The same pattern serves any future sprint whose walkthrough lands on a provider
+  incident.
+
+## DEC-109 — `source_preference` is a ranking, not a strict order
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Context:** The domain conformance check required a domain's `source_preference` tuple to be a
+  subsequence of the provider registry's construction order. The series domain's identity strategy
+  declares `("wikidata", "tvmaze")` — TVmaze being Sprint 050's provider, declared now so that
+  sprint adds an adapter and not a declaration — which is not a subsequence of a registry that does
+  not yet contain TVmaze. The check conflated two different contracts.
+- **Decision:** `source_preference` is a ranking used by `_merge_group` for identity grouping and
+  fill-empty, and a provider absent from the registry is simply never consulted, so the conformance
+  check no longer requires it to be a subsequence of the registry. `enrichment.provider_order`
+  stays strict: the enrichment handler walks it directly, and a provider named there that is not
+  registered is a real defect, not a forward declaration.
+- **Consequences:** A domain may declare its full identity strategy ahead of the providers that
+  satisfy it, which is what lets a later provider land as an adapter alone. The two contracts are
+  now checked separately rather than one strictness serving both.

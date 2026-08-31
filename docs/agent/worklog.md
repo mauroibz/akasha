@@ -2754,3 +2754,67 @@ produced documentation rather than sprints:
 
 **Next.** Sprint 049 — the series domain on Wikidata, with posters in the same sprint rather than a
 sprint later. Nothing is implemented.
+
+## 2026-08-31 — Sprint 049 complete; series is the fifth domain
+
+**Done.** Series ships as the fifth domain, on keyless Wikidata, with a working poster and a working
+episode-progress control from the first commit. `metahub_poster_url` was promoted to
+`infrastructure/posters.py`; `domains/series/` carries the declaration (12 measured fields, anime's
+five statuses plus `unsorted`, the movie four formats, `ProgressSpec("Episodes watched", "episode",
+total_field="episodes")`), the recognizer and `WikidataSeriesProvider` with the five-class `P31`
+filter, the `P170`→`P58` creator fallback, the `_is_series` guard, the claim re-check,
+`fetch_by_identifier("imdb")` and the Stremio `cover_url`. Registered into the registry
+(`ItemTypeName.SERIES`) and constructed into the provider catalog as `wikidata-series`. No migration,
+no new status, no new format, no screen. 28 declaration tests, 19 provider tests, 20 live-captured
+fixtures.
+
+**The walkthrough, and what it found.** The gate ran against recorded Wikidata — the replicas were
+maxlag-shedding all day (lag 24 s → 47 s and climbing) and the adapter's contractual `maxlag=5`
+means every live search is refused — with the Stremio poster fetch and the whole cover pipeline left
+live. `scripts/walkthrough_series.py` boots the real application on a disposable data directory and
+replays the Wikidata half at the transport seam. 12/12 browser tests pass: the Series tab and its
+five status words render from the registry with no frontend change; searching "BoJack Horseman"
+finds the animated series a single-class filter would miss; a pasted IMDb link resolves through the
+exact `P345` claim to Breaking Bad; the detail page renders the domain's fields and its own words;
+the poster is the series' actual poster art (two ~60 KB JPEGs fetched live from
+`images.metahub.space`, asserted non-trivial — the Sprint 046 blank-tile failure mode); an episode
+count stores and renders `20 / 62 episodes` against the series' own `P1113`, and a count above it is
+stored rather than refused; a hand-added series lands in Plan to watch and moves between statuses;
+the opinion form offers this domain's formats and no book's; filtering the library by status finds
+the series; a link naming no series says so rather than guessing.
+
+One real defect surfaced and was fixed: `resolve_input` was first-match-wins, and the movie domain
+(registered before series) claims every `wikidata.org/wiki/Q…` and `imdb.com/title/tt…` URL, so a
+pasted series link was intercepted by the movie provider, refused by its film guard, and never
+reached the series recognizer. A typed `record_not_found` is an answer about that domain's
+catalogue, not about the URL, so the loop now offers the next domain its turn; any other error still
+propagates, and when every recognizing domain refuses, the last refusal is the answer. Surfaced to
+the owner, who chose the continue-on-miss repair (`eb0a316 [FIX]`, three tests).
+
+Two runner bugs cost time before the gate ran: uvicorn's own lifespan pass re-ran after the replay
+seam was installed and rebuilt every provider on a live client, silently undoing the swap (fixed
+with `lifespan="off"`, the runner driving the lifespan itself); and the add path fetches the chosen
+entity alone rather than as the search batch, so the replay needed single-entity routes derived from
+the batch fixtures.
+
+**Verified.** The sprint's focused suites — 252 passed. `make check` — lint, typecheck, format,
+OpenAPI-type parity, project validation all pass. `make test` — 967 backend + 189 frontend, zero
+warnings from this sprint. `make openapi` — no diff beyond the already-committed `ItemTypeName`
+addition. The walkthrough above.
+
+**Deviations.** The walkthrough ran against recorded Wikidata, not live (DEC-108); what is not
+proven is that the adapter's request shape is still what live Wikidata answers today, discharged by
+one live search once the replicas recover. Fixtures were captured without `maxlag`; `tt0000001`
+turned out to be a real film, so the miss fixture uses `tt9999999`; `Q87484192` carries
+`P31=Q5398426` itself. The conformance check was refined — `source_preference` is a ranking, not a
+strict order; `enrichment.provider_order` stays strict (DEC-109). The shared resolve repair is a
+behaviour change outside the listed deliverables, approved by the owner during the walkthrough.
+
+**Also observed, out of scope, recorded for the owner.** The `/api/search/resolve` route maps every
+failure — including a plain `record_not_found` miss — to a 502 "Metadata could not be resolved", so
+a link that names nothing still reads as a provider outage rather than a clean "no series by that
+name". The walkthrough tolerates it; a future sprint may want to map a miss to a 4xx.
+
+**Next.** Sprint 050 — TVmaze, the second series provider: a real synopsis, an airing status, and
+the shows Wikidata's search misses. The identity strategy already declares `("wikidata", "tvmaze")`,
+so 050 adds an adapter, not a declaration.

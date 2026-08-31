@@ -2,7 +2,7 @@
 
 **Plan revision:** 27
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [049 — Series: the fifth domain, with posters on day one](049-series-domain.md)
+**Active sprint:** [050 — TVmaze: the second series provider](050-tvmaze-provider.md)
 
 ## Shape of the plan
 
@@ -149,8 +149,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | completed |
 | [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | completed |
 | [048](048-movie-posters.md) | Movie posters, without a setup step | 047 | completed |
-| [049](049-series-domain.md) | Series: the fifth domain, with posters on day one | 048 | ready |
-| [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | planned |
+| [049](049-series-domain.md) | Series: the fifth domain, with posters on day one | 048 | completed |
+| [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | ready |
 | [051](051-multi-domain-imports.md) | One source, many libraries | 049 | planned |
 | [052](052-imdb-import.md) | The IMDb import | 049, 051 | planned |
 | [053](053-trakt-import.md) | The Trakt import | 049, 051, 052 | planned |
