@@ -209,9 +209,7 @@ class TvmazeSeriesProvider:
             imdb = None
         thetvdb = _whole(externals_map.get("thetvdb"))
         network = show.get("network")
-        network_name = (
-            _text(network.get("name")) if isinstance(network, Mapping) else None
-        )
+        network_name = _text(network.get("name")) if isinstance(network, Mapping) else None
         if network_name is None:
             web_channel = show.get("webChannel")
             network_name = (
@@ -293,9 +291,7 @@ class TvmazeSeriesProvider:
             raise ProviderPayloadError(f"{raw!r} is not an IMDb id")
         body = await self._read("/lookup/shows", {"imdb": raw})
         if not isinstance(body, Mapping):
-            raise ProviderPayloadError(
-                f"TVmaze has no record for {raw}", code="record_not_found"
-            )
+            raise ProviderPayloadError(f"TVmaze has no record for {raw}", code="record_not_found")
         candidate = self._candidate(body)
         if candidate is None:
             raise ProviderPayloadError("TVmaze returned a record with no usable title")

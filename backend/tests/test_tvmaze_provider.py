@@ -20,10 +20,10 @@ import pytest
 from recordings import recording, replay
 
 from book_tracker.application.providers import search_providers
-from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef, merge_and_rank
+from book_tracker.domain.providers import ItemPayload, SearchCandidate, merge_and_rank
 from book_tracker.domains.series import SERIES_IDENTITY, imdb_identity
 from book_tracker.domains.series.providers import WikidataSeriesProvider, wikidata_series_route_key
-from book_tracker.domains.series.tvmaze import TVMAZE_BASE, TvmazeSeriesProvider
+from book_tracker.domains.series.tvmaze import TvmazeSeriesProvider
 from book_tracker.infrastructure.providers import ProviderPayloadError, create_provider_client
 
 pytestmark = pytest.mark.anyio
@@ -232,7 +232,9 @@ class TestMergeThroughTheSharedLayer:
     async def test_tvmaze_fills_what_wikidata_left_empty_and_overwrites_nothing(self) -> None:
         wikidata = await _wikidata_breaking_bad()
         tvmaze_payload = await tvmaze(FETCH_BREAKING_BAD).fetch("169")
-        merged = merge_and_rank("Breaking Bad", [wikidata, tvmaze_payload], identity=SERIES_IDENTITY)
+        merged = merge_and_rank(
+            "Breaking Bad", [wikidata, tvmaze_payload], identity=SERIES_IDENTITY
+        )
         row = merged[0]
         # Filled from TVmaze: a field Wikidata does not supply as the adapter emits it.
         assert row.metadata["network"] == tvmaze_payload.metadata["network"] == "AMC"
