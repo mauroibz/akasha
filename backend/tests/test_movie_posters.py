@@ -14,9 +14,9 @@ from __future__ import annotations
 import httpx
 import pytest
 
-from book_tracker.infrastructure.posters import metahub_poster_url
 from book_tracker.domains.movie.posters import TmdbPosters, poster_for
 from book_tracker.infrastructure.covers import ALLOWED_COVER_HOSTS, CoverError, prepare_cover
+from book_tracker.infrastructure.posters import metahub_poster_url
 from book_tracker.infrastructure.providers import create_provider_client
 
 pytestmark = pytest.mark.anyio

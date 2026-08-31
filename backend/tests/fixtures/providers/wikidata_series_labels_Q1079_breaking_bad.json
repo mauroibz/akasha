@@ -1,0 +1,369 @@
+{
+  "entities": {
+    "Q4500": {
+      "type": "item",
+      "id": "Q4500",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Vince Gilligan"
+        },
+        "es": {
+          "language": "es",
+          "value": "Vince Gilligan"
+        }
+      }
+    },
+    "Q7174311": {
+      "type": "item",
+      "id": "Q7174311",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Peter Gould"
+        },
+        "es": {
+          "language": "es",
+          "value": "Peter Gould"
+        }
+      }
+    },
+    "Q5542223": {
+      "type": "item",
+      "id": "Q5542223",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "George Mastras"
+        },
+        "es": {
+          "language": "es",
+          "value": "George Mastras"
+        }
+      }
+    },
+    "Q7407299": {
+      "type": "item",
+      "id": "Q7407299",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Sam Catlin"
+        },
+        "es": {
+          "language": "es",
+          "value": "Sam Catlin"
+        }
+      }
+    },
+    "Q10307893": {
+      "type": "item",
+      "id": "Q10307893",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "John Shiban"
+        },
+        "es": {
+          "language": "es",
+          "value": "John Shiban"
+        }
+      }
+    },
+    "Q15042700": {
+      "type": "item",
+      "id": "Q15042700",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Thomas Schnauz"
+        },
+        "es": {
+          "language": "es",
+          "value": "Thomas Schnauz"
+        }
+      }
+    },
+    "Q30": {
+      "type": "item",
+      "id": "Q30",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Estados Unidos"
+        },
+        "en": {
+          "language": "en",
+          "value": "United States"
+        }
+      }
+    },
+    "Q7976": {
+      "type": "item",
+      "id": "Q7976",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "inglés estadounidense"
+        },
+        "en": {
+          "language": "en",
+          "value": "American English"
+        }
+      }
+    },
+    "Q9335577": {
+      "type": "item",
+      "id": "Q9335577",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "crime television series"
+        },
+        "es": {
+          "language": "es",
+          "value": "serie de televisión policíaca"
+        }
+      }
+    },
+    "Q1366112": {
+      "type": "item",
+      "id": "Q1366112",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "drama televisivo"
+        },
+        "en": {
+          "language": "en",
+          "value": "drama television series"
+        }
+      }
+    },
+    "Q67175872": {
+      "type": "item",
+      "id": "Q67175872",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "thriller television series"
+        },
+        "es": {
+          "language": "es",
+          "value": "serie de televisión de suspenso"
+        }
+      }
+    },
+    "Q20652466": {
+      "type": "item",
+      "id": "Q20652466",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "humor negro"
+        },
+        "en": {
+          "language": "en",
+          "value": "black comedy television series"
+        }
+      }
+    },
+    "Q78528852": {
+      "type": "item",
+      "id": "Q78528852",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "contemporary Western film"
+        },
+        "es": {
+          "language": "es",
+          "value": "neo-western"
+        }
+      }
+    },
+    "Q294660": {
+      "type": "item",
+      "id": "Q294660",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "AMC"
+        },
+        "es": {
+          "language": "es",
+          "value": "AMC"
+        }
+      }
+    },
+    "Q271050": {
+      "type": "item",
+      "id": "Q271050",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Anna Gunn"
+        },
+        "es": {
+          "language": "es",
+          "value": "Anna Gunn"
+        }
+      }
+    },
+    "Q302491": {
+      "type": "item",
+      "id": "Q302491",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Aaron Paul"
+        },
+        "es": {
+          "language": "es",
+          "value": "Aaron Paul"
+        }
+      }
+    },
+    "Q432385": {
+      "type": "item",
+      "id": "Q432385",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Dean Norris"
+        },
+        "es": {
+          "language": "es",
+          "value": "Dean Norris"
+        }
+      }
+    },
+    "Q462622": {
+      "type": "item",
+      "id": "Q462622",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Betsy Brandt"
+        },
+        "es": {
+          "language": "es",
+          "value": "Betsy Brandt"
+        }
+      }
+    },
+    "Q2118568": {
+      "type": "item",
+      "id": "Q2118568",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "RJ Mitte"
+        },
+        "es": {
+          "language": "es",
+          "value": "RJ Mitte"
+        }
+      }
+    },
+    "Q198638": {
+      "type": "item",
+      "id": "Q198638",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Jonathan Banks"
+        },
+        "es": {
+          "language": "es",
+          "value": "Jonathan Banks"
+        }
+      }
+    },
+    "Q23547": {
+      "type": "item",
+      "id": "Q23547",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Bryan Cranston"
+        },
+        "es": {
+          "language": "es",
+          "value": "Bryan Cranston"
+        }
+      }
+    },
+    "Q888178": {
+      "type": "item",
+      "id": "Q888178",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Bob Odenkirk"
+        },
+        "es": {
+          "language": "es",
+          "value": "Bob Odenkirk"
+        }
+      }
+    },
+    "Q726142": {
+      "type": "item",
+      "id": "Q726142",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Giancarlo Esposito"
+        },
+        "es": {
+          "language": "es",
+          "value": "Giancarlo Esposito"
+        }
+      }
+    },
+    "Q266067": {
+      "type": "item",
+      "id": "Q266067",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Laura Fraser"
+        },
+        "en": {
+          "language": "en",
+          "value": "Laura Fraser"
+        }
+      }
+    },
+    "Q1138674": {
+      "type": "item",
+      "id": "Q1138674",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Jesse Plemons"
+        },
+        "es": {
+          "language": "es",
+          "value": "Jesse Plemons"
+        }
+      }
+    },
+    "Q16194347": {
+      "type": "item",
+      "id": "Q16194347",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Marius Stan"
+        },
+        "es": {
+          "language": "es",
+          "value": "Marius Stan"
+        }
+      }
+    }
+  },
+  "success": 1
+}

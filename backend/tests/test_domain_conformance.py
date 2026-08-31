@@ -546,11 +546,28 @@ def the_database_accepts_every_declared_status(domain: Domain, engine: Engine) -
 
 @app_check
 def declared_providers_are_constructed_for_this_domain(domain: Domain, app: FastAPI) -> None:
-    """Declarations must name adapters this build constructs for the same domain."""
+    """Declarations must name adapters this build constructs for the same domain.
+
+    `source_preference` is a ranking: a provider named there but not yet constructed
+    simply never appears in a merge, so the domain still functions while a planned
+    adapter is unbuilt — Sprint 049 declares `tvmaze` so Sprint 050 adds an adapter
+    and not a declaration. What must hold is that the domain can be searched at all,
+    so at least one preferred source is constructed. `enrichment.provider_order` is
+    stricter: enrichment iterates the whole order and records "not configured" for a
+    missing one, so every name it declares must be constructed.
+    """
     catalog = app.state.provider_catalog
+    preferred = [
+        catalog.get(name)
+        for name in domain.identity.source_preference
+        if catalog.get(name) is not None
+    ]
+    assert any(provider.item_type == domain.item_type for provider in preferred), (
+        f"{domain.item_type} prefers {domain.identity.source_preference}, "
+        "none of which this build constructs for it"
+    )
     enrichment_names = set(domain.enrichment.provider_order) if domain.enrichment else set()
-    names = set(domain.identity.source_preference) | enrichment_names
-    for name in names:
+    for name in enrichment_names:
         provider = catalog.get(name)
         assert provider is not None, (
             f"{domain.item_type} names {name!r}, which this build does not construct"
@@ -558,11 +575,10 @@ def declared_providers_are_constructed_for_this_domain(domain: Domain, app: Fast
         assert provider.item_type == domain.item_type, (
             f"{domain.item_type} names {name!r}, which serves {provider.item_type!r}"
         )
-        if name in enrichment_names:
-            assert isinstance(provider, EnrichingProvider), (
-                f"{domain.item_type} enriches through {name!r}, which cannot answer "
-                "background enrichment"
-            )
+        assert isinstance(provider, EnrichingProvider), (
+            f"{domain.item_type} enriches through {name!r}, which cannot answer "
+            "background enrichment"
+        )
 
 
 @app_check

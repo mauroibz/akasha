@@ -28,6 +28,7 @@ from book_tracker.domains.album.providers import MusicBrainzProvider
 from book_tracker.domains.anime.providers import AniListProvider, KitsuProvider
 from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.domains.movie.providers import WikidataMovieProvider
+from book_tracker.domains.series.providers import WikidataSeriesProvider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
@@ -186,6 +187,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # incompatible with this application's permanent, owner-editable metadata.
         catalog.append(
             WikidataMovieProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
+        # The series domain. Same keyless Wikidata contract as movies (DEC-098), with
+        # the five-class search filter DEC-104 measured — the movie shape misses
+        # animated series, anime series and miniseries outright. Registered as
+        # `wikidata-series`: the catalog is keyed by name, and a second `wikidata`
+        # would silently replace the movie adapter.
+        catalog.append(
+            WikidataSeriesProvider(
                 provider_client, configured.user_agent_contact or "local@example.invalid"
             )
         )

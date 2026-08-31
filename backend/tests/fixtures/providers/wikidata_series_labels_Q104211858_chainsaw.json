@@ -1,0 +1,75 @@
+{
+  "entities": {
+    "Q56346814": {
+      "type": "item",
+      "id": "Q56346814",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Hiroshi Seko"
+        },
+        "es": {
+          "language": "es",
+          "value": "Hiroshi Seko"
+        }
+      }
+    },
+    "Q17": {
+      "type": "item",
+      "id": "Q17",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Japón"
+        },
+        "en": {
+          "language": "en",
+          "value": "Japan"
+        }
+      }
+    },
+    "Q5287": {
+      "type": "item",
+      "id": "Q5287",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "japonés"
+        },
+        "en": {
+          "language": "en",
+          "value": "Japanese"
+        }
+      }
+    },
+    "Q794912": {
+      "type": "item",
+      "id": "Q794912",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "dark fantasy"
+        },
+        "es": {
+          "language": "es",
+          "value": "fantasía oscura"
+        }
+      }
+    },
+    "Q15712918": {
+      "type": "item",
+      "id": "Q15712918",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "adventure anime and manga"
+        },
+        "es": {
+          "language": "es",
+          "value": "anime y manga de aventuras"
+        }
+      }
+    }
+  },
+  "success": 1
+}

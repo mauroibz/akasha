@@ -1,0 +1,147 @@
+{
+  "entities": {
+    "Q16199525": {
+      "type": "item",
+      "id": "Q16199525",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Raphael Bob-Waksberg"
+        },
+        "es": {
+          "language": "es",
+          "value": "Raphael Bob-Waksberg"
+        }
+      }
+    },
+    "Q30": {
+      "type": "item",
+      "id": "Q30",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Estados Unidos"
+        },
+        "en": {
+          "language": "en",
+          "value": "United States"
+        }
+      }
+    },
+    "Q1860": {
+      "type": "item",
+      "id": "Q1860",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "inglés"
+        },
+        "en": {
+          "language": "en",
+          "value": "English"
+        }
+      }
+    },
+    "Q4765080": {
+      "type": "item",
+      "id": "Q4765080",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "animated sitcom"
+        },
+        "es": {
+          "language": "es",
+          "value": "comedia de situación animada"
+        }
+      }
+    },
+    "Q859369": {
+      "type": "item",
+      "id": "Q859369",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "comedia dramática"
+        },
+        "en": {
+          "language": "en",
+          "value": "comedy drama"
+        }
+      }
+    },
+    "Q9335576": {
+      "type": "item",
+      "id": "Q9335576",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "comedy television series"
+        },
+        "es": {
+          "language": "es",
+          "value": "telecomedia"
+        }
+      }
+    },
+    "Q138600175": {
+      "type": "item",
+      "id": "Q138600175",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "adult animated television series"
+        }
+      }
+    },
+    "Q907311": {
+      "type": "item",
+      "id": "Q907311",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Netflix"
+        },
+        "es": {
+          "language": "es",
+          "value": "Netflix"
+        }
+      }
+    },
+    "Q170238": {
+      "type": "item",
+      "id": "Q170238",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "comedia de situación"
+        },
+        "en": {
+          "language": "en",
+          "value": "sitcom"
+        }
+      }
+    },
+    "Q65090308": {
+      "type": "item",
+      "id": "Q65090308",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "BoJack Horseman"
+        }
+      }
+    },
+    "Q108388519": {
+      "type": "item",
+      "id": "Q108388519",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Sarah Lynn"
+        }
+      }
+    }
+  },
+  "success": 1
+}

@@ -1,0 +1,19 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "searchinfo": {
+      "totalhits": 1
+    },
+    "search": [
+      {
+        "ns": 0,
+        "title": "Q104211858",
+        "pageid": 99675997,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "Japanese anime television series",
+        "timestamp": "2026-08-29T22:37:04Z"
+      }
+    ]
+  }
+}

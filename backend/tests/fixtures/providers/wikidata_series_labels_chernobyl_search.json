@@ -1,0 +1,531 @@
+{
+  "entities": {
+    "Q1138605": {
+      "type": "item",
+      "id": "Q1138605",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Craig Mazin"
+        },
+        "es": {
+          "language": "es",
+          "value": "Craig Mazin"
+        }
+      }
+    },
+    "Q30": {
+      "type": "item",
+      "id": "Q30",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Estados Unidos"
+        },
+        "en": {
+          "language": "en",
+          "value": "United States"
+        }
+      }
+    },
+    "Q145": {
+      "type": "item",
+      "id": "Q145",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Reino Unido"
+        },
+        "en": {
+          "language": "en",
+          "value": "United Kingdom"
+        }
+      }
+    },
+    "Q1860": {
+      "type": "item",
+      "id": "Q1860",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "inglés"
+        },
+        "en": {
+          "language": "en",
+          "value": "English"
+        }
+      }
+    },
+    "Q7168625": {
+      "type": "item",
+      "id": "Q7168625",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "historical drama"
+        },
+        "es": {
+          "language": "es",
+          "value": "drama histórico"
+        }
+      }
+    },
+    "Q23633": {
+      "type": "item",
+      "id": "Q23633",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "HBO"
+        },
+        "es": {
+          "language": "es",
+          "value": "HBO"
+        }
+      }
+    },
+    "Q3510971": {
+      "type": "item",
+      "id": "Q3510971",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Sky Atlantic"
+        },
+        "es": {
+          "language": "es",
+          "value": "Sky Atlantic"
+        }
+      }
+    },
+    "Q362500": {
+      "type": "item",
+      "id": "Q362500",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Jared Harris"
+        },
+        "es": {
+          "language": "es",
+          "value": "Jared Harris"
+        }
+      }
+    },
+    "Q208667": {
+      "type": "item",
+      "id": "Q208667",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Stellan Skarsgård"
+        },
+        "es": {
+          "language": "es",
+          "value": "Stellan Skarsgård"
+        }
+      }
+    },
+    "Q229535": {
+      "type": "item",
+      "id": "Q229535",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Emily Watson"
+        },
+        "es": {
+          "language": "es",
+          "value": "Emily Watson"
+        }
+      }
+    },
+    "Q6187642": {
+      "type": "item",
+      "id": "Q6187642",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Jessie Buckley"
+        },
+        "es": {
+          "language": "es",
+          "value": "Jessie Buckley"
+        }
+      }
+    },
+    "Q27601724": {
+      "type": "item",
+      "id": "Q27601724",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Adam Nagaitis"
+        },
+        "es": {
+          "language": "es",
+          "value": "Adam Nagaitis"
+        }
+      }
+    },
+    "Q7153247": {
+      "type": "item",
+      "id": "Q7153247",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Paul Ritter"
+        },
+        "es": {
+          "language": "es",
+          "value": "Paul Ritter"
+        }
+      }
+    },
+    "Q3041680": {
+      "type": "item",
+      "id": "Q3041680",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Sam Troughton"
+        },
+        "en": {
+          "language": "en",
+          "value": "Sam Troughton"
+        }
+      }
+    },
+    "Q13576931": {
+      "type": "item",
+      "id": "Q13576931",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Robert Emms"
+        },
+        "es": {
+          "language": "es",
+          "value": "Robert Emms"
+        }
+      }
+    },
+    "Q5966500": {
+      "type": "item",
+      "id": "Q5966500",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Adam Lundgren"
+        },
+        "es": {
+          "language": "es",
+          "value": "Adam Lundgren"
+        }
+      }
+    },
+    "Q4172011": {
+      "type": "item",
+      "id": "Q4172011",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Karl Davies"
+        },
+        "es": {
+          "language": "es",
+          "value": "Karl Davies"
+        }
+      }
+    },
+    "Q6167194": {
+      "type": "item",
+      "id": "Q6167194",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Jay Simpson"
+        },
+        "es": {
+          "language": "es",
+          "value": "Jay Simpson"
+        }
+      }
+    },
+    "Q374041": {
+      "type": "item",
+      "id": "Q374041",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Adrian Rawlins"
+        },
+        "es": {
+          "language": "es",
+          "value": "Adrian Rawlins"
+        }
+      }
+    },
+    "Q121879841": {
+      "type": "item",
+      "id": "Q121879841",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Nikolay Snitsar"
+        },
+        "en": {
+          "language": "en",
+          "value": "Nikolay Snitsar"
+        }
+      }
+    },
+    "Q212": {
+      "type": "item",
+      "id": "Q212",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "Ucrania"
+        },
+        "en": {
+          "language": "en",
+          "value": "Ukraine"
+        }
+      }
+    },
+    "Q8798": {
+      "type": "item",
+      "id": "Q8798",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Ukrainian"
+        },
+        "es": {
+          "language": "es",
+          "value": "ucraniano"
+        }
+      }
+    },
+    "Q42269372": {
+      "type": "item",
+      "id": "Q42269372",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Rihards Lepers"
+        }
+      }
+    },
+    "Q20069680": {
+      "type": "item",
+      "id": "Q20069680",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Ivanna Sakhno"
+        },
+        "es": {
+          "language": "es",
+          "value": "Ivanna Sakhno"
+        }
+      }
+    },
+    "Q4408286": {
+      "type": "item",
+      "id": "Q4408286",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Viktor Saraykin"
+        }
+      }
+    },
+    "Q12655077": {
+      "type": "item",
+      "id": "Q12655077",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Gediminas Storpirštis"
+        },
+        "es": {
+          "language": "es",
+          "value": "Gediminas Storpirštis"
+        }
+      }
+    },
+    "Q24938028": {
+      "type": "item",
+      "id": "Q24938028",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Leonid Muzhuk"
+        }
+      }
+    },
+    "Q12150261": {
+      "type": "item",
+      "id": "Q12150261",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Khem Salhanyk"
+        }
+      }
+    },
+    "Q15180": {
+      "type": "item",
+      "id": "Q15180",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Soviet Union"
+        },
+        "es": {
+          "language": "es",
+          "value": "Unión Soviética"
+        }
+      }
+    },
+    "Q7737": {
+      "type": "item",
+      "id": "Q7737",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "ruso"
+        },
+        "en": {
+          "language": "en",
+          "value": "Russian"
+        }
+      }
+    },
+    "Q93204": {
+      "type": "item",
+      "id": "Q93204",
+      "labels": {
+        "es": {
+          "language": "es",
+          "value": "documental"
+        },
+        "en": {
+          "language": "en",
+          "value": "documentary film"
+        }
+      }
+    },
+    "Q130232": {
+      "type": "item",
+      "id": "Q130232",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "drama film"
+        },
+        "es": {
+          "language": "es",
+          "value": "drama"
+        }
+      }
+    },
+    "Q1919632": {
+      "type": "item",
+      "id": "Q1919632",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "melodrama"
+        },
+        "es": {
+          "language": "es",
+          "value": "melodrama"
+        }
+      }
+    },
+    "Q2914786": {
+      "type": "item",
+      "id": "Q2914786",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Inter"
+        }
+      }
+    },
+    "Q42309414": {
+      "type": "item",
+      "id": "Q42309414",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Maria Poezzhaeva"
+        },
+        "es": {
+          "language": "es",
+          "value": "Maria Poezzhaeva"
+        }
+      }
+    },
+    "Q3572479": {
+      "type": "item",
+      "id": "Q3572479",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Evgeniya Loza"
+        },
+        "es": {
+          "language": "es",
+          "value": "Evgeniya Loza"
+        }
+      }
+    },
+    "Q4207543": {
+      "type": "item",
+      "id": "Q4207543",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Andrey Kazakov"
+        },
+        "es": {
+          "language": "es",
+          "value": "Andrey Kazakov"
+        }
+      }
+    },
+    "Q1072225": {
+      "type": "item",
+      "id": "Q1072225",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Yuriy Nazarov"
+        },
+        "es": {
+          "language": "es",
+          "value": "Yuriy Nazarov"
+        }
+      }
+    },
+    "Q4401155": {
+      "type": "item",
+      "id": "Q4401155",
+      "labels": {
+        "en": {
+          "language": "en",
+          "value": "Yuliya Rutberg"
+        },
+        "es": {
+          "language": "es",
+          "value": "Yuliya Rutberg"
+        }
+      }
+    }
+  },
+  "success": 1
+}

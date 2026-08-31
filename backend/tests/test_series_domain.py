@@ -105,9 +105,7 @@ def test_progress_counts_episodes_against_the_measured_total() -> None:
 
 
 def test_identity_is_the_imdb_id() -> None:
-    assert (
-        DOMAIN.identity.identity_key(_candidate({"imdb": "tt0944947"})) == "imdb:tt0944947"
-    )
+    assert DOMAIN.identity.identity_key(_candidate({"imdb": "tt0944947"})) == "imdb:tt0944947"
     assert DOMAIN.identity.identity_key(_candidate({})) is None
     assert DOMAIN.identity.source_preference == ("wikidata-series", "tvmaze")
 
