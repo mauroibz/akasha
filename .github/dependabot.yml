@@ -1,0 +1,33 @@
+version: 2
+updates:
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types: ["patch"]
+
+  - package-ecosystem: "uv"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types: ["patch"]
+
+  # The Dockerfile's two base images, digest-pinned by Sprint 058. This is
+  # what closes the loop a digest pin opens: a security update no longer
+  # arrives on its own, so something has to propose the new digest.
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
+      patch-updates:
+        update-types: ["patch"]
