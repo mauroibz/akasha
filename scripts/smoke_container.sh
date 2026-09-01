@@ -79,6 +79,16 @@ trap cleanup EXIT
 step() { printf '\n== %s ==\n' "$*"; }
 fail() { printf 'FAIL: %s\n' "$*" >&2; docker compose logs --no-color akasha >&2 || true; exit 1; }
 api() { curl -fsS --max-time 20 "http://127.0.0.1:${AKASHA_PORT}$1" "${@:2}"; }
+# The application settings the container actually received, as JSON. Everything
+# the smoke test asserts about the environment goes through this, so every
+# assertion reads the running process, not the compose file.
+container_env() {
+  docker compose exec -T akasha python -c '
+import json
+from os import environ
+print(json.dumps({name: environ.get(name) for name in sorted(environ) if name.startswith("BOOK_TRACKER_") or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
+'
+}
 
 mkdir -p "$CALIBRE_DIR/Personal"
 
@@ -185,6 +195,7 @@ created="$(api /api/entries -H 'content-type: application/json' -d '{
   "idempotency_key": "smoke-ficciones"
 }')"
 entry_id="$(printf '%s' "$created" | python3 -c 'import json,sys; print(json.load(sys.stdin)["entry"]["id"])')"
+item_id="$(printf '%s' "$created" | python3 -c 'import json,sys; print(json.load(sys.stdin)["entry"]["item_id"])')"
 api "/api/entries/$entry_id" -X PATCH -H 'content-type: application/json' \
   -d '{"notes": "Kept for the Aleph, reread for the maps."}' >/dev/null
 
@@ -199,6 +210,51 @@ print(entry["item"]["title"], entry["score"], entry["notes"], sep="|")
 }
 expected="Ficciones|9|Kept for the Aleph, reread for the maps."
 [ "$(read_back)" = "$expected" ] || fail "the entry did not read back: $(read_back)"
+
+step "AC5: the documented settings are visible in the process"
+# smoke.env sets all three of Sprint 056's pass-throughs with values chosen to
+# prove travel: a cap that is not the default, a timeout that is not the
+# default, and a token. Present with exactly the values sent.
+container_env | python3 -c '
+import json, sys
+
+env = json.loads(sys.stdin.read())
+assert env.get("BOOK_TRACKER_ATTACHMENT_MAX_BYTES") == "1024", env
+assert env.get("BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS") == "12000", env
+assert env.get("TMDB_READ_TOKEN") == "token-for-smoke", env
+assert env.get("BOOK_TRACKER_ENVIRONMENT") == "production", env
+' || fail "the settings smoke.env set did not reach the process: $(container_env)"
+
+step "AC4: the attachment cap the application enforces is the one .env sent"
+# The honest proof for the pass-through: a value travelling from the
+# environment through compose into a setting the application reads at
+# runtime. Above the 1 KiB cap: refused with the documented typed error.
+# Below it: stored, and it reads back.
+refusal="$(curl -sS --max-time 20 -w '\n%{http_code}' \
+  -F 'file=@-;filename=over.epub' \
+  <<< "$(python3 -c 'print("x" * 2048)')" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/items/$item_id/attachments")"
+refusal_body="${refusal%$'\n'*}"
+refusal_code="${refusal##*$'\n'}"
+[ "$refusal_code" = "413" ] || fail "an upload over the cap was not refused with 413: $refusal_code $refusal_body"
+printf '%s' "$refusal_body" | python3 -c '
+import json, sys
+
+error = json.load(sys.stdin)["error"]
+assert error["code"] == "attachment_too_large", error
+assert "limited to 1024 bytes" in error["message"], error
+' || fail "the refusal was not the typed attachment_too_large: $refusal_body"
+stored="$(printf 'small' | curl -fsS --max-time 20 \
+  -F 'file=@-;filename=small.txt' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/items/$item_id/attachments")"
+printf '%s' "$stored" | python3 -c '
+import json, sys
+
+attachment = json.load(sys.stdin)
+assert attachment["filename"] == "small.txt", attachment
+assert attachment["byte_size"] == 5, attachment
+' || fail "an upload under the cap was not stored: $stored"
+printf 'cap 1024 enforced: over refused with attachment_too_large, under stored\n'
 
 step "AC1: every emitted chunk is served (DEC-037 splits the bundle)"
 index="$(api /)"
@@ -240,6 +296,53 @@ snapshot = CalibreAdapter(Path("/calibre")).read("Personal")
 assert [record["title"] for record in snapshot.records] == ["El Aleph"], snapshot.records
 print("calibre read through the adapter, query_only enforced")
 ' || fail "the Calibre adapter could not read the read-only mount"
+
+step "AC6: a .env copied verbatim from .env.example starts production"
+# The example file sets BOOK_TRACKER_ENVIRONMENT=development. The compose
+# environment list is the boundary: it names what the container may receive,
+# and that variable is not on it, so a fresh install copying the example
+# verbatim still runs production. The shell exports (port, bind, calibre,
+# volumes) win over the example's values, so this recreation publishes on the
+# same random port as the rest of the run.
+COMPOSE_ENV_FILES="$workdir/example.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+container_env | python3 -c '
+import json, sys
+
+env = json.loads(sys.stdin.read())
+assert env.get("BOOK_TRACKER_ENVIRONMENT") == "production", env
+# The example documents the token and the cap as commented lines, so neither
+# reaches the process; the busy timeout is an active example line, so it does.
+assert "TMDB_READ_TOKEN" not in env, env
+assert "BOOK_TRACKER_ATTACHMENT_MAX_BYTES" not in env, env
+assert env.get("BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS") == "5000", env
+' || fail "the example .env changed the container's environment: $(container_env)"
+
+step "AC6: removing USER_AGENT_CONTACT refuses to start"
+if env -u USER_AGENT_CONTACT COMPOSE_ENV_FILES="$workdir/no-contact.env" \
+  docker compose up --detach --wait=false >/dev/null 2>"$workdir/refusal.txt"; then
+  fail "the stack started without USER_AGENT_CONTACT"
+fi
+grep -q "USER_AGENT_CONTACT" "$workdir/refusal.txt" \
+  || fail "the refusal did not name USER_AGENT_CONTACT: $(cat "$workdir/refusal.txt")"
+docker compose ps --status running --services | grep -qx akasha \
+  || fail "the refused start disturbed the running container"
+
+step "AC5: settings absent from the environment are absent from the container"
+# bare.env sets nothing: the pass-throughs must be omitted entirely, not
+# passed as empty strings — an empty string where an integer is required
+# would refuse to start, and an always-present variable is not an absent one.
+COMPOSE_ENV_FILES="$workdir/bare.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+container_env | python3 -c '
+import json, sys
+
+env = json.loads(sys.stdin.read())
+assert "BOOK_TRACKER_ATTACHMENT_MAX_BYTES" not in env, env
+assert "BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS" not in env, env
+assert "TMDB_READ_TOKEN" not in env, env
+assert env.get("BOOK_TRACKER_ENVIRONMENT") == "production", env
+' || fail "an unset setting reached the container anyway: $(container_env)"
 
 step "AC3: backup, verify, and restore into an empty directory"
 BACKUP_RETENTION=7 ./scripts/backup.sh

@@ -140,6 +140,9 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 | ---------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
 | `USER_AGENT_CONTACT`   | *required*       | Contact address sent to metadata providers                                                 |
 | `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
+| `TMDB_READ_TOKEN`     | *empty*          | Optional. The movie domain's poster fallback for films with a TMDB id and no IMDb id       |
+| `BOOK_TRACKER_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |
+| `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` | `5000`   | How long SQLite waits for a locked database before failing                                 |
 | `AKASHA_DATA_VOLUME`   | `akasha_data`    | Docker volume name for the database, covers and attached files                             |
 | `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume                       |
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |

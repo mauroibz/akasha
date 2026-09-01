@@ -28,11 +28,30 @@ services:
       # on a network you trust; 127.0.0.1 restricts it to this machine.
       - "${AKASHA_BIND:-0.0.0.0}:${AKASHA_PORT:-4441}:8000"
     environment:
-      USER_AGENT_CONTACT: "${USER_AGENT_CONTACT:?Set USER_AGENT_CONTACT in .env}"
-      TZ: "${TZ:-UTC}"
-      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
-      GOOGLE_BOOKS_API_KEY: "${GOOGLE_BOOKS_API_KEY:-}"
-      BOOK_TRACKER_BACKUP_DIR: /backups
+      # An explicit pass-through list: the compose file is the list of what
+      # the container is allowed to receive, deliberately not `env_file:`.
+      # env_file would hand it the whole .env, including the example's
+      # BOOK_TRACKER_ENVIRONMENT=development, which turns off the production
+      # guard that makes USER_AGENT_CONTACT mandatory.
+      #
+      # The bare list form resolves from .env when set and is omitted from the
+      # container's environment when not. Map form with a default
+      # (`${VAR:-26214400}`) would fork the real default into a second place;
+      # map form with an empty default (`${VAR:-}`) would pass an empty string
+      # into a setting pydantic parses as an integer and refuse to start. The
+      # bare form keeps config.py the single source of every default.
+      #
+      # USER_AGENT_CONTACT is the one variable with no fallback: it is
+      # mandatory in production, and `:?` makes a missing value refuse to
+      # start rather than run silently anonymous.
+      - USER_AGENT_CONTACT=${USER_AGENT_CONTACT:?Set USER_AGENT_CONTACT in .env}
+      - TZ=${TZ:-UTC}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - GOOGLE_BOOKS_API_KEY=${GOOGLE_BOOKS_API_KEY:-}
+      - BOOK_TRACKER_BACKUP_DIR=/backups
+      - BOOK_TRACKER_ATTACHMENT_MAX_BYTES
+      - BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS
+      - TMDB_READ_TOKEN
     volumes:
       - data:/data
       # Named volumes by default (DEC-075): Docker seeds a fresh volume from the
