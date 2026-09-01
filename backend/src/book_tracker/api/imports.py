@@ -29,6 +29,7 @@ from book_tracker.infrastructure.attachments import (
     AttachmentTooLarge,
     BlobWriter,
 )
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.repositories import DomainRepository
 
 #: Matches the item attachment route: one megabyte through, never the whole file
@@ -646,8 +647,13 @@ async def browse(
 
 @router.post("/{importer_name}/commit", response_model=CommitResponse)
 async def commit(importer_name: str, body: CommitBody, request: Request) -> CommitResponse:
+    # Phase A (Sprint 059) measured this call blocking every other request for its
+    # whole duration — a large batch is many synchronous SQLAlchemy writes plus a
+    # per-item cover install, with not one `await` in between. `off_loop` is the one
+    # seam that moves synchronous work off the loop; see its module docstring.
     try:
-        result = service(request, importer_name).commit(
+        result = await off_loop(
+            service(request, importer_name).commit,
             body.batch_id,
             {choice.record_id: choice.model_dump(exclude={"record_id"}) for choice in body.choices},
         )

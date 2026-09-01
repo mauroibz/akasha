@@ -10,7 +10,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
 from book_tracker.api.export import router as export_router
 from book_tracker.api.imports import catalog_router, enrichment_router
@@ -263,6 +263,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:
         return JSONResponse(status_code=error.status_code, content={"error": error.payload()})
+
+    @app.exception_handler(OperationalError)
+    async def database_busy(_request: object, error: OperationalError) -> JSONResponse:
+        """`PRAGMA busy_timeout` (database.py) turns write contention into a wait,
+        not a crash — Sprint 059's offload seam is the first thing that lets two
+        real OS threads contend for this engine's write lock at all. If the wait
+        still expires, the caller gets a typed, retryable error instead of a raw
+        driver message. Any other `OperationalError` (a genuine bug: bad SQL, a
+        missing table) is not this and must not be swallowed.
+        """
+        if "database is locked" not in str(error).lower():
+            raise error
+        busy = LibraryError(
+            "library_busy",
+            "The library is busy with another write; try again",
+            status_code=503,
+            user_message="Akasha is busy saving something else. Try again in a moment.",
+        )
+        return JSONResponse(status_code=busy.status_code, content={"error": busy.payload()})
 
     @app.get("/api/health/live")
     async def live() -> dict[str, str]:
