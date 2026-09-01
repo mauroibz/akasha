@@ -24,6 +24,7 @@ from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.movie.imdb import IMPORTER as IMDB_IMPORTER
 from book_tracker.domains.movie.letterboxd import IMPORTER as LETTERBOXD_IMPORTER
+from book_tracker.domains.movie.trakt import IMPORTER as TRAKT_IMPORTER
 from book_tracker.domains.series import DOMAIN as SERIES
 
 DOMAINS: dict[str, Domain] = {
@@ -44,6 +45,7 @@ REGISTERED_IMPORTERS: tuple[Importer, ...] = (
     MYANIMELIST_IMPORTER,
     LETTERBOXD_IMPORTER,
     IMDB_IMPORTER,
+    TRAKT_IMPORTER,
 )
 IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
     item_type: tuple(

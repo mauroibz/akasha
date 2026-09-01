@@ -1,6 +1,6 @@
 # Sprint 054 — The Trakt import
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 049, 052, 053
 
 **Roadmap revision:** 28
