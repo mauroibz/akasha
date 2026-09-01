@@ -33,5 +33,12 @@ EXPOSE 8000
 # uvicorn is PID 1 under the exec-form CMD below, so SIGTERM reaches it directly
 # and it runs its own graceful shutdown. Compose adds `init: true` on top.
 STOPSIGNAL SIGTERM
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=2)"]
+# The start period is sized by the slowest legitimate start, not by a warm
+# restart: a start with pending revisions takes a pre-migration backup first
+# (DEC-039), which tars every cover, and then a migration that rewrites every
+# row — on a slow or busy disk that is minutes, not seconds. 60 s keeps the
+# container from being declared unhealthy while it is doing exactly what it was
+# told to. Interval and retries stay tight so a genuinely dead container is
+# still flagged within about half a minute after the start period lapses.
+HEALTHCHECK --interval=10s --timeout=3s --start-period=60s --retries=3 CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health/ready', timeout=2)"]
 CMD ["uvicorn", "book_tracker.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
