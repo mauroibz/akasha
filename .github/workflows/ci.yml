@@ -1,6 +1,15 @@
 name: CI
 on:
+  # Every sprint in this repository's history commits directly to `main` (see
+  # AGENTS.md) -- `push` only needs to cover that, and never a tag: a version
+  # tag's commit was already tested by the `push` that landed it on `main`,
+  # and the `Release` workflow only builds the image, not this suite. Without
+  # this filter, every Dependabot branch fired CI twice (once for `push`, once
+  # for `pull_request`, on the identical commit) and every version tag fired a
+  # third full run for nothing -- both observed directly during Sprint
+  # 058-060's closing session.
   push:
+    branches: [main]
   pull_request:
 
 jobs:
