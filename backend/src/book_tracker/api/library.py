@@ -31,6 +31,7 @@ from book_tracker.infrastructure.covers import (
     prepare_cover,
     prepare_uploaded_cover,
 )
+from book_tracker.infrastructure.diskspace import ensure_free_space
 from book_tracker.infrastructure.providers import ProviderPayloadError
 from book_tracker.infrastructure.repositories import DomainRepository
 
@@ -645,6 +646,7 @@ async def replace_cover(
     """
     library = LibraryService(request.app.state.engine)
     library.get_item(item_id)
+    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
     chosen: str | None = None
     upload: tuple[bytes, str] | None = None
     if cover is None:
@@ -731,6 +733,7 @@ async def add_attachment(
     # Before a single chunk is read: an upload to an item that is not here should
     # cost nothing, not 25 MiB of transfer followed by a 404.
     library.ensure_item(item_id)
+    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
 
     cap = request.app.state.attachment_max_bytes
     filename = clean_attachment_filename(file.filename or "") or "attachment"

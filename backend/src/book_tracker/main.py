@@ -30,6 +30,7 @@ from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibrary
 from book_tracker.domains.movie.providers import WikidataMovieProvider
 from book_tracker.domains.series.providers import WikidataSeriesProvider
 from book_tracker.domains.series.tvmaze import TvmazeSeriesProvider
+from book_tracker.infrastructure.diskspace import InsufficientDiskSpace, free_bytes
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
@@ -141,6 +142,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
         app.state.attachment_max_bytes = configured.attachment_max_bytes
+        app.state.min_free_bytes = configured.min_free_bytes
         app.state.calibre_dir = configured.calibre_dir
         # Every provider this build knows how to construct, wired or not. Provider
         # wiring is one of the three registration points a domain is allowed to share
@@ -284,6 +286,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
         return JSONResponse(status_code=busy.status_code, content={"error": busy.payload()})
 
+    @app.exception_handler(InsufficientDiskSpace)
+    async def disk_full(_request: object, error: InsufficientDiskSpace) -> JSONResponse:
+        full = LibraryError(
+            "insufficient_disk_space",
+            str(error),
+            status_code=507,
+            user_message=(
+                "Akasha's disk is nearly full, so this was refused before writing anything."
+            ),
+            action="Free up space, or ask whoever manages this server to.",
+            details={"free_bytes": error.free_bytes, "minimum_bytes": error.minimum_bytes},
+        )
+        return JSONResponse(status_code=full.status_code, content={"error": full.payload()})
+
     @app.get("/api/health/live")
     async def live() -> dict[str, str]:
         return {"status": "live"}
@@ -315,7 +331,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     }
                 },
             )
-        return JSONResponse({"status": "ready"})
+        # Separate from the database check above on purpose: a full disk cannot
+        # write, but it can still read, so it is not what "ready" means (technical
+        # spec 8's shape, already used by /api/health/providers — a missing API key
+        # must never make the application look down either). Still 200: Docker's
+        # HEALTHCHECK only sees the status code, and restarting a container fixes
+        # nothing about a full disk.
+        disk_free = free_bytes(app.state.data_dir)
+        return JSONResponse(
+            {
+                "status": "ready",
+                "disk": {
+                    "free_bytes": disk_free,
+                    "low": disk_free < app.state.min_free_bytes,
+                },
+            }
+        )
 
     @app.get("/api/health/providers", response_model=ProviderHealth)
     async def provider_health() -> ProviderHealth:

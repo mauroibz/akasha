@@ -39,6 +39,8 @@ from pathlib import Path
 from shutil import rmtree
 from typing import Any
 
+from book_tracker.infrastructure.diskspace import InsufficientDiskSpace, ensure_free_space
+
 MANIFEST_NAME = "manifest.json"
 CHECKSUM_NAME = "checksums.sha256"
 DATABASE_NAME = "books.db"
@@ -66,10 +68,14 @@ def create_backup(
     dest: Path,
     label: str = "nightly",
     now: datetime | None = None,
+    min_free_bytes: int | None = None,
 ) -> BackupResult:
     """Write one self-contained backup directory and return where it landed."""
     if not database_path.is_file():
         raise BackupError(f"No database to back up at {database_path}")
+    if min_free_bytes is not None:
+        dest.mkdir(parents=True, exist_ok=True)
+        ensure_free_space(dest, min_free_bytes)
     stamp = (now or datetime.now(UTC)).astimezone(UTC)
     path = dest / f"{label}-{stamp.strftime('%Y%m%dT%H%M%SZ')}"
     if path.exists():
@@ -441,6 +447,12 @@ def main(argv: list[str] | None = None) -> int:
     create.add_argument("--dest", type=Path, default=Path("/backups"))
     create.add_argument("--label", default="nightly")
     create.add_argument("--keep", type=int, default=7, help="0 disables retention")
+    create.add_argument(
+        "--min-free-bytes",
+        type=int,
+        default=500 * 1024 * 1024,
+        help="refuse to start a backup below this much free space on --dest (0 disables the check)",
+    )
 
     check = commands.add_parser("verify", help="re-check checksums and database integrity")
     check.add_argument("path", type=Path)
@@ -470,6 +482,7 @@ def main(argv: list[str] | None = None) -> int:
                 data_dir=args.data_dir,
                 dest=args.dest,
                 label=args.label,
+                min_free_bytes=args.min_free_bytes or None,
             )
             print(f"Backup written to {result.path}")
             print(json.dumps(result.manifest["counts"], sort_keys=True))
@@ -516,7 +529,7 @@ def main(argv: list[str] | None = None) -> int:
                 print(f"Not found, skipped: {name}", file=sys.stderr)
             if not report.applied and report.deleted:
                 print("\nNothing was deleted. Re-run with --apply to prune.")
-    except BackupError as error:
+    except (BackupError, InsufficientDiskSpace) as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
     return 0

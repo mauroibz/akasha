@@ -161,6 +161,7 @@ def app_with(tmp_path: Path, engine: Engine, routes: dict[str, Any]) -> Any:
     # they can replay recordings rather than reach the network.
     app.state.engine = engine
     app.state.data_dir = tmp_path
+    app.state.min_free_bytes = configured.min_free_bytes
     app.state.provider_client = client
     app.state.providers = {"openlibrary": OpenLibraryProvider(client, "test@example.invalid")}
     return app
@@ -413,6 +414,7 @@ async def test_the_chooser_gives_up_rather_than_making_someone_wait(
     client = create_provider_client(transport=httpx.MockTransport(crawl))
     app.state.engine = engine
     app.state.data_dir = tmp_path
+    app.state.min_free_bytes = configured.min_free_bytes
     app.state.provider_client = client
     app.state.providers = {"openlibrary": OpenLibraryProvider(client, "test@example.invalid")}
 

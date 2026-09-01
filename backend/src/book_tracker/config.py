@@ -36,6 +36,13 @@ class Settings(BaseSettings):
     # It bounds the worst single file, not the total — with no auth, anyone on the LAN
     # can still fill the disk, which is a property of v1 being LAN-only.
     attachment_max_bytes: int = 25 * 1024 * 1024
+    # Below this much free space on the data volume, a write that would grow the
+    # disk refuses before it starts rather than failing partway through (Sprint
+    # 060). 500 MB is generous headroom above the single largest thing this
+    # application writes in one call (an attachment, capped above) while staying
+    # far under "normally full" for a home server's data volume — the failure
+    # mode this guards against is running out entirely, not running low.
+    min_free_bytes: int = 500 * 1024 * 1024
     sqlite_busy_timeout_ms: int = 5_000
     static_dir: Path | None = None
 

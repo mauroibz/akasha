@@ -29,6 +29,7 @@ from book_tracker.infrastructure.attachments import (
     AttachmentTooLarge,
     BlobWriter,
 )
+from book_tracker.infrastructure.diskspace import ensure_free_space
 from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.repositories import DomainRepository
 
@@ -458,6 +459,7 @@ def _too_large(spec: ImportInputSpec) -> LibraryError:
 
 @router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)
 async def preview(importer_name: str, request: Request) -> PreviewResponse:
+    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
     import_service = service(request, importer_name)
     source, targets = await _source(request, importer_name)
     try:
@@ -563,6 +565,7 @@ async def attach_file(importer_name: str, batch_id: str, request: Request) -> Im
     exactly like an 18-book one, a file that cannot be stored costs one book rather
     than the import, and the screen can count progress honestly.
     """
+    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
     import_service = service(request, importer_name)
     spec = IMPORTERS[importer_name].input
     cap = int(request.app.state.attachment_max_bytes)

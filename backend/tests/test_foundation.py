@@ -52,7 +52,12 @@ async def test_ready_health_reports_migrated_database(tmp_path: Path) -> None:
         response = await client.get("/api/health/ready")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ready"}
+    body = response.json()
+    assert body["status"] == "ready"
+    # Sprint 060: disk space is surfaced here, but never as a reason to be
+    # unready -- a full disk can still read, and this is still 200.
+    assert body["disk"]["free_bytes"] > 0
+    assert body["disk"]["low"] is False
 
 
 @pytest.mark.anyio
