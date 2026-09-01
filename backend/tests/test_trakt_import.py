@@ -24,8 +24,7 @@ from typing import Any
 import pytest
 
 from book_tracker.domain.importers import ImportReadContext, ImportReadError, ImportSource
-from book_tracker.domains.movie.trakt import IMPORTER, TraktError, parse_trakt
-
+from book_tracker.domains.movie.trakt import IMPORTER, TraktError
 
 # ----------------------------------------------------------------------------------
 # Synthetic archive builders. Every id, title and timestamp is invented.
@@ -52,8 +51,14 @@ def ids(
     return block
 
 
-def movie_obj(imdb: str = "tt0000001", title: str = "Invented Film", year: int = 2020) -> dict[str, Any]:
-    return {"title": title, "year": year, "ids": ids(trakt=10, slug="invented-film", imdb=imdb, tmdb=11)}
+def movie_obj(
+    imdb: str = "tt0000001", title: str = "Invented Film", year: int = 2020
+) -> dict[str, Any]:
+    return {
+        "title": title,
+        "year": year,
+        "ids": ids(trakt=10, slug="invented-film", imdb=imdb, tmdb=11),
+    }
 
 
 def show_obj(
@@ -150,7 +155,9 @@ def episode_event(
     }
 
 
-def movie_event(imdb: str = "tt0000001", watched_at: str = "2026-01-10T20:00:00.000Z") -> dict[str, Any]:
+def movie_event(
+    imdb: str = "tt0000001", watched_at: str = "2026-01-10T20:00:00.000Z"
+) -> dict[str, Any]:
     return {
         "id": 999,
         "watched_at": watched_at,
@@ -163,7 +170,11 @@ def movie_event(imdb: str = "tt0000001", watched_at: str = "2026-01-10T20:00:00.
 def watchlist_row(kind: str, imdb: str, title: str, year: int, listed_at: str) -> dict[str, Any]:
     """The populated watchlist shape, declared from Trakt's published API and not
     measured — the owner's archive holds only `[]` (the sprint's own risk note)."""
-    obj = movie_obj(imdb=imdb, title=title, year=year) if kind == "movie" else show_obj(imdb=imdb, title=title, year=year)
+    obj = (
+        movie_obj(imdb=imdb, title=title, year=year)
+        if kind == "movie"
+        else show_obj(imdb=imdb, title=title, year=year)
+    )
     return {"listed_at": listed_at, "type": kind, kind: obj}
 
 
@@ -262,7 +273,12 @@ class TestMembers:
 
     def test_ratings_supply_the_score(self) -> None:
         record = only(
-            archive({"watched-movies.json": [watched_movie()], "ratings-movies.json": [rated_movie(rating=8)]})
+            archive(
+                {
+                    "watched-movies.json": [watched_movie()],
+                    "ratings-movies.json": [rated_movie(rating=8)],
+                }
+            )
         )
         assert record.entry.score == 8
         assert record.entry.score_provisional is False
@@ -270,7 +286,10 @@ class TestMembers:
     def test_show_ratings_supply_the_score(self) -> None:
         record = only(
             archive(
-                {"watched-shows.json": [watched_show()], "ratings-shows.json": [rated_show(rating=9)]}
+                {
+                    "watched-shows.json": [watched_show()],
+                    "ratings-shows.json": [rated_show(rating=9)],
+                }
             )
         )
         assert record.item_type == "series"
@@ -285,7 +304,13 @@ class TestMembers:
     def test_the_watchlist_produces_rows_when_present(self) -> None:
         record = only(
             archive(
-                {"lists-watchlist.json": [watchlist_row("movie", "tt0000042", "Later Film", 2024, "2026-03-01T09:00:00.000Z")]}
+                {
+                    "lists-watchlist.json": [
+                        watchlist_row(
+                            "movie", "tt0000042", "Later Film", 2024, "2026-03-01T09:00:00.000Z"
+                        )
+                    ]
+                }
             )
         )
         assert record.entry.suggested_status == "watchlist"
@@ -294,7 +319,13 @@ class TestMembers:
     def test_a_show_on_the_watchlist_suggests_plan_to_watch(self) -> None:
         record = only(
             archive(
-                {"lists-watchlist.json": [watchlist_row("show", "tt0000043", "Later Show", 2021, "2026-03-02T09:00:00.000Z")]}
+                {
+                    "lists-watchlist.json": [
+                        watchlist_row(
+                            "show", "tt0000043", "Later Show", 2021, "2026-03-02T09:00:00.000Z"
+                        )
+                    ]
+                }
             )
         )
         assert record.item_type == "series"
@@ -311,7 +342,11 @@ class TestMembers:
             archive(
                 {
                     "watched-movies.json": [watched_movie()],
-                    "lists-watchlist.json": [watchlist_row("movie", "tt0000001", "Invented Film", 2020, "2026-03-01T09:00:00.000Z")],
+                    "lists-watchlist.json": [
+                        watchlist_row(
+                            "movie", "tt0000001", "Invented Film", 2020, "2026-03-01T09:00:00.000Z"
+                        )
+                    ],
                 }
             )
         )
@@ -357,7 +392,13 @@ def history_archive(events: list[dict[str, Any]], **members: Any) -> bytes:
     list: every Trakt member holds a list of entries."""
     body: dict[str, Any] = {"watched-history.json": events}
     for name, rows in members.items():
-        member = "watched-shows.json" if name == "watched_show" else "watched-movies.json" if name == "watched_movie" else name
+        member = (
+            "watched-shows.json"
+            if name == "watched_show"
+            else "watched-movies.json"
+            if name == "watched_movie"
+            else name
+        )
         body[member] = [rows] if isinstance(rows, dict) else rows
     return archive(body)
 
@@ -539,9 +580,7 @@ class TestStatusSuggestion:
         assert record.entry.suggested_status == "completed"
 
     def test_a_show_watched_beyond_its_total_suggests_completed(self) -> None:
-        record = only(
-            archive({"watched-shows.json": [watched_show(plays=40, aired=12)]})
-        )
+        record = only(archive({"watched-shows.json": [watched_show(plays=40, aired=12)]}))
         assert record.entry.suggested_status == "completed"
 
     def test_a_movie_suggests_watched(self) -> None:
@@ -555,25 +594,19 @@ class TestScores:
 
     @pytest.mark.parametrize("rating", [1, 5, 10])
     def test_scores_map_one_to_one(self, rating: int) -> None:
-        record = only(
-            archive({"ratings-movies.json": [rated_movie(rating=rating)]})
-        )
+        record = only(archive({"ratings-movies.json": [rated_movie(rating=rating)]}))
         assert record.entry.score == rating
         assert record.entry.score_provisional is False
 
     @pytest.mark.parametrize("rating", [0, 11, -1])
     def test_a_score_outside_the_scale_is_a_visible_row_error(self, rating: int) -> None:
-        record = only(
-            archive({"ratings-movies.json": [rated_movie(rating=rating)]})
-        )
+        record = only(archive({"ratings-movies.json": [rated_movie(rating=rating)]}))
         assert record.entry.score is None
         assert any(row["code"] == "rating_out_of_range" for row in record.errors)
 
     def test_a_blank_rating_is_unscored_and_not_an_error(self) -> None:
         record = only(
-            archive(
-                {"watched-movies.json": [watched_movie()], "ratings-movies.json": []}
-            )
+            archive({"watched-movies.json": [watched_movie()], "ratings-movies.json": []})
         )
         assert record.entry.score is None
         assert not record.errors
@@ -613,10 +646,14 @@ class TestDates:
         record = only(
             archive(
                 {
-                    "watched-movies.json": [watched_movie(last_watched_at="2026-01-10T20:00:00.000Z")],
+                    "watched-movies.json": [
+                        watched_movie(last_watched_at="2026-01-10T20:00:00.000Z")
+                    ],
                     "ratings-movies.json": [rated_movie(rated_at="2026-01-11T10:00:00.000Z")],
                     "lists-watchlist.json": [
-                        watchlist_row("movie", "tt0000001", "Invented Film", 2020, "2026-01-05T09:00:00.000Z")
+                        watchlist_row(
+                            "movie", "tt0000001", "Invented Film", 2020, "2026-01-05T09:00:00.000Z"
+                        )
                     ],
                 }
             )
@@ -984,9 +1021,7 @@ class TestMatching:
     def test_title_and_year_alone_are_offered_never_merged(self, tmp_path: Path) -> None:
         matcher, add = library(tmp_path)
         existing = add("Invented Film", "movie", 2020)
-        record = only(
-            archive({"watched-movies.json": [watched_movie(imdb="tt0000099")]})
-        )
+        record = only(archive({"watched-movies.json": [watched_movie(imdb="tt0000099")]}))
         decision = IMPORTER.match(record, matcher)
         assert decision.kind.value == "ambiguous"
         assert decision.candidates == (existing,)
@@ -1004,6 +1039,7 @@ class TestMatching:
         )
         decision = IMPORTER.match(record, matcher)
         assert decision.candidates == ()
+
 
 # ----------------------------------------------------------------------------------
 # Through the real pipeline: preview, targets, commit, undo, enrichment (AC1, AC4,
@@ -1066,9 +1102,7 @@ MIXED_ARCHIVE = archive(
         "watched-movies.json": [watched_movie(imdb="tt0000001")],
         "ratings-movies.json": [rated_movie(imdb="tt0000001", rating=8)],
         "watched-shows.json": [watched_show(imdb="tt0000010", plays=12, aired=12)],
-        "watched-history.json": [
-            episode_event("tt0000010", 1, number) for number in range(1, 13)
-        ]
+        "watched-history.json": [episode_event("tt0000010", 1, number) for number in range(1, 13)]
         + [movie_event(imdb="tt0000001")],
         "ratings-seasons.json": [
             {
@@ -1126,12 +1160,8 @@ async def test_the_progress_control_total_is_the_episodes_metadata(tmp_path: Pat
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
         preview = await _preview(client, MIXED_ARCHIVE)
-        await client.post(
-            "/api/import/trakt/commit", json={"batch_id": preview.json()["batch_id"]}
-        )
-        show = next(
-            row for row in preview.json()["records"] if row["item_type"] == "series"
-        )
+        await client.post("/api/import/trakt/commit", json={"batch_id": preview.json()["batch_id"]})
+        show = next(row for row in preview.json()["records"] if row["item_type"] == "series")
     assert show["item"]["metadata"]["episodes"] == 12
 
 
@@ -1155,9 +1185,7 @@ async def test_re_importing_matches_on_imdb_with_nothing_created(tmp_path: Path)
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
         first = await _preview(client, MIXED_ARCHIVE)
-        await client.post(
-            "/api/import/trakt/commit", json={"batch_id": first.json()["batch_id"]}
-        )
+        await client.post("/api/import/trakt/commit", json={"batch_id": first.json()["batch_id"]})
         second = await _preview(client, again)
         assert [row["planned_action"] for row in second.json()["records"]] == [
             "reuse_item",
@@ -1180,11 +1208,11 @@ async def test_an_imdb_imported_film_is_not_duplicated_by_trakt(tmp_path: Path) 
     from tests.test_imdb_import import LIST_HEADER  # noqa: F401  (shape documented there)
 
     imdb_csv = (
-        "Const,Your Rating,Date Rated,Title,Original Title,URL,Title Type,IMDb Rating,"
-        "Runtime (mins),Year,Genres,Num Votes,Release Date,Directors\n"
-        "tt0000001,9,2024-03-01,Invented Film,,https://www.imdb.com/title/tt0000001/,"
-        "Movie,7.5,100,2020,Drama,10,2020-01-01,A Director\n"
-    ).encode("utf-8")
+        b"Const,Your Rating,Date Rated,Title,Original Title,URL,Title Type,IMDb Rating,"
+        b"Runtime (mins),Year,Genres,Num Votes,Release Date,Directors\n"
+        b"tt0000001,9,2024-03-01,Invented Film,,https://www.imdb.com/title/tt0000001/,"
+        b"Movie,7.5,100,2020,Drama,10,2020-01-01,A Director\n"
+    )
     app = _app(tmp_path)
     async with (
         app.router.lifespan_context(app),
@@ -1195,9 +1223,7 @@ async def test_an_imdb_imported_film_is_not_duplicated_by_trakt(tmp_path: Path) 
             files={"file": ("ratings.csv", imdb_csv, "text/csv")},
         )
         assert first.status_code == 201, first.text
-        await client.post(
-            "/api/import/imdb/commit", json={"batch_id": first.json()["batch_id"]}
-        )
+        await client.post("/api/import/imdb/commit", json={"batch_id": first.json()["batch_id"]})
         second = await _preview(client, archive({"watched-movies.json": [watched_movie()]}))
         assert [row["planned_action"] for row in second.json()["records"]] == ["reuse_item"]
         committed = await client.post(
@@ -1248,9 +1274,7 @@ async def test_the_plays_fallback_row_commits_and_carries_its_warning(tmp_path: 
         assert committed.status_code == 200, committed.text
 
     with Session(app.state.engine) as session:
-        notes, progress = session.execute(
-            text("SELECT notes, progress FROM entries")
-        ).one()
+        notes, progress = session.execute(text("SELECT notes, progress FROM entries")).one()
     assert progress == 40
     assert notes is not None and "play count" in notes
 
@@ -1293,9 +1317,7 @@ async def test_committing_queues_enrichment_for_both_libraries(tmp_path: Path) -
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
         preview = await _preview(client, MIXED_ARCHIVE)
-        await client.post(
-            "/api/import/trakt/commit", json={"batch_id": preview.json()["batch_id"]}
-        )
+        await client.post("/api/import/trakt/commit", json={"batch_id": preview.json()["batch_id"]})
         with Session(app.state.engine) as session:
             payloads = [
                 json.loads(str(row[0]))

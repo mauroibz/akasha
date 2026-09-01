@@ -45,7 +45,6 @@ import re
 import zipfile
 from dataclasses import dataclass, field
 from datetime import date
-from pathlib import Path
 from typing import Any
 
 from book_tracker.domain.identity import normalize_identifier
@@ -244,11 +243,15 @@ def _members(data: bytes) -> tuple[dict[str, list[Any]], list[ImportSkip]]:
     for info in archive.infolist():
         if info.flag_bits & 0x1:
             raise TraktError(
-                "unsafe_archive", "The archive contains an encrypted member", {"member": info.filename[:80]}
+                "unsafe_archive",
+                "The archive contains an encrypted member",
+                {"member": info.filename[:80]},
             )
         if not _safe_member(info.filename):
             raise TraktError(
-                "unsafe_archive", "The archive contains an unsafe member name", {"member": info.filename[:80]}
+                "unsafe_archive",
+                "The archive contains an unsafe member name",
+                {"member": info.filename[:80]},
             )
         if info.filename in seen:
             # Two members with one name: whichever is read, the other was ignored.
@@ -265,26 +268,32 @@ def _members(data: bytes) -> tuple[dict[str, list[Any]], list[ImportSkip]]:
         total += info.file_size
         if total > MAX_TOTAL_BYTES:
             # Declared sizes, before a byte is decompressed.
-            raise TraktError("export_too_large", "The archive expands to more than Akasha will read")
+            raise TraktError(
+                "export_too_large", "The archive expands to more than Akasha will read"
+            )
 
     tables: dict[str, list[Any]] = {}
     skipped: dict[str, int] = {}
     for name in (*MEMBERS, *COUNTED_MEMBERS):
-        info = archive.getinfo(name) if name in seen else None
-        if info is None:
+        if name not in seen:
             # Absent is absent. The owner's own archive has 26 empty members and
             # no watchlist, and requiring one this row does not need is how a
             # healthy import fails.
             continue
+        info = archive.getinfo(name)
         try:
             text = _body(archive, info).decode("utf-8-sig")
             rows = json.loads(text)
         except UnicodeDecodeError as error:
             raise TraktError("invalid_archive", f"{name} is not UTF-8", {"member": name}) from error
         except json.JSONDecodeError as error:
-            raise TraktError("invalid_archive", f"{name} is not readable JSON", {"member": name}) from error
+            raise TraktError(
+                "invalid_archive", f"{name} is not readable JSON", {"member": name}
+            ) from error
         if not isinstance(rows, list) or any(not isinstance(row, dict) for row in rows):
-            raise TraktError("invalid_archive", f"{name} does not hold a list of entries", {"member": name})
+            raise TraktError(
+                "invalid_archive", f"{name} does not hold a list of entries", {"member": name}
+            )
         if name in COUNTED_MEMBERS:
             # Counted, never read: a series holds one score (DEC-077), and
             # collection, comments, notes, likes, the follower graph, hidden
@@ -368,7 +377,7 @@ def _rating(row: dict[str, Any], errors: list[dict[str, Any]]) -> int | None:
     if not _MIN_SCORE <= rating <= _MAX_SCORE:
         errors.append({"field": "rating", "code": "rating_out_of_range", "value": str(rating)[:50]})
         return None
-    return rating
+    return int(rating)
 
 
 # --------------------------------------------------------------------------------------
@@ -603,8 +612,7 @@ class TraktImporter:
         guide=(
             "On trakt.tv, open your profile's Settings and choose Export Data. "
             "This is a VIP feature — the option is not there on a free account.",
-            "Download the .zip and upload it exactly as it downloaded, without "
-            "unpacking it.",
+            "Download the .zip and upload it exactly as it downloaded, without unpacking it.",
             "Films go to your Movies library and shows to your Series library, "
             "and you choose above which of the two this import brings in.",
             "A show's progress is counted from its watch history — episodes "
