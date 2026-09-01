@@ -1,5 +1,7 @@
 import { test as base, expect } from "@playwright/test";
 
+import { bookItemType } from "./seed";
+
 /**
  * Every test in this suite fails if the page logged an error or threw.
  *
@@ -15,7 +17,32 @@ import { test as base, expect } from "@playwright/test";
  */
 export const ALLOW_CONSOLE_ERRORS = "allow-console-errors";
 
-export const test = base.extend<{ failOnConsoleErrors: void }>({
+export const test = base.extend<{
+  failOnConsoleErrors: void;
+  stubCommonEndpoints: void;
+}>({
+  // `/api/item-types` and `/api/shelves` are fetched by nearly every screen
+  // (the domain chooser, shelf pickers) and no spec exercises either one
+  // failing. ci.yml's e2e job runs no backend, so an unstubbed call here is
+  // always a real ECONNREFUSED — wasted retries competing for CPU with the
+  // browser under test on a runner with far less headroom than a dev
+  // workstation, which is exactly what turned into cross-spec flakiness.
+  // Registered before the test body runs, so it still yields to whatever a
+  // test stubs itself: Playwright resolves overlapping routes most-recently-
+  // registered first, and `stubItemTypes(page, [...])` or a test's own
+  // `page.route("**/api/shelves", ...)` is always registered after this one.
+  stubCommonEndpoints: [
+    async ({ page }, use) => {
+      await page.route("**/api/item-types", (route) =>
+        route.fulfill({ json: [bookItemType] }),
+      );
+      await page.route("**/api/shelves", (route) =>
+        route.fulfill({ json: [] }),
+      );
+      await use();
+    },
+    { auto: true },
+  ],
   failOnConsoleErrors: [
     async ({ page }, use, testInfo) => {
       const problems: string[] = [];

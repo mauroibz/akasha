@@ -34,6 +34,15 @@ export default defineConfig({
   fullyParallel: true,
   outputDir: "/tmp/akasha-playwright-results",
   reporter: "line",
+  // GitHub's shared runners give this suite far less CPU headroom than a dev
+  // workstation, and ci.yml's e2e job runs no backend at all — every
+  // unstubbed request is a real (if now rare, since console.ts's global
+  // stubs) network failure competing for the same CPU as the browser under
+  // test. That is genuine timing flakiness, not a broken feature: a real
+  // defect fails the same test every time, and CI's failures before this
+  // change did not — a different, unrelated test each run. Zero locally,
+  // where the difference does not bite.
+  retries: process.env.CI ? 2 : 0,
   // Per-test bound, stated rather than Playwright's unstated 30 s default: a
   // wedged spec fails with its name instead of looking like slow work
   // (TESTING.md's Sprint 035 triage lesson).
