@@ -4296,3 +4296,88 @@ and state the success condition as "green", not as "seconds".**
   runs, a real upgrade and rollback with an entry surviving both, and Dependabot's first
   activation on `origin`'s default branch); its Outcome and this repository's worklog carry
   the run IDs and digests.
+
+## DEC-122 — Sprint 059's verdict: the import commit breaches the loop badly, one offload seam fixes it, everything else measured clean
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Extends:** DEC-035/DEC-042 (assess-then-build as the default shape), DEC-036 (the only
+  prior contended-latency measurement this project had, and the read-path budget it used).
+- **Context:** every handler in `backend/src/book_tracker/` is `async def`, and nothing under
+  it had ever called `run_in_threadpool`/`anyio.to_thread`/`asyncio.to_thread` — every SQLite
+  write, Pillow decode/resize and disk write ran directly on the single uvicorn worker's event
+  loop. `scripts/benchmark_library.py` measures SQLite write-lock contention against a
+  synthetic drainer in the same process; it never runs the real ASGI server and never proves
+  or disproves whether the loop itself stalls under a second concurrent request. Sprint 059
+  built `scripts/measure_event_loop.py`/`.sh` to answer that directly: drive one of three
+  realistic background tasks against a real running container — a 5,000-row Goodreads import
+  commit, ~65 cover uploads, or twenty 20 MiB attachment uploads, each following an untimed
+  seed import to give the read path a realistic-size library — while a second client polls the
+  first library page and records its latency, with the container's own Docker healthcheck
+  watched throughout via `docker inspect` (a client-side timing of `/api/health/ready` proves
+  the endpoint was slow, not that Docker ever acted on it).
+- **Measurement.** `--cpus=2` throughout — this repository's own precedent for "constrained
+  like a small/shared machine" (the same value the e2e CI flakiness fix used to reproduce
+  GitHub's runners), state so the number can be reproduced. Budget: first-library-page p95 <
+  500 ms (technical spec §1), and the container's Docker healthcheck never reporting
+  `unhealthy`.
+
+  | Scenario | p95 before | p95 after Phase B | Docker health |
+  |---|---:|---:|---|
+  | Import commit (5,000 rows) | **5,005.6 ms** (2 sample requests timed out entirely) | 78.0 ms | never unhealthy either run (14–20 s of blocking is not sustained enough to fail three consecutive 10 s-interval checks) |
+  | Cover uploads (~65 of them) | 75.4 ms | 86.4 ms | healthy throughout |
+  | Attachment uploads (20 × 20 MiB) | 61.3 ms | 67.3 ms | healthy throughout |
+
+  The import commit breached the budget by roughly 10x, with real request timeouts — not a
+  marginal number. Covers and attachments were within budget **unconstrained and at
+  `--cpus=2`, before any code changed**: each individual upload's Pillow/hash-and-write cost is
+  short enough (tens of milliseconds) that the loop reliably regains control between requests,
+  unlike the import commit's single multi-second call with no `await` anywhere inside it.
+- **Decision — Phase B, scoped to what Phase A named.** One offload seam,
+  `infrastructure/offload.py`'s `off_loop`, wraps `anyio.to_thread.run_sync` behind a
+  deliberately small `anyio.CapacityLimiter(4)` rather than anyio's own default (40): this
+  application has exactly one writer process and one SQLite file, so a burst of offloaded work
+  does not go faster for more threads, it only queues more writers behind the same
+  `PRAGMA busy_timeout` — four lets a couple of imports or a backfill proceed without
+  serializing behind each other, while bounding worst-case thread and connection fan-out on a
+  ZimaBoard-class machine (technical spec §4). It is wired at exactly the one call site Phase A
+  named: `api/imports.py`'s `commit` handler now `await`s `off_loop(service(...).commit, ...)`
+  instead of calling it directly. Covers and attachments are not touched — they did not breach,
+  and moving them would be scope Phase A did not justify (deliverable text: "conditional on the
+  verdict, and scoped by it rather than by this file").
+- **The engine's threading contract, confirmed rather than assumed.** `database.py`'s
+  `create_engine` registers pragmas on SQLAlchemy's `connect` event, which fires once per new
+  physical DBAPI connection regardless of which thread requested it from the pool — file-based
+  SQLite defaults to `QueuePool`, not `SingletonThreadPool` (`:memory:` only), and the pysqlite
+  dialect sets `check_same_thread=False` automatically. `test_event_loop_offload.py::
+  test_pragmas_apply_to_a_connection_obtained_off_the_main_thread` obtains a connection from a
+  worker thread via `off_loop` and asserts `foreign_keys`, `journal_mode` and `busy_timeout`
+  match the main thread's — this was already true before Sprint 059's change and the test
+  proves it rather than assumes it, per the sprint's own risk list.
+- **A newly possible failure mode, closed in the same sprint.** Before `off_loop` existed,
+  every synchronous call ran on the single event-loop thread, so two SQLite writers could never
+  truly contend at the OS level — cooperative `async`/`await` scheduling made it structurally
+  impossible. `off_loop` is the first thing in this application that lets two real OS threads
+  contend for the same SQLite write lock at once, which is exactly the risk the sprint's own
+  "risks and decisions to surface" section named. `main.py` gained an `OperationalError`
+  exception handler that turns an expired `busy_timeout` (`"database is locked"`, and only that
+  message — any other `OperationalError` re-raises rather than being swallowed) into a typed,
+  retryable `library_busy` 503 instead of an unhandled driver exception.
+  `test_a_queued_writer_surfaces_a_typed_error_rather_than_database_is_locked` proves it under
+  genuine contention: a raw connection holds `BEGIN IMMEDIATE` on a 100 ms busy_timeout while a
+  request writes through the app.
+  `test_concurrent_writes_through_the_offloaded_path_leave_a_correct_ledger` proves an import
+  commit running through `off_loop` alongside an unrelated manual entry write leaves both
+  correct with no lost row.
+- **Consequences:** no behaviour visible to a person changed — same responses, same status
+  codes, same ordering; the full backend suite (1,190 tests, the four new ones included) and
+  `make check` are green, and re-measuring after the change shows the import commit's p95 fall
+  from 5,005.6 ms to 78.0 ms with zero sample errors, comfortably inside budget. One residual
+  worth recording rather than hiding: the post-fix import run's **max** (not p95) sample hit
+  3,898.4 ms once across 181 samples, plausibly GIL contention between the worker thread's
+  CPU-bound ORM work and the main thread rather than the loop being blocked outright — it does
+  not breach the p95-based acceptance criterion and no further change is made against a single
+  outlier, but a future sprint moving more CPU-bound work through this seam should watch for
+  the same shape. `docs/agent/TESTING.md` gains an "Event-loop contention" section naming the
+  harness and `off_loop` so a later sprint touching a handler's synchronous work knows both
+  exist. Still exactly one uvicorn worker; nothing in `Explicit non-scope` was touched.

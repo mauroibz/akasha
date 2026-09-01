@@ -122,6 +122,34 @@ that signature with a focused case, use the approved non-sandbox test execution 
 or repeating the sandboxed run. This is an environment workaround, never permission to ignore a
 failure that reproduces outside the sandbox.
 
+## Event-loop contention
+
+`scripts/measure_event_loop.py` (driven by `scripts/measure_event_loop.sh`) is the harness Sprint
+059 built to answer one question `scripts/benchmark_library.py` cannot: whether synchronous work
+inside an `async def` handler stalls *every other request*, not just how contended the SQLite write
+lock is. It drives one of three realistic background tasks — a large Goodreads import commit, a
+batch of cover uploads, or a large attachment upload — against a **real, running container**, while
+a second client polls the first library page and records the latency it sees. It also watches the
+container's own Docker healthcheck (`docker inspect`) throughout, because a client-side timing of
+`/api/health/ready` proves the endpoint was slow, not that Docker ever acted on it — and the
+Dockerfile's 60s start-period means a scenario run too early can never observe a real `unhealthy`
+transition at all.
+
+```bash
+scripts/measure_event_loop.sh [cpus] [scenario ...]   # default: cpus=2, all three scenarios
+```
+
+`cpus` is a label as much as a control: 2 is this repository's own precedent for "constrained like a
+small/shared machine" (the same value the e2e CI flakiness fix used to reproduce GitHub's runners).
+State whatever value a future run uses next to its numbers — an unconstrained measurement on a fast
+workstation answers a different question than the one this harness exists to ask.
+
+Any handler that adds new synchronous work spending more than a few milliseconds — a bulk write, an
+image transform, a large synchronous read — should be run through this harness before assuming the
+event loop stays responsive under it. `off_loop` (`infrastructure/offload.py`) is the seam Sprint 059
+added for exactly that case: the one place synchronous work crosses onto a worker thread, bounded by
+a deliberately small capacity limiter rather than left unbounded.
+
 ## Walkthrough reuse
 
 Before writing a walkthrough, search the active sprint, `frontend/e2e/`,
