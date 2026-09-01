@@ -195,6 +195,39 @@ docker compose -f compose.yaml -f compose.bind-mounts.yaml up -d
 Use the same two `-f` flags on every subsequent `docker compose` command for
 this stack — upgrades, `down`, `logs`, all of it.
 
+### Backups on their own disk
+
+DEC-040 says a backup on the same disk as the database does not survive losing
+that disk — and on the default named volumes, both land under the same Docker
+data root. `compose.backups-host.yaml` is the shape that closes the gap: it
+binds **only** `/backups` to a host path and leaves `/data` the named volume
+`compose.yaml` gives it, so the database keeps the seed-with-ownership default
+(DEC-075) while backups go to a second disk, a NAS share, anywhere that is not
+the database's disk.
+
+```bash
+mkdir -p /mnt/second-disk/akasha-backups
+sudo chown 10001:10001 /mnt/second-disk/akasha-backups   # the one privileged command this deployment needs
+BACKUP_DIR=/mnt/second-disk/akasha-backups docker compose -f compose.yaml -f compose.backups-host.yaml up -d
+```
+
+The `chown` prints nothing and exits 0. Compose would create a missing
+directory as root:root, which the container's uid 10001 cannot write into —
+that is the failure the `mkdir` + `chown` pair exists to prevent, and it fails
+at 3am as `attempt to write a readonly database` if skipped.
+
+The compose files, as a set:
+
+| Tier | Files | `/data` | `/backups` | One-time setup |
+|---|---|---|---|---|
+| 1 — default | `compose.yaml` | named volume | named volume | none |
+| 2 — both on host paths | `+ compose.bind-mounts.yaml` | host directory | host directory | `mkdir` + `chown` both |
+| 3 — backups on their own disk | `+ compose.backups-host.yaml` | named volume | host directory | `mkdir` + `chown` the backups directory only |
+
+Each overlay is opt-in, invoked explicitly, and never merged in by accident —
+none is named `docker-compose.override.yml`. Use the same `-f` flags on every
+subsequent `docker compose` command for the stack.
+
 ## Reverse proxy
 
 Nginx Proxy Manager on the same LAN, e.g. `books.home.lan` → `http://<host>:8000`.
@@ -210,13 +243,15 @@ container port is not reachable from the network directly.
 | Symptom | Cause |
 |---|---|
 | `attempt to write a readonly database` | on `compose.bind-mounts.yaml` only: `data/` is not owned by 10001 |
-| Startup exits with `Refusing to migrate without a backup` | on `compose.bind-mounts.yaml` only: `backups/` is missing or not owned by 10001 |
+| Startup exits with `Refusing to migrate without a backup` | on `compose.bind-mounts.yaml` or `compose.backups-host.yaml`: `backups/` is missing or not owned by 10001 |
 | `/api/health/ready` returns 503 `schema_not_current` | migrations have not finished, or failed; check the logs |
 | Search finds nothing and the UI says degraded | no `GOOGLE_BOOKS_API_KEY`, or no outbound network |
 | The backup script says the service is not running | start the stack; an online backup needs a live database |
 
 On the default named-volume mounts, neither ownership row above is reachable —
-there's no host directory to get wrong.
+there's no host directory to get wrong. Bring a host directory in for either
+mount (`compose.bind-mounts.yaml`, or `compose.backups-host.yaml` for backups
+only) and its row becomes reachable for that mount.
 
 Logs are JSON, one object per line: `docker compose logs -f akasha`. Notes,
 review text, import rows and API keys are redacted before they are written.

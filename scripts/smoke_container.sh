@@ -71,7 +71,14 @@ cleanup() {
   [ -z "$restored_volume" ] || docker volume rm -f "$restored_volume" >/dev/null 2>&1 || true
   docker image rm -f "akasha:${smoke_tag}" >/dev/null 2>&1 || true
   # calibre is a real host bind mount, host-owned throughout and mounted :ro,
-  # so nothing under it is ever container-written.
+  # so nothing under it is ever container-written. The overlay drill's host
+  # backups directory is the one thing under the workdir the container DID
+  # write — uid 10001 files the host cannot rm — so empty it from a
+  # throwaway container as that uid before the final rm -rf. Nothing outside
+  # $workdir is ever touched.
+  [ ! -d "$host_backups" ] || docker run --rm --user 10001 \
+    -v "$host_backups:/drill:rw" alpine:latest \
+    sh -c 'rm -rf /drill/* /drill/.[!.]* 2>/dev/null || true' >/dev/null 2>&1 || true
   rm -rf "$workdir"
 }
 trap cleanup EXIT
@@ -381,6 +388,33 @@ docker compose down --timeout 10 >/dev/null
 docker compose up --detach --wait=false >/dev/null
 wait_healthy
 [ "$(read_back)" = "$expected" ] || fail "the entry did not survive recreation: $(read_back)"
+
+step "AC8: backups on their own disk, the database stays on its volume"
+# The opt-in third overlay binds only /backups to a host path, leaving /data
+# the named volume compose.yaml gives it (DEC-040 without giving up DEC-075).
+# The runbook's chown needs root, which this test does not have and must not
+# use: 0777 on a throwaway directory under /tmp stands in for it, and what is
+# under test is the mount topology, not the ownership dance. Absolute COMPOSE_FILE
+# paths because backup.sh cds to the repository root before invoking compose.
+host_backups="$workdir/host-backups"
+mkdir -p "$host_backups"
+chmod 0777 "$host_backups"
+export COMPOSE_FILE="$root/compose.yaml:$root/compose.backups-host.yaml"
+export BACKUP_DIR="$host_backups"
+docker compose up --detach --wait=false >/dev/null
+wait_healthy
+BACKUP_RETENTION=7 ./scripts/backup.sh
+[ -n "$(ls "$host_backups" | grep ^nightly- | tail -1)" ] \
+  || fail "the backup did not land on the host path: $(ls "$host_backups")"
+docker compose config --format json | python3 -c '
+import json, sys
+
+volumes = {entry["target"]: entry for entry in json.load(sys.stdin)["services"]["akasha"]["volumes"]}
+assert volumes["/data"]["type"] == "volume", volumes
+assert volumes["/data"]["source"], volumes
+assert volumes["/backups"]["type"] == "bind", volumes
+' || fail "the overlay did not leave /data a named volume while binding /backups"
+unset COMPOSE_FILE BACKUP_DIR
 
 step "Signals: SIGTERM stops the container promptly and cleanly"
 container="$(docker compose ps -q akasha)"

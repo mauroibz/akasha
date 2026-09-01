@@ -131,6 +131,8 @@ and startup refuses without it.
 `data` and `backups` are named Docker volumes, seeded from the image with the right
 ownership already on them. Want them as real host directories instead (a NAS-backed `BACKUP_DIR`, direct access to the sqlite
 file)? See [Bind-mounting data and backups](#bind-mounting-data-and-backups).
+Want backups on their own disk without moving the database off its named volume? See
+[the operator runbook](docs/operations/runbook.md#backups-on-their-own-disk).
 
 ### Configuration
 
