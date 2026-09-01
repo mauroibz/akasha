@@ -183,7 +183,9 @@ class EnrichmentSpec:
     - **`completeness_fields`** are the metadata fields whose absence means this
       record is still worth a lookup. They must be fields the domain declares — a
       name it does not have is always absent, so the record would never look complete.
-      A missing cover or year always counts, in every domain, and is not listed here.
+      A missing cover or year counts in every registered domain but is a declaration
+      (`wants_cover`, `wants_year`) rather than a constant, because a domain whose
+      providers carry neither must not be re-queued against them for ever (DEC-116).
     - **`fuller_answer_fields`** are the long-text fields where a longer answer is a
       better answer rather than a conflict (DEC-115). The first usable payload still
       wins every other field; for these alone, the remaining providers in
@@ -196,6 +198,18 @@ class EnrichmentSpec:
     identity_kinds: tuple[str, ...]
     provider_order: tuple[str, ...]
     completeness_fields: tuple[str, ...]
+    #: Whether a missing cover makes a record worth a lookup. The cover pipeline
+    #: post-dates the assumption: every enriching domain's providers can carry a
+    #: poster (Open Library and Google Books for films' books, Stremio for movies
+    #: and series, AniList for anime), so the default is True — but it is a
+    #: declaration rather than a constant because a domain whose providers carry
+    #: none must not be re-queued for ever against them (DEC-116).
+    wants_cover: bool = True
+    #: Whether a missing year makes a record worth a lookup. Sharper than the
+    #: cover condition: no provider contract guarantees a year, so a domain
+    #: whose rows legitimately carry none would be re-queued on every backfill
+    #: for ever unless it says otherwise (DEC-116).
+    wants_year: bool = True
     #: Which long-text fields prefer the fuller of the providers' answers. Absent
     #: means every field keeps its first provider's answer, as before.
     fuller_answer_fields: tuple[str, ...] = ()

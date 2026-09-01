@@ -438,7 +438,10 @@ def _backfillable_items(
     incompleteness rule named `publisher`, `page_count` and `description`, which an
     anime has none of, so every anime would have looked incomplete for ever.
 
-    A missing cover or year counts in every domain and is not part of the declaration.
+    A missing cover or year counts in every registered domain — as the
+    `wants_cover`/`wants_year` declarations, which default to True rather than
+    being constants, so a domain whose providers carry neither can opt out
+    instead of being re-queued for ever (DEC-116).
     """
     rows: list[tuple[int, str, str]] = []
     for domain in DOMAINS.values():
@@ -456,6 +459,17 @@ def _backfillable_items(
         for index, field in enumerate(spec.completeness_fields):
             incomplete.append(f"json_extract(items.metadata, :path_{index}) IS NULL")
             parameters[f"path_{index}"] = f"$.{field}"
+        # The cover and year conditions are the domain's declaration too, not a
+        # constant: a domain whose providers carry no covers, or whose rows
+        # legitimately carry no year, would otherwise be re-queued on every
+        # backfill for ever (DEC-116). Both default to True, which is what every
+        # registered domain means today.
+        conditions = []
+        if spec.wants_cover:
+            conditions.append("items.cover_path IS NULL")
+            conditions.append("items.cover_path = ''")
+        if spec.wants_year:
+            conditions.append("items.year IS NULL")
         scope = ""
         if item_ids is not None:
             # Bound and parameterised rather than interpolated.
@@ -477,10 +491,7 @@ def _backfillable_items(
                       ON ident.item_id = items.id AND ident.kind = :kind
                     WHERE items.type = :type
                       AND (
-                            items.cover_path IS NULL
-                         OR items.cover_path = ''
-                         OR items.year IS NULL
-                         OR {" OR ".join(incomplete)}
+                            {" OR ".join([*conditions, *incomplete])}
                       )
                       AND NOT EXISTS (
                             SELECT 1 FROM jobs

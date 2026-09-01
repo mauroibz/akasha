@@ -701,7 +701,10 @@ worth saying what each does:
 
   Choose fields a complete record really has. `season` and `episode_minutes` are legitimately absent
   from plenty of anime, so naming them would re-queue those rows for ever — the same bug in a subtler
-  hat. A missing cover or year already counts in every domain and is not something you declare.
+  hat. A missing cover or year counts too, through the `wants_cover`/`wants_year` declarations — they
+  default to True, and conformance leaves them alone unless your providers cannot supply one, in
+  which case opting out is how your rows stop being re-queued against a provider that will never
+  answer (DEC-116).
 
 **Your adapter implements `EnrichingProvider`**, which is one method:
 

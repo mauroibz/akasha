@@ -13,6 +13,7 @@ from book_tracker.application.providers import (
 )
 from book_tracker.domain.providers import Provider, SearchCandidate
 from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
+from book_tracker.infrastructure.providers import ProviderPayloadError
 
 router = APIRouter(prefix="/api")
 
@@ -85,6 +86,19 @@ async def resolve(
         rows = await resolve_input(url, _providers(request))
     except InvalidResolution as error:
         raise LibraryError("invalid_resolution", str(error), status_code=422) from error
+    except ProviderPayloadError as error:
+        # A typed miss is an answer, not an outage: `record_not_found` means this
+        # record does not exist anywhere this build can look, and telling the
+        # owner the provider is down would be a lie about a precise answer
+        # (DEC-100). Any other payload error — a malformed response, a refused
+        # guard — keeps the old 502, because the provider really did fail.
+        if error.code != "record_not_found":
+            raise LibraryError(
+                "provider_failure", "Metadata could not be resolved", status_code=502
+            ) from error
+        raise LibraryError(
+            "record_not_found", str(error), status_code=404
+        ) from error
     except Exception as error:
         raise LibraryError(
             "provider_failure", "Metadata could not be resolved", status_code=502

@@ -4016,3 +4016,44 @@ and state the success condition as "green", not as "seconds".**
   169 (the real HTML-derived synopsis) — the merged record stores TVmaze's. With TVmaze
   recording a 404, the one-liner arrives exactly as before. The owner's five-character
   synopsis survives both providers.
+
+
+## DEC-116 — The cover and year backfill conditions are the domain's declaration, and a typed miss is not an outage
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Implements:** Sprint 055 deliverable 2. **Closes:** the two defects DEC-100 recorded
+  and left. **Cross-references:** DEC-100 (the observations), DEC-067 row 3 and DEC-091
+  (the `completeness_fields` trap this is the same shape as), DEC-098 (why movies shipped
+  coverless), Sprint 048 (the Stremio poster pipeline that changed the cover answer).
+- **Context:** DEC-100 observed two defects and left both for a later sprint.
+
+  **1. `_backfillable_items` treated a null `cover_path` or `year` as "worth a lookup"
+  in every domain, regardless of the domain's declaration.** The recorded case was movies:
+  they shipped coverless because the Wikidata adapter carries no poster, so every movie
+  sat re-queueable for ever against a provider that would never answer. Two things changed
+  the answer rather than the observation: Sprint 048 gave movies Stremio posters through
+  their own adapter, and series and anime's providers carry covers too — so "a missing
+  cover is worth a lookup" is *true* for every registered domain today, but as a fact
+  about the provider catalogue rather than a law of nature. The year condition is the
+  sharper one: no provider contract guarantees a year, so a domain whose rows
+  legitimately carry none would be re-queued on every backfill for ever.
+- **Decision:** the conditions became declarations — `EnrichmentSpec.wants_cover` and
+  `wants_year`, both defaulting to `True` (what every registered domain means today), and
+  `_backfillable_items` builds its `OR` list from them rather than from literals. The
+  defaults mean no registered domain changes behaviour; a future domain whose providers
+  carry no covers opts out instead of inheriting the assumption. The guard tests prove the
+  opt-out through the unit seam: a coverless, otherwise-complete book row is queued under
+  the shipped declaration and not queued at all when the domain opts out, and the mirror
+  for a yearless row.
+- **2. `GET /api/search/resolve` mapped every exception from `resolve_input` to a 502.**
+  A typed `record_not_found` is an answer — the record does not exist anywhere this build
+  can look — and reading it as a provider outage told the owner the provider was down when
+  it had answered precisely.**
+- **Decision:** the route now catches `ProviderPayloadError` before the generic handler:
+  `record_not_found` becomes **404 under the provider's own code and message**, and every
+  other payload error — malformed response, refused guard — plus every transport failure
+  keeps the old 502 `provider_failure`. The tests prove the split both ways: a provider
+  raising the typed miss reads 404, a provider raising `httpx.ConnectError` still reads
+  502. The client screens already branch on the error code, so a miss now reads as "not
+  found" rather than "the provider failed" wherever the code reaches the screen.
