@@ -3478,3 +3478,38 @@ so 050 adds an adapter, not a declaration.
   the leading hypothesis, not confirmed).
 - Next: diagnose and fix as an out-of-sprint repair (user-authorized),
   same pattern as the earlier e2e CI flakiness fix.
+
+## 2026-09-01 — Out-of-sprint fix: the Calibre e2e failure was a gitignored fixture
+
+- Done: root-caused the finding above. Chromium/CPU-contention theories
+  were both ruled out empirically: reproduced the exact Playwright
+  version (1.61.1) and Chromium build (Ubuntu 24.04 "noble") in a local
+  Docker container, with `--cpus=2` and `--workers=2` matching CI
+  exactly — all 3 tests passed every time against this machine's
+  working tree. The difference was the working tree itself:
+  `frontend/e2e/fixtures/Calibre Library/metadata.db` (16 bytes, an
+  inert fixture — its only role is to be *named* `metadata.db` so
+  `calibreBundle()` recognizes the folder) was untracked, silently
+  excluded by `.gitignore`'s blanket `*.db` rule (meant for real
+  application databases). It existed only on this machine, never in
+  any git checkout including every one CI has ever run — so
+  `bundle.database` never got set in CI, and "Preview Calibre library"
+  correctly stayed disabled forever, which is exactly the observed
+  symptom. Confirmed causally, not just correlated: cloned the repo
+  fresh at the parent commit (no bind-mount leakage) inside the same
+  Docker image — reproduced the identical failure; cloned fresh at the
+  fix commit — all 3 passed. Fix: a narrow `.gitignore` negation
+  (`!frontend/e2e/fixtures/**/*.db`) plus committing the file.
+- Verified: reproduced pre-fix and confirmed post-fix in an isolated
+  Docker container (no reliance on "it works on my machine"), then
+  pushed and watched a real CI run (33558338614) go fully green —
+  `checks`, `container` and `e2e` all success, the first clean e2e run
+  on `main` since 2026-08-21.
+- Deviations: none — a pure bug fix, no behavior or scope change.
+- Blocked/open: nothing. This also retroactively explains why the
+  runner-contention diagnosis (this same session, closing Sprint 058)
+  looked plausible at first: the earlier bursts of concurrent CI runs
+  all failed for this same, unrelated, always-broken-in-CI reason,
+  which happened to surface for the first time only because `main` had
+  not had a real e2e run in weeks.
+- Next: Sprint 060 (storage housekeeping, ships v1.5.6).
