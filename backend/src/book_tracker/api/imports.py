@@ -353,16 +353,13 @@ async def _source(
                 "invalid_import_source", "An import file is required", status_code=422
             )
         targets = _targets(form.get("targets"))
+        cap = spec.max_bytes or MAX_IMPORT_BYTES
         chunks: list[bytes] = []
         size = 0
         while chunk := await upload.read(64 * 1024):
             size += len(chunk)
-            if size > MAX_IMPORT_BYTES:
-                raise LibraryError(
-                    "import_too_large",
-                    f"{importer.label} source exceeds 5 MiB",
-                    status_code=413,
-                )
+            if size > cap:
+                raise _too_large(spec)
             chunks.append(chunk)
         return ImportSource(data=b"".join(chunks), filename=upload.filename), targets
     try:
@@ -441,12 +438,21 @@ async def _bundle(
 
 def _too_large(spec: ImportInputSpec) -> LibraryError:
     megabytes = (spec.max_bytes or MAX_IMPORT_BYTES) // (1024 * 1024)
+    # An alternate is only ever the mounted-path input today (DEC-081's one level
+    # deep), which is what this sentence names; a connector with no alternate has no
+    # second way in, so the refusal says only what actually happened (deliverable 5,
+    # Sprint 060).
+    action = (
+        "Import it from a mounted path instead, using the option below the folder chooser."
+        if spec.alternate is not None
+        else "Export a smaller file, or split it into more than one."
+    )
     return LibraryError(
         "import_too_large",
         f"Upload exceeds {megabytes} MiB or {spec.max_files or MAX_IMPORT_FILES} files",
         status_code=413,
         user_message=f"That library is larger than the {megabytes} MiB this accepts.",
-        action="Import it from a mounted path instead, using the option below the folder chooser.",
+        action=action,
     )
 
 

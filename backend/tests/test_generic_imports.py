@@ -1166,3 +1166,84 @@ async def test_the_import_path_refuses_a_progress_the_domain_does_not_record(
         assert service._validate(record(None)) == {"progress": None}
     assert refused.value.status_code == 422
     assert "progress" in str(refused.value).lower() or "Book" in str(refused.value)
+
+
+class _CapFixtureImporter:
+    """An upload-only connector with no alternate, declaring its own byte cap.
+
+    No production connector does this yet (Sprint 060's own baseline note), so the
+    only way to prove the upload branch reads `spec.max_bytes` rather than the
+    module default is a fixture connector built for exactly that.
+    """
+
+    name = "cap_fixture"
+    label = "Cap Fixture"
+    item_types: tuple[str, ...] = ("book",)
+    input = ImportInputSpec(kind="upload", label="Fixture", field="file", max_bytes=1000)
+    identity_kinds: frozenset[str] = frozenset()
+
+    def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
+        return ImportSnapshot(
+            fingerprint=f"cap-{len(source.data or b'')}",
+            filename="fixture",
+            source_descriptor={},
+            records=(
+                NormalizedImportRecord(
+                    row_number=1,
+                    item=ImportItem(
+                        title="Cap Fixture Book",
+                        subtitle=None,
+                        year=None,
+                        identifiers={},
+                        metadata={},
+                    ),
+                    entry=ImportEntry(score=None, notes=None, date_added=None, values={}),
+                    shelves=(),
+                    errors=(),
+                    source_fields={},
+                ),
+            ),
+        )
+
+    def stage(self, snapshot: ImportSnapshot, _directory: Path, _data_dir: Path) -> ImportSnapshot:
+        return snapshot
+
+    def match(self, record: NormalizedImportRecord, matcher: Any) -> MatchDecision:
+        return matcher.match(identifiers=[], title=record.item.title, first_author="")
+
+
+@pytest.mark.anyio
+async def test_a_declared_upload_cap_is_honoured_in_both_directions(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Deliverable 5: the upload branch reads `spec.max_bytes`, not just the directory
+    branch — a connector declaring a larger cap accepts what the module default would
+    have refused, and its own refusal still fires above that larger cap."""
+    import book_tracker.api.imports as imports_module
+
+    monkeypatch.setattr(imports_module, "MAX_IMPORT_BYTES", 100)
+    monkeypatch.setitem(IMPORTERS, "cap_fixture", _CapFixtureImporter())
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        accepted = await client.post(
+            "/api/import/cap_fixture/preview",
+            files={"file": ("fixture.csv", b"x" * 500, "text/csv")},
+        )
+        assert accepted.status_code == 201, accepted.text
+
+        refused = await client.post(
+            "/api/import/cap_fixture/preview",
+            files={"file": ("fixture.csv", b"x" * 1500, "text/csv")},
+        )
+
+    assert refused.status_code == 413, refused.text
+    body = refused.json()["error"]
+    assert body["code"] == "import_too_large"
+    # No alternate on this connector, so the refusal must not suggest one that does
+    # not exist (deliverable 5's other half: "offers the alternate only when declared").
+    assert "mounted path" not in body["action"]
+    assert "Export a smaller file" in body["action"]
