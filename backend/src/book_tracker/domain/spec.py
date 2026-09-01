@@ -184,11 +184,21 @@ class EnrichmentSpec:
       record is still worth a lookup. They must be fields the domain declares — a
       name it does not have is always absent, so the record would never look complete.
       A missing cover or year always counts, in every domain, and is not listed here.
+    - **`fuller_answer_fields`** are the long-text fields where a longer answer is a
+      better answer rather than a conflict (DEC-115). The first usable payload still
+      wins every other field; for these alone, the remaining providers in
+      `provider_order` are also asked, and the longest value fills the field when it
+      is still empty. An owner's own value is never replaced, however short, and a
+      provider's answer is never swapped for a shorter one — the rule is
+      fuller-*than-what-would-otherwise-be-stored*, not "the last provider wins".
     """
 
     identity_kinds: tuple[str, ...]
     provider_order: tuple[str, ...]
     completeness_fields: tuple[str, ...]
+    #: Which long-text fields prefer the fuller of the providers' answers. Absent
+    #: means every field keeps its first provider's answer, as before.
+    fuller_answer_fields: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

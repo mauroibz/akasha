@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Collection, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -104,12 +105,20 @@ class EnrichmentHandler:
         A provider over its daily budget is skipped rather than called, and if that
         leaves nothing to try the caller defers the job instead of failing it — a
         quota that has not reset yet is not a failure (DEC-045).
+
+        The first usable payload wins, with one declared exception
+        (`fuller_answer_fields`): after it is chosen, the remaining providers are
+        asked for those fields alone, and the longest answer fills the field if
+        it beats the first provider's. Every other field, and the whole payload
+        when the domain declares none, behaves exactly as before.
         """
         reasons: list[str] = []
         unreachable = False
         capped = False
         available = False
         moment = now or datetime.now(UTC)
+        chosen: ItemPayload | None = None
+        chosen_source: str | None = None
         for name in spec.provider_order:
             provider = self.providers.get(name)
             if provider is None:
@@ -154,7 +163,38 @@ class EnrichmentHandler:
                     f"{_label(name)} returned no usable metadata for {kind.upper()} {value}."
                 )
                 continue
-            return payload, name, None
+            if chosen is None:
+                chosen = payload
+                chosen_source = name
+                if not spec.fuller_answer_fields:
+                    # Nothing left to ask: the first usable payload is the answer,
+                    # exactly as before this declaration existed.
+                    return payload, name, None
+                continue
+            # A second usable payload, reached only when the domain declared
+            # `fuller_answer_fields`: it contributes those fields alone, and only
+            # when its answer is longer than what the earlier provider supplied.
+            # A shorter or equally long answer changes nothing, and no other
+            # field of the first payload is ever touched — the second payload's
+            # other values are not merged in, so this is not "the last provider
+            # wins", and it is not "both providers merged" either (DEC-115).
+            fuller: dict[str, Any] = {}
+            for field_name in spec.fuller_answer_fields:
+                existing = chosen.metadata.get(field_name)
+                offered = payload.metadata.get(field_name)
+                if not isinstance(existing, str) or not isinstance(offered, str):
+                    continue
+                if len(offered) > len(existing):
+                    fuller[field_name] = offered
+            if fuller:
+                chosen = replace(chosen, metadata={**chosen.metadata, **fuller})
+            return chosen, chosen_source, None
+
+        if chosen is not None:
+            # The first provider was usable and a later one was not — the loop's
+            # `continue` after choosing means a miss or outage below the chosen
+            # provider must not lose the payload already in hand.
+            return chosen, chosen_source, None
 
         if capped and not available:
             # Nothing was even tried: every configured provider is out of budget.

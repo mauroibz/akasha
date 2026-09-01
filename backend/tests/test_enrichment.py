@@ -23,7 +23,10 @@ from recordings import (
     OPENLIBRARY_MISS_CONFIRMED,
     RECORDED_ISBN,
     enrichment_providers,
+    recording,
+    replay,
 )
+from recordings import Route as Route  # noqa: F401  (the recorded-response route type)
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
@@ -31,8 +34,13 @@ from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.undo import UndoService
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
+from book_tracker.domains.series.providers import (
+    WikidataSeriesProvider,
+    wikidata_series_route_key,
+)
 from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.models import ImportEffectRow, JobRow
+from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.main import create_app
 from book_tracker.migrations import upgrade
 
@@ -409,3 +417,132 @@ async def test_a_book_provider_is_never_asked_for_an_anime(engine: Engine) -> No
         result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
     assert result["state"] == "failed"
     assert result["error_code"] == "enrichment_not_configured"
+
+
+# ----------------------------------------------------------------------------------
+# Sprint 055, deliverable 1: a series gets the synopsis somebody would actually read.
+# ----------------------------------------------------------------------------------
+
+
+def _series_enrichment_providers(
+    tvmaze_lookup: Route | None = None,
+) -> dict[str, Any]:
+    """Wikidata-series and TVmaze replaying Sprint 049/050's committed recordings.
+
+    Both answer the same key — an IMDb id — so this is the real two-provider
+    order the series domain declares, not a stand-in. Wikidata's routes are
+    `IMDB_RESOLUTION` from the provider's own suite: the `P345` claim search,
+    the entity fetch and the label batch.
+    """
+    from tests.test_tvmaze_provider import tvmaze as make_tvmaze
+    from tests.test_wikidata_series_provider import IMDB_RESOLUTION, wikidata as make_wikidata
+
+    wikidata = make_wikidata(IMDB_RESOLUTION)
+    lookup = tvmaze_lookup or (200, recording("tvmaze_lookup_tt0903747.json"))
+    tvmaze_provider = make_tvmaze({"/lookup/shows": lookup})
+    return {"wikidata-series": wikidata, "tvmaze": tvmaze_provider}
+
+
+def _create_series(engine: Engine, **metadata: Any) -> int:
+    with engine.begin() as connection:
+        item_id = connection.execute(
+            text(
+                "INSERT INTO items"
+                "(type,title,year,cover_path,identifiers,metadata,created_at,updated_at) "
+                "VALUES('series','Breaking Bad',2008,NULL,'{}',:metadata,'n','n') RETURNING id"
+            ),
+            {"metadata": json.dumps(metadata)},
+        ).scalar_one()
+        connection.execute(
+            text(
+                "INSERT INTO item_identifiers(item_id,kind,normalized_value,value,"
+                "created_at,updated_at) VALUES(:item,'imdb','tt0903747','tt0903747','n','n')"
+            ),
+            {"item": item_id},
+        )
+    return item_id
+
+
+async def _run_series_job(engine: Engine, providers: dict[str, Any], item_id: int) -> dict[str, Any]:
+    job_id = JobRepository(engine).enqueue(
+        None, "enrich_item", {"item_id": item_id, "kind": "imdb", "value": "tt0903747"}
+    )
+    handler = EnrichmentHandler(engine, providers, rate_limiter=None)
+    result = await handler.process(job_id, datetime.now(UTC))
+    assert result["state"] == "succeeded", result
+    return result
+
+
+class TestTheSynopsisSomebodyWouldActuallyRead:
+    """A longer answer for a long-text field is not a conflict to be resolved by
+    arrival order. The recorded responses are the two Sprint 055 named: Wikidata's
+    one-line description and TVmaze's real synopsis for the same show."""
+
+    @pytest.mark.anyio
+    async def test_a_series_stores_the_full_synopsis_not_the_one_liner(
+        self, engine: Engine
+    ) -> None:
+        """AC1: both providers recorded, the fuller answer wins."""
+        item_id = _create_series(engine)
+        await _run_series_job(engine, _series_enrichment_providers(), item_id)
+        row = read_item(engine, item_id)
+        metadata = json.loads(row.metadata)
+        synopsis = metadata["synopsis"]
+        # TVmaze's recorded summary, not Wikidata's recorded one-liner.
+        assert synopsis.startswith("Breaking Bad follows protagonist Walter White")
+        assert "chemistry teacher" in synopsis
+
+    @pytest.mark.anyio
+    async def test_a_healthy_synopsis_from_the_first_provider_is_not_replaced(
+        self, engine: Engine
+    ) -> None:
+        """The negative: a provider's good value survives. TVmaze's answer here is
+        shorter than Wikidata's, so a naive "longest wins" would replace it — the
+        rule is fuller-*than-what-is-there*, not fuller-than-everything."""
+        item_id = _create_series(
+            engine, synopsis="A chemistry teacher starts cooking meth in New Mexico."
+        )
+        await _run_series_job(engine, _series_enrichment_providers(), item_id)
+        row = read_item(engine, item_id)
+        metadata = json.loads(row.metadata)
+        assert metadata["synopsis"] == "A chemistry teacher starts cooking meth in New Mexico."
+
+    @pytest.mark.anyio
+    async def test_the_one_liner_still_arrives_when_it_is_all_there_is(
+        self, engine: Engine
+    ) -> None:
+        """TVmaze has no record for this show, so Wikidata's one-liner is the whole
+        answer and arrives exactly as it always did."""
+        item_id = _create_series(engine)
+        await _run_series_job(
+            engine,
+            _series_enrichment_providers(tvmaze_lookup=(404, recording("tvmaze_lookup_no_match.json"))),
+            item_id,
+        )
+        row = read_item(engine, item_id)
+        metadata = json.loads(row.metadata)
+        assert metadata["synopsis"] == "serie de televisión estadounidense"
+
+    @pytest.mark.anyio
+    async def test_no_other_field_is_touched_by_the_second_provider(self, engine: Engine) -> None:
+        """AC2's regression half: the second provider contributes its declared
+        field alone. `episodes` stays Wikidata's (the TVmaze adapter deliberately
+        never emits it), and `network`/`airing_status` arrive from the first
+        payload, exactly as they did before this rule existed — the second
+        payload's other values are not merged in."""
+        item_id = _create_series(engine)
+        await _run_series_job(engine, _series_enrichment_providers(), item_id)
+        row = read_item(engine, item_id)
+        metadata = json.loads(row.metadata)
+        assert metadata["episodes"] == 62  # Wikidata's P1113, from the recording
+        assert metadata["network"] == "AMC"  # Wikidata's own claim, first payload
+        assert metadata["airing_status"] == "Ended"  # Wikidata's, first payload
+
+    @pytest.mark.anyio
+    async def test_the_owner_s_own_synopsis_is_never_touched(self, engine: Engine) -> None:
+        """AC2: an owner edit beats every provider, however short."""
+        item_id = _create_series(engine, synopsis="Mine.")
+        await _run_series_job(engine, _series_enrichment_providers(), item_id)
+        row = read_item(engine, item_id)
+        metadata = json.loads(row.metadata)
+        assert metadata["synopsis"] == "Mine."

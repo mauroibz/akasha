@@ -109,6 +109,11 @@ SERIES_ENRICHMENT = EnrichmentSpec(
     # deliberately absent: naming a legitimately empty field re-queues its row on
     # every backfill for ever.
     completeness_fields=("creators", "genres", "synopsis"),
+    # The one field where a longer answer is a better answer: Wikidata's `synopsis`
+    # is its one-line identification sentence and TVmaze's is a real synopsis, and
+    # `wikidata-series` is first in `provider_order` — so without this, the
+    # one-liner arrives first and the real synopsis never gets a turn (DEC-115).
+    fuller_answer_fields=("synopsis",),
 )
 
 

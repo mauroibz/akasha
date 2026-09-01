@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 29,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "055",
   "active_sprint_file": "docs/sprints/055-recorded-defects.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "054",
   "completed_sprints": [
     "001",
@@ -62,6 +62,6 @@
     "053",
     "054"
   ],
-  "started_at": "",
+  "started_at": "2026-08-31T23:05:00-03:00",
   "updated_at": "2026-09-01T01:35:00-03:00"
 }

@@ -360,6 +360,22 @@ def enrichment_is_answerable_by_this_domain(domain: Domain) -> None:
         f"{unknown}. A field this domain never stores is always absent, so every "
         "record would be re-queued for ever."
     )
+    # The same trap one table over (DEC-115): a `fuller_answer_fields` name the
+    # domain does not declare is never emitted by any payload, so the rule would
+    # cost a second provider request per item and change nothing. It must also
+    # name a long-text field: a longer list or number is not a fuller answer.
+    unknown_fuller = set(spec.fuller_answer_fields) - declared
+    assert not unknown_fuller, (
+        f"{domain.item_type} prefers the fuller answer of fields it does not declare: "
+        f"{unknown_fuller}. No payload ever carries them, so every enrichment would "
+        "spend a second provider request for nothing."
+    )
+    for name in spec.fuller_answer_fields:
+        field = next(field for field in domain.fields if field.name == name)
+        assert field.type == "long_text", (
+            f"{domain.item_type} prefers the fuller answer of {name!r}, which is a "
+            f"{field.type} field. A longer number or list is not a fuller answer."
+        )
 
 
 @registry_check

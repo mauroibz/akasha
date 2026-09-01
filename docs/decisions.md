@@ -3972,3 +3972,47 @@ Sprint 051's four items were chosen from a backlog of observations. Three were r
 failed is the one whose success condition was stated as a duration rather than as a property, and the
 two costs it missed were the ones nobody had thought to time. **Time the gate before optimising it,
 and state the success condition as "green", not as "seconds".**
+
+
+## DEC-115 — A long-text field may prefer the fuller of its providers' answers
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Implements:** Sprint 055 deliverable 1. **Cross-references:** DEC-110 (the fill-empty
+  merge rule this carves one class out of), DEC-100 (where the defect was first observed
+  and left), Sprint 053's Outcome (the one-liner as it appeared on a real record),
+  DEC-067 row 3 (per-domain enrichment), DEC-113 (the declaration shape this follows).
+- **Context:** A series enriched live to `synopsis: "serie de televisión animada"` —
+  Wikidata's one-line identification *description*, where TVmaze had a real synopsis for
+  the same show. Nothing was broken: `wikidata-series` is first in `provider_order`, the
+  handler stops at the first usable payload, and `fill_empty` fills only empty fields —
+  so the short text arrives first and the long one never gets a turn. The rule is right
+  for every field where providers answer the same question with the same shape, and wrong
+  for one class: a long-text field, where "one line" and "three paragraphs" are both
+  complete answers of different value.
+- **The alternatives, costed:** trimming `wikidata-series` to stop emitting `synopsis`
+  (the sprint's second option) fixes the series case in one line but is a provider being
+  edited to fit a rule — the domain, not the adapter, is where a field's meaning lives —
+  and it would leave the next domain with the same problem and no mechanism. "The last
+  provider wins" was refused outright by the sprint: it overwrites everywhere, not just
+  where longer is better.
+- **Decision:** `EnrichmentSpec.fuller_answer_fields` is a tuple of field names, the same
+  shape as `completeness_fields` — a domain saying something about its own fields (the
+  sprint's preferred option, chosen because it costs no more than the second). When a
+  domain declares it, the handler still stops at the first usable payload for everything
+  else, then asks the remaining providers in `provider_order` for the declared fields
+  alone, and keeps the **longest** answer for each — but only while the field would
+  otherwise be stored empty or shorter: a shorter second answer changes nothing, a
+  provider's healthy value is never swapped for a peer's, and the second payload's other
+  fields are never merged in. The owner's own value is never touched at any length, by
+  the unchanged fill-empty write. Series declares `("synopsis",)`; no other domain
+  declares any, and behaves exactly as before.
+- **Conformance:** the conformance suite checks every `fuller_answer_fields` name is a
+  field the domain declares **and** is `long_text` — the same trap as
+  `completeness_fields` one table over: an undeclared name never arrives on any payload,
+  so the rule would spend a second provider request per item and change nothing.
+- **Measured, 2026-09-01, against Sprint 049/050's committed recordings:** Wikidata's
+  Breaking Bad entity (`serie de televisión estadounidense`, 33 chars) and TVmaze's show
+  169 (the real HTML-derived synopsis) — the merged record stores TVmaze's. With TVmaze
+  recording a 404, the one-liner arrives exactly as before. The owner's five-character
+  synopsis survives both providers.
