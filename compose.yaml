@@ -11,6 +11,18 @@ services:
   akasha:
     build: .
     image: akasha:local
+    logging:
+      # The container's stdout is the only sink this service has: uvicorn's
+      # access log is on, and one library page is many requests. Docker's
+      # json-file default has no size bound, so without this block a home
+      # server discovers the logs by running out of the disk it shares with
+      # everything else it is for. 10 MiB x 5 is about two days of a chatty
+      # incident and a 50 MiB ceiling; both knobs are overridable in the same
+      # shape as the rest of this file.
+      driver: json-file
+      options:
+        max-size: "${AKASHA_LOG_MAX_SIZE:-10m}"
+        max-file: "${AKASHA_LOG_MAX_FILE:-5}"
     ports:
       # Bound to the LAN interface you choose. Leave AKASHA_BIND at 0.0.0.0 only
       # on a network you trust; 127.0.0.1 restricts it to this machine.

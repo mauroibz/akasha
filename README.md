@@ -145,6 +145,7 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
 | `AKASHA_PORT`          | `4441`           | Published port                                                                             |
 | `AKASHA_BIND`          | `0.0.0.0`        | Set to `127.0.0.1` to keep it off the network                                              |
+| `AKASHA_LOG_MAX_SIZE`  | `10m`            | Container log rotation bound, with `AKASHA_LOG_MAX_FILE` (`5`)                             |
 | `TZ`                   | `UTC`            | Timezone                                                                                   |
 | `LOG_LEVEL`            | `INFO`           | Log verbosity                                                                              |
 

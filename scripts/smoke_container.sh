@@ -150,6 +150,20 @@ docker compose up --detach --wait=false >/dev/null
 # healthcheck is invisible to a test that reimplements it.
 wait_healthy
 
+step "AC3: the container's logs are bounded"
+# Docker's json-file default has no size limit and uvicorn's access log is on,
+# so an unbounded default grows the host disk with every request this very
+# script makes. The resolved LogConfig must carry both knobs.
+docker inspect "$(docker compose ps -q akasha)" |
+  python3 -c '
+import json, sys
+
+log_config = json.load(sys.stdin)[0]["HostConfig"].get("LogConfig") or {}
+assert log_config.get("Type") == "json-file", log_config
+assert log_config.get("Config", {}).get("max-size"), log_config
+assert log_config.get("Config", {}).get("max-file"), log_config
+' || fail "the container's log driver is unbounded (no max-size/max-file)"
+
 step "AC1: no Node runtime, non-root user"
 [ "$(docker compose exec -T akasha id -u)" != "0" ] || fail "the container runs as root"
 if docker compose exec -T akasha sh -c 'command -v node' >/dev/null 2>&1; then
