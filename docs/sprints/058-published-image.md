@@ -1,6 +1,6 @@
 # Sprint 058 — An image you pull, not a build you run
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 056
 
 **Roadmap revision:** 30
