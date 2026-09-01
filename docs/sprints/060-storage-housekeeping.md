@@ -1,4 +1,4 @@
-# Sprint 059 — The disk stops filling quietly
+# Sprint 060 — The disk stops filling quietly
 
 **Status:** planned
 **Depends on:** 056
@@ -122,9 +122,9 @@ container through Sprint 056's passthrough list.
 and its refusal names the actual limit and offers the alternate input only when the connector
 declares one. A connector-level test proves a declared cap is respected in both directions.
 
-### 6. Release notes for v1.5.4
+### 6. Release notes for v1.5.5
 
-`docs/operations/release-notes-v1.5.4.md`, and the runbook's "Nightly backups" and "Reclaiming
+`docs/operations/release-notes-v1.5.5.md`, and the runbook's "Nightly backups" and "Reclaiming
 attachment space" sections updated to describe every collector the application now has, in one place.
 
 ## Acceptance criteria
@@ -188,7 +188,7 @@ real backup-and-restore cycle regardless: run it, read the sizes, and report wha
 - **A retention policy for nightly backups beyond the existing `BACKUP_RETENTION`.**
 - **Quotas per domain, per item or per user.** There is one user.
 - **Compressing covers or re-encoding attachments.** DEC-047 measured that ground already.
-- Anything from Sprints 056, 057 or 058.
+- Anything from Sprints 056, 058 or 059.
 
 ## Commit checkpoints
 
@@ -197,8 +197,8 @@ real backup-and-restore cycle regardless: run it, read the sizes, and report wha
 3. `[ADD] An explicit prune for pre-migration backups`
 4. `[ADD] Refuse a write the disk cannot take`
 5. `[FIX] Honour the connector's declared upload cap`
-6. `[DOCS] Every collector in one place, and release notes for v1.5.4`
-7. `[DOCS] Close sprint 059 and hand off`
+6. `[DOCS] Every collector in one place, and release notes for v1.5.5`
+7. `[DOCS] Close sprint 060 and hand off`
 
 ## Risks and decisions to surface
 

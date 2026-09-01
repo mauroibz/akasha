@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 30
+**Plan revision:** 31
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 057 — An image you pull, not a build you run](057-published-image.md)
+**Active sprint:** [Sprint 057 — The names the product actually uses](057-product-names.md)
 
 ## Shape of the plan
 
@@ -54,9 +54,10 @@ Post-v1 work branches:
 
 v1.5.0 released
  └─ 056 Deployment defaults          v1.5.1
-     ├─ 057 A published image        v1.5.2
-     ├─ 058 Nothing blocks the loop  v1.5.3  [GATED]
-     └─ 059 Storage housekeeping     v1.5.4
+     ├─ 057 Product names           v1.5.1
+     ├─ 058 A published image       v1.5.3
+     ├─ 059 Nothing blocks the loop  v1.5.4  [GATED]
+     └─ 060 Storage housekeeping     v1.5.5
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -98,13 +99,13 @@ optimization backlog so the three import sprints after it run against faster, qu
 sprints recorded and left, and the three gates that measurement showed had stopped paying for
 themselves — including one of Sprint 051's own four items.
 
-**Sprints 056–059 are the deployment line, and they build no product** (DEC-117). v1.5.0 released
+**Sprints 056–060 are the deployment line, and they build no product** (DEC-117; DEC-119 inserted 057). v1.5.0 released
 five domains and six import sources; what had never been examined was what a real installation of it
 meets on the first day and on every upgrade after. The image itself held — the container smoke test
 passes end to end from a clean build — and the gaps were all one layer out: defaults that fight the
 host, an upgrade that is a full rebuild on the server, write paths whose contention has never been
 measured, and three places that write bytes with nothing to collect them. Each sprint ships one patch
-release. 057, 058 and 059 depend on 056 alone and are otherwise independent; 057 runs first because
+release. 058, 059 and 060 depend on 056 alone and are otherwise independent; 058 runs first because
 a published image makes delivering the other two cheap. Nothing in the line changes what a person
 sees in the application, and none of it adds authentication — product spec §9 keeps that a v2
 deferral, reaffirmed by the owner while commissioning these sprints.
@@ -181,9 +182,10 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | completed |
 | [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | completed |
 | [056](056-deployment-defaults.md) | The deployment defaults a home server needs | 055 | completed |
-| [057](057-published-image.md) | An image you pull, not a build you run | 056 | planned |
-| [058](058-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
-| [059](059-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
+| [057](057-product-names.md) | The names the product actually uses | 056 | ready |
+| [058](058-published-image.md) | An image you pull, not a build you run | 056 | planned |
+| [059](059-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
+| [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 
 ## Sprint contracts
 
@@ -1042,7 +1044,11 @@ asks for and DEC-075 currently makes impossible to have at the same time. And th
 gains the sentence it has always been missing: a host joined to a VPN or mesh network carries an
 extra interface that `AKASHA_BIND=0.0.0.0` publishes on too.
 
-### [Sprint 057 — An image you pull, not a build you run](057-published-image.md)
+### [Sprint 057 — The names the product actually uses](057-product-names.md)
+
+The two cheap layers of the naming assessment (DEC-119): the environment prefix becomes `AKASHA_` — a clean break, owner-directed, no alias, landing before v1.5.1 is tagged — and the API title drops "Book Tracker" for the brand. The `book_tracker` package itself is untouched: DEC-042's rejection and the internal-names invariant stand. Full gate owed (backend/src and generated contracts change).
+
+### [Sprint 058 — An image you pull, not a build you run](058-published-image.md)
 
 An upgrade becomes `docker compose pull && docker compose up -d`. Today `compose.yaml` carries
 `build: .`, so every server needs the source tree, both toolchains and three reachable registries,
@@ -1058,7 +1064,7 @@ exist. Three steps need the owner's own account — allowing the workflow to wri
 the tag, and deciding the package's visibility — and they are written out step by step, with expected
 results, in the sprint and in `docs/operations/publishing-images.md`.
 
-### [Sprint 058 — Nothing blocks the event loop](058-off-the-event-loop.md) **[GATED]**
+### [Sprint 059 — Nothing blocks the event loop](059-off-the-event-loop.md) **[GATED]**
 
 Every API handler is `async def` and there is no `to_thread` or `run_in_threadpool` anywhere in the
 backend, so every SQLite query, Pillow resize and import parse runs on the single event loop of a
@@ -1074,7 +1080,7 @@ is a pass**, written into the acceptance criteria as one, following DEC-035 and 
 does run, the load-bearing proof is that foreign keys, WAL and the busy timeout still hold on a
 connection used from a worker thread.
 
-### [Sprint 059 — The disk stops filling quietly](059-storage-housekeeping.md)
+### [Sprint 060 — The disk stops filling quietly](060-storage-housekeeping.md)
 
 Three growth paths have no collector. `/data/imports/<batch_id>` is written by every preview — one
 prepared JPEG per book for a Calibre library — and removed by nothing, not by commit, not by the

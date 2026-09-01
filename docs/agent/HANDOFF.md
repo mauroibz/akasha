@@ -1,57 +1,42 @@
-# Handoff — Sprint 057 is ready: the published image
+# Handoff — Sprint 057 is ready: the names the product actually uses
 
-Sprint 056 (deployment defaults, v1.5.1) is complete and committed. `docs/agent/state.json`
-reads `ready` with `057` active. v1.5.1 is **not tagged and not pushed** — the owner's call,
-as with every release before it.
+Plan revision **31** (DEC-119): the owner directed the two cheap layers of the naming
+assessment — the pydantic `env_prefix` becomes `AKASHA_` (**clean break, no alias**) and the
+FastAPI title drops "Book Tracker". Both ship inside the still-untagged **v1.5.1**. The
+deployment line renumbered: old 057/058/059 are now **058/059/060** (v1.5.3/v1.5.4/v1.5.5);
+`FINAL_SPRINT` is 60. Sprint 056's closure and its evidence are untouched history.
 
 The next move is ordinary: execute Sprint 057 with the protocol in `/AGENTS.md`.
 
-## What Sprint 056 changed (all committed, all verified)
-
-- The published port defaults to **4441**; the container still listens on 8000. The one
-  breaking change of the line; `AKASHA_PORT=8000` in `.env` restores the old address, and the
-  release notes lead with it.
-- Container logs are bounded (json-file, 10 MiB × 5) via a `logging:` block in `compose.yaml`.
-- `BOOK_TRACKER_ATTACHMENT_MAX_BYTES`, `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` and
-  `TMDB_READ_TOKEN` are bare list-form pass-throughs: present with the sent value, absent from
-  the container when unset. **Never replace them with `env_file:`** — it would inject the
-  example's `BOOK_TRACKER_ENVIRONMENT=development` and disable the production guard.
-- Healthcheck start period is 60 s (sized by DEC-039's pre-migration backup plus a row-rewrite
-  migration, not by a warm restart).
-- `image: akasha:${AKASHA_VERSION:-local}` — the shape Sprint 057 builds its registry reference
-  on. The runbook's rollback and restore recipes carry the variable.
-- `compose.backups-host.yaml` binds only `/backups` to a host path; `/data` stays the named
-  volume. The runbook has the tier table (tiers 1/2/3) and the one privileged `chown`.
-- Overlay-network sentence present in `SECURITY.md`, the compose header, and the runbook.
-- `docs/operations/release-notes-v1.5.1.md` exists and is linked in `docs/README.md`.
-
 ## What Sprint 057 must not get wrong
 
-- **A compose service carrying both `image:` and `build:` builds silently when the image is
-  absent** — that is the failure the sprint exists to remove. The local build moves to its own
-  overlay; compose points at the registry.
-- **`scripts/smoke_container.sh` must keep building locally.** It now also carries Sprint 056's
-  hermetic `COMPOSE_ENV_FILES` harness and its five new assertions; the sprint file names the
-  steps that need adapting for a pulled image.
-- **Sprint 057 declares the same narrowed gate** (validator + `make check` + smoke), and its
-  diff must stay confined to deployment/CI configuration and docs to keep it. Its three
-  owner-only steps (workflow package-write permission, pushing the tag, package visibility)
-  are written out with expected results in the sprint file — surface them to the owner, don't
-  improvise them.
-- The smoke test picks a **random port** and never binds 4441; keep that property when adapting
-  it.
+- **The `book_tracker` package is not renamed.** DEC-042's rejection and the AGENTS.md
+  internal-names invariant stand. Only the env prefix and the API title change.
+- **No alias.** A `BOOK_TRACKER_*` variable in an operator's `.env` is silently ignored from
+  v1.5.1 on. The release notes say so with the rename table; do not add a compat layer.
+- **`AKASHA_BIND`/`AKASHA_PORT` fall inside the pydantic prefix after the flip.** They must
+  stay absorbed by `extra="ignore"` — prove it in a unit test, don't assume it.
+- **Full gate owed.** The diff touches `backend/src/` and `openapi.json` (a generated
+  contract): validator, `make check`, `make test`, `make smoke-container`. The version surfaces
+  (pyproject, package.json, main.py, openapi.json) move to **1.5.1** — forced by the title
+  change, and it corrects the drift 056's release notes acknowledged.
+- Historical records (closed sprints, worklog, DEC-001–118) keep `BOOK_TRACKER_` — do not
+  edit them. Verify the split with grep, not by eye.
+- Sprint 056's compose env boundary (explicit list, never `env_file:`) is renamed, not widened.
 
-## Verified at Sprint 056's close
+## Verified at Sprint 056's close (previous sprint)
 
-- `bash scripts/smoke_container.sh` — exit 0 on the final frozen tree, all 20 steps, no
-  leftovers, no smoke volumes remaining.
-- `make check`, `python scripts/validate_project.py` — green.
-- `AKASHA_VERSION=1.5.1 docker compose build` — tags `akasha:1.5.1`.
-- `make test` / `npm run test:e2e` — not owed (narrowed gate); CI runs both on every push.
+`make smoke-container` exit 0 on the frozen tree; `make check` green; narrowed gate held
+(no application code). Eleven local commits on main, nothing tagged or pushed. v1.5.1 is
+assembled but untagged: the tag decision is the owner's, after this sprint's changes fold in.
+
+## After Sprint 057
+
+058 (published image, v1.5.3) carries three owner-only GitHub steps; 059 (event loop,
+v1.5.4) is gated measurement-first; 060 (storage, v1.5.5) owes the full gate.
 
 ## Private data and operational constraints
 
 Unchanged. `exports/` is the owner's private source archive, gitignored whole, read-only
-walkthrough input; no fixture may be cut from it. Secrets, databases, uploaded imports and
-covers are never committed. v1 has no auth and stays LAN-only; Calibre is opened read-only.
-No pushing unless asked.
+walkthrough input. Secrets, databases, uploaded imports and covers are never committed. v1
+has no auth and stays LAN-only; Calibre is opened read-only. No pushing unless asked.

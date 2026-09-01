@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "plan_revision": 30,
+  "plan_revision": 31,
   "project_status": "ready",
   "active_sprint": "057",
-  "active_sprint_file": "docs/sprints/057-published-image.md",
+  "active_sprint_file": "docs/sprints/057-product-names.md",
   "active_sprint_status": "ready",
   "last_completed_sprint": "056",
   "completed_sprints": [
@@ -65,5 +65,5 @@
     "056"
   ],
   "started_at": "",
-  "updated_at": "2026-09-01T10:25:00-03:00"
+  "updated_at": "2026-09-01T11:00:00-03:00"
 }

@@ -3230,3 +3230,25 @@ so 050 adds an adapter, not a declaration.
 - Blocked/open: nothing. Three owner-only steps live in Sprint 057 (GitHub package-write, tag
   push, package visibility) and are not blockers until that sprint runs.
 - Next: execute Sprint 057 — read `docs/sprints/057-published-image.md`.
+
+## 2026-09-01 — Planning session: DEC-119, the names sprint (plan revision 31)
+
+- Done: no runtime code. The owner reviewed the naming assessment and directed its two cheap
+  layers: `env_prefix` `BOOK_TRACKER_` -> `AKASHA_` (clean break, no alias — explicit owner
+  instruction) and the FastAPI title "Akasha Book Tracker" -> "Akasha". Both ship inside the
+  untagged v1.5.1; version surfaces move 1.5.0 -> 1.5.1 in the same sprint because the title
+  lands in `openapi.json`. DEC-042's package-name rejection stands untouched. Recorded
+  **DEC-119**; inserted **Sprint 057 — The names the product actually uses** (ready); the
+  deployment line renumbered 057->058, 058->059, 059->060 with releases shifted to
+  v1.5.3/v1.5.4/v1.5.5; `FINAL_SPRINT` 59 -> 60; ROADMAP (revision line, active pointer,
+  tree, index, contract headers, deployment-line paragraph); state.json at revision 31;
+  HANDOFF rewritten; release-notes v1.5.1 amended with the rename table and the two new
+  bullets.
+- Verified: `python scripts/validate_project.py` green after every edit; `git diff --check`
+  clean. `make test` not owed — no application code changed (the post-gate matrix's
+  plan-revision row).
+- Deviations: none. The renumbering is the seeds insertion pattern: append-only history keeps
+  its original sprint numbers and release names everywhere.
+- Blocked/open: nothing.
+- Next: execute Sprint 057 — read `docs/sprints/057-product-names.md`. It owes the FULL gate
+  (backend/src + generated contract change); the narrowed gate is withdrawn by design.

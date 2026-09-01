@@ -1,6 +1,6 @@
-# Sprint 057 — An image you pull, not a build you run
+# Sprint 058 — An image you pull, not a build you run
 
-**Status:** ready
+**Status:** planned
 **Depends on:** 056
 
 **Roadmap revision:** 30
@@ -52,7 +52,7 @@ A workflow that builds the image once and pushes it to GHCR when a `v*` tag is p
 - run only on a tag, never on a branch push or a pull request;
 - authenticate with the workflow's own `GITHUB_TOKEN` under `permissions: packages: write`, so that
   **no personal access token or repository secret is created for it**;
-- tag the result with the full version, the minor line and `latest` — `1.5.2`, `1.5`, `latest` — so
+- tag the result with the full version, the minor line and `latest` — `1.5.3`, `1.5`, `latest` — so
   an operator can pin as tightly as they like;
 - carry OCI labels, `org.opencontainers.image.source` among them, which is what links the published
   package back to this repository;
@@ -116,30 +116,30 @@ exactly this shape — what it does, the exact step, and what a correct result l
    is normally sufficient; if the first release run fails with a `403` or `denied` from `ghcr.io`,
    this setting is why. Expected result: the release run's `docker/login-action` step succeeds and
    the push step reports a digest.
-2. **Push a version tag, and watch the run.** `git tag v1.5.2 && git push origin v1.5.2`, then the
+2. **Push a version tag, and watch the run.** `git tag v1.5.3 && git push origin v1.5.3`, then the
    *Actions* tab. Expected result: one workflow run named for the tag, green, whose log ends with
-   the pushed tags `1.5.2`, `1.5` and `latest`.
+   the pushed tags `1.5.3`, `1.5` and `latest`.
 3. **Decide the package's visibility, once.** A package published by a workflow starts **private**
    even when the repository is public. On the package's *Package settings* page, either change
    visibility to public — the recommendation, since the repository and its licence already are, and
    it means a server pulls with no credentials at all — or leave it private and accept that every
    machine that pulls needs `docker login ghcr.io` with a token carrying `read:packages`. Expected
-   result for the public path: `docker pull ghcr.io/<owner>/akasha:1.5.2` succeeds from a machine
+   result for the public path: `docker pull ghcr.io/<owner>/akasha:1.5.3` succeeds from a machine
    that has never authenticated.
 
 If the answer to step 3 is "private", the document must also carry the login procedure and say
 plainly that the credential then lives on every server that runs this.
 
-### 8. Release notes for v1.5.2
+### 8. Release notes for v1.5.3
 
-`docs/operations/release-notes-v1.5.2.md`. This release changes how the software is obtained, so the
+`docs/operations/release-notes-v1.5.3.md`. This release changes how the software is obtained, so the
 notes carry the migration for an existing install: how to stop building and start pulling, and that
 the data volumes are untouched by the switch.
 
 ## Acceptance criteria
 
 1. Pushing a `v*` tag publishes an image; pushing a branch or opening a pull request does not.
-2. The published image carries `1.5.2`, `1.5` and `latest`, and its labels include
+2. The published image carries `1.5.3`, `1.5` and `latest`, and its labels include
    `org.opencontainers.image.source` pointing at this repository.
 3. A machine with only Docker installed — no source tree, no Node, no Python — can run the
    application from the published `compose.yaml` and reach a healthy container.
@@ -206,7 +206,7 @@ the narrowing.
 - **Automatic deployment.** Nothing in this sprint may push, deploy or restart anything on a server.
   Publishing is where CI stops; `docker compose pull` is a person's decision.
 - **A public release announcement, a Docker Hub mirror, or documentation aimed at strangers.**
-- Auth, the event loop (Sprint 058), and disk housekeeping (Sprint 059).
+- Auth, the event loop (Sprint 059), and disk housekeeping (Sprint 060).
 
 ## Commit checkpoints
 
@@ -215,8 +215,8 @@ the narrowing.
 3. `[CHANGE] Pin the base images by digest`
 4. `[ADD] Dependency updates arrive as pull requests`
 5. `[DOCS] The upgrade is a pull, and how to publish one`
-6. `[DOCS] Release notes for v1.5.2`
-7. `[DOCS] Close sprint 057 and hand off`
+6. `[DOCS] Release notes for v1.5.3`
+7. `[DOCS] Close sprint 058 and hand off`
 
 ## Risks and decisions to surface
 

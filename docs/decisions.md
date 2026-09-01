@@ -4192,3 +4192,34 @@ and state the success condition as "green", not as "seconds".**
   are `release-notes-v1.5.1.md` through `release-notes-v1.5.4.md`. The narrowed gate is
   available to any future sprint that qualifies, not only to this line — a documentation or
   operations sprint is its natural other use.
+
+## DEC-119 — The environment prefix becomes AKASHA_ and the API title drops "Book Tracker"; a names sprint is inserted before the deployment line
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Context:** After Sprint 056 closed, the owner asked for an assessment of renaming the
+  `BOOK_TRACKER_*` names that survive in a product whose books are one domain of five. The
+  assessment measured five layers and found one settled decision: DEC-042 rejected renaming
+  the `book_tracker` package on the internal-names invariant, and that rejection stands — the
+  package, `books.db` and the `/books/:id` route are untouched. The owner directed the two
+  cheap layers only: the FastAPI title ("Akasha Book Tracker" -> "Akasha") and the pydantic
+  `env_prefix` ("BOOK_TRACKER_" -> "AKASHA_"), the latter **as a clean break with no
+  compatibility alias**. Because v1.5.1 is still untagged, both fold into that release, which
+  is the last moment the prefix rename costs nothing; after the tag it is a breaking change
+  that must lead release notes. The title change lands in `frontend/openapi.json`, a generated
+  contract, so the version surfaces move 1.5.0 -> 1.5.1 in the same sprint — correcting the
+  drift Sprint 056's own release notes acknowledged ("the version surfaces stay at 1.5.0"
+  cannot survive an OpenAPI-affecting change).
+- **Decision:** Plan revision 31 inserts **Sprint 057 — The names the product actually uses**
+  ahead of the deployment line; the three planned sprints renumber 057->058, 058->059,
+  059->060 and their patch releases shift v1.5.2->v1.5.3, v1.5.3->v1.5.4, v1.5.4->v1.5.5.
+  Sprint 057 ships inside v1.5.1 (no separate release). `FINAL_SPRINT` moves 59 -> 60. The
+  sprint owes the **full gate**: its diff touches `backend/src/`, frontend config and the
+  generated OpenAPI contract, which is the narrowed gate's withdrawal condition. Operators
+  setting `BOOK_TRACKER_*` variables in `.env` must rename them; the release notes carry the
+  table and the remedy.
+- **Consequences:** `AKASHA_BIND` and `AKASHA_PORT` — previously compose-only names — now fall
+  inside the pydantic prefix and are absorbed by `extra="ignore"`; the sprint proves that
+  rather than assuming it. Historical records keep `BOOK_TRACKER_` where they describe the
+  past. The compose pass-through list (the env boundary Sprint 056 established) is renamed,
+  not widened: no new variable may reach the container except by an explicit list entry.

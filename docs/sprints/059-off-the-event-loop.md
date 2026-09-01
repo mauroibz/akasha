@@ -1,4 +1,4 @@
-# Sprint 058 — Nothing blocks the event loop **[GATED]**
+# Sprint 059 — Nothing blocks the event loop **[GATED]**
 
 **Status:** planned
 **Depends on:** 056
@@ -99,7 +99,7 @@ Conditional on the verdict, and scoped by it rather than by this file:
 
 8. **`docs/agent/TESTING.md` gains the harness** in its verification vocabulary, so a later sprint
    that touches an import path knows the measurement exists and how to run it.
-9. **Release notes for v1.5.3.** If Phase A ends the sprint, the release is a documented measurement
+9. **Release notes for v1.5.4.** If Phase A ends the sprint, the release is a documented measurement
    and whatever small things came with it — and that is worth saying plainly rather than dressing up.
 
 ## Acceptance criteria
@@ -167,7 +167,7 @@ report what it felt like, per the walkthrough gate in `AGENTS.md`.
   and let it be its own sprint rather than smuggling a process model in here.
 - **Streaming, pagination or protocol changes** to make responses feel faster. This is about not
   blocking, not about response shape.
-- Anything from Sprints 056, 057 or 059.
+- Anything from Sprints 056, 058 or 060.
 
 ## Commit checkpoints
 
@@ -180,8 +180,8 @@ Phase B, only if the verdict calls for it:
 
 3. `[ADD] One seam for work that must leave the loop`
 4. `[CHANGE] Move the measured-blocking paths onto it`
-5. `[DOCS] Re-measured, and release notes for v1.5.3`
-6. `[DOCS] Close sprint 058 and hand off`
+5. `[DOCS] Re-measured, and release notes for v1.5.4`
+6. `[DOCS] Close sprint 059 and hand off`
 
 ## Risks and decisions to surface
 

@@ -28,12 +28,22 @@ correction to documentation you can read at leisure.
 - **Container logs are bounded.** Docker's `json-file` default has no size limit, and the
   access log is on. The service now ships a `logging:` block — 10 MiB × 5 files, a 50 MiB
   ceiling — overridable with `AKASHA_LOG_MAX_SIZE` and `AKASHA_LOG_MAX_FILE`.
-- **Every documented setting now reaches the process.** `BOOK_TRACKER_ATTACHMENT_MAX_BYTES`,
-  `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` and `TMDB_READ_TOKEN` are explicit pass-throughs in
+- **Every documented setting now reaches the process.** `AKASHA_ATTACHMENT_MAX_BYTES`,
+  `AKASHA_SQLITE_BUSY_TIMEOUT_MS` and `TMDB_READ_TOKEN` are explicit pass-throughs in
   `compose.yaml`. A value set in `.env` is now honoured, and unset settings stay absent from
   the container rather than arriving as something the application has to interpret.
   `TMDB_READ_TOKEN` is documented for the first time, in `.env.example` and the README's
   configuration table.
+- **The configuration prefix is `AKASHA_`, not `BOOK_TRACKER_`.** Akasha holds five domains,
+  and the name moved on. An existing `.env` that sets a `BOOK_TRACKER_*` variable: rename it —
+  `BOOK_TRACKER_ATTACHMENT_MAX_BYTES` becomes `AKASHA_ATTACHMENT_MAX_BYTES`,
+  `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` becomes `AKASHA_SQLITE_BUSY_TIMEOUT_MS`,
+  `BOOK_TRACKER_ENVIRONMENT` becomes `AKASHA_ENVIRONMENT`. There is no compatibility alias,
+  deliberately: an ignored old name is a silent misconfiguration, but it is one this release
+  names in its notes, and the rename is one find-and-replace. The application package keeps
+  its internal name.
+- **The API calls itself Akasha.** The OpenAPI title drops "Book Tracker"; the version
+  surfaces read `1.5.1` for the first time since v1.5.0 was tagged.
 - **The healthcheck tolerates a slow first start.** The start period grows from 10 s to 60 s:
   a start with pending revisions takes a pre-migration backup first — one that tars every
   cover — and then a migration that may rewrite every row. On a slow disk that is minutes,
