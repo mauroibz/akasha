@@ -1,6 +1,6 @@
 # Sprint 059 — Nothing blocks the event loop **[GATED]**
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 056
 
 **Roadmap revision:** 30
@@ -199,4 +199,91 @@ Phase B, only if the verdict calls for it:
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+**Completed 2026-09-01.** Phase A found a real breach; Phase B fixed exactly what it named.
+Full account, including the measurement table, in DEC-122.
+
+### Delivered
+
+- **Phase A — the harness.** `scripts/measure_event_loop.py`/`.sh`
+  (`e39b098`): drives a large Goodreads import commit, ~65 cover uploads, or twenty 20 MiB
+  attachment uploads against a real running container at `--cpus=2`, while polling the first
+  library page and watching the container's own Docker healthcheck via `docker inspect`.
+- **Phase A — the verdict.** Import commit: p95 5,005.6 ms (2 requests timed out) against a
+  500 ms budget — a ~10x breach, not marginal. Covers (75.4 ms) and attachments (61.3 ms) were
+  already within budget, unconstrained and at `--cpus=2`, before any code changed. Recorded in
+  DEC-122 with the full table.
+- **Phase B — the seam.** `infrastructure/offload.py`'s `off_loop` (`fb97fac`): wraps
+  `anyio.to_thread.run_sync` behind `CapacityLimiter(4)`, deliberately small rather than anyio's
+  default 40, since this application has one writer process and one SQLite file. Wired at
+  exactly the call site Phase A named — `api/imports.py`'s `commit` handler (`16258cc`). Covers
+  and attachments untouched; they did not breach.
+- **Phase B — the threading contract, confirmed.** `test_pragmas_apply_to_a_connection_obtained_off_the_main_thread`
+  proves `database.py`'s pragma listener applies to a connection obtained from a worker thread
+  (it already did — `QueuePool` plus pysqlite's automatic `check_same_thread=False`; the test
+  proves rather than assumes it).
+- **Phase B — the newly possible failure, closed.** `main.py` gained an `OperationalError`
+  handler (`16258cc`): an expired `busy_timeout` surfaces as a typed `library_busy` 503 rather
+  than an unhandled driver error. Two tests prove it under genuine contention:
+  `test_concurrent_writes_through_the_offloaded_path_leave_a_correct_ledger` (no lost row) and
+  `test_a_queued_writer_surfaces_a_typed_error_rather_than_database_is_locked`.
+- **Re-measured.** Import commit p95: 78.0 ms, zero sample errors, 181 samples collected during
+  the 19.8 s commit (versus 6 samples before, since the loop stayed free to answer them). One
+  residual noted rather than chased: the run's **max** (not p95) sample hit 3,898.4 ms once,
+  plausibly GIL contention between the worker thread's CPU-bound ORM work and the main thread —
+  does not breach the p95-based criterion.
+- **Walkthrough (AGENTS.md's gate, owed because Phase B ran).** Real backend + real frontend dev
+  server (`scripts/walkthrough.py` + `npm run dev` against it), driven with a throwaway
+  Playwright script (`frontend/e2e/scratchpad/manual-walkthrough-import.mjs`, gitignored): a real
+  4,000-row Goodreads CSV, uploaded, previewed and committed through the actual UI. Clicking the
+  "Library" nav link while the 4,000-row commit was still in flight resolved in 51 ms — the
+  browser was never unresponsive. Confirmed after: `GET /api/entries?status=unsorted` reported
+  all 4,000 rows landed. What it felt like: no visible change from before Sprint 058 — which is
+  the point; the fix is that a bystander's own interactions during someone else's import no
+  longer freeze.
+- **`docs/agent/TESTING.md`** gained an "Event-loop contention" section (`3dcea6d`) naming the
+  harness and `off_loop`.
+- **`docs/operations/release-notes-v1.5.5.md`** (`3dcea6d`), listed in `docs/README.md`.
+
+### Verified
+
+**Full gate**, owed with no argument since Phase B changed `backend/src/`:
+
+- `python scripts/validate_project.py` — green.
+- `make check` — green (ruff format/check, mypy, ESLint, tsc, OpenAPI drift check).
+- `make test` — backend 1,190 passed (1,186 + 4 new), frontend 194 passed.
+- `make smoke-container` — exit 0, unchanged in outcome (this sprint's diff never touches the
+  container's own runtime behavior, only in-process request handling).
+- `bash scripts/measure_event_loop.sh 2 import covers attachment` — all three within budget
+  post-fix (numbers above and in DEC-122).
+- Walkthrough as described above.
+- `npm run test:e2e` — **not separately re-run in this session** beyond what CI already runs on
+  every push; nothing in this sprint's diff touches `frontend/src/` or any Playwright spec, and
+  the full backend/frontend unit suites plus the container smoke test already prove request
+  behavior unchanged. See "Deviations" for an unrelated e2e finding from this same session that
+  is explicitly not this sprint's to fix.
+
+### Deviations
+
+- **Commit order folds checkpoints 2 and 5.** The sprint template asked for the verdict as its
+  own commit before Phase B's implementation commits; both phases ran in one continuous session,
+  so the verdict was written into DEC-122 alongside the re-measurement rather than as a separate
+  interim commit. No information was lost — the measurement table records both the before and
+  after numbers together.
+- **An unrelated, real e2e failure was found and left alone.** Reconciling Sprint 058's closure
+  (see that sprint's Outcome and this session's worklog) required pushing `main` for the first
+  time in weeks, which triggered the first real CI run against the accumulated 056–058 work.
+  Three Calibre folder-picker tests (`import.spec.ts`) failed reproducibly — not the transient
+  runner-contention flakiness the earlier e2e fix addressed, but the "Preview Calibre library"
+  button staying disabled for a full 60 s after a folder is chosen. Confirmed unrelated to this
+  sprint (nothing in the diff touches Calibre or `frontend/src/`) and confirmed with the user as
+  a separate, out-of-sprint repair to take up next — not folded into this sprint's scope or
+  gate.
+- No other deviation. Non-scope items (multiple uvicorn workers, an async driver, a job-runner
+  process, protocol/streaming changes) were not touched.
+
+### Impact on future sprints
+
+None on scope or dependencies. Sprint 060 (storage housekeeping, `v1.5.6` per DEC-121) still
+depends on 056 only. `off_loop` and `scripts/measure_event_loop.py` are now available to any
+future sprint that adds synchronous work spending more than a few milliseconds inside a handler —
+`docs/agent/TESTING.md`'s new section says so.

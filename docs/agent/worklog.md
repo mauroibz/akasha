@@ -3417,3 +3417,64 @@ so 050 adds an adapter, not a declaration.
 - Next: execute Sprint 059 — read `docs/sprints/059-off-the-event-loop.md`.
   It ships as **v1.5.5** now, not v1.5.4 (DEC-121); Sprint 060 ships
   **v1.5.6**.
+
+## 2026-09-01 — Sprint 059 (complete)
+
+- Done: Phase A built `scripts/measure_event_loop.py`/`.sh`, a harness that
+  drives a real background task (large Goodreads import commit, cover
+  uploads, large attachment uploads) against a real running container at
+  `--cpus=2` while polling the first library page and watching the
+  container's Docker healthcheck. Measured: import commit p95 5,005.6ms
+  against the 500ms budget (real request timeouts), covers 75.4ms,
+  attachments 61.3ms — only the import commit breached. Phase B added the
+  one offload seam (`infrastructure/offload.py`'s `off_loop`,
+  `CapacityLimiter(4)`, deliberately small), wired it at exactly the
+  `commit` handler Phase A named, proved the pragma/threading contract
+  already held off-thread, and added an `OperationalError` -> typed
+  `library_busy` 503 handler for the newly-possible cross-thread SQLite
+  contention. Re-measured: p95 78.0ms, zero errors. Real browser
+  walkthrough (`scripts/walkthrough.py` + `npm run dev` + a throwaway
+  Playwright script) committed a real 4,000-row Goodreads import while
+  clicking the Library nav link mid-commit — resolved in 51ms.
+- Verified: full gate (Phase B touched `backend/src/`, withdrawing any
+  narrowing). `python scripts/validate_project.py`, `make check` green.
+  `make test`: backend 1,190 passed (4 new), frontend 194 passed.
+  `make smoke-container` exit 0. `measure_event_loop.sh 2 import covers
+  attachment` all within budget post-fix.
+- Deviations: none material — see the sprint's own Outcome for the
+  commit-order note. A real, reproducible e2e failure was found while
+  closing Sprint 058 (see below) and confirmed with the user as
+  out-of-scope for this sprint.
+- Blocked/open: nothing for this sprint.
+- Next: fix the Calibre folder-picker e2e failure (out-of-sprint repair,
+  user-approved), then execute Sprint 060 —
+  read `docs/sprints/060-storage-housekeeping.md` (ships v1.5.6).
+
+## 2026-09-01 — Out-of-sprint finding: a real, reproducible e2e failure on `main`
+
+- Done: while closing Sprint 058, the user asked about CI #73 failing on
+  `fa47bfc` ("[DOCS] Close sprint 058 and hand off", a docs-only commit).
+  Investigated with `gh run view`/`--log-failed` rather than guessing.
+  Found: 3 `import.spec.ts` Calibre folder-picker tests fail consistently
+  (`gh run rerun --failed` on the same run, ~40 minutes after the
+  Dependabot burst that first surfaced it had fully cleared, reproduced
+  identically). Also confirmed via an unrelated Dependabot PR run
+  (`docker/login-action` version bump only) that showed the same 3 tests
+  failing, ruling out anything in the 25 commits pushed to `main` this
+  session as the cause. The rerun's error is concrete, not a timing
+  fluke: the "Preview Calibre library" button stays `disabled` for the
+  full 60s test timeout after a folder is chosen — `readyInput()`
+  gating it is pure synchronous client state (`bundle.members.length`),
+  no network call involved, so this is not a slow request. Most likely
+  cause: Chromium/`webkitdirectory` behavior drift on GitHub's runners,
+  since this is the first real e2e run on `main` since 2026-08-21 and
+  nothing in the newly-pushed commits touches Calibre import code.
+- Verified: reproduced twice (the original run and a clean rerun after
+  the burst cleared), and shown unrelated to any pushed code via a
+  Dependabot PR's independent CI run.
+- Deviations: none — this is a finding, not a fix. The user confirmed
+  fixing it should wait until Sprint 059 closes.
+- Blocked/open: root cause not yet isolated (Chromium version drift is
+  the leading hypothesis, not confirmed).
+- Next: diagnose and fix as an out-of-sprint repair (user-authorized),
+  same pattern as the earlier e2e CI flakiness fix.

@@ -1,6 +1,6 @@
 # Sprint 060 — The disk stops filling quietly
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 056
 
 **Roadmap revision:** 30

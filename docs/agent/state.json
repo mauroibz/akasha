@@ -2,10 +2,10 @@
   "schema_version": 1,
   "plan_revision": 31,
   "project_status": "ready",
-  "active_sprint": "059",
-  "active_sprint_file": "docs/sprints/059-off-the-event-loop.md",
+  "active_sprint": "060",
+  "active_sprint_file": "docs/sprints/060-storage-housekeeping.md",
   "active_sprint_status": "ready",
-  "last_completed_sprint": "058",
+  "last_completed_sprint": "059",
   "completed_sprints": [
     "001",
     "002",
@@ -64,8 +64,9 @@
     "055",
     "056",
     "057",
-    "058"
+    "058",
+    "059"
   ],
   "started_at": "",
-  "updated_at": "2026-09-01T16:50:00-03:00"
+  "updated_at": "2026-09-01T17:35:00-03:00"
 }
