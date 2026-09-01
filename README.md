@@ -136,15 +136,21 @@ Want backups on their own disk without moving the database off its named volume?
 
 ### Configuration
 
-Everything is environment variables, all documented in [`.env.example`](.env.example).
+Everything is environment variables, all documented in [`.env.example`](.env.example). The
+`AKASHA_*` names split in two: the ones the application reads (`AKASHA_ATTACHMENT_MAX_BYTES`,
+`AKASHA_SQLITE_BUSY_TIMEOUT_MS`, `AKASHA_ENVIRONMENT`, `AKASHA_DATA_DIR`, `AKASHA_CALIBRE_DIR`,
+`AKASHA_DATABASE_URL`, `AKASHA_BACKUP_DIR`) and the ones Compose itself interpolates
+(`AKASHA_PORT`, `AKASHA_BIND`, `AKASHA_VERSION`, `AKASHA_DATA_VOLUME`, `AKASHA_BACKUP_VOLUME`,
+`AKASHA_LOG_MAX_SIZE`, `AKASHA_LOG_MAX_FILE`) — the second group configures the deployment
+and never reaches the process.
 
 | Variable               | Default          | What it does                                                                               |
 | ---------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
 | `USER_AGENT_CONTACT`   | *required*       | Contact address sent to metadata providers                                                 |
 | `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
 | `TMDB_READ_TOKEN`     | *empty*          | Optional. The movie domain's poster fallback for films with a TMDB id and no IMDb id       |
-| `BOOK_TRACKER_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |
-| `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` | `5000`   | How long SQLite waits for a locked database before failing                                 |
+| `AKASHA_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |
+| `AKASHA_SQLITE_BUSY_TIMEOUT_MS` | `5000`   | How long SQLite waits for a locked database before failing                                 |
 | `AKASHA_DATA_VOLUME`   | `akasha_data`    | Docker volume name for the database, covers and attached files                             |
 | `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume                       |
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
