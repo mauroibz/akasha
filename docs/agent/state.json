@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 29,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 30,
+  "project_status": "ready",
+  "active_sprint": "056",
+  "active_sprint_file": "docs/sprints/056-deployment-defaults.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "055",
   "completed_sprints": [
     "001",
@@ -64,5 +64,5 @@
     "055"
   ],
   "started_at": "",
-  "updated_at": "2026-09-01T02:45:00-03:00"
+  "updated_at": "2026-09-01T04:10:00-03:00"
 }

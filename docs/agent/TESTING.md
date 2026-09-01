@@ -29,6 +29,36 @@ required.
 Passing a lower rung never replaces a required higher rung. The ladder changes when a command runs,
 not whether it runs.
 
+## Gate scope by what changed
+
+The ladder says when a command runs. This says which commands a sprint owes at all, because running
+a product suite against a diff it cannot reach is the same waste DEC-114 measured from the other
+direction — paying repeatedly for evidence already held.
+
+A sprint qualifies for a **narrowed gate** when its entire diff is confined to deployment
+configuration (`compose*.yaml`, `Dockerfile`), CI configuration, operator and planning documentation,
+and shell scripts that are not themselves under test — and touches **nothing** under
+`backend/src/`, `frontend/src/`, `backend/tests/`, `backend/alembic/versions/`, `uv.lock` or
+`package-lock.json`.
+
+| | Full gate | Narrowed gate |
+|---|---|---|
+| `python scripts/validate_project.py` | required | required |
+| `make check` | required | required |
+| `make test` | required | **not owed** — no Python or TypeScript the suites execute has changed |
+| `npm run test:e2e` | required when a request path or a screen changed | **not owed** |
+| `make smoke-container` | required for deployment work | **required, and it is the gate** |
+
+The narrowed gate is a claim about the diff, so it is verified against the diff. `git status` and
+`git diff --stat` at the freeze point are the evidence, and both belong in the Outcome beside the
+declaration. One file under `backend/src/` withdraws the narrowing for the whole sprint — including
+a one-line fix that felt too small to matter, which is exactly the case this rule must not let
+through.
+
+A base-image or dependency change is deployment configuration by path and a runtime change by
+effect: it owes the container gate, and `make test` tells you nothing about it, because the suites
+run on the host and not in the image.
+
 ## Post-gate rerun matrix
 
 | Change after the exhaustive gate | Required before closure |

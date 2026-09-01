@@ -49,6 +49,12 @@ if those targets exist and the sprint did not already name them. For UI behavior
 specified browser or Playwright checks rather than relying only on unit tests. For deployment work,
 build and exercise the container.
 
+A sprint may declare a **narrowed gate** in its `Verification` section — naming the exhaustive
+commands it does *not* owe, with the reason — but only when its diff qualifies under
+`docs/agent/TESTING.md`'s "Gate scope by what changed". The declaration is checked against the actual
+diff at closure, not taken on trust: a sprint that ends up touching application code owes the full
+gate regardless of what it planned, and must say so in its Outcome.
+
 Do not rerun an exhaustive product suite merely because the only subsequent changes are sprint
 Outcome, roadmap, worklog, handoff, or state documentation. Classify the post-gate diff using the
 playbook and run its required closure checks. Any later change to runtime code, tests, migrations,

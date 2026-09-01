@@ -22,9 +22,10 @@ import urllib.request
 import urllib.error
 
 BASE = os.environ.get("BOOK_TRACKER_BASE_URL", "http://127.0.0.1:41517")
-TRAKT_ARCHIVE = os.environ.get(
-    "TRAKT_ARCHIVE", "exports/trakt-export-mauro0094-59d74e.zip"
-)
+# No default. An owner path inlined here is an account identifier committed to a public
+# repository, which is what Sprint 055's handoff already asked these scripts not to do:
+# owner paths come through the environment, never inline.
+TRAKT_ARCHIVE = os.environ.get("TRAKT_ARCHIVE", "")
 IMDB_RATINGS = os.environ.get("IMDB_RATINGS", "")
 IMDB_LIST = os.environ.get("IMDB_LIST", "")
 
@@ -81,6 +82,9 @@ def multipart(path: str, field: str, filename: str, content: bytes, form: dict[s
 
 
 async def main() -> int:
+    if not TRAKT_ARCHIVE:
+        print("Set TRAKT_ARCHIVE to your Trakt export .zip — see this file's docstring.")
+        return 2
     with open(TRAKT_ARCHIVE, "rb") as handle:
         archive_bytes = handle.read()
     print(f"archive: {len(archive_bytes)} bytes")

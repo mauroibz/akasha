@@ -3104,3 +3104,91 @@ so 050 adds an adapter, not a declaration.
 - **Next.** Whatever the owner directs: the release, an epic from the roadmap's future
   list, or nothing at all. A new sprint would be a plan revision — the seeds skill's
   extension worked example is the shape.
+
+## 2026-09-01 — Planning session: the deployment line (Sprints 056–059), plan revision 30
+
+- Done: no runtime code. The owner asked for a pre-deployment assessment of v1.5.0 and then for the
+  findings to be planned as sprints, one per minor release. Added four sprint files expanded from
+  `TEMPLATE.md` — **056 deployment defaults** (`ready`), **057 a published image**, **058 nothing
+  blocks the event loop** (gated), **059 storage housekeeping** (all `planned`). Recorded
+  **DEC-117** with the whole assessment, moved `FINAL_SPRINT` 55→59, bumped `plan_revision` to 30,
+  flipped state `complete → ready` with 056 active, extended ROADMAP (revision line, active-sprint
+  pointer, tree, index rows, four contract sections, one shape-of-the-plan paragraph), and rewrote
+  HANDOFF.
+- Evidence the plan is built on, all taken 2026-09-01 on Docker 29.5.2 / Compose v5.1.4:
+  `bash scripts/smoke_container.sh` **passed, exit 0**, from a clean build — so the image and its
+  data handling are sound and none of these sprints is about them. The gaps are one layer out:
+  (1) `compose.yaml` publishes `${AKASHA_PORT:-8000}`, declares no `logging:` (Docker's `json-file`
+  default is unbounded and uvicorn's access log is on), passes five variables while `.env.example`
+  documents `BOOK_TRACKER_ATTACHMENT_MAX_BYTES`/`BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` and
+  `config.py` carries `TMDB_READ_TOKEN` — none of the three reaches the container; healthcheck
+  `--start-period=10s --interval=10s --retries=3` is ~40 s against DEC-039's pre-migration backup;
+  `compose.bind-mounts.yaml` overrides `/data` and `/backups` together, so DEC-040 cannot be
+  satisfied without giving up DEC-075. (2) `build: .` means every install is a build; CI has no
+  publish job and no `.github/dependabot.yml`; both `FROM` lines are floating tags. (3) Every API
+  handler is `async def` and there is **no** `to_thread`/`run_in_threadpool` anywhere under
+  `backend/src/book_tracker/`; `import_service.preview/commit` are sync calls inside `async def`
+  handlers; DEC-036's 82 ms idle vs 312 ms contended is the only contended number and it was a read
+  path on a workstation. (4) `/data/imports/<batch_id>` is written by every preview
+  (`application/imports.py:271`, Calibre's `stage` writes one JPEG per book) and deleted by nothing;
+  `ARCHIVED_DIRECTORIES = ("covers", "imports")` is re-tarred in full every backup where DEC-047
+  hardlinks attachments; `enforce_retention` is label-scoped so `pre-migration` copies are pruned by
+  nothing; no `statvfs`/`disk_usage`/ENOSPC handling exists. Also latent: `api/imports.py:359`'s
+  upload branch uses the module constant and ignores `spec.max_bytes`, and hardcodes "5 MiB" in the
+  refusal — no upload connector declares a larger cap today, so it is not live.
+- Verified: `python scripts/validate_project.py` green after every edit; `git diff --check` clean.
+  `make test` not owed — no application code changed (the post-gate matrix's plan-revision row).
+- Deviations: the owner set the new default published port (**4441**) and reaffirmed that no auth is
+  wanted, both recorded in DEC-117. The assessment also raised mounting an existing Calibre library
+  read-only through `CALIBRE_DIR`; the owner rejected it — the library manager in question is being
+  retired — so no sprint plans around a Calibre mount, and DEC-081's browser-folder path stays the
+  Calibre route.
+- Blocked/open: nothing. Sprint 057 carries three steps only the owner's GitHub account can perform
+  (workflow package-write permission, pushing the tag, package visibility); they are written out with
+  expected results in the sprint file and are not a blocker until that sprint runs.
+- Next: execute Sprint 056 — read `docs/sprints/056-deployment-defaults.md`.
+
+## 2026-09-01 — Planning session, second pass: the owner's three amendments (DEC-118)
+
+- Done: no runtime code except one script fix (below). The owner reviewed the plan from the previous
+  entry and raised three things.
+  1. **Gates.** These sprints would each have owed `make test` under `AGENTS.md` §3, against diffs the
+     suites cannot reach. Added **"Gate scope by what changed"** to `TESTING.md` and the enabling
+     clause to `AGENTS.md` §3: a sprint may declare a **narrowed gate** —
+     `validate_project.py` + `make check` + `make smoke-container`, with `make test` and
+     `npm run test:e2e` not owed — only when its whole diff is deployment/CI configuration,
+     operator and planning docs, and scripts not under test, touching nothing under `backend/src/`,
+     `frontend/src/`, `backend/tests/`, `backend/alembic/versions/`, `uv.lock` or
+     `package-lock.json`. It is a claim about the diff and is checked against it (`git diff --stat`
+     in the Outcome); one file under `backend/src/` withdraws it for the whole sprint; CI's own
+     `checks`/`e2e` jobs still run the full suites on every push. Sprints 056 and 057 declare it,
+     058 declares it conditionally (Phase A only — Phase B owes the full gate), 059 owes the full
+     gate outright.
+  2. **Release numbers.** Minor versions are reserved for new domains and major features, so the
+     line ships **v1.5.1–v1.5.4** rather than v1.6.0–v1.9.0. Renumbered across the four sprint
+     files, ROADMAP, HANDOFF and the release-notes filenames; Sprint 057's published image tags
+     become `1.5.2`, `1.5`, `latest`.
+  3. **Personal data in the plans.** Scanned the four sprint files, DEC-117, ROADMAP, HANDOFF and the
+     worklog entry: **clean** — no address, host, network, username or hardware anywhere in them.
+     The scan did find two pre-existing hits elsewhere in the public repository, neither from this
+     line: `scripts/walkthrough_trakt_054.py` carried the owner's Trakt export filename as an inline
+     default (an account username), and `docs/sprints/041-myanimelist-import.md:44` names a
+     MyAnimeList export filename carrying two account ids. **Fixed the first** — `TRAKT_ARCHIVE`
+     now defaults to empty with an explicit refusal, which is what Sprint 055's handoff already
+     asked of these scripts ("owner paths through the environment, never inline"). Left the second:
+     it is a closed sprint file and historical records are not edited. Both strings remain in git
+     history, which is pushed and public; rewriting that is the owner's call and was not taken.
+- Recorded **DEC-118**. **DEC-117's version references were corrected in place** rather than
+  superseded — same day, no sprint had run against it, and leaving four wrong version numbers inside
+  the decision that plans them would have been a trap for the next session. The correction is stated
+  in DEC-118, here, and in the commit message, which is what keeps it from being a silent edit.
+- Verified: `python scripts/validate_project.py` green after every edit; `git diff --check` clean;
+  `ast.parse` on the changed script. `make test` not owed — nothing under `backend/src/`,
+  `frontend/src/` or either test tree changed; the one script touched is a walkthrough launcher that
+  no suite executes. This is the first use of the rule added in this same entry, which is worth
+  naming rather than glossing.
+- Deviations: the script fix is outside every sprint's scope. It is recorded here as a prerequisite
+  repair rather than folded into a sprint, because it removes an account identifier from a public
+  repository and should not wait for 056 to be executed.
+- Blocked/open: nothing. Sprint 056 is still `ready` and unchanged in scope.
+- Next: execute Sprint 056 — read `docs/sprints/056-deployment-defaults.md`.

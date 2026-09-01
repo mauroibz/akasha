@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 29
+**Plan revision:** 30
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the plan is complete at [Sprint 055](055-recorded-defects.md)
+**Active sprint:** [Sprint 056 — The deployment defaults a home server needs](056-deployment-defaults.md)
 
 ## Shape of the plan
 
@@ -51,6 +51,12 @@ Post-v1 work branches:
                                                                                                       └─ 053 The IMDb import
                                                                                                           └─ 054 The Trakt import
                                                                                                               └─ 055 The recorded defects
+
+v1.5.0 released
+ └─ 056 Deployment defaults          v1.5.1
+     ├─ 057 A published image        v1.5.2
+     ├─ 058 Nothing blocks the loop  v1.5.3  [GATED]
+     └─ 059 Storage housekeeping     v1.5.4
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -91,6 +97,17 @@ optimization backlog so the three import sprints after it run against faster, qu
 055, inserted at plan revision 29 (DEC-114), closes the line: the defects the movie and series
 sprints recorded and left, and the three gates that measurement showed had stopped paying for
 themselves — including one of Sprint 051's own four items.
+
+**Sprints 056–059 are the deployment line, and they build no product** (DEC-117). v1.5.0 released
+five domains and six import sources; what had never been examined was what a real installation of it
+meets on the first day and on every upgrade after. The image itself held — the container smoke test
+passes end to end from a clean build — and the gaps were all one layer out: defaults that fight the
+host, an upgrade that is a full rebuild on the server, write paths whose contention has never been
+measured, and three places that write bytes with nothing to collect them. Each sprint ships one patch
+release. 057, 058 and 059 depend on 056 alone and are otherwise independent; 057 runs first because
+a published image makes delivering the other two cheap. Nothing in the line changes what a person
+sees in the application, and none of it adds authentication — product spec §9 keeps that a v2
+deferral, reaffirmed by the owner while commissioning these sprints.
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -163,6 +180,10 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [053](053-imdb-import.md) | The IMDb import | 049, 052 | completed |
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | completed |
 | [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | completed |
+| [056](056-deployment-defaults.md) | The deployment defaults a home server needs | 055 | ready |
+| [057](057-published-image.md) | An image you pull, not a build you run | 056 | planned |
+| [058](058-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
+| [059](059-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 
 ## Sprint contracts
 
@@ -1002,6 +1023,72 @@ afterwards anyway and the split costs more than it saved. Two larger costs that 
 at: coverage sits in `addopts` and charges 26 s and a 60-line table to *every* backend run including
 the focused ones the playbook asks for, and the lint gate reads `frontend/e2e/scratchpad/`, so
 writing a local walkthrough turns `make check` red on a file that is not in the repository.
+
+### [Sprint 056 — The deployment defaults a home server needs](056-deployment-defaults.md)
+
+The shipped configuration and the operator documentation, with the container smoke test as its gate.
+No application behaviour changes.
+
+The published port becomes **4441** — 8000 is among the most contended ports on a machine that runs
+anything else, and this is the one default in the line that breaks an existing install, so the
+release notes lead with it. Container logs get a size bound, because Docker's `json-file` default has
+none and uvicorn's access log is on. The three settings that are documented in `.env.example` or live
+in `config.py` but never reach the container — the attachment cap, the SQLite busy timeout, the TMDB
+token — become explicit passthroughs, deliberately not `env_file:`, which would inject the example's
+`BOOK_TRACKER_ENVIRONMENT=development` and disable the production guard on `USER_AGENT_CONTACT`. The
+healthcheck's start period grows to admit DEC-039's pre-migration backup on a slow disk. A third
+overlay lets `/backups` go to a second disk while `/data` stays a named volume, which is what DEC-040
+asks for and DEC-075 currently makes impossible to have at the same time. And the exposure boundary
+gains the sentence it has always been missing: a host joined to a VPN or mesh network carries an
+extra interface that `AKASHA_BIND=0.0.0.0` publishes on too.
+
+### [Sprint 057 — An image you pull, not a build you run](057-published-image.md)
+
+An upgrade becomes `docker compose pull && docker compose up -d`. Today `compose.yaml` carries
+`build: .`, so every server needs the source tree, both toolchains and three reachable registries,
+and pays a full frontend build per upgrade — while the artifact CI already smoke-tests is thrown
+away.
+
+A workflow publishes the image on a `v*` tag using the workflow's own token, so no secret is created.
+Compose points at the published image and the local build moves to its own overlay, because a service
+carrying both `image:` and `build:` builds silently when the image is missing — which is the failure
+this sprint exists to remove, arriving disguised as success. Base images get pinned by digest, and
+Dependabot opens the pull requests that keep them current, gated by the three CI jobs that already
+exist. Three steps need the owner's own account — allowing the workflow to write packages, pushing
+the tag, and deciding the package's visibility — and they are written out step by step, with expected
+results, in the sprint and in `docs/operations/publishing-images.md`.
+
+### [Sprint 058 — Nothing blocks the event loop](058-off-the-event-loop.md) **[GATED]**
+
+Every API handler is `async def` and there is no `to_thread` or `run_in_threadpool` anywhere in the
+backend, so every SQLite query, Pillow resize and import parse runs on the single event loop of a
+single worker. That is a legitimate design for one user. What is missing is evidence: DEC-036's 82 ms
+idle against 312 ms contended is the only contended number this project has, it was a *read* path,
+and it was measured on a workstation.
+
+Phase A measures request latency while a large import commits, while enrichment installs covers and
+while an attachment uploads — inside the container, under an explicit CPU constraint, because a
+measurement taken on fast hardware answers a question nobody asked. Phase B moves work off the loop
+through one seam, and only for what Phase A named. **Phase A concluding that nothing needs changing
+is a pass**, written into the acceptance criteria as one, following DEC-035 and DEC-042. If Phase B
+does run, the load-bearing proof is that foreign keys, WAL and the busy timeout still hold on a
+connection used from a worker thread.
+
+### [Sprint 059 — The disk stops filling quietly](059-storage-housekeeping.md)
+
+Three growth paths have no collector. `/data/imports/<batch_id>` is written by every preview — one
+prepared JPEG per book for a Calibre library — and removed by nothing, not by commit, not by the
+expiry of the undo window, not by `akasha-attachments reclaim`. `covers.tar.gz` and `imports.tar.gz`
+are rebuilt in full on every backup, where DEC-047 already solved exactly that problem for
+attachments by hardlinking them, with the measurement that made the case. `pre-migration` backups
+accumulate for ever: never pruned by nightly retention, which is right and is DEC-039's whole point,
+but removable by no command either. And there is no free-space check anywhere in the codebase, so a
+full disk is discovered halfway through a write.
+
+Each gets a collector or a documented reason it has none, and a write that cannot complete is refused
+before it starts rather than failing partway. The highest risk in the line lives here: changing what a
+backup contains means an older backup must still restore, and if that cannot be proved, the sharing
+does not ship.
 
 ## Future epics, after this plan
 

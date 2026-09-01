@@ -4057,3 +4057,138 @@ and state the success condition as "green", not as "seconds".**
   raising the typed miss reads 404, a provider raising `httpx.ConnectError` still reads
   502. The client screens already branch on the error code, so a miss now reads as "not
   found" rather than "the provider failed" wherever the code reaches the screen.
+
+
+## DEC-117 — Four deployment sprints, one patch release each, before anything new is built
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Extends:** the roadmap from 55 sprints to 59; `FINAL_SPRINT` in
+  `scripts/validate_project.py` moves 55 → 59 and `plan_revision` becomes 30.
+  **Cross-references:** DEC-039 (the pre-migration backup), DEC-040 (backups outside
+  the data volume), DEC-047 (attachments hardlinked between backups, measured),
+  DEC-048 (the attachment cap is configuration), DEC-036 (the only contended latency
+  number this project has), DEC-075 (named volumes by default), DEC-035 and DEC-042
+  (the gated shape Sprint 058 uses).
+- **Context:** the plan completed at Sprint 055 and v1.5.0 was released, and the owner
+  asked what a real deployment of it would meet. The artifact itself answered well:
+  `bash scripts/smoke_container.sh` passes end to end from a clean build — healthcheck,
+  non-root, no Node in the runtime, read-only Calibre, backup, verify, in-container
+  restore, the named-volume restore drill and a graceful SIGTERM in 0 s. Nothing about
+  the image or its data handling needed defending.
+
+  The gaps were all one layer out, in the shipped *configuration*, the *operator
+  documentation* and the paths that write bytes with nothing to collect them:
+
+  1. **Defaults that fight the host.** Port 8000 by default on a machine that runs
+     anything else; no `logging:` block, so Docker's unbounded `json-file` applies to a
+     process whose access log is on; a 40 s window before `unhealthy` that a
+     pre-migration backup plus a migration can exceed; three settings documented in
+     `.env.example` or living in `config.py` that the compose file never passes to the
+     container; and `compose.bind-mounts.yaml` overriding `/data` and `/backups`
+     together, so DEC-040's own advice — put the backup on another disk — cannot be
+     followed without giving up DEC-075.
+  2. **Every install is a build.** `build: .` means the server needs the source tree,
+     both toolchains and three reachable registries, and pays a full frontend build per
+     upgrade, while the image CI already smoke-tests is discarded.
+  3. **Nothing is measured about contention on the write paths.** Every handler is
+     `async def` and there is no `to_thread` or `run_in_threadpool` anywhere in the
+     backend, so imports, cover processing and attachment writes all run on the single
+     event loop. That is a legitimate design for one user and it may well be fine — but
+     DEC-036's 82 ms idle against 312 ms contended is the only number that exists, it
+     was a read path, and it was taken on a workstation.
+  4. **Three growth paths with no collector.** `/data/imports/<batch_id>` is written by
+     every preview and removed by nothing; `covers.tar.gz` and `imports.tar.gz` are
+     rebuilt in full every night where DEC-047 already solved that problem for
+     attachments; `pre-migration` backups accumulate for ever with no command that
+     removes one. And there is no free-space check anywhere in the codebase.
+- **Decision:** four sprints, each shipping one patch release, in dependency order:
+  **056** the deployment defaults (v1.5.1), **057** a published image (v1.5.2), **058**
+  the event-loop measurement, gated (v1.5.3), **059** storage housekeeping (v1.5.4).
+  057, 058 and 059 each depend on 056 alone and are otherwise independent; the order
+  among them is by value, and 057 comes first because it makes delivering the other two
+  cheap.
+
+  Three things this line deliberately does **not** do. It does not add authentication —
+  product spec §9 keeps that a v2 deferral and the owner reaffirmed it while
+  commissioning these sprints. It does not change any behaviour a person sees in the
+  application; every acceptance criterion is about deployment, measurement or
+  housekeeping. And 058 may correctly end having changed no code at all, which is
+  written into its acceptance criteria as a pass rather than a failure, following
+  DEC-035 and DEC-042.
+- **The one user-facing default that changes: the published port becomes 4441.** 8000 is
+  among the most contended ports on a machine that runs other services, and the owner
+  chose 4441 explicitly. The container keeps listening on 8000 internally, so only the
+  host side of the mapping moves. This breaks an existing install that never set
+  `AKASHA_PORT`, which is why v1.5.1's release notes lead with it and the remedy is one
+  line of `.env`.
+- **The exposure boundary is restated, not moved.** "Trusted LAN" is written in
+  `SECURITY.md`, `compose.yaml` and the runbook, and none of them mentions that a host
+  joined to a VPN or mesh network carries an extra interface that `AKASHA_BIND=0.0.0.0`
+  publishes on too. An unauthenticated port becomes reachable from outside the building
+  with nobody having forwarded anything. `AKASHA_BIND` already fixes it by naming one
+  address; what was missing is the sentence telling an operator that leaving it at
+  `0.0.0.0` is a decision. Sprint 056 adds that sentence, provider-neutrally — the
+  property belongs to overlay networks as a class.
+
+
+## DEC-118 — A sprint that changes no application code owes no application gate, and the deployment line ships as patch releases
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Amends:** DEC-117, on the same day and before any of its sprints ran.
+  **Cross-references:** DEC-084 (the verification playbook), DEC-114 (coverage stopped
+  being charged to every run — the same waste, measured from the other direction),
+  DEC-035 and DEC-042 (the gated shape Sprint 058 uses).
+- **Context:** the owner reviewed the plan recorded in DEC-117 and raised two things.
+
+  **1. The gates.** Every sprint in the deployment line would have run `make test` and,
+  under `AGENTS.md` §3's "plus `make check` and `make test` … if the sprint did not
+  already name them", could not have declined it. Sprints 056 and 057 change
+  `compose*.yaml`, the `Dockerfile`, CI configuration and documentation. The backend and
+  frontend suites execute no line of that. Running 1184 backend and 194 frontend tests
+  against a diff they cannot reach is precisely the waste DEC-114 measured from the other
+  direction, and it is worse than merely slow: a gate that always runs and never fails
+  teaches a session to stop reading it.
+
+  The sharpest case is the base-image digest pin in Sprint 057. It genuinely changes the
+  runtime environment, and `make test` still says nothing about it, because the suites run
+  on the host and not inside the image. The container smoke test is the gate that can see
+  it.
+
+  **2. The release numbers.** DEC-117 planned four minor releases, v1.6.0 to v1.9.0. The
+  owner's rule: minor versions are for new domains and major features, and none of this
+  line adds either. It ships as **v1.5.1 through v1.5.4**.
+- **Decision, part 1 — the narrowed gate.** `TESTING.md` gains "Gate scope by what
+  changed", and `AGENTS.md` §3 gains the clause that lets a sprint use it. A sprint may
+  declare a narrowed gate — `validate_project.py`, `make check` and
+  `make smoke-container`, with `make test` and `npm run test:e2e` not owed — **only** when
+  its entire diff is deployment configuration, CI configuration, operator and planning
+  documentation, and scripts not themselves under test, and touches nothing under
+  `backend/src/`, `frontend/src/`, `backend/tests/`, `backend/alembic/versions/`,
+  `uv.lock` or `package-lock.json`.
+
+  Three properties keep this from becoming a loophole. The narrowing is a **claim about
+  the diff**, so it is checked against the diff: `git diff --stat` at the freeze point goes
+  in the Outcome beside the declaration. **One file under `backend/src/` withdraws it for
+  the whole sprint**, including a one-line fix that felt too small to mention — that case
+  is named explicitly because it is the one that would otherwise slip through. And CI's
+  own `checks` and `e2e` jobs still run the full suites on every push regardless; what is
+  removed is a session running them a second time by hand, not the evidence itself.
+
+  Sprint 056 and Sprint 057 declare it. Sprint 058 declares it **conditionally** — Phase A
+  alone qualifies, Phase B owes the full gate with no argument, because moving work across
+  a thread boundary on every write path is the broadest change in the line. Sprint 059 owes
+  the full gate outright.
+- **Decision, part 2 — patch releases.** The line ships **v1.5.1** (056), **v1.5.2** (057),
+  **v1.5.3** (058) and **v1.5.4** (059). Minor versions stay reserved for new domains and
+  major features. DEC-117's version references were corrected in place rather than
+  superseded: it was recorded the same day, no sprint had run against it, and leaving four
+  wrong version numbers in the decision that plans them would have been a trap for the next
+  session rather than a preserved record. The correction is noted here, in the worklog and
+  in the commit message, which is what keeps it from being a silent edit.
+- **Consequences:** Sprint 057's published image tags become `1.5.2`, `1.5` and `latest`,
+  so the floating minor line is `1.5` rather than a per-sprint one. The release-notes files
+  are `release-notes-v1.5.1.md` through `release-notes-v1.5.4.md`. The narrowed gate is
+  available to any future sprint that qualifies, not only to this line — a documentation or
+  operations sprint is its natural other use.

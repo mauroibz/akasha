@@ -1,67 +1,71 @@
-# Handoff — the plan is complete at Sprint 055; the release decision is the owner's
+# Handoff — Sprint 056 is ready; the deployment line is planned
 
-Sprint 055 closed with every recorded defect fixed and every verification gate repaired,
-so all 55 planned sprints are done. `docs/agent/state.json` reads `complete` with null
-active fields. Nothing is tagged, released or pushed — every commit is local on
-`sprint-049-series`. The next move is the owner's, not an agent's: the **v1.5.0 release
-decision** (five domains, four import sources, the series line, zero known open
-defects), and whether the movie line's v1.4.0 gets tagged before it. Sprint 018's
-release procedure is unchanged; nothing moves without being asked.
+v1.5.0 is released and tagged. The plan was complete at Sprint 055; the owner then commissioned a
+**deployment line of four sprints, one patch release each**, and this session planned it. Plan
+revision is **30**, `FINAL_SPRINT` is **59**, and `docs/agent/state.json` reads `ready` with
+`056` active. No runtime code changed in this session.
 
-## What Sprint 055 delivered
+The line ships as **patch releases**, v1.5.1 through v1.5.4 — no new domains, no major features.
 
-**A series gets the synopsis somebody would actually read (DEC-115).**
-`EnrichmentSpec.fuller_answer_fields` — the declaration shape the sprint preferred —
-with series declaring `("synopsis",)`. The first usable payload still wins everything
-else; the remaining providers are asked for the declared fields alone and the longest
-string fills the field. The walkthrough caught the unit suites' blind spot: the *add
-path* never consulted a second provider and never queues enrichment, so a series added
-by hand kept the one-liner for ever. `prefer_fuller` lives in `domain/merge.py` and both
-arrival paths apply it; verified live — BoJack stores TVmaze's 151-char synopsis with
-Wikidata's `episodes: 77` and `network: Netflix` untouched.
+The next move is ordinary: execute Sprint 056 with the protocol in `/AGENTS.md`.
 
-**The two DEC-100 defects (DEC-116).** Cover and year backfill conditions are
-`wants_cover`/`wants_year` declarations (default True; a future domain opts out instead
-of being re-queued for ever). `/api/search/resolve` answers a typed `record_not_found`
-with **404** under the provider's own code and message; transport failures keep the 502.
+## The line, and why it exists
 
-**The gates, as measured at this closure** (TESTING.md carries the full table):
+The owner asked what a real deployment of v1.5.0 would meet. The artifact answered well —
+`bash scripts/smoke_container.sh` passes end to end from a clean build, and nothing about the image
+or its data handling needed defending. Every gap found was one layer out, in the shipped
+configuration, the operator documentation, and the paths that write bytes with nothing to collect
+them. **DEC-117** records the whole assessment and the four-sprint decision.
 
-- **Parallel Playwright is the gate** — three consecutive green runs (44.5, 44.5,
-  45.3 s) plus a fourth (43.7 s) after the last change. Four load-sensitive tests live
-  in the serial `heavy-library` project (18.8 s alone): DEC-023's two, two crossfade
-  samplers, and the three library-view axe checks. The card caption no longer fades.
-- **Coverage left `addopts`.** `make test` and `make coverage` carry the flags; a focused
-  run is 1–5 s with no table. A session that never runs either sees no number — the
-  intended trade, named in TESTING.md.
-- **`make check` is green with scratchpad specs present** (Prettier and ESLint ignore
-  the gitignored directory), and **a green `npm test` prints no stderr** (motion's
-  Reduced Motion notice filtered; vitest's empty labels suppressed).
-- `make test`: 1184 backend + 194 frontend, coverage 90%.
+| Sprint | Ships | Shape |
+|---|---|---|
+| [056](../sprints/056-deployment-defaults.md) — deployment defaults | v1.5.1 | Config and docs only. Gate is the container smoke test. **Active, `ready`.** |
+| [057](../sprints/057-published-image.md) — a published image | v1.5.2 | CI publishes on a tag; compose pulls. Three steps need the owner's GitHub account. |
+| [058](../sprints/058-off-the-event-loop.md) — nothing blocks the loop | v1.5.3 | **Gated.** Phase A measures; Phase B only does what the measurement names. |
+| [059](../sprints/059-storage-housekeeping.md) — the disk stops filling | v1.5.4 | Collectors for three growth paths, plus a free-space guard. |
 
-## The one question this sprint leaves with the owner
+057, 058 and 059 depend on 056 alone and are otherwise independent. Nothing in the line changes what
+a person sees in the application, and none of it adds authentication — product spec §9 keeps that a
+v2 deferral and the owner reaffirmed it while commissioning these sprints.
 
-The IMDb list export's `Description` column is deliberately dropped by the reader. If
-you use it as a note, it can be mapped to entry notes — a product decision, not a
-defect, so nothing was implemented. Say yes and it becomes a small follow-up.
+## The gates these sprints owe
 
-## If a future session starts anything new
+**DEC-118** added "Gate scope by what changed" to `TESTING.md` and the clause in `AGENTS.md` §3 that
+lets a sprint use it. Sprints 056 and 057 **declare a narrowed gate**: `validate_project.py`,
+`make check` and `make smoke-container`, with `make test` and `npm run test:e2e` not owed, because
+their diffs contain no line those suites execute. Sprint 058 declares it conditionally — Phase A
+alone qualifies, Phase B owes the full gate. Sprint 059 owes the full gate outright.
 
-There is no next sprint. A new sprint requires a plan revision (state flips `complete →
-ready` with a new active file — the seeds skill's extension worked example is the
-mechanics, including the validator's sprint-file-at-`ready` trap). The roadmap's future
-epics list the candidates: games via IGDB, music imports via Spotify, ebook
-attachments' follow-ups. The walkthrough launcher (`scripts/walkthrough.py`) and the two
-sprint-specific API scripts (`walkthrough_trakt_054.py`, `walkthrough_synopsis_055.py`)
-are tracked and take owner paths through the environment, never inline.
+The narrowing is a claim about the diff and is checked against it: `git diff --stat` at the freeze
+point goes in the Outcome. **One file under `backend/src/` withdraws it for the whole sprint.** CI's
+`checks` and `e2e` jobs still run the full suites on every push either way.
+
+## What Sprint 056 must not get wrong
+
+- **The published port becomes 4441.** The container still listens on 8000 internally; only the host
+  side of the mapping moves. This is the one change that breaks an existing install, so the release
+  notes lead with it and the remedy is one line of `.env`.
+- **Do not use `env_file: .env`** to fix the missing environment passthroughs. It would inject the
+  shipped example's `BOOK_TRACKER_ENVIRONMENT=development` into the container and disable the
+  production guard that makes `USER_AGENT_CONTACT` mandatory. Acceptance criterion 6 exists to catch
+  a session taking that shortcut.
+- The sprint's own baseline table carries the measurements this session took, with file and line
+  references. Re-confirm them at activation rather than trusting the table — that is the standing
+  rule, and the table is dated 2026-09-01.
+
+## Verified this session
+
+- `bash scripts/smoke_container.sh` — passed, exit 0, from a clean build on Docker 29.5.2 /
+  Compose v5.1.4. Healthcheck, non-root, no Node in the runtime, API persistence across recreation,
+  every emitted chunk served, read-only Calibre, in-container restore, named-volume restore drill,
+  graceful SIGTERM in 0 s with exit 143.
+- `python scripts/validate_project.py` — green after every planning edit.
+- `make test` is **not owed**: no application code changed. This is a plan revision, per the
+  post-gate matrix in `TESTING.md`.
 
 ## Private data and operational constraints
 
-- `exports/` is the owner's private source archive, gitignored as a whole. Read-only
-  walkthrough input. **No fixture may be cut from any of them** — every importer
-  fixture is invented. Trakt's two email-carrying members are never opened by the
-  reader, and a test asserts it.
-- Wikidata, TVmaze and AniList need no key, only `USER_AGENT_CONTACT`. Stremio's poster
-  host is already in `ALLOWED_COVER_HOSTS`. IGDB would need Twitch OAuth credentials.
-- Secrets, databases, uploaded imports and covers are never committed; v1 has no auth
-  and stays LAN-only; Calibre is opened read-only.
+Unchanged from Sprint 055's handoff. `exports/` is the owner's private source archive, gitignored
+whole, read-only walkthrough input, and no fixture may be cut from any of it. Wikidata, TVmaze and
+AniList need no key, only `USER_AGENT_CONTACT`. Secrets, databases, uploaded imports and covers are
+never committed; v1 has no auth and stays LAN-only; Calibre is opened read-only.
