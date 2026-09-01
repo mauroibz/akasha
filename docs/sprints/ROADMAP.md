@@ -1,6 +1,6 @@
 # Implementation Roadmap
 
-**Plan revision:** 28
+**Plan revision:** 29
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
 **Active sprint:** [054 — The Trakt import](054-trakt-import.md)
 
@@ -50,6 +50,7 @@ Post-v1 work branches:
                                                                                                   └─ 052 One source, many libraries
                                                                                                       └─ 053 The IMDb import
                                                                                                           └─ 054 The Trakt import
+                                                                                                              └─ 055 The recorded defects
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -77,8 +78,8 @@ tuple entry and one migration whose only purpose was removing a constraint that 
 existed. Everything else the line spent went on two seams the owner's export forced, both of which
 earlier decisions had already foreseen and priced (DEC-090, DEC-091, DEC-092, DEC-093).
 
-**Sprints 049–054 are the fifth domain and the last new one planned, plus one infrastructure
-sprint.** Series were an unnumbered epic from Sprint 028 until plan revision 27, described as gated
+**Sprints 049–055 are the fifth domain and the last new one planned, plus two infrastructure
+sprints.** Series were an unnumbered epic from Sprint 028 until plan revision 27, described as gated
 on a product decision about entry hierarchy — a decision DEC-077 had already made and Sprint 040 had
 already built. What was left was measurement, and it was done before this line was written: two
 keyless providers, a poster source already allowlisted, and both of the owner's real exports parsed
@@ -86,7 +87,10 @@ keyless providers, a poster source already allowlisted, and both of the owner's 
 makes cheap; it is Sprint 052, where the shared import pipeline learns to hold more than one domain
 at once because a television tracker tracks films too (DEC-106). Sprint 051, inserted at plan
 revision 28 (DEC-111), is not series work at all: it implements the four items in TESTING.md's
-optimization backlog so the three import sprints after it run against faster, quieter gates.
+optimization backlog so the three import sprints after it run against faster, quieter gates. Sprint
+055, inserted at plan revision 29 (DEC-114), closes the line: the defects the movie and series
+sprints recorded and left, and the three gates that measurement showed had stopped paying for
+themselves — including one of Sprint 051's own four items.
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -157,7 +161,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | completed |
 | [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | completed |
 | [053](053-imdb-import.md) | The IMDb import | 049, 052 | completed |
-| [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | planned |
+| [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | ready |
+| [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | planned |
 
 ## Sprint contracts
 
@@ -976,7 +981,27 @@ Two members are **never opened**: `user-settings.json` and `user-profile.json` c
 address, and a test asserts nothing reads them. Season and episode ratings are counted and discarded,
 because a series holds one score — DEC-077's line, restated where somebody would otherwise be tempted.
 
-Closing this sprint puts the release decision in front of the owner. Nothing is pushed unasked.
+Closing this sprint used to put the release decision in front of the owner. Sprint 055 now sits
+between, so that decision is made on a library with no known open defects in it.
+
+### [Sprint 055 — The recorded defects, and the gates that stopped paying](055-recorded-defects.md)
+
+Short, and last. Every defect the movie and series lines recorded and left, plus the three places the
+verification gates now cost more than the evidence they buy. No new product behaviour.
+
+The product half: a series stores the synopsis somebody would actually read rather than Wikidata's
+one-line description, which is the fill-empty rule (DEC-110) being right for most fields and wrong
+for one class of them; and the two defects DEC-100 named — a backfill that re-queues rows for ever on
+conditions their domain never declared, and a `resolve` route that calls a clean miss a provider
+outage.
+
+The gate half is measured rather than asserted (DEC-114). Sprint 051 bought four things; three held.
+The parallel Playwright split has **not passed once** — 1 to 2 failures on three of three runs, always
+the same two rendering-timing tests, both green serially — so a session runs the 101.7 s serial gate
+afterwards anyway and the split costs more than it saved. Two larger costs that sprint never looked
+at: coverage sits in `addopts` and charges 26 s and a 60-line table to *every* backend run including
+the focused ones the playbook asks for, and the lint gate reads `frontend/e2e/scratchpad/`, so
+writing a local walkthrough turns `make check` red on a file that is not in the repository.
 
 ## Future epics, after this plan
 

@@ -3909,3 +3909,66 @@ predictions about mistakes to come.
   172-minute runtime, a description and a poster; the show to its creator, three genres, a synopsis,
   Netflix, `Ended`, 77 episodes, 6 seasons and a poster. Before this change the film half of that was
   empty and would have stayed empty.
+
+## DEC-114 — Sprint 051 measured: three of four held, and the visible one did not
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Cross-references:** DEC-084 (the verification playbook), DEC-111 (the sprint being assessed),
+  DEC-100 and DEC-110 (the product defects scheduled alongside), DEC-023 (the load-sensitive
+  invariants Sprint 051 correctly identified).
+- **Context:** the owner asked whether Sprint 051 — scheduled specifically to reduce the cost of
+  testing — actually worked. It was assessed by re-running every gate on this workstation at Sprint
+  053's closure commit rather than by reading its Outcome.
+
+### What was measured, 2026-09-01
+
+| Gate | Sprint 051 recorded | Measured now | Verdict |
+|---|---:|---:|---|
+| `make check` | ~10 s | 1.6 s | faster, but **red** whenever a local walkthrough spec exists |
+| backend pytest, as run | ~62 s @ 989 | 67.5 s @ 1090 | flat per test |
+| backend pytest, `--no-cov` | — | 41.8 s | **coverage costs 26 s, 61%, every run** |
+| frontend Vitest | ~23 s @ 190 | 23.7 s @ 194 | flat; 21 warnings → 10 stderr lines, all one notice |
+| Playwright, parallel | 38.2 s green | 38.4 s, **failed on 3 of 3 runs** | never green |
+| Playwright, serial | 49.4 s | 101.7 s green | the only trustworthy result |
+
+### The verdict, item by item
+
+- **Bounded timeouts: held.** In place at all three layers; nothing hit one this session, which is
+  the correct result for a bound.
+- **Vitest noise: held, not finished.** The 21 `Query data cannot be undefined` warnings are gone.
+  Ten stderr lines survive and are all the same motion `Reduced Motion` notice.
+- **The tracked walkthrough launcher: held, with a sharp edge.** Used four times across Sprints 052
+  and 053, in live and replay modes. Its data directory is fresh per **launch**, not per spec run,
+  and three Sprint 053 attempts failed on state carried between runs — a committed batch replays by
+  fingerprint and approved rows leave an empty inbox, so every symptom looked like a product defect.
+- **The parallel Playwright split: did not hold.** Three runs, 2 / 2 / 1 failures, always
+  `accessibility.spec.ts:474` and `library.spec.ts:255`, both green on every serial run. They are the
+  same class of rendering-timing test as the two 10,000-entry invariants Sprint 051 moved into the
+  serial project; it moved two and missed these two. **A gate that is 63 s faster and never green
+  costs more than the one it replaced**, because the session runs the serial gate afterwards anyway.
+
+### Two larger costs Sprint 051 did not look at
+
+- **Coverage is in `addopts`,** so every backend run — including the focused single-file runs the
+  playbook's first rung asks for — pays 26 s and prints a 60-line table. That is precisely "paying
+  for the same evidence repeatedly", the sentence `TESTING.md` opens with. It is the largest single
+  item in the table and it was never on the backlog.
+- **The lint gate reads `frontend/e2e/scratchpad/`,** which is gitignored on purpose. Writing a
+  walkthrough turns `make check` red, naming a file that is not in the repository.
+
+### Decision
+
+Schedule **Sprint 055 — The recorded defects, and the gates that stopped paying** (plan revision 29;
+`FINAL_SPRINT` 54 → 55), after Sprint 054 so the release decision is made on a library with no known
+open defects. It carries the two DEC-100 defects and the DEC-110 synopsis case alongside the four
+gate repairs. Its acceptance test for the browser gate is **three consecutive green runs at the
+default worker count, or the split is withdrawn and the reason recorded** — the wall-clock number is
+not the criterion, and undoing the visible half of Sprint 051 is an acceptable outcome.
+
+### The generalisation worth keeping
+
+Sprint 051's four items were chosen from a backlog of observations. Three were right. The one that
+failed is the one whose success condition was stated as a duration rather than as a property, and the
+two costs it missed were the ones nobody had thought to time. **Time the gate before optimising it,
+and state the success condition as "green", not as "seconds".**

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "plan_revision": 28,
+  "plan_revision": 29,
   "project_status": "ready",
   "active_sprint": "054",
   "active_sprint_file": "docs/sprints/054-trakt-import.md",
@@ -62,5 +62,5 @@
     "053"
   ],
   "started_at": "",
-  "updated_at": "2026-09-01T00:05:00-03:00"
+  "updated_at": "2026-09-01T00:40:00-03:00"
 }

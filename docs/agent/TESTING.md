@@ -45,21 +45,22 @@ not “text only.” Classify by effect, not extension.
 
 ## Time and environment triage
 
-Measured on this workstation at Sprint 051 closure (the Sprint 035 baselines they replace were:
-`make check` 8 s; backend 559 tests 60 s; Vitest 179 tests 25 s; `make test` 85 s; full Playwright at
-one worker 1 min 40 s):
+Measured on this workstation 2026-09-01, at Sprint 053's closure (DEC-114):
 
-| Gate | Normal duration |
-|---|---:|
-| `make check` | about 10 seconds |
-| backend pytest, 989 tests | about 62 seconds |
-| frontend Vitest, 190 tests | about 23 seconds |
-| `make test` combined | about 85 seconds |
-| full Playwright, parallel ordinary + serial heavy-library | about 39 seconds |
-| Sprint 035 realistic-data walkthrough | about 13 seconds after services are ready |
+| Gate | Normal duration | |
+|---|---:|---|
+| `make check` | about 2 seconds | red if a local scratchpad spec is unformatted — Sprint 055 |
+| backend pytest, 1090 tests, as `addopts` runs it | about 68 seconds | |
+| backend pytest, `--no-cov` | about 42 seconds | **coverage costs 26 s of the above** |
+| frontend Vitest, 194 tests | about 24 seconds | |
+| `make test` combined | about 91 seconds | |
+| full Playwright, parallel | about 38 seconds | **fails 1–2 tests every run** — Sprint 055 |
+| full Playwright, serial (`--workers=1`) | about 102 seconds | green; the trustworthy result today |
+| Sprint 053 walkthrough, after the backend is ready | about 8 seconds | |
 
-Playwright was 49.4 s at one worker when Sprint 051 measured it; the parallel split bought the
-remainder over boot (two web servers, one a full production build, dominate the gate).
+Until Sprint 055 lands, **the serial Playwright run is the gate**: the parallel split has not passed
+once, always on the same two rendering-timing tests, so a session that runs it runs the serial one
+afterwards anyway and pays for both.
 
 These are diagnostic baselines, not performance acceptance criteria. Every test is bounded, so a
 deadlock no longer looks like slow work: the bound fires and names the test — backend pytest at 30 s
@@ -88,6 +89,17 @@ Before writing a walkthrough, search the active sprint, `frontend/e2e/`,
 
 `scripts/walkthrough.py` is the tracked launcher: one command creates a fresh temporary data
 directory, starts the backend on an ephemeral port, waits for readiness, and stops it cleanly.
+
+**Fresh per launch, not per spec run.** Rerunning a spec against a still-running launcher inherits
+the previous attempt's data: a committed batch replays by fingerprint and approved rows leave an
+empty inbox, so a spec that is merely being debugged fails in ways that look exactly like product
+defects. That cost three attempts in Sprint 053. Restart the backend for every attempt — a short
+wrapper that kills the old one, starts a new one, waits for the printed URL and runs the spec makes
+that free.
+
+**Enrichment is a background job, so a browser assertion races it.** Prove a post-commit enrichment
+criterion with a short script that commits through the API and polls until the covers arrive
+(about 6 seconds in Sprint 053), rather than by adding a sleep to a Playwright spec.
 `--replay <module>` installs a module's `walkthrough_transport(live)` seam (the pattern
 `scripts/walkthrough_series_050.py` defines) so provider responses replay from fixtures while the
 rest of the boundary stays live; `--keep` preserves the data dir for inspection. A flow runs against
