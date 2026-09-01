@@ -251,7 +251,14 @@ not put it behind a proxy that terminates on a public address. There is no login
 to stop anyone who arrives.
 
 Set `AKASHA_BIND=127.0.0.1` if the proxy runs on the same machine, so the
-container port is not reachable from the network directly.
+container port is not reachable from the network directly. And note what
+`0.0.0.0` publishes on: a host that has joined a VPN or mesh network
+(WireGuard, Tailscale, ZeroTier and the like) carries an extra interface, and
+`AKASHA_BIND=0.0.0.0` publishes on that one too — an unauthenticated port
+reachable from outside the building without anyone having forwarded anything.
+The way to exclude it is to bind `AKASHA_BIND` to one address rather than to
+everything. The property belongs to overlay networks generally, not to any
+particular one.
 
 ## When something is wrong
 

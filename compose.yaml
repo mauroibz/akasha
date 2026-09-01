@@ -5,6 +5,12 @@
 # network only: never to the internet, never through a port forward, and never
 # behind a reverse proxy that terminates on a public address.
 #
+# A host that has joined a VPN or mesh network (WireGuard, Tailscale, ZeroTier
+# and the like) carries an extra interface, and AKASHA_BIND=0.0.0.0 publishes
+# on that one too — an unauthenticated port reachable from outside the
+# building without anyone having forwarded anything. To exclude it, bind
+# AKASHA_BIND to one address rather than to everything.
+#
 # Copy .env.example to .env and set USER_AGENT_CONTACT before the first start.
 
 services:
@@ -25,7 +31,9 @@ services:
         max-file: "${AKASHA_LOG_MAX_FILE:-5}"
     ports:
       # Bound to the LAN interface you choose. Leave AKASHA_BIND at 0.0.0.0 only
-      # on a network you trust; 127.0.0.1 restricts it to this machine.
+      # on a network you trust; 127.0.0.1 restricts it to this machine. Note
+      # that 0.0.0.0 publishes on an overlay-network interface too — see the
+      # header above.
       - "${AKASHA_BIND:-0.0.0.0}:${AKASHA_PORT:-4441}:8000"
     environment:
       # An explicit pass-through list: the compose file is the list of what

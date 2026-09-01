@@ -14,6 +14,11 @@ This means:
 - Do not expose Akasha to the internet.
 - Do not forward a port to it.
 - Do not put it behind a reverse proxy that terminates on a public address.
+- A host that has joined a VPN or mesh network (WireGuard, Tailscale, ZeroTier
+  and the like) carries an extra interface, and `AKASHA_BIND=0.0.0.0` publishes
+  on that one too — an unauthenticated port reachable from outside the
+  building without anyone having forwarded anything. Exclude it by binding
+  `AKASHA_BIND` to one address rather than to everything.
 - A reverse proxy on the LAN (e.g. Nginx Proxy Manager at `books.home.lan`) is
   the supported deployment, and it is documented in
   [the operator runbook](docs/operations/runbook.md).
