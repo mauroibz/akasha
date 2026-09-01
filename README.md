@@ -148,7 +148,7 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 | `AKASHA_DATA_VOLUME`   | `akasha_data`    | Docker volume name for the database, covers and attached files                             |
 | `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume                       |
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
-| `AKASHA_PORT`          | `4441`           | Published port                                                                             |
+| `AKASHA_PORT`          | `4441`           | Published port. `8000` was the default before v1.5.1                                       |
 | `AKASHA_BIND`          | `0.0.0.0`        | Set to `127.0.0.1` to keep it off the network. Publishes on overlay-network interfaces too |
 | `AKASHA_VERSION`      | `local`          | Image tag compose runs. Pin a version so rollback is a variable, not a rebuild             |
 | `AKASHA_LOG_MAX_SIZE`  | `10m`            | Container log rotation bound, with `AKASHA_LOG_MAX_FILE` (`5`)                             |

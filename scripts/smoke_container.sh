@@ -167,6 +167,12 @@ docker compose up --detach --wait=false >/dev/null
 # healthcheck is invisible to a test that reimplements it.
 wait_healthy
 
+step "AC1: no Node runtime, non-root user"
+[ "$(docker compose exec -T akasha id -u)" != "0" ] || fail "the container runs as root"
+if docker compose exec -T akasha sh -c 'command -v node' >/dev/null 2>&1; then
+  fail "Node is present in the runtime image"
+fi
+
 step "AC3: the container's logs are bounded"
 # Docker's json-file default has no size limit and uvicorn's access log is on,
 # so an unbounded default grows the host disk with every request this very
@@ -180,12 +186,6 @@ assert log_config.get("Type") == "json-file", log_config
 assert log_config.get("Config", {}).get("max-size"), log_config
 assert log_config.get("Config", {}).get("max-file"), log_config
 ' || fail "the container's log driver is unbounded (no max-size/max-file)"
-
-step "AC1: no Node runtime, non-root user"
-[ "$(docker compose exec -T akasha id -u)" != "0" ] || fail "the container runs as root"
-if docker compose exec -T akasha sh -c 'command -v node' >/dev/null 2>&1; then
-  fail "Node is present in the runtime image"
-fi
 
 step "Write an entry, a score and a note through the API"
 # A manual add needs an idempotency key or an ISBN. The key also makes this
@@ -451,6 +451,14 @@ done
 [ -n "$shutdown_logged" ] || fail "the application did not run a graceful shutdown"
 printf 'stopped in %ss with exit code %s, shutdown was graceful\n' "$elapsed" "$exit_code"
 
-printf '\nContainer smoke test passed: healthcheck, non-root, no Node, API persistence across\n'
-printf 'recreation, every emitted chunk served, read-only Calibre, an in-container restore,\n'
-printf 'and a named-volume restore drill through the documented host-side procedure.\n'
+printf '\nContainer smoke test passed: healthcheck (start period admits a slow first\n'
+printf 'start), non-root, no Node, the published port defaulting to 4441 without ever\n'
+printf 'binding it here, bounded logs, the documented settings reaching the process and\n'
+printf 'enforced (a 1 KiB attachment cap refused an over-cap upload with the typed error\n'
+printf 'and stored one under it), a verbatim .env.example still starting production and\n'
+printf 'refusing to start without USER_AGENT_CONTACT, unset settings absent from the\n'
+printf 'container, API persistence across recreation, every emitted chunk served,\n'
+printf 'read-only Calibre, an in-container restore, a named-volume restore drill through\n'
+printf 'the documented host-side procedure, backups on their own host disk while /data\n'
+printf 'stayed a named volume, a version-tagged build starting without rebuilding, and\n'
+printf 'a graceful SIGTERM.\n'

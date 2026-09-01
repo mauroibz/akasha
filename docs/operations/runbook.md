@@ -255,10 +255,10 @@ subsequent `docker compose` command for the stack.
 
 ## Reverse proxy
 
-Nginx Proxy Manager on the same LAN, e.g. `books.home.lan` → `http://<host>:8000`.
+Nginx Proxy Manager on the same LAN, e.g. `books.home.lan` → `http://<host>:4441`.
 Do not expose that hostname beyond the LAN, do not forward a port to it, and do
-not put it behind a proxy that terminates on a public address. There is no login
-to stop anyone who arrives.
+not put it behind a proxy that terminates on a public address. There is no
+login to stop anyone who arrives.
 
 Set `AKASHA_BIND=127.0.0.1` if the proxy runs on the same machine, so the
 container port is not reachable from the network directly. And note what
