@@ -1,0 +1,20 @@
+{
+  "kind": "akasha-backup",
+  "version": 1,
+  "label": "nightly",
+  "created_at": "2026-09-01T21:24:24.233821+00:00",
+  "alembic_revision": "0016_import_kind_is_the_registrys",
+  "counts": {
+    "items": 1,
+    "entries": 1,
+    "shelves": 1,
+    "covers": 1,
+    "attachments": 0
+  },
+  "files": [
+    "books.db",
+    "covers.tar.gz",
+    "imports.tar.gz"
+  ],
+  "attachments": []
+}

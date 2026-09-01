@@ -20,6 +20,7 @@ from book_tracker.backup import (
     BackupError,
     create_backup,
     enforce_retention,
+    read_manifest,
     restore_backup,
     verify_backup,
 )
@@ -118,8 +119,12 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
 
     assert result.path.parent == tmp_path / "backups"
     assert (result.path / "books.db").is_file()
-    assert (result.path / "covers.tar.gz").is_file()
-    assert (result.path / "imports.tar.gz").is_file()
+    # Sprint 060: covers are shared (hardlinked from the live store, or copied
+    # when that is not possible), not tarred; /data/imports is not archived at
+    # all (DEC-124).
+    assert (result.path / "covers" / "1.jpg").read_bytes() == COVER_BYTES
+    assert not (result.path / "covers.tar.gz").exists()
+    assert not (result.path / "imports.tar.gz").exists()
     # A live WAL database copied file-by-file can be torn; the online backup API
     # cannot be, and the copy carries no sidecar files at all.
     assert not list(result.path.glob("*.db-wal"))
@@ -172,9 +177,9 @@ def test_verify_rejects_a_mutated_file(tmp_path: Path) -> None:
         label="nightly",
     )
 
-    (result.path / "covers.tar.gz").write_bytes(b"tampered")
+    (result.path / "covers" / "1.jpg").write_bytes(b"tampered, and a different length")
 
-    with pytest.raises(BackupError, match="checksum"):
+    with pytest.raises(BackupError, match="cover.*wrong size"):
         verify_backup(result.path)
 
 
@@ -236,9 +241,12 @@ def test_restore_brings_back_scores_notes_shelves_and_covers(tmp_path: Path) -> 
     assert title == "Rayuela"
     assert shelves == ["Argentina"]
     assert (restored / "covers" / "1.jpg").read_bytes() == COVER_BYTES
-    assert (restored / "imports" / "batch-1" / "audit.json").read_text(encoding="utf-8") == (
-        '{"rows": 1}'
-    )
+    # /data/imports is not archived (DEC-124): restore creates the empty
+    # directory the application expects, but the batch staged before the
+    # backup was taken is deliberately not there — the database backup already
+    # carries whatever the batch decided, and undo never reads this directory.
+    assert (restored / "imports").is_dir()
+    assert list((restored / "imports").iterdir()) == []
 
 
 def test_restore_refuses_a_non_empty_target(tmp_path: Path) -> None:
@@ -503,3 +511,164 @@ def test_backups_share_blobs_even_when_the_data_volume_is_a_separate_filesystem(
     verify_backup(second.path)
     restore_backup(second.path, into=tmp_path / "restored")
     assert (tmp_path / "restored" / "attachments" / digest[:2] / digest).is_file()
+
+
+def test_a_second_backup_shares_the_unchanged_cover_rather_than_copying_it(
+    tmp_path: Path,
+) -> None:
+    """Sprint 060: covers get the same treatment DEC-047 gave attachments."""
+    data_dir = populated_data_dir(tmp_path)
+    dest = tmp_path / "backups"
+
+    first = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    second = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    one = (first.path / "covers" / "1.jpg").stat()
+    two = (second.path / "covers" / "1.jpg").stat()
+    assert (one.st_dev, one.st_ino) == (two.st_dev, two.st_ino), "covers should be hardlinked"
+
+
+def test_two_backups_of_an_unchanged_library_cost_far_less_than_two_full_cover_sets(
+    tmp_path: Path,
+) -> None:
+    """AC3, measured rather than assumed: sizes recorded here are the sprint's evidence."""
+    data_dir = populated_data_dir(tmp_path)
+    # A realistic-enough cover set: DEC-047's own measurement corpus was epub-sized;
+    # a handful of real cover-sized files makes the "two full copies" comparison honest
+    # without a slow test.
+    cover_bytes = b"\xff\xd8\xff\xe0" + b"a cover-sized blob, not a real jpeg" * 1000
+    for index in range(2, 12):
+        (data_dir / "covers" / f"{index}.jpg").write_bytes(cover_bytes + bytes([index]))
+    live_cover_total = sum(f.stat().st_size for f in (data_dir / "covers").glob("*.jpg"))
+    dest = tmp_path / "backups"
+
+    first = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    second = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    # A hardlink's apparent size (st_size) is the same whether one directory entry
+    # points at it or ten -- that is exactly the property being measured, so the
+    # honest way to see the saving is by disk-distinct inode, not by file entry.
+    unique_blobs: dict[tuple[int, int], int] = {}
+    for backup_path in (first.path, second.path):
+        for cover in (backup_path / "covers").glob("*.jpg"):
+            stat = cover.stat()
+            unique_blobs[(stat.st_dev, stat.st_ino)] = stat.st_size
+    unique_bytes = sum(unique_blobs.values())
+    two_full_copies = live_cover_total * 2
+    print(
+        f"\ncover set: {live_cover_total} bytes; two backups' distinct cover bytes: "
+        f"{unique_bytes} bytes; two full copies would be {two_full_copies} bytes"
+    )
+    assert unique_bytes < two_full_copies
+    assert unique_bytes == pytest.approx(live_cover_total, rel=0.01)
+
+
+def test_a_changed_cover_between_two_backups_is_correct_in_both(tmp_path: Path) -> None:
+    """The safety property specific to covers not being content-addressed: a live
+    replacement must not retroactively corrupt an earlier backup's copy, and the
+    later backup must pick up the new bytes rather than reusing the old link."""
+    data_dir = populated_data_dir(tmp_path)
+    dest = tmp_path / "backups"
+
+    first = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    # A real cover replacement always arrives via os.replace (install_cover,
+    # prepare_uploaded_cover/prepare_cover) -- never an in-place write, which is
+    # what keeps the first backup's hardlinked bytes intact.
+    replacement = data_dir / "covers" / "1.jpg.new"
+    replacement.write_bytes(b"a completely different cover")
+    os.replace(replacement, data_dir / "covers" / "1.jpg")
+
+    second = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    assert (first.path / "covers" / "1.jpg").read_bytes() == COVER_BYTES
+    assert (second.path / "covers" / "1.jpg").read_bytes() == b"a completely different cover"
+
+
+def test_covers_are_still_correct_when_the_data_volume_is_a_separate_filesystem(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The EXDEV case `_share_covers` deliberately handles differently from
+    attachments: no sibling-backup fallback, because a cover has no content
+    address to guarantee a sibling's copy is still current."""
+    data_dir = populated_data_dir(tmp_path)
+    dest = tmp_path / "backups"
+    real_link = os.link
+
+    def link_only_within_the_backup_volume(source: str | Path, target: str | Path) -> None:
+        if Path(source).is_relative_to(data_dir):
+            raise OSError(18, "Invalid cross-device link")
+        real_link(source, target)
+
+    monkeypatch.setattr("book_tracker.backup.os.link", link_only_within_the_backup_volume)
+
+    first = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW),
+    )
+    replacement = data_dir / "covers" / "1.jpg.new"
+    replacement.write_bytes(b"a completely different cover")
+    os.replace(replacement, data_dir / "covers" / "1.jpg")
+    second = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=dest,
+        now=datetime.fromisoformat(NOW) + timedelta(days=1),
+    )
+
+    # Each backup is its own plain copy here (EXDEV blocks linking from the live
+    # store, and there is no sibling fallback), so neither is stale.
+    assert (first.path / "covers" / "1.jpg").read_bytes() == COVER_BYTES
+    assert (second.path / "covers" / "1.jpg").read_bytes() == b"a completely different cover"
+    verify_backup(first.path)
+    verify_backup(second.path)
+
+
+def test_restoring_a_version_one_backup_still_works(tmp_path: Path) -> None:
+    """AC4, against a real backup rather than a hand-edited manifest: this fixture
+    was produced by the actual pre-Sprint-060 create_backup, before covers and
+    imports stopped being tarballs."""
+    fixture = Path(__file__).parent / "fixtures" / "backup-v1"
+    assert read_manifest(fixture) is not None
+    assert read_manifest(fixture)["version"] == 1
+
+    manifest = verify_backup(fixture)
+    assert manifest["version"] == 1
+
+    restored = tmp_path / "restored"
+    restore_backup(fixture, into=restored)
+
+    assert (restored / "books.db").is_file()
+    assert (restored / "covers" / "1.jpg").is_file()
+    assert (restored / "imports" / "batch-1" / "audit.json").is_file()

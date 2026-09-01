@@ -45,7 +45,10 @@ MANIFEST_NAME = "manifest.json"
 CHECKSUM_NAME = "checksums.sha256"
 DATABASE_NAME = "books.db"
 MANIFEST_KIND = "akasha-backup"
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
+#: Version-1 compatibility only (Sprint 060, DEC-124): a v1 backup tarred both of
+#: these; a v2 one shares covers by hardlink/copy and does not archive imports at
+#: all. `restore_backup` still reads this to extract an old backup correctly.
 ARCHIVED_DIRECTORIES = ("covers", "imports")
 ATTACHMENTS_DIR = "attachments"
 _CHUNK = 1024 * 1024
@@ -83,12 +86,15 @@ def create_backup(
     path.mkdir(parents=True)
     try:
         counts = _copy_database(database_path, path / DATABASE_NAME)
-        for directory in ARCHIVED_DIRECTORIES:
-            _archive(data_dir / directory, path / f"{directory}.tar.gz")
-        counts["covers"] = sum(1 for entry in (data_dir / "covers").glob("*") if entry.is_file())
+        covers = _share_covers(data_dir, path)
+        counts["covers"] = len(covers)
         attachments = _share_attachments(data_dir, path, dest)
         counts["attachments"] = len(attachments)
-        archived = [DATABASE_NAME, *(f"{name}.tar.gz" for name in ARCHIVED_DIRECTORIES)]
+        # /data/imports is deliberately not archived (DEC-124): it holds derived,
+        # short-lived staging for a batch that is either committed -- where the
+        # durable result is already in the database and in `covers` -- or
+        # abandoned, in which case there is nothing worth restoring anyway.
+        archived = [DATABASE_NAME]
         manifest: dict[str, Any] = {
             "kind": MANIFEST_KIND,
             "version": MANIFEST_VERSION,
@@ -98,6 +104,7 @@ def create_backup(
             "counts": counts,
             "files": archived,
             "attachments": attachments,
+            "covers": covers,
         }
         (path / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
         _write_checksums(path, [*archived, MANIFEST_NAME])
@@ -130,24 +137,51 @@ def verify_backup(path: Path) -> dict[str, Any]:
             raise BackupError(f"{path}: attachment {digest} is missing")
         if blob.stat().st_size != int(entry.get("bytes", -1)):
             raise BackupError(f"{path}: attachment {digest} is the wrong size")
+    # Absent from a version-1 manifest, so this is a no-op restoring one — the
+    # version's own covers.tar.gz already has its checksum verified above.
+    for entry in manifest.get("covers", []):
+        name = str(entry.get("name", ""))
+        cover = path / "covers" / name
+        if not cover.is_file():
+            raise BackupError(f"{path}: cover {name} is missing")
+        if cover.stat().st_size != int(entry.get("bytes", -1)):
+            raise BackupError(f"{path}: cover {name} is the wrong size")
     _check_integrity(path / DATABASE_NAME)
     return manifest
 
 
 def restore_backup(path: Path, *, into: Path) -> dict[str, Any]:
-    """Restore a verified backup into an empty directory."""
+    """Restore a verified backup into an empty directory.
+
+    Version 1 backups (Sprint 060 and earlier) archived `covers/` and `imports/`
+    as tarballs; version 2 shares covers by hardlink or plain copy and does not
+    archive `imports/` at all (DEC-124). Both restore correctly — this is the
+    read side of that format change, and it is what the old-version fixture in
+    `tests/fixtures/backup-v1/` proves against a real backup rather than a
+    hand-edited manifest.
+    """
     manifest = verify_backup(path)
     if into.exists() and any(into.iterdir()):
         raise BackupError(f"{into} is not empty; restore into an empty directory")
     into.mkdir(parents=True, exist_ok=True)
     (into / DATABASE_NAME).write_bytes((path / DATABASE_NAME).read_bytes())
-    for directory in ARCHIVED_DIRECTORIES:
-        target = into / directory
-        target.mkdir(exist_ok=True)
-        with tarfile.open(path / f"{directory}.tar.gz", "r:gz") as archive:
-            # `data` refuses absolute paths, `..` and special files, so a tampered
-            # archive cannot write outside the directory being restored.
-            archive.extractall(target, filter="data")
+    if manifest.get("version", 1) == 1:
+        for directory in ARCHIVED_DIRECTORIES:
+            target = into / directory
+            target.mkdir(exist_ok=True)
+            with tarfile.open(path / f"{directory}.tar.gz", "r:gz") as archive:
+                # `data` refuses absolute paths, `..` and special files, so a
+                # tampered archive cannot write outside the directory being restored.
+                archive.extractall(target, filter="data")
+    else:
+        (into / "imports").mkdir(exist_ok=True)
+        source = path / "covers"
+        if source.is_dir():
+            for cover in sorted(source.iterdir()):
+                if cover.is_file():
+                    destination = into / "covers" / cover.name
+                    destination.parent.mkdir(parents=True, exist_ok=True)
+                    destination.write_bytes(cover.read_bytes())
     source = path / ATTACHMENTS_DIR
     if source.is_dir():
         for blob in sorted(source.rglob("*")):
@@ -300,17 +334,38 @@ def _copy_database(source_path: Path, target_path: Path) -> dict[str, int]:
     return counts
 
 
-def _archive(source: Path, target: Path) -> None:
-    """Walk explicitly and add one entry at a time.
+def _share_covers(data_dir: Path, backup_path: Path) -> list[dict[str, Any]]:
+    """Hardlink each cover from the live store; copy fresh bytes if that fails.
 
-    `TarFile.add` recurses by default, which combined with `rglob` writes every
-    nested file twice. Sorting the walk also makes the archive byte-stable, so a
-    checksum only changes when the contents do.
+    Extends DEC-047's attachment-sharing trick to covers (Sprint 060), with one
+    deliberate difference: **no sibling-backup fallback tier**. `_share_attachments`
+    falls back to linking from a sibling backup when linking from the live store
+    fails (`EXDEV` — /data and /backups on separate filesystems, which DEC-040
+    recommends), and that is safe there only because an attachment is
+    content-addressed: the same digest guarantees the same bytes in every backup
+    that has ever linked it. A cover has no such guarantee — `install_cover` and
+    `prepare_uploaded_cover`/`prepare_cover` replace it in place by digest-less
+    filename (`covers/<item_id>.jpg`), so a sibling backup's copy could be stale
+    if the cover changed since that backup ran. Reading fresh from the live store
+    (or copying it when a link is not possible) is what keeps this backup's covers
+    correct regardless of what any sibling holds; the cost is that the
+    cross-filesystem deployment shares nothing between backups for covers
+    specifically, which is no worse than every backup before this sprint archived
+    a fresh tarball of all of them regardless.
     """
-    with tarfile.open(target, "w:gz") as archive:
-        if source.is_dir():
-            for entry in sorted(source.rglob("*")):
-                archive.add(entry, arcname=str(entry.relative_to(source)), recursive=False)
+    source = data_dir / "covers"
+    recorded: list[dict[str, Any]] = []
+    if not source.is_dir():
+        return recorded
+    for cover in sorted(source.iterdir()):
+        if not cover.is_file():
+            continue
+        target = backup_path / "covers" / cover.name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        if not _link_from(cover, target):
+            target.write_bytes(cover.read_bytes())
+        recorded.append({"name": cover.name, "bytes": target.stat().st_size})
+    return recorded
 
 
 def _share_attachments(data_dir: Path, backup_path: Path, dest: Path) -> list[dict[str, Any]]:

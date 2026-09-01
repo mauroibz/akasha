@@ -46,6 +46,11 @@ calibre/
 # library" button never enabling (no code path reads network at that
 # point; `calibreBundle()` never found a file named metadata.db to key on).
 !frontend/e2e/fixtures/**/*.db
+# Same reasoning, this time backend-side (Sprint 060): a small, real backup
+# fixture in the previous manifest format, needed to prove restore_backup
+# still reads a version-1 backup correctly -- caught before it repeated the
+# exact gap above, rather than after.
+!backend/tests/fixtures/**/*.db
 
 # Editors and OS
 .idea/
