@@ -1,6 +1,6 @@
 # Sprint 057 — The names the product actually uses
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 056
 
 **Roadmap revision:** 31
@@ -135,4 +135,57 @@ invocation in TESTING.md must be re-verified by hand once if any scratchpad spec
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-09-01, same day, one session, on top of the plan revision (DEC-119, c6651b3).
+Both owner-directed changes shipped inside the still-untagged v1.5.1.
+
+**Full gate owed and paid** — the diff touches `backend/src/`, frontend config, and the
+generated OpenAPI contract, which is the narrowed gate's withdrawal condition.
+
+**Verification, all green on the final frozen tree:**
+
+- `python scripts/validate_project.py` — passed after every edit.
+- `make check` — green (ruff, mypy, tsc, OpenAPI drift check against the regenerated
+  `frontend/openapi.json`, validator).
+- `make test` — **1186 backend passed** (1184 + the 2 new prefix tests), 90% coverage;
+  **194 frontend passed**; exit 0.
+- `bash scripts/smoke_container.sh` — **exit 0 twice** (once at the prefix flip, once on the
+  frozen tree after the AC4 title assertion was added). All Sprint 056 assertions hold under
+  `AKASHA_*` names, plus the new step: the served `/openapi.json` reports title `Akasha`,
+  version `1.5.1`.
+
+**Acceptance criteria, each verified:**
+
+1. Prefix flip proved twice: unit test (`AKASHA_DATA_DIR` read, `BOOK_TRACKER_DATA_DIR`
+   ignored — RED observed first with the old prefix winning) and the smoke test's attachment
+   cap travelling as `AKASHA_ATTACHMENT_MAX_BYTES` into the running container.
+2. `AKASHA_BIND`/`AKASHA_PORT` absorbed by `extra="ignore"`, settings unchanged — the
+   `test_compose_side_akasha_names_are_ignored_not_applied` unit test; the smoke test's port
+   and bind behavior unchanged.
+3. Smoke test green end to end under the new names, including Sprint 056's five env
+   assertions and the verbatim-`.env.example`-still-production check (now
+   `AKASHA_ENVIRONMENT=development` in the example, still never reaching the container).
+4. Served OpenAPI title/version asserted in the smoke test; frontend type check green against
+   the regenerated contract.
+5. Grep proves the split: the only `BOOK_TRACKER_` strings left in live surfaces are the
+   DEC-119 rationale comment, the regression test proving the old name dead, and the release
+   notes' rename table. Historical records untouched.
+6. `backend/pyproject.toml`, `frontend/package.json`, `main.py`, `openapi.json`, `uv.lock`
+   all read 1.5.1.
+7. Validator passes.
+
+**Commits:** c6651b3 (plan revision, DEC-119), 8979a14 (prefix flip, 17 files), 4574f90
+(title + version + contract regen), 3e58a62 (operator docs), plus this closure commit.
+
+**Deviations:** none in behavior. Two scope notes: the version bump to 1.5.1 was forced by
+the title change landing in the OpenAPI contract and was planned as such; the smoke test's
+AC4 title assertion was added after the first green run and the gate re-run on the frozen
+tree paid for it.
+
+**Impact on future sprints:** 058 (published image) builds on `akasha:${AKASHA_VERSION:-local}`
+unaffected. The walkthrough scripts and TESTING.md's scratchpad invocation now use
+`AKASHA_INCLUDE_SCRATCHPAD`/`AKASHA_E2E_BACKEND` — anyone resuming an old scratchpad flow
+must use the new names. Operators upgrading to v1.5.1 must rename their `.env` variables per
+the release notes' table.
+
+**Release:** v1.5.1 now carries Sprint 056 + Sprint 057. Not tagged, not pushed — the owner's
+call. The release notes lead with the port change and name the prefix rename.

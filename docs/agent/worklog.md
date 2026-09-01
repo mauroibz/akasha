@@ -3252,3 +3252,24 @@ so 050 adds an adapter, not a declaration.
 - Blocked/open: nothing.
 - Next: execute Sprint 057 — read `docs/sprints/057-product-names.md`. It owes the FULL gate
   (backend/src + generated contract change); the narrowed gate is withdrawn by design.
+
+## 2026-09-01 — Sprint 057 (complete)
+
+- Done: both owner-directed name changes, shipped inside untagged v1.5.1. `env_prefix`
+  `BOOK_TRACKER_` -> `AKASHA_` (clean break, no alias) across config.py + 16 consumer
+  surfaces (Dockerfile ENV, compose pass-throughs, Makefile dev target, .env.example, smoke
+  test, 6 walkthrough scripts, playwright/vite config, technical spec table, TESTING.md);
+  FastAPI title "Akasha Book Tracker" -> "Akasha"; version surfaces 1.5.0 -> 1.5.1 together
+  with the regenerated openapi.json. Two new unit tests pin the flip: `AKASHA_DATA_DIR` read
+  while `BOOK_TRACKER_DATA_DIR` is ignored (RED observed first), and the compose-side
+  `AKASHA_BIND`/`AKASHA_PORT` absorbed by `extra="ignore"`. README and .env.example gained
+  the application-settings vs compose-interpolation split note. The `book_tracker` package
+  untouched (DEC-042 stands).
+- Verified: FULL gate (narrowed gate withdrawn by design). `make test` 1186 backend + 194
+  frontend, exit 0. `make check` green including the OpenAPI type check against the
+  regenerated contract. `make smoke-container` exit 0 twice — the second on the frozen tree
+  with the new AC4 assertion (served /openapi.json: title "Akasha", version "1.5.1").
+  Validator green after every edit. Grep proves the BOOK_TRACKER_/historical split.
+- Deviations: none. The version bump was planned as forced by the OpenAPI contract change.
+- Blocked/open: nothing for this sprint. Sprint 058 carries three owner-only GitHub steps.
+- Next: execute Sprint 058 — read `docs/sprints/058-published-image.md`.

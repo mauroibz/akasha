@@ -1,39 +1,40 @@
-# Handoff — Sprint 057 is ready: the names the product actually uses
+# Handoff — Sprint 058 is ready: an image you pull, not a build you run
 
-Plan revision **31** (DEC-119): the owner directed the two cheap layers of the naming
-assessment — the pydantic `env_prefix` becomes `AKASHA_` (**clean break, no alias**) and the
-FastAPI title drops "Book Tracker". Both ship inside the still-untagged **v1.5.1**. The
-deployment line renumbered: old 057/058/059 are now **058/059/060** (v1.5.3/v1.5.4/v1.5.5);
-`FINAL_SPRINT` is 60. Sprint 056's closure and its evidence are untouched history.
+Sprint 057 (the names sprint, DEC-119) is complete and committed: the pydantic env prefix is
+`AKASHA_` (clean break, no alias — an operator's old `BOOK_TRACKER_*` variables are ignored
+from v1.5.1 on), the API title is "Akasha", and every version surface reads 1.5.1. v1.5.1 now
+carries Sprints 056 + 057 and is **still untagged** — the owner's call. `docs/agent/state.json`
+reads `ready` with `058` active. The `book_tracker` package itself is untouched; DEC-042 and
+the internal-names invariant stand.
 
-The next move is ordinary: execute Sprint 057 with the protocol in `/AGENTS.md`.
+The next move is ordinary: execute Sprint 058 with the protocol in `/AGENTS.md`.
 
-## What Sprint 057 must not get wrong
+## What Sprint 058 must not get wrong
 
-- **The `book_tracker` package is not renamed.** DEC-042's rejection and the AGENTS.md
-  internal-names invariant stand. Only the env prefix and the API title change.
-- **No alias.** A `BOOK_TRACKER_*` variable in an operator's `.env` is silently ignored from
-  v1.5.1 on. The release notes say so with the rename table; do not add a compat layer.
-- **`AKASHA_BIND`/`AKASHA_PORT` fall inside the pydantic prefix after the flip.** They must
-  stay absorbed by `extra="ignore"` — prove it in a unit test, don't assume it.
-- **Full gate owed.** The diff touches `backend/src/` and `openapi.json` (a generated
-  contract): validator, `make check`, `make test`, `make smoke-container`. The version surfaces
-  (pyproject, package.json, main.py, openapi.json) move to **1.5.1** — forced by the title
-  change, and it corrects the drift 056's release notes acknowledged.
-- Historical records (closed sprints, worklog, DEC-001–118) keep `BOOK_TRACKER_` — do not
-  edit them. Verify the split with grep, not by eye.
-- Sprint 056's compose env boundary (explicit list, never `env_file:`) is renamed, not widened.
+- **A compose service carrying both `image:` and `build:` builds silently when the image is
+  absent** — the failure this sprint exists to remove. The local build moves to its own
+  overlay; compose points at the registry.
+- **Three steps need the owner's GitHub account** — workflow package-write permission,
+  pushing the tag, package visibility. They are written out with expected results in the
+  sprint file: surface them, don't improvise them.
+- **The smoke test must keep building locally and keep its hermetic `COMPOSE_ENV_FILES`
+  harness and random port.** Its env names are `AKASHA_*` now (Sprint 057); the scratchpad
+  invocation in TESTING.md uses `AKASHA_INCLUDE_SCRATCHPAD`.
+- **Sprint 058 declares the narrowed gate** (validator + `make check` + smoke) as long as its
+  diff stays confined to deployment/CI configuration and docs — one file under `backend/src/`
+  withdraws it.
+- The walkthrough scripts print `AKASHA_DATA_DIR=...` now; old scratchpad flows with the old
+  names are dead.
 
-## Verified at Sprint 056's close (previous sprint)
+## Verified at Sprint 057's close
 
-`make smoke-container` exit 0 on the frozen tree; `make check` green; narrowed gate held
-(no application code). Eleven local commits on main, nothing tagged or pushed. v1.5.1 is
-assembled but untagged: the tag decision is the owner's, after this sprint's changes fold in.
+`make test` 1186 + 194 green; `make check` green; `make smoke-container` exit 0 on the frozen
+tree (title/version asserted through the served OpenAPI); validator green. Fifteen local
+commits on main, nothing tagged or pushed.
 
-## After Sprint 057
+## After Sprint 058
 
-058 (published image, v1.5.3) carries three owner-only GitHub steps; 059 (event loop,
-v1.5.4) is gated measurement-first; 060 (storage, v1.5.5) owes the full gate.
+059 (event loop, v1.5.4) is gated measurement-first; 060 (storage, v1.5.5) owes the full gate.
 
 ## Private data and operational constraints
 

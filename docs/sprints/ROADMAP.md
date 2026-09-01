@@ -2,7 +2,7 @@
 
 **Plan revision:** 31
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 057 — The names the product actually uses](057-product-names.md)
+**Active sprint:** [Sprint 058 — An image you pull, not a build you run](058-published-image.md)
 
 ## Shape of the plan
 
@@ -182,7 +182,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | completed |
 | [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | completed |
 | [056](056-deployment-defaults.md) | The deployment defaults a home server needs | 055 | completed |
-| [057](057-product-names.md) | The names the product actually uses | 056 | ready |
+| [057](057-product-names.md) | The names the product actually uses | 056 | completed |
 | [058](058-published-image.md) | An image you pull, not a build you run | 056 | planned |
 | [059](059-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
