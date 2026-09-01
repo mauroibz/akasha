@@ -20,7 +20,7 @@ services:
     # pulling whenever the local image is missing, which defeats the point of
     # publishing one. Building from source is `compose.build.yaml`:
     #   docker compose -f compose.yaml -f compose.build.yaml up -d --build
-    image: ghcr.io/mauroibz/akasha:${AKASHA_VERSION:-1.5.3}
+    image: ghcr.io/mauroibz/akasha:${AKASHA_VERSION:-1.5.4}
     logging:
       # The container's stdout is the only sink this service has: uvicorn's
       # access log is on, and one library page is many requests. Docker's

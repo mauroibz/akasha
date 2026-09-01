@@ -56,8 +56,9 @@ v1.5.0 released
  └─ 056 Deployment defaults          v1.5.1
      ├─ 057 Product names           v1.5.1
      ├─ 058 A published image       v1.5.3
-     ├─ 059 Nothing blocks the loop  v1.5.4  [GATED]
-     └─ 060 Storage housekeeping     v1.5.5
+     ├─ (out-of-sprint e2e CI fix)   v1.5.4 — see DEC-121
+     ├─ 059 Nothing blocks the loop  v1.5.5  [GATED]
+     └─ 060 Storage housekeeping     v1.5.6
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was

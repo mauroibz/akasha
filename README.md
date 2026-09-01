@@ -166,7 +166,7 @@ and never reaches the process.
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
 | `AKASHA_PORT`          | `4441`           | Published port. `8000` was the default before v1.5.1                                       |
 | `AKASHA_BIND`          | `0.0.0.0`        | Set to `127.0.0.1` to keep it off the network. Publishes on overlay-network interfaces too |
-| `AKASHA_VERSION`      | `1.5.3`          | Image tag compose pulls. Pin a version so an upgrade or a rollback is a variable, not a rebuild — `latest` moves under you |
+| `AKASHA_VERSION`      | `1.5.4`          | Image tag compose pulls. Pin a version so an upgrade or a rollback is a variable, not a rebuild — `latest` moves under you |
 | `AKASHA_LOG_MAX_SIZE`  | `10m`            | Container log rotation bound, with `AKASHA_LOG_MAX_FILE` (`5`)                             |
 | `TZ`                   | `UTC`            | Timezone                                                                                   |
 | `LOG_LEVEL`            | `INFO`           | Log verbosity                                                                              |

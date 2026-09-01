@@ -4257,3 +4257,42 @@ and state the success condition as "green", not as "seconds".**
   the corresponding tag being pushed — those tags were never an acceptance criterion, and
   this one is. `docs/agent/state.json` and the sprint file record `blocked` rather than
   `completed` until then; `HANDOFF.md` carries the exact commands.
+
+## DEC-121 — An out-of-sprint v1.5.4 patch closes Sprint 058's real upgrade/rollback proof; 059 and 060 shift to v1.5.5 and v1.5.6
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Amends:** DEC-118's version table (v1.5.1 through v1.5.4 for Sprints 056–059).
+  **Extends:** DEC-120.
+- **Context:** the owner performed all three actions DEC-120 left pending — the workflow's
+  package-write permission was already sufficient, `v1.5.3` was tagged and pushed, and the
+  package came up public — but only the tag was pushed, not `main`; `origin/main` stayed at
+  the v1.5.0 commit through Sprints 056–058 and the later out-of-sprint e2e CI fix
+  (`b557ef7`/`99a196e`, worklog 2026-09-01). Reconciling that left two gaps in Sprint 058's
+  own acceptance criteria: AC4 and AC5 require a real `docker compose pull`/rollback between
+  **two published versions**, and only one, `v1.5.3`, had ever gone through the release
+  workflow. Waiting for Sprint 059's own release to supply the second version would have left
+  058 open indefinitely, which the state model does not allow (WORKFLOW.md: exactly one
+  non-completed sprint may be active).
+- **Decision:** push `main` to `origin` now, so the default branch matches what is already
+  released and public, and cut **v1.5.4** immediately as a patch release carrying the
+  already-committed, already out-of-sprint e2e CI flakiness fix (`b557ef7`) — no new code
+  written for the sole purpose of manufacturing a version number. `v1.5.3` -> `v1.5.4` is then
+  the real pair Sprint 058's AC4/AC5 exercise. Because `v1.5.4` was DEC-118's number for
+  Sprint 059, that line renumbers by one: **059 ships v1.5.5, 060 ships v1.5.6.**
+  `docs/sprints/ROADMAP.md`, `059-off-the-event-loop.md` and `060-storage-housekeeping.md` are
+  corrected in place for the same reason DEC-119 corrected DEC-117's numbers in place: no
+  sprint had run against the old numbers yet, and leaving them wrong would trap the next
+  session. `FINAL_SPRINT` does not move — no sprint was added or removed, only renumbered.
+  DEC-117/DEC-118 are left as they were written, historical to the plan revision they
+  describe, per this document's own rule that a historical entry is dated, not wrong.
+- **Consequences:** `docs/operations/release-notes-v1.5.4.md` documents the release; it
+  carries no application-code or contract change, so `backend/pyproject.toml` and
+  `frontend/package.json` stay at `1.5.1`, unchanged since Sprint 057 — the internal package
+  version tracks the API contract, not the deployment-line tag, and the two have been
+  decoupled since `v1.5.2` and `v1.5.3` were likewise never reflected there. `compose.yaml`'s
+  default `AKASHA_VERSION` moves `1.5.3` -> `1.5.4`. Sprint 058 closes with AC1, AC2, AC4,
+  AC5, AC6, AC9 and AC10 verified against real evidence (the `v1.5.3` and `v1.5.4` release
+  runs, a real upgrade and rollback with an entry surviving both, and Dependabot's first
+  activation on `origin`'s default branch); its Outcome and this repository's worklog carry
+  the run IDs and digests.
