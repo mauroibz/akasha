@@ -32,8 +32,15 @@ typecheck:
 	cd frontend && npm run typecheck
 
 test:
-	cd backend && $(UV_ENV) uv run pytest
+	cd backend && $(UV_ENV) uv run pytest --cov=book_tracker --cov-report=term-missing
 	cd frontend && npm test
+
+# The coverage report on demand: `make test` already carries the flags, so this
+# is for a session that wants the number (and the missing-lines table) without
+# running the frontend suite. A focused run without coverage costs 26 s less
+# (DEC-114).
+coverage:
+	cd backend && $(UV_ENV) uv run pytest --cov=book_tracker --cov-report=term-missing
 
 openapi:
 	cd backend && $(UV_ENV) uv run python ../scripts/export_openapi.py

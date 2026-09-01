@@ -34,10 +34,6 @@ from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.undo import UndoService
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
-from book_tracker.domains.series.providers import (
-    WikidataSeriesProvider,
-    wikidata_series_route_key,
-)
 from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.models import ImportEffectRow, JobRow
 from book_tracker.infrastructure.providers import create_provider_client
@@ -378,10 +374,9 @@ async def test_an_item_whose_domain_does_not_enrich_is_refused(engine: Engine) -
 async def test_an_anime_is_enriched_from_its_own_providers(engine: Engine) -> None:
     """The whole point of the sprint, end to end: a `mal` key, anime's own provider
     order, and a record filled from AniList rather than from a book provider."""
-    from recordings import recording, replay
+    from recordings import recording
 
     from book_tracker.domains.anime.providers import AniListProvider
-    from book_tracker.infrastructure.providers import create_provider_client
 
     item_id = create_typed_item(engine, "Chainsaw Man", "anime", ("mal", "44511"))
     job_id = enqueue(engine, {"item_id": item_id, "kind": "mal", "value": "44511"})
@@ -435,7 +430,8 @@ def _series_enrichment_providers(
     the entity fetch and the label batch.
     """
     from tests.test_tvmaze_provider import tvmaze as make_tvmaze
-    from tests.test_wikidata_series_provider import IMDB_RESOLUTION, wikidata as make_wikidata
+    from tests.test_wikidata_series_provider import IMDB_RESOLUTION
+    from tests.test_wikidata_series_provider import wikidata as make_wikidata
 
     wikidata = make_wikidata(IMDB_RESOLUTION)
     lookup = tvmaze_lookup or (200, recording("tvmaze_lookup_tt0903747.json"))
@@ -463,7 +459,9 @@ def _create_series(engine: Engine, **metadata: Any) -> int:
     return item_id
 
 
-async def _run_series_job(engine: Engine, providers: dict[str, Any], item_id: int) -> dict[str, Any]:
+async def _run_series_job(
+    engine: Engine, providers: dict[str, Any], item_id: int
+) -> dict[str, Any]:
     job_id = JobRepository(engine).enqueue(
         None, "enrich_item", {"item_id": item_id, "kind": "imdb", "value": "tt0903747"}
     )
@@ -516,7 +514,9 @@ class TestTheSynopsisSomebodyWouldActuallyRead:
         item_id = _create_series(engine)
         await _run_series_job(
             engine,
-            _series_enrichment_providers(tvmaze_lookup=(404, recording("tvmaze_lookup_no_match.json"))),
+            _series_enrichment_providers(
+                tvmaze_lookup=(404, recording("tvmaze_lookup_no_match.json"))
+            ),
             item_id,
         )
         row = read_item(engine, item_id)

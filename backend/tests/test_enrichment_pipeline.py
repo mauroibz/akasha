@@ -723,10 +723,11 @@ async def test_a_domain_that_does_not_want_a_cover_is_not_requeued_without_one(
     cover; the fix makes the condition a declaration (`wants_cover`) rather than
     an assumption, and the guard test is the unit seam: a domain that opts out
     is never selected for a missing cover."""
+    from dataclasses import replace as dc_replace
+
     from book_tracker.application.enrichment import _backfillable_items
     from book_tracker.domain.registry import DOMAINS
     from book_tracker.domain.spec import EnrichmentSpec
-    from dataclasses import replace as dc_replace
 
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
@@ -751,8 +752,11 @@ async def test_a_domain_that_does_not_want_a_cover_is_not_requeued_without_one(
         opted_out = dc_replace(
             book,
             enrichment=dc_replace(
-                book.enrichment or EnrichmentSpec(
-                    identity_kinds=("isbn",), provider_order=("openlibrary",), completeness_fields=()
+                book.enrichment
+                or EnrichmentSpec(
+                    identity_kinds=("isbn",),
+                    provider_order=("openlibrary",),
+                    completeness_fields=(),
                 ),
                 wants_cover=False,
             ),
@@ -760,6 +764,7 @@ async def test_a_domain_that_does_not_want_a_cover_is_not_requeued_without_one(
         DOMAINS["book"] = opted_out
         try:
             from book_tracker.infrastructure.models import JobRow  # noqa: F401
+
             assert _backfillable_items(engine) == []
         finally:
             DOMAINS["book"] = book
@@ -773,10 +778,11 @@ async def test_a_domain_that_does_not_want_a_year_is_not_requeued_without_one(
     year, so a domain whose rows legitimately carry none would be re-queued on
     every backfill for ever. A book with no year, complete on the domain's own
     fields, is the case."""
+    from dataclasses import replace as dc_replace
+
     from book_tracker.application.enrichment import _backfillable_items
     from book_tracker.domain.registry import DOMAINS
     from book_tracker.domain.spec import EnrichmentSpec
-    from dataclasses import replace as dc_replace
 
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
@@ -796,9 +802,7 @@ async def test_a_domain_that_does_not_want_a_year_is_not_requeued_without_one(
         base = book.enrichment or EnrichmentSpec(
             identity_kinds=("isbn",), provider_order=("openlibrary",), completeness_fields=()
         )
-        DOMAINS["book"] = dc_replace(
-            book, enrichment=dc_replace(base, wants_year=False)
-        )
+        DOMAINS["book"] = dc_replace(book, enrichment=dc_replace(base, wants_year=False))
         try:
             assert _backfillable_items(engine) == []
         finally:

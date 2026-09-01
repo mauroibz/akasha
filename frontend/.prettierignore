@@ -1,3 +1,7 @@
 openapi.json
 dist
 test-results
+# Local walkthrough specs: owner paths, throwaway flows, deliberately not in
+# the repository (TESTING.md). Policing them turns `make check` red on a file
+# nobody committed — Sprint 053 paid for this, Sprint 055 fixed it.
+e2e/scratchpad/

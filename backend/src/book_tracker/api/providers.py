@@ -96,9 +96,7 @@ async def resolve(
             raise LibraryError(
                 "provider_failure", "Metadata could not be resolved", status_code=502
             ) from error
-        raise LibraryError(
-            "record_not_found", str(error), status_code=404
-        ) from error
+        raise LibraryError("record_not_found", str(error), status_code=404) from error
     except Exception as error:
         raise LibraryError(
             "provider_failure", "Metadata could not be resolved", status_code=502
