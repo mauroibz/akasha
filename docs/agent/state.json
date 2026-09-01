@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 31,
-  "project_status": "in_progress",
+  "project_status": "blocked",
   "active_sprint": "058",
   "active_sprint_file": "docs/sprints/058-published-image.md",
-  "active_sprint_status": "in_progress",
+  "active_sprint_status": "blocked",
   "last_completed_sprint": "057",
   "completed_sprints": [
     "001",
@@ -66,5 +66,5 @@
     "057"
   ],
   "started_at": "2026-09-01T14:00:00-03:00",
-  "updated_at": "2026-09-01T14:00:00-03:00"
+  "updated_at": "2026-09-01T15:55:00-03:00"
 }

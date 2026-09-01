@@ -4223,3 +4223,37 @@ and state the success condition as "green", not as "seconds".**
   rather than assuming it. Historical records keep `BOOK_TRACKER_` where they describe the
   past. The compose pass-through list (the env boundary Sprint 056 established) is renamed,
   not widened: no new variable may reach the container except by an explicit list entry.
+
+## DEC-120 — The published image is `ghcr.io/mauroibz/akasha`; the publish, visibility and first tag are owner actions, not built by the session that wrote the workflow
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Extends:** DEC-075 (named volumes), DEC-117/DEC-118 (the deployment line's patch releases)
+- **Context:** Sprint 058 implements `.github/workflows/release.yml`, splits `compose.yaml`
+  into a pull-based service plus a `compose.build.yaml` local-build overlay, pins both
+  `Dockerfile` base images by digest, and adds `.github/dependabot.yml`. Its own acceptance
+  criterion 10 requires the three owner-only GitHub steps — workflow package-write
+  permission, the first `v*` tag push, and the package's visibility — to be **performed**,
+  not merely written out. None of the three can be taken by the session implementing the
+  workflow: the permission toggle and the visibility choice are settings on the owner's
+  GitHub account, and this repository's own working agreement is that nothing is pushed to
+  `origin` — branch or tag — unless the owner asks (unchanged since Sprint 057's close, where
+  fifteen local commits sat untagged and unpushed by the same rule).
+- **Decision:** The image name is settled now, before any push, because it becomes permanent
+  in practice the moment an operator's `compose.yaml` names it: `ghcr.io/mauroibz/akasha`,
+  matching the GitHub repository path exactly (`docker/metadata-action`'s
+  `images: ghcr.io/${{ github.repository }}`, so the workflow never hardcodes it a second
+  time). `compose.yaml`'s default tag is `1.5.3` — the version this sprint's code targets —
+  rather than `local`, matching deliverable 2's instruction that the default be a released
+  tag. The three owner actions stay exactly as `docs/operations/publishing-images.md` writes
+  them out, and the sprint's Outcome records them as **not yet performed**, pending the
+  owner. Everything that does not require the owner's account or a push — the workflow file,
+  the compose split, the digest pins, dependabot, the runbook/README/release-notes rewrite —
+  is implemented and verified through the narrowed gate (`validate_project.py`, `make check`,
+  `bash scripts/smoke_container.sh` against the local-build overlay).
+- **Consequences:** Sprint 058 cannot close under its own acceptance criterion 10 until the
+  owner performs the three steps and the results are recorded in the sprint's Outcome. This
+  is a deliberate departure from Sprints 056/057, which shipped their release notes without
+  the corresponding tag being pushed — those tags were never an acceptance criterion, and
+  this one is. `docs/agent/state.json` and the sprint file record `blocked` rather than
+  `completed` until then; `HANDOFF.md` carries the exact commands.

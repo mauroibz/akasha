@@ -183,7 +183,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | completed |
 | [056](056-deployment-defaults.md) | The deployment defaults a home server needs | 055 | completed |
 | [057](057-product-names.md) | The names the product actually uses | 056 | completed |
-| [058](058-published-image.md) | An image you pull, not a build you run | 056 | planned |
+| [058](058-published-image.md) | An image you pull, not a build you run | 056 | blocked |
 | [059](059-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 

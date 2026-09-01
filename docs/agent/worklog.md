@@ -3273,3 +3273,51 @@ so 050 adds an adapter, not a declaration.
 - Deviations: none. The version bump was planned as forced by the OpenAPI contract change.
 - Blocked/open: nothing for this sprint. Sprint 058 carries three owner-only GitHub steps.
 - Next: execute Sprint 058 — read `docs/sprints/058-published-image.md`.
+
+## 2026-09-01 — Sprint 058 (blocked on owner action)
+
+- Done: every deliverable that needs no push and no GitHub-account setting.
+  `.github/workflows/release.yml` (publish on `v*` only, `packages: write`, no new
+  secret, same Dockerfile `ci.yml` smoke-tests, tags full/minor/`latest` +
+  `org.opencontainers.image.source`). `compose.yaml` now `image:
+  ghcr.io/mauroibz/akasha:${AKASHA_VERSION:-1.5.3}` with no `build:` key;
+  `compose.build.yaml` is the new local-build overlay. Both `Dockerfile` `FROM`
+  lines pinned by digest (node:22-alpine, python:3.12-slim, captured and
+  diffed programmatically, not hand-copied). `.github/dependabot.yml`: npm,
+  uv, docker, github-actions, weekly. `scripts/smoke_container.sh` threads the
+  build overlay through `COMPOSE_FILE`, pins its own `AKASHA_VERSION=local` so
+  its assertions never depend on compose.yaml's release-number default, and
+  reads the image reference back from `docker compose config` instead of the
+  old hardcoded `akasha:local` (two call sites: the AC4 restore drill, the AC9
+  version-tag drill). runbook.md's Upgrading/Rolling back/Restoring rewritten
+  around `docker compose pull` and `ghcr.io/mauroibz/akasha:<version>`;
+  README's Quick start stops cloning. New canonical doc
+  `docs/operations/publishing-images.md` (workflow behavior, release
+  procedure, verification, digest refresh, and the three owner actions
+  written out with expected results) and `release-notes-v1.5.3.md`. DEC-120
+  records the image name and the decision to leave the owner actions
+  unperformed.
+- Verified: narrowed gate (DEC-118's rule) — diff confined to `.github/`,
+  `compose*.yaml`, `Dockerfile`, `scripts/smoke_container.sh` and docs,
+  nothing under `backend/src/`/`frontend/src/`/test trees/migrations/lockfiles
+  (`git diff --stat` in the sprint Outcome). `python scripts/validate_project.py`
+  green after every edit. `make check` green. `bash scripts/smoke_container.sh`
+  **exit 0 twice** on the frozen tree, through the new compose split. Both
+  YAML files parse (`yaml.safe_load`).
+- Deviations: sprint left `blocked`, not `completed` — see DEC-120. AC10
+  requires the three owner-only GitHub steps (workflow package-write
+  permission, the first `v*` tag push, package visibility) to be **performed
+  and recorded**, not merely written out, unlike Sprints 056/057 where an
+  untagged release was never an acceptance criterion. None of the three can
+  be taken by this session: two are GitHub account settings, and the
+  standing rule that nothing is pushed to `origin` without the owner asking
+  (unchanged since Sprint 057) covers the tag push. AC1/2/4/5/6/9/10 recorded
+  NOT RUN in the sprint Outcome, each requiring a real `ghcr.io` publish.
+- Blocked/open: the three owner actions in
+  `docs/operations/publishing-images.md`. Nothing else — implementation is
+  complete and gated green.
+- Next: the owner performs the three steps (or asks this session to push the
+  branch and a `v1.5.3` tag once ready); whoever resumes records the run URL,
+  digest and chosen visibility in the sprint Outcome, flips the NOT RUN
+  criteria, and closes Sprint 058 per the normal protocol. No further code
+  is anticipated before Sprint 059.
