@@ -1,6 +1,6 @@
 # Sprint 055 — The recorded defects, and the gates that stopped paying
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 054
 
 **Roadmap revision:** 29
@@ -196,4 +196,72 @@ one real series and read its synopsis.
 
 ## Outcome
 
-_Not started._
+**Delivered 2026-09-01, commits `33d0d92`, `1fb916d`, `0eaaf97`, `0d2597d`, `2c4f7da`.**
+Every deliverable landed, plus one defect the walkthrough gate caught that no unit suite
+would have (recorded below). The project's last planned sprint is complete.
+
+**Deliverable 1 — the synopsis (DEC-115).** `EnrichmentSpec.fuller_answer_fields`, the
+sprint's preferred option: the same declaration shape as `completeness_fields`. The
+enrichment handler still takes the first usable payload for everything, then asks the
+remaining providers for the declared fields alone; the longest string wins. Series
+declares `("synopsis",)`. Proved against Sprint 049/050's committed recordings —
+Wikidata's one-liner versus TVmaze's real synopsis — with the negatives: the one-liner
+still arrives when TVmaze 404s, an owner's five-character synopsis survives both
+providers, and no other field of the first payload is ever touched.
+
+**The walkthrough caught the unit suites' blind spot.** The first live run stored the
+one-liner anyway: the *add path* takes one candidate's payload and never consults a
+second provider, and interactive add never queues background enrichment — so an
+added-by-hand series would have kept the one-liner for ever. `prefer_fuller` was
+extracted to `domain/merge.py` and applied on the add path too (commit `2c4f7da`), with
+the regression tests: an added series stores the fuller synopsis, keeps the first
+provider's other fields, and a domain declaring no `fuller_answer_fields` still consults
+exactly one provider once. Re-run live: BoJack added by its IMDb link stores TVmaze's
+151-char synopsis, with `episodes: 77` and `network: Netflix` from Wikidata.
+
+**Deliverable 2 — the two DEC-100 defects (DEC-116).** (1) The cover and year backfill
+conditions became declarations (`wants_cover`/`wants_year`, default True — what every
+registered domain means today, post-Sprint-048), so a future domain whose providers carry
+no covers opts out instead of being re-queued for ever; guard tests prove the opt-out
+through the unit seam. (2) `GET /api/search/resolve` maps a typed `record_not_found` to
+**404** under the provider's own code and message; transport failures and other payload
+errors keep the 502 — proved both ways.
+
+**Deliverable 3 — the parallel gate (AC5 held; not withdrawn).** The caption at
+`VirtualLibrary.tsx:100` no longer fades (the `/80` opacity is gone, so axe samples the
+settled colour). Four load-sensitive tests moved into the serial `heavy-library` project
+with their reasons beside `HEAVY_LIBRARY`'s grep — two crossfade samplers (the second,
+`the mounted-DOM budget holds through a crossfade`, was not in DEC-114's list; it failed
+the first acceptance run, same class) and the three library-view axe checks. **Three
+consecutive parallel runs green: 44.5 s, 44.5 s, 45.3 s** (106 passed + 2 skipped each),
+against 101.7 s for the old serial gate. A fourth run after the add-path change: 43.7 s,
+green. The `heavy-library` project itself: 7 passed in 18.8 s.
+
+**Deliverables 4–6 — the gates stop double-charging.** Coverage left `addopts` for
+explicit flags on `make test` and a new `make coverage`; a focused single-file run is
+1–5 s with no table. `.prettierignore` and ESLint's `ignores` exclude the gitignored
+`e2e/scratchpad/`, so `make check` is green with walkthrough specs present. Motion's
+Reduced Motion notice is filtered at `console.warn` beside the `scrollTo` shim, and
+vitest's empty `stderr |` labels are suppressed via `onConsoleLog`: **a green `npm test`
+prints no stderr at all** (194 passed, zero lines).
+
+**Verification.** `make check` green (validator included). `make test` 1184 backend +
+194 frontend, coverage 90%. The sprint's focused suites: `test_enrichment.py`,
+`test_series_domain.py`, `test_search_ranking.py` plus the neighbours the changes touch
+(pipeline, provider-api, conformance, cached-add, both series providers, item types) —
+342 focused tests green. Parallel Playwright green ×3 + 1, durations recorded above.
+Walkthrough gate passed on the live boundary (`scripts/walkthrough_synopsis_055.py`:
+resolve by IMDb link → add → poll → read the synopsis and the kept fields).
+
+**Deviations.** (1) The Verification block's `tests/test_search_api.py` does not exist —
+the resolve behaviour lives in `tests/test_provider_api.py`, where the new tests went.
+(2) The sprint named two tests to move; the first acceptance run found a third of the
+same class, and the axe checks that render the caption are three tests, not one — four
+moved in total, all with reasons in the config. (3) Deliverable 1's fix touched one
+shared file the plan did not name (`application/add.py`) — the walkthrough's finding, not
+a scope drift: the sprint's own acceptance criterion is "a series … stores the full
+synopsis", unqualified by arrival path.
+
+**Explicit non-scope held.** The IMDb list `Description` column is still deliberately
+dropped — it is the owner's question, and this sprint asked nothing new. No new product
+behaviour shipped.

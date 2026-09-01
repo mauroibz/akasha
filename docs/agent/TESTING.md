@@ -45,22 +45,32 @@ not “text only.” Classify by effect, not extension.
 
 ## Time and environment triage
 
-Measured on this workstation 2026-09-01, at Sprint 053's closure (DEC-114):
+Measured on this workstation 2026-09-01, at Sprint 055's closure:
 
 | Gate | Normal duration | |
 |---|---:|---|
-| `make check` | about 2 seconds | red if a local scratchpad spec is unformatted — Sprint 055 |
-| backend pytest, 1090 tests, as `addopts` runs it | about 68 seconds | |
-| backend pytest, `--no-cov` | about 42 seconds | **coverage costs 26 s of the above** |
-| frontend Vitest, 194 tests | about 24 seconds | |
-| `make test` combined | about 91 seconds | |
-| full Playwright, parallel | about 38 seconds | **fails 1–2 tests every run** — Sprint 055 |
-| full Playwright, serial (`--workers=1`) | about 102 seconds | green; the trustworthy result today |
-| Sprint 053 walkthrough, after the backend is ready | about 8 seconds | |
+| `make check` | about 2 seconds | green even with a local scratchpad spec present — fixed this sprint |
+| backend pytest, 1184 tests, as the gate runs it | about 73 seconds | coverage rides `make test`/`make coverage` only |
+| backend pytest, focused single file | 1–5 seconds | **no coverage charged since Sprint 055** — a focused run is the first rung again |
+| frontend Vitest, 194 tests | about 24 seconds | silent on stderr since Sprint 055 |
+| `make test` combined | about 97 seconds | |
+| full Playwright, parallel (default) | about 44 seconds | **green — three consecutive runs this sprint (44.5, 44.5, 45.3 s)** |
+| full Playwright, serial `heavy-library` project | about 19 seconds | the six load-sensitive tests run here alone (DEC-023 + Sprint 055's four) |
+| Sprint 055 synopsis walkthrough, after the backend is ready | about 8 seconds | |
 
-Until Sprint 055 lands, **the serial Playwright run is the gate**: the parallel split has not passed
-once, always on the same two rendering-timing tests, so a session that runs it runs the serial one
-afterwards anyway and pays for both.
+**The parallel Playwright run is the gate.** Sprint 055 moved the four
+never-green-in-parallel tests into the serial `heavy-library` project (two crossfade
+samplers, three library-view axe checks — one more crossfade than DEC-114 named, the
+same class, found on the first acceptance run) and fixed the caption itself
+(`VirtualLibrary.tsx` no longer fades it, so axe samples the settled colour). Three
+consecutive green runs at the default worker count is the acceptance test this sprint
+set, and it held; a fourth run after the add-path change held too.
+
+**Coverage moved out of `addopts`.** `make test` and `make coverage` pass the flags
+explicitly, so the number still exists per exhaustive run and on demand; a focused TDD
+run pays nothing and prints no table. The trade is deliberate and named here: a session
+that never runs either target sees no coverage number at all (DEC-114's measurement:
+coverage cost 26 s, 61% of a focused run).
 
 These are diagnostic baselines, not performance acceptance criteria. Every test is bounded, so a
 deadlock no longer looks like slow work: the bound fires and names the test — backend pytest at 30 s

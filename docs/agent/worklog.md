@@ -3052,3 +3052,55 @@ so 050 adds an adapter, not a declaration.
 - **Next.** Sprint 055 — the recorded defects and the gate repairs, the last planned sprint.
   Read `docs/sprints/055-recorded-defects.md`. The release decision (v1.5.0, tagging the movie
   line's v1.4.0) comes after it, and nothing is pushed unasked.
+
+## 2026-09-01 — Sprint 055 (complete): the recorded defects fixed, the gates repaired; the plan is finished
+
+- **Done.** Five commits: `33d0d92` (fuller-answer rule, DEC-115), `1fb916d` (the two
+  DEC-100 defects, DEC-116), `0eaaf97` (parallel gate green + caption), `0d2597d`
+  (coverage/lint/silence), `2c4f7da` (the add path, found by the walkthrough).
+- **The synopsis.** `EnrichmentSpec.fuller_answer_fields` — the declaration the sprint
+  preferred — with series declaring `("synopsis",)`. The enrichment handler keeps the
+  first usable payload for everything else and asks the remaining providers for the
+  declared fields alone; the longest string wins. Proved against Sprint 049/050's
+  committed recordings with all three negatives intact.
+- **The walkthrough earned its keep.** The first live run still stored the one-liner:
+  the *add path* consults exactly one provider and never queues background enrichment,
+  so a series added by hand kept the one-liner for ever — invisible to every unit suite
+  that mocks the boundary. `prefer_fuller` moved to `domain/merge.py` and the add path
+  applies it too; re-run live, BoJack stores TVmaze's 151-char synopsis with Wikidata's
+  episodes and network kept. **Lesson: a merge rule fixed in one arrival path must be
+  checked in every arrival path the item has.**
+- **The two DEC-100 defects.** Cover and year are `wants_cover`/`wants_year`
+  declarations (default True, what every registered domain means post-Sprint-048) rather
+  than constants; `/api/search/resolve` answers a typed `record_not_found` with 404 and
+  the provider's own message, keeping 502 for real failures.
+- **The parallel gate held, so it was not withdrawn.** Three consecutive green runs at
+  the default worker count: 44.5 s, 44.5 s, 45.3 s (a fourth, after the add-path change:
+  43.7 s). Four load-sensitive tests moved to the serial `heavy-library` project —
+  DEC-114's two plus one more crossfade it had not named (failed the first acceptance
+  run, same class) and the three library-view axe checks. The caption at
+  `VirtualLibrary.tsx:100` no longer fades.
+- **The gates stopped double-charging.** Coverage left `addopts` (focused runs are 1–5 s
+  again; `make test` and the new `make coverage` carry the flags). The gitignored
+  scratchpad is out of Prettier's and ESLint's sight, so `make check` is green with
+  walkthrough specs present. Motion's Reduced Motion notice is filtered at
+  `console.warn`, vitest's empty stderr labels suppressed via `onConsoleLog: a green
+  `npm test` is silent. TESTING.md's baseline table is this sprint's measurements.
+- **Verified.** `make check` green (validator included). `make test` 1184 backend + 194
+  frontend, coverage 90%. Focused suites: 342 tests across enrichment, pipeline,
+  provider-api, conformance, cached-add, series providers, item types and search.
+  Parallel Playwright 106 + 2 skipped, ×4 green. `heavy-library` 7 passed, 18.8 s.
+  Walkthrough `scripts/walkthrough_synopsis_055.py` PASSED on the live boundary.
+- **Deviations.** (1) The sprint's `tests/test_search_api.py` does not exist — the
+  resolve tests live in `test_provider_api.py`. (2) Four tests moved, not two — the
+  first acceptance run found the third crossfade and the caption renders in three axe
+  checks. (3) `application/add.py` changed: the walkthrough's finding, recorded in the
+  Outcome as this sprint's own criterion, not a scope drift.
+- **The plan is finished.** All 55 sprints complete; state.json is `complete` with null
+  active fields. Nothing is tagged or pushed. The release decision is the owner's:
+  v1.5.0 (five domains, four import sources, the series line, all recorded defects
+  closed), and whether the movie line's v1.4.0 gets tagged first. Sprint 018's
+  procedure is unchanged and nothing moves without being asked.
+- **Next.** Whatever the owner directs: the release, an epic from the roadmap's future
+  list, or nothing at all. A new sprint would be a plan revision — the seeds skill's
+  extension worked example is the shape.
