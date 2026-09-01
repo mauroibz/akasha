@@ -40,6 +40,15 @@ s.bind(("127.0.0.1", 0))
 print(s.getsockname()[1])
 s.close()')"
 export AKASHA_PORT
+# Local builds go through the dev overlay (Sprint 058): compose.yaml itself
+# carries no `build:` key any more — a service naming both `image:` and
+# `build:` builds silently instead of pulling when the local image is
+# missing, which is the failure this split exists to prevent — so every
+# `docker compose` call below must name the overlay explicitly.
+export COMPOSE_FILE="$root/compose.yaml:$root/compose.build.yaml"
+# Decoupled from whatever version compose.yaml's own default resolves to (a
+# real release number that moves every sprint), so nothing here depends on it.
+export AKASHA_VERSION="local"
 # The version-tag drill builds and starts a second tag of the same image.
 smoke_tag="smoke-$$"
 
@@ -61,15 +70,19 @@ printf 'USER_AGENT_CONTACT=%s\nTZ=UTC\n' "$USER_AGENT_CONTACT" > "$workdir/defau
 cp .env.example "$workdir/example.env"
 grep -v '^USER_AGENT_CONTACT=' "$workdir/example.env" > "$workdir/no-contact.env"
 export COMPOSE_ENV_FILES="$workdir/smoke.env"
+# The resolved image reference, read back from Compose itself rather than
+# hardcoded, so this script never drifts from compose.yaml's own image name.
+image_ref="$(docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["akasha"]["image"])')"
 
 restored_volume=""
 host_backups=""
+smoke_tag_image=""
 
 cleanup() {
   docker compose down --remove-orphans --timeout 10 >/dev/null 2>&1 || true
   docker volume rm -f "$data_volume_original" "$AKASHA_BACKUP_VOLUME" >/dev/null 2>&1 || true
   [ -z "$restored_volume" ] || docker volume rm -f "$restored_volume" >/dev/null 2>&1 || true
-  docker image rm -f "akasha:${smoke_tag}" >/dev/null 2>&1 || true
+  [ -z "$smoke_tag_image" ] || docker image rm -f "$smoke_tag_image" >/dev/null 2>&1 || true
   # calibre is a real host bind mount, host-owned throughout and mounted :ro,
   # so nothing under it is ever container-written. The overlay drill's host
   # backups directory is the one thing under the workdir the container DID
@@ -391,7 +404,7 @@ restored_volume="${AKASHA_DATA_VOLUME}-restored"
 docker volume create "$restored_volume" >/dev/null
 docker run --rm --user 10001 \
   -v "$AKASHA_BACKUP_VOLUME:/backups:ro" -v "$restored_volume:/data" \
-  akasha:local akasha-backup restore "/backups/$backup_name" --into /data
+  "$image_ref" akasha-backup restore "/backups/$backup_name" --into /data
 export AKASHA_DATA_VOLUME="$restored_volume"
 docker compose up --detach --wait=false >/dev/null
 wait_healthy
@@ -413,7 +426,7 @@ step "AC8: backups on their own disk, the database stays on its volume"
 host_backups="$workdir/host-backups"
 mkdir -p "$host_backups"
 chmod 0777 "$host_backups"
-export COMPOSE_FILE="$root/compose.yaml:$root/compose.backups-host.yaml"
+export COMPOSE_FILE="$root/compose.yaml:$root/compose.build.yaml:$root/compose.backups-host.yaml"
 export BACKUP_DIR="$host_backups"
 docker compose up --detach --wait=false >/dev/null
 wait_healthy
@@ -428,15 +441,19 @@ assert volumes["/data"]["type"] == "volume", volumes
 assert volumes["/data"]["source"], volumes
 assert volumes["/backups"]["type"] == "bind", volumes
 ' || fail "the overlay did not leave /data a named volume while binding /backups"
-unset COMPOSE_FILE BACKUP_DIR
+# Restore the base overlay (not a bare unset): AC9 below still needs
+# compose.build.yaml's `build:` key, and a full unset would drop it.
+export COMPOSE_FILE="$root/compose.yaml:$root/compose.build.yaml"
+unset BACKUP_DIR
 
 step "AC9: AKASHA_VERSION tags the build, and that tag starts without rebuilding"
 AKASHA_VERSION="$smoke_tag" docker compose build --quiet
-docker image inspect "akasha:${smoke_tag}" >/dev/null \
+smoke_tag_image="$(AKASHA_VERSION="$smoke_tag" docker compose config --format json | python3 -c 'import json,sys; print(json.load(sys.stdin)["services"]["akasha"]["image"])')"
+docker image inspect "$smoke_tag_image" >/dev/null \
   || fail "AKASHA_VERSION=${smoke_tag} did not tag the built image"
 AKASHA_VERSION="$smoke_tag" docker compose up --detach --no-build --wait=false >/dev/null
 wait_healthy
-[ "$(docker inspect --format '{{.Config.Image}}' "$(docker compose ps -q akasha)")" = "akasha:${smoke_tag}" ] \
+[ "$(docker inspect --format '{{.Config.Image}}' "$(docker compose ps -q akasha)")" = "$smoke_tag_image" ] \
   || fail "the running container did not come from the version tag"
 
 step "Signals: SIGTERM stops the container promptly and cleanly"

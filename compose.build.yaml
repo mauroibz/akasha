@@ -1,0 +1,13 @@
+# Local-build overlay (Sprint 058). compose.yaml on its own points at the
+# published registry image and carries no `build:` key. Add this file to
+# build from source instead of pulling:
+#
+#   docker compose -f compose.yaml -f compose.build.yaml up -d --build
+#
+# This is the development and unsupported-architecture path — the published
+# image ships linux/amd64 only. scripts/smoke_container.sh always includes
+# this overlay: proving the artifact before it ships is the one thing that
+# must build rather than pull.
+services:
+  akasha:
+    build: .
