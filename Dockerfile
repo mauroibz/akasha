@@ -1,11 +1,17 @@
-FROM node:22-alpine AS frontend-build
+# Base images pinned by digest (Sprint 058): a rebuild months from now gets
+# exactly these bytes, not whatever the tag points to that day. Refresh a
+# digest with:
+#   docker pull <tag> && docker inspect --format='{{index .RepoDigests 0}}' <tag>
+# then update both the digest here and the human-readable tag beside it if
+# the tag itself moved (e.g. node:22-alpine -> node:24-alpine).
+FROM node:22-alpine@sha256:c610fcdfb1d5b4740dd70c284ed3cb16bb857e0f7166196e36a5501df7a3aa32 AS frontend-build
 WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci
 COPY frontend/ ./
 RUN npm run build
 
-FROM python:3.12-slim AS backend-build
+FROM python:3.12-slim@sha256:e5c9fa26ffb76e11e0f054f30dc2523a2f9693f0c36c0cf1e39b27e152d899fc AS backend-build
 WORKDIR /build/backend
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 RUN pip install --no-cache-dir uv
@@ -14,7 +20,7 @@ RUN uv sync --frozen --no-dev --no-install-project
 COPY backend/ ./
 RUN uv sync --frozen --no-dev --no-editable && uv build
 
-FROM python:3.12-slim AS runtime
+FROM python:3.12-slim@sha256:e5c9fa26ffb76e11e0f054f30dc2523a2f9693f0c36c0cf1e39b27e152d899fc AS runtime
 ENV PATH=/opt/venv/bin:$PATH \
     AKASHA_DATA_DIR=/data \
     AKASHA_BACKUP_DIR=/backups \
