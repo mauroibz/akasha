@@ -24,12 +24,14 @@
 
 ## What it is
 
-You add a book, record, anime series or film, score it out of ten, write a note, put it on a shelf.
-Reading trackers optimise for other people seeing your opinions and their vendors selling you stuff;
-this optimises for you remembering, three years later, whether something was any good.
+You add a book, record, anime series, film or television show, score it out of ten, write a note,
+put it on a shelf. Reading trackers optimise for other people seeing your opinions and their vendors
+selling you stuff; this optimises for you remembering, three years later, whether something was any
+good.
 
-Akasha is domain agnostic, it's built so you can extend it to hold information on anything you enjoy,
-but today it supports Books, Albums, Anime and Movies. See [Domains](#domains-and-stack) for more info.
+Akasha is domain agnostic, it's built so you can extend it to hold information on anything you
+enjoy, but today it supports Books, Albums, Anime, Movies and Series. See
+[Domains](#domains-and-stack) for more info.
 
 > [!WARNING]
 > **v1 has no authentication of any kind.** Anyone who can reach the port can read
@@ -63,7 +65,8 @@ in case you need a safe place to store that PDF.
 ## Importing and triage
 
 **Import** brings in a Goodreads CSV export, a Calibre library, a MyAnimeList anime
-export or a Letterboxd data export. The screen has two steps: preview a source and commit it, then work through **Triage**, where committed
+export, a Letterboxd data export, an IMDb export or a Trakt archive. The screen has two steps:
+preview a source and commit it, then work through **Triage**, where committed
 rows land as `unsorted` — the ordinary library view hides those until you sort them.
 Score edits in Triage save immediately. Each row's status control shows the imported
 suggestion, or that domain's default when the source has none — Inbox is already implied
@@ -90,8 +93,18 @@ deleted or orphaned entries are deliberately left alone. Films then fill their d
 runtime, countries, languages, genres and cast from Wikidata, and their poster from Stremio's
 keyless image service.
 
+An IMDb account exports two shapes — a ratings CSV and a list CSV — and both are read by one
+connector, with films and shows routed to their own libraries by their title type and anything
+Akasha doesn't hold counted on the preview screen rather than failed. A Trakt export is a .zip
+of raw API responses; watched films and shows, ratings, the watchlist and the episode roll-up
+come across into both libraries from one archive, with the archive's account settings — which
+carry your email address — never opened at all. A show's watched-episode count is its distinct
+episodes, rewatches counted once and specials left out, and a show with no watch history falls
+back to Trakt's play count and says so on its row.
+
 Connectors are domain-owned and registry-driven; Goodreads and Calibre ship for books,
-MyAnimeList for anime, and Letterboxd for movies. A new one can be added without touching the shared
+MyAnimeList for anime, Letterboxd and IMDb for movies, Trakt for movies and series together. A
+new one can be added without touching the shared
 preview, commit, triage or undo pipeline. See
 [how to add a domain and importer](docs/guides/adding-a-domain.md).
 
@@ -215,7 +228,8 @@ FastAPI, SQLAlchemy, Alembic and SQLite on the backend; React 18, Vite, TypeScri
 Tailwind, shadcn/ui and TanStack Query on the frontend. One container, one process,
 one SQLite file.
 
-A **domain** is a kind of thing the library holds — a book, an album, an anime series, a film.
+A **domain** is a kind of thing the library holds — a book, an album, an anime series, a film,
+a television series.
 Each lives in its own package under `backend/src/book_tracker/domains/`, declaring its fields, statuses,
 formats, identity rule and provider; that declaration is served over the API and every
 screen renders from it, so nothing above the registry branches on type. Adding one

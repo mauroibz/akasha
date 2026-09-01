@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 26
+**Plan revision:** 29
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — every planned sprint is complete
+**Active sprint:** none — the plan is complete at [Sprint 055](055-recorded-defects.md)
 
 ## Shape of the plan
 
@@ -43,6 +43,14 @@ Post-v1 work branches:
                                                                           └─ 045 Movies viability  [GATED]  ✓
                                                                               └─ 046 Movie domain on Wikidata
                                                                                   └─ 047 Letterboxd import
+                                                                                      └─ 048 Movie posters  ✓
+                                                                                          └─ 049 Series domain on Wikidata
+                                                                                              ├─ 050 TVmaze, the second provider
+                                                                                              └─ 051 The verification gates get faster
+                                                                                                  └─ 052 One source, many libraries
+                                                                                                      └─ 053 The IMDb import
+                                                                                                          └─ 054 The Trakt import
+                                                                                                              └─ 055 The recorded defects
 ```
 
 **Sprints 019–037 closed the line DEC-058 drew.** Sprint 025 asked whether a second domain was
@@ -69,6 +77,20 @@ deleted. Adding a domain cost about 45 lines of shared registration; adding a co
 tuple entry and one migration whose only purpose was removing a constraint that should not have
 existed. Everything else the line spent went on two seams the owner's export forced, both of which
 earlier decisions had already foreseen and priced (DEC-090, DEC-091, DEC-092, DEC-093).
+
+**Sprints 049–055 are the fifth domain and the last new one planned, plus two infrastructure
+sprints.** Series were an unnumbered epic from Sprint 028 until plan revision 27, described as gated
+on a product decision about entry hierarchy — a decision DEC-077 had already made and Sprint 040 had
+already built. What was left was measurement, and it was done before this line was written: two
+keyless providers, a poster source already allowlisted, and both of the owner's real exports parsed
+(DEC-104, `docs/series-domain-viability.md`). The line's centre is not the domain, which the contract
+makes cheap; it is Sprint 052, where the shared import pipeline learns to hold more than one domain
+at once because a television tracker tracks films too (DEC-106). Sprint 051, inserted at plan
+revision 28 (DEC-111), is not series work at all: it implements the four items in TESTING.md's
+optimization backlog so the three import sprints after it run against faster, quieter gates. Sprint
+055, inserted at plan revision 29 (DEC-114), closes the line: the defects the movie and series
+sprints recorded and left, and the three gates that measurement showed had stopped paying for
+themselves — including one of Sprint 051's own four items.
 
 020 precedes the domain work because its Phase A settles how a candidate record is verified before
 its fields are merged, and that is the provider contract every later domain inherits. 022 precedes
@@ -134,6 +156,13 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [046](046-movie-domain.md) | Movies: the fourth domain on Wikidata | 045 | completed |
 | [047](047-letterboxd-import.md) | Letterboxd import for movies | 046 | completed |
 | [048](048-movie-posters.md) | Movie posters, without a setup step | 047 | completed |
+| [049](049-series-domain.md) | Series: the fifth domain, with posters on day one | 048 | completed |
+| [050](050-tvmaze-provider.md) | TVmaze: the second series provider | 049 | completed |
+| [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | completed |
+| [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | completed |
+| [053](053-imdb-import.md) | The IMDb import | 049, 052 | completed |
+| [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | completed |
+| [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | completed |
 
 ## Sprint contracts
 
@@ -843,6 +872,137 @@ Stremio's keyless image service, measured at 14 of 14 on a deliberately hard sam
 API calls because its URL is deterministic from the IMDb id already stored. TMDB fills only the ~2%
 of films that carry a TMDB id and no IMDb id.
 
+### [Sprint 049 — Series: the fifth domain, with posters on day one](049-series-domain.md)
+
+Television series, flat, on keyless Wikidata, with a working poster and a working episode-progress
+control from the first commit. **Sprint 048's lesson applied before the fact:** movies shipped
+coverless because the provider had no posters, which was true about the provider and wrong about what
+the owner would see. Series has posters in the same sprint as the domain, from the source and the
+allowlisted host that already serve films.
+
+The domain introduces **no new status and no new format** — anime's five statuses and the movie
+four formats are exactly right and already published — so registration points 4 and 5 of the guide do
+not apply and `ItemTypeName` is the only published-vocabulary change. Progress is `ProgressSpec` over
+an `episodes` total: the case DEC-077 rejected hierarchy for and Sprint 040 built.
+
+One measured finding drives the adapter and is the reason this is not a copy of the movie one: the
+movie search filter **does not transfer**. A single `haswbstatement:P31=Q5398426` found the right
+series for 9 of 14 titles and nothing at all for two; a five-class filter found 14 of 14 (DEC-104).
+
+### [Sprint 050 — TVmaze: the second series provider](050-tvmaze-provider.md)
+
+The fallback, keyless like the primary. It supplies the three things Wikidata structurally does not:
+a synopsis somebody would read, an airing status, and the Spanish-language shows Wikidata's title
+index does not surface. Both providers publish the IMDb id, so candidates genuinely merge — the first
+domain since anime where that is true.
+
+Two deliberate refusals inside it. `episodes` is **not** taken from TVmaze, because its count and
+Wikidata's disagree and `fill_empty` would let whichever answered second win a field that drives a
+progress control. Covers are **not** taken from TVmaze either: its variants measured 210×295 and
+2000×3000, either side of the pipeline's target, while Stremio's 500×750 is already installed.
+
+It ships a credit line. TVmaze's licence asks for one and the owner chose to give it, having declined
+TMDB's three days earlier — DEC-105 records why the two are different questions, and defers CC BY-SA's
+share-alike half explicitly so that it is found if sharing is ever built.
+
+### [Sprint 051 — The verification gates get faster](051-verification-gate-optimization.md)
+
+The four items in `docs/agent/TESTING.md`'s *Optimization backlog*, implemented as a sprint so the
+three import sprints after it pay cheaper gates. Owner-directed at plan revision 28 (DEC-111).
+
+The backlog items, verbatim from TESTING.md: split Playwright into a parallel ordinary project and a
+serial heavy-library project (today the whole suite uses one worker because two `library.spec.ts`
+invariants are load-sensitive); remove the known Vitest harness noise (a deliberate
+`window.scrollTo` shim — already present — defined attachment-query fixtures, and properly awaited
+Radix/motion state updates), preserving real console failures; promote the local realistic-data
+flow to a tracked, sanitized launcher that creates a temporary data directory, starts and stops the
+backend, and accepts the library path in one command; and add bounded test timeouts or phase timing
+where a deadlock currently looks like slow work.
+
+No application behavior changes; every acceptance criterion is a gate property. The backlog section
+is removed from TESTING.md at closure because nothing is left in it.
+
+### [Sprint 052 — One source, many libraries](052-multi-domain-imports.md)
+
+The seam both importers force, built before either of them. A television tracker tracks films too:
+IMDb's CSVs and Trakt's archive each carry films and shows in one file, and `Importer.item_type` is a
+single string the shared service resolves once per batch.
+
+The owner was offered the cheap alternative — two connectors per source, one per domain, nothing
+shared changed — and chose against it: importers should hold multi-domain sources properly, and
+*"users choose the importer SOURCE, not the target type, that is decided downstream"* (DEC-106).
+
+Measured against the code, that costs less than it looks. The Import screen is **already**
+source-shaped and ignores `item_type` entirely; Triage **already** renders statuses and hotkeys from
+each row's own type; `_backfillable_items` **already** loops over every domain. What is left is the
+declaration, per-record domain resolution at three call sites, the commit signature, a target
+selector rendered from the declaration, and folding the chosen targets into the preview fingerprint —
+without which the same file imported as films and then as series silently returns the first preview.
+
+Built and proved against a **test** connector, not against IMDb. A seam proved only by the connector
+it was built for is not proved, which is DEC-093's lesson applied ahead of the failure this time.
+
+**Delivered as planned.** Per-record resolution reached exactly the call sites the plan named and no
+further — Triage and undo needed no change at all, only proof. The two mechanisms DEC-106 left open
+became DEC-112: a reader reports what it cannot target as a tally rather than as discarded records,
+and the chosen target set folds into the fingerprint only when it is a strict subset, which is what
+makes the change migration-free.
+
+### [Sprint 053 — The IMDb import](053-imdb-import.md)
+
+The owner's real exports, measured at planning time: **two different CSV shapes**, a ratings export
+and a list export (the Watchlist is one), sharing a core of columns but differing in header and in
+where the rating columns sit. Both carry the `tt` id on every row, which is the identity both target
+domains already resolve — so a film imported from Letterboxd and enriched through Wikidata matches
+**exactly** rather than by title and year.
+
+`Title Type` routes each row, through a declared table whose default is *skip and count*. A title type
+IMDb has not published yet must appear as a number on the preview screen, never as a failed import.
+
+Its sharpest acceptance criterion is the negative one Sprint 041 established: **no change to
+`application/imports.py`, `api/imports.py`, `ImportPage.tsx` or `TriagePage.tsx`.** If that cannot be
+met, the finding is the deliverable and Sprint 052 was incomplete.
+
+**Delivered, and the negative criterion held**: the connector is one new module plus one line in the
+registry, and no shared file changed. What did not hold was enrichment — the movie domain enriched on
+`letterboxd` alone, so every film from an IMDb export would have stayed permanently thin in silence.
+`EnrichmentSpec.identity_kinds` is a tuple now (DEC-113). The walkthrough ran against the owner's real
+exports and paid Sprint 047's debt (DEC-102) on the way.
+
+### [Sprint 054 — The Trakt import](054-trakt-import.md)
+
+A ZIP of 43 verbatim `/sync/*` responses, 26 of them empty in the owner's archive. The interesting
+half is the roll-up: `watched-history.json` is the only member with episode detail, and distinct
+`(show, season, number)` events excluding season 0 become the entry's progress, against
+`aired_episodes` as the total at export time. In the owner's archive that produced 76 and 38, matching
+`plays` exactly — which is why the `plays` fallback needs a synthetic fixture of its own.
+
+Two members are **never opened**: `user-settings.json` and `user-profile.json` carry the owner's email
+address, and a test asserts nothing reads them. Season and episode ratings are counted and discarded,
+because a series holds one score — DEC-077's line, restated where somebody would otherwise be tempted.
+
+Closing this sprint used to put the release decision in front of the owner. Sprint 055 now sits
+between, so that decision is made on a library with no known open defects in it.
+
+### [Sprint 055 — The recorded defects, and the gates that stopped paying](055-recorded-defects.md)
+
+Short, and last. Every defect the movie and series lines recorded and left, plus the three places the
+verification gates now cost more than the evidence they buy. No new product behaviour.
+
+The product half: a series stores the synopsis somebody would actually read rather than Wikidata's
+one-line description, which is the fill-empty rule (DEC-110) being right for most fields and wrong
+for one class of them; and the two defects DEC-100 named — a backfill that re-queues rows for ever on
+conditions their domain never declared, and a `resolve` route that calls a clean miss a provider
+outage.
+
+The gate half is measured rather than asserted (DEC-114). Sprint 051 bought four things; three held.
+The parallel Playwright split has **not passed once** — 1 to 2 failures on three of three runs, always
+the same two rendering-timing tests, both green serially — so a session runs the 101.7 s serial gate
+afterwards anyway and the split costs more than it saved. Two larger costs that sprint never looked
+at: coverage sits in `addopts` and charges 26 s and a 60-line table to *every* backend run including
+the focused ones the playbook asks for, and the lint gate reads `frontend/e2e/scratchpad/`, so
+writing a local walkthrough turns `make check` red on a file that is not in the repository.
+
 ## Future epics, after this plan
 
 These are not sprints and remain deliberately unnumbered (DEC-058). Each becomes an epic on top of
@@ -857,18 +1017,15 @@ its `action` sentences beside its reader, and the shared screen renders them wit
   conformance suite is where that gets checked. The new infrastructure is authentication: IGDB needs
   Twitch OAuth client credentials and token refresh, where every provider so far has needed at most a
   static API key. `steam → games` is the import.
-- **Series — TMDB.** Gated on a product decision rather than an integration. The entry model is one
-  score, one status, one `reread_count` per item (product spec section 10, item 4), and a television
-  series does not fit it: either a series is one entry and "watched through season 3" is not
-  expressible, or entries gain hierarchy, which reaches keyset pagination, triage selection, bulk
-  operations and every count in the UI. **Sprint 030's verdict (DEC-077, `docs/entry-depth-verdict.md`)
-  priced that hierarchy and rejected it on evidence**: depth is a per-domain `progress` field or a
-  marker in provider `rows`, never child entities. What the verdict could not do is measure TMDB —
-  no credential was available, so the series/season/episode arm is a labelled paper walk whose
-  closing cost is a token and two requests. This epic inherits that measurement as its first task.
-  Note the vocabulary collision before it causes confusion — book-series already exists as a
-  free-text `metadata` field, and product spec section 11 item 4 records the deliberate choice not
-  to model it.
+- **Series — ~~TMDB~~.** **No longer an epic: scheduled as Sprints 049–054** at plan revisions 27–28.
+  The product decision this was gated on had already been made — DEC-077 priced entry hierarchy across
+  nine shared surfaces, rejected it, and chose a per-domain `progress` field, which Sprint 040 built
+  and anime has used since Sprint 041. What remained was a provider question, and the answer is not
+  TMDB: Wikidata and TVmaze both answered live with no credential (DEC-104), where TMDB needs a key
+  and carries the six-month cache limit Sprint 045 measured. The vocabulary collision this entry
+  warned about still stands — book-series remains a free-text `metadata` field and product spec §11
+  item 4 records the deliberate choice not to model it.
+
 - **Music imports — `spotify → music`.** The natural first exercise of Sprint 031's boundary, and
   deliberately **an architecture goal, not a commitment** (DEC-076): the owner is in no hurry to
   build it and wants the ground stable underneath first. Its design constraint is real, though —
@@ -996,6 +1153,25 @@ in DEC-073.
   them; none is scheduled. Wine's weakness is access economics rather than catalogue geography. That
   report's anime verdict — "a good domain, wrong default provider" — is **superseded by DEC-088**,
   which measured the providers instead of reading their documentation and reached a different answer.
+- **Re-file an item into another domain** — "this series is really an anime", or "I imported this into
+  the wrong library". Raised by the owner on 2026-08-31 while reviewing the series plan, costed, and
+  deliberately **not** made a sprint in that line.
+
+  It is not a "move to anime" button, and `docs/guides/adding-a-domain.md` §8 explains why: there is
+  no item-type change path anywhere in the application, `items.type` is written at creation only, and
+  a moved item would carry an `imdb:` identifier into a domain whose enrichment looks for `mal:` —
+  stranding it from every anime provider for ever. Six of a series' twelve metadata fields have no
+  home in anime and would sit orphaned in `metadata_json`; a `DVD` format would become undeclared.
+  Status and progress are the only two things that survive a naive move intact.
+
+  The shape that works is a **re-file**: search the target domain's providers by title, have the
+  person confirm the match through the ambiguity-confirm flow Triage already has, create the item
+  properly in the target domain, transfer the *entry* — status, score, progress, dates, shelves,
+  notes — remove the old item, and record an undo effect. **Roughly a third to a half of a sprint**,
+  and worth more than this one case: it is also the general answer to an import that landed in the
+  wrong library. It needs the series line closed first, because until then there is only one pair of
+  domains it could move between.
+
 - **Manga.** Refused by name in Sprint 041's connector rather than half-supported. A separate domain
   if it is ever wanted, and not a mode of the anime one.
 

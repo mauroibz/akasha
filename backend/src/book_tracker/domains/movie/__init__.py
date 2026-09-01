@@ -99,7 +99,11 @@ MOVIE_IDENTITY = IdentityStrategy(wikidata_identity, ("wikidata",))
 # and a year, with every field a person wants to look at still empty. The key is a
 # Letterboxd film because that is the only identity the export carries (DEC-067 row 3).
 MOVIE_ENRICHMENT = EnrichmentSpec(
-    identity_kind="letterboxd",
+    # Both, in preference order, because this domain's two sources supply different
+    # keys: a Letterboxd export names a film by a `boxd.it` URI and an IMDb export by
+    # its `tt` id, and neither carries the other's (DEC-113). Wikidata resolves both
+    # exactly, so this is one lookup reachable two ways rather than two lookups.
+    identity_kinds=("letterboxd", "imdb"),
     provider_order=("wikidata",),
     # All five films Sprint 045 fetched carried director, genre and duration claims.
     # `cast` and `description` are deliberately absent from this rule: a legitimately

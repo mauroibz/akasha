@@ -1,59 +1,67 @@
-# Handoff — the plan is complete; movies and Letterboxd both ship
+# Handoff — the plan is complete at Sprint 055; the release decision is the owner's
 
-Sprint 047 closed on `sprint-045-movies` in `a076f0c`. It was the last numbered sprint in the
-roadmap, so `docs/agent/state.json` reads `complete` with null active fields. **There is no active
-sprint.** Nothing has been tagged, released or pushed; the movie line is entirely local on this
-branch.
+Sprint 055 closed with every recorded defect fixed and every verification gate repaired,
+so all 55 planned sprints are done. `docs/agent/state.json` reads `complete` with null
+active fields. Nothing is tagged, released or pushed — every commit is local on
+`sprint-049-series`. The next move is the owner's, not an agent's: the **v1.5.0 release
+decision** (five domains, four import sources, the series line, zero known open
+defects), and whether the movie line's v1.4.0 gets tagged before it. Sprint 018's
+release procedure is unchanged; nothing moves without being asked.
 
-Akasha now holds four domains — books, albums, anime and movies — and five connectors: Goodreads,
-Calibre, MyAnimeList and Letterboxd.
+## What Sprint 055 delivered
 
-## Read this before trusting Sprint 047's green
+**A series gets the synopsis somebody would actually read (DEC-115).**
+`EnrichmentSpec.fuller_answer_fields` — the declaration shape the sprint preferred —
+with series declaring `("synopsis",)`. The first usable payload still wins everything
+else; the remaining providers are asked for the declared fields alone and the longest
+string fills the field. The walkthrough caught the unit suites' blind spot: the *add
+path* never consulted a second provider and never queues enrichment, so a series added
+by hand kept the one-liner for ever. `prefer_fuller` lives in `domain/merge.py` and both
+arrival paths apply it; verified live — BoJack stores TVmaze's 151-char synopsis with
+Wikidata's `episodes: 77` and `network: Netflix` untouched.
 
-Sprint 047 was verified at a **reduced level, by the owner's explicit direction** (DEC-102). Its
-focused suite, the conformance and every other importer suite, `make check`, both full unit suites
-and a real end-to-end pass on the owner's own archive all ran and passed. Playwright, the walkthrough
-gate through the real screens, and frontend tests for the new connector declaration **did not run**.
+**The two DEC-100 defects (DEC-116).** Cover and year backfill conditions are
+`wants_cover`/`wants_year` declarations (default True; a future domain opts out instead
+of being re-queued for ever). `/api/search/resolve` answers a typed `record_not_found`
+with **404** under the provider's own code and message; transport failures keep the 502.
 
-Concretely, and this is the part that matters to whoever goes next:
+**The gates, as measured at this closure** (TESTING.md carries the full table):
 
-- Nobody has seen the Letterboxd connector rendered on the Import page.
-- Nobody has approved a movie row from the Triage UI.
-- **Undo has no coverage in that sprint at any level.**
+- **Parallel Playwright is the gate** — three consecutive green runs (44.5, 44.5,
+  45.3 s) plus a fourth (43.7 s) after the last change. Four load-sensitive tests live
+  in the serial `heavy-library` project (18.8 s alone): DEC-023's two, two crossfade
+  samplers, and the three library-view axe checks. The card caption no longer fades.
+- **Coverage left `addopts`.** `make test` and `make coverage` carry the flags; a focused
+  run is 1–5 s with no table. A session that never runs either sees no number — the
+  intended trade, named in TESTING.md.
+- **`make check` is green with scratchpad specs present** (Prettier and ESLint ignore
+  the gitignored directory), and **a green `npm test` prints no stderr** (motion's
+  Reduced Motion notice filtered; vitest's empty labels suppressed).
+- `make test`: 1184 backend + 194 frontend, coverage 90%.
 
-The risky logic is covered — archive handling, the mapping matrix, the matcher scope, enrichment
-against live Wikidata. The screen is not. Treat a UI defect there as expected rather than surprising.
+## The one question this sprint leaves with the owner
 
-## Known defects, recorded and not repaired
+The IMDb list export's `Description` column is deliberately dropped by the reader. If
+you use it as a note, it can be mapped to entry notes — a product decision, not a
+defect, so nothing was implemented. Say yes and it becomes a small follow-up.
 
-From Sprint 046 (DEC-100), neither of them movie-specific:
+## If a future session starts anything new
 
-- `_backfillable_items` (`application/enrichment.py`) counts a null `cover_path` or `year` as "worth
-  a lookup" in every domain, regardless of that domain's `completeness_fields`. Movies are
-  deliberately coverless, so `POST /api/enrichment/backfill` re-queues every movie on every call and
-  each job asks Wikidata for a cover it never returns.
-- `GET /api/search/resolve` maps every exception from `resolve_input` to HTTP 502 `provider_failure`.
-  A typed `record_not_found` is an answer, not an outage, and the reader is told the provider failed.
+There is no next sprint. A new sprint requires a plan revision (state flips `complete →
+ready` with a new active file — the seeds skill's extension worked example is the
+mechanics, including the validator's sprint-file-at-`ready` trap). The roadmap's future
+epics list the candidates: games via IGDB, music imports via Spotify, ebook
+attachments' follow-ups. The walkthrough launcher (`scripts/walkthrough.py`) and the two
+sprint-specific API scripts (`walkthrough_trakt_054.py`, `walkthrough_synopsis_055.py`)
+are tracked and take owner paths through the environment, never inline.
 
-## If the next session picks something up
+## Private data and operational constraints
 
-Nothing is scheduled. The obvious candidates, in the order they seem worth doing:
-
-1. The UI surface DEC-102 leaves untested — the Import page declaration, a movie Triage approval, and
-   an undo of a Letterboxd batch, driven through the real screens.
-2. The two defects above.
-3. A v1.4 release for the movie line, if the owner wants one. Sprint 018's release procedure and the
-   `make build` / container smoke path are unchanged and were last exercised for v1.3.0.
-
-Any of those needs a new sprint file, a roadmap entry, and `FINAL_SPRINT` in
-`scripts/validate_project.py` moved past 47.
-
-## Private and operational constraints
-
-- `letterboxd-tomateperitarg-2026-08-27-22-42-utc.zip` is the owner's real export and remains
-  untracked private data, byte-identical at 2,908 bytes. It is read-only walkthrough input and never
-  a fixture. Every committed Letterboxd fixture is invented in `tests/test_letterboxd_import.py`.
-- Wikidata needs no key, only `USER_AGENT_CONTACT`. A movie search costs four bounded requests.
-- `frontend/e2e/scratchpad/movie-walkthrough.spec.ts` drives the movie domain through the real UI and
-  is the place to start on item 1 above. The scratchpad directory is gitignored, so it is local only.
-- The v1.3.0 anime/MyAnimeList release remains merged, tagged and pushed on `main` at `3bce2de`.
+- `exports/` is the owner's private source archive, gitignored as a whole. Read-only
+  walkthrough input. **No fixture may be cut from any of them** — every importer
+  fixture is invented. Trakt's two email-carrying members are never opened by the
+  reader, and a test asserts it.
+- Wikidata, TVmaze and AniList need no key, only `USER_AGENT_CONTACT`. Stremio's poster
+  host is already in `ALLOWED_COVER_HOSTS`. IGDB would need Twitch OAuth credentials.
+- Secrets, databases, uploaded imports and covers are never committed; v1 has no auth
+  and stays LAN-only; Calibre is opened read-only.

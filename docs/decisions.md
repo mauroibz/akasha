@@ -3603,3 +3603,457 @@ predictions about mistakes to come.
   poster images past six months and shows no TMDB attribution, which is outside TMDB's API terms for
   the ~2% of films that path serves. Anyone revisiting this should treat it as a known, dated
   position rather than as something nobody thought about.
+
+## DEC-104 — Series launch on two keyless providers, and the movie search filter does not transfer
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-098 and DEC-099 (the Wikidata movie adapter and what its search costs),
+  DEC-088 (measure providers, do not read their documentation), DEC-077 and DEC-092 (progress is one
+  number with a floor and no ceiling), DEC-103 (Stremio posters). Evidence:
+  `docs/series-domain-viability.md`.
+- **Context:** the roadmap has carried "Series — TMDB" as an unnumbered epic since Sprint 028,
+  described as gated on a product decision about entry hierarchy. That decision was already made —
+  DEC-077 rejected child entities and chose a per-domain `progress` field, and Sprint 040 built it —
+  so what remained was a provider question and an importer question. The owner asked for a primary
+  and a fallback that need no setup.
+- **Measurement, 2026-08-31, keyless and live:** Wikidata resolved **13 of 13** series by IMDb id
+  through `haswbstatement:P345=`, and every fetched entity carried IMDb, TMDB and TVDB ids, an
+  episode count, a start date and at least one genre. TVmaze answered **13 of 13** of the same series
+  by IMDb id, with a real synopsis and an airing status on every one. Stremio's already-allowlisted
+  poster URL answered **15 of 16**. Fourteen anime series spanning the popular and the obscure were
+  covered by the same three sources at 14/14, 14/14 and 13/14.
+- **Decision:** Wikidata is the primary provider and TVmaze the fallback. Both are keyless. The
+  cross-provider identity is the **IMDb id**, which both publish and both planned importers carry —
+  the strongest identity position of any domain so far. Posters need no new source and no new
+  allowlist entry.
+- **The finding worth carrying forward:** the movie adapter's search filter **does not transfer**. A
+  single `haswbstatement:P31=Q5398426` returned the right series at rank 1 for only **9 of 14**
+  titles and returned *nothing at all* for two; a five-class filter adding animated series,
+  anime series, miniseries and animated series returned **14 of 14**. `BoJack Horseman`,
+  `Rick and Morty`, `Avatar: The Last Airbender`, `Chainsaw Man` and `Chernobyl` are the ones the
+  copied filter loses. Copying a working adapter is the right instinct and this is where it fails.
+- **Consequence:** episode totals disagree between sources and move over time — 77/76/76 for one
+  series, 38/44/38 for another. This is not reconciled. DEC-092 already made `total_field` display
+  only and gave `validate_progress` no ceiling, precisely so a refresh cannot invalidate a count that
+  was correct when written. Series is the case that decision was made for.
+- **Not selected:** TMDB (key, plus the six-month cache limit Sprint 045 measured), TheTVDB v4
+  (subscriber key), OMDb (key, CC BY-NC, no localization), the Trakt API (key, and it would only
+  re-fetch what the export already holds), and Wikipedia REST extracts (keyless and genuinely good
+  for Spanish synopses, 9 of 9, but a third source to fill one field TVmaze already fills).
+
+## DEC-105 — TVmaze is credited; CC BY-SA's other half is deferred, not ignored
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-103 (where the owner declined TMDB's attribution notice), DEC-104.
+- **Context:** TVmaze's published terms are unambiguous — *"Use of the TVmaze API is licensed by
+  CC BY-SA. This means the data can freely be used for any purpose, as long as TVmaze is properly
+  credited as source."* No key, no account, no cache expiry, and images explicitly cacheable
+  indefinitely. The only obligation is credit. The owner was asked directly, having declined TMDB's
+  attribution notice three days earlier, and chose to give it.
+- **Decision:** Sprint 050 ships a permanent, visible credit line naming Wikidata and TVmaze as the
+  sources of series data. One line of copy and one line of markup, and a deliverable rather than a
+  footnote because the alternative was chosen against on purpose.
+- **Why this differs from DEC-103:** TMDB's terms ask for attribution *and* a six-month cache purge
+  that Akasha's permanent, owner-editable store cannot honour without an architecture that does not
+  exist. There was no compliant option short of building it. TVmaze asks for one thing, and that
+  thing costs a line.
+- **Deferred, and named so it is found:** CC BY-SA is share-alike as well as attribution. Akasha is
+  LAN-only with no auth and no publishing surface (product spec §9), so nothing is redistributed
+  today and the share-alike clause has nothing to bite on. **If sharing, multiuser, a public
+  deployment or a public export is ever built, this needs revisiting before it ships.**
+
+## DEC-106 — A connector may target more than one domain; the reader chooses the source
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-071 and DEC-080 (the per-domain import boundary and the self-describing
+  connector), DEC-081 (one source, one tab), DEC-093 (what the boundary cost the first time somebody
+  else tested it), DEC-104.
+- **Context:** a television tracker tracks films too. Both exports the owner supplied — IMDb's CSVs
+  and Trakt's archive — carry films and shows in one file, and `Importer.item_type` is a single
+  string that the shared service resolves once per batch. Neither source can be read correctly under
+  that contract.
+- **The alternative, costed and rejected:** register two connectors per source, one per domain, each
+  keeping only its own rows. It changes nothing shared and costs no sprint. It was put to the owner
+  with that costing and **the owner chose against it**: importers should support multi-domain sources
+  properly, with a real flow for choosing what comes in, and *"users choose the importer SOURCE, not
+  the target type, that is decided downstream."*
+- **What that turned out to cost, measured against the code rather than estimated:** less than it
+  looked. The Import screen is **already** source-shaped — `ImportPage.tsx` renders one tab per
+  connector and ignores `item_type` entirely — so the UX the owner asked to keep is the UX that
+  already ships. Triage **already** resolves statuses, hotkeys and labels from each row's own
+  `item.type`, so a mixed batch renders correctly today. `_backfillable_items` **already** loops over
+  every registered domain. The real work is the declaration, per-record domain resolution at three
+  call sites, the commit signature, the target selector, and the fingerprint.
+- **Decision:** `Importer.item_types` is a tuple; a record carries its own `item_type`, defaulting to
+  the connector's first; the shared service resolves the domain per record; the connector declares
+  what it can produce and the screen renders a checkbox per type; and **the service, not the reader,
+  applies the selection**, so no connector can get the filter wrong. Sprint 051 builds this against a
+  **test** connector rather than against IMDb — a seam proved only by the connector it was built for
+  is not proved (DEC-093's lesson, applied before the fact this time).
+- **The trap worth writing down:** preview is idempotent on `(connector, fingerprint)`. The chosen
+  target set must be folded into the fingerprint, or importing a file as films and then as series
+  silently returns the first preview — a wrong answer that looks like a working feature.
+
+## DEC-107 — Anime rows from a TV source stay series; the metadata switch was measured and dropped
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-088 (the anime domain and its MyAnimeList identity), DEC-104, DEC-106.
+- **Context:** IMDb and Trakt exports contain anime, and Akasha already has an anime domain. The
+  owner asked for a default of series, and asked whether a row could switch to the anime domain when
+  the television providers cannot serve it — with the explicit instruction to evaluate that
+  independently and drop it if it was not viable.
+- **Measurement, 2026-08-31,** over fourteen anime series chosen to span the popular and the obscure
+  and to include sequel seasons: Stremio returned a poster for **14 of 14**, Wikidata returned an entity with an episode
+  count for **14 of 14**, and TVmaze returned a record with a synopsis for **13 of 14**. The one gap
+  still had a poster and a Wikidata entity.
+- **Decision: dropped.** The condition the switch would fire on did not occur once in fourteen tries
+  and would have fired partially in one. An anime row from IMDb or Trakt becomes a **series** item.
+  Somebody who wants that show in the Anime library adds it there through the existing anime search,
+  which is one step and needs no heuristic and no cross-domain library lookup the importer contract
+  deliberately scopes away.
+- **Consequence, accepted and stated rather than hidden:** a show may exist as both an anime item and
+  a series item. They share no identity — anime is keyed on `mal:` and series on `imdb:` — so nothing
+  merges them silently, and the duplicate is visible.
+
+## DEC-108 — A walkthrough gate may run against recorded provider responses when the live boundary is down
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Context:** Sprint 049's walkthrough gate requires running the application and performing the
+  series search/add flow end to end against realistic data. On the day the gate was due, Wikidata's
+  query-service replicas had been maxlag-shedding for over three hours (measured lag climbing from
+  24 s to 47 s and still rising), and the adapter's contractual `maxlag=5` means every live search
+  is refused with a rate-limit error. The incident had no ETA, and the gate cannot wait on an
+  external outage indefinitely. DEC-025 already establishes that provider-boundary behavior is
+  proven against recorded real responses, and the sprint had captured exactly such responses live
+  earlier the same day.
+- **Decision:** At the owner's direction, the walkthrough ran against the sprint's own recorded
+  Wikidata responses, replayed at the transport seam by `scripts/walkthrough_series.py`, while the
+  Stremio poster fetch and the whole cover pipeline were left live — a blank tile being the
+  specific failure mode (Sprint 046) the gate exists to catch. The substitution is recorded
+  explicitly in the sprint Outcome and the worklog, including what is and is not proven: the
+  rendered flow, the poster pipeline and the progress control are proven; that the adapter's
+  request shape is still what live Wikidata answers today is not, and is discharged by one live
+  search once the replicas recover. This is a gate-level substitution made visible, not a silent
+  weakening of the walkthrough standard.
+- **Consequences:** A walkthrough blocked by a provider outage is not a reason to close a sprint
+  without exercising the product, nor a reason to wait indefinitely. The runner drives the
+  lifespan itself because uvicorn's own lifespan pass would rebuild every provider on a live
+  client and silently undo the replay — a substitution that is not asserted is a substitution that
+  did not happen. The same pattern serves any future sprint whose walkthrough lands on a provider
+  incident.
+
+## DEC-109 — `source_preference` is a ranking, not a strict order
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Context:** The domain conformance check required a domain's `source_preference` tuple to be a
+  subsequence of the provider registry's construction order. The series domain's identity strategy
+  declares `("wikidata", "tvmaze")` — TVmaze being Sprint 050's provider, declared now so that
+  sprint adds an adapter and not a declaration — which is not a subsequence of a registry that does
+  not yet contain TVmaze. The check conflated two different contracts.
+- **Decision:** `source_preference` is a ranking used by `_merge_group` for identity grouping and
+  fill-empty, and a provider absent from the registry is simply never consulted, so the conformance
+  check no longer requires it to be a subsequence of the registry. `enrichment.provider_order`
+  stays strict: the enrichment handler walks it directly, and a provider named there that is not
+  registered is a real defect, not a forward declaration.
+- **Consequences:** A domain may declare its full identity strategy ahead of the providers that
+  satisfy it, which is what lets a later provider land as an adapter alone. The two contracts are
+  now checked separately rather than one strictness serving both.
+
+## DEC-110 — A shared boundary may widen its return shape; a typed companion keeps the old guard
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-025 (prove a provider boundary against recorded real responses), the
+  AniList precedent where the same boundary gained a verb (POST) rather than a special case.
+- **Context:** The shared provider HTTP boundary, `bounded_json`, historically returned
+  `Mapping[str, Any]` and enforced it — every provider before TVmaze answered a JSON object. TVmaze's
+  `/search/shows` answers a JSON **array**, the first list-shaped response the boundary had met.
+  Widening the return to `Any` and deleting the object guard makes the new caller typecheck, but it
+  silently drops the malformed-shape guard the seven existing object callers relied on (mypy then
+  surfaces six `no-any-return` errors where `Any` flows into a `Mapping` wrapper). Weakening every
+  wrapper to `-> Any` throws the guard away; special-casing the list caller inside the boundary
+  (`if "tvmaze" in url`) is the seam violation the shared layer forbids.
+- **Decision:** Widen the boundary and add a typed companion, rather than weaken every caller.
+  `bounded_json` returns `Any` for the one list-shaped caller; a new `bounded_json_object` re-asserts
+  the object shape (`if not isinstance(decoded, Mapping): raise ProviderPayloadError`) and the seven
+  existing callers migrate to it. The list caller keeps its own `isinstance(body, list)` check. The
+  new shape is the caller's to judge — exactly as the HTTP verb was when the boundary gained POST for
+  AniList — and the old shape's guard is the companion's to keep. The boundary gained a shape, not a
+  special case.
+- **Consequences:** `make typecheck` clears with no caller's guard weakened; the migrated object
+  callers behave identically under the companion (the full provider regression suites stay green);
+  and the next provider with a non-object response follows the same pattern — widen the boundary, add
+  a companion, do not weaken the callers. The technique is written up for reuse in the
+  seeds-methodology skill's `widening-a-shared-boundary-return-type` reference.
+
+## DEC-111 — The gate-optimization backlog becomes Sprint 051; the import line renumbers to 052–054
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-084 (the verification playbook whose backlog this implements),
+  DEC-104/DEC-106 (the series line it inserts ahead of).
+- **Context:** `docs/agent/TESTING.md` has carried an *Optimization backlog* section since
+  DEC-084 — four registered observations about the gates: Playwright runs the whole suite at one
+  worker because two `library.spec.ts` invariants are load-sensitive; Vitest green output is
+  buried under harness noise (21 `Query data cannot be undefined` warnings on the attachments
+  query, measured 2026-08-31); the realistic-data walkthrough is per-sprint folklore with two
+  hand-rolled runners; and no test anywhere has a timeout, so a deadlock looks like slow work
+  (the Sprint 035 futex stall). The owner directed this backlog to run as a sprint now, before
+  the remaining roadmap, so each of the three import sprints after it pays cheaper gates.
+- **Decision:** Insert the work as **Sprint 051 — The verification gates get faster**, depending
+  on 050. The validator requires the active sprint to follow `completed_sprints` sequentially
+  (`scripts/validate_project.py`), so an unnumbered insertion is impossible and the planned
+  import line renumbers: 051 → 052 (multi-domain imports), 052 → 053 (IMDb), 053 → 054 (Trakt).
+  `FINAL_SPRINT` moves 53 → 54. The renumbering is mechanical: three `git mv`s, Depends-on
+  chains, every ROADMAP reference, and the two historical mentions in the renumbered files
+  updated; append-only records (old worklog entries, prior DEC entries, the dated viability
+  report) keep their original numbers, as they describe the plan on the day it was written.
+- **Consequences:** Plan revision 28. The sprint's acceptance criteria are gate properties, not
+  application behavior — no code under `backend/src/book_tracker/` or `frontend/src/` outside
+  test configuration, mocks and setup. The backlog section is removed from TESTING.md at
+  closure because nothing is left in it. Sprints 052–054's contracts are unchanged in every
+  other respect; 052 now additionally depends on 051 so the gates it runs against are the
+  optimized ones.
+
+## DEC-112 — What a reader cannot target, and what a chosen target does to the fingerprint
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Implements:** DEC-106 (a connector may target more than one domain). **Cross-references:**
+  DEC-080 (a connector declares its own guidance), DEC-093 (what the connector boundary cost the
+  first time somebody who had not written it tried to use it).
+- **Context:** DEC-106 settled the shape — a connector declares `item_types`, a record carries its
+  own, the service resolves per record, and the screen renders a checkbox per declared type — and
+  left two mechanisms unspecified that Sprint 052 could not build without. Both are contract
+  surface that Sprints 053 and 054 inherit, so both are recorded rather than left in the code.
+- **Decision 1 — a reader reports what it could not target as a tally, not as records.**
+  `ImportSnapshot.skipped` is a tuple of `ImportSkip(reason, count)`, where `reason` is the
+  **source's own word** for the kind ("TV Episode", "Podcast Episode"). A reader never emits a
+  record for a row no registered domain holds. The two alternatives were costed: a `skip_reason`
+  flag on a full `NormalizedImportRecord` keeps per-row detail but parses and holds a record for
+  every discarded row — on the owner's IMDb account that is hundreds of objects nothing will ever
+  read — and silent filtering was refused outright, because a title type IMDb has not published yet
+  must appear as a number on a screen rather than vanish. The tally is bounded by the number of
+  distinct reasons rather than by the size of the export.
+- **Consequence:** the preview summary carries `skipped_not_requested` and `skipped_unsupported` as
+  **separate** counts, and neither is ever folded into `errors`. They are different answers: one is
+  a library you did not ask for, the other is a kind of thing this application does not hold.
+  Somebody who exports their whole account should meet a number, not forty red rows for podcasts
+  they once rated.
+- **Decision 2 — the chosen target set folds into the fingerprint only when it is a strict subset.**
+  Preview is idempotent on `(connector, fingerprint)`, and DEC-106 named the trap: without the
+  targets in it, an export previewed as films and then as shows silently returns the first preview.
+  The composition is `<reader fingerprint>#<types in declaration order>`, and it is applied **only**
+  when the selection is narrower than what the connector declares.
+- **Why that condition, rather than always composing:** every connector that shipped before this
+  sprint declares exactly one domain, so it always selects all of it and its sources fingerprint
+  exactly as they always did. A batch left in `previewed` across the upgrade still resolves, and the
+  change needs no migration. The alternative — always composing — would have orphaned every staged
+  batch in the owner's database for the sake of a uniformity nothing reads.
+- **Also decided, smaller:** the target selection travels on the **request**, not on `ImportSource`.
+  `ImportSource` is what reaches the reader, and the whole point of DEC-106 is that the service
+  applies the selection so no connector can get the filter wrong. A multipart request states it as
+  one comma-separated `targets` field, so an upload and a folder bundle say it the same way; a JSON
+  path body states it as a list. An undeclared or empty target set is a 422 `invalid_import_targets`
+  rather than a silent narrowing, because an import that quietly brings in nothing is worse than one
+  that says it cannot.
+
+## DEC-113 — A domain enriches on every key its sources supply, not on the one it was written for
+
+- **Date:** 2026-08-31
+- **Status:** accepted
+- **Cross-references:** DEC-067 row 3 (enrichment is per-domain), DEC-100 (the movie domain's two
+  Letterboxd shapes), DEC-106 and DEC-112 (the multi-domain import boundary this surfaced it),
+  DEC-093 (a reader tested against one file is tested against one file — the same shape, one layer up).
+- **Context:** `EnrichmentSpec.identity_kind` was a single string. The movie domain declared
+  `letterboxd`, because Letterboxd was the source it was built for. An IMDb export names a film by
+  its `tt` id and carries **no** Letterboxd URI — IMDb does not publish one — so every film imported
+  from IMDb would have had no identifier of the declared kind, would never have been queued, and
+  would have sat in the library for ever with no poster, no genres and no runtime. Nothing would have
+  failed: the backfill's join simply matches no rows. Sprint 052 found it while costing Sprint 053
+  and refused to let it pass as a silent gap.
+- **The alternatives, costed:**
+  - *Change the movie key to `imdb`.* Rejected: it regresses the delivered Letterboxd path, whose
+    films carry only a `boxd.it` URI until an enrichment they would no longer get adds an IMDb id.
+  - *Narrow the acceptance criterion and record it.* Rejected: it ships a visibly broken library —
+    a Movies shelf of grey tiles — in exchange for saving a contract change of about forty lines.
+  - *Have the IMDb reader also write a `letterboxd` identifier.* Rejected outright: it would be a
+    connector inventing an identity its source does not carry, which is the opposite of what an
+    identity is for.
+- **Decision:** `EnrichmentSpec.identity_kinds` is an ordered tuple. The backfill runs one statement
+  per key in declaration order and queues an item **once**, under the first key it actually has;
+  the pair travels in the job payload as it already did, so the handler is unchanged. Movies declare
+  `("letterboxd", "imdb")`; every other domain declares a one-element tuple and changes in no other
+  way. Wikidata's movie adapter accepts either, resolving `P6127` and `P345` as exact claims, so this
+  is one film reachable two ways rather than two lookups.
+- **Why one statement per key rather than `kind IN (…)`:** the query returns a value, and the handler
+  needs to know which kind that value *is*. A single statement cannot say, and guessing would hand a
+  `boxd.it` URI to a lookup expecting a `tt` id.
+- **The obligation this creates, stated because conformance cannot check it:** every provider in a
+  domain's `provider_order` must answer every key it declares. A fallback that answers only the first
+  stops being a fallback for rows that arrived under the second — silently, in the same way this
+  defect was silent. `docs/guides/adding-a-domain.md` says so where a domain is declared.
+- **What it changes about the anime/series merge argument**, which the guide made on this field: the
+  test is no longer "one `identity_kind` per domain" but "one `provider_order` that answers every key
+  the domain declares". Anime and series still fail it — AniList cannot resolve an IMDb id and
+  Wikidata cannot resolve a MyAnimeList one — so the verdict is unchanged and now rests on the thing
+  that was actually load-bearing. Movies pass it with two keys and one provider.
+- **Measured, 2026-08-31, against the live boundary:** an IMDb ratings export of one film and one
+  show committed and enriched in about six seconds — the film to Christopher Nolan, three genres, a
+  172-minute runtime, a description and a poster; the show to its creator, three genres, a synopsis,
+  Netflix, `Ended`, 77 episodes, 6 seasons and a poster. Before this change the film half of that was
+  empty and would have stayed empty.
+
+## DEC-114 — Sprint 051 measured: three of four held, and the visible one did not
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Cross-references:** DEC-084 (the verification playbook), DEC-111 (the sprint being assessed),
+  DEC-100 and DEC-110 (the product defects scheduled alongside), DEC-023 (the load-sensitive
+  invariants Sprint 051 correctly identified).
+- **Context:** the owner asked whether Sprint 051 — scheduled specifically to reduce the cost of
+  testing — actually worked. It was assessed by re-running every gate on this workstation at Sprint
+  053's closure commit rather than by reading its Outcome.
+
+### What was measured, 2026-09-01
+
+| Gate | Sprint 051 recorded | Measured now | Verdict |
+|---|---:|---:|---|
+| `make check` | ~10 s | 1.6 s | faster, but **red** whenever a local walkthrough spec exists |
+| backend pytest, as run | ~62 s @ 989 | 67.5 s @ 1090 | flat per test |
+| backend pytest, `--no-cov` | — | 41.8 s | **coverage costs 26 s, 61%, every run** |
+| frontend Vitest | ~23 s @ 190 | 23.7 s @ 194 | flat; 21 warnings → 10 stderr lines, all one notice |
+| Playwright, parallel | 38.2 s green | 38.4 s, **failed on 3 of 3 runs** | never green |
+| Playwright, serial | 49.4 s | 101.7 s green | the only trustworthy result |
+
+### The verdict, item by item
+
+- **Bounded timeouts: held.** In place at all three layers; nothing hit one this session, which is
+  the correct result for a bound.
+- **Vitest noise: held, not finished.** The 21 `Query data cannot be undefined` warnings are gone.
+  Ten stderr lines survive and are all the same motion `Reduced Motion` notice.
+- **The tracked walkthrough launcher: held, with a sharp edge.** Used four times across Sprints 052
+  and 053, in live and replay modes. Its data directory is fresh per **launch**, not per spec run,
+  and three Sprint 053 attempts failed on state carried between runs — a committed batch replays by
+  fingerprint and approved rows leave an empty inbox, so every symptom looked like a product defect.
+- **The parallel Playwright split: did not hold.** Three runs, 2 / 2 / 1 failures, always
+  `accessibility.spec.ts:474` and `library.spec.ts:255`, both green on every serial run. They are the
+  same class of rendering-timing test as the two 10,000-entry invariants Sprint 051 moved into the
+  serial project; it moved two and missed these two. **A gate that is 63 s faster and never green
+  costs more than the one it replaced**, because the session runs the serial gate afterwards anyway.
+
+### Two larger costs Sprint 051 did not look at
+
+- **Coverage is in `addopts`,** so every backend run — including the focused single-file runs the
+  playbook's first rung asks for — pays 26 s and prints a 60-line table. That is precisely "paying
+  for the same evidence repeatedly", the sentence `TESTING.md` opens with. It is the largest single
+  item in the table and it was never on the backlog.
+- **The lint gate reads `frontend/e2e/scratchpad/`,** which is gitignored on purpose. Writing a
+  walkthrough turns `make check` red, naming a file that is not in the repository.
+
+### Decision
+
+Schedule **Sprint 055 — The recorded defects, and the gates that stopped paying** (plan revision 29;
+`FINAL_SPRINT` 54 → 55), after Sprint 054 so the release decision is made on a library with no known
+open defects. It carries the two DEC-100 defects and the DEC-110 synopsis case alongside the four
+gate repairs. Its acceptance test for the browser gate is **three consecutive green runs at the
+default worker count, or the split is withdrawn and the reason recorded** — the wall-clock number is
+not the criterion, and undoing the visible half of Sprint 051 is an acceptable outcome.
+
+### The generalisation worth keeping
+
+Sprint 051's four items were chosen from a backlog of observations. Three were right. The one that
+failed is the one whose success condition was stated as a duration rather than as a property, and the
+two costs it missed were the ones nobody had thought to time. **Time the gate before optimising it,
+and state the success condition as "green", not as "seconds".**
+
+
+## DEC-115 — A long-text field may prefer the fuller of its providers' answers
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Implements:** Sprint 055 deliverable 1. **Cross-references:** DEC-110 (the fill-empty
+  merge rule this carves one class out of), DEC-100 (where the defect was first observed
+  and left), Sprint 053's Outcome (the one-liner as it appeared on a real record),
+  DEC-067 row 3 (per-domain enrichment), DEC-113 (the declaration shape this follows).
+- **Context:** A series enriched live to `synopsis: "serie de televisión animada"` —
+  Wikidata's one-line identification *description*, where TVmaze had a real synopsis for
+  the same show. Nothing was broken: `wikidata-series` is first in `provider_order`, the
+  handler stops at the first usable payload, and `fill_empty` fills only empty fields —
+  so the short text arrives first and the long one never gets a turn. The rule is right
+  for every field where providers answer the same question with the same shape, and wrong
+  for one class: a long-text field, where "one line" and "three paragraphs" are both
+  complete answers of different value.
+- **The alternatives, costed:** trimming `wikidata-series` to stop emitting `synopsis`
+  (the sprint's second option) fixes the series case in one line but is a provider being
+  edited to fit a rule — the domain, not the adapter, is where a field's meaning lives —
+  and it would leave the next domain with the same problem and no mechanism. "The last
+  provider wins" was refused outright by the sprint: it overwrites everywhere, not just
+  where longer is better.
+- **Decision:** `EnrichmentSpec.fuller_answer_fields` is a tuple of field names, the same
+  shape as `completeness_fields` — a domain saying something about its own fields (the
+  sprint's preferred option, chosen because it costs no more than the second). When a
+  domain declares it, the handler still stops at the first usable payload for everything
+  else, then asks the remaining providers in `provider_order` for the declared fields
+  alone, and keeps the **longest** answer for each — but only while the field would
+  otherwise be stored empty or shorter: a shorter second answer changes nothing, a
+  provider's healthy value is never swapped for a peer's, and the second payload's other
+  fields are never merged in. The owner's own value is never touched at any length, by
+  the unchanged fill-empty write. Series declares `("synopsis",)`; no other domain
+  declares any, and behaves exactly as before.
+- **Conformance:** the conformance suite checks every `fuller_answer_fields` name is a
+  field the domain declares **and** is `long_text` — the same trap as
+  `completeness_fields` one table over: an undeclared name never arrives on any payload,
+  so the rule would spend a second provider request per item and change nothing.
+- **Measured, 2026-09-01, against Sprint 049/050's committed recordings:** Wikidata's
+  Breaking Bad entity (`serie de televisión estadounidense`, 33 chars) and TVmaze's show
+  169 (the real HTML-derived synopsis) — the merged record stores TVmaze's. With TVmaze
+  recording a 404, the one-liner arrives exactly as before. The owner's five-character
+  synopsis survives both providers.
+
+
+## DEC-116 — The cover and year backfill conditions are the domain's declaration, and a typed miss is not an outage
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Implements:** Sprint 055 deliverable 2. **Closes:** the two defects DEC-100 recorded
+  and left. **Cross-references:** DEC-100 (the observations), DEC-067 row 3 and DEC-091
+  (the `completeness_fields` trap this is the same shape as), DEC-098 (why movies shipped
+  coverless), Sprint 048 (the Stremio poster pipeline that changed the cover answer).
+- **Context:** DEC-100 observed two defects and left both for a later sprint.
+
+  **1. `_backfillable_items` treated a null `cover_path` or `year` as "worth a lookup"
+  in every domain, regardless of the domain's declaration.** The recorded case was movies:
+  they shipped coverless because the Wikidata adapter carries no poster, so every movie
+  sat re-queueable for ever against a provider that would never answer. Two things changed
+  the answer rather than the observation: Sprint 048 gave movies Stremio posters through
+  their own adapter, and series and anime's providers carry covers too — so "a missing
+  cover is worth a lookup" is *true* for every registered domain today, but as a fact
+  about the provider catalogue rather than a law of nature. The year condition is the
+  sharper one: no provider contract guarantees a year, so a domain whose rows
+  legitimately carry none would be re-queued on every backfill for ever.
+- **Decision:** the conditions became declarations — `EnrichmentSpec.wants_cover` and
+  `wants_year`, both defaulting to `True` (what every registered domain means today), and
+  `_backfillable_items` builds its `OR` list from them rather than from literals. The
+  defaults mean no registered domain changes behaviour; a future domain whose providers
+  carry no covers opts out instead of inheriting the assumption. The guard tests prove the
+  opt-out through the unit seam: a coverless, otherwise-complete book row is queued under
+  the shipped declaration and not queued at all when the domain opts out, and the mirror
+  for a yearless row.
+- **2. `GET /api/search/resolve` mapped every exception from `resolve_input` to a 502.**
+  A typed `record_not_found` is an answer — the record does not exist anywhere this build
+  can look — and reading it as a provider outage told the owner the provider was down when
+  it had answered precisely.**
+- **Decision:** the route now catches `ProviderPayloadError` before the generic handler:
+  `record_not_found` becomes **404 under the provider's own code and message**, and every
+  other payload error — malformed response, refused guard — plus every transport failure
+  keeps the old 502 `provider_failure`. The tests prove the split both ways: a provider
+  raising the typed miss reads 404, a provider raising `httpx.ConnectError` still reads
+  502. The client screens already branch on the error code, so a miss now reads as "not
+  found" rather than "the provider failed" wherever the code reaches the screen.

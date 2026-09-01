@@ -189,7 +189,7 @@ def parse_goodreads(data: bytes) -> list[dict[str, Any]]:
 class GoodreadsImporter:
     name = "goodreads"
     label = "Goodreads"
-    item_type = DOMAIN.item_type
+    item_types: tuple[str, ...] = (DOMAIN.item_type,)
     input = ImportInputSpec(
         kind="upload",
         label="Goodreads CSV",

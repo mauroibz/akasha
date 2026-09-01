@@ -36,7 +36,7 @@ const expected = {
   // `src/api/imports.ts` mirrors these by hand, and the import screen renders
   // whatever a connector declares in them rather than branching on which
   // connector it is holding (DEC-080).
-  ImporterResponse: ["id", "label", "item_type", "input"],
+  ImporterResponse: ["id", "label", "item_types", "input"],
   ImportInputResponse: [
     "kind",
     "label",

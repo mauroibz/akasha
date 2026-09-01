@@ -99,5 +99,16 @@ export default defineConfig({
     globals: true,
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["./src/test/setup.ts"],
+    // Bounded like the backend: a wedged test fails with its name instead of
+    // looking like slow work. 15 s is measured headroom — the slowest current
+    // test is ~2.4 s (HomePage's provider-search cases).
+    testTimeout: 15_000,
+    // A green run is silent: the ErrorBoundary tests mock `console.error`, and
+    // vitest still prints an empty `stderr |` label for each suppressed event.
+    // A log with no content is the mock working, not a message — suppress the
+    // label. Anything with actual content still prints (Sprint 055, AC9).
+    onConsoleLog(log, type) {
+      if (type === "stderr" && log.trim() === "") return false;
+    },
   },
 });

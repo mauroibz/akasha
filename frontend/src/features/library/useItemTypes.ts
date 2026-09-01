@@ -10,11 +10,15 @@ import { getItemTypes } from "@/api/library";
  * its own. A failure renders the shared vocabulary: the registry must never be the
  * reason a page is blank.
  */
-export function useItemTypes() {
+export function useItemTypes(enabled = true) {
   return useQuery({
     queryKey: ["item-types"],
     queryFn: getItemTypes,
     staleTime: Infinity,
     retry: false,
+    // A screen that only needs domain labels under a condition should not pay for
+    // them unconditionally. The cache is shared, so a screen that opts out still
+    // reads whatever another one already fetched.
+    enabled,
   });
 }

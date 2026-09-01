@@ -1,6 +1,6 @@
 import json
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path
@@ -14,12 +14,14 @@ from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.importers import (
     Importer,
     ImportReadContext,
+    ImportSnapshot,
     ImportSource,
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import (
+    Domain,
     InvalidEntryField,
     InvalidMetadata,
     InvalidProgress,
@@ -75,6 +77,9 @@ def _stored_record(record: NormalizedImportRecord) -> dict[str, Any]:
         },
         "shelves": list(record.shelves),
         "source_fields": dict(record.source_fields),
+        # Which library this row lands in. Written at preview time because commit
+        # never re-reads the source: the snapshot is the stable result (DEC-106).
+        "item_type": record.item_type,
         "cover_stage": record.cover_stage,
         # Kept so a file arriving after the commit can be resolved back to the record
         # it belongs to, without the route knowing what any source looks like on disk.
@@ -107,6 +112,7 @@ def _preview_record(row: ImportRecordRow) -> dict[str, Any]:
         "entry": entry,
         "source_fields": source_fields,
         "cover_staged": payload.get("cover_stage") is not None,
+        "item_type": payload.get("item_type"),
         # Compatibility for the two readers that predate the neutral nested shape:
         # flatten what they actually supplied without naming any domain's fields here.
         **metadata,
@@ -131,11 +137,40 @@ class ImportService:
         self.data_dir = data_dir
         self.source_root = source_root
         self.importer = importer
-        self.domain = DOMAINS[importer.item_type]
+        #: The domains this connector declared, in declaration order. A batch has no
+        #: one domain any more (DEC-106): each record resolves its own, and the first
+        #: entry is what a record naming no type of its own becomes.
+        self.domains = {item_type: DOMAINS[item_type] for item_type in importer.item_types}
         self.library = DomainRepository(engine)
         self.imports = ImportRepository(engine)
 
+    def _domain_for(self, record: NormalizedImportRecord) -> Domain:
+        """The domain this row targets, refusing one the connector never declared.
+
+        A record naming an undeclared type is a defect in the connector, so it is
+        refused at the same boundary and under the same code as an undeclared identity
+        kind — rather than reaching the registry as a `KeyError` with a batch already
+        staged behind it.
+        """
+        if record.item_type is None:
+            return next(iter(self.domains.values()))
+        domain = self.domains.get(record.item_type)
+        if domain is None:
+            raise LibraryError(
+                "invalid_import_record",
+                f"{self.importer.label} produced a record targeting {record.item_type!r}, "
+                f"which it does not declare",
+                status_code=422,
+                details={"row_number": record.row_number},
+            )
+        return domain
+
+    def _target_of(self, record: NormalizedImportRecord) -> str:
+        """Which library this row is for, before it has been validated."""
+        return record.item_type or next(iter(self.domains))
+
     def _validate(self, record: NormalizedImportRecord) -> dict[str, Any]:
+        domain = self._domain_for(record)
         unknown_identities = set(record.item.identifiers) - self.importer.identity_kinds
         if unknown_identities:
             raise LibraryError(
@@ -153,10 +188,10 @@ class ImportService:
                 details={"row_number": record.row_number},
             )
         try:
-            validate_metadata_patch(self.domain, record.item.metadata)
-            entry_values = validate_entry_values(self.domain, record.entry.values)
+            validate_metadata_patch(domain, record.item.metadata)
+            entry_values = validate_entry_values(domain, record.entry.values)
             if record.entry.suggested_status is not None:
-                validate_status(self.domain, record.entry.suggested_status)
+                validate_status(domain, record.entry.suggested_status)
         except (InvalidMetadata, InvalidEntryField, InvalidProgress, InvalidStatus) as error:
             raise LibraryError(
                 "invalid_import_record",
@@ -166,9 +201,48 @@ class ImportService:
             ) from error
         return entry_values
 
-    def preview(self, source: ImportSource) -> dict[str, Any]:
+    def chosen_targets(self, targets: Sequence[str] | None) -> tuple[str, ...]:
+        """Which of this connector's domains this import is for.
+
+        `None` is every one it declares, which is what the screen ticks by default and
+        what a single-domain connector can only ever mean. An unknown or empty choice
+        is refused here rather than silently narrowed, because an import that quietly
+        brings in nothing is worse than one that says it cannot.
+        """
+        if targets is None:
+            return tuple(self.domains)
+        chosen = tuple(item_type for item_type in self.domains if item_type in set(targets))
+        unknown = sorted(set(targets) - set(self.domains))
+        if unknown or not chosen:
+            raise LibraryError(
+                "invalid_import_targets",
+                f"{self.importer.label} does not import {unknown or 'nothing'}",
+                status_code=422,
+                details={"declared": list(self.domains)},
+            )
+        return chosen
+
+    def _fingerprint(self, snapshot: ImportSnapshot, targets: Sequence[str]) -> str:
+        """The identity of this import, which is the source *and* what was asked of it.
+
+        Preview is idempotent on `(connector, fingerprint)`, so an export previewed as
+        films and then as shows would otherwise return the first preview — a wrong
+        answer that looks like a working feature (DEC-106).
+
+        Composed only when a strict subset was chosen, which is what keeps every
+        fingerprint already in the database resolving: a connector declaring one domain
+        always selects all of it, so its sources fingerprint exactly as they always did
+        and no batch staged before this contract is orphaned.
+        """
+        if set(targets) == set(self.domains):
+            return snapshot.fingerprint
+        return f"{snapshot.fingerprint}#{'+'.join(targets)}"
+
+    def preview(self, source: ImportSource, targets: Sequence[str] | None = None) -> dict[str, Any]:
+        chosen = self.chosen_targets(targets)
         snapshot = self.importer.read(source, ImportReadContext(path_root=self.source_root))
-        existing = self.imports.get_batch_by_fingerprint(self.importer.name, snapshot.fingerprint)
+        fingerprint = self._fingerprint(snapshot, chosen)
+        existing = self.imports.get_batch_by_fingerprint(self.importer.name, fingerprint)
         if existing is not None:
             return self.get_preview(existing)
         snapshot = replace(
@@ -176,6 +250,20 @@ class ImportService:
             records=tuple(
                 replace(record, entry=replace(record.entry, values=self._validate(record)))
                 for record in snapshot.records
+            ),
+        )
+        # The reader always emits every row it can parse and the service applies the
+        # selection, so a connector cannot get the filter wrong and one rule covers
+        # every connector present and future (DEC-106). Dropped before staging: an
+        # unwanted row should cost no copied bytes.
+        wanted = set(chosen)
+        not_requested = [
+            record for record in snapshot.records if self._target_of(record) not in wanted
+        ]
+        snapshot = replace(
+            snapshot,
+            records=tuple(
+                record for record in snapshot.records if self._target_of(record) in wanted
             ),
         )
 
@@ -212,10 +300,19 @@ class ImportService:
                 row["planned_action"] in {"error", "identity_conflict"} for row in planned
             ),
             "ambiguous": sum(row["planned_action"] == "ambiguous" for row in planned),
+            # Two different things get skipped and they are never conflated: a row for
+            # a library the reader did not tick, and a row of a kind no library holds.
+            # Neither is an error — somebody who exports their whole account should not
+            # meet forty red rows for podcasts they once rated.
+            "skipped_not_requested": len(not_requested),
+            "skipped_unsupported": sum(skip.count for skip in snapshot.skipped),
+            "skipped_reasons": [
+                {"reason": skip.reason, "count": skip.count} for skip in snapshot.skipped
+            ],
         }
         self.imports.create_preview(
             batch_id,
-            snapshot.fingerprint,
+            fingerprint,
             snapshot.filename,
             summary,
             planned,
@@ -342,7 +439,7 @@ class ImportService:
             batch_id,
             choices,
             kind=self.importer.name,
-            domain=self.domain,
+            domains=self.domains,
             identity_kinds=self.importer.identity_kinds,
         )
         with Session(self.engine) as session:
@@ -365,7 +462,10 @@ class ImportService:
                 self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")
             except CoverError:
                 pass
-        if self.domain.enriches:
+        # Any domain this connector can produce, rather than the one it happened to
+        # declare first: a mixed batch has no single domain to ask, and asking the
+        # wrong one would silently skip half the library's backfill.
+        if any(domain.enriches for domain in self.domains.values()):
             enqueue_enrichment_backfill(
                 self.engine,
                 batch_id=batch_id,

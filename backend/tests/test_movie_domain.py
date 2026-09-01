@@ -193,9 +193,12 @@ class TestEnrichment:
     declaration exists for the imported row that is a URI, a title and a year.
     """
 
-    def test_it_enriches_on_the_letterboxd_film(self) -> None:
+    def test_it_enriches_on_either_key_its_sources_supply(self) -> None:
+        """Letterboxd first, then IMDb. A film arrives from an export that names it
+        one way or the other and never both, and Wikidata holds both claims exactly
+        (DEC-113)."""
         assert DOMAIN.enrichment is not None
-        assert DOMAIN.enrichment.identity_kind == "letterboxd"
+        assert DOMAIN.enrichment.identity_kinds == ("letterboxd", "imdb")
 
     def test_wikidata_answers_that_key(self) -> None:
         assert DOMAIN.enrichment is not None

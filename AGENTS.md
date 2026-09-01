@@ -33,7 +33,10 @@ If state is inconsistent, repair documentation-only inconsistencies when the int
    - implement the smallest coherent behavior;
    - run the focused test and relevant regression tests;
    - refactor only while tests remain green.
-3. Make small conventional commits at coherent checkpoints. Do not rewrite or squash commits made before this session.
+3. Make small commits at coherent checkpoints, in the tagged `[TAG] Title` form
+   [`CONTRIBUTING.md`](CONTRIBUTING.md) defines. One tag per commit; a commit needing two is
+   doing two things. Do not rewrite or squash commits made before this session, and never add
+   an attribution trailer of any kind.
 4. Stay inside sprint scope. A prerequisite defect may be fixed if necessary; record it. Future-sprint work is forbidden unless the active sprint explicitly pulls it forward.
 5. Never weaken, delete, skip, or mark flaky a test merely to get green. Never fabricate command output.
 6. Whenever a session ends without closing the sprint — out of budget, interrupted, or blocked — append a `docs/agent/worklog.md` entry before stopping, so the next session resumes from recorded evidence rather than re-deriving it.
@@ -86,7 +89,7 @@ Only after all acceptance criteria and verification pass:
    normal documentation/state-only closure, run `python scripts/validate_project.py` and
    `git diff --check`; run documentation formatting or link checks when applicable. If a post-gate
    change invalidated a product gate, rerun that gate before closing.
-5. Create the final documentation/state commit: `docs(sprint-NNN): close sprint and hand off`.
+5. Create the final documentation/state commit: `[DOCS] Close sprint NNN and hand off`.
 6. Confirm `git status --short` is empty, then write the completion report for the owner (Mauro, not a frontend developer): in plain language, the sprint that was completed, one line per acceptance criterion and how it was verified, any deviations, anything that needs the owner (accounts, keys, money, irreversible choices), and one sentence on what the next sprint delivers. Keep audit detail — commit hashes, full command output — in the sprint `Outcome` and worklog, not the report.
 
 The active sprint pointer must never advance before the implementation is tested and committed.

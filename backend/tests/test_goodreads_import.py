@@ -39,7 +39,17 @@ async def test_preview_persists_normalized_plan_without_library_writes(tmp_path:
         )
         assert response.status_code == 201
         body = response.json()
-        assert body["summary"] == {"total": 2, "ready": 1, "errors": 1, "ambiguous": 0}
+        # A single-domain connector skips nothing on either count: it declares one
+        # library, so every row it emits is for a library that was asked for.
+        assert body["summary"] == {
+            "total": 2,
+            "ready": 1,
+            "errors": 1,
+            "ambiguous": 0,
+            "skipped_not_requested": 0,
+            "skipped_unsupported": 0,
+            "skipped_reasons": [],
+        }
         assert body["records"][0]["goodreads_book_id"] == "101"
         assert body["records"][0]["isbn"] == "9788437604572"
         assert body["records"][0]["suggested_status"] == "read"

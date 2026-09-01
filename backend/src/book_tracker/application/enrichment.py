@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import Collection, Mapping
+from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -13,6 +14,7 @@ import httpx
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
+from book_tracker.domain.merge import prefer_fuller
 from book_tracker.domain.providers import ItemPayload
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import EnrichmentSpec
@@ -41,6 +43,8 @@ PROVIDER_LABELS = {
     "anilist": "AniList",
     "kitsu": "Kitsu",
     "wikidata": "Wikidata",
+    "wikidata-series": "Wikidata",
+    "tvmaze": "TVmaze",
 }
 
 
@@ -102,12 +106,20 @@ class EnrichmentHandler:
         A provider over its daily budget is skipped rather than called, and if that
         leaves nothing to try the caller defers the job instead of failing it — a
         quota that has not reset yet is not a failure (DEC-045).
+
+        The first usable payload wins, with one declared exception
+        (`fuller_answer_fields`): after it is chosen, the remaining providers are
+        asked for those fields alone, and the longest answer fills the field if
+        it beats the first provider's. Every other field, and the whole payload
+        when the domain declares none, behaves exactly as before.
         """
         reasons: list[str] = []
         unreachable = False
         capped = False
         available = False
         moment = now or datetime.now(UTC)
+        chosen: ItemPayload | None = None
+        chosen_source: str | None = None
         for name in spec.provider_order:
             provider = self.providers.get(name)
             if provider is None:
@@ -152,7 +164,31 @@ class EnrichmentHandler:
                     f"{_label(name)} returned no usable metadata for {kind.upper()} {value}."
                 )
                 continue
-            return payload, name, None
+            if chosen is None:
+                chosen = payload
+                chosen_source = name
+                if not spec.fuller_answer_fields:
+                    # Nothing left to ask: the first usable payload is the answer,
+                    # exactly as before this declaration existed.
+                    return payload, name, None
+                continue
+            # A second usable payload, reached only when the domain declared
+            # `fuller_answer_fields`: it contributes those fields alone, and only
+            # when its answer is longer than what the earlier provider supplied.
+            # A shorter or equally long answer changes nothing, and no other
+            # field of the first payload is ever touched — the second payload's
+            # other values are not merged in, so this is not "the last provider
+            # wins", and it is not "both providers merged" either (DEC-115).
+            fuller = prefer_fuller(chosen.metadata, payload.metadata, spec.fuller_answer_fields)
+            if fuller:
+                chosen = replace(chosen, metadata={**chosen.metadata, **fuller})
+            return chosen, chosen_source, None
+
+        if chosen is not None:
+            # The first provider was usable and a later one was not — the loop's
+            # `continue` after choosing means a miss or outage below the chosen
+            # provider must not lose the payload already in hand.
+            return chosen, chosen_source, None
 
         if capped and not available:
             # Nothing was even tried: every configured provider is out of budget.
@@ -209,7 +245,7 @@ class EnrichmentHandler:
         # `{item_id, kind, value}`. Jobs survive restart by design, so a row queued
         # before the upgrade is still here afterwards; it is read as the domain's own
         # key rather than failing silently in a queue nobody is watching.
-        kind = str(payload.get("kind") or spec.identity_kind)
+        kind = str(payload.get("kind") or spec.identity_kinds[0])
         value = payload.get("value") or payload.get("isbn")
         if not value:
             return {
@@ -396,7 +432,10 @@ def _backfillable_items(
     incompleteness rule named `publisher`, `page_count` and `description`, which an
     anime has none of, so every anime would have looked incomplete for ever.
 
-    A missing cover or year counts in every domain and is not part of the declaration.
+    A missing cover or year counts in every registered domain — as the
+    `wants_cover`/`wants_year` declarations, which default to True rather than
+    being constants, so a domain whose providers carry neither can opt out
+    instead of being re-queued for ever (DEC-116).
     """
     rows: list[tuple[int, str, str]] = []
     for domain in DOMAINS.values():
@@ -406,33 +445,47 @@ def _backfillable_items(
         spec = domain.enrichment
         if spec is None:
             continue
-        parameters: dict[str, Any] = {"type": domain.item_type, "kind": spec.identity_kind}
+        claimed: set[int] = set()
+        parameters: dict[str, Any] = {"type": domain.item_type}
         # The field names reach SQLite as *bound* `json_extract` paths rather than as
         # interpolated SQL, so a domain cannot spell its way into the statement.
         incomplete = []
         for index, field in enumerate(spec.completeness_fields):
             incomplete.append(f"json_extract(items.metadata, :path_{index}) IS NULL")
             parameters[f"path_{index}"] = f"$.{field}"
+        # The cover and year conditions are the domain's declaration too, not a
+        # constant: a domain whose providers carry no covers, or whose rows
+        # legitimately carry no year, would otherwise be re-queued on every
+        # backfill for ever (DEC-116). Both default to True, which is what every
+        # registered domain means today.
+        conditions = []
+        if spec.wants_cover:
+            conditions.append("items.cover_path IS NULL")
+            conditions.append("items.cover_path = ''")
+        if spec.wants_year:
+            conditions.append("items.year IS NULL")
         scope = ""
         if item_ids is not None:
             # Bound and parameterised rather than interpolated.
             placeholders = ", ".join(f":item_{index}" for index, _ in enumerate(item_ids))
             scope = f"AND items.id IN ({placeholders})"
             parameters.update({f"item_{index}": value for index, value in enumerate(item_ids)})
-        with engine.connect() as connection:
-            result = connection.execute(
-                text(
-                    f"""
+        # One statement per declared key, in the domain's own order of preference. An
+        # item reachable by several is queued once, under the first it actually has:
+        # the alternative — one statement with `kind IN (…)` — cannot say which kind
+        # the value it returned belongs to, and the handler needs both.
+        for kind in spec.identity_kinds:
+            with engine.connect() as connection:
+                result = connection.execute(
+                    text(
+                        f"""
                     SELECT items.id AS item_id, MIN(ident.normalized_value) AS value
                     FROM items
                     JOIN item_identifiers AS ident
                       ON ident.item_id = items.id AND ident.kind = :kind
                     WHERE items.type = :type
                       AND (
-                            items.cover_path IS NULL
-                         OR items.cover_path = ''
-                         OR items.year IS NULL
-                         OR {" OR ".join(incomplete)}
+                            {" OR ".join([*conditions, *incomplete])}
                       )
                       AND NOT EXISTS (
                             SELECT 1 FROM jobs
@@ -444,8 +497,12 @@ def _backfillable_items(
                     GROUP BY items.id
                     ORDER BY items.id
                     """
-                ),
-                parameters,
-            )
-            rows.extend((row.item_id, spec.identity_kind, row.value) for row in result)
+                    ),
+                    {**parameters, "kind": kind},
+                )
+                for row in result:
+                    if row.item_id in claimed:
+                        continue
+                    claimed.add(row.item_id)
+                    rows.append((row.item_id, kind, row.value))
     return sorted(rows)

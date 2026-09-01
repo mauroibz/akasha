@@ -70,10 +70,56 @@ the thing to catch in review.
 - **Passing tests are not evidence that a flow works.** Run the application against realistic data
   and use the thing you changed.
 
-## Commits and pull requests
+## Commit messages
 
-Conventional subjects: `feat:`, `fix:`, `test:`, `refactor:`, `build:`, `docs:`. Say what changed and
-why it changed; the diff already says how.
+One tag, one title, a blank line, then the body:
+
+```text
+[TAG] Title in the imperative, no trailing full stop
+
+Why this changed, and anything the diff cannot say for itself. Wrap at 100
+columns. Reference decisions as DEC-NNN and sprints as "Sprint NNN" so both
+stay greppable.
+```
+
+The tag is mandatory, uppercase, and one of:
+
+| Tag | For |
+|---|---|
+| `[ADD]` | A new capability that did not exist before |
+| `[MOD]` | A change to behaviour that already existed |
+| `[FIX]` | A defect repair. Say what was broken, not just what you changed |
+| `[REF]` | Restructuring with no behaviour change. If behaviour changed, it is not a `[REF]` |
+| `[DOCS]` | Documentation, specs, sprint files, decisions, the roadmap |
+| `[TEST]` | Tests only. A test added alongside a change ships in that change's commit instead |
+| `[BUILD]` | Dependencies, the container, CI, Makefile targets, generated contracts |
+| `[CHORE]` | Repository housekeeping with no product effect — ignore rules, file moves, cleanup |
+
+Nothing else. A change that seems to need a new tag is usually two commits.
+
+Rules that follow from the table:
+
+- **One tag per commit**, so a commit that would need two is doing two things. Split it.
+- **`[REF]` means the tests do not change.** A refactor whose tests had to be edited changed
+  behaviour, and belongs under `[MOD]` or `[FIX]` where a reviewer will look for it.
+- **The title says what, the body says why.** The diff already says how, and a body that narrates the
+  diff is wasted.
+- **No attribution trailers.** No `Co-Authored-By`, no generated-with notice, no tool signature —
+  this applies to human and agent commits alike.
+
+Examples:
+
+```text
+[ADD] Read series from Wikidata on a five-class instance-of filter
+[FIX] Stop the backfill re-queueing deliberately coverless movies
+[REF] Promote the poster URL builder to shared infrastructure
+[DOCS] Close sprint 049 and hand off
+```
+
+**Commits made before 2026-08-31 use Conventional Commits** (`feat(sprint-048): …`). They are history
+and are not rewritten; the table above applies to everything after it.
+
+## Pull requests
 
 If your change alters a contract — an API shape, a schema, a product behaviour — update the spec it
 contradicts in the same pull request, and add an entry to [`docs/decisions.md`](docs/decisions.md)

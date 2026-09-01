@@ -45,19 +45,38 @@ not “text only.” Classify by effect, not extension.
 
 ## Time and environment triage
 
-Measured on this workstation at Sprint 035 closure:
+Measured on this workstation 2026-09-01, at Sprint 055's closure:
 
-| Gate | Normal duration |
-|---|---:|
-| `make check` | about 8 seconds |
-| backend pytest, 559 tests | about 60 seconds |
-| frontend Vitest, 179 tests | about 25 seconds |
-| `make test` combined | about 85 seconds |
-| full Playwright, one worker | about 1 minute 40 seconds |
-| Sprint 035 realistic-data walkthrough | about 13 seconds after services are ready |
+| Gate | Normal duration | |
+|---|---:|---|
+| `make check` | about 2 seconds | green even with a local scratchpad spec present — fixed this sprint |
+| backend pytest, 1184 tests, as the gate runs it | about 73 seconds | coverage rides `make test`/`make coverage` only |
+| backend pytest, focused single file | 1–5 seconds | **no coverage charged since Sprint 055** — a focused run is the first rung again |
+| frontend Vitest, 194 tests | about 24 seconds | silent on stderr since Sprint 055 |
+| `make test` combined | about 97 seconds | |
+| full Playwright, parallel (default) | about 44 seconds | **green — three consecutive runs this sprint (44.5, 44.5, 45.3 s)** |
+| full Playwright, serial `heavy-library` project | about 19 seconds | the six load-sensitive tests run here alone (DEC-023 + Sprint 055's four) |
+| Sprint 055 synopsis walkthrough, after the backend is ready | about 8 seconds | |
 
-These are diagnostic baselines, not performance acceptance criteria. If a normally chatty command
-produces no output through twice the expected phase duration:
+**The parallel Playwright run is the gate.** Sprint 055 moved the four
+never-green-in-parallel tests into the serial `heavy-library` project (two crossfade
+samplers, three library-view axe checks — one more crossfade than DEC-114 named, the
+same class, found on the first acceptance run) and fixed the caption itself
+(`VirtualLibrary.tsx` no longer fades it, so axe samples the settled colour). Three
+consecutive green runs at the default worker count is the acceptance test this sprint
+set, and it held; a fourth run after the add-path change held too.
+
+**Coverage moved out of `addopts`.** `make test` and `make coverage` pass the flags
+explicitly, so the number still exists per exhaustive run and on demand; a focused TDD
+run pays nothing and prints no table. The trade is deliberate and named here: a session
+that never runs either target sees no coverage number at all (DEC-114's measurement:
+coverage cost 26 s, 61% of a focused run).
+
+These are diagnostic baselines, not performance acceptance criteria. Every test is bounded, so a
+deadlock no longer looks like slow work: the bound fires and names the test — backend pytest at 30 s
+(`--timeout=30` in `backend/pyproject.toml`), frontend Vitest at 15 s (`testTimeout` in
+`frontend/vite.config.ts`), Playwright at 60 s (`timeout` in `frontend/playwright.config.ts`). If a
+normally chatty command still produces no output through twice the expected phase duration:
 
 1. inspect the process and identify the exact test or phase;
 2. reproduce that unit once, with verbose naming and a bounded timeout;
@@ -77,6 +96,24 @@ failure that reproduces outside the sandbox.
 
 Before writing a walkthrough, search the active sprint, `frontend/e2e/`,
 `frontend/e2e/scratchpad/`, the last worklog entry and the handoff. Adapt the nearest existing flow.
+
+`scripts/walkthrough.py` is the tracked launcher: one command creates a fresh temporary data
+directory, starts the backend on an ephemeral port, waits for readiness, and stops it cleanly.
+
+**Fresh per launch, not per spec run.** Rerunning a spec against a still-running launcher inherits
+the previous attempt's data: a committed batch replays by fingerprint and approved rows leave an
+empty inbox, so a spec that is merely being debugged fails in ways that look exactly like product
+defects. That cost three attempts in Sprint 053. Restart the backend for every attempt — a short
+wrapper that kills the old one, starts a new one, waits for the printed URL and runs the spec makes
+that free.
+
+**Enrichment is a background job, so a browser assertion races it.** Prove a post-commit enrichment
+criterion with a short script that commits through the API and polls until the covers arrive
+(about 6 seconds in Sprint 053), rather than by adding a sleep to a Playwright spec.
+`--replay <module>` installs a module's `walkthrough_transport(live)` seam (the pattern
+`scripts/walkthrough_series_050.py` defines) so provider responses replay from fixtures while the
+rest of the boundary stays live; `--keep` preserves the data dir for inspection. A flow runs against
+the base URL the launcher prints.
 
 - Keep owner-specific paths and destructive data targets in environment variables.
 - Use a clean temporary application data directory; realistic source data is input, never the live
@@ -100,7 +137,8 @@ Use the controls the application actually exposes when adapting a walkthrough:
 - the Library status filter is a popover whose option names include live facet counts;
 - Library-row status controls are popovers, while Triage-row status controls are native selects
   (DEC-086);
-- the Triage heading reads `Inbox N unsorted`; and
+- the Triage heading reads `Inbox N unsorted` while rows remain, and `Inbox is clear` once they
+  are all approved;
 - Detail remains `/books/:id` for every domain, a deliberate cosmetic coupling (DEC-067 row 8).
 
 `frontend/e2e/scratchpad/anime-walkthrough.spec.ts` is the working reference for the domain chooser,
@@ -119,16 +157,3 @@ walkthrough does not count as having exercised the flow.
 - Poll a long-running command at sensible phase boundaries. Silence alone is not evidence of a
   hang, but silence beyond the baseline requires diagnosis.
 - Never weaken a test to shorten a gate. Optimize scheduling, isolation and signal quality instead.
-
-## Optimization backlog—not implemented yet
-
-These observations are registered so a future sprint can cost and implement them deliberately:
-
-1. Split Playwright into a parallel ordinary project and a serial heavy-library project. Today the
-   whole suite uses one worker because two `library.spec.ts` invariants are load-sensitive.
-2. Remove known Vitest harness noise: provide a deliberate `window.scrollTo` test shim, return
-   defined attachment-query fixtures, and await Radix/motion state updates correctly. Preserve real
-   console failures while making green output readable.
-3. Promote the local realistic-data flow to a tracked, sanitized launcher that creates a temporary
-   data directory, starts and stops the backend, and accepts the library path in one command.
-4. Add bounded test timeouts or phase timing where a deadlock currently looks like slow work.

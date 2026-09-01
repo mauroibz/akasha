@@ -28,6 +28,8 @@ from book_tracker.domains.album.providers import MusicBrainzProvider
 from book_tracker.domains.anime.providers import AniListProvider, KitsuProvider
 from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
 from book_tracker.domains.movie.providers import WikidataMovieProvider
+from book_tracker.domains.series.providers import WikidataSeriesProvider
+from book_tracker.domains.series.tvmaze import TvmazeSeriesProvider
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
@@ -189,6 +191,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 provider_client, configured.user_agent_contact or "local@example.invalid"
             )
         )
+        # The series domain. Same keyless Wikidata contract as movies (DEC-098), with
+        # the five-class search filter DEC-104 measured — the movie shape misses
+        # animated series, anime series and miniseries outright. Registered as
+        # `wikidata-series`: the catalog is keyed by name, and a second `wikidata`
+        # would silently replace the movie adapter.
+        catalog.append(
+            WikidataSeriesProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
+        # TVmaze is the series domain's second source (DEC-104): a real synopsis, a
+        # real airing status, and the shows Wikidata's title search misses. Keyless
+        # like Wikidata, CC BY-SA — the credit line is DEC-105's deliverable. It
+        # merges through the shared layer on the IMDb id; no fallback path is written.
+        catalog.append(
+            TvmazeSeriesProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
         app.state.provider_catalog = {provider.name: provider for provider in catalog}
         # What search, add and enrichment actually reach. A provider missing its
         # configuration is disabled, not failed (technical spec 6.2).
@@ -237,7 +258,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha Book Tracker", version="1.4.0", lifespan=lifespan)
+    app = FastAPI(title="Akasha Book Tracker", version="1.5.0", lifespan=lifespan)
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:

@@ -6,7 +6,7 @@ from typing import Any
 from book_tracker.domain.providers import Provider, SearchCandidate, merge_and_rank
 from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
 from book_tracker.domain.spec import Domain
-from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS
+from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS, ProviderPayloadError
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +58,7 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
     this function only spends what the recognizing domain asks for.
     """
     cleaned = value.strip()
+    last_miss: ProviderPayloadError | None = None
     for domain in DOMAINS.values():
         try:
             match = domain.recognize(cleaned)
@@ -88,7 +89,28 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
         if match.action == "work":
             resolver: Any = provider
             return list(await resolver.resolve_work(match.value))
-        return [await provider.fetch(match.value)]
+        try:
+            return [await provider.fetch(match.value)]
+        except ProviderPayloadError as error:
+            # A typed miss is an answer about *this* domain's catalogue, not about
+            # the URL: the movie recognizer claims every IMDb title link, and its
+            # film guard refusing a series entity is exactly the case the series
+            # domain exists for. Offer the next domain its turn. Anything else — an
+            # outage, throttling, garbage — is the resolve's failure, not an
+            # invitation for the next domain to guess.
+            if error.code != "record_not_found":
+                raise
+            logger.info(
+                "domain refused a URL it recognized; trying the next",
+                extra={"item_type": domain.item_type, "value": match.value},
+            )
+            last_miss = error
+            continue
+    if last_miss is not None:
+        # Every domain that recognized the URL refused it: the record genuinely
+        # does not exist anywhere this build can look. The last refusal is the
+        # answer, exactly as it was before the fall-through existed.
+        raise last_miss
     raise InvalidResolution(
         "Use an ISBN, an Open Library edition/work URL, a Google Books URL, "
         "or a MusicBrainz release group URL"

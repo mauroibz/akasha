@@ -328,7 +328,7 @@ def parse_myanimelist(data: bytes) -> list[dict[str, Any]]:
 class MyAnimeListImporter:
     name = "myanimelist"
     label = "MyAnimeList"
-    item_type = DOMAIN.item_type
+    item_types: tuple[str, ...] = (DOMAIN.item_type,)
     input = ImportInputSpec(
         kind="upload",
         label="MyAnimeList export",

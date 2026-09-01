@@ -1,0 +1,28 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "searchinfo": {
+      "totalhits": 2
+    },
+    "search": [
+      {
+        "ns": 0,
+        "title": "Q17733404",
+        "pageid": 19334479,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "2014–2020 American animated television series",
+        "timestamp": "2026-08-31T06:33:44Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q87484192",
+        "pageid": 86720427,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "fictitious television series within the series <span class=\"searchmatch\">BoJack</span> <span class=\"searchmatch\">Horseman</span>",
+        "timestamp": "2024-07-04T11:47:16Z"
+      }
+    ]
+  }
+}

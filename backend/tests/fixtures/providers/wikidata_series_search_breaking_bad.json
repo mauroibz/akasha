@@ -1,0 +1,37 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "searchinfo": {
+      "totalhits": 3
+    },
+    "search": [
+      {
+        "ns": 0,
+        "title": "Q1079",
+        "pageid": 1424,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "American crime drama television series (2008–2013)",
+        "timestamp": "2026-08-29T22:48:20Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q17057981",
+        "pageid": 18663442,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "Colombian, Spanish-language version of the U.S. crime drama <span class=\"searchmatch\">Breaking</span> <span class=\"searchmatch\">Bad</span>",
+        "timestamp": "2026-08-29T21:47:28Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q136483358",
+        "pageid": 130184507,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "2025 DreamWorks Animation television series",
+        "timestamp": "2026-08-31T02:14:12Z"
+      }
+    ]
+  }
+}

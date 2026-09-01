@@ -2691,3 +2691,416 @@ export carries attachment bytes, references, or neither; put it to the owner at 
 - Not run: the container smoke drill, per the owner's standing request not to re-investigate a
   working container, and no packaging behaviour changed in this release.
 - Next: merge to `main`, tag `v1.4.0`, push — all three explicitly authorized by the owner.
+
+## 2026-08-31 — Planning session: the series line (Sprints 049–053), plan revision 27
+
+**Done.** No runtime code. Extended the roadmap from 48 sprints to 53 and moved the project from
+`complete` back to `ready` on Sprint 049.
+
+Measured first, planned second, in that order:
+
+- **Wikidata as the series primary.** 13/13 series resolved by IMDb id through
+  `haswbstatement:P345=`; every fetched entity carried IMDb, TMDB and TVDB ids, an episode count, a
+  start date and at least one genre. Seasons absent on 2/13, cast absent on 4/13 (every animated
+  series measured), poster property absent on 13/13. Thirteen entities weighed 1.37 MB, so DEC-099's
+  bounded batching applies unchanged.
+- **The movie search filter does not transfer**, which is the finding of the session. A single
+  `P31=Q5398426` filter returned the right series at rank 1 for 9 of 14 titles and *nothing at all*
+  for `Chainsaw Man` and `Rick and Morty`; a five-class filter returned 14/14.
+- **TVmaze as the fallback.** Keyless, 13/13 by IMDb id, a synopsis and an airing status on every hit,
+  and it covers Spanish-language shows Wikidata's title search does not surface. Its images are the
+  wrong sizes for the cover pipeline (210×295 and 2000×3000), so it is not a cover source.
+- **Posters need no new work.** `images.metahub.space` answered 15/16 series and is already
+  allowlisted; the miss was a clean 404.
+- **Both exports parsed in place.** IMDb turned out to be *two* CSV shapes with different headers, not
+  one. Trakt is a ZIP of 43 verbatim `/sync/*` responses, 26 of them empty, with `imdb` on every movie,
+  show and episode object, and episode detail only in `watched-history.json`.
+- **The anime-overlap switch the owner asked me to evaluate: measured and dropped.** Over fourteen
+  anime spanning the popular and the obscure, Stremio answered 14/14, Wikidata 14/14 and
+  TVmaze 13/14 — the condition the switch would fire on did not occur.
+
+**Owner decisions taken during the session.** Three questions were put and all three answered:
+multi-domain importers rather than two connectors per source, with the source chosen and the target
+decided downstream (DEC-106); TVmaze taken **with** a credit line, unlike TMDB three days earlier
+(DEC-105); and the anime switch evaluated independently and dropped if not viable, which it was not
+(DEC-107).
+
+**Verified.** `python scripts/validate_project.py` passes. No code, tests, migrations or generated
+contracts were touched, so no product gate applies.
+
+**Deviations.** None from the protocol. One change outside the plan, at the owner's explicit
+instruction: `exports/` is now gitignored as a whole directory. It was untracked and unignored, and
+it holds five private source archives including one carrying the owner's email address.
+
+**Also written, at the owner's request, after reviewing the plan.** Two questions came back and both
+produced documentation rather than sprints:
+
+- Auditing the sprint files against the code found **two real defects in what had just been written**,
+  both now fixed. Sprint 050 specified a "consult TVmaze when Wikidata returns nothing" fallback that
+  does not exist — `search_providers` fans out to every provider in parallel and `_merge_group`
+  already does identity grouping and fill-empty by `source_preference`, so the sprint would have sent
+  an implementer to build a second merge mechanism competing with the shared one. Sprint 051 left the
+  commit signature as "a mapping or per-record resolution, either is acceptable", which is not a
+  specification; it now names the exact change.
+- **Why anime and series are two domains** is now `docs/guides/adding-a-domain.md` §8, because that
+  question is bound to be asked again. The deciding test is not field overlap — 6 of 12 fields, and
+  identical statuses, formats and entry shape — it is that `EnrichmentSpec.identity_kind` is one
+  string per domain and the two provider sets share nothing: a merged domain would silently never
+  enrich whichever half arrived under the other key. The section generalises the test and states the
+  accepted cost. The guide's stale intro and file map (movies missing since Sprint 046) were fixed in
+  passing. The "move to anime" button the owner asked about is costed there and recorded under **Not
+  scheduled** in the roadmap as a general *re-file* feature — it is not a button, because `items.type`
+  is written at creation only and a moved item would strand itself from every anime provider.
+
+**Next.** Sprint 049 — the series domain on Wikidata, with posters in the same sprint rather than a
+sprint later. Nothing is implemented.
+
+## 2026-08-31 — Sprint 049 complete; series is the fifth domain
+
+**Done.** Series ships as the fifth domain, on keyless Wikidata, with a working poster and a working
+episode-progress control from the first commit. `metahub_poster_url` was promoted to
+`infrastructure/posters.py`; `domains/series/` carries the declaration (12 measured fields, anime's
+five statuses plus `unsorted`, the movie four formats, `ProgressSpec("Episodes watched", "episode",
+total_field="episodes")`), the recognizer and `WikidataSeriesProvider` with the five-class `P31`
+filter, the `P170`→`P58` creator fallback, the `_is_series` guard, the claim re-check,
+`fetch_by_identifier("imdb")` and the Stremio `cover_url`. Registered into the registry
+(`ItemTypeName.SERIES`) and constructed into the provider catalog as `wikidata-series`. No migration,
+no new status, no new format, no screen. 28 declaration tests, 19 provider tests, 20 live-captured
+fixtures.
+
+**The walkthrough, and what it found.** The gate ran against recorded Wikidata — the replicas were
+maxlag-shedding all day (lag 24 s → 47 s and climbing) and the adapter's contractual `maxlag=5`
+means every live search is refused — with the Stremio poster fetch and the whole cover pipeline left
+live. `scripts/walkthrough_series.py` boots the real application on a disposable data directory and
+replays the Wikidata half at the transport seam. 12/12 browser tests pass: the Series tab and its
+five status words render from the registry with no frontend change; searching "BoJack Horseman"
+finds the animated series a single-class filter would miss; a pasted IMDb link resolves through the
+exact `P345` claim to Breaking Bad; the detail page renders the domain's fields and its own words;
+the poster is the series' actual poster art (two ~60 KB JPEGs fetched live from
+`images.metahub.space`, asserted non-trivial — the Sprint 046 blank-tile failure mode); an episode
+count stores and renders `20 / 62 episodes` against the series' own `P1113`, and a count above it is
+stored rather than refused; a hand-added series lands in Plan to watch and moves between statuses;
+the opinion form offers this domain's formats and no book's; filtering the library by status finds
+the series; a link naming no series says so rather than guessing.
+
+One real defect surfaced and was fixed: `resolve_input` was first-match-wins, and the movie domain
+(registered before series) claims every `wikidata.org/wiki/Q…` and `imdb.com/title/tt…` URL, so a
+pasted series link was intercepted by the movie provider, refused by its film guard, and never
+reached the series recognizer. A typed `record_not_found` is an answer about that domain's
+catalogue, not about the URL, so the loop now offers the next domain its turn; any other error still
+propagates, and when every recognizing domain refuses, the last refusal is the answer. Surfaced to
+the owner, who chose the continue-on-miss repair (`eb0a316 [FIX]`, three tests).
+
+Two runner bugs cost time before the gate ran: uvicorn's own lifespan pass re-ran after the replay
+seam was installed and rebuilt every provider on a live client, silently undoing the swap (fixed
+with `lifespan="off"`, the runner driving the lifespan itself); and the add path fetches the chosen
+entity alone rather than as the search batch, so the replay needed single-entity routes derived from
+the batch fixtures.
+
+**Verified.** The sprint's focused suites — 252 passed. `make check` — lint, typecheck, format,
+OpenAPI-type parity, project validation all pass. `make test` — 967 backend + 189 frontend, zero
+warnings from this sprint. `make openapi` — no diff beyond the already-committed `ItemTypeName`
+addition. The walkthrough above.
+
+**Deviations.** The walkthrough ran against recorded Wikidata, not live (DEC-108); what is not
+proven is that the adapter's request shape is still what live Wikidata answers today, discharged by
+one live search once the replicas recover. Fixtures were captured without `maxlag`; `tt0000001`
+turned out to be a real film, so the miss fixture uses `tt9999999`; `Q87484192` carries
+`P31=Q5398426` itself. The conformance check was refined — `source_preference` is a ranking, not a
+strict order; `enrichment.provider_order` stays strict (DEC-109). The shared resolve repair is a
+behaviour change outside the listed deliverables, approved by the owner during the walkthrough.
+
+**Also observed, out of scope, recorded for the owner.** The `/api/search/resolve` route maps every
+failure — including a plain `record_not_found` miss — to a 502 "Metadata could not be resolved", so
+a link that names nothing still reads as a provider outage rather than a clean "no series by that
+name". The walkthrough tolerates it; a future sprint may want to map a miss to a 4xx.
+
+**Next.** Sprint 050 — TVmaze, the second series provider: a real synopsis, an airing status, and
+the shows Wikidata's search misses. The identity strategy already declares `("wikidata", "tvmaze")`,
+so 050 adds an adapter, not a declaration.
+
+## 2026-08-31 — Sprint 050 (complete)
+- Done: closed Sprint 050 (TVmaze, the second series provider). The implementation was already
+  committed by the prior session (`0e96e9a` adapter, `e094a4b` merge/registration, `ff4ec35` credit,
+  `d279341` provenance, `e1f8719` format). This session fixed the walkthrough spec's wrong assertion,
+  resolved the unexplained 422, wrote the Outcome, added DEC-110, advanced the roadmap and state to
+  Sprint 051, and rewrote the handoff.
+- Verified: focused backend suites 229 passed; `make check` green (lint, typecheck, format,
+  OpenAPI-type parity, project validation); `make test` 989 backend + 190 frontend, the single warning
+  a pre-existing Letterboxd zipfile duplicate-name; `make openapi` clean. The walkthrough spec ran
+  5/5 green earlier in the session against recorded Wikidata+TVmaze with a live Stremio cover fetch.
+- Deviations: (1) The walkthrough spec asserted TVmaze's synopsis would appear on the merged record —
+  a misread of `fill_empty`, which only fills empty fields; Breaking Bad's Wikidata synopsis is
+  non-empty so it correctly survives. Corrected the assertion to the designed rule (fill when empty,
+  overwrite nothing); the merge was already right. The spec is gitignored scratchpad, so the fix is
+  local-only. (2) The intermittent `422 POST /api/entries` was identified by static analysis as the
+  designed `near_match_confirmation_required` guard (`application/add.py:197-202`) firing on a
+  leftover row when two add-tests ran back-to-back against a reused walkthrough data dir; it does not
+  reproduce on a fresh data dir. Recorded as a harness state artifact, not a product defect. (3) The
+  `bounded_json` widening to `Any` plus the `bounded_json_object` companion is recorded as DEC-110.
+- Blocked/open: the walkthrough gate ran against recorded provider responses, not live (DEC-108); one
+  live series search is still owed to prove the adapters' request shape is still what live Wikidata
+  and TVmaze answer today. Carried into the handoff.
+- Next: Sprint 051 — One source, many libraries. A connector declares the domains it can produce
+  (`Importer.item_types`), the shared service resolves the domain per record, the screen renders a
+  target checkbox per declared type, and the chosen targets fold into the preview fingerprint. Built
+  and proved against a test connector, not IMDb. Read `docs/sprints/051-multi-domain-imports.md`.
+
+## 2026-08-31 — Planning session: the gate-optimization sprint (Sprint 051), plan revision 28
+
+- Done: no runtime code. The owner directed TESTING.md's *Optimization backlog* to run as a sprint
+  before the remaining roadmap. Inserted **Sprint 051 — The verification gates get faster**
+  (file expanded from TEMPLATE.md, status `ready`) and renumbered the import line 051→052,
+  052→053, 053→054 (three `git mv`s plus every reference). Moved `FINAL_SPRINT` 53→54, bumped
+  `plan_revision` to 28, recorded DEC-111, rewrote HANDOFF. Measured the baseline the sprint
+  file carries: Playwright 106 passed + 2 skipped in 49.4 s at one worker; Vitest 190 passed in
+  23.3 s with 21 `Query data cannot be undefined` warnings on `["attachments",3]`; no timeouts
+  configured anywhere; the scrollTo shim already present at `frontend/src/test/setup.ts:30`.
+- Verified: `python scripts/validate_project.py` green; `git diff --check` clean. `make test`
+  not owed — no application code changed (plan revision, per the playbook).
+- Deviations: none beyond the renumbering itself, which DEC-111 records. Append-only records
+  (old worklog entries, prior DEC entries, the dated viability report) keep their original
+  sprint numbers on purpose.
+- Blocked/open: nothing.
+- Next: execute Sprint 051 — read `docs/sprints/051-verification-gate-optimization.md`.
+
+## 2026-08-31 — Sprint 051 (complete): the verification gates get faster
+
+- Done: implemented all four TESTING.md optimization-backlog items. (1) Playwright split into a
+  parallel `chromium` project and a serial `heavy-library` project holding the two load-sensitive
+  10,000-entry invariants (`library.spec.ts:75`, `:125`); 49.4 s → 38.2 s, the modest gain recorded
+  as boot-dominated. (2) New shared `frontend/src/test/mockApi.ts` with defined-by-default answers;
+  all 24 DetailPage mocks migrated; 21 `Query data cannot be undefined` warnings → 0. The mechanism
+  was mocks answering the attachments query with the *entry* JSON, not `fetch` returning undefined.
+  (3) `scripts/walkthrough.py` launcher: fresh temp data dir, ephemeral port, readiness wait,
+  clean stop, `--replay <module>` seam inside the lifespan. (4) `pytest-timeout` 30 s backend,
+  Vitest `testTimeout` 15 s, Playwright `timeout` 60 s stated; backend and frontend bounds proven
+  with throwaway sleeping tests (30.06 s, 15.01 s).
+- Verified: `npm run test:e2e` 106 passed + 2 skipped in 39.5 s; `npm test` 190 passed, 0 warnings;
+  `uv run pytest -q` 989 passed; `make check` green; `make test` 989 + 190; `make openapi` no diff.
+  The mockApi guard (un-routed endpoint rejects loudly) and both timeout bounds proven with
+  throwaway tests, run and removed.
+- Deviations: (1) AC3's flow-through run — one Playwright flow through the launcher — is NOT done;
+  the owner stopped further server launches after the harness foreground-timeout loop. The launcher
+  is proven to boot and serve in live and replay modes; the flow run is owed and carried into the
+  handoff. (2) The Playwright speedup is 23%, not a transformation. (3) The e2e `ECONNREFUSED`
+  proxy noise (dev server proxies `/api` to a non-running backend) observed and left, not one of
+  the four items.
+- Blocked/open: the flow-through proof (above). One live series search is still owed from Sprint
+  050, unchanged.
+- Next: Sprint 052 — One source, many libraries. Read `docs/sprints/052-multi-domain-imports.md`.
+  Its walkthrough gate should use `scripts/walkthrough.py` rather than hand-rolling a fourth runner.
+
+## 2026-08-31 — Sprint 052 (complete): one source, many libraries
+
+- **Done.** The shared import boundary now holds N domains. `Importer.item_types` is an ordered
+  tuple; `NormalizedImportRecord.item_type` names a row's own domain (`None` = the first declared);
+  `ImportService.domains` replaces `.domain` and three call sites resolve per record — `_validate`,
+  `ImportRepository.commit`/`commit_batch` (now `domains: Mapping[str, Domain]`, reading the type
+  from the stored payload), and the enrichment guard (`any(... .enriches)`). `IMPORTERS_BY_DOMAIN`
+  is derived from declarations rather than written out. The screen renders a checkbox per declared
+  type, named from `/api/item-types`, none at all for a connector with one; the **service** applies
+  the choice and drops unwanted rows before staging. `ImportSnapshot.skipped` is the reader's tally
+  of rows no domain holds. Five commits, `8c05dbe` → `d91aaad`.
+- **Verified.** Focused suites 319 passed (307 before). `make test` 1012 backend + 194 frontend.
+  `make check` green. `make openapi` regenerated — `item_types` plus three `PreviewSummary` fields
+  is the whole diff. Playwright serial 106 passed + 2 skipped in 1 m 43 s, the historical baseline.
+- **Walkthrough gate, and Sprint 051's owed flow-through proof discharged with it.** Ran
+  `cd backend && uv run python ../scripts/walkthrough.py --replay ../scripts/walkthrough_two_domains.py`
+  (backend on an ephemeral port, fresh temp data dir, live provider boundary), then
+  `BOOK_TRACKER_INCLUDE_SCRATCHPAD=1 BOOK_TRACKER_E2E_BACKEND=http://127.0.0.1:<port> npx playwright
+  test --project=chromium --workers=1 e2e/scratchpad/sprint52-walkthrough.spec.ts` — passed in 8.1 s.
+  **This is the first Playwright flow to run through the tracked launcher**, which is what Sprint 051
+  left owed. Exercised: `/api/importers` publishing `two_domains → ["movie","series"]`; both
+  checkboxes ticked and named "Movie"/"Series" from the registry; unticking Series giving 2 rows with
+  "2 rows are for libraries you did not choose · 3 TV Episode — not a kind this tracks" and 0 errors;
+  the **same file** previewed again with both ticked giving 4 rows rather than the cached 2 (the
+  fingerprint trap, proved in a browser); one commit reporting "4 entries added; 0 already present";
+  Triage showing `Apply Watchlist to Arrival`, `Apply Watchlist to Sicario`, `Apply Plan to watch to
+  The Wire`, `Apply Watching to Breaking Bad` — each row its own domain's words in one inbox; a
+  status change persisting on a series row; undo leaving items, entries and identifiers all at zero.
+- **Sprint 050's owed live series search, discharged.** `GET /api/search?q=Breaking Bad&type=series`
+  against live Wikidata and TVmaze returned 10 candidates; the top hit carried
+  `{wikidata: Q1079, imdb: tt0903747, tmdb: 1396, tvmaze: 169, thetvdb: 81189}` — both adapters
+  answered and merged on the IMDb id, so their request shape is still what those APIs answer today.
+  DEC-108's carried debt is closed.
+- **Deviations.** (1) The sprint named `tests/test_imports.py`, which does not exist — the suite is
+  `tests/test_generic_imports.py`, and the new seam tests are `tests/test_multi_domain_imports.py`;
+  corrected in the file. (2) The client mirror is `api/imports.ts`, not `api/library.ts`; corrected.
+  (3) `test_goodreads_import.py` compared the whole `summary` for equality and the summary grew three
+  fields, so that one assertion now names all seven — same strength, no behaviour changed. (4)
+  `useItemTypes` gained an `enabled` flag so the Import screen fetches the registry only when a
+  connector can fill more than one library. (5) DEC-112 records the two mechanisms DEC-106 left open.
+  (6) The checkboxes read "Movie"/"Series" — the registry's own labels — not the plan's mock copy.
+- **Two runner findings worth keeping.** The `--replay` seam is the launcher's only in-application
+  hook, so `scripts/walkthrough_two_domains.py` uses it to *register* the fixture connector and
+  returns the live transport unchanged; it imports `TwoDomainImporter` from the test suite so the
+  browser flow and the unit suite exercise one definition. And navigating to `/import?tab=<id>` by
+  URL does not record the source preference, so returning from Triage lands on the remembered
+  connector and discards the batch — click the tab instead. Designed behaviour, not a defect
+  (`ImportPage.tsx` comments it), but it cost a walkthrough iteration.
+- **Also observed, out of scope.** Under six Playwright workers, axe intermittently reports
+  `color-contrast [serious]` on `.text-muted-foreground/80` — one class, used once, at
+  `frontend/src/features/library/VirtualLibrary.tsx:100`. Green every time serially; the failing
+  spec moves between the two that render that caption. Computed statically it is 5.26:1 on the page
+  background and 4.88:1 on a surface, both above the 4.5:1 that text size needs — so this looks like
+  a sample taken mid-fade, surfaced by Sprint 051's parallel projects rather than caused by them.
+  This sprint touches none of that file, class, palette or motion code. Separately:
+  `movie.enrichment.identity_kind` is `letterboxd` while `series` is `imdb`, so an IMDb export will
+  enrich shows and not films — carried into Sprint 053's baseline as a question it must answer.
+- **Next.** Sprint 053 — the IMDb import. Two CSV shapes detected from the header, `Title Type`
+  routing onto the skip channel this sprint built, and the negative criterion that decides whether
+  the seam actually held: no change to `application/imports.py`, `api/imports.py`, `ImportPage.tsx`
+  or `TriagePage.tsx`. Read `docs/sprints/053-imdb-import.md`.
+
+## 2026-08-31 — Sprint 053 (complete): the IMDb import
+
+- **Done.** One connector, `imdb`, declaring `("movie", "series")`, over both export shapes — a
+  ratings CSV and a list CSV, told apart by their headers rather than by column position.
+  `Title Type` routes each row through a declared table whose default is skip-and-count.
+  `Runtime (mins)` lands in `runtime` for a film and `episode_minutes` for a show. Ratings map 1:1
+  with no doubling; neither date column becomes a viewing date. Two commits, `60b7a1a` and `3d464e6`.
+- **The sprint's negative criterion held.** The whole connector is
+  `backend/src/book_tracker/domains/movie/imdb.py` plus one line in `REGISTERED_IMPORTERS`.
+  `application/imports.py`, `api/imports.py`, `ImportPage.tsx` and `TriagePage.tsx` are untouched,
+  and so is the entire frontend. Sprint 052's seam held for a connector it was not built for.
+- **The one thing that did not hold was enrichment, and it is now DEC-113.** The movie domain
+  enriched on `letterboxd` alone; an IMDb export carries no Letterboxd URI, so every film from it
+  would have been permanently thin — no poster, no genres, no runtime — with nothing failing.
+  `EnrichmentSpec.identity_kind` becomes `identity_kinds`, ordered; movies declare
+  `("letterboxd", "imdb")`; the backfill runs one statement per key and queues an item once under the
+  first it has. A pre-existing test asserted the defect as intended behaviour and was rewritten.
+- **Verified.** `tests/test_imdb_import.py` 75 passed. `make test` 1090 backend + 194 frontend.
+  `make check` green, `make openapi` no diff. Playwright serial 106 passed + 2 skipped.
+- **Walkthrough gate, on the owner's real exports, live boundary.** Fresh backend per attempt via
+  `scripts/walkthrough.py`; spec at `frontend/e2e/scratchpad/sprint53-walkthrough.spec.ts` with
+  `IMDB_RATINGS` and `IMDB_LIST` in the environment. Passed in 8.2 s. Exercised: the IMDb tab with
+  both target checkboxes; 2 rows, 0 errors; commit; Triage showing the film's `Watchlist`/`Watched`
+  and the show's five words, scores 8 and 10 unmarked; **both rows approved through the UI**, inbox
+  cleared; the list export as a second batch; undo taking it back and leaving the first alone.
+  **This pays Sprint 047's debt (DEC-102)** — a movie has now been previewed, approved and undone
+  through the real screens.
+- **AC9 proved separately, because enrichment is a background job a browser test would race.** A
+  scripted live run committed the real ratings export and polled: enriched in about 6 seconds, the
+  film to Christopher Nolan, three genres, runtime 172, a description and a poster; the show to its
+  creator, three genres, episode_minutes 25, a synopsis, Netflix, `Ended`, 77 episodes, 6 seasons and
+  a poster. Before DEC-113 the film half of that was empty.
+- **Deviations.** (1) The Verification block named `tests/test_imports.py` again; corrected. (2)
+  DEC-093's fifth trap (`shelf_slug` on a punctuation tag) does not apply — this source has no tags
+  and creates no shelves; a malformed `Year` and a truncated row are proved instead. (3) A
+  structurally short row is a visible row error rather than a skip, so file damage is not hidden
+  inside the "not a kind this tracks" count. (4) DEC-113 is a shared-contract change, which the
+  sprint's baseline explicitly required be settled rather than left silent. (5) The guide's
+  anime/series merge argument rested on `identity_kind` being one string; the verdict is unchanged
+  but now rests on `provider_order`, which was the load-bearing half.
+- **Harness lesson worth keeping.** Three walkthrough attempts failed on *state carried between
+  runs*, not on the product: the launcher gives a fresh data dir per **launch**, and I reran the spec
+  three times against one launch. A committed batch replays by fingerprint and approved rows leave an
+  empty inbox, so every symptom looked like a product bug. One clean backend per attempt is the rule;
+  a two-line wrapper that restarts it makes iteration cheap.
+- **Also observed, out of scope.** The show's synopsis came back as Wikidata's one-line description
+  ("serie de televisión animada") rather than TVmaze's real synopsis — the designed fill-empty rule
+  working (DEC-110), but a poor synopsis on a real record; worth a scoped decision. An IMDb list row
+  carries a `Description` this deliberately drops. The intermittent parallel-Playwright
+  `color-contrast` finding on `VirtualLibrary.tsx:100` from Sprint 052 is unchanged.
+- **Next.** Sprint 054 — the Trakt import, the last planned sprint. Read
+  `docs/sprints/054-trakt-import.md`; its baseline was rewritten at this closure with what 053
+  established.
+
+## 2026-09-01 — Sprint 054 (complete): the Trakt import
+
+- **Done.** One connector, `trakt`, in `backend/src/book_tracker/domains/movie/trakt.py` plus one
+  import and one tuple entry in `domain/registry.py`. Six members read, 31 counted by the source's
+  own word, four never opened (the sprint's two email-carrying members, plus
+  `user-last-activities.json` and `user-stats.json` — account telemetry, same treatment). Progress
+  is distinct `(show, season, number)` events excluding season 0; `plays` is the fallback and a row
+  that used it says so in its entry notes. Two commits, `45fd3c4` and `a5f79d0`.
+- **The negative criterion held.** `application/imports.py`, `api/imports.py`, `ImportPage.tsx` and
+  `TriagePage.tsx` untouched, verified by diff against `7200758`; no other shared or frontend file
+  changed either.
+- **Two contract findings, both recorded in the Outcome.** (1) The Verification block named
+  `tests/test_imports.py` again — corrected, as Sprint 053 did; the focused suites are the six
+  import-flavoured files, 439 tests. (2) AC4's "visible warning" cannot be a row error (errors
+  block commit, DEC-112) nor a UI change (AC11), and the shared entry-value allowlist refuses
+  unknown names in `values` — so it rides `entry.notes`, rendered on the Detail page, with a
+  `plays_used` marker in `source_fields`.
+- **Verified.** `tests/test_trakt_import.py` 80 passed, every fixture synthetic. Neighbouring
+  suites 359 green with the connector registered. `make check` green after four lint fixes and two
+  mypy narrowings. `make test` 1172 backend (exactly 1092 + 80) + 194 frontend. Serial Playwright
+  106 passed + 2 skipped.
+- **Walkthrough gate, on the owner's real archive, live boundary, fresh backend per attempt.**
+  `scripts/walkthrough_trakt_054.py` (API, 27 checks, all passed): preview 3 rows 0 errors;
+  BoJack 76/76 and Ted Lasso 38/38, no `plays` fallback; commit 3; inbox 3; stored progress 76/38;
+  detail payloads carry progress and total; the IMDb ratings export previews its 2 overlapping
+  rows as `reuse_item` and commits 0 items 0 entries; undo takes back exactly the Trakt rows.
+  `frontend/e2e/scratchpad/sprint54-walkthrough.spec.ts` (browser, 8.9 s): both target checkboxes
+  and the VIP note on the Trakt tab; all three rows approved through the Triage UI; **the progress
+  control reads "76 / 76 episodes" on BoJack's detail page**; the IMDb overlap commits without
+  duplicating; both titles exactly once in their libraries.
+- **Harness lessons this session paid for.** (1) The walkthrough script's first order ran the IMDb
+  overlap *after* an undo — undo is terminal for a fingerprint, so the re-preview replayed the
+  undone batch and the overlap compared against an empty library. Order matters: match checks
+  need the rows, undo goes last. (2) The two IMDb CSVs are easy to swap: the `Const,...` header is
+  the *ratings* export (the overlapping one); the `Position,...` header is a *list* export
+  (House of the Dragon, no overlap). (3) The Library grid's rows are `button "Open <title>"`, not
+  links, and the Library is domain-scoped via `/?type=series`. (4) The shared Import preview does
+  not render entry values — progress is proven on the Detail page, not the preview screen.
+- **Also observed, out of scope.** Nothing new: the recorded defects remain Sprint 055's list.
+- **Process note.** The plan-revision-29 session (commit `7200758`) never appended a worklog entry
+  despite AGENTS.md §2.6 — this entry covers both sessions' reality; the next session should not
+  have to re-derive what revision 29 changed (Sprint 055 planned, FINAL_SPRINT 54→55).
+- **Next.** Sprint 055 — the recorded defects and the gate repairs, the last planned sprint.
+  Read `docs/sprints/055-recorded-defects.md`. The release decision (v1.5.0, tagging the movie
+  line's v1.4.0) comes after it, and nothing is pushed unasked.
+
+## 2026-09-01 — Sprint 055 (complete): the recorded defects fixed, the gates repaired; the plan is finished
+
+- **Done.** Five commits: `33d0d92` (fuller-answer rule, DEC-115), `1fb916d` (the two
+  DEC-100 defects, DEC-116), `0eaaf97` (parallel gate green + caption), `0d2597d`
+  (coverage/lint/silence), `2c4f7da` (the add path, found by the walkthrough).
+- **The synopsis.** `EnrichmentSpec.fuller_answer_fields` — the declaration the sprint
+  preferred — with series declaring `("synopsis",)`. The enrichment handler keeps the
+  first usable payload for everything else and asks the remaining providers for the
+  declared fields alone; the longest string wins. Proved against Sprint 049/050's
+  committed recordings with all three negatives intact.
+- **The walkthrough earned its keep.** The first live run still stored the one-liner:
+  the *add path* consults exactly one provider and never queues background enrichment,
+  so a series added by hand kept the one-liner for ever — invisible to every unit suite
+  that mocks the boundary. `prefer_fuller` moved to `domain/merge.py` and the add path
+  applies it too; re-run live, BoJack stores TVmaze's 151-char synopsis with Wikidata's
+  episodes and network kept. **Lesson: a merge rule fixed in one arrival path must be
+  checked in every arrival path the item has.**
+- **The two DEC-100 defects.** Cover and year are `wants_cover`/`wants_year`
+  declarations (default True, what every registered domain means post-Sprint-048) rather
+  than constants; `/api/search/resolve` answers a typed `record_not_found` with 404 and
+  the provider's own message, keeping 502 for real failures.
+- **The parallel gate held, so it was not withdrawn.** Three consecutive green runs at
+  the default worker count: 44.5 s, 44.5 s, 45.3 s (a fourth, after the add-path change:
+  43.7 s). Four load-sensitive tests moved to the serial `heavy-library` project —
+  DEC-114's two plus one more crossfade it had not named (failed the first acceptance
+  run, same class) and the three library-view axe checks. The caption at
+  `VirtualLibrary.tsx:100` no longer fades.
+- **The gates stopped double-charging.** Coverage left `addopts` (focused runs are 1–5 s
+  again; `make test` and the new `make coverage` carry the flags). The gitignored
+  scratchpad is out of Prettier's and ESLint's sight, so `make check` is green with
+  walkthrough specs present. Motion's Reduced Motion notice is filtered at
+  `console.warn`, vitest's empty stderr labels suppressed via `onConsoleLog: a green
+  `npm test` is silent. TESTING.md's baseline table is this sprint's measurements.
+- **Verified.** `make check` green (validator included). `make test` 1184 backend + 194
+  frontend, coverage 90%. Focused suites: 342 tests across enrichment, pipeline,
+  provider-api, conformance, cached-add, series providers, item types and search.
+  Parallel Playwright 106 + 2 skipped, ×4 green. `heavy-library` 7 passed, 18.8 s.
+  Walkthrough `scripts/walkthrough_synopsis_055.py` PASSED on the live boundary.
+- **Deviations.** (1) The sprint's `tests/test_search_api.py` does not exist — the
+  resolve tests live in `test_provider_api.py`. (2) Four tests moved, not two — the
+  first acceptance run found the third crossfade and the caption renders in three axe
+  checks. (3) `application/add.py` changed: the walkthrough's finding, recorded in the
+  Outcome as this sprint's own criterion, not a scope drift.
+- **The plan is finished.** All 55 sprints complete; state.json is `complete` with null
+  active fields. Nothing is tagged or pushed. The release decision is the owner's:
+  v1.5.0 (five domains, four import sources, the series line, all recorded defects
+  closed), and whether the movie line's v1.4.0 gets tagged first. Sprint 018's
+  procedure is unchanged and nothing moves without being asked.
+- **Next.** Whatever the owner directs: the release, an epic from the roadmap's future
+  list, or nothing at all. A new sprint would be a plan revision — the seeds skill's
+  extension worked example is the shape.

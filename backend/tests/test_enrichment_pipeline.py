@@ -568,12 +568,33 @@ async def test_a_movie_is_queued_on_its_letterboxd_film(tmp_path: Path) -> None:
 
 
 @pytest.mark.anyio
-async def test_a_movie_with_no_letterboxd_film_is_never_queued(tmp_path: Path) -> None:
-    """A film added by hand and never matched to Letterboxd has nothing to look up by."""
+async def test_a_movie_known_only_by_its_imdb_id_is_queued_on_that(tmp_path: Path) -> None:
+    """This asserted the opposite until Sprint 053, and the opposite was the defect.
+
+    The movie domain declared `letterboxd` alone, so a film that arrived from an IMDb
+    export — carrying a `tt` id and no Letterboxd URI, because IMDb does not publish
+    one — was never queued for anything: no poster, no genres, no runtime, and every
+    gate green. The domain declares both keys now (DEC-113).
+    """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         engine = app.state.engine
-        create_typed_item(engine, "Untitled", "movie", ("imdb", "tt0076786"))
+        movie = create_typed_item(engine, "Untitled", "movie", ("imdb", "tt0076786"))
+        assert enqueue_enrichment_backfill(engine) == 1
+        payloads = {row["item_id"]: row for row in queued_payloads(engine)}
+
+    assert payloads[movie]["kind"] == "imdb"
+    assert payloads[movie]["value"] == "tt0076786"
+
+
+@pytest.mark.anyio
+async def test_a_movie_with_neither_key_is_never_queued(tmp_path: Path) -> None:
+    """The negative that still holds: a film added by hand and matched to nothing has
+    nothing to look it up by, and a job with no key is a job that can only fail."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        create_typed_item(engine, "Untitled", "movie", ("tmdb", "1396"))
         assert enqueue_enrichment_backfill(engine) == 0
 
 
@@ -682,3 +703,107 @@ async def test_a_movie_provider_miss_is_a_typed_outcome_and_not_a_crash(tmp_path
     # could not find rather than leaking a provider exception.
     assert "this-film-does-not-exist-xyz" in str(result["error"])
     assert "Wikidata" in str(result["error"])
+
+
+# ----------------------------------------------------------------------------------
+# Sprint 055, deliverable 2: the cover/year conditions belong to the declaration.
+# ----------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_domain_that_does_not_want_a_cover_is_not_requeued_without_one(
+    tmp_path: Path,
+) -> None:
+    """DEC-100's first recorded defect: a null `cover_path` counted as "worth a
+    lookup" in every domain regardless of what the domain's providers can
+    return. Movies are the recorded case — they shipped coverless because the
+    Wikidata adapter carries no poster, so every movie sat re-queueable for ever
+    against a provider that would never answer. Post-Sprint-048 the movie
+    provider does carry posters, so every enriching domain today *can* supply a
+    cover; the fix makes the condition a declaration (`wants_cover`) rather than
+    an assumption, and the guard test is the unit seam: a domain that opts out
+    is never selected for a missing cover."""
+    from dataclasses import replace as dc_replace
+
+    from book_tracker.application.enrichment import _backfillable_items
+    from book_tracker.domain.registry import DOMAINS
+    from book_tracker.domain.spec import EnrichmentSpec
+
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        # A book row that has everything except a cover: complete by every other
+        # measure, coverless on purpose for this test.
+        coverless = create_item_with_isbn(
+            engine,
+            "Coverless",
+            RECORDED_ISBN,
+            year=1949,
+            metadata={"creators": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
+        )
+
+        # The declaration as it ships: a missing cover counts.
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert [row["item_id"] for row in queued_payloads(engine)] == [coverless]
+
+        # The same domain opting out of the cover condition: the identical row
+        # is no longer worth a lookup, and nothing is queued.
+        book = DOMAINS["book"]
+        opted_out = dc_replace(
+            book,
+            enrichment=dc_replace(
+                book.enrichment
+                or EnrichmentSpec(
+                    identity_kinds=("isbn",),
+                    provider_order=("openlibrary",),
+                    completeness_fields=(),
+                ),
+                wants_cover=False,
+            ),
+        )
+        DOMAINS["book"] = opted_out
+        try:
+            from book_tracker.infrastructure.models import JobRow  # noqa: F401
+
+            assert _backfillable_items(engine) == []
+        finally:
+            DOMAINS["book"] = book
+
+
+@pytest.mark.anyio
+async def test_a_domain_that_does_not_want_a_year_is_not_requeued_without_one(
+    tmp_path: Path,
+) -> None:
+    """The sharper half of the same defect: no provider contract guarantees a
+    year, so a domain whose rows legitimately carry none would be re-queued on
+    every backfill for ever. A book with no year, complete on the domain's own
+    fields, is the case."""
+    from dataclasses import replace as dc_replace
+
+    from book_tracker.application.enrichment import _backfillable_items
+    from book_tracker.domain.registry import DOMAINS
+    from book_tracker.domain.spec import EnrichmentSpec
+
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        # No year, no cover needed either (both supplied), complete otherwise.
+        yearless = create_item_with_isbn(
+            engine,
+            "Yearless",
+            RECORDED_ISBN,
+            cover_path="covers/7.jpg",
+            metadata={"creators": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
+        )
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert [row["item_id"] for row in queued_payloads(engine)] == [yearless]
+
+        book = DOMAINS["book"]
+        base = book.enrichment or EnrichmentSpec(
+            identity_kinds=("isbn",), provider_order=("openlibrary",), completeness_fields=()
+        )
+        DOMAINS["book"] = dc_replace(book, enrichment=dc_replace(base, wants_year=False))
+        try:
+            assert _backfillable_items(engine) == []
+        finally:
+            DOMAINS["book"] = book

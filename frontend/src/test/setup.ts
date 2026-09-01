@@ -20,6 +20,31 @@ if (!Element.prototype.scrollIntoView) {
   Element.prototype.scrollIntoView = () => undefined;
 }
 /**
+ * jsdom *defines* `window.scrollTo` but makes it throw `Not implemented`, so
+ * unlike the shims above this cannot be guarded on absence — it has to replace
+ * the throwing stub outright. @tanstack/react-virtual calls it on every mount
+ * of a virtualized list, and each call printed a full stack trace to stderr:
+ * harmless, but it buried real output under pages of noise. Scrolling is not
+ * what these tests assert; the Playwright suite exercises the real thing.
+ */
+window.scrollTo = () => undefined;
+
+/**
+ * Motion logs one warning per VisualElement mount when reduced motion is on —
+ * "You have Reduced Motion enabled on your device." — and this suite turns
+ * reduced motion ON deliberately (see below), so ten stderr lines of that
+ * warning are noise on every green run, burying a real `console.error` the
+ * way `scrollTo`'s stack traces once did. Motion has no flag for it
+ * (`MotionGlobalConfig` covers skipping animations, not the notice), so the
+ * message is filtered at `console.warn` — one known string, nothing else.
+ */
+const MOTION_NOTICE = "You have Reduced Motion enabled";
+const warn = console.warn.bind(console);
+console.warn = (...args: unknown[]) => {
+  if (typeof args[0] === "string" && args[0].includes(MOTION_NOTICE)) return;
+  warn(...args);
+};
+/**
  * jsdom has no `ResizeObserver` at all, and cmdk constructs one as it mounts, so
  * the shelf picker's list throws before it can render. Nothing here measures
  * anything — every layout assertion lives in the Playwright suite, which runs in a

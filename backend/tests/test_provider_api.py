@@ -5,6 +5,7 @@ import pytest
 
 from book_tracker.config import Settings
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
+from book_tracker.infrastructure.providers import ProviderPayloadError
 from book_tracker.main import create_app
 
 
@@ -303,3 +304,86 @@ async def test_a_failed_preview_is_a_502_and_not_a_crash(tmp_path: Path) -> None
             )
     assert response.status_code == 502
     assert response.json()["error"]["code"] == "provider_failure"
+
+
+# ----------------------------------------------------------------------------------
+# Sprint 055, deliverable 2: the two defects DEC-100 recorded and left.
+# ----------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_record_that_does_not_exist_is_a_miss_not_an_outage(
+    tmp_path: Path,
+) -> None:
+    """A typed `record_not_found` is an answer: "no such record". Mapping it to
+    502 tells the owner the provider is down when the provider said, precisely
+    and in a typed way, that the record does not exist (DEC-100)."""
+
+    class Missing(Provider):
+        name = "openlibrary"
+        item_type = "book"
+
+        async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+            return []
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            raise ProviderPayloadError("No edition at this id", code="record_not_found")
+
+        async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+            raise ProviderPayloadError("No edition at this id", code="record_not_found")
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.providers = {"openlibrary": Missing()}
+        miss = await client.get(
+            "/api/search/resolve",
+            params={"url": "https://openlibrary.org/books/OL00000000M"},
+        )
+        outage = await client.get(
+            "/api/search/resolve",
+            params={"url": "https://openlibrary.org/books/OL00000000M"},
+        )
+
+    assert miss.status_code == 404, miss.text
+    assert miss.json()["error"]["code"] == "record_not_found"
+    assert outage.status_code == 404
+    # The message is the provider's own sentence, carried through.
+    assert miss.json()["error"]["message"] == "No edition at this id"
+
+
+@pytest.mark.anyio
+async def test_a_transport_failure_still_reads_as_a_provider_failure(
+    tmp_path: Path,
+) -> None:
+    """The other half of the split: a real outage stays a 502, so the typed
+    miss is not hiding a provider that is genuinely down."""
+
+    class Unreachable(Provider):
+        name = "openlibrary"
+        item_type = "book"
+
+        async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+            return []
+
+        async def fetch(self, source_id: str) -> ItemPayload:
+            raise httpx.ConnectError("connection refused")
+
+        async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+            raise httpx.ConnectError("connection refused")
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        app.state.providers = {"openlibrary": Unreachable()}
+        failure = await client.get(
+            "/api/search/resolve",
+            params={"url": "https://openlibrary.org/books/OL19845805M"},
+        )
+
+    assert failure.status_code == 502, failure.text
+    assert failure.json()["error"]["code"] == "provider_failure"

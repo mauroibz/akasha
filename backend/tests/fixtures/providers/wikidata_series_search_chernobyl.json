@@ -1,0 +1,64 @@
+{
+  "batchcomplete": true,
+  "query": {
+    "searchinfo": {
+      "totalhits": 6
+    },
+    "search": [
+      {
+        "ns": 0,
+        "title": "Q48741246",
+        "pageid": 49762797,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "2019 miniseries about the Chernobyl disaster",
+        "timestamp": "2026-08-29T21:32:13Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q18406980",
+        "pageid": 19941100,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "television series",
+        "timestamp": "2026-08-30T19:58:22Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q111377804",
+        "pageid": 106346880,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "Russian TV series",
+        "timestamp": "2026-07-30T08:12:54Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q121879824",
+        "pageid": 116212987,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "",
+        "timestamp": "2026-07-06T00:49:30Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q86000614",
+        "pageid": 85266824,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "1986-1988 Soviet documentary film-trilogy",
+        "timestamp": "2024-07-19T18:17:51Z"
+      },
+      {
+        "ns": 0,
+        "title": "Q15270776",
+        "pageid": 16918951,
+        "size": null,
+        "wordcount": 0,
+        "snippet": "2013 television series by FILM.UA",
+        "timestamp": "2026-08-29T20:21:24Z"
+      }
+    ]
+  }
+}

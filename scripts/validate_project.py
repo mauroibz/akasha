@@ -35,8 +35,10 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # DEC-079 to 32, DEC-081 to 33, DEC-082 to 34, DEC-083 to 35, DEC-085 to 36,
 # DEC-089 to 41, DEC-094 to 42, DEC-095's first Triage insertion to 43,
 # DEC-096's owner-approved follow-up to 44, DEC-097's measured movie gate to 45, and
-# DEC-098's provider-backed movie domain/importer line to 47).
-FINAL_SPRINT = 48
+# DEC-098's provider-backed movie domain/importer line to 47, DEC-103's poster sprint to 48,
+# and DEC-104/DEC-106's measured series domain and multi-domain import line to 53,
+# and DEC-111's gate-optimization insertion to 54).
+FINAL_SPRINT = 55
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 
 import { AkashaMark } from "@/components/AkashaMark";
+import { DataCredit } from "@/components/DataCredit";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +95,12 @@ export function AppShell({ children }: { children: ReactNode }) {
           ))}
         </nav>
         <div data-route-key={location.pathname}>{children}</div>
+        {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
+            content so it never competes with a control. The mobile bottom padding
+            clears the fixed bottom navigation. */}
+        <footer className="pb-20 sm:pb-0">
+          <DataCredit />
+        </footer>
         <div className="h-16 sm:hidden" aria-hidden="true" />
         {/* The application's one visible feedback surface. Mounted at the shell so
           a confirmation survives the navigation that follows the action.

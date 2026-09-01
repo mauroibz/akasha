@@ -522,7 +522,7 @@ def parse_letterboxd(data: bytes) -> list[_Film]:
 class LetterboxdImporter:
     name = "letterboxd"
     label = "Letterboxd"
-    item_type = DOMAIN.item_type
+    item_types: tuple[str, ...] = (DOMAIN.item_type,)
     input = ImportInputSpec(
         kind="upload",
         label="Letterboxd export",
@@ -627,7 +627,7 @@ class LetterboxdImporter:
             title=record.item.title,
             first_author="",
             year=record.item.year,
-            item_type=self.item_type,
+            item_type=self.item_types[0],
         )
 
 

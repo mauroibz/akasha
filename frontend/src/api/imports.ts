@@ -57,7 +57,14 @@ export interface ImportInputSpec {
 export interface ImporterDefinition {
   id: string;
   label: string;
-  item_type: string;
+  /**
+   * Every library this connector can fill, ordered, first-declared first.
+   *
+   * A list rather than one name because a television export carries films and shows
+   * in one file (DEC-106). One entry means no choice to offer, so the screen renders
+   * no target checkboxes at all.
+   */
+  item_types: string[];
   input: ImportInputSpec;
   /** Per-file ceiling for attachments created by an import. */
   attachment_max_bytes: number;
@@ -92,7 +99,17 @@ export interface ImportPreview {
   batch_id: string;
   fingerprint: string;
   state: string;
-  summary: { total: number; ready: number; errors: number; ambiguous: number };
+  summary: {
+    total: number;
+    ready: number;
+    errors: number;
+    ambiguous: number;
+    /** Rows for a library that was not ticked. Not an error — a choice. */
+    skipped_not_requested: number;
+    /** Rows of a kind no library holds, counted so they are never silent. */
+    skipped_unsupported: number;
+    skipped_reasons: Array<{ reason: string; count: number }>;
+  };
   records: ImportRecord[];
 }
 export interface ImportResult {
@@ -205,12 +222,24 @@ export function planImport(
   }).then((response) => responseJson<ImportPlanResult>(response));
 }
 
+/**
+ * Preview a source into the libraries that were chosen for it.
+ *
+ * `targets` is which of the connector\'s declared types this import is for, omitted
+ * when every one is wanted. It travels as one comma-separated field so an upload and
+ * a folder bundle say it the same way, and as a list in the JSON path body. The
+ * server, not this client, applies it (DEC-106): a filter applied here would have to
+ * be reimplemented, correctly, by every future caller.
+ */
 export function previewImport(
   importer: ImporterDefinition,
   spec: ImportInputSpec,
   source: File | string | BundleMember[],
+  targets?: string[],
 ) {
   const url = `/api/import/${encodeURIComponent(importer.id)}/preview`;
+  const chosen =
+    targets && targets.length < importer.item_types.length ? targets : null;
   if (spec.kind === "directory") {
     const form = new FormData();
     for (const member of source as BundleMember[]) {
@@ -218,6 +247,7 @@ export function previewImport(
       // and refuses anything outside the shape it asked for.
       form.append(spec.field, member.file, member.path);
     }
+    if (chosen) form.append("targets", chosen.join(","));
     return fetch(url, { method: "POST", body: form }).then((response) =>
       responseJson<ImportPreview>(response),
     );
@@ -225,6 +255,7 @@ export function previewImport(
   if (spec.kind === "upload") {
     const form = new FormData();
     form.append(spec.field, source as File);
+    if (chosen) form.append("targets", chosen.join(","));
     return fetch(url, { method: "POST", body: form }).then((response) =>
       responseJson<ImportPreview>(response),
     );
@@ -232,7 +263,10 @@ export function previewImport(
   return fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ [spec.field]: source }),
+    body: JSON.stringify({
+      [spec.field]: source,
+      ...(chosen ? { targets: chosen } : {}),
+    }),
   }).then((response) => responseJson<ImportPreview>(response));
 }
 
