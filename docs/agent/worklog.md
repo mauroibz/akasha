@@ -3006,3 +3006,49 @@ so 050 adds an adapter, not a declaration.
 - **Next.** Sprint 054 — the Trakt import, the last planned sprint. Read
   `docs/sprints/054-trakt-import.md`; its baseline was rewritten at this closure with what 053
   established.
+
+## 2026-09-01 — Sprint 054 (complete): the Trakt import
+
+- **Done.** One connector, `trakt`, in `backend/src/book_tracker/domains/movie/trakt.py` plus one
+  import and one tuple entry in `domain/registry.py`. Six members read, 31 counted by the source's
+  own word, four never opened (the sprint's two email-carrying members, plus
+  `user-last-activities.json` and `user-stats.json` — account telemetry, same treatment). Progress
+  is distinct `(show, season, number)` events excluding season 0; `plays` is the fallback and a row
+  that used it says so in its entry notes. Two commits, `45fd3c4` and `a5f79d0`.
+- **The negative criterion held.** `application/imports.py`, `api/imports.py`, `ImportPage.tsx` and
+  `TriagePage.tsx` untouched, verified by diff against `7200758`; no other shared or frontend file
+  changed either.
+- **Two contract findings, both recorded in the Outcome.** (1) The Verification block named
+  `tests/test_imports.py` again — corrected, as Sprint 053 did; the focused suites are the six
+  import-flavoured files, 439 tests. (2) AC4's "visible warning" cannot be a row error (errors
+  block commit, DEC-112) nor a UI change (AC11), and the shared entry-value allowlist refuses
+  unknown names in `values` — so it rides `entry.notes`, rendered on the Detail page, with a
+  `plays_used` marker in `source_fields`.
+- **Verified.** `tests/test_trakt_import.py` 80 passed, every fixture synthetic. Neighbouring
+  suites 359 green with the connector registered. `make check` green after four lint fixes and two
+  mypy narrowings. `make test` 1172 backend (exactly 1092 + 80) + 194 frontend. Serial Playwright
+  106 passed + 2 skipped.
+- **Walkthrough gate, on the owner's real archive, live boundary, fresh backend per attempt.**
+  `scripts/walkthrough_trakt_054.py` (API, 27 checks, all passed): preview 3 rows 0 errors;
+  BoJack 76/76 and Ted Lasso 38/38, no `plays` fallback; commit 3; inbox 3; stored progress 76/38;
+  detail payloads carry progress and total; the IMDb ratings export previews its 2 overlapping
+  rows as `reuse_item` and commits 0 items 0 entries; undo takes back exactly the Trakt rows.
+  `frontend/e2e/scratchpad/sprint54-walkthrough.spec.ts` (browser, 8.9 s): both target checkboxes
+  and the VIP note on the Trakt tab; all three rows approved through the Triage UI; **the progress
+  control reads "76 / 76 episodes" on BoJack's detail page**; the IMDb overlap commits without
+  duplicating; both titles exactly once in their libraries.
+- **Harness lessons this session paid for.** (1) The walkthrough script's first order ran the IMDb
+  overlap *after* an undo — undo is terminal for a fingerprint, so the re-preview replayed the
+  undone batch and the overlap compared against an empty library. Order matters: match checks
+  need the rows, undo goes last. (2) The two IMDb CSVs are easy to swap: the `Const,...` header is
+  the *ratings* export (the overlapping one); the `Position,...` header is a *list* export
+  (House of the Dragon, no overlap). (3) The Library grid's rows are `button "Open <title>"`, not
+  links, and the Library is domain-scoped via `/?type=series`. (4) The shared Import preview does
+  not render entry values — progress is proven on the Detail page, not the preview screen.
+- **Also observed, out of scope.** Nothing new: the recorded defects remain Sprint 055's list.
+- **Process note.** The plan-revision-29 session (commit `7200758`) never appended a worklog entry
+  despite AGENTS.md §2.6 — this entry covers both sessions' reality; the next session should not
+  have to re-derive what revision 29 changed (Sprint 055 planned, FINAL_SPRINT 54→55).
+- **Next.** Sprint 055 — the recorded defects and the gate repairs, the last planned sprint.
+  Read `docs/sprints/055-recorded-defects.md`. The release decision (v1.5.0, tagging the movie
+  line's v1.4.0) comes after it, and nothing is pushed unasked.

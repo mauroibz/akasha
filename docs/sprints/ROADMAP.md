@@ -2,7 +2,7 @@
 
 **Plan revision:** 29
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [054 — The Trakt import](054-trakt-import.md)
+**Active sprint:** [055 — The recorded defects, and the gates that stopped paying](055-recorded-defects.md)
 
 ## Shape of the plan
 
@@ -161,8 +161,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [051](051-verification-gate-optimization.md) | The verification gates get faster | 050 | completed |
 | [052](052-multi-domain-imports.md) | One source, many libraries | 049, 051 | completed |
 | [053](053-imdb-import.md) | The IMDb import | 049, 052 | completed |
-| [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | ready |
-| [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | planned |
+| [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | completed |
+| [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | ready |
 
 ## Sprint contracts
 

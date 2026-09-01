@@ -1,6 +1,6 @@
 # Sprint 054 — The Trakt import
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 049, 052, 053
 
 **Roadmap revision:** 28
@@ -184,4 +184,68 @@ the same library and that is the interesting case, not the happy path.
 
 ## Outcome
 
-_Not started._
+**Delivered 2026-08-31, commits `45fd3c4` and `a5f79d0`.** One connector, `trakt`, in
+`backend/src/book_tracker/domains/movie/trakt.py` plus one import and one tuple entry in
+`backend/src/book_tracker/domain/registry.py`. Nothing else changed: `application/imports.py`,
+`api/imports.py`, `ImportPage.tsx` and `TriagePage.tsx` are untouched (AC11, verified by diff
+against `7200758`), and neither is any other frontend or shared file.
+
+**The reader.** Six members consumed; 31 counted-not-read members tallied by the source's own
+word (`season rating`, `episode rating`, `collection entry`, `comment`, `note`, `like`, follower
+graph, hidden items, playback progress); four never opened (`user-settings.json`,
+`user-profile.json`, `user-last-activities.json`, `user-stats.json`). Every Letterboxd refusal
+made, plus a not-a-list-of-objects refusal JSON needed. Bounded per member and in total, declared
+sizes checked before decompression and re-checked mid-read. Scores map 1:1 with nothing
+provisional; `rated_at` is not a viewing date; the `plex` sub-object is never read; `trakt`/`slug`/
+`tmdb`/`tvdb` do not become authoritative identities.
+
+**The roll-up.** Progress is distinct `(show, season, number)` with `action == "watch"`,
+excluding season 0; `episodes` metadata is `aired_episodes` at export. The `plays` fallback fires
+when history is absent or holds nothing for a show, is never clamped to the total (DEC-092), and
+a row that used it carries the fact in its entry notes — a row *error* would block a healthy
+commit, and the shared entry-value allowlist (`validate_entry_values`) owns what `values` may
+hold, so the marker rides `source_fields["plays_used"]` instead.
+
+**Tests.** `tests/test_trakt_import.py`: 80 tests, every fixture synthetic and invented — the
+malformed-`user-settings.json` archive proves nothing reads the private members (AC7), the
+26-empty-members shape imports cleanly (AC8), a rewatched episode does not inflate progress (AC3),
+progress above the total is kept (AC5), season/episode ratings are counted not scored (AC6), and
+the Letterboxd/IMDb identity matches are exact (AC10).
+
+**Verification.** `make check` green (ruff format + lint, mypy, frontend types, OpenAPI, validator).
+`make test` 1172 backend + 194 frontend, all green — the backend delta is exactly this sprint's 80
+tests (1092 + 80). Serial Playwright 106 passed + 2 skipped (the parallel split remains never-green
+until Sprint 055). The Verification block's `tests/test_imports.py` does not exist; the focused
+suites run were `test_trakt_import.py`, `test_domain_conformance.py`,
+`test_multi_domain_imports.py`, `test_generic_imports.py`, `test_imdb_import.py` and
+`test_letterboxd_import.py` — 439 tests across the six files.
+
+**Walkthrough gate, on the owner's real archive, live boundary, fresh backend per attempt.**
+Two flows, both green:
+
+- `scripts/walkthrough_trakt_054.py` (API, 27 checks): preview 3 rows 0 errors; BoJack 76/76 and
+  Ted Lasso 38/38 with no `plays` fallback; both `completed`, film `watched` score 7, shows 10 and
+  8; commit 3; inbox 3; stored progress 76/38; detail payloads carry progress and total; the IMDb
+  ratings export previews its 2 overlapping rows as `reuse_item` and commits 0 items 0 entries
+  (AC10's interesting case); undo takes back exactly the Trakt rows.
+- `frontend/e2e/scratchpad/sprint54-walkthrough.spec.ts` (browser, 8.9 s): the Trakt tab renders
+  both target checkboxes and the VIP note; the real archive previews 3 ready 0 errors; suggested
+  statuses on the preview rows; commit; **all three rows approved through the Triage UI** with
+  per-domain vocabulary; the progress control reads **"76 / 76 episodes"** on BoJack's detail
+  page; the IMDb overlap commits without duplicating; both titles appear exactly once in their
+  libraries.
+
+**Deviations.** (1) The Verification block's `tests/test_imports.py` corrected as above — the same
+miss Sprint 053 recorded. (2) AC4's "visible warning" is the row's `entry.notes` (rendered on the
+Detail page and carried through the API) rather than a preview-screen element: a row error would
+refuse a healthy commit and AC11 forbids a UI change, so notes are the one surface the sprint left
+available. (3) The watchlist member's populated shape remains declared-not-measured; no populated
+archive was available to measure against. (4) Two fixture-side test errors (colliding synthetic
+titles, a wrong `plays` expectation) were corrected against the designed rules, not by weakening
+any assertion.
+
+**Observed, out of scope.** The owner's real archive's `user-last-activities.json` and
+`user-stats.json` carry account telemetry this reader ignores like the two email members — a
+deliberate extension of the never-opened list beyond the sprint's two, recorded here because the
+sprint named only the pair. The Library's `?type=` scoping and the Import preview's non-rendering
+of entry values are pre-existing screens this sprint did not touch.

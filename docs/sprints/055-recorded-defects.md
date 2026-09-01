@@ -1,6 +1,6 @@
 # Sprint 055 — The recorded defects, and the gates that stopped paying
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 054
 
 **Roadmap revision:** 29
