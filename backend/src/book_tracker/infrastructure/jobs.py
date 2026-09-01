@@ -11,12 +11,14 @@ from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.models import JobRow
+from book_tracker.reclaim import reclaim_import_batches
 
 
 def _now() -> str:
@@ -341,6 +343,7 @@ class JobRunner:
         rate_limiter: RateLimiter | None = None,
         poll_interval: float = 1.0,
         max_retries: int = DEFAULT_MAX_RETRIES,
+        data_dir: Path | None = None,
     ) -> None:
         self.engine = engine
         self.repo = JobRepository(engine)
@@ -348,6 +351,10 @@ class JobRunner:
         self.rate_limiter = rate_limiter
         self.poll_interval = poll_interval
         self.max_retries = max_retries
+        #: Only for `reclaim_import_batches` on each idle tick (Sprint 060). `None`
+        #: (the default, and every existing caller) simply skips that sweep, so
+        #: nothing about job leasing depends on it.
+        self.data_dir = data_dir
         self._running = False
 
     async def run_forever(self) -> None:
@@ -355,7 +362,8 @@ class JobRunner:
 
         Nothing called `tick` before Sprint 014, so no enqueued job had ever been
         processed. Reclaiming expired leases on each idle pass is what returns work
-        abandoned by a crash.
+        abandoned by a crash; collecting committed batches past their undo window
+        (Sprint 060) is the same shape of housekeeping, run the same way.
         """
         self._running = True
         while self._running:
@@ -363,6 +371,8 @@ class JobRunner:
                 now = datetime.now(UTC)
                 if not await self.tick(now):
                     self.repo.reclaim_expired(now)
+                    if self.data_dir is not None:
+                        reclaim_import_batches(self.engine, self.data_dir, now=now)
                     await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:
                 raise

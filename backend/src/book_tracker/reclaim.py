@@ -40,9 +40,15 @@ import sys
 import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from datetime import UTC, datetime
 from pathlib import Path
+from shutil import rmtree
+
+from sqlalchemy import Engine, select
+from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.attachments import ATTACHMENTS_DIR
+from book_tracker.infrastructure.models import ImportBatchRow
 
 DATABASE_NAME = "books.db"
 GRACE_SECONDS = 3600
@@ -187,6 +193,49 @@ def _referenced_digests(database_path: Path) -> set[str]:
 
 class ReclaimError(RuntimeError):
     """The store or the database could not be read, so nothing was reclaimed."""
+
+
+@dataclass(frozen=True)
+class ImportBatchReclaimReport:
+    """Which committed batches' staging directories were removed."""
+
+    reclaimed: tuple[str, ...] = ()
+
+
+def reclaim_import_batches(
+    engine: Engine, data_dir: Path, *, now: datetime | None = None
+) -> ImportBatchReclaimReport:
+    """Remove a committed batch's staging directory once its undo window has passed.
+
+    Unlike `reclaim_attachments`, this is not deletion by inference. `application/undo.py`
+    never reads `data_dir / "imports" / batch_id` — it works entirely from the database
+    ledger and the attachments store — and nothing else in this codebase reads a batch's
+    staging directory after `ImportService.commit` has already moved its staged covers
+    into `covers/`. A committed batch past its undo window therefore has nothing left that
+    depends on this directory, which is what makes automatic removal safe here where it
+    would not be for an attachment blob. Runs on every `JobRunner` idle tick, alongside
+    `JobRepository.reclaim_expired` — no `--apply` gate, for the same reason.
+
+    An uncommitted (still-`previewed`) batch that is simply abandoned is not covered: its
+    `undo_expires_at` is never set, so it never becomes a candidate here. That is a
+    narrower, separate leak from the one this sprint's acceptance criteria describe.
+    """
+    now_iso = (now or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
+    reclaimed: list[str] = []
+    with Session(engine) as session:
+        expired = session.scalars(
+            select(ImportBatchRow).where(
+                ImportBatchRow.state == "committed",
+                ImportBatchRow.undo_expires_at.is_not(None),
+                ImportBatchRow.undo_expires_at <= now_iso,
+            )
+        ).all()
+        for batch in expired:
+            staging = data_dir / "imports" / batch.id
+            if staging.is_dir():
+                rmtree(staging)
+                reclaimed.append(batch.id)
+    return ImportBatchReclaimReport(reclaimed=tuple(reclaimed))
 
 
 def main(argv: list[str] | None = None) -> int:

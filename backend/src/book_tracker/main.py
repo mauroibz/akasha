@@ -238,6 +238,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.engine,
             {"enrich_item": enrichment_handler},
             rate_limiter=rate_limiter,
+            data_dir=configured.data_dir,
         )
         app.state.job_runner = job_runner
         # Reclaim expired jobs from a potential crash (best-effort;
