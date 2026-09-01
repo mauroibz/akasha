@@ -5,7 +5,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="BOOK_TRACKER_", extra="ignore")
+    # DEC-119: the prefix is AKASHA_, a clean break from BOOK_TRACKER_ with no
+    # alias. The two compose-side names that already carried the AKASHA_
+    # spelling (AKASHA_BIND, AKASHA_PORT) now fall inside this prefix and are
+    # absorbed by extra="ignore" — a test pins that.
+    model_config = SettingsConfigDict(env_prefix="AKASHA_", extra="ignore")
 
     data_dir: Path = Path("/data")
     calibre_dir: Path = Path("/calibre")
@@ -22,7 +26,7 @@ class Settings(BaseSettings):
     environment: str = "development"
     # Daily request budgets per provider. Configuration rather than code (DEC-045), so
     # a metered provider added later is an entry here and not a patch: override with
-    # BOOK_TRACKER_PROVIDER_DAILY_LIMITS as JSON. A provider absent from this mapping is
+    # AKASHA_PROVIDER_DAILY_LIMITS as JSON. A provider absent from this mapping is
     # unmetered and never blocked. 900 rather than Google's real ~1000 is deliberate
     # headroom, because their quota resets on Pacific time and the counter uses UTC.
     provider_daily_limits: dict[str, int] = Field(default_factory=lambda: {"googlebooks": 900})

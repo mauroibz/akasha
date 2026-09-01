@@ -4,7 +4,7 @@ const DEV_PORT = 4173;
 const PREVIEW_PORT = 4174;
 const PRODUCTION_BUNDLE = /production-bundle\.spec\.ts/;
 const SCRATCHPAD = /scratchpad/;
-const INCLUDE_SCRATCHPAD = process.env.BOOK_TRACKER_INCLUDE_SCRATCHPAD === "1";
+const INCLUDE_SCRATCHPAD = process.env.AKASHA_INCLUDE_SCRATCHPAD === "1";
 // The two 10,000-entry DOM-budget invariants in library.spec.ts (DEC-023) are
 // load-sensitive: asserted mounted-row bounds assume the machine is not running
 // the rest of the suite beside them. They run alone in the serial project

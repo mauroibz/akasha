@@ -91,14 +91,14 @@ Environment variables:
 
 | Variable | Required | Default | Meaning |
 |---|---:|---|---|
-| `BOOK_TRACKER_DATA_DIR` | no | `/data` | DB, covers, staged imports, backups |
-| `BOOK_TRACKER_CALIBRE_DIR` | no | `/calibre` | read-only Calibre library root |
-| `BOOK_TRACKER_DATABASE_URL` | no | derived | SQLite URL, overridable in tests |
+| `AKASHA_DATA_DIR` | no | `/data` | DB, covers, staged imports, backups |
+| `AKASHA_CALIBRE_DIR` | no | `/calibre` | read-only Calibre library root |
+| `AKASHA_DATABASE_URL` | no | derived | SQLite URL, overridable in tests |
 | `GOOGLE_BOOKS_API_KEY` | no | empty | enables Google Books provider |
 | `USER_AGENT_CONTACT` | yes in production | none | contact included in provider User-Agent |
 | `TZ` | no | `UTC` | display/default local timezone; stored dates remain ISO |
 | `LOG_LEVEL` | no | `INFO` | structured application log threshold |
-| `BOOK_TRACKER_ATTACHMENT_MAX_BYTES` | no | `26214400` | per-file cap on attachments; bounds the worst file, not the total |
+| `AKASHA_ATTACHMENT_MAX_BYTES` | no | `26214400` | per-file cap on attachments; bounds the worst file, not the total |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -404,7 +404,7 @@ Preview is mandatory and has no library side effects beyond durable staging/audi
 Goodreads files are copied to `/data/imports/{batch_id}/` with size limits and a SHA-256 fingerprint.
 Parse and persist normalized `ImportRecord` rows, match decisions, explicit ambiguities, row errors,
 and preview counts. Calibre requests identify only a path relative to configured
-`BOOK_TRACKER_CALIBRE_DIR`; resolve and verify it cannot escape the mount, open `metadata.db` with
+`AKASHA_CALIBRE_DIR`; resolve and verify it cannot escape the mount, open `metadata.db` with
 `mode=ro` and `PRAGMA query_only=ON`, and stage its normalized rows during preview so commit never
 rereads a changing source DB.
 

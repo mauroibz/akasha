@@ -53,9 +53,9 @@ smoke_tag="smoke-$$"
 #   defaults.env  the shipped defaults, for the port check — a config-file
 #                 property, asserted resolved and never bound here
 #   example.env   .env.example verbatim: the environment a fresh install
-#                 copies, including its BOOK_TRACKER_ENVIRONMENT=development
+#                 copies, including its AKASHA_ENVIRONMENT=development
 #   no-contact.env  example.env minus USER_AGENT_CONTACT: must refuse to start
-printf 'BOOK_TRACKER_ATTACHMENT_MAX_BYTES=1024\nBOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS=12000\nTMDB_READ_TOKEN=token-for-smoke\n' > "$workdir/smoke.env"
+printf 'AKASHA_ATTACHMENT_MAX_BYTES=1024\nAKASHA_SQLITE_BUSY_TIMEOUT_MS=12000\nTMDB_READ_TOKEN=token-for-smoke\n' > "$workdir/smoke.env"
 : > "$workdir/bare.env"
 printf 'USER_AGENT_CONTACT=%s\nTZ=UTC\n' "$USER_AGENT_CONTACT" > "$workdir/defaults.env"
 cp .env.example "$workdir/example.env"
@@ -93,7 +93,7 @@ container_env() {
   docker compose exec -T akasha python -c '
 import json
 from os import environ
-print(json.dumps({name: environ.get(name) for name in sorted(environ) if name.startswith("BOOK_TRACKER_") or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
+print(json.dumps({name: environ.get(name) for name in sorted(environ) if name.startswith("AKASHA_") or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
 '
 }
 
@@ -218,6 +218,20 @@ print(entry["item"]["title"], entry["score"], entry["notes"], sep="|")
 expected="Ficciones|9|Kept for the Aleph, reread for the maps."
 [ "$(read_back)" = "$expected" ] || fail "the entry did not read back: $(read_back)"
 
+step "AC4: the API calls itself Akasha and reports its version"
+# The OpenAPI document the running container serves is the generated contract
+# the frontend type-checks against; its title dropped "Book Tracker" (DEC-119).
+# FastAPI serves the schema at its default /openapi.json, registered before
+# the SPA catch-all, so it is the served contract and not the shell.
+served_openapi="$(api /openapi.json)"
+printf '%s' "$served_openapi" | python3 -c '
+import json, sys
+
+document = json.load(sys.stdin)
+assert document["info"]["title"] == "Akasha", document["info"]
+assert document["info"]["version"] == "1.5.1", document["info"]
+' || fail "the served OpenAPI title/version is wrong: $(printf '%s' "$served_openapi" | head -c 200)"
+
 step "AC5: the documented settings are visible in the process"
 # smoke.env sets all three of Sprint 056's pass-throughs with values chosen to
 # prove travel: a cap that is not the default, a timeout that is not the
@@ -226,10 +240,10 @@ container_env | python3 -c '
 import json, sys
 
 env = json.loads(sys.stdin.read())
-assert env.get("BOOK_TRACKER_ATTACHMENT_MAX_BYTES") == "1024", env
-assert env.get("BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS") == "12000", env
+assert env.get("AKASHA_ATTACHMENT_MAX_BYTES") == "1024", env
+assert env.get("AKASHA_SQLITE_BUSY_TIMEOUT_MS") == "12000", env
 assert env.get("TMDB_READ_TOKEN") == "token-for-smoke", env
-assert env.get("BOOK_TRACKER_ENVIRONMENT") == "production", env
+assert env.get("AKASHA_ENVIRONMENT") == "production", env
 ' || fail "the settings smoke.env set did not reach the process: $(container_env)"
 
 step "AC4: the attachment cap the application enforces is the one .env sent"
@@ -305,7 +319,7 @@ print("calibre read through the adapter, query_only enforced")
 ' || fail "the Calibre adapter could not read the read-only mount"
 
 step "AC6: a .env copied verbatim from .env.example starts production"
-# The example file sets BOOK_TRACKER_ENVIRONMENT=development. The compose
+# The example file sets AKASHA_ENVIRONMENT=development. The compose
 # environment list is the boundary: it names what the container may receive,
 # and that variable is not on it, so a fresh install copying the example
 # verbatim still runs production. The shell exports (port, bind, calibre,
@@ -317,12 +331,12 @@ container_env | python3 -c '
 import json, sys
 
 env = json.loads(sys.stdin.read())
-assert env.get("BOOK_TRACKER_ENVIRONMENT") == "production", env
+assert env.get("AKASHA_ENVIRONMENT") == "production", env
 # The example documents the token and the cap as commented lines, so neither
 # reaches the process; the busy timeout is an active example line, so it does.
 assert "TMDB_READ_TOKEN" not in env, env
-assert "BOOK_TRACKER_ATTACHMENT_MAX_BYTES" not in env, env
-assert env.get("BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS") == "5000", env
+assert "AKASHA_ATTACHMENT_MAX_BYTES" not in env, env
+assert env.get("AKASHA_SQLITE_BUSY_TIMEOUT_MS") == "5000", env
 ' || fail "the example .env changed the container's environment: $(container_env)"
 
 step "AC6: removing USER_AGENT_CONTACT refuses to start"
@@ -345,10 +359,10 @@ container_env | python3 -c '
 import json, sys
 
 env = json.loads(sys.stdin.read())
-assert "BOOK_TRACKER_ATTACHMENT_MAX_BYTES" not in env, env
-assert "BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS" not in env, env
+assert "AKASHA_ATTACHMENT_MAX_BYTES" not in env, env
+assert "AKASHA_SQLITE_BUSY_TIMEOUT_MS" not in env, env
 assert "TMDB_READ_TOKEN" not in env, env
-assert env.get("BOOK_TRACKER_ENVIRONMENT") == "production", env
+assert env.get("AKASHA_ENVIRONMENT") == "production", env
 ' || fail "an unset setting reached the container anyway: $(container_env)"
 
 step "AC3: backup, verify, and restore into an empty directory"

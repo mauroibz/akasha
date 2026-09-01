@@ -209,7 +209,7 @@ async def main() -> None:
                 break
             await asyncio.sleep(0.05)
         print(f"walkthrough backend on http://127.0.0.1:{port}", flush=True)
-        print(f"BOOK_TRACKER_DATA_DIR={data_dir}", flush=True)
+        print(f"AKASHA_DATA_DIR={data_dir}", flush=True)
         try:
             await task
         finally:

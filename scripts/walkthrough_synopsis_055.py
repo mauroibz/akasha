@@ -9,7 +9,7 @@ enrichment finish, and reads the stored synopsis back. BoJack Horseman is the
 measured series from Sprint 053's record — Wikidata's description is the one-line
 "serie de televisión animada" and TVmaze has a real synopsis.
 
-    BOOK_TRACKER_BASE_URL=http://127.0.0.1:<port> \
+    AKASHA_BASE_URL=http://127.0.0.1:<port> \
     uv run python ../scripts/walkthrough_synopsis_055.py
 """
 
@@ -24,7 +24,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-BASE = os.environ.get("BOOK_TRACKER_BASE_URL", "http://127.0.0.1:37555")
+BASE = os.environ.get("AKASHA_BASE_URL", "http://127.0.0.1:37555")
 TIMEOUT_SECONDS = 60
 FAILED: list[str] = []
 

@@ -324,7 +324,7 @@ def test_the_backup_cli_does_not_need_the_application_configured(tmp_path: Path)
         key: value
         for key, value in os.environ.items()
         if key not in {"USER_AGENT_CONTACT", "GOOGLE_BOOKS_API_KEY"}
-    } | {"BOOK_TRACKER_ENVIRONMENT": "production"}
+    } | {"AKASHA_ENVIRONMENT": "production"}
 
     completed = subprocess.run(
         [sys.executable, "-m", "book_tracker.backup", "verify", str(result.path)],

@@ -7,7 +7,7 @@ the API, undo, and the IMDb-overlap re-import. The archive is read-only input;
 nothing from it is printed beyond counts and titles it shares with the public
 catalog.
 
-    BOOK_TRACKER_BASE_URL=http://127.0.0.1:<port> \
+    AKASHA_BASE_URL=http://127.0.0.1:<port> \
     TRAKT_ARCHIVE=exports/trakt-export-*.zip IMDB_RATINGS=exports/*.csv \
     uv run python ../scripts/walkthrough_trakt_054.py
 """
@@ -21,7 +21,7 @@ import sys
 import urllib.request
 import urllib.error
 
-BASE = os.environ.get("BOOK_TRACKER_BASE_URL", "http://127.0.0.1:41517")
+BASE = os.environ.get("AKASHA_BASE_URL", "http://127.0.0.1:41517")
 # No default. An owner path inlined here is an account identifier committed to a public
 # repository, which is what Sprint 055's handoff already asked these scripts not to do:
 # owner paths come through the environment, never inline.

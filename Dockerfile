@@ -16,10 +16,10 @@ RUN uv sync --frozen --no-dev --no-editable && uv build
 
 FROM python:3.12-slim AS runtime
 ENV PATH=/opt/venv/bin:$PATH \
-    BOOK_TRACKER_DATA_DIR=/data \
-    BOOK_TRACKER_BACKUP_DIR=/backups \
-    BOOK_TRACKER_STATIC_DIR=/app/static \
-    BOOK_TRACKER_ENVIRONMENT=production \
+    AKASHA_DATA_DIR=/data \
+    AKASHA_BACKUP_DIR=/backups \
+    AKASHA_STATIC_DIR=/app/static \
+    AKASHA_ENVIRONMENT=production \
     PYTHONUNBUFFERED=1
 RUN groupadd --system --gid 10001 akasha && useradd --system --uid 10001 --gid akasha --home /app akasha
 WORKDIR /app

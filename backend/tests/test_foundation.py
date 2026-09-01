@@ -149,3 +149,38 @@ def test_backup_dir_is_overridable(tmp_path: Path) -> None:
     )
 
     assert configured.backup_dir == tmp_path / "elsewhere"
+
+
+def test_settings_are_read_through_the_akasha_prefix(monkeypatch: pytest.MonkeyPatch) -> None:
+    """DEC-119: the prefix is `AKASHA_`, and the old `BOOK_TRACKER_` name is dead.
+
+    No alias, by the owner's explicit instruction: an operator's `.env` that
+    still sets a `BOOK_TRACKER_*` variable is silently ignored from v1.5.1 on,
+    which the release notes name rather than paper over.
+    """
+    monkeypatch.setenv("AKASHA_DATA_DIR", "/prefix/works")
+    monkeypatch.setenv("BOOK_TRACKER_DATA_DIR", "/old/prefix/is/ignored")
+    monkeypatch.setenv("USER_AGENT_CONTACT", "test@example.invalid")
+
+    configured = Settings()
+
+    assert configured.data_dir == Path("/prefix/works")
+
+
+def test_compose_side_akasha_names_are_ignored_not_applied(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """`AKASHA_BIND` and `AKASHA_PORT` are compose interpolation variables.
+
+    After DEC-119 they fall inside the pydantic prefix, so prove the thing that
+    must now hold: they are absorbed by `extra="ignore"` and change no setting.
+    """
+    monkeypatch.setenv("AKASHA_BIND", "127.0.0.1")
+    monkeypatch.setenv("AKASHA_PORT", "4441")
+    monkeypatch.setenv("USER_AGENT_CONTACT", "test@example.invalid")
+
+    configured = Settings()
+
+    assert (
+        configured.model_dump() == Settings(user_agent_contact="test@example.invalid").model_dump()
+    )

@@ -11,7 +11,7 @@ dev:
 
 .PHONY: dev-backend dev-frontend
 dev-backend:
-	cd backend && BOOK_TRACKER_DATA_DIR=../data USER_AGENT_CONTACT=local@example.invalid $(UV_ENV) uv run uvicorn book_tracker.main:app --reload
+	cd backend && AKASHA_DATA_DIR=../data USER_AGENT_CONTACT=local@example.invalid $(UV_ENV) uv run uvicorn book_tracker.main:app --reload
 
 dev-frontend:
 	cd frontend && npm run dev

@@ -91,7 +91,7 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src", import.meta.url)) } },
   server: {
     proxy: {
-      "/api": process.env.BOOK_TRACKER_E2E_BACKEND ?? "http://localhost:8000",
+      "/api": process.env.AKASHA_E2E_BACKEND ?? "http://localhost:8000",
     },
   },
   test: {

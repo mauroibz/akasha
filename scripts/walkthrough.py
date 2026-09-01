@@ -23,7 +23,7 @@ Playwright spec or a script — runs against the base URL it prints:
   provider — and the enrichment handler's cover client — replays through it.
   Without `--replay` the whole boundary is live.
 - The source library a flow needs is passed by the flow itself through the
-  environment (`BOOK_TRACKER_WALKTHROUGH_LIBRARY`); the launcher never
+  environment (`AKASHA_WALKTHROUGH_LIBRARY`); the launcher never
   hardcodes an owner path.
 
 The runner drives the lifespan itself (`lifespan="off"` on uvicorn) because the
@@ -111,7 +111,7 @@ async def serve(args: argparse.Namespace) -> int:
             loop.add_signal_handler(sig, stop.set)
 
         print(f"walkthrough backend on http://127.0.0.1:{port}", flush=True)
-        print(f"BOOK_TRACKER_DATA_DIR={data_dir}", flush=True)
+        print(f"AKASHA_DATA_DIR={data_dir}", flush=True)
         try:
             await stop.wait()
         finally:
