@@ -46,7 +46,7 @@ CHECKSUM_NAME = "checksums.sha256"
 DATABASE_NAME = "books.db"
 MANIFEST_KIND = "akasha-backup"
 MANIFEST_VERSION = 2
-#: Version-1 compatibility only (Sprint 060, DEC-124): a v1 backup tarred both of
+#: Version-1 compatibility only (Sprint 060, DEC-123): a v1 backup tarred both of
 #: these; a v2 one shares covers by hardlink/copy and does not archive imports at
 #: all. `restore_backup` still reads this to extract an old backup correctly.
 ARCHIVED_DIRECTORIES = ("covers", "imports")
@@ -90,7 +90,7 @@ def create_backup(
         counts["covers"] = len(covers)
         attachments = _share_attachments(data_dir, path, dest)
         counts["attachments"] = len(attachments)
-        # /data/imports is deliberately not archived (DEC-124): it holds derived,
+        # /data/imports is deliberately not archived (DEC-123): it holds derived,
         # short-lived staging for a batch that is either committed -- where the
         # durable result is already in the database and in `covers` -- or
         # abandoned, in which case there is nothing worth restoring anyway.
@@ -155,7 +155,7 @@ def restore_backup(path: Path, *, into: Path) -> dict[str, Any]:
 
     Version 1 backups (Sprint 060 and earlier) archived `covers/` and `imports/`
     as tarballs; version 2 shares covers by hardlink or plain copy and does not
-    archive `imports/` at all (DEC-124). Both restore correctly — this is the
+    archive `imports/` at all (DEC-123). Both restore correctly — this is the
     read side of that format change, and it is what the old-version fixture in
     `tests/fixtures/backup-v1/` proves against a real backup rather than a
     hand-edited manifest.

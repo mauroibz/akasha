@@ -146,34 +146,63 @@ including `.env.example`.
 `scripts/backup.sh` requires the stack to be running: an online backup reads a
 live database through SQLite's backup API rather than copying a WAL file out
 from under a writer. Each run writes a directory containing `books.db`,
-`covers.tar.gz`, `imports.tar.gz`, `manifest.json` and `checksums.sha256`,
-verifies its own output with `PRAGMA integrity_check`, and then deletes the
-oldest `nightly-` backups beyond `BACKUP_RETENTION` (default 7).
+`manifest.json` and `checksums.sha256`, verifies its own output with
+`PRAGMA integrity_check`, and then deletes the oldest `nightly-` backups beyond
+`BACKUP_RETENTION` (default 7). Below `AKASHA_MIN_FREE_BYTES` of free space on
+the backup destination, the run refuses before writing anything rather than
+leaving a partial backup behind.
 
-Attached files are carried as **hardlinks**, in an `attachments/` directory
-alongside the tarballs, and the manifest lists each blob's digest and size.
-They are not tarred and not compressed: an epub is already a ZIP, so gzip
-measured a ratio of 1.0003 on them while costing ten times the runtime, and a
-tar shares no bytes with the one written the night before (DEC-047). Sharing is
-why seven nights of attachments cost about one copy instead of seven. Deleting
-an expired backup only decrements a link count, so it can never take a blob
-another backup still needs — and a backup keeps an attachment recoverable after
-you delete it from the library, which is the point of having one.
+Covers and attached files are both carried as **hardlinks** — covers in a
+`covers/` directory, attachments in `attachments/` — and the manifest lists
+each one's name (or digest, for attachments) and size. Neither is tarred and
+attachments are not compressed: an epub is already a ZIP, so gzip measured a
+ratio of 1.0003 on them while costing ten times the runtime, and a tar shares
+no bytes with the one written the night before (DEC-047; covers get the same
+treatment as of Sprint 060, DEC-123). Sharing is why seven nights of these cost
+about one copy instead of seven. Deleting an expired backup only decrements a
+link count, so it can never take a blob another backup still needs — and a
+backup keeps a cover or attachment recoverable after you change or delete it in
+the library, which is the point of having one.
+
+`/data/imports` — a batch's staging directory while an import is in progress —
+is not backed up at all: nothing reads it back after a commit, and the
+application collects a committed batch's copy on its own once its 24-hour undo
+window passes, with no schedule or `--apply` flag to remember (Sprint 060,
+DEC-123).
 
 If `BACKUP_DIR` is on a different filesystem from the data volume — which is the
-normal Compose setup — blobs are linked from the previous backup instead, so
-sharing still holds. A copy is only paid on the very first backup to a fresh
-disk.
-
-Backups live on their own mount, outside the data volume (DEC-040). Point
-`BACKUP_DIR` at a NAS share if you have one; a backup on the same disk as the
-database does not survive losing that disk.
+normal Compose setup — attachment blobs link from the previous backup instead,
+so sharing still holds; a copy is only paid on the very first backup to a fresh
+disk. Covers do not fall back to a sibling backup the same way, because a cover
+is not content-addressed and can be replaced in place — a sibling's copy is not
+guaranteed to still be current the way a digest-addressed attachment's is. On a
+separate-filesystem `BACKUP_DIR`, every backup gets a fresh copy of each cover
+directly from the live store instead, which is no worse than every backup
+tarring all of them cost before this sprint.
 
 Check one by hand at any time:
 
 ```bash
 docker compose exec akasha akasha-backup verify /backups/nightly-<stamp>
 ```
+
+### Pruning pre-migration backups
+
+The backup taken automatically before a migration (DEC-039) is never touched by
+nightly retention — it is the rollback point for that upgrade, and it stays
+until you decide otherwise. List what has accumulated, and prune only what you
+name:
+
+```bash
+docker compose exec akasha akasha-backup prune-pre-migration
+# name one or more to actually consider deleting them:
+docker compose exec akasha akasha-backup prune-pre-migration pre-migration-20260815T142246Z --apply
+```
+
+The newest one and the one matching the database's current schema revision are
+refused even if you name them — those are the two DEC-039 exists to protect.
+Nothing is deleted without `--apply`, and this command is never called from a
+schedule or from `create`.
 
 ## Reclaiming attachment space
 

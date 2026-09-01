@@ -121,7 +121,7 @@ def test_backup_copies_a_consistent_database_and_passes_integrity_check(tmp_path
     assert (result.path / "books.db").is_file()
     # Sprint 060: covers are shared (hardlinked from the live store, or copied
     # when that is not possible), not tarred; /data/imports is not archived at
-    # all (DEC-124).
+    # all (DEC-123).
     assert (result.path / "covers" / "1.jpg").read_bytes() == COVER_BYTES
     assert not (result.path / "covers.tar.gz").exists()
     assert not (result.path / "imports.tar.gz").exists()
@@ -241,7 +241,7 @@ def test_restore_brings_back_scores_notes_shelves_and_covers(tmp_path: Path) -> 
     assert title == "Rayuela"
     assert shelves == ["Argentina"]
     assert (restored / "covers" / "1.jpg").read_bytes() == COVER_BYTES
-    # /data/imports is not archived (DEC-124): restore creates the empty
+    # /data/imports is not archived (DEC-123): restore creates the empty
     # directory the application expects, but the batch staged before the
     # backup was taken is deliberately not there — the database backup already
     # carries whatever the batch decided, and undo never reads this directory.

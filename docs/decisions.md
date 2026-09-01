@@ -4381,3 +4381,70 @@ and state the success condition as "green", not as "seconds".**
   the same shape. `docs/agent/TESTING.md` gains an "Event-loop contention" section naming the
   harness and `off_loop` so a later sprint touching a handler's synchronous work knows both
   exist. Still exactly one uvicorn worker; nothing in `Explicit non-scope` was touched.
+
+## DEC-123 — Sprint 060's five decisions: automatic staging collection, covers hardlinked without a sibling fallback, imports dropped from backups, a 200-not-507 readiness signal, and an explicit prune
+
+- **Date:** 2026-09-01
+- **Status:** accepted
+- **Extends:** DEC-047/DEC-048 (attachment content-addressing and sharing), DEC-039/DEC-040
+  (the pre-migration backup and why it lives outside the data volume), DEC-049 (attachment
+  reclaim's report-then-`--apply` ethic).
+- **Context:** Sprint 060's baseline named three uncollected growth paths (staged import
+  batches, a covers/imports tarball rebuilt in full every night, pre-migration backups with
+  no exit) and two missing guards (no free-space check anywhere, the upload branch ignoring a
+  connector's declared cap).
+- **Decision 1 — staged import batch collection is automatic, not gated.** `reclaim.py`'s own
+  header calls it "the only routine in the codebase that deletes data by inference," and that
+  is precisely the property a committed batch's staging directory does not have:
+  `application/undo.py` never reads `data_dir / "imports" / batch_id` — grepping every
+  reference to `"imports"` under `backend/src/` turns up exactly one writer
+  (`application/imports.py`'s `preview`) and no reader after `ImportService.commit` moves the
+  staged covers out. A committed batch past its 24-hour undo window therefore has nothing left
+  that depends on this directory, unlike an attachment orphan, which is inferred from a
+  database cross-reference and could in principle be wrong. `reclaim_import_batches` runs on
+  every `JobRunner` idle tick, no `--apply` gate. An abandoned, never-committed preview is a
+  narrower, separate leak `undo_expires_at` cannot identify (it is never set for one) and this
+  sprint's acceptance criteria do not ask for it.
+- **Decision 2 — covers are hardlinked like attachments, but with no sibling-backup fallback.**
+  `_share_attachments`' fallback to a sibling backup when linking from the live store fails
+  (`EXDEV`, the deployment DEC-040 recommends) is safe only because an attachment is
+  content-addressed: the same digest guarantees the same bytes in every backup that has ever
+  linked it. A cover has no content address — `install_cover` names it by item id and replaces
+  it with `os.replace` — so a sibling backup's copy is not guaranteed current if the cover
+  changed since that backup ran. `_share_covers` therefore falls back straight to a fresh copy
+  of the live file instead of a sibling's, which is no worse than the tarball every backup
+  wrote before this sprint and stays correct across a live replacement (`os.replace` never
+  mutates the earlier inode, so an already-linked backup keeps its old bytes regardless).
+  Measured: two nightly backups of an unchanged 11-cover library cost 350,101 bytes total
+  against 700,202 for two full copies (`tests/test_backup.py`'s own printed evidence).
+- **Decision 3 — `/data/imports` is not backed up at all.** It holds derived, short-lived
+  staging for a batch that is either committed (durable result already in the database and in
+  `covers/`, decision 1 above collects the rest) or abandoned (nothing worth restoring).
+  `MANIFEST_VERSION` moves 1 → 2 for this and decision 2 together; `restore_backup` and
+  `verify_backup` read both versions, proved against `tests/fixtures/backup-v1/`, a real backup
+  produced by the actual pre-Sprint-060 `create_backup` rather than a hand-edited manifest.
+- **Decision 4 — a low-disk `/api/health/ready` stays 200.** A full disk cannot write but can
+  still read, which is what "ready" means (technical spec §8) — the same reasoning that already
+  keeps a missing provider API key from making `/api/health/providers` report the application
+  down. Docker's `HEALTHCHECK` only sees the status code, and restarting the container fixes
+  nothing about a full disk; a 503 here would trade a real problem for a useless one. Disk state
+  is surfaced in the response body (`disk.free_bytes`, `disk.low`) instead. Every other write
+  boundary (attachment upload, import preview, cover replace, file attach, backup creation)
+  refuses with a typed 507 before writing a byte, via one seam
+  (`infrastructure/diskspace.ensure_free_space`) and one config knob
+  (`AKASHA_MIN_FREE_BYTES`, default 500 MB, reaching the container through Sprint 056's
+  passthrough list).
+- **Decision 5 — the pre-migration prune names backups, not a threshold.** `akasha-backup
+  prune-pre-migration` lists every one and deletes only names an operator gives it, refusing
+  the newest and the one matching the live database's current schema revision even when named
+  — DEC-039's guarantee stays a person's decision, never a schedule or an age cutoff, matching
+  `akasha-attachments reclaim`'s report-by-default ethic on the same file this sprint already
+  touches for decisions 2 and 3.
+- **Consequences:** the upload branch of `_source` (`api/imports.py`) now reads a connector's
+  declared `max_bytes`/`max_files` instead of the shared module default — latent until now,
+  since no connector had declared a larger cap, but the gap this closes is real; a fixture-only
+  connector proves it in both directions since no production connector needs the larger cap
+  yet. Inline comments and one commit message from this sprint anticipated this entry as
+  "DEC-124" before DEC-122 (Sprint 059's) was confirmed as the prior number; corrected in place
+  to DEC-123 everywhere except the already-pushed commit message itself, which this entry's
+  number is the record of.
