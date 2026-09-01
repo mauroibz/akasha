@@ -14,7 +14,7 @@ services:
     ports:
       # Bound to the LAN interface you choose. Leave AKASHA_BIND at 0.0.0.0 only
       # on a network you trust; 127.0.0.1 restricts it to this machine.
-      - "${AKASHA_BIND:-0.0.0.0}:${AKASHA_PORT:-8000}:8000"
+      - "${AKASHA_BIND:-0.0.0.0}:${AKASHA_PORT:-4441}:8000"
     environment:
       USER_AGENT_CONTACT: "${USER_AGENT_CONTACT:?Set USER_AGENT_CONTACT in .env}"
       TZ: "${TZ:-UTC}"

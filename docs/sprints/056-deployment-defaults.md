@@ -1,6 +1,6 @@
 # Sprint 056 — The deployment defaults a home server needs
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 055
 
 **Roadmap revision:** 30

@@ -28,8 +28,12 @@ Check it came up:
 
 ```bash
 docker compose ps                     # State should be "healthy"
-curl -fsS http://localhost:8000/api/health/ready
+curl -fsS http://localhost:4441/api/health/ready
 ```
+
+The published port defaults to **4441**. An install that upgraded from an
+earlier version and never set a port: put `AKASHA_PORT=8000` in `.env` to keep
+the old address.
 
 ## Upgrading
 

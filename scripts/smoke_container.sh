@@ -7,6 +7,13 @@
 # data/backups are throwaway named volumes, unique to this run; calibre is a
 # throwaway directory under /tmp. The owner's own volumes and ./data are never
 # touched.
+#
+# COMPOSE_ENV_FILES points every compose invocation in this script — including
+# the ones inside scripts/backup.sh — at a throwaway env file under the workdir,
+# so the owner's real .env never reaches the run: no variable it sets (a port,
+# a token) can leak into an assertion, and no assertion depends on the machine
+# this runs on. The published port stays random on purpose: a test binding the
+# shipped default would collide with a real install on the same host.
 set -euo pipefail
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -33,13 +40,36 @@ s.bind(("127.0.0.1", 0))
 print(s.getsockname()[1])
 s.close()')"
 export AKASHA_PORT
+# The version-tag drill builds and starts a second tag of the same image.
+smoke_tag="smoke-$$"
+
+# The env files this run interpolates from, in place of the owner's .env:
+#
+#   smoke.env     the main run: the three operator settings that Sprint 056
+#                 passes through, with values chosen to prove they travel
+#                 (a 1 KiB attachment cap the upload proof enforces, a busy
+#                 timeout that is not the default, a fake TMDB token)
+#   bare.env      nothing set: the pass-throughs must be absent entirely
+#   defaults.env  the shipped defaults, for the port check — a config-file
+#                 property, asserted resolved and never bound here
+#   example.env   .env.example verbatim: the environment a fresh install
+#                 copies, including its BOOK_TRACKER_ENVIRONMENT=development
+#   no-contact.env  example.env minus USER_AGENT_CONTACT: must refuse to start
+printf 'BOOK_TRACKER_ATTACHMENT_MAX_BYTES=1024\nBOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS=12000\nTMDB_READ_TOKEN=token-for-smoke\n' > "$workdir/smoke.env"
+: > "$workdir/bare.env"
+printf 'USER_AGENT_CONTACT=%s\nTZ=UTC\n' "$USER_AGENT_CONTACT" > "$workdir/defaults.env"
+cp .env.example "$workdir/example.env"
+grep -v '^USER_AGENT_CONTACT=' "$workdir/example.env" > "$workdir/no-contact.env"
+export COMPOSE_ENV_FILES="$workdir/smoke.env"
 
 restored_volume=""
+host_backups=""
 
 cleanup() {
   docker compose down --remove-orphans --timeout 10 >/dev/null 2>&1 || true
   docker volume rm -f "$data_volume_original" "$AKASHA_BACKUP_VOLUME" >/dev/null 2>&1 || true
   [ -z "$restored_volume" ] || docker volume rm -f "$restored_volume" >/dev/null 2>&1 || true
+  docker image rm -f "akasha:${smoke_tag}" >/dev/null 2>&1 || true
   # calibre is a real host bind mount, host-owned throughout and mounted :ro,
   # so nothing under it is ever container-written.
   rm -rf "$workdir"
@@ -87,6 +117,29 @@ wait_healthy() {
   done
   fail "the container never became healthy"
 }
+
+step "AC1: the published port defaults to 4441, container side unchanged"
+# A property of the shipped compose file, asserted against the resolved
+# config — never by binding 4441 here. `env -u AKASHA_PORT` strips the shell
+# value and defaults.env carries no port, so the interpolation falls all the
+# way back to the shipped default; AKASHA_PORT=8000 must restore the old
+# address for an existing install that wants it.
+env -u AKASHA_PORT COMPOSE_ENV_FILES="$workdir/defaults.env" docker compose config --format json |
+  python3 -c '
+import json, sys
+
+published = json.load(sys.stdin)["services"]["akasha"]["ports"]
+assert len(published) == 1, published
+assert published[0]["target"] == 8000, published
+assert int(published[0]["published"]) == 4441, published
+' || fail "the shipped default port is not 4441 -> container 8000"
+env AKASHA_PORT=8000 COMPOSE_ENV_FILES="$workdir/defaults.env" docker compose config --format json |
+  python3 -c '
+import json, sys
+
+published = json.load(sys.stdin)["services"]["akasha"]["ports"]
+assert int(published[0]["published"]) == 8000, published
+' || fail "AKASHA_PORT=8000 did not restore the old mapping"
 
 step "Build the image"
 docker compose build --quiet

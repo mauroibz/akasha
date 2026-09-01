@@ -123,7 +123,7 @@ mkdir -p calibre
 docker compose up -d
 ```
 
-Open `http://localhost:8000`.
+Open `http://localhost:4441`.
 
 `USER_AGENT_CONTACT` is required — Open Library asks callers to identify themselves,
 and startup refuses without it.
@@ -143,7 +143,7 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 | `AKASHA_DATA_VOLUME`   | `akasha_data`    | Docker volume name for the database, covers and attached files                             |
 | `AKASHA_BACKUP_VOLUME` | `akasha_backups` | Docker volume name for backups, deliberately outside the data volume                       |
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
-| `AKASHA_PORT`          | `8000`           | Published port                                                                             |
+| `AKASHA_PORT`          | `4441`           | Published port                                                                             |
 | `AKASHA_BIND`          | `0.0.0.0`        | Set to `127.0.0.1` to keep it off the network                                              |
 | `TZ`                   | `UTC`            | Timezone                                                                                   |
 | `LOG_LEVEL`            | `INFO`           | Log verbosity                                                                              |
@@ -151,7 +151,7 @@ Everything is environment variables, all documented in [`.env.example`](.env.exa
 Check which providers are live:
 
 ```bash
-curl -s localhost:8000/api/health/providers
+curl -s localhost:4441/api/health/providers
 ```
 
 ### Bind-mounting data and backups
