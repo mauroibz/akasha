@@ -37,6 +37,15 @@ calibre/
 *.db-wal
 *.sqlite
 *.sqlite3
+# Except a deliberately committed, inert e2e fixture: a 16-byte file whose
+# only role is to be named "metadata.db" so the Calibre folder-picker test
+# recognizes the fixture directory as a library. It was never a real
+# database and the blanket *.db rule above silently kept it out of every
+# checkout but the one it was created on -- which is why CI's Calibre
+# folder-picker tests failed reproducibly with the "Preview Calibre
+# library" button never enabling (no code path reads network at that
+# point; `calibreBundle()` never found a file named metadata.db to key on).
+!frontend/e2e/fixtures/**/*.db
 
 # Editors and OS
 .idea/
