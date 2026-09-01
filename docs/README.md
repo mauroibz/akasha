@@ -32,6 +32,7 @@ follow one as instructions; follow the canonical documents below.
 | [`specs/technical-spec.md`](specs/technical-spec.md) | Implementation contracts. **§6.6 is the domain contract.** |
 | [`guides/adding-a-domain.md`](guides/adding-a-domain.md) | How to build a domain against §6.6, with diagrams and a worked example. |
 | [`operations/runbook.md`](operations/runbook.md) | Restore, rollback, upgrades, reverse-proxy guidance. |
+| [`operations/publishing-images.md`](operations/publishing-images.md) | How the published image is built, verified, and the one-time owner setup. |
 | [`brand/BRAND.md`](brand/BRAND.md) | Palette, typography, the mark and how it is constructed. |
 | [`agent/HANDOFF.md`](agent/HANDOFF.md) | Current reality for whoever picks the work up next. |
 | [`agent/state.json`](agent/state.json) | The machine-readable sprint pointer. Validated by `scripts/validate_project.py`. |
@@ -50,7 +51,7 @@ Kept because they are the record, not because they are current.
 | [`domain_metadata_roadmap_report.md`](domain_metadata_roadmap_report.md) | Which domains are viable at all, by provider: catalogue breadth, Spanish coverage, licensing. | — for viability; its architecture recommendation is superseded by DEC-052, and its anime verdict by DEC-088, which measured the providers rather than reading their documentation |
 | [`movie-domain-viability.md`](movie-domain-viability.md) | Live provider and domain-contract measurement for movies at Sprint 045. | Sprint 046's Outcome for the domain and provider as built, and DEC-099 where its measurements were refined; the importer half awaits Sprint 047 |
 | [`series-domain-viability.md`](series-domain-viability.md) | Live provider, poster, export and anime-overlap measurement for television series, taken 2026-08-31 while planning Sprints 049–053. | Sprint 049's and 050's Outcomes for the domain and providers as built; DEC-104–107 for the decisions it produced |
-| [`operations/release-notes-v1.md`](operations/release-notes-v1.md), [`release-notes-v1.1.md`](operations/release-notes-v1.1.md), [`release-notes-v1.2.md`](operations/release-notes-v1.2.md), [`release-notes-v1.3.md`](operations/release-notes-v1.3.md), [`release-notes-v1.4.md`](operations/release-notes-v1.4.md), [`release-notes-v1.5.md`](operations/release-notes-v1.5.md), [`release-notes-v1.5.1.md`](operations/release-notes-v1.5.1.md) | What shipped, per release. | — |
+| [`operations/release-notes-v1.md`](operations/release-notes-v1.md), [`release-notes-v1.1.md`](operations/release-notes-v1.1.md), [`release-notes-v1.2.md`](operations/release-notes-v1.2.md), [`release-notes-v1.3.md`](operations/release-notes-v1.3.md), [`release-notes-v1.4.md`](operations/release-notes-v1.4.md), [`release-notes-v1.5.md`](operations/release-notes-v1.5.md), [`release-notes-v1.5.1.md`](operations/release-notes-v1.5.1.md), [`release-notes-v1.5.3.md`](operations/release-notes-v1.5.3.md) | What shipped, per release. | — |
 | [`brand/brand-handoff.md`](brand/brand-handoff.md) | The brand work as delivered. | `brand/BRAND.md` |
 
 Superseded one-off proposals and assessments (domain architecture, unified search, the post-Sprint-013

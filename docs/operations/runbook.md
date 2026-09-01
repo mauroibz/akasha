@@ -38,19 +38,40 @@ the old address.
 ## Upgrading
 
 ```bash
-git pull
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
-Tag the build with the version it came from, so a rollback starts an image
-that already exists rather than rebuilding from an old commit:
+No `git pull`, no toolchain, no build: `docker compose pull` fetches the tag
+`AKASHA_VERSION` names from `ghcr.io/mauroibz/akasha` — CI publishes it there
+on every version tag — and `up -d` recreates the container from it. Pin the
+version rather than trailing `latest`, so an upgrade is a decision you make
+instead of one that happens to you on the next restart:
 
 ```bash
-AKASHA_VERSION=1.5.1 docker compose up -d --build   # builds and runs akasha:1.5.1
+echo "AKASHA_VERSION=1.5.3" >> .env
+docker compose pull
+docker compose up -d
 ```
 
 `AKASHA_VERSION` is read by every later `docker compose` command too — `down`,
-`logs`, `scripts/backup.sh` — so keep it in `.env` once it is set.
+`logs`, `scripts/backup.sh` — so keep it in `.env` once it is set. `latest`
+always resolves to whatever the newest published tag is, major versions
+included; a pinned version is the one you actually reviewed.
+
+Building from source is still available — a fork, a local patch, or an
+architecture other than the published `linux/amd64` — through the local-build
+overlay:
+
+```bash
+git pull
+docker compose -f compose.yaml -f compose.build.yaml up -d --build
+```
+
+The Dockerfile's two base images are pinned by digest, so a local build never
+picks up an unreviewed change either — see the comment above its first `FROM`
+line for the one-command refresh procedure, or let Dependabot's `docker`
+ecosystem propose the update as a pull request.
 
 Migrations run automatically at startup, and startup takes an online backup
 first whenever there are pending revisions (DEC-039). That copy lands in
@@ -67,6 +88,8 @@ books it takes well under a second; the log line to look for is
 ## Rolling back
 
 Alembic here is forward-only, so a rollback is a restore plus an older image.
+Published images keep every prior tag available, so the image side of a
+rollback is a pull rather than a rebuild.
 
 Docker has no way to rename a volume, so this restores into a fresh one and
 flips which volume Compose points at, rather than swapping directories on the
@@ -79,15 +102,17 @@ docker run --rm -v akasha_backups:/backups:ro alpine ls /backups   # find the pr
 docker volume create akasha_data_rollback
 docker run --rm --user 10001 \
   -v akasha_backups:/backups:ro -v akasha_data_rollback:/data \
-  akasha:${AKASHA_VERSION:-local} akasha-backup restore /backups/pre-migration-<stamp> --into /data
+  ghcr.io/mauroibz/akasha:<the-previous-version> akasha-backup restore /backups/pre-migration-<stamp> --into /data
 echo "AKASHA_DATA_VOLUME=akasha_data_rollback" >> .env
 echo "AKASHA_VERSION=<the-previous-version>" >> .env   # the image that was running before
 docker compose up -d
 ```
 
-If the previous version was never tagged, fall back to the old procedure —
-`git checkout <previous-tag-or-commit> && docker compose up -d --build` — and
-tag builds from now on so the next rollback does not need it.
+`docker run` pulls an image it does not already have, so naming the previous
+version is enough — there is nothing to rebuild. If the previous version
+predates the published image (v1.5.2 and earlier), fall back to the old
+procedure for that one rollback only — `git checkout <previous-tag-or-commit>
+&& docker compose -f compose.yaml -f compose.build.yaml up -d --build`.
 
 On `compose.bind-mounts.yaml` (a real `backups/` directory), replace both
 `-v akasha_backups:/backups:ro` above with `-v "$PWD/backups:/backups:ro"`, and
@@ -189,7 +214,7 @@ docker compose down
 docker volume create akasha_data_restored
 docker run --rm --user 10001 \
   -v akasha_backups:/backups:ro -v akasha_data_restored:/data \
-  akasha:${AKASHA_VERSION:-local} akasha-backup restore /backups/nightly-<stamp> --into /data
+  ghcr.io/mauroibz/akasha:${AKASHA_VERSION:-latest} akasha-backup restore /backups/nightly-<stamp> --into /data
 echo "AKASHA_DATA_VOLUME=akasha_data_restored" >> .env
 docker compose up -d
 ```

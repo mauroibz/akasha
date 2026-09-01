@@ -110,20 +110,30 @@ preview, commit, triage or undo pipeline. See
 
 ## Quick start
 
-You need Docker with the Compose plugin
+You need Docker with the Compose plugin. No source tree, no Node or Python
+toolchain — `docker compose pull` fetches the built image.
 
 ```bash
-git clone https://github.com/mauroibz/akasha.git
-cd akasha
+mkdir akasha && cd akasha
+curl -fsSLO https://raw.githubusercontent.com/mauroibz/akasha/main/compose.yaml
+curl -fsSLO https://raw.githubusercontent.com/mauroibz/akasha/main/.env.example
 
 cp .env.example .env
 $EDITOR .env                              # set USER_AGENT_CONTACT to a real address
 
 mkdir -p calibre
+docker compose pull
 docker compose up -d
 ```
 
 Open `http://localhost:4441`.
+
+Building from source — a fork, a local patch, an architecture other than the
+published `linux/amd64` — is still supported; clone the repository and add
+the local-build overlay instead: `docker compose -f compose.yaml -f
+compose.build.yaml up -d --build`. See
+[`docs/operations/publishing-images.md`](docs/operations/publishing-images.md)
+for how the published image is built and how to verify one.
 
 `USER_AGENT_CONTACT` is required — Open Library asks callers to identify themselves,
 and startup refuses without it.
@@ -156,7 +166,7 @@ and never reaches the process.
 | `CALIBRE_DIR`          | `./calibre`      | Your Calibre library, mounted read-only                                                    |
 | `AKASHA_PORT`          | `4441`           | Published port. `8000` was the default before v1.5.1                                       |
 | `AKASHA_BIND`          | `0.0.0.0`        | Set to `127.0.0.1` to keep it off the network. Publishes on overlay-network interfaces too |
-| `AKASHA_VERSION`      | `local`          | Image tag compose runs. Pin a version so rollback is a variable, not a rebuild             |
+| `AKASHA_VERSION`      | `1.5.3`          | Image tag compose pulls. Pin a version so an upgrade or a rollback is a variable, not a rebuild — `latest` moves under you |
 | `AKASHA_LOG_MAX_SIZE`  | `10m`            | Container log rotation bound, with `AKASHA_LOG_MAX_FILE` (`5`)                             |
 | `TZ`                   | `UTC`            | Timezone                                                                                   |
 | `LOG_LEVEL`            | `INFO`           | Log verbosity                                                                              |
