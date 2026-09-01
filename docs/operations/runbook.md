@@ -105,8 +105,18 @@ Schedule from the host, not from inside the container — the application is one
 process and is not a cron daemon.
 
 ```cron
-15 3 * * *  cd /srv/akasha && ./scripts/backup.sh >> /var/log/akasha-backup.log 2>&1
+15 3 * * *  cd /srv/akasha && BACKUP_RETENTION=7 ./scripts/backup.sh >> backups/akasha-backup.log 2>&1
 ```
+
+Write the log somewhere you choose — the example uses the checkout's own
+`backups/` directory because a host with a read-only root filesystem (several
+appliance distributions ship one) has no writable `/var/log`.
+
+`BACKUP_RETENTION` is read by `scripts/backup.sh` from the **process
+environment**, and cron does not source `.env`: a value in `.env` is silently
+ignored. Set it in the crontab line, as above, or in the environment that
+launches cron — the same is true wherever that variable is documented,
+including `.env.example`.
 
 `scripts/backup.sh` requires the stack to be running: an online backup reads a
 live database through SQLite's backup API rather than copying a WAL file out

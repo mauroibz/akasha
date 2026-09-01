@@ -181,8 +181,8 @@ Use the same two `-f` flags on every later `docker compose` command for this sta
 Take one now, or schedule it nightly:
 
 ```bash
-./scripts/backup.sh                                                       # now
-15 3 * * *  cd /srv/akasha && ./scripts/backup.sh >> /var/log/akasha-backup.log 2>&1  # nightly, host crontab
+./scripts/backup.sh                                                     # now
+15 3 * * *  cd /srv/akasha && BACKUP_RETENTION=7 ./scripts/backup.sh >> backups/akasha-backup.log 2>&1  # nightly, host crontab
 ```
 
 Each run backs up the live database through SQLite's own backup API, archives covers,
