@@ -416,6 +416,15 @@ assert volumes["/backups"]["type"] == "bind", volumes
 ' || fail "the overlay did not leave /data a named volume while binding /backups"
 unset COMPOSE_FILE BACKUP_DIR
 
+step "AC9: AKASHA_VERSION tags the build, and that tag starts without rebuilding"
+AKASHA_VERSION="$smoke_tag" docker compose build --quiet
+docker image inspect "akasha:${smoke_tag}" >/dev/null \
+  || fail "AKASHA_VERSION=${smoke_tag} did not tag the built image"
+AKASHA_VERSION="$smoke_tag" docker compose up --detach --no-build --wait=false >/dev/null
+wait_healthy
+[ "$(docker inspect --format '{{.Config.Image}}' "$(docker compose ps -q akasha)")" = "akasha:${smoke_tag}" ] \
+  || fail "the running container did not come from the version tag"
+
 step "Signals: SIGTERM stops the container promptly and cleanly"
 container="$(docker compose ps -q akasha)"
 started="$(date +%s)"

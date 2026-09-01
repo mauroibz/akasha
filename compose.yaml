@@ -10,7 +10,7 @@
 services:
   akasha:
     build: .
-    image: akasha:local
+    image: akasha:${AKASHA_VERSION:-local}
     logging:
       # The container's stdout is the only sink this service has: uvicorn's
       # access log is on, and one library page is many requests. Docker's
