@@ -1,4 +1,5 @@
 from collections.abc import Mapping, Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -8,6 +9,7 @@ from sqlalchemy import Engine
 from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
 from book_tracker.domain.matching import MatchKind
+from book_tracker.domain.merge import prefer_fuller
 from book_tracker.domain.providers import ItemPayload, Provider, SourceRef
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import (
@@ -68,6 +70,7 @@ class AddService:
             raise LibraryError(
                 "provider_failure", "Metadata could not be fetched", status_code=502
             ) from error
+        payload = await self._prefer_fuller_answers(payload)
         refs = list(payload.source_refs)
         metadata = dict(payload.metadata)
         identifiers = dict(payload.identifiers)
@@ -103,6 +106,46 @@ class AddService:
                 "cover_url": cover_url,
             }
         )
+
+    async def _prefer_fuller_answers(self, payload: ItemPayload) -> ItemPayload:
+        """Ask the domain's remaining providers for the fields it prefers fuller.
+
+        The add path is where the owner meets the synopsis defect: a series
+        resolved through the first provider stored that provider's one-line
+        description for ever, because interactive add never queues background
+        enrichment and nothing ever revisits the row. The same declared rule the
+        enrichment handler applies (DEC-115) applies here: the remaining
+        providers in `provider_order` are asked under the item's own identity,
+        and a longer answer for a declared field alone replaces the shorter one.
+        A failure on the second provider is not the add's failure — the first
+        payload already holds everything the item needs.
+        """
+        provider = self.providers.get(payload.source)
+        item_type = getattr(provider, "item_type", None)
+        domain = DOMAINS.get(str(item_type)) if isinstance(item_type, str) else None
+        spec = domain.enrichment if domain is not None else None
+        if spec is None or not spec.fuller_answer_fields:
+            return payload
+        remaining = [name for name in spec.provider_order if name != payload.source]
+        if not remaining:
+            return payload
+        kind = next((key for key in spec.identity_kinds if payload.identifiers.get(key)), None)
+        value = payload.identifiers.get(kind) if kind is not None else None
+        if kind is None or not value:
+            return payload
+        for name in remaining:
+            secondary = self.providers.get(name)
+            if secondary is None:
+                continue
+            try:
+                candidate = await secondary.fetch_by_identifier(kind, str(value))  # type: ignore[attr-defined]
+            except Exception:
+                # Not this add's failure: the first payload is already complete.
+                continue
+            fuller = prefer_fuller(payload.metadata, candidate.metadata, spec.fuller_answer_fields)
+            if fuller:
+                payload = replace(payload, metadata={**payload.metadata, **fuller})
+        return payload
 
     async def add(
         self,

@@ -602,3 +602,157 @@ async def test_add_service_allowlists_entry_values_and_still_allows_clearing(
     assert refused.value.status_code == 422
     assert refused.value.code == "invalid_entry_field"
     assert "Book" in refused.value.message
+
+
+# ----------------------------------------------------------------------------------
+# Sprint 055: the add path honours fuller_answer_fields too (DEC-115).
+# ----------------------------------------------------------------------------------
+
+
+class SeriesPrimary:
+    """Wikidata-shaped: the one-line description the real series domain sees."""
+
+    name = "wikidata-series"
+    item_type = "series"
+    fetches = 0
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        self.fetches += 1
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Bojack Horseman",
+            subtitle=None,
+            creators=("Raphael Bob-Waksberg",),
+            year=2014,
+            cover_url=None,
+            identifiers={"imdb": "tt3398228"},
+            language=None,
+            metadata={
+                "creators": ["Raphael Bob-Waksberg"],
+                "genres": ["animation"],
+                "synopsis": "serie de televisión animada",
+            },
+        )
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        return await self.fetch(value)
+
+
+class SeriesSecondary:
+    """TVmaze-shaped: the real synopsis for the same show."""
+
+    name = "tvmaze"
+    item_type = "series"
+    fetches = 0
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        self.fetches += 1
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Bojack Horseman",
+            subtitle=None,
+            creators=("Raphael Bob-Waksberg",),
+            year=2014,
+            cover_url=None,
+            identifiers={"imdb": "tt3398228"},
+            language=None,
+            metadata={
+                "creators": ["Raphael Bob-Waksberg"],
+                "synopsis": "A depressed horseman in his fifties lives in Los Angeles "
+                "and wrestles with self-loathing, alcoholism and failed relationships "
+                "while the people around him burn out in a town that rewards the worst "
+                "of them.",
+                "airing_status": "Ended",
+            },
+        )
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        return await self.fetch(value)
+
+
+@pytest.mark.anyio
+async def test_an_added_series_stores_the_fuller_synopsis_not_the_one_liner(
+    tmp_path: Path,
+) -> None:
+    """The add path is where the owner meets the defect: a series resolved through
+    the first provider stored that provider's one-line description for ever,
+    because interactive add never queues background enrichment. The fuller-answer
+    rule applies here too (DEC-115)."""
+    primary = SeriesPrimary()
+    secondary = SeriesSecondary()
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {primary.name: primary, secondary.name: secondary}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={"source": "wikidata-series", "source_id": "Q17733404", "status": "completed"},
+            )
+
+    assert created.status_code == 201, created.text
+    metadata = created.json()["entry"]["item"]["metadata"]
+    assert metadata["synopsis"].startswith("A depressed horseman")
+    assert secondary.fetches == 1
+
+
+@pytest.mark.anyio
+async def test_an_added_series_keeps_the_first_provider_s_other_fields(
+    tmp_path: Path,
+) -> None:
+    """The secondary payload contributed its declared field alone: `genres` is
+    the first provider's and the second's `airing_status` did not ride along."""
+    primary = SeriesPrimary()
+    secondary = SeriesSecondary()
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {primary.name: primary, secondary.name: secondary}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={"source": "wikidata-series", "source_id": "Q17733404", "status": "completed"},
+            )
+
+    metadata = created.json()["entry"]["item"]["metadata"]
+    assert metadata["genres"] == ["animation"]
+    assert "airing_status" not in metadata
+
+
+@pytest.mark.anyio
+async def test_a_domain_with_no_fuller_fields_never_asks_a_second_provider(
+    tmp_path: Path,
+) -> None:
+    """Books declare no `fuller_answer_fields`, so an add consults exactly one
+    provider exactly once — the pre-Sprint-055 contract, unchanged (AC2)."""
+    from tests.test_enrichment import _series_enrichment_providers  # noqa: F401  (shape doc)
+
+    provider = Provider()
+    other = SeriesPrimary()
+    other.name = "openlibrary-backup"
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {provider.name: provider, other.name: other}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={"source": "openlibrary", "source_id": "OL1M", "status": "reading"},
+            )
+
+    assert created.status_code == 201
+    assert provider.fetches == 1
+    assert other.fetches == 0

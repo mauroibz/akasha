@@ -14,6 +14,7 @@ import httpx
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
+from book_tracker.domain.merge import prefer_fuller
 from book_tracker.domain.providers import ItemPayload
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import EnrichmentSpec
@@ -178,14 +179,7 @@ class EnrichmentHandler:
             # field of the first payload is ever touched — the second payload's
             # other values are not merged in, so this is not "the last provider
             # wins", and it is not "both providers merged" either (DEC-115).
-            fuller: dict[str, Any] = {}
-            for field_name in spec.fuller_answer_fields:
-                existing = chosen.metadata.get(field_name)
-                offered = payload.metadata.get(field_name)
-                if not isinstance(existing, str) or not isinstance(offered, str):
-                    continue
-                if len(offered) > len(existing):
-                    fuller[field_name] = offered
+            fuller = prefer_fuller(chosen.metadata, payload.metadata, spec.fuller_answer_fields)
             if fuller:
                 chosen = replace(chosen, metadata={**chosen.metadata, **fuller})
             return chosen, chosen_source, None
