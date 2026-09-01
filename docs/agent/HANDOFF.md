@@ -26,10 +26,19 @@ Starting from Sprint 058 sitting undocumented-but-actually-unblocked, this sessi
 5. **Executed Sprint 060** (storage housekeeping, the final planned sprint) — automatic staging
    cleanup, covers hardlinked in backups, an explicit pre-migration prune, a disk-space guard
    at every bulk-write boundary, and a latent upload-cap gap closed. See DEC-123.
+6. **Fixed a real CI inefficiency, requested by the owner**: `ci.yml`'s `push` trigger had no
+   branch filter, so every Dependabot branch fired CI twice (`push` + `pull_request` on the
+   identical commit) and every version tag fired a third redundant full run on top of the
+   dedicated `Release` workflow — both observed directly this session. Now `push:
+   branches: [main]`.
+7. **Cut and published `v1.5.6`**, owner-requested once the gap was pointed out: Sprint 059 and
+   060 had landed on `main` with release notes but no published image, so a fresh install would
+   have pulled `v1.5.4` and missed both. `compose.yaml`'s default now points at `1.5.6`.
 
-Everything is pushed to `origin/main`. No release tag was cut for `v1.5.6` — nothing in Sprint
-060's acceptance criteria needed a live published image, unlike 058/059, and the final-sprint
-rule in `WORKFLOW.md` says not to tag/publish/deploy beyond what the user asks.
+Everything is pushed to `origin/main`, including the `v1.5.6` tag. The published image is
+current — `docker pull ghcr.io/mauroibz/akasha:1.5.6` (and `:1.5`, `:latest`) all resolve to
+`sha256:a4853eed90a07cf4770bbe2e636affb07d66b9566fa6ba0e6229b984e849bbf1`, confirmed pullable
+with no login (package is public).
 
 ## Current state, concretely
 
@@ -39,10 +48,12 @@ rule in `WORKFLOW.md` says not to tag/publish/deploy beyond what the user asks.
   Version 1 backups still restore — proved against a real fixture, not a hand-edited one.
 - **New operator-facing surface:** `AKASHA_MIN_FREE_BYTES` (disk guard, default 500 MB),
   `akasha-backup prune-pre-migration` (explicit, name-based, never automatic).
-- **CI is green** on `main` for the first time since 2026-08-21 — `checks`, `e2e` and
-  `container` all pass.
+- **CI is green** on `main`, runs exactly once per push (the branch-filter fix above), and the
+  published image is current at `v1.5.6`.
 - **`docs/decisions.md`** ends at DEC-123. Read DEC-120 through DEC-123 for the full account
-  of this session's decisions, in order.
+  of this session's decisions, in order. (The `v1.5.6` release and the CI trigger fix were
+  owner-requested follow-ups after this session's work, not new architectural decisions, so
+  they carry no DEC entry of their own — see the worklog's last entry instead.)
 
 ## If you're asked to find the next thing to do
 

@@ -1,10 +1,27 @@
 # Akasha v1.5.6 — release notes
 
-Sprint 060: the disk stops filling quietly. Three growth paths with no collector, a
-migration rollback point with no prune, and no guard against a write landing on a full
-disk — all closed. No screen changed and no request shape changed for anything already
-working; the new behavior is entirely about what happens near the edges (a full disk, an
-old backup, a finished import).
+**The first published image since v1.5.4.** `v1.5.5` (Sprint 059) shipped release notes but
+was never tagged, so this release carries both Sprint 059's and Sprint 060's changes — read
+[`release-notes-v1.5.5.md`](release-notes-v1.5.5.md) for the event-loop fix in full; the
+short version is below. If you are upgrading from `v1.5.4` or earlier, both sections apply.
+
+## From Sprint 059: nothing blocks the event loop
+
+A large import commit no longer freezes the application for everyone else. Measured on
+hardware constrained to 2 CPUs, a 5,000-row commit held the first library page's latency at
+just over five seconds against a 500 ms budget, with real request timeouts; it now moves onto
+a worker thread through one seam, and the same measurement shows 78 ms with zero errors. Moving
+work off the loop is also the first time this application can have two real threads writing to
+SQLite at once — a write that loses that race now surfaces as a typed, retryable error instead
+of an unhandled one, if `PRAGMA busy_timeout` still expires. No behavior visible to a person
+changed.
+
+## From Sprint 060: the disk stops filling quietly
+
+Three growth paths with no collector, a migration rollback point with no prune, and no guard
+against a write landing on a full disk — all closed. No screen changed and no request shape
+changed for anything already working; the new behavior is entirely about what happens near the
+edges (a full disk, an old backup, a finished import).
 
 ## What changed
 

@@ -3570,3 +3570,46 @@ so 050 adds an adapter, not a declaration.
 - Next: nothing planned. `docs/agent/HANDOFF.md` is the release-state
   handoff for whoever picks this repository up next — read it before
   assuming there is an active sprint.
+
+## 2026-09-01 — Out-of-sprint, owner-requested: deployment readiness review, CI fix, v1.5.6 published
+
+- Done: the owner asked whether the repo was ready to deploy on their home
+  server and whether there was value in further cleanup (a settings UI,
+  install simplicity, doc freshness, and whether the Seeds protocol/CI setup
+  was optimized). Reviewed each and reported back; two findings led to
+  owner-approved action:
+  1. **The published image was stale.** Sprint 059 and 060 shipped release
+     notes but no tag — `docker pull` would have gotten `v1.5.4`, missing
+     both the event-loop fix and the disk-space guards. Bumped
+     `compose.yaml`'s default to `1.5.6`, tagged and pushed it, watched the
+     `Release` run go green, confirmed `docker pull
+     ghcr.io/mauroibz/akasha:1.5.6` (and `:1.5`, `:latest`) resolve to
+     `sha256:a4853eed9…` with no login required.
+  2. **`ci.yml`'s `push` trigger had no branch filter.** Every Dependabot
+     branch fired CI twice (`push` + `pull_request` on the identical
+     commit — the 17-PR burst during Sprint 058's closure produced 34 runs
+     instead of 17) and every version tag fired a redundant third full run
+     on top of `Release` (observed directly on `v1.5.4`'s tag push). Fixed
+     with `push: branches: [main]`; verified the fix itself by watching a
+     normal push to `main` still trigger exactly one `CI` run, and the
+     `v1.5.6` tag push trigger `Release` with no accompanying `CI` run.
+  3. **A real doc gap**: README's config table was missing
+     `AKASHA_MIN_FREE_BYTES` (Sprint 060). Fixed.
+  Other findings reported but not acted on (no clear action needed, or
+  explicitly the owner's call): a settings UI — assessed as low value for a
+  single-user, LAN-only, technical-audience app where `.env` + redeploy
+  already works, unless the owner has hit real friction; the install
+  process — already minimal (7 commands, no toolchain); a local dev
+  container (`akasha-try-akasha-1`, bind-mounted to the repo's own
+  `./data`) found crash-looping on an alembic revision mismatch — flagged,
+  not touched, since it's the owner's local data.
+- Verified: `make check`, `make smoke-container` green on the version bump.
+  Both new commits' CI runs green (`877e6c7` CI-trigger fix, `f013c48`
+  version bump). `v1.5.6`'s `Release` run green; the published image
+  verified pullable with no credentials, matching digest across
+  `1.5.6`/`1.5`/`latest`.
+- Deviations: none — both actions were explicitly approved before being
+  taken.
+- Blocked/open: nothing. The crash-looping local container and the
+  settings-UI question remain the owner's call.
+- Next: nothing planned. Deployment is now current with `main`.
