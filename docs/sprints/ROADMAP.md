@@ -2,7 +2,7 @@
 
 **Plan revision:** 31
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 058 — An image you pull, not a build you run](058-published-image.md)
+**Active sprint:** none — every planned sprint (001–060) is complete; see `docs/agent/state.json`.
 
 ## Shape of the plan
 

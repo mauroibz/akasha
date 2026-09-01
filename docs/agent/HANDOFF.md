@@ -1,66 +1,64 @@
-# Handoff — Sprint 059 is closed; a real e2e bug is next, then Sprint 060
+# Handoff — every planned sprint is complete; there is no active sprint
 
-Sprint 059 (nothing blocks the event loop) is **completed**. Phase A measured a real ~10x
-budget breach in the import-commit path under a 2-CPU constraint; Phase B fixed exactly that
-path with one offload seam (`infrastructure/offload.py`'s `off_loop`) and closed the new
-cross-thread SQLite contention risk it introduced. Full account, numbers and commit IDs in the
-sprint's own Outcome and `docs/decisions.md` DEC-122.
+`docs/agent/state.json` reads `project_status: "complete"`, with `active_sprint`,
+`active_sprint_file` and `active_sprint_status` all `null`. Sprint 060 (storage housekeeping)
+was the final sprint in the current roadmap (`FINAL_SPRINT = 60` in
+`scripts/validate_project.py`), and it closed clean. **Do not assume there is a sprint to
+resume** — read `docs/sprints/ROADMAP.md`'s "Future epics" section and ask the owner what's
+next, rather than picking up where this file's previous version left off.
 
-## What to do right now
+## What shipped in this closing session
 
-**Fix the Calibre folder-picker e2e failure before touching Sprint 060.** This was found while
-closing Sprint 058 (the user asked about a failing CI run) and confirmed real and reproducible —
-not the transient runner-contention flakiness the earlier e2e fix addressed:
+Starting from Sprint 058 sitting undocumented-but-actually-unblocked, this session:
 
-- 3 tests in `frontend/e2e/import.spec.ts` fail consistently: the ones that choose a Calibre
-  folder via the browser's native folder picker (`webkitdirectory`).
-- The concrete symptom (from a clean rerun, well after any runner contention had cleared): the
-  "Preview Calibre library" button stays `disabled` for the full 60s test timeout after a folder
-  is chosen. `readyInput()` gating that button is pure synchronous client state
-  (`bundle.members.length` in `frontend/src/pages/ImportPage.tsx`) — no network call is involved,
-  so this is not a slow request, it is the state never getting set.
-- Confirmed unrelated to anything pushed this session: an independent Dependabot PR run (a
-  `docker/login-action` version bump, touching nothing in `frontend/`) showed the identical 3
-  failures in the same time window.
-- Leading hypothesis, not yet confirmed: Chromium/`webkitdirectory` behavior drift on GitHub's
-  hosted runners, since this is the first real e2e run against `main` since 2026-08-21 and
-  nothing in the 25 commits that just landed touches Calibre import code.
-- Start by reproducing locally if possible (may require CI's exact Chromium build —
-  `npx playwright install chromium` at whatever version `package-lock.json` pins), then trace
-  what sets `bundle` in `ImportPage.tsx` after `setInputFiles` on a `webkitdirectory` input.
-- The user authorized this as an out-of-sprint repair, same pattern as the earlier e2e CI
-  flakiness fix (see that worklog entry for the precedent). Record the diagnosis and fix in the
-  worklog the same way.
+1. **Reconciled and closed Sprint 058** (published image) — the owner had already performed
+   the three owner-only actions; the documentation just hadn't caught up.
+2. **Cut an out-of-sprint `v1.5.4` patch** (the e2e CI flakiness fix, already committed) to
+   supply the second published version Sprint 058's AC4/AC5 needed — see DEC-121 for the
+   version renumbering this forced (059 → v1.5.5, 060 → v1.5.6).
+3. **Executed Sprint 059** (event loop) — Phase A found a real ~10x latency budget breach in
+   the import-commit path under CPU constraint; Phase B fixed exactly that with one offload
+   seam. See DEC-122.
+4. **Found and fixed a real, reproducible e2e CI bug** (unrelated to any sprint): a test
+   fixture (`frontend/e2e/fixtures/Calibre Library/metadata.db`) was gitignored by a blanket
+   `*.db` rule and had never actually reached any CI checkout. Root-caused with a Docker
+   reproduction, fixed with a narrow `.gitignore` negation, confirmed with a real green CI run.
+5. **Executed Sprint 060** (storage housekeeping, the final planned sprint) — automatic staging
+   cleanup, covers hardlinked in backups, an explicit pre-migration prune, a disk-space guard
+   at every bulk-write boundary, and a latent upload-cap gap closed. See DEC-123.
 
-**Then execute Sprint 060** — read `docs/sprints/060-storage-housekeeping.md`. It ships as
-**v1.5.6**, not v1.5.5 (DEC-121 renumbered it). `docs/agent/state.json` already points at it.
+Everything is pushed to `origin/main`. No release tag was cut for `v1.5.6` — nothing in Sprint
+060's acceptance criteria needed a live published image, unlike 058/059, and the final-sprint
+rule in `WORKFLOW.md` says not to tag/publish/deploy beyond what the user asks.
 
-## What Sprint 059 built, concretely
+## Current state, concretely
 
-- `scripts/measure_event_loop.py`/`.sh` — the event-loop-contention harness, now referenced from
-  `docs/agent/TESTING.md`.
-- `backend/src/book_tracker/infrastructure/offload.py` — the one seam (`off_loop`,
-  `CapacityLimiter(4)`).
-- `api/imports.py`'s `commit` handler now runs through `off_loop`; `main.py` gained an
-  `OperationalError` -> typed `library_busy` 503 handler.
-- `backend/tests/test_event_loop_offload.py` — four tests proving the threading contract, the
-  fix's effect, concurrency safety and the busy-timeout error path.
-- `docs/operations/release-notes-v1.5.5.md`, listed in `docs/README.md`.
+- **Backend:** 1,215 tests passing. **Frontend:** 194 tests passing. `make check` green.
+  `make smoke-container` green.
+- **Backup format is version 2** (covers hardlinked, `/data/imports` no longer archived).
+  Version 1 backups still restore — proved against a real fixture, not a hand-edited one.
+- **New operator-facing surface:** `AKASHA_MIN_FREE_BYTES` (disk guard, default 500 MB),
+  `akasha-backup prune-pre-migration` (explicit, name-based, never automatic).
+- **CI is green** on `main` for the first time since 2026-08-21 — `checks`, `e2e` and
+  `container` all pass.
+- **`docs/decisions.md`** ends at DEC-123. Read DEC-120 through DEC-123 for the full account
+  of this session's decisions, in order.
 
-## Verified at this session's close
+## If you're asked to find the next thing to do
 
-Full gate (Phase B touched `backend/src/`): `python scripts/validate_project.py`, `make check`,
-`make test` (1,190 backend + 194 frontend), `make smoke-container` all green.
-`bash scripts/measure_event_loop.sh 2 import covers attachment` — all three scenarios within
-budget post-fix. A real browser walkthrough committed a 4,000-row import while confirming the UI
-stayed responsive mid-commit.
+There is no active sprint file to read. Options, roughly in the order the roadmap's "Future
+epics" section names them: games, a second series-like domain, the Spotify connector, or
+whatever the owner asks for next. Any of these starts the same way Sprint 019 or 025 did —
+assess viability and cost before committing to a build, per the `docs/decisions.md` precedent
+(DEC-035, DEC-042). Do not invent a sprint number or a deliverable list without the owner's
+direction; propose a plan and ask.
 
 ## Private data and operational constraints
 
 Unchanged. `exports/` is the owner's private source archive, gitignored whole, read-only
 walkthrough input. Secrets, databases, uploaded imports and covers are never committed. v1 has
 no auth and stays LAN-only; Calibre is opened read-only. The owner authorized autonomous work
-through the Calibre e2e fix and into Sprint 060, including pushing commits as each stage closes
-— that authorization does not extend to force-pushes, history rewrites, or anything outside the
-normal sprint-closure pattern already used this session (commit, then push `main`, no tags
-unless a sprint's own release step calls for one).
+through this session's chain (Sprint 058 → the Calibre fix → Sprint 059 → Sprint 060),
+including pushing commits as each stage closed — that authorization does not carry forward to
+a new session, and does not extend to force-pushes, history rewrites, or cutting a new release
+tag without being asked again.

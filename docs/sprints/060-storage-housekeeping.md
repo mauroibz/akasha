@@ -1,6 +1,6 @@
 # Sprint 060 — The disk stops filling quietly
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 056
 
 **Roadmap revision:** 30
@@ -218,4 +218,97 @@ real backup-and-restore cycle regardless: run it, read the sizes, and report wha
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+**Completed 2026-09-01.** All five deliverables shipped; DEC-123 records the five material
+decisions with their reasoning.
+
+### Delivered
+
+- **Deliverable 1 — staged import batches collected automatically.** `reclaim_import_batches`
+  (`backend/src/book_tracker/reclaim.py`, commit `1bb84c5`) removes a committed batch's
+  staging directory once `undo_expires_at` has passed, wired into `JobRunner`'s idle tick. No
+  `--apply` gate — DEC-123 records why this is not "deletion by inference" the way attachment
+  reclaim is.
+- **Deliverable 2 — a backup shares covers instead of re-tarring them.** `_share_covers`
+  (commit `97d01c2`) hardlinks from the live store with no sibling-backup fallback tier
+  (DEC-123's reasoning). `/data/imports` is no longer archived at all. `MANIFEST_VERSION` moves
+  1 → 2; `restore_backup`/`verify_backup` read both, proved against
+  `tests/fixtures/backup-v1/`, a real backup produced by the actual pre-Sprint-060 code.
+- **Deliverable 3 — an explicit, name-based prune for pre-migration backups.**
+  `akasha-backup prune-pre-migration` (commit `2fc1f8a`): lists every one with revision/age/
+  size; deletes only names given, with `--apply`; refuses the newest and the current-revision
+  copy even when named.
+- **Deliverable 4 — a free-space guard at every bulk-write boundary.**
+  `infrastructure/diskspace.py`'s `ensure_free_space` (commit `b5945e1`), wired into attachment
+  upload, import preview, the post-commit file-attach route, cover replace, and backup
+  creation. `/api/health/ready` reports `disk.free_bytes`/`disk.low` but stays 200 — DEC-123
+  records why a full disk is not a readiness failure.
+- **Deliverable 5 — the upload branch honours a connector's declared cap.** `api/imports.py`'s
+  `_source` (commit `1dab09d`) reads `spec.max_bytes`/`max_files` instead of the shared module
+  default; `_too_large`'s refusal only suggests a mounted-path alternate when the connector
+  actually declares one.
+- **Deliverable 6 — documentation.** `docs/operations/runbook.md`'s "Nightly backups" rewritten
+  for covers/imports/the free-space guard, plus a new "Pruning pre-migration backups"
+  subsection; `docs/operations/release-notes-v1.5.6.md`; DEC-123 (commit `30aa959`).
+
+### Verified
+
+**Full gate**, owed with no argument since every deliverable touches `backend/src/`:
+
+- `python scripts/validate_project.py` — green after every commit.
+- `make check` — green (ruff format/check, mypy, ESLint, tsc, OpenAPI drift check).
+- `make test` — backend 1,215 passed (1,190 + 25 new across
+  `test_staged_import_cleanup.py`, `test_prune_pre_migration.py`, `test_diskspace.py`, and
+  additions to `test_generic_imports.py`/`test_backup.py`/`test_foundation.py`/
+  `test_cover_candidates.py`), frontend 194 passed, both unchanged in shape.
+- `make smoke-container` — exit 0. The container's own `akasha-backup create`/`verify`/
+  `restore` path (AC8's drill) exercised the real v2 format end to end.
+- **AC3, measured, not assumed:** `test_two_backups_of_an_unchanged_library_cost_far_less_than_two_full_cover_sets`
+  prints `cover set: 350101 bytes; two backups' distinct cover bytes: 350101 bytes; two full
+  copies would be 700202 bytes` — computed by disk-distinct inode (`st_dev`, `st_ino`), since a
+  hardlink's apparent size is identical to a copy's and would otherwise hide the saving.
+- **AC4, against a real fixture:** `tests/fixtures/backup-v1/` was produced by running the
+  actual pre-Sprint-060 `create_backup` once, copied verbatim (not hand-edited), and
+  `test_restoring_a_version_one_backup_still_works` restores it correctly.
+- **A real, narrated backup-and-restore walkthrough** (not just the pytest suite): built the
+  image, ran it with `/data` and `/backups` as separate bind mounts (matching the container's
+  documented deployment shape), created 3 items with real JPEG covers via the API, took a
+  backup (`{"attachments": 0, "covers": 2, "entries": 3, "items": 3, "shelves": 0}`, 228K on
+  disk, no `.tar.gz` files present), replaced one cover and added a third, took a second backup
+  (232K, `+3.jpg` and the changed `1.jpg` only). What this environment's bind-mount setup
+  actually exercised: `os.link` returned `EXDEV` even though `st_dev` matched on both mounts
+  (a virtualized-filesystem quirk of the environment this walkthrough ran in, not a code
+  defect — verified directly with a raw `os.link` probe), so covers were freshly copied rather
+  than hardlinked here. That is exactly the no-sibling-fallback path DEC-123 designed for, and
+  it proved itself: the unchanged cover 2 differed in inode between the two backups but was
+  byte-identical, the changed cover 1 was provably different in each (`cmp` disagreed), and
+  `akasha-backup verify` and `restore` both succeeded, with the restored `1.jpg` matching the
+  live file exactly. The byte-sharing proof (350,101 vs 700,202) comes from the pytest
+  measurement above, run on a single filesystem where hardlinking actually succeeds — the
+  common case for named-volume deployments.
+- **AC6** — `test_nightly_retention_with_a_full_pre_migration_set_removes_none_of_them` (5
+  pre-migration backups, `enforce_retention(keep=0, label="nightly")` removes none).
+- **AC10** — `reclaim.py`'s existing `reclaim_attachments`/CLI `reclaim` subcommand were not
+  modified; the pre-existing `test_reclaim.py` suite (25 tests) passes unchanged.
+
+### Deviations
+
+- **`make smoke-container` was not extended with a version-1 restore drill**, as the
+  Verification section suggested. `restore_backup`'s version-1 path is proved directly and
+  more precisely at the unit level (`test_restoring_a_version_one_backup_still_works`, against
+  the same real fixture an integration drill would need anyway); adding a second drill to the
+  container script would exercise the identical code path through more moving parts for the
+  same evidence. Recorded here rather than silently skipped.
+- **Inline comments and one already-pushed commit message (`97d01c2`) say "DEC-124"** — written
+  before DEC-122 (Sprint 059's) was confirmed as the prior number. Corrected to DEC-123
+  everywhere it could be (comments, docs); the pushed commit message is the one place left as
+  written, per the standing rule against rewriting pushed history. DEC-123's own text notes
+  this.
+- No other deviation. Non-scope items (backup encryption/off-host copying/in-container
+  scheduling, a new retention policy, per-entity quotas, compression) were not touched.
+
+### Impact on future sprints
+
+None on scope or dependencies — this was the last sprint in the deployment line (DEC-117),
+and no further sprint is currently planned. `AKASHA_MIN_FREE_BYTES` and
+`akasha-backup prune-pre-migration` are now part of the operator-facing surface any future
+sprint touching backups or disk usage should know about.

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 31,
-  "project_status": "ready",
-  "active_sprint": "060",
-  "active_sprint_file": "docs/sprints/060-storage-housekeeping.md",
-  "active_sprint_status": "ready",
-  "last_completed_sprint": "059",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "060",
   "completed_sprints": [
     "001",
     "002",
@@ -65,8 +65,9 @@
     "056",
     "057",
     "058",
-    "059"
+    "059",
+    "060"
   ],
   "started_at": "",
-  "updated_at": "2026-09-01T17:35:00-03:00"
+  "updated_at": "2026-09-01T18:45:00-03:00"
 }
