@@ -3192,3 +3192,41 @@ so 050 adds an adapter, not a declaration.
   repository and should not wait for 056 to be executed.
 - Blocked/open: nothing. Sprint 056 is still `ready` and unchanged in scope.
 - Next: execute Sprint 056 — read `docs/sprints/056-deployment-defaults.md`.
+
+## 2026-09-01 — Sprint 056 (complete)
+
+- Done: the shipped configuration and the operator documentation, all nine deliverables, no
+  application code. Port default 8000 -> **4441** (container side unchanged; `AKASHA_PORT=8000`
+  restores); bounded logs (json-file 10m x 5, `AKASHA_LOG_MAX_SIZE`/`AKASHA_LOG_MAX_FILE`);
+  the three missing settings (`BOOK_TRACKER_ATTACHMENT_MAX_BYTES`,
+  `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS`, `TMDB_READ_TOKEN`) are explicit bare list-form
+  pass-throughs — present with the sent value, absent when unset, never an empty string into an
+  int setting; healthcheck start period 10 s -> 60 s with the reasoning in the Dockerfile;
+  `image: akasha:${AKASHA_VERSION:-local}`; `compose.backups-host.yaml` binds only `/backups`
+  to a host path (DEC-040 without giving up DEC-075); overlay-network sentence in SECURITY.md,
+  the compose header and the runbook; runbook cron-log/`BACKUP_RETENTION` corrections;
+  `release-notes-v1.5.1.md` leading with the port change. The config audit also removed three
+  dead knobs from `.env.example` (the container's paths are fixed by its mounts).
+- Verified: `bash scripts/smoke_container.sh` **exit 0** on the final frozen tree (three green
+  runs total this session; RED observed first at the port assertion). The smoke test gained the
+  sprint's five required properties and is now hermetic: `COMPOSE_ENV_FILES` points every
+  compose call — including backup.sh's inner ones — at throwaway env files, so the owner's real
+  `.env` never reaches a run. Attachment cap proved through the API (2048 B -> 413
+  `attachment_too_large` with "limited to 1024 bytes"; 5 B -> stored, reads back); verbatim
+  `.env.example` starts `production` and removing `USER_AGENT_CONTACT` refuses to start naming
+  the variable; unset pass-throughs are absent from the process environment; the overlay drill
+  writes a backup to a host path while `/data` stays a named volume; the version tag builds and
+  starts without rebuilding. `make check` green; validator green after every slice;
+  `AKASHA_VERSION=1.5.1 docker compose build` tags `akasha:1.5.1`. `make test` / `npm run
+  test:e2e` **not owed** — narrowed gate, diff confined to config + docs + the smoke script,
+  nothing under `backend/src/` / `frontend/src/` / test trees / migrations / lockfiles.
+- Deviations: deliverable 5 (version tag) had no named checkpoint, shipped as an eighth
+  implementation commit (09fbf55) — recorded in the Outcome. The smoke cleanup gained a
+  throwaway alpine container to empty the overlay drill's uid-10001-owned host directory (the
+  one thing under the workdir the container writes; host `rm` cannot remove it). Commit slicing
+  of the tested tree dropped content in five places (worst: the runbook's reverse-proxy example
+  still said :8000); restored in 4d36025 and re-gated green — the last smoke run is against the
+  exact final tree.
+- Blocked/open: nothing. Three owner-only steps live in Sprint 057 (GitHub package-write, tag
+  push, package visibility) and are not blockers until that sprint runs.
+- Next: execute Sprint 057 — read `docs/sprints/057-published-image.md`.

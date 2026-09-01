@@ -1,6 +1,6 @@
 # Sprint 056 — The deployment defaults a home server needs
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 055
 
 **Roadmap revision:** 30
@@ -254,4 +254,101 @@ the full gate is owed** — including a one-line fix that felt too small to ment
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Completed 2026-09-01, same day, one session. All nine deliverables; no application code touched.
+
+**Narrowed gate — held.** `git diff --stat` at the freeze point (`adc4de4..HEAD`) is
+`compose.yaml`, `compose.backups-host.yaml`, `Dockerfile`, `.env.example`, `README.md`,
+`SECURITY.md`, `scripts/smoke_container.sh` and documentation only — nothing under
+`backend/src/`, `frontend/src/`, `backend/tests/`, `frontend/` tests,
+`backend/alembic/versions/`, `uv.lock` or `package-lock.json`:
+
+    .env.example 49 +-- | Dockerfile 9 +- | README.md 19 +- | SECURITY.md 5 + | compose.backups-host.yaml 32 +
+    compose.yaml 55 +- | docs/README.md 2 +- | release-notes-v1.5.1.md 80 + | runbook.md 93 +--
+    state.json 8 +- | 056 sprint file 2 +- | smoke_container.sh 229 +-
+
+**Verification, all green on the final frozen tree:**
+
+- `bash scripts/smoke_container.sh` — **exit 0**, three times this session (RED observed first at
+  the port assertion; then two GREEN runs on intermediate states; final run on the frozen tree
+  after the commit slicing, all 20 steps). The smoke test was extended with the sprint's five
+  required properties and stays hermetic: `COMPOSE_ENV_FILES` points every compose call at
+  throwaway env files, so the owner's real `.env` never reaches a run and the random-port
+  property is kept.
+- `python scripts/validate_project.py` — passed after every slice.
+- `make check` — green (ruff, mypy, tsc, OpenAPI drift, validator).
+- `docker compose config` — the port default and the environment block asserted resolved
+  inside the smoke test (4441 default, `AKASHA_PORT=8000` restore, three pass-throughs
+  present-with-value/absent-when-unset); the owner's real `.env` resolves to their own
+  overrides as designed.
+- `AKASHA_VERSION=1.5.1 docker compose build && docker images akasha` — tags `akasha:1.5.1`.
+- `make test` and `npm run test:e2e` — **not owed** under the narrowed gate; no Python or
+  TypeScript those suites execute changed. CI's `checks`/`e2e` jobs still run them per push.
+
+**Acceptance criteria, each verified:**
+
+1. Port default — asserted against `docker compose config` with the variable unset: published
+   4441, target 8000; `AKASHA_PORT=8000` restores 8000. Never bound 4441 on the test machine.
+2. No non-development `localhost:8000` — grep across the repo leaves only the two dev-server
+   mentions (CONTRIBUTING.md, README dev section) and the in-container side of the mapping.
+3. Bounded logs — `docker inspect`'s `HostConfig.LogConfig` carries `max-size: 10m`,
+   `max-file: 5`; overridable via `AKASHA_LOG_MAX_SIZE`/`AKASHA_LOG_MAX_FILE`.
+4. Attachment cap travels — with `BOOK_TRACKER_ATTACHMENT_MAX_BYTES=1024` in the env file, a
+   2048-byte POST to `/api/items/{id}/attachments` returns 413 with
+   `error.code == "attachment_too_large"` and `"...limited to 1024 bytes"`; a 5-byte upload
+   stores and reads back (filename, byte_size 5). Proved through the API against the running
+   container.
+5. `TMDB_READ_TOKEN`/`BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS` — present with exactly the sent
+   values when set in the env file; **absent from the process environment entirely** when unset
+   (bare list-form pass-throughs, which omit rather than pass empty strings).
+6. `BOOK_TRACKER_ENVIRONMENT` does not leak — a `.env` copied verbatim from `.env.example`
+   (its `development` line included) still starts a container whose environment is `production`;
+   `env -u USER_AGENT_CONTACT` with the example-minus-contact file refuses to start, names
+   `USER_AGENT_CONTACT` in the error, and leaves the running container undisturbed.
+7. Start period — `--start-period=60s` with the reasoning written beside it in the Dockerfile;
+   the container reached `healthy` in the smoke test exactly as before.
+8. Backups-only overlay — both compose files up against a throwaway host directory: backup
+   written through it and verified on the host path, `/data` still a named volume (asserted
+   against the resolved config). The `chown` was stood in for with 0777 on the throwaway
+   directory (the test must not use root); the mount topology is what was under test.
+9. Version tag — `AKASHA_VERSION=<tag> docker compose build` tags `akasha:<tag>`;
+   `up -d --no-build` with the same variable starts that tag (asserted via
+   `Config.Image` of the running container).
+10. Overlay-network sentence — present in `SECURITY.md`, `compose.yaml`'s header and the
+    runbook's reverse-proxy section, provider-neutral.
+11. Validator passes including the link check (release notes registered in docs/README.md).
+
+**Commits:** d583f6a (4441, state flip rides it), cca3969 (logs), 8518c2b (pass-throughs),
+14d6cf4 (start period), 33ac401 (backups overlay), 09fbf55 (version tag), 894430c (overlay
+networks), 1266114 (runbook + release notes), 4d36025 (restored slicing-dropped content).
+
+**Deviations and decisions:**
+
+- **Deliverable 5 (the version tag) had no named checkpoint.** It shipped as its own
+  `[CHANGE]` commit (09fbf55) between checkpoints 5 and 6, recorded here; the checkpoint list
+  in the sprint file names seven implementation commits and this is an eighth of the same kind.
+- **The smoke test's cleanup gained a throwaway alpine container** — the overlay drill's host
+  backups directory is written by the container as uid 10001, which the host cannot `rm`.
+  The cleanup empties it as that uid before `rm -rf` of the workdir. Docker is used for
+  container management only, per the house rule.
+- **The config.py audit (deliverable 3) found three more dead knobs**: `BOOK_TRACKER_DATA_DIR`,
+  `BOOK_TRACKER_CALIBRE_DIR` and `BOOK_TRACKER_DATABASE_URL` were documented in `.env.example`
+  but never reach the container (its paths are fixed by the image and mounts). Their
+  documentation was replaced with a sentence saying exactly that, rather than kept as knobs
+  that do nothing.
+- **`GOOGLE_BOOKS_API_KEY` keeps its map-form entry** (`${GOOGLE_BOOKS_API_KEY:-}`): it is a
+  string setting where empty-means-absent is today's behaviour, so the always-present form is
+  the compatibility-preserving one. The two integer settings and the token use the bare form.
+- **The environment block moved from map form to list form** so the three pass-throughs could
+  be bare entries; `USER_AGENT_CONTACT`'s `:?` refusal behaviour is preserved verbatim.
+- **The example `.env`'s `BOOK_TRACKER_SQLITE_BUSY_TIMEOUT_MS=5000` is an active line and does
+  reach the container** (5000 is also the default, so nothing changes); the smoke test asserts
+  it rather than assuming absence. `BOOK_TRACKER_ENVIRONMENT` and the commented cap/token do
+  not reach it.
+
+**Impact on future sprints:** Sprint 057 builds on `akasha:${AKASHA_VERSION:-local}` exactly as
+its file assumes; its "compose carries build:." trap paragraph is unaffected (still true). The
+runbook's rollback/restore recipes now carry `AKASHA_VERSION`, which 057's publishing flow will
+supersede by pointing at a registry. No sprint 058/059 assumption changed.
+
+**Release notes:** `docs/operations/release-notes-v1.5.1.md`, leading with the port change.
+Not tagged, not pushed — the owner's call, as with v1.5.0.

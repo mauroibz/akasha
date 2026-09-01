@@ -1,6 +1,6 @@
 # Sprint 057 — An image you pull, not a build you run
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 056
 
 **Roadmap revision:** 30

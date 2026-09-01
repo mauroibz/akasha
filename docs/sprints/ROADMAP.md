@@ -2,7 +2,7 @@
 
 **Plan revision:** 30
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [Sprint 056 — The deployment defaults a home server needs](056-deployment-defaults.md)
+**Active sprint:** [Sprint 057 — An image you pull, not a build you run](057-published-image.md)
 
 ## Shape of the plan
 
@@ -180,7 +180,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [053](053-imdb-import.md) | The IMDb import | 049, 052 | completed |
 | [054](054-trakt-import.md) | The Trakt import | 049, 052, 053 | completed |
 | [055](055-recorded-defects.md) | The recorded defects, and the gates that stopped paying | 054 | completed |
-| [056](056-deployment-defaults.md) | The deployment defaults a home server needs | 055 | ready |
+| [056](056-deployment-defaults.md) | The deployment defaults a home server needs | 055 | completed |
 | [057](057-published-image.md) | An image you pull, not a build you run | 056 | planned |
 | [058](058-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
 | [059](059-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
