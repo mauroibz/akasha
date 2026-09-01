@@ -97,7 +97,9 @@ function EntryMetadata({
           card box is pinned (DEC-023) and the cover cannot shrink, so the text
           shortens and wraps instead: the label survives for screen readers,
           where it costs no pixels, and the years are what a reader needs. */}
-      <p className={`text-xs text-muted-foreground/80 ${grid ? "mt-1" : ""}`}>
+      {/* No opacity modifier: the caption does not fade in, so axe samples the
+          settled colour rather than a frame mid-transition (Sprint 055). */}
+      <p className={`text-xs text-muted-foreground ${grid ? "mt-1" : ""}`}>
         <span className="sr-only">Edition year: </span>
         {/* A bare "unknown" under an author reads as a broken field. With a
             year present the number speaks for itself; without one it needs the

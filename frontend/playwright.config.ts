@@ -10,8 +10,21 @@ const INCLUDE_SCRATCHPAD = process.env.BOOK_TRACKER_INCLUDE_SCRATCHPAD === "1";
 // the rest of the suite beside them. They run alone in the serial project
 // below; every other spec runs parallel in the ordinary one. A future
 // load-sensitive test goes in the same title grep, with its reason.
+//
+// Sprint 055 moved two more in, both never-green-in-parallel on three of
+// three runs (DEC-114's measurement) and green on every serial run:
+// - `changing sort crossfades the container and animates no row` and
+//   `the mounted-DOM budget holds through a crossfade` — animation crossfades
+//   sampled under load read mid-transition frames and inflated peaks;
+// - the three library-view axe checks (`library in grid view…`, `library in
+//   table view…`, `the library with web results on it…`) — axe's
+//   color-contrast check samples the card caption, and under parallel load it
+//   sampled mid-fade. The caption itself no longer fades (Sprint 055 dropped
+//   the opacity modifier), but the assertions stay serial: a rendering-timing
+//   sample under load is exactly the flakiness this project exists to remove,
+//   and the failing test moved between them.
 const HEAVY_LIBRARY =
-  /the deterministic 10,000-entry library mounts only overscanned rows|the 10,000-entry library keeps its DOM budget with web results on the page/;
+  /the deterministic 10,000-entry library mounts only overscanned rows|the 10,000-entry library keeps its DOM budget with web results on the page|changing sort crossfades the container and animates no row|the mounted-DOM budget holds through a crossfade|library in (grid|table) view has no serious accessibility violations|the library with web results on it has no serious accessibility violations/;
 
 export default defineConfig({
   testDir: "./e2e",
@@ -54,7 +67,9 @@ export default defineConfig({
     },
     {
       name: "heavy-library",
-      testMatch: /library\.spec\.ts/,
+      // Both files carry load-sensitive tests: the 10,000-entry invariants in
+      // library.spec.ts and the two Sprint 055 additions, one in each file.
+      testMatch: /(library|accessibility)\.spec\.ts/,
       grep: HEAVY_LIBRARY,
       workers: 1,
       use: { ...devices["Desktop Chrome"] },
