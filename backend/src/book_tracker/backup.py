@@ -32,6 +32,7 @@ import os
 import sqlite3
 import sys
 import tarfile
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
@@ -167,6 +168,97 @@ def enforce_retention(dest: Path, *, keep: int, label: str) -> list[Path]:
     for path in doomed:
         rmtree(path)
     return doomed
+
+
+@dataclass(frozen=True)
+class PreMigrationBackup:
+    """One `pre-migration` backup, with what an operator needs to decide about it."""
+
+    name: str
+    path: Path
+    revision: str | None
+    created_at: str
+    bytes: int
+
+
+@dataclass(frozen=True)
+class PrunePreMigrationReport:
+    """What the prune did or would do. `kept` and `not_found` explain a refusal —
+    reading the report has to be enough to know why a name did not go, the same as
+    `reclaim.py`'s report is enough to know why a blob was not."""
+
+    applied: bool
+    deleted: tuple[str, ...] = ()
+    kept: tuple[tuple[str, str], ...] = ()  # (name, reason)
+    not_found: tuple[str, ...] = ()
+
+
+def _directory_bytes(path: Path) -> int:
+    return sum(entry.stat().st_size for entry in path.rglob("*") if entry.is_file())
+
+
+def list_pre_migration_backups(
+    dest: Path, *, now: datetime | None = None
+) -> list[PreMigrationBackup]:
+    """Every `pre-migration` backup under `dest`, newest first."""
+    if not dest.is_dir():
+        return []
+    found: list[PreMigrationBackup] = []
+    for candidate in dest.iterdir():
+        manifest = read_manifest(candidate) if candidate.is_dir() else None
+        if manifest is None or manifest.get("label") != "pre-migration":
+            continue
+        found.append(
+            PreMigrationBackup(
+                name=candidate.name,
+                path=candidate,
+                revision=manifest.get("alembic_revision"),
+                created_at=str(manifest.get("created_at", "")),
+                bytes=_directory_bytes(candidate),
+            )
+        )
+    return sorted(found, key=lambda backup: backup.created_at, reverse=True)
+
+
+def prune_pre_migration(
+    dest: Path,
+    names: Sequence[str],
+    *,
+    apply: bool = False,
+    current_revision: str | None = None,
+) -> PrunePreMigrationReport:
+    """Delete named `pre-migration` backups, refusing the two DEC-039 must protect.
+
+    Never called from `create_backup`, `enforce_retention` or startup -- this is the
+    one place in the codebase that may delete a migration rollback point, and it only
+    ever acts on backups an operator named, never a schedule or a threshold.
+    """
+    backups = list_pre_migration_backups(dest)
+    if not backups:
+        return PrunePreMigrationReport(applied=apply)
+    by_name = {backup.name: backup for backup in backups}
+    newest_name = backups[0].name  # list_pre_migration_backups sorts newest first
+
+    deleted: list[str] = []
+    kept: list[tuple[str, str]] = []
+    not_found: list[str] = []
+    for name in names:
+        backup = by_name.get(name)
+        if backup is None:
+            not_found.append(name)
+            continue
+        if name == newest_name:
+            kept.append((name, "newest pre-migration backup"))
+            continue
+        if current_revision is not None and backup.revision == current_revision:
+            kept.append((name, f"matches the current schema revision ({current_revision})"))
+            continue
+        if apply:
+            rmtree(backup.path)
+        deleted.append(name)
+    return PrunePreMigrationReport(
+        applied=apply, deleted=tuple(deleted), kept=tuple(kept), not_found=tuple(not_found)
+    )
 
 
 def read_manifest(path: Path) -> dict[str, Any] | None:
@@ -310,6 +402,10 @@ def _check_integrity(database_path: Path) -> None:
         raise BackupError(f"{database_path} failed its integrity check: {'; '.join(reported)}")
 
 
+def _megabytes(value: int) -> str:
+    return f"{value / (1024 * 1024):.1f} MB"
+
+
 def _digest(path: Path) -> str:
     digest = hashlib.sha256()
     with path.open("rb") as handle:
@@ -353,6 +449,19 @@ def main(argv: list[str] | None = None) -> int:
     restore.add_argument("path", type=Path)
     restore.add_argument("--into", type=Path, required=True)
 
+    prune = commands.add_parser(
+        "prune-pre-migration",
+        help="list, or delete named, pre-migration backups (DEC-039: never automatic)",
+    )
+    prune.add_argument("--dest", type=Path, default=Path("/backups"))
+    prune.add_argument("--data-dir", type=Path, default=Path("/data"))
+    prune.add_argument(
+        "names", nargs="*", help="backup directory names to delete; omit to only list"
+    )
+    prune.add_argument(
+        "--apply", action="store_true", help="actually delete; without this, only report"
+    )
+
     args = parser.parse_args(argv)
     try:
         if args.command == "create":
@@ -370,9 +479,43 @@ def main(argv: list[str] | None = None) -> int:
         elif args.command == "verify":
             manifest = verify_backup(args.path)
             print(f"{args.path} verified: revision {manifest.get('alembic_revision')}")
-        else:
+        elif args.command == "restore":
             restore_backup(args.path, into=args.into)
             print(f"Restored {args.path} into {args.into}")
+        else:
+            backups = list_pre_migration_backups(args.dest)
+            if not backups:
+                print(f"No pre-migration backups under {args.dest}")
+                return 0
+            current_revision = _revision(args.data_dir / DATABASE_NAME)
+            print(f"{'name':<32}{'revision':<16}{'created_at':<26}{'size'}")
+            for backup in backups:
+                flags = []
+                if backup is backups[0]:
+                    flags.append("newest")
+                if current_revision is not None and backup.revision == current_revision:
+                    flags.append("current revision")
+                suffix = f"  ({', '.join(flags)})" if flags else ""
+                print(
+                    f"{backup.name:<32}{backup.revision or '?':<16}{backup.created_at:<26}"
+                    f"{_megabytes(backup.bytes)}{suffix}"
+                )
+            if not args.names:
+                print("\nNo names given: nothing deleted. Name backups above to prune them.")
+                return 0
+            report = prune_pre_migration(
+                args.dest, args.names, apply=args.apply, current_revision=current_revision
+            )
+            print()
+            verb = "Deleted" if report.applied else "Would delete"
+            for name in report.deleted:
+                print(f"{verb}: {name}")
+            for name, reason in report.kept:
+                print(f"Refused (kept): {name} — {reason}")
+            for name in report.not_found:
+                print(f"Not found, skipped: {name}", file=sys.stderr)
+            if not report.applied and report.deleted:
+                print("\nNothing was deleted. Re-run with --apply to prune.")
     except BackupError as error:
         print(f"error: {error}", file=sys.stderr)
         return 1
