@@ -1,72 +1,46 @@
-# Handoff — Sprint 058 is implemented and gated green; blocked on three owner actions
+# Handoff — Sprint 058 is closed; Sprint 059 (event loop) is ready
 
-Sprint 058 (an image you pull, not a build you run) has every deliverable that does not
-need the repository owner's GitHub account or a push to `origin`: the publish workflow, the
-compose pull/build split, digest-pinned base images, Dependabot, the runbook/README
-rewrite, and `docs/operations/publishing-images.md`. `docs/agent/state.json` and the sprint
-file both read `blocked` — not `completed` — because acceptance criterion 10 requires the
-three owner-only steps to be **performed and their results recorded**, and none of them can
-be taken by an agent session. See DEC-120 and the sprint file's Outcome for the full
-account.
+Sprint 058 (an image you pull, not a build you run) is **completed**. It was implemented and
+gated green in one session, then sat `blocked` in the documentation past the point the owner
+had actually unblocked it — the owner tagged and pushed `v1.5.3` and the release ran green,
+but `main` itself was never pushed and nobody flipped the sprint's bookkeeping. This closing
+session verified the real state (`gh run list`, `git ls-remote`, a real `docker pull`) against
+the stale documents, reconciled them, pushed `main`, and — with the user's explicit sign-off —
+cut an out-of-sprint `v1.5.4` patch release (the already-committed e2e CI fix, no new code) to
+supply the second published version AC4/AC5 needed. Full account: the sprint's own Outcome,
+and `docs/decisions.md` DEC-120/DEC-121.
 
-## What is blocking
+## What that changes for the version numbers
 
-Three steps, all in `docs/operations/publishing-images.md` with expected results:
+DEC-118 had reserved `v1.5.4` for Sprint 059 and `v1.5.5` for Sprint 060. Cutting `v1.5.4`
+out-of-sprint consumed that number. **Sprint 059 now ships `v1.5.5`; Sprint 060 ships
+`v1.5.6`.** Both sprint files and `docs/sprints/ROADMAP.md` already carry the corrected
+numbers — this is not something to redo.
 
-1. **Allow the workflow to write packages** — repository Settings → Actions → General →
-   Workflow permissions. GitHub setting; not scriptable from here.
-2. **Push a version tag and watch the run** — `git tag v1.5.3 && git push origin v1.5.3`.
-   Not done: this repository's standing rule is nothing goes to `origin` — branch or
-   tag — without the owner asking, and that has not been asked for this sprint.
-3. **Decide the package's visibility** — public (recommended) or private. A judgment call
-   only the owner can make; nothing to publish yet either way.
+## Current release state
 
-Sixteen local commits from this session sit on top of the sixteen already ahead of
-`origin/main` from Sprints 056/057 — thirty-two total, nothing pushed.
+- Published: `v1.5.3` and `v1.5.4`, both on `ghcr.io/mauroibz/akasha`, both public (`docker
+  pull` with no login succeeds), both tagged `<full>`, `1.5` and `latest` from
+  `docker/metadata-action`.
+- `compose.yaml`'s default `AKASHA_VERSION` is `1.5.4`.
+- `origin/main` is caught up (pushed this session); `.github/dependabot.yml` is live and has
+  already opened 17 pull requests across npm, uv, docker and github-actions, each gated by a
+  real CI run.
+- No secret, PAT or deploy key exists for any of this — both releases authenticated with the
+  workflow's own `GITHUB_TOKEN`.
 
 ## What to do next
 
-Ask the owner: perform the three steps directly, or authorize this session to push `main`
-and a `v1.5.3` tag so the owner can then do steps 1 and 3 against a real run. Either way,
-once a release run has gone green:
-
-- record the run URL, the pushed digest, and the visibility decision in Sprint 058's
-  Outcome;
-- flip AC1, AC2, AC4, AC5, AC6, AC9 and AC10 from NOT RUN to verified against that run;
-- close the sprint through the normal protocol (`docs/agent/state.json` to `058` completed,
-  `059` ready; worklog entry; this file rewritten for Sprint 059).
-
-No further code is anticipated before that. Sprint 059 (event loop, gated, v1.5.4) and
-Sprint 060 (storage, v1.5.5) both depend on 056 only and are unaffected by 058 sitting
-blocked.
-
-## What Sprint 058 built, concretely
-
-- `.github/workflows/release.yml` — publishes on `v*` tags only, using the workflow's own
-  `GITHUB_TOKEN` (`packages: write`), no new secret. Builds the same `Dockerfile` `ci.yml`'s
-  `container` job smoke-tests; tags full/minor/`latest`; carries
-  `org.opencontainers.image.source`.
-- `compose.yaml` now `image: ghcr.io/mauroibz/akasha:${AKASHA_VERSION:-1.5.3}`, no `build:`
-  key. `compose.build.yaml` is the new local-build overlay:
-  `docker compose -f compose.yaml -f compose.build.yaml up -d --build`.
-- Both `Dockerfile` `FROM` lines pinned by digest (captured 2026-09-01), refresh procedure
-  as a Dockerfile comment.
-- `.github/dependabot.yml`: npm, uv, docker, github-actions, weekly.
-- `scripts/smoke_container.sh` updated for the compose split — still the thing that must
-  build rather than pull, and still exit-0 twice on the frozen tree.
-- `docs/operations/runbook.md`, `README.md`, `docs/operations/publishing-images.md`
-  (new), `docs/operations/release-notes-v1.5.3.md` (new).
-
-## Verified at this session's close
-
-`python scripts/validate_project.py` green after every edit; `make check` green;
-`bash scripts/smoke_container.sh` exit 0 twice on the frozen tree, through the new compose
-split. Narrowed gate (DEC-118's rule): `make test`/`npm run test:e2e` not owed — nothing
-under `backend/src/`, `frontend/src/`, either test tree, migrations or lockfiles changed.
+Execute Sprint 059 — read `docs/sprints/059-off-the-event-loop.md`. It is **[GATED]**: Phase A
+measures whether the single-threaded event loop actually blocks under realistic load; Phase B
+(moving blocking work off it) only happens if the measurement says so. Read its own `Required
+context` section before touching anything. Remember it ships as `v1.5.5`, not the `v1.5.4`
+the file's prose was originally written against in a couple of spots that are now corrected.
 
 ## Private data and operational constraints
 
 Unchanged. `exports/` is the owner's private source archive, gitignored whole, read-only
-walkthrough input. Secrets, databases, uploaded imports and covers are never committed. v1
-has no auth and stays LAN-only; Calibre is opened read-only. **No pushing unless asked** —
-this now covers a real published package as well as a branch or tag.
+walkthrough input. Secrets, databases, uploaded imports and covers are never committed. v1 has
+no auth and stays LAN-only; Calibre is opened read-only. **No pushing unless asked** — this
+session pushed `main` and two tags only after the owner explicitly approved each one; that
+approval does not carry forward to future pushes.

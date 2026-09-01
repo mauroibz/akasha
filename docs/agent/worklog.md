@@ -3357,3 +3357,63 @@ so 050 adds an adapter, not a declaration.
   title to `HEAVY_LIBRARY`.
 - Next: watch the next real CI run against this fix. No sprint depends on
   it.
+
+## 2026-09-01 — Sprint 058 (complete)
+
+- Done: found on start that `docs/agent/state.json`/`HANDOFF.md`/the sprint
+  file all still read `blocked`, but the owner had already performed all
+  three owner-only actions from a prior, undocumented interaction: `v1.5.3`
+  was tagged and its tag (not `main`) pushed to `origin`, the `Release`
+  workflow ran green (run 33546224799, digest
+  `sha256:0e9188b3…3aa691`), and the package came up public (`docker pull`
+  after `docker logout ghcr.io` succeeded with a matching digest). Verified
+  each claim independently (`gh run list`, `git ls-remote`, a real `docker
+  pull`) rather than trusting the stale documents. Confirmed with the user
+  before acting: pushed `main` (25 commits, `99a196e`) so `origin` matches
+  what is already released and Dependabot can activate. AC4/AC5 needed a
+  second real published version that did not exist; confirmed with the user
+  the plan to cut one from the already-committed, out-of-sprint e2e CI fix
+  rather than write new code for it. That collided with DEC-118's version
+  table (`v1.5.4` was reserved for Sprint 059) — confirmed with the user
+  again, then recorded DEC-121: renumbers 059→v1.5.5, 060→v1.5.6 in
+  `ROADMAP.md` and both sprint files, bumps `compose.yaml`'s default
+  `AKASHA_VERSION` 1.5.3→1.5.4, adds `release-notes-v1.5.4.md`. Tagged and
+  pushed `v1.5.4`; run 33550023964 succeeded, digest
+  `sha256:bfbc75d9b5a2…7d1000`. Pushing `.github/dependabot.yml` to
+  `origin`'s default branch made Dependabot fire within about a minute: 17
+  PRs across all four ecosystems (npm/uv/docker/github-actions), each
+  gated by a real `CI` run.
+- Verified: narrowed gate confirmed for this session's own diff (README,
+  compose.yaml, docs only) — `python scripts/validate_project.py` and
+  `make check` green, `bash scripts/smoke_container.sh` exit 0 on the
+  frozen tree after the version bump. AC1 (tag publishes, branch/PR does
+  not) proved affirmatively: `gh run list --workflow=release.yml` shows
+  exactly two runs total, one per tag, despite two `main` pushes and 17
+  Dependabot PRs in the same session. AC2 confirmed from both runs' logs
+  (full/minor/`latest` tags, `org.opencontainers.image.source`). AC3
+  proved functionally with a copy of the published `compose.yaml`,
+  `docker compose pull && up -d` only, no build invoked (not literally on
+  a Node/Python-free machine — none was available). AC4/AC5 proved for
+  real in an isolated `docker compose` project
+  (`akasha-ac45drill`, its own named volumes/port, unrelated to this
+  host's real `akasha_data`/`akasha_backups`): wrote an entry under
+  `1.5.3`, pulled and upgraded to `1.5.4` with no rebuild, read it back,
+  rolled back to `1.5.3` with no rebuild, read it back again identical;
+  torn down with `docker compose down -v` after. AC6 true by construction
+  (both releases used only `GITHUB_TOKEN`). AC9 confirmed by the 17 real
+  PRs and their CI runs. AC10's document and listing already existed;
+  its owner-action results are now recorded in the sprint Outcome instead
+  of "not yet performed."
+- Deviations: sprint closes `completed`, not the second `blocked` cycle
+  the stale documents implied — see DEC-121 for the full account, and the
+  sprint's own Outcome/Deviations section for the version-renumbering
+  detail. No application code changed in this session; the only prior
+  code change folded into this release (the e2e CI fix) was already
+  committed, gated and recorded in the entry above before this session
+  began.
+- Blocked/open: nothing. Sprint 059 (event loop, gated) is `ready`; its
+  file's `Status` flipped `planned`→`ready` to match, no other content
+  changed.
+- Next: execute Sprint 059 — read `docs/sprints/059-off-the-event-loop.md`.
+  It ships as **v1.5.5** now, not v1.5.4 (DEC-121); Sprint 060 ships
+  **v1.5.6**.

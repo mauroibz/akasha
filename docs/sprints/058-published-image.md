@@ -1,6 +1,6 @@
 # Sprint 058 — An image you pull, not a build you run
 
-**Status:** blocked
+**Status:** completed
 **Depends on:** 056
 
 **Roadmap revision:** 30
@@ -235,13 +235,16 @@ the narrowing.
 
 ## Outcome
 
-**Blocked 2026-09-01, same session that implemented it.** Every deliverable that does not
-require the repository owner's GitHub account or a push to `origin` is built and verified.
-Acceptance criterion 10 requires the three owner-only steps to be **performed**, not merely
-documented, and criteria 1, 2, 4, 5, 6 and 9 depend on a real publish those steps unlock —
-see DEC-120. This repository's standing rule that nothing is pushed to `origin` without the
-owner asking (unchanged since Sprint 057's close) applies to the tag push named in
-deliverable 7 step 2 as much as to anything else.
+**Completed 2026-09-01.** Implemented and gated green the same session it was written, then
+left `blocked` pending three owner-only GitHub actions (DEC-120). The owner performed all
+three directly — pushing only the `v1.5.3` tag, not `main` — and a later out-of-sprint
+session (the e2e CI flakiness repair, worklog 2026-09-01) left that discovered but
+unreconciled: `docs/agent/state.json` and this file still read `blocked` while a real
+release already existed on `ghcr.io`. This closing session reconciled the documentation
+against that reality, pushed `main`, and — per DEC-121 — cut an out-of-sprint `v1.5.4`
+patch release (the already-committed e2e CI fix, no new code written) to supply the
+**second** published version AC4 and AC5 require. Every acceptance criterion below is now
+verified against real evidence, not inspection.
 
 ### Delivered
 
@@ -285,73 +288,117 @@ deliverable 7 step 2 as much as to anything else.
   decision to leave the three owner actions unperformed rather than taken on the session's
   own authority.
 
-### Not delivered — deliverable 7 / acceptance criteria 1, 2, 4, 5, 6, 9, 10
+### Deliverable 7 / acceptance criteria 1, 2, 4, 5, 6, 9, 10 — now verified against a real publish
 
-The three owner actions in `docs/operations/publishing-images.md` have **not been
-performed**:
+The three owner actions in `docs/operations/publishing-images.md`, confirmed performed:
 
-1. Allow the workflow to write packages (repository Settings → Actions → General →
-   Workflow permissions) — **not done**.
-2. Push a version tag (`git tag v1.5.3 && git push origin v1.5.3`) and watch the run —
-   **not done**; no tag exists locally or on `origin`.
-3. Decide the package's visibility — **not applicable yet**; no package has been published.
+1. **Allow the workflow to write packages** — confirmed done: both release runs succeeded
+   using only the workflow's own `GITHUB_TOKEN` under `permissions: packages: write`, with
+   no `403`/`denied` from `ghcr.io`, so the repository's default workflow permissions were
+   already sufficient (or the owner set them before the first run).
+2. **Push a version tag and watch the run** — done twice. `git tag v1.5.3 && git push origin
+   v1.5.3` (owner, before this closing session) and `git tag v1.5.4 && git push origin
+   v1.5.4` (this session, per DEC-121). Both produced one green `Release` run each:
+   - `v1.5.3`: run [33546224799](https://github.com/mauroibz/akasha/actions/runs/33546224799),
+     success, digest `sha256:0e9188b38740e8b836d8fe5c056d6f1d51fadd0590690637fb12eb28ff3aa691`.
+   - `v1.5.4`: run [33550023964](https://github.com/mauroibz/akasha/actions/runs/33550023964),
+     success, digest `sha256:bfbc75d9b5a225fc23a3ae5839b9c4a741899f9ecf16716e5ce4a2e38d7d1000`.
+   Both runs' logs show `docker/metadata-action` producing exactly `<full>`, `<minor>`
+   (`1.5`) and `latest`, and the `org.opencontainers.image.source` label pointing at
+   `https://github.com/mauroibz/akasha`.
+3. **Decide the package's visibility** — **public**, confirmed the honest way: `docker pull
+   ghcr.io/mauroibz/akasha:1.5.3` and `:1.5.4` both succeeded from this session after
+   `docker logout ghcr.io`, no credential presented, digests matching the release logs
+   exactly.
 
-Consequently NOT RUN, each requiring a real `ghcr.io` publish:
+Verified against that real publish:
 
-- **AC1/AC2** (a tag publishes; a branch push or pull request does not) — the trigger
-  configuration was reviewed by inspection (`on: push: tags: ["v*"]`, no `pull_request`
-  block), not exercised against a real GitHub Actions run.
-- **AC4/AC5** (upgrade and rollback between two published versions, with an entry surviving
-  both) — no published version exists yet to move between.
-- **AC6** (no secret/PAT/deploy key created) — true by construction of the workflow file;
-  not separately provable without a run.
-- **AC9** (Dependabot opens pull requests) — `.github/dependabot.yml` is present and
-  YAML-valid; GitHub only starts running it once the file reaches `origin`'s default branch.
-- **AC10** — the document and its `docs/README.md` listing exist; the owner actions it
-  describes are not yet performed.
+- **AC1** — a tag publishes; a branch or pull request does not. Affirmative evidence, not
+  just inspection: `gh run list --workflow=release.yml` shows exactly two runs, one per tag
+  push, while `main` was pushed twice in this session and Dependabot opened 17 pull requests
+  in the same window — none of them produced a third `Release` run.
+- **AC2** — tags and labels, per the run logs above.
+- **AC3** — a pull-only install reaches a healthy container. Proved functionally: an
+  isolated `docker compose` project (`akasha-ac45drill`, its own named volumes and port,
+  no relation to this host's real `akasha` data) brought up `ghcr.io/mauroibz/akasha:1.5.3`
+  from the published `compose.yaml` with `docker compose pull && up -d` alone — no `build:`
+  key, no build ever invoked. Not literally exercised on a machine with no Node/Python
+  installed, since none was available this session; the compose file and command sequence
+  used are exactly what such a machine would run.
+- **AC4** — real upgrade. In that same isolated stack: wrote an entry (`AC45 Drill`, score
+  7) under `1.5.3`, set `AKASHA_VERSION=1.5.4`, ran `docker compose pull && up -d`
+  (recreated the container, no build), read the same entry back unchanged.
+- **AC5** — real rollback. Same stack, pinned `AKASHA_VERSION` back to `1.5.3`, `up -d`
+  (recreate, no build), read the entry back unchanged a second time. Stack torn down with
+  `docker compose down -v` afterward; no volumes left behind.
+- **AC6** — no PAT, deploy key or repository secret exists for any of this; both releases
+  authenticated with the workflow's own `GITHUB_TOKEN` only.
+- **AC9** — Dependabot opened pull requests within a minute of `.github/dependabot.yml`
+  reaching `origin`'s default branch: 17 PRs across all four ecosystems (`npm_and_yarn`
+  under `/frontend`, `uv` under `/backend`, `docker`, `github-actions`), several grouped as
+  `patch-updates`. `gh run list` confirms CI's `checks`/`e2e`/`container` jobs ran against
+  each one on both `push` and `pull_request`.
+- **AC10** — `docs/operations/publishing-images.md` exists and is listed in
+  `docs/README.md`'s canonical table; its three owner actions are recorded above with their
+  actual results, not merely written out.
 
 ### Verified
 
-**Narrowed gate declared and paid**, per DEC-118's rule: the diff touches only
-`.github/`, `compose*.yaml`, `Dockerfile`, `scripts/smoke_container.sh` and documentation —
-nothing under `backend/src/`, `frontend/src/`, `backend/tests/`,
-`backend/alembic/versions/`, `uv.lock` or `package-lock.json`
-(`git diff --stat 8657c28..HEAD` confirms: `.github/dependabot.yml`,
-`.github/workflows/release.yml`, `Dockerfile`, `compose.build.yaml`, `compose.yaml`,
-`scripts/smoke_container.sh`, plus documentation).
+**Narrowed gate declared and paid**, per DEC-118's rule, across the whole sprint diff
+including this closing session's own commit: `.github/`, `compose*.yaml`, `Dockerfile`,
+`scripts/smoke_container.sh` and documentation, plus `frontend/e2e/console.ts` and
+`playwright.config.ts` from the out-of-sprint e2e repair folded into `v1.5.4` — nothing
+under `backend/src/`, `frontend/src/`, `backend/tests/`, `backend/alembic/versions/`,
+`uv.lock` or `package-lock.json` (`git diff --stat 8657c28..HEAD` confirmed at closure).
 
-- `python scripts/validate_project.py` — green after every edit.
+- `python scripts/validate_project.py` — green after every edit, including this session's.
 - `make check` — green (ruff format/check, mypy, `npm run format:check`/`lint`/`typecheck`,
-  OpenAPI drift check, validator).
-- `bash scripts/smoke_container.sh` — **exit 0**, twice, on the frozen tree. Confirms the
-  compose split builds and runs correctly through the overlay: image built and tagged
-  `ghcr.io/mauroibz/akasha:local`, healthcheck, non-root/no-Node, bounded logs, the entry
-  round-trip, the AC4/AC5/AC6/AC8/AC9-numbered assertions inherited from Sprint 056/057 all
-  still green under the new compose files, the named-volume restore drill now referencing
-  the image name read back from `docker compose config` instead of a hardcoded tag, and the
-  AKASHA_VERSION-tag drill building and starting `ghcr.io/mauroibz/akasha:smoke-<pid>`
-  without a rebuild.
+  OpenAPI drift check, validator) — re-run at closure after the `v1.5.4` version bump.
+- `bash scripts/smoke_container.sh` — **exit 0**, on the frozen tree at closure (and twice
+  during implementation). Confirms the compose split builds and runs correctly through the
+  overlay: image built and tagged `ghcr.io/mauroibz/akasha:local`, healthcheck,
+  non-root/no-Node, bounded logs, the entry round-trip, the named-volume restore drill
+  reading the image name back from `docker compose config`, and the AKASHA_VERSION-tag
+  drill building and starting `ghcr.io/mauroibz/akasha:smoke-<pid>` without a rebuild.
 - The two base-image digests were captured directly (`docker inspect --format '{{index
   .RepoDigests 0}}'`) and diffed programmatically against the Dockerfile content before
   committing, rather than hand-copied.
-- `.github/workflows/release.yml` and `.github/dependabot.yml` parse as valid YAML
-  (`yaml.safe_load`). Neither has run on GitHub — see "Not delivered" above.
+- `.github/workflows/release.yml` and `.github/dependabot.yml` — no longer just YAML-valid:
+  both ran for real on GitHub (see AC1/AC2/AC9 above).
+- The AC4/AC5 upgrade/rollback drill ran in an isolated `docker compose` project
+  (`akasha-ac45drill`, its own volumes and port) on this workstation, not on this host's
+  real `akasha`/`akasha_data`/`akasha_backups` stack, and was torn down with
+  `docker compose down -v` afterward — nothing left behind.
 
 ### Deviations
 
-- **The sprint is left `blocked`, not `completed`.** Every prior sprint in this deployment
-  line (056, 057) closed with a release un-tagged and un-pushed, because tagging was never
-  one of their acceptance criteria. Sprint 058's AC10 is explicit that the owner actions must
-  be performed and recorded, so this sprint cannot claim completion the same way. Recorded as
-  DEC-120 rather than silently narrowing AC10.
+- **The sprint closes as `completed`, reconciling a documentation gap rather than
+  redoing work.** The owner performed all three owner actions (tag pushed, workflow ran,
+  package public) before this session started; a prior out-of-sprint session (the e2e CI
+  fix) observed and used that release but never flipped the sprint's own bookkeeping.
+  `docs/agent/state.json` and this file read `blocked` while the release already existed.
+  This closing session found that by re-verifying claims against `gh run list`, `docker
+  pull` and `git ls-remote` rather than trusting the stale documents — see DEC-121.
+- **`main` had never been pushed to `origin`; this session pushed it.** Only the `v1.5.3`
+  tag had gone up (a tag push uploads the commit object it points at even when the branch
+  ref is not updated), so `origin/main` sat at the v1.5.0 commit through Sprints 056–058
+  and the e2e fix. Pushing `main` was confirmed with the user before doing it, and is what
+  let Dependabot activate for AC9.
+- **An out-of-sprint `v1.5.4` patch release closes AC4/AC5**, confirmed with the user
+  first: no published second version existed to prove a real upgrade/rollback against, so
+  the already-committed e2e CI fix — not new code written for this purpose — was tagged
+  and released as `v1.5.4` rather than waiting for Sprint 059's own release. This consumed
+  the version number DEC-118 had assigned Sprint 059, which now ships `v1.5.5`; Sprint 060
+  shifts to `v1.5.6`. Recorded as DEC-121, with `docs/sprints/ROADMAP.md`,
+  `059-off-the-event-loop.md` and `060-storage-housekeeping.md` corrected in place, the
+  same way DEC-119 corrected DEC-117's numbers before any sprint had run against them.
 - No other deviation. The compose-file split, the digest pins and the workflow match the
   sprint's deliverables as written.
 
 ### Impact on future sprints
 
-059 (event loop) and 060 (storage) both depend on 056 only, not on 058, and are unaffected
-by 058 remaining blocked. Whoever resumes this sprint after the owner acts needs only to:
-run the three steps in `docs/operations/publishing-images.md`, record their results here
-(run URL, digest, chosen visibility), flip AC1/AC2/AC4/AC5/AC6/AC9/AC10 from NOT RUN to
-verified against the real run, and close the sprint per the normal protocol. No further
-code is anticipated.
+**059 ships v1.5.5, not v1.5.4; 060 ships v1.5.6, not v1.5.5** — see DEC-121. Both still
+depend on 056 only, not on 058, and neither needed any code change from this closing
+session. `docs/sprints/059-off-the-event-loop.md` and `060-storage-housekeeping.md` already
+carry the corrected version numbers in their own text (release-notes filenames and commit
+checkpoints).

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 31,
-  "project_status": "blocked",
-  "active_sprint": "058",
-  "active_sprint_file": "docs/sprints/058-published-image.md",
-  "active_sprint_status": "blocked",
-  "last_completed_sprint": "057",
+  "project_status": "ready",
+  "active_sprint": "059",
+  "active_sprint_file": "docs/sprints/059-off-the-event-loop.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "058",
   "completed_sprints": [
     "001",
     "002",
@@ -63,8 +63,9 @@
     "054",
     "055",
     "056",
-    "057"
+    "057",
+    "058"
   ],
-  "started_at": "2026-09-01T14:00:00-03:00",
-  "updated_at": "2026-09-01T15:55:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-01T16:50:00-03:00"
 }

@@ -1,6 +1,6 @@
 # Sprint 059 — Nothing blocks the event loop **[GATED]**
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 056
 
 **Roadmap revision:** 30
