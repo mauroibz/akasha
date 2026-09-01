@@ -3321,3 +3321,39 @@ so 050 adds an adapter, not a declaration.
   digest and chosen visibility in the sprint Outcome, flips the NOT RUN
   criteria, and closes Sprint 058 per the normal protocol. No further code
   is anticipated before Sprint 059.
+
+## 2026-09-01 — Out-of-sprint repair: the e2e CI job's runner-contention flakiness
+
+- Done: after the owner published v1.5.3 and reported `e2e` failing in CI
+  "for a while," diagnosed and fixed. `gh run list` showed `e2e` failing
+  consistently since 2026-08-21, a different unrelated test each run;
+  `ci.yml`'s `e2e` job runs no backend, so every unstubbed request is a real
+  `ECONNREFUSED`, and `/api/item-types`/`/api/shelves` are fetched by nearly
+  every screen. Reproduced locally: full suite clean unconstrained, a
+  failure (different test each time) when pinned to 2 CPUs
+  (`taskset -c 0,1`), matching GitHub's shared runners rather than this
+  workstation's 12. `frontend/e2e/console.ts`'s shared fixture now stubs
+  both endpoints by default (overridable — Playwright resolves overlapping
+  routes most-recently-registered first, so a spec's own stub still wins);
+  `playwright.config.ts` adds `retries: process.env.CI ? 2 : 0`.
+- Verified: `make check` green; frontend lint/typecheck/194 unit tests
+  green; full e2e suite green unconstrained (106 passed, the noise gone
+  from the log); CPU-pinned with `CI=true`, clean or one flaky-then-passed
+  in two of three runs, versus a hard failure every run before. One
+  still-load-sensitive test named but not touched — see below.
+- Deviations: none from what the owner approved (options 1 and 2 from the
+  diagnosis). Outside every sprint's scope, recorded here as a prerequisite
+  repair per the standing pattern (see the Sprint 056 planning entry above).
+- Blocked/open: **not fully eliminated.** One CPU-pinned run of three still
+  failed `library.spec.ts:460` ("keyboard guards and reduced motion remain
+  effective") after both retries — it passes every time in isolation, so
+  this is the same rendering-timing-under-load class DEC-114/Sprint 055
+  already named for other tests (crossfades, axe color-contrast sampling),
+  just not yet added to `playwright.config.ts`'s `HEAVY_LIBRARY` serial set.
+  Left alone deliberately: moving it is a specific classification call the
+  owner did not ask for, and the two approved fixes already changed a
+  consistent hard failure into rare, mostly retry-absorbed flakiness. Watch
+  the real GitHub runner outcome; if it still flakes there, add this test's
+  title to `HEAVY_LIBRARY`.
+- Next: watch the next real CI run against this fix. No sprint depends on
+  it.
