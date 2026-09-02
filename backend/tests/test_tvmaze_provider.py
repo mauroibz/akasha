@@ -75,6 +75,7 @@ class TestTvmazeSearch:
         row = (await tvmaze(SEARCH_BREAKING_BAD).search("Breaking Bad"))[0]
         assert set(row.metadata) <= {
             "genres",
+            "languages",
             "network",
             "episode_minutes",
             "airing_status",
@@ -91,10 +92,12 @@ class TestTvmazeSearch:
         assert synopsis.startswith("Breaking Bad follows protagonist Walter White")
         assert "<" not in synopsis and ">" not in synopsis
 
-    async def test_it_emits_no_cover_and_no_episode_count(self) -> None:
-        """Covers come from Stremio and the episode total from Wikidata (AC5, AC7)."""
+    async def test_it_emits_the_stremio_cover_and_no_episode_count(self) -> None:
+        """The cover is Stremio's, built rather than fetched, and never TVmaze's own
+        image (AC7 — `static.tvmaze.com` stays off the allowlist). The episode total is
+        still Wikidata's alone (AC5)."""
         row = (await tvmaze(SEARCH_BREAKING_BAD).search("Breaking Bad"))[0]
-        assert row.cover_url is None
+        assert row.cover_url == "https://images.metahub.space/poster/medium/tt0903747/img"
         assert "episodes" not in row.metadata
 
     async def test_the_shows_wikidata_s_title_search_misses(self) -> None:
@@ -206,6 +209,7 @@ class TestBothAdaptersAgree:
         payload = await tvmaze(FETCH_BREAKING_BAD).fetch("169")
         assert set(payload.metadata) <= {
             "genres",
+            "languages",
             "network",
             "episode_minutes",
             "airing_status",
@@ -261,9 +265,51 @@ class TestCovers:
         assert "static.tvmaze.com" not in ALLOWED_COVER_HOSTS
         assert not any(host.endswith("tvmaze.com") for host in ALLOWED_COVER_HOSTS)
 
-    def test_tvmaze_emits_no_cover_url(self) -> None:
+    def test_tvmaze_builds_the_stremio_poster_from_the_id_it_already_holds(self) -> None:
+        """Sprint 050 left `cover_url=None` reasoning that Stremio supplies the right
+        variant — but only the Wikidata adapter ever built the URL, so a series TVmaze
+        answered alone had no cover at all. It arrived the day Wikidata went down
+        (DEC-125). The builder is keyless and issues no request, and the IMDb id is
+        already in hand two lines above."""
         candidate = _tvmaze_candidate()
+        assert candidate.cover_url == "https://images.metahub.space/poster/medium/tt0903747/img"
+
+    def test_a_show_with_no_imdb_id_still_emits_no_cover(self) -> None:
+        """`Samantha Oups` is the recorded show TVmaze carries no IMDb id for, so the
+        builder has nothing to key on and the item is coverless, exactly as before."""
+        body = recording("tvmaze_show_76954_samantha_oups.json")
+        candidate = TvmazeSeriesProvider._candidate(body)  # type: ignore[attr-defined]
+        assert candidate is not None
+        assert "imdb" not in candidate.identifiers
         assert candidate.cover_url is None
+
+
+class TestLanguage:
+    """TVmaze publishes the language it observed; Sprint 050 hardcoded `"en"` over it."""
+
+    def test_it_reports_the_language_the_recording_carries(self) -> None:
+        for fixture, expected in (
+            ("tvmaze_show_169_breaking_bad.json", "English"),
+            ("tvmaze_show_45942_okupas.json", "Spanish"),
+            ("tvmaze_show_10577_los_simuladores.json", "Spanish"),
+            ("tvmaze_show_76954_samantha_oups.json", "French"),
+        ):
+            candidate = TvmazeSeriesProvider._candidate(recording(fixture))  # type: ignore[attr-defined]
+            assert candidate is not None
+            assert candidate.metadata["languages"] == [expected], fixture
+
+    def test_the_scalar_language_field_is_left_alone(self) -> None:
+        """`SearchCandidate.language` is `book`'s and `album`'s field. The series domain
+        models this as `languages`, and filling the scalar made every TVmaze-sourced add
+        a 422 until DEC-125."""
+        assert _tvmaze_candidate().language is None
+
+    def test_a_show_with_no_language_reports_none(self) -> None:
+        body = dict(recording("tvmaze_show_169_breaking_bad.json"))
+        body["language"] = None
+        candidate = TvmazeSeriesProvider._candidate(body)  # type: ignore[attr-defined]
+        assert candidate is not None
+        assert "languages" not in candidate.metadata
 
 
 # --------------------------------------------------------------------------------------

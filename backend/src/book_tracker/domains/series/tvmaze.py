@@ -48,6 +48,7 @@ from typing import Any
 import httpx
 
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
+from book_tracker.infrastructure.posters import metahub_poster_url
 from book_tracker.infrastructure.providers import (
     INTERACTIVE_ATTEMPTS,
     ProviderPayloadError,
@@ -218,8 +219,14 @@ class TvmazeSeriesProvider:
         # `averageRuntime` is the measured steadier value; `runtime` is the fallback.
         # Both are legitimately null on some records, and a null is not a zero.
         episode_minutes = _whole(show.get("averageRuntime")) or _whole(show.get("runtime"))
+        # TVmaze publishes one language per show, as a display name ("Spanish"), which
+        # is the shape Wikidata's `P364` labels arrive in too. It goes to the domain's
+        # `languages` field and never to `SearchCandidate.language`: that scalar is
+        # `book`'s and `album`'s, and filling it made every series add a 422 (DEC-125).
+        language = _text(show.get("language"))
         metadata: dict[str, Any] = {
             "genres": _names(show.get("genres")) or None,
+            "languages": [language] if language else None,
             "network": network_name,
             "episode_minutes": episode_minutes,
             "airing_status": _text(show.get("status")),
@@ -238,11 +245,15 @@ class TvmazeSeriesProvider:
             subtitle=None,
             creators=(),
             year=_year(show.get("premiered")),
-            # No cover: Stremio's 500×750 is already the right variant, and TVmaze's
-            # would be upscaled or a 1.3 MB original (measured 2026-08-31).
-            cover_url=None,
+            # Stremio's 500×750 rather than TVmaze's own, which would be upscaled or a
+            # 1.3 MB original (measured 2026-08-31) and whose host is deliberately off
+            # the cover allowlist. Built from the IMDb id extracted above, keylessly and
+            # with no request; a show TVmaze carries no IMDb id for stays coverless.
+            # Sprint 050 reasoned this far and then left the URL unbuilt, so a series
+            # TVmaze answered alone had no cover until DEC-125.
+            cover_url=metahub_poster_url(identifiers.get("imdb")),
             identifiers=identifiers,
-            language="en",
+            language=None,
             metadata={key: value for key, value in metadata.items() if value not in (None, [], "")},
             creator_sort=None,
         )
