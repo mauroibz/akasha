@@ -10,7 +10,12 @@ import httpx
 import pytest
 from recordings import recording, replay
 
-from book_tracker.domains.anime.providers import AniListProvider, KitsuProvider
+from book_tracker.application.providers import CANDIDATE_TIMEOUT_SECONDS
+from book_tracker.domains.anime.providers import (
+    KITSU_TIMEOUT_SECONDS,
+    AniListProvider,
+    KitsuProvider,
+)
 from book_tracker.infrastructure.providers import ProviderPayloadError, create_provider_client
 
 pytestmark = pytest.mark.anyio
@@ -157,6 +162,28 @@ class TestKitsuSearch:
         await kitsu(KITSU_SEARCH, on_request=seen.append).search("akame ga kill")
         assert seen[0].url.params["include"] == "mappings"
         assert seen[0].url.params["filter[text]"] == "akame ga kill"
+
+    async def test_it_waits_longer_than_the_shared_client_would(self) -> None:
+        """Kitsu's search spends its time *before* the first byte: time-to-first-byte
+        measured 4.2, 5.0, 5.0 and 6.4 seconds on 2026-09-02, against the shared client's
+        5-second read timeout. So httpx cut the request, `bounded_json` retried, and two
+        attempts plus backoff overran the caller's whole budget — an empty anime search
+        while Kitsu was answering perfectly well, and AniList's API was disabled upstream
+        so nothing else could answer (DEC-125).
+
+        Raising the caller's budget alone would not have helped: the request that gets
+        cut is cut by *this* timeout. One attempt long enough to succeed beats two too
+        short to, which is why the budget goes here rather than into more attempts — and
+        why it sits just under the caller's own, inside which a second attempt could not
+        fit regardless.
+        """
+        seen: list[httpx.Request] = []
+        await kitsu(KITSU_SEARCH, on_request=seen.append).search("akame ga kill")
+        timeout = seen[0].extensions["timeout"]
+        assert timeout["read"] == KITSU_TIMEOUT_SECONDS
+        # Above the measured tail (6.4s TTFB, 7.98s end to end) and under the budget the
+        # caller allows one provider, so the attempt is never cut by the wrong clock.
+        assert 7.98 < KITSU_TIMEOUT_SECONDS < CANDIDATE_TIMEOUT_SECONDS
 
 
 class TestKitsuFetch:

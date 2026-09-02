@@ -42,6 +42,19 @@ ANILIST_ENDPOINT = "https://graphql.anilist.co"
 KITSU_BASE = "https://kitsu.io/api/edge"
 USER_AGENT = "Akasha/1.2 ({contact})"
 
+# Kitsu spends its time before the first byte: TTFB measured 4.2, 5.0, 5.0 and 6.4
+# seconds on 2026-09-02, against the shared client's 5-second read timeout. So a healthy
+# Kitsu search was being cut by our own transport, retried, and the two attempts together
+# overran the caller's budget — an empty anime search, with AniList's API disabled
+# upstream and nothing else able to answer (DEC-125).
+#
+# Sized just under `search_providers`' own budget, because a second attempt cannot fit
+# inside that budget anyway: one attempt as long as the caller will wait is strictly
+# better than two that are each too short. `INTERACTIVE_ATTEMPTS` still earns its keep on
+# a *fast* failure, where the retry does fit. One live search measured 7.98s end to end
+# through the running container, so the headroom above the observed tail is deliberate.
+KITSU_TIMEOUT_SECONDS = 9.0
+
 # Observed `X-RateLimit-Limit: 30` on 2026-08-27, i.e. one request every two seconds
 # averaged. AniList documents a higher ceiling and was serving a reduced one; pacing to
 # what was actually measured is the conservative reading, and a search is one request,
@@ -389,6 +402,7 @@ class KitsuProvider:
                     "Accept": "application/vnd.api+json",
                     "User-Agent": USER_AGENT.format(contact=self.contact),
                 },
+                timeout=KITSU_TIMEOUT_SECONDS,
                 attempts=INTERACTIVE_ATTEMPTS,
             )
         except httpx.HTTPStatusError as error:
