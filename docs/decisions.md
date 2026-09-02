@@ -4528,3 +4528,108 @@ and state the success condition as "green", not as "seconds".**
   matching the same verified structure. Reading `notes.db`, Calibre custom columns, `config_dir`
   entries, and multi-library exports remain explicit non-scope, matching what the other two
   Calibre paths already do not read.
+
+## DEC-125 — Three provider outages, and the four defects they uncovered
+
+- **Date:** 2026-09-02
+- **Status:** accepted
+- **Supersedes:** the contractual `maxlag=5` declared by Sprint 046 (movies) and Sprint 049
+  (series). Those sprints' reasoning is unchanged and is not rewritten; the measurement below
+  is new evidence that the parameter does not do for a read what they expected it to do.
+- **Cross-references:** DEC-098 (Wikidata as the movie domain's one adapter), DEC-103 (the
+  keyless Stremio poster), DEC-104 (the measured series providers), DEC-108 (the 2026-08-31
+  maxlag incident), DEC-025 (a mock of the unit under test does not prove a boundary).
+- **Context:** The owner reported instability across the product: movies and anime returning
+  nothing, albums and series searching but refusing to add, series without cover art. Three
+  external providers were degraded simultaneously, and each one uncovered something of ours
+  standing behind it. The four fixes below are separable and are recorded together because
+  the diagnosis is only legible as one account.
+
+### 1. `maxlag` is removed from both Wikidata adapters
+
+Wikidata's query-service replica pool was 15–17 s behind, measured on two separate days
+(`wdqs1013` at 16.6 s, `wdqs1011` at 15.7 s, `queryserviceLag` 944). Wikimedia answers a
+`maxlag` refusal with **HTTP 200 and an error object**, which `_read` translates into an
+outage, so every single read was refused and the single-adapter movie domain returned
+`503 providers_unavailable` for every query. The identical request with the parameter removed
+returns results.
+
+**Decision:** neither adapter sends `maxlag`. The parameter is Wikimedia's brake on writes and
+bulk automated jobs; every call these adapters make is one interactive read, and the lag being
+reported belongs to the query service rather than to the API serving the request. What these
+adapters actually owe — per-adapter pacing, a bounded response, a descriptive User-Agent — is
+unchanged. The error-block branch stays: a 200 carrying an error is still an outage. DEC-108
+treated this as an incident to wait out; a recurrence three days later makes it a chronic
+condition, and a courtesy that takes a domain offline whenever the query service is behind is
+not a courtesy worth paying in an interactive path.
+
+### 2. A candidate's `language` reaches metadata only where the domain declares that field
+
+`SearchCandidate.language` is a transport field any provider may fill, but only `book` and
+`album` declare somewhere to put it — `movie` and `series` model original languages as a `many`
+field named `languages`, and `anime` has neither. The add path and `refresh_item` folded the
+value in unconditionally, so `validate_metadata_patch` refused the entire write: **"Series
+metadata has no field named 'language'", HTTP 422, on every add.**
+
+TVmaze has sent `language="en"` since Sprint 050, so every TVmaze-sourced series add has been
+broken since it landed. It stayed invisible because `SERIES_IDENTITY` ranks `wikidata-series`
+first and that adapter reports no language, so the TVmaze branch is reached only when Wikidata
+is unavailable. Item 1 is why it became reachable.
+
+**Decision:** `declares_field(domain, "language")` gates the fold in both callers. This is the
+root defect of the four — any future provider filling `language` for a domain without that
+field would have broken identically.
+
+**How it hid:** `test_cached_add.py`'s TVmaze double reported `language=None` while the real
+adapter reported `"en"`, so the suite proved a payload the adapter never sends. This is DEC-025's
+failure mode arriving by a different door: not a mock of the method under test, but a double
+whose shape had drifted from the real one it stands for. The double now matches what broke.
+
+### 3. TVmaze reports the language it observed, and builds the poster it already has the id for
+
+Two defects in one constructor, both from Sprint 050. The hardcoded `language="en"` was wrong on
+its own terms — the sprint's own recorded fixtures include two Argentine series and one French
+one, all labelled English; the observed value now goes to `languages`. And `cover_url` was left
+`None` on the correct reasoning that Stremio's variant beats TVmaze's own upscaled image, after
+which the URL was never built: only the Wikidata adapter called `metahub_poster_url`, so a series
+Wikidata missed or could not answer for arrived with a blank tile. The IMDb id is in hand two
+lines above the constructor and the builder is keyless and performs no request.
+
+### 4. Two budgets sized below what the providers behind them do
+
+- **MusicBrainz** signals throttling with `503` and `Retry-After` (recorded in the fixtures
+  README since Sprint 025), and the album adapter spent only `INTERACTIVE_ATTEMPTS` on it. An
+  album add makes two sequential reads, so one throttled answer could exhaust the allowance and
+  fail the add: 5 of 47 requests were throttled when measured, and one live add answered `502`.
+  It gets `PROVIDER_ATTEMPTS`. Verified live afterwards: 12 concurrent fetches all succeeded
+  while MusicBrainz answered 11 upstream `503`s.
+- **Kitsu** spends its time before the first byte — TTFB measured 4.2, 5.0, 5.0 and 6.4 s
+  against the shared client's 5 s read timeout. Our own transport was cutting a search Kitsu was
+  answering, `bounded_json` retried, and the attempts together overran the caller's budget. With
+  AniList's API disabled upstream (`HTTP 403`, "temporarily disabled due to severe stability
+  issues"), Kitsu is the anime domain's only remaining provider, so a cut answer is an empty
+  search. `search_providers`' budget rises from 5 s to the `CANDIDATE_TIMEOUT_SECONDS` the
+  resolve path already uses, and the Kitsu read gets an explicit budget just under it.
+
+**The second half of this was found by the walkthrough gate, not the suite.** Raising the
+caller's budget alone left anime failing, because the timeout doing the cutting was the shared
+client's, one layer down. Ten live searches through the built container failed 0 of 10 after
+both changes, against 1 of 3 before the second.
+
+- **Consequences and what is deliberately not fixed:**
+  - **Movie search remains single-adapter** (DEC-098), so a genuine Wikidata outage is still a
+    total outage for that domain. Removing `maxlag` removes the self-inflicted half.
+  - **The AniList adapter stays** though its API is disabled upstream with no stated end date.
+    It fails fast, costs one wasted request, and Kitsu covers the domain; re-check before
+    building anything further on it.
+  - **`/api/health/providers` reports configuration, not reachability** — it said
+    `available: true` for AniList throughout this incident. Worth fixing, and not fixed here.
+  - **Kitsu's latency tail exceeds any budget worth paying.** One live search measured 7.98 s
+    end to end. When it exceeds the budget the anime search still returns `503`; that is Kitsu
+    being slow, not a defect, and the honest fix is a second working provider rather than a
+    longer wait for everyone.
+  - **The `languages` field now mixes vocabularies**: Wikidata supplies localized labels
+    (`español`, `inglés estadounidense`) and TVmaze supplies English names (`Spanish`,
+    `Japanese`), so the same field reads differently depending on which provider answered.
+    Observed during the walkthrough, out of this sprint's scope, and recorded rather than left
+    for someone to rediscover.
