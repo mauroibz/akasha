@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 32,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 33,
+  "project_status": "in_progress",
+  "active_sprint": "062",
+  "active_sprint_file": "docs/sprints/062-providers-under-strain.md",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "061",
   "completed_sprints": [
     "001",
@@ -69,6 +69,6 @@
     "060",
     "061"
   ],
-  "started_at": "",
-  "updated_at": "2026-09-02T11:30:00-03:00"
+  "started_at": "2026-09-02T19:05:00-03:00",
+  "updated_at": "2026-09-02T19:05:00-03:00"
 }

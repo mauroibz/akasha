@@ -39,8 +39,9 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # and DEC-104/DEC-106's measured series domain and multi-domain import line to 53,
 # and DEC-111's gate-optimization insertion to 54, and DEC-114's recorded-defects sprint
 # to 55, and DEC-117's four-sprint deployment line to 59, and DEC-119's names sprint inserted
-# before the line, pushing it to 60).
-FINAL_SPRINT = 61
+# before the line, pushing it to 60, and DEC-124's Calibre export bundle to 61, and DEC-125's
+# provider-resilience sprint to 62).
+FINAL_SPRINT = 62
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

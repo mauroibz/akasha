@@ -51,10 +51,10 @@ SERIES_FILTER = "haswbstatement:P31=Q5398426|P31=Q117467246|P31=Q63952888|P31=Q1
 #: something this domain can hold.
 SERIES_CLASSES = frozenset({"Q5398426", "Q117467246", "Q63952888", "Q1259759", "Q581714"})
 
-# Wikimedia asks clients to use `maxlag` so a replica that has fallen behind sheds load
-# rather than serving stale reads. Five seconds is the value their own guidance suggests
-# for interactive clients.
-MAXLAG_SECONDS = 5
+# `maxlag` is deliberately absent, for the reason the movie adapter records in full and
+# DEC-125 argues: it answers to the query-service replica pool, which was 15–17 s behind
+# on both days this was measured, so `maxlag=5` refused every read. This domain survived
+# it because TVmaze answers too — but coverless and, until this sprint, unaddable.
 # Measured 2026-08-31: thirteen series entities weighed 1.37 MB — larger than films,
 # one of them 105 KB alone. `MAX_PROVIDER_BYTES` is 2 MiB, so three at a time leaves
 # real headroom for a series with an unusually long claim list, exactly as for films.
@@ -354,12 +354,7 @@ class WikidataSeriesProvider:
             body = await bounded_json_object(
                 self.client,
                 WIKIDATA_API,
-                params={
-                    **params,
-                    "format": "json",
-                    "formatversion": 2,
-                    "maxlag": MAXLAG_SECONDS,
-                },
+                params={**params, "format": "json", "formatversion": 2},
                 headers={
                     "Accept": "application/json",
                     "User-Agent": USER_AGENT.format(contact=self.contact),

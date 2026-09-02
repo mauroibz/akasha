@@ -51,10 +51,12 @@ USER_AGENT = "Akasha/1.3 ({contact})"
 #: Instance-of film. The whole difference between a movie search and a word search.
 FILM_FILTER = "haswbstatement:P31=Q11424"
 
-# Wikimedia asks clients to use `maxlag` so a replica that has fallen behind sheds load
-# rather than serving stale reads. Five seconds is the value their own guidance suggests
-# for interactive clients.
-MAXLAG_SECONDS = 5
+# `maxlag` used to be sent here. It is not, and DEC-125 is why: the lag it answers to is
+# the **query service** replica pool, measured at 15–17 s on 2026-08-31 and again on
+# 2026-09-02, which sheds every `maxlag=5` request and takes this single-adapter domain
+# down with it. Wikimedia aims the parameter at writes and bulk automated jobs; every
+# call below is one interactive read, and the courtesy it owes is paid by `_Paced`, the
+# byte bound and the User-Agent instead.
 # Measured 2026-08-27: 1 entity ~113 KB, 5 entities up to 1.15 MB, 10 entities 1.9 MB.
 # `MAX_PROVIDER_BYTES` is 2 MiB, so three at a time leaves real headroom for a film with
 # an unusually long claim list.
@@ -342,12 +344,7 @@ class WikidataMovieProvider:
             body = await bounded_json_object(
                 self.client,
                 WIKIDATA_API,
-                params={
-                    **params,
-                    "format": "json",
-                    "formatversion": 2,
-                    "maxlag": MAXLAG_SECONDS,
-                },
+                params={**params, "format": "json", "formatversion": 2},
                 headers={
                     "Accept": "application/json",
                     "User-Agent": USER_AGENT.format(contact=self.contact),

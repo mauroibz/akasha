@@ -282,6 +282,18 @@ class TestFetchByIdentifier:
         assert error.value.code == "record_not_found"
 
 
+class TestRequestShape:
+    async def test_no_request_declares_a_lag_tolerance(self) -> None:
+        """The same removal as the movie adapter's, for the same measured reason — and
+        the reason these fixtures were captured without `maxlag` in the first place."""
+        seen: list[str] = []
+        provider = wikidata(
+            FETCH_BREAKING_BAD, on_request=lambda request: seen.append(str(request.url))
+        )
+        await provider.fetch("Q1079")
+        assert seen and all("maxlag" not in url for url in seen)
+
+
 class TestPosters:
     async def test_a_series_with_an_imdb_id_emits_a_stremio_url_with_no_request(self) -> None:
         asked: list[str] = []

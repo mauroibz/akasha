@@ -602,11 +602,17 @@ class TestFailures:
         await provider.fetch("Q546900")
         assert "Akasha" in seen[0] and "test@example.invalid" in seen[0]
 
-    async def test_every_request_declares_a_lag_tolerance(self) -> None:
+    async def test_no_request_declares_a_lag_tolerance(self) -> None:
+        """`maxlag` is Wikimedia's brake on *writes* and bulk automated jobs. Every read
+        this adapter makes is a `query` or a `wbgetentities`, and the lag the parameter
+        answers to is the **query service** replica pool — measured at 15–17 s on two
+        separate days, which shed every single `maxlag=5` request and blacked out the
+        movie domain twice (DEC-108, then DEC-125). The courtesy obligations are met by
+        `_Paced`, the byte bound and the User-Agent, none of which this removes."""
         seen: list[str] = []
         provider = wikidata(FETCH_1977, on_request=lambda request: seen.append(str(request.url)))
         await provider.fetch("Q546900")
-        assert all("maxlag=" in url for url in seen)
+        assert seen and all("maxlag" not in url for url in seen)
 
 
 def test_the_route_key_separates_operations_that_share_one_path() -> None:

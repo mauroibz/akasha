@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 31
+**Plan revision:** 33
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — every planned sprint (001–060) is complete; see `docs/agent/state.json`.
+**Active sprint:** 062 — sprints 001–061 are complete; see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1096,6 +1096,31 @@ Each gets a collector or a documented reason it has none, and a write that canno
 before it starts rather than failing partway. The highest risk in the line lives here: changing what a
 backup contains means an older backup must still restore, and if that cannot be proved, the sharing
 does not ship.
+
+### [Sprint 061 — Drag Calibre's own export bundle into the Calibre tab](061-calibre-export-bundle.md)
+
+A third way into the Calibre tab, beside the folder picker and the mount: the
+`part-NNNN.calibre-data` files Calibre's own *Export/import all calibre data* feature produces, with
+the same preview/commit/undo experience every other Calibre path has. Generalizes
+`ImportInputSpec.alternate` to `alternates`, adds an `"export"` input kind for a set of opaque files
+a source's own export feature produced, and takes the ebook attachment for free — the export's bytes
+are already local once uploaded. See DEC-124.
+
+### [Sprint 062 — Search and add survive a provider having a bad day](062-providers-under-strain.md)
+
+Three providers were degraded at once on 2026-09-02, and each one exposed something of ours behind
+it. Wikidata's query-service replicas are chronically lagged, so the contractual `maxlag=5` both
+adapters send refuses every read and blacks out the single-adapter movie domain. That outage
+uncovered two defects latent since Sprint 050: TVmaze hardcodes `language="en"`, which the add path
+folds into a metadata patch the series domain refuses, so every TVmaze-sourced series add is a 422;
+and TVmaze never builds the keyless Stremio poster from the IMDb id it already holds, so a
+Wikidata-less series has no cover. MusicBrainz's `503` throttling outlives a two-attempt budget, and
+Kitsu's measured latency sits above the 5 s search bound that AniList's upstream shutdown now leaves
+it alone inside.
+
+The unifying fix is the second one: a candidate's `language` reaches metadata only where the domain
+declares that field. The rest is a provider telling the truth about what it observed, and two budgets
+matched to measurements rather than guesses. See DEC-125.
 
 ## Future epics, after this plan
 
