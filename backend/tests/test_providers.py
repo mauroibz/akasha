@@ -99,6 +99,39 @@ async def test_search_returns_partial_results_with_independent_timeout() -> None
     assert [row.source_id for row in result] == ["OL1M"]
 
 
+def test_the_search_budget_is_above_the_measured_provider_latency() -> None:
+    """Five seconds sat *below* what a healthy provider takes. Five live Kitsu searches
+    on 2026-09-02 measured 3.5, 5.8, 5.4, 3.5 and 4.4 seconds, so two of five were
+    dropped as failures — and with AniList's API disabled upstream (HTTP 403), Kitsu is
+    the anime domain's only remaining provider, so a dropped answer is an empty search.
+
+    The budget matches `CANDIDATE_TIMEOUT_SECONDS` rather than inventing a number: the
+    resolve path already waits ten seconds for the same reason, and the providers run
+    concurrently, so this bounds the slowest answer rather than their sum (DEC-125).
+    """
+    import inspect
+
+    from book_tracker.application.providers import CANDIDATE_TIMEOUT_SECONDS
+
+    default = inspect.signature(search_providers).parameters["timeout_seconds"].default
+    assert default == CANDIDATE_TIMEOUT_SECONDS == 10.0
+
+
+@pytest.mark.anyio
+async def test_a_provider_slower_than_the_old_budget_is_still_included() -> None:
+    """The behaviour the number buys, at a hundredth of the scale so the suite stays
+    fast: an answer inside the budget is kept, and one outside it is dropped."""
+    result = await search_providers(
+        "Rayuela",
+        [
+            StubProvider("openlibrary", [candidate("openlibrary", "OL1M")], delay=0.06),
+            StubProvider("googlebooks", [candidate("googlebooks", "g1")], delay=0.2),
+        ],
+        timeout_seconds=0.1,
+    )
+    assert [row.source_id for row in result] == ["OL1M"]
+
+
 @pytest.mark.anyio
 async def test_search_reports_typed_error_only_when_every_enabled_provider_fails() -> None:
     with pytest.raises(ProvidersUnavailable):

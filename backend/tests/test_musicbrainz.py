@@ -203,6 +203,30 @@ async def test_throttling_arrives_as_503_and_is_retried() -> None:
 
 
 @pytest.mark.anyio
+async def test_two_throttled_answers_in_a_row_are_still_survived() -> None:
+    """A two-attempt budget spent its whole allowance on one 503, so a second one failed
+    the add outright — HTTP 502, "That could not be added", observed live on 2026-09-02
+    with 5 of 47 requests throttled. An album add makes two sequential reads, so the odds
+    compound. A source that throttles by design gets the full budget (DEC-125)."""
+    attempts: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        attempts.append(request)
+        if len(attempts) <= 2:
+            return httpx.Response(503, text="rate limited")
+        return httpx.Response(200, json=recording("musicbrainz_search_kind_of_blue.json"))
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    async with create_provider_client(transport=httpx.MockTransport(handler)) as client:
+        rows = await MusicBrainzProvider(client, CONTACT, sleep=no_sleep).search("Kind of Blue")
+
+    assert len(attempts) == 3
+    assert rows[0].title == "Kind of Blue"
+
+
+@pytest.mark.anyio
 async def test_a_release_carries_its_tracklist_as_ordered_metadata() -> None:
     """One `inc` parameter and no extra request, measured 2026-08-14 and re-measured
     on re-recording: 6.5 KB for *Kind of Blue*.

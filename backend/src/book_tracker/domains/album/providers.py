@@ -31,7 +31,7 @@ import httpx
 
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
 from book_tracker.infrastructure.providers import (
-    INTERACTIVE_ATTEMPTS,
+    PROVIDER_ATTEMPTS,
     ProviderPayloadError,
     bounded_json_object,
     parse_year,
@@ -149,7 +149,13 @@ class MusicBrainzProvider:
             f"{MUSICBRAINZ_BASE}{path}",
             params={**params, "fmt": "json"},
             headers={"User-Agent": USER_AGENT.format(contact=self.contact)},
-            attempts=INTERACTIVE_ATTEMPTS,
+            # The full budget rather than the interactive two, because MusicBrainz
+            # throttles by design and says so with a 503 and a `Retry-After` this
+            # boundary already honours. An album add makes two sequential reads here, so
+            # a two-attempt allowance spent on one throttled answer failed the add
+            # outright — 5 of 47 requests were throttled when this was measured on
+            # 2026-09-02, and one live add returned 502 (DEC-125).
+            attempts=PROVIDER_ATTEMPTS,
         )
 
     def _candidate(self, group: Mapping[str, Any]) -> SearchCandidate | None:

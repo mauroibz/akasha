@@ -11,6 +11,14 @@ from book_tracker.infrastructure.providers import INTERACTIVE_ATTEMPTS, Provider
 logger = logging.getLogger(__name__)
 
 
+# How long anyone waiting on a provider is made to wait. Open Library was measured
+# answering a single edition record in 11.3s during Sprint 020's walkthrough, and Kitsu
+# answering a search in 3.5-5.8s on 2026-09-02; ten seconds covers a healthy provider
+# having a slow moment, and a failed search or a failed chooser is worse than a slow one.
+# It bounds one provider's answer, not their sum — a search runs them concurrently.
+CANDIDATE_TIMEOUT_SECONDS = 10.0
+
+
 class ProvidersUnavailable(RuntimeError):
     pass
 
@@ -39,7 +47,11 @@ async def search_providers(
     *,
     domain: Domain = DEFAULT_DOMAIN,
     limit: int = 20,
-    timeout_seconds: float = 5,
+    # Five seconds sat below what a healthy provider takes: five live Kitsu searches on
+    # 2026-09-02 measured 3.5-5.8 s, so two of five were dropped as failures while Kitsu
+    # was the anime domain's only working provider (DEC-125). The providers run
+    # concurrently, so this bounds the slowest answer rather than their sum.
+    timeout_seconds: float = CANDIDATE_TIMEOUT_SECONDS,
 ) -> list[SearchCandidate]:
     results = await asyncio.gather(
         *(_search_one(provider, query, limit, timeout_seconds) for provider in providers)
@@ -117,11 +129,6 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
     )
 
 
-# The shared client allows 5s, which suits a search someone is watching. A chooser is
-# opened deliberately and Open Library was measured answering a single edition record in
-# 11.3s during Sprint 020's walkthrough, so the candidate path gets its own budget: a
-# ten-second wait is tolerable, a failed chooser is not.
-CANDIDATE_TIMEOUT_SECONDS = 10.0
 # The chooser is opened deliberately and does not block the page behind it, so it can
 # wait a little — but only a little, and only once. Two attempts at ten seconds under a
 # single overall budget: if Open Library is having a bad minute the dialog says so
