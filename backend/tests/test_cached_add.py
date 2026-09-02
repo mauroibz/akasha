@@ -680,6 +680,92 @@ class SeriesSecondary:
         return await self.fetch(value)
 
 
+# ----------------------------------------------------------------------------------
+# Sprint 062: a candidate's `language` reaches metadata only where the domain has that
+# field (DEC-125).
+# ----------------------------------------------------------------------------------
+
+
+class SeriesProviderThatReportsALanguage:
+    """A series provider that fills `SearchCandidate.language`, as TVmaze did.
+
+    This is the shape that broke: the series domain declares `languages` (many) and no
+    scalar `language`, so folding this payload's `language` into the metadata patch made
+    every TVmaze-sourced series add a 422. The double sets `"en"` because that is
+    literally what the adapter sent — the divergence between this file's old double
+    (`language=None`) and the real adapter is what hid the defect for twelve sprints,
+    which is the DEC-025 failure mode arriving by a different door.
+    """
+
+    name = "tvmaze"
+    item_type = "series"
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Okupas",
+            subtitle=None,
+            creators=(),
+            year=2000,
+            cover_url=None,
+            identifiers={"imdb": "tt0289649"},
+            language="en",
+            metadata={"network": "Canal 7", "airing_status": "Ended"},
+        )
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        return await self.fetch(value)
+
+
+@pytest.mark.anyio
+async def test_a_series_is_added_though_its_provider_reports_a_language(
+    tmp_path: Path,
+) -> None:
+    provider = SeriesProviderThatReportsALanguage()
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {provider.name: provider}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={"source": "tvmaze", "source_id": "45942", "status": "completed"},
+            )
+
+    assert created.status_code == 201, created.text
+    metadata = created.json()["entry"]["item"]["metadata"]
+    # Dropped rather than stored under a name the domain does not have, and rather than
+    # guessed into `languages` — the provider said `language`, and this domain has none.
+    assert "language" not in metadata
+    assert metadata["network"] == "Canal 7"
+
+
+@pytest.mark.anyio
+async def test_a_book_still_stores_the_language_its_provider_reports(tmp_path: Path) -> None:
+    """The guard is the domain's field spec, not a list of provider names: `book`
+    declares `language`, so nothing about that path changed."""
+    provider = Provider()
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {provider.name: provider}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={"source": "openlibrary", "source_id": "OL1M", "status": "read"},
+            )
+
+    assert created.status_code == 201, created.text
+    assert created.json()["entry"]["item"]["metadata"]["language"] == "es"
+
+
 @pytest.mark.anyio
 async def test_an_added_series_stores_the_fuller_synopsis_not_the_one_liner(
     tmp_path: Path,

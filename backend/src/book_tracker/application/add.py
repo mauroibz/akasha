@@ -18,6 +18,7 @@ from book_tracker.domain.spec import (
     InvalidMetadata,
     InvalidProgress,
     InvalidStatus,
+    declares_field,
     validate_entry_values,
     validate_formats,
     validate_metadata_patch,
@@ -168,6 +169,9 @@ class AddService:
         formats: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         creator_sort: str | None = None
+        #: Held rather than folded in here: whether it belongs in the metadata is the
+        #: domain's question, and the domain is not resolved until below.
+        candidate_language: str | None = None
         if manual is not None:
             item_type = str(manual["item_type"])
             cover_url = None
@@ -197,8 +201,7 @@ class AddService:
             creator_sort = payload.creator_sort
             year = payload.year
             metadata = {**payload.metadata, "creators": list(creators)}
-            if payload.language:
-                metadata["language"] = payload.language
+            candidate_language = payload.language
             identifiers = self._identifiers(payload.identifiers)
             sources = [
                 SourceIdentity(ref.source, ref.source_id, ref.source == payload.source)
@@ -209,6 +212,8 @@ class AddService:
             raise LibraryError(
                 "unknown_item_type", f"No domain named {item_type!r}", status_code=422
             )
+        if candidate_language and declares_field(domain, "language"):
+            metadata["language"] = candidate_language
         try:
             metadata = validate_metadata_patch(domain, metadata)
         except InvalidMetadata as error:

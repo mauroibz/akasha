@@ -18,7 +18,7 @@ from book_tracker.application.library import (
 from book_tracker.application.providers import CANDIDATE_BUDGET_SECONDS, cover_candidates
 from book_tracker.domain.providers import SourceRef
 from book_tracker.domain.registry import DOMAINS, EntryFormat, EntryStatus, ItemTypeName
-from book_tracker.domain.spec import InvalidMetadata, validate_metadata_patch
+from book_tracker.domain.spec import InvalidMetadata, declares_field, validate_metadata_patch
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
     AttachmentTooLarge,
@@ -892,7 +892,15 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
         ) from error
     metadata = dict(payload.metadata)
     metadata["creators"] = list(payload.creators)
-    if payload.language is not None:
+    # The same domain question the add path asks (DEC-125): a provider may report a
+    # language for a domain with nowhere to put one, and refresh must not store it under
+    # a name the domain does not have.
+    refreshed_domain = DOMAINS.get(str(getattr(provider, "item_type", "")))
+    if (
+        payload.language is not None
+        and refreshed_domain is not None
+        and declares_field(refreshed_domain, "language")
+    ):
         metadata["language"] = payload.language
     prepared = None
     cover_urls = ([payload.cover_url] if payload.cover_url else []) + list(

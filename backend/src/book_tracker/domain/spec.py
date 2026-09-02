@@ -407,6 +407,20 @@ class InvalidMetadata(ValueError):
     """A patch that the domain's own field spec refuses."""
 
 
+def declares_field(domain: Domain, name: str) -> bool:
+    """Whether this domain has a field by this name.
+
+    `SearchCandidate.language` is a transport field every provider may fill, but only
+    `book` and `album` declare somewhere to put it: `movie` and `series` model the
+    original languages as a `many` field called `languages`, and `anime` has neither.
+    The add and refresh paths folded it in unconditionally, so a provider filling it for
+    one of the other three turned every add of its results into a 422 — which is exactly
+    what TVmaze did from Sprint 050 until DEC-125. Whether a candidate's language is
+    stored is the domain's question, and this is how the two callers ask it.
+    """
+    return any(row.name == name for row in domain.fields)
+
+
 def validate_metadata_patch(domain: Domain, patch: Mapping[str, Any]) -> dict[str, Any]:
     """Check a metadata patch against the fields this domain declares.
 
