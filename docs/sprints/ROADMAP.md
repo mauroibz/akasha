@@ -1122,6 +1122,35 @@ The unifying fix is the second one: a candidate's `language` reaches metadata on
 declares that field. The rest is a provider telling the truth about what it observed, and two budgets
 matched to measurements rather than guesses. See DEC-125.
 
+### [Sprint 063 — A second source for films and shows](063-cinemeta-second-source.md) **[PLANNED]**
+
+Sprint 062 removed the self-inflicted half of the movie outage; this adds the redundancy the other
+half needs. Movies are served by one adapter, and the blocker to adding a second is not the adapter
+but the identity: `MOVIE_IDENTITY` keys on the Wikidata `Q` id, so any second provider would
+duplicate every film rather than merge with it. Series already key on IMDb and need no such change.
+
+Cinemeta — Stremio's keyless, IMDb-keyed metadata service, measured on 2026-09-02 at 6/6 searches
+and full field coverage in 0.09–4.45 s — becomes a complementary source for both domains through one
+shared reader, ranked behind the sources already there and never displacing them. It is not a new
+third party: DEC-103 already routes every movie and series poster through the same infrastructure.
+The film identity moves to IMDb, which the Wikidata adapter already emits on every measured result.
+
+Gated on a measured coverage assessment first (the DEC-104 method, with a stop condition), because a
+fallback that answers worse than the thing it backs up is not a fallback.
+
+### Sprint 064 — A second source for anime and albums **[PLANNED, not yet written]**
+
+The other two single-provider domains, split from 063 because each is blocked on something 063 is
+not. **Anime:** Jikan is the obvious candidate — it is MyAnimeList's API, and `mal:` is already the
+anime domain's declared identity, so it would merge with Kitsu for free. But its search endpoint
+answered `504` on every attempt on 2026-09-02 while MyAnimeList itself was up, so the sprint opens
+by re-measuring whether it is dependable enough to be worth the adapter. **Albums:** blocked by
+DEC-052, which found deliberately that albums have *no* cross-provider identity — barcode
+`888837168625` appeared on three distinct releases — so a second provider means un-mergeable
+duplicate rows in every search. That is a product decision to reopen with the owner, not an adapter
+to write. Deezer and iTunes were both measured keyless and working; neither can merge until the
+identity question is answered.
+
 ## Future epics, after this plan
 
 These are not sprints and remain deliberately unnumbered (DEC-058). Each becomes an epic on top of
