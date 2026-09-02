@@ -3613,3 +3613,57 @@ so 050 adds an adapter, not a declaration.
 - Blocked/open: nothing. The crash-looping local container and the
   settings-UI question remain the owner's call.
 - Next: nothing planned. Deployment is now current with `main`.
+
+## 2026-09-02 — Sprint 062 (complete)
+- Done: the owner reported broad instability — movies and anime returning
+  nothing, albums and series searching but refusing to add, series with no
+  cover art — and asked whether it was the providers or something we
+  introduced. Diagnosed against their own running `1.5.6` container and the
+  live provider APIs before changing anything: **three simultaneous external
+  outages, four defects of ours standing behind them.** Opened Sprint 062 and
+  fixed all four. Commits `6541670` (maxlag), `c896a46` (the domain-gated
+  language fold), `a4e2cb6` (TVmaze's language and poster), `71f984d` (the
+  MusicBrainz and search budgets), `f635f4f` (the Kitsu transport budget),
+  `cf893aa` (DEC-125 + v1.5.7 release notes). Full account in DEC-125 and the
+  sprint Outcome.
+- Verified: full gate. `make check`, `make test` (1,236 backend + 197
+  frontend), `make smoke-container` — the last run twice, since the
+  `compose.yaml` version bump is deployment config and re-owes it. Walkthrough
+  ran against a container built from this branch on an **isolated volume at
+  port 8062**; the owner's live instance on 8000 was never written to. Search
+  and add in all five domains, plus `/refresh` on two TVmaze-sourced series.
+  Movie search: `503` → 3 results. Series add: `422` → `201` from both
+  sources. Album: 12 concurrent fetches all `200` while MusicBrainz answered
+  11 upstream `503`s. Anime: 0/10 live searches failed, against 1/3 before the
+  Kitsu fix.
+- Deviations: **one scope addition, forced by the walkthrough.** AC6 as planned
+  (raise `search_providers`' budget 5s → 10s) did not fix anime: the timeout
+  actually cutting the request was the *shared client's* 5s read timeout one
+  layer down, and Kitsu's TTFB measured 4.2–6.4s. Added an explicit
+  `KITSU_TIMEOUT_SECONDS = 9.0` on the Kitsu read. The suite was green at the
+  point anime was still broken in the running application — this sprint is its
+  own argument for the walkthrough gate. Also repaired two documentation
+  inconsistencies inherited from Sprint 061: `ROADMAP.md` had no section for it
+  and its header still said 001–060 at revision 31 while `state.json` said 32.
+- Dead ends worth not repeating: (1) `maxlag` cannot be "fixed" by raising the
+  value — the reported lag is the *query service* pool's and was 15–17s on two
+  separate days, so any tolerance an interactive read can afford is below it.
+  (2) Two TVmaze series added coverless despite carrying an IMDb id; this is
+  *not* a bug — `images.metahub.space` answers 307 and the redirect target
+  answers 404 for `tt12072666` and `tt1524147`, i.e. Stremio has no poster for
+  those titles. Checked directly before assuming. (3) The container is not
+  slower than the host for Kitsu (measured 2.4–4.9s from inside), so the
+  timeouts were ours, not the network's.
+- Blocked/open: nothing in scope. Deliberately unfixed and recorded in DEC-125:
+  movie search still rests on Wikidata alone; AniList's API is disabled
+  upstream (`403`) with no stated return date; `/api/health/providers` reports
+  configuration rather than reachability and said `available: true` for AniList
+  throughout; Kitsu's latency tail still exceeds the budget occasionally; and
+  `languages` now mixes Wikidata's localized labels (`español`) with TVmaze's
+  English names (`Spanish`).
+- Next: **v1.5.7 is prepared but not published.** `compose.yaml`'s default names
+  `1.5.7`, which does not exist in the registry until the owner pushes the tag
+  — `git push origin main && git tag v1.5.7 && git push origin v1.5.7`, then
+  watch the `Release` run. Nothing is pushed: `main` is ahead of `origin` by
+  this sprint's commits plus Sprint 061's. Until the tag is published, a fresh
+  `docker compose up` on a clean host would fail to pull.

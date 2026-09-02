@@ -2,7 +2,7 @@
 
 **Plan revision:** 33
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** 062 — sprints 001–061 are complete; see `docs/agent/state.json`.
+**Active sprint:** none — every planned sprint (001–062) is complete; see `docs/agent/state.json`.
 
 ## Shape of the plan
 

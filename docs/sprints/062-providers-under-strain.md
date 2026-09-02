@@ -1,6 +1,6 @@
 # Sprint 062 — Search and add survive a provider having a bad day
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 046, 049, 050
 **Roadmap revision:** 33
 
@@ -168,4 +168,91 @@ request path, and no screen. This is a claim about the diff and is checked again
 
 ## Outcome
 
-_Not started._
+Delivered in full, with one scope addition the walkthrough forced. DEC-125 carries the
+reasoning; this section carries the evidence.
+
+### Acceptance criteria
+
+| AC | Result | How it was verified |
+|---|---|---|
+| 1 | met | `test_no_request_declares_a_lag_tolerance` in both Wikidata suites; the recorded lag-error body is still refused (`test_replication_lag_is_reported_rather_than_parsed`, unchanged). Live: movie search returned 3 results where it had returned `503`. |
+| 2 | met | `test_a_series_is_added_though_its_provider_reports_a_language` and `test_a_book_still_stores_the_language_its_provider_reports`. Live: five series added from both sources, `language` absent from every stored record. |
+| 3 | met | `test_it_reports_the_language_the_recording_carries` over four recordings. Live: TVmaze results reported `Japanese`, `French`, `Thai`, `English`. |
+| 4 | met | `test_tvmaze_builds_the_stremio_poster_from_the_id_it_already_holds` and `test_a_show_with_no_imdb_id_still_emits_no_cover`. |
+| 5 | met | `test_two_throttled_answers_in_a_row_are_still_survived`. Live: 12 concurrent album fetches all returned `200` while MusicBrainz answered 11 upstream `503`s. |
+| 6 | met, and extended | `test_the_search_budget_is_above_the_measured_provider_latency`, plus `test_it_waits_longer_than_the_shared_client_would` for the addition below. |
+| 7 | met | The walkthrough, below. |
+
+### The scope addition, and why
+
+**AC6 as planned was not sufficient, and the walkthrough is what caught it.** With the
+caller's budget raised to 10 s, anime search still failed: the timeout doing the cutting
+was the *shared client's* 5 s read timeout, one layer down, and Kitsu spends its time
+before the first byte (TTFB measured 4.2, 5.0, 5.0, 6.4 s). httpx aborted the request,
+`bounded_json` retried, and the two attempts overran the caller's budget. The Kitsu read
+now carries an explicit `KITSU_TIMEOUT_SECONDS = 9.0`, sized just under the caller's
+budget because a second attempt cannot fit inside it anyway. Measured through the built
+container: **0 of 10 live anime searches failed afterwards, against 1 of 3 before it.**
+
+This is the sprint's own evidence for the walkthrough gate. The suite was green at the
+point anime was still broken in the running application.
+
+### Verification
+
+- `python scripts/validate_project.py` — passed.
+- `make check` — passed (ruff format/check, mypy 62 files, tsc, eslint, OpenAPI check).
+- `make test` — **1,236 backend passed** (from 1,228 at sprint start), **197 frontend
+  passed**, coverage 89%.
+- `make smoke-container` — passed, twice: once at the implementation freeze, once after the
+  `compose.yaml` version bump, which is deployment configuration and re-owes that gate.
+- `npx playwright test` — **not owed and not run.** The declaration in Verification is
+  checked against the diff: `git diff --name-only 8cbab07..HEAD` matches **zero** files
+  under `frontend/src/`, and no request path or response shape changed. (Sprint 061's
+  root-owned `frontend/node_modules/.vite/deps` blocker is also still present, but it is
+  not the reason — the diff is.)
+
+### Walkthrough (DEC-025), against the built container and live providers
+
+Ran `akasha:sprint062` on an isolated volume at `127.0.0.1:8062` — the owner's own running
+instance was never touched. Search **and add** in all five domains:
+
+| Domain | Search | Add |
+|---|---|---|
+| book | 18 results, 10 with covers | `201`, cover installed |
+| album | 4 results, 4 with covers | `201`, cover installed |
+| movie | 3 results, 3 with covers — **was `503` before this sprint** | `201`, cover installed |
+| series | 10 results, 8 with covers | `201` from Wikidata *and* from TVmaze — **was `422` before this sprint** |
+| anime | 5 results, 5 with covers | `201`, cover installed |
+
+Also exercised: `POST /api/items/{id}/refresh` on two TVmaze-sourced series (the second
+copy of the language fold) — both `200`, `languages` correct, no `language` key.
+
+### Observed and reported, out of scope
+
+- **`languages` now mixes vocabularies.** Wikidata supplies localized labels (`español`,
+  `inglés estadounidense`); TVmaze supplies English names (`Spanish`, `Japanese`). The same
+  field reads differently depending on which provider answered. Recorded in DEC-125.
+- **Two TVmaze series were added coverless despite having an IMDb id.** Chased rather than
+  assumed: `images.metahub.space` answers `307` and the redirect target answers `404` for
+  `tt12072666` and `tt1524147` — Stremio genuinely has no poster for those titles. This is
+  DEC-103's documented behaviour, and the cover pipeline degraded correctly.
+- **`/api/health/providers` reported `available: true` for AniList throughout**, while
+  AniList was answering `403`. It reports configuration, not reachability. Not fixed.
+- **Kitsu's latency tail exceeds any budget worth paying** — one live search measured 7.98 s
+  end to end. When it exceeds the budget the anime search still returns `503`.
+- **`ROADMAP.md` had no section for Sprint 061** and its header still read "every planned
+  sprint (001–060) is complete" at revision 31 while `state.json` read 32. Repaired as an
+  unambiguous documentation inconsistency, per `AGENTS.md` §1.
+
+### Commits
+
+`6541670` maxlag removal and sprint opening · `c896a46` the domain-gated language fold ·
+`a4e2cb6` TVmaze's language and poster · `71f984d` the MusicBrainz and search budgets ·
+`f635f4f` the Kitsu transport budget (the walkthrough's find) · `cf893aa` DEC-125 and the
+v1.5.7 release notes · plus this closing commit.
+
+### Impact on future sprints
+
+None planned to change. The non-scope items in DEC-125 — a second movie provider, an
+AniList replacement, and a reachability-aware `/api/health/providers` — are candidates for
+the next planning round, not commitments made here.
