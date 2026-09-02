@@ -394,12 +394,24 @@ flag.
 Calibre's `metadata.db` is a plain SQLite database — no API needed, and this is
 the better of the two integrations.
 
-**Access, two ways** (DEC-081). **Primarily, the reader chooses the folder in the
-browser** and the client uploads `metadata.db` plus the covers — nothing is mounted,
-nothing is configured, and no handle is held on a library another program is using.
-This is the answer to the real-world problem the mount created: `CALIBRE_DIR` is a
-container-level setting, and a library served by calibre-web-automated is held open,
-where concurrent readers are not supported.
+**Access, three ways** (DEC-081, generalized by DEC-124). **Primarily, the reader
+chooses the folder in the browser** and the client uploads `metadata.db` plus the
+covers — nothing is mounted, nothing is configured, and no handle is held on a library
+another program is using. This is the answer to the real-world problem the mount
+created: `CALIBRE_DIR` is a container-level setting, and a library served by
+calibre-web-automated is held open, where concurrent readers are not supported.
+
+**A third way: drop what Calibre's own export produced.** Calibre's *Preferences →
+Import/export → Export/import all calibre data* feature writes one or more
+`part-NNNN.calibre-data` files. Dropping every one of them onto the Calibre tab
+imports the same library with no folder access needed at all — useful when the
+folder picker isn't an option, or when an export is already sitting on disk. Unlike
+the folder option, **this sends the entire export, ebook files included**, because
+Calibre packs everything together and the manifest describing what is where is only
+readable after the whole thing has arrived — there is no way to filter client-side
+first. Because the bytes are already local once uploaded, one preferred ebook file
+per book is attached automatically on commit, with no second upload the folder
+option's opt-in attachment needs.
 
 **A re-import sends only what is missing** (DEC-082). Before uploading, the client
 asks the server which books it already holds with a cover or an attachment of the offered name,
@@ -417,7 +429,7 @@ bytes do not join the preview bundle: after commit the client sends each wanted 
 request, reports progress, and names a failure without failing the import. An unchanged re-sync
 sends none; deleting one attachment makes that file wanted again.
 
-**Secondarily, a mounted library** the server can already see: mounted read-only into
+**Also, a mounted library** the server can already see: mounted read-only into
 the container and opened with `sqlite3.connect("file:metadata.db?mode=ro", uri=True)`.
 It is what automation and a too-large-to-upload library use.
 

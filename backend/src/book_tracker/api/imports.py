@@ -1,6 +1,7 @@
 import json
 import shutil
 import tempfile
+from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -112,8 +113,8 @@ class ImportInputResponse(BaseModel):
     accepts_files: bool = False
     max_bytes: int | None = None
     max_files: int | None = None
-    #: A second way into the same connector, rendered beneath the primary. One deep.
-    alternate: "ImportInputResponse | None" = None
+    #: Other ways into the same connector, each rendered beneath the primary. One deep.
+    alternates: "list[ImportInputResponse]" = Field(default_factory=list)
 
 
 class ImportPlanResponse(BaseModel):
@@ -148,9 +149,7 @@ class ImporterResponse(BaseModel):
 
 def _published_input(spec: ImportInputSpec) -> ImportInputResponse:
     published = dict(spec.__dict__)
-    published["alternate"] = (
-        _published_input(spec.alternate) if spec.alternate is not None else None
-    )
+    published["alternates"] = [_published_input(alternate) for alternate in spec.alternates]
     return ImportInputResponse.model_validate(published)
 
 
@@ -187,6 +186,7 @@ class ImportRecordResponse(BaseModel):
     entry: dict[str, Any]
     source_fields: dict[str, Any]
     cover_staged: bool = False
+    attachment_staged: bool = False
 
 
 class SkippedReason(BaseModel):
@@ -288,24 +288,25 @@ def service(request: Request, importer_name: str) -> ImportService:
         request.app.state.data_dir,
         request.app.state.calibre_dir,
         importer,
+        attachment_max_bytes=int(request.app.state.attachment_max_bytes),
     )
 
 
 def _inputs(importer: object) -> tuple[ImportInputSpec, ...]:
-    """The ways into this connector: its primary, then its alternate if it has one."""
+    """The ways into this connector: its primary, then its alternates in order."""
     spec: ImportInputSpec = importer.input  # type: ignore[attr-defined]
-    return (spec,) if spec.alternate is None else (spec, spec.alternate)
+    return (spec, *spec.alternates)
 
 
 def _chosen_input(importer: object, request: Request) -> ImportInputSpec:
     """Which declared input this request is using.
 
-    A connector with an alternate is reached two ways on one route, so the content type
-    decides rather than the declaration: a body of parts is the file or folder input, a
-    JSON body is the path one (DEC-081).
+    A connector with alternates is reached several ways on one route, so the content
+    type decides rather than the declaration: a body of parts is a file, folder or
+    export input, a JSON body is the path one (DEC-081).
     """
     posted_parts = request.headers.get("content-type", "").startswith("multipart/form-data")
-    wanted = ("upload", "directory") if posted_parts else ("path",)
+    wanted = ("upload", "directory", "export") if posted_parts else ("path",)
     for spec in _inputs(importer):
         if spec.kind in wanted:
             return spec
@@ -342,10 +343,19 @@ async def _source(
     request: Request, importer_name: str
 ) -> tuple[ImportSource, tuple[str, ...] | None]:
     importer = IMPORTERS[importer_name]
-    spec = _chosen_input(importer, request)
-    if spec.kind == "directory":
-        source, extras = await _bundle(request, spec, form_extras=("manifest", "targets"))
+    bundle_inputs = [spec for spec in _inputs(importer) if spec.kind in ("directory", "export")]
+    posted_parts = request.headers.get("content-type", "").startswith("multipart/form-data")
+    if posted_parts and bundle_inputs:
+        form, spec = await _multipart_form(request, bundle_inputs)
+        try:
+            if spec.kind == "directory":
+                source, extras = await _bundle(form, spec, form_extras=("manifest", "targets"))
+            else:
+                source, extras = await _export(form, spec, form_extras=("targets",))
+        finally:
+            await form.close()
         return source, _targets(extras.get("targets"))
+    spec = _chosen_input(importer, request)
     if spec.kind == "upload":
         form = await request.form()
         upload = form.get(spec.field)
@@ -375,17 +385,21 @@ async def _source(
     return ImportSource(path=value), _targets(body.get("targets"))
 
 
-async def _bundle(
-    request: Request, spec: ImportInputSpec, *, form_extras: tuple[str, ...] = ()
-) -> tuple[ImportSource, dict[str, str]]:
-    """Stream an uploaded folder to disk as a library the reader already understands.
+async def _multipart_form(
+    request: Request, candidates: Sequence[ImportInputSpec]
+) -> tuple[Any, ImportInputSpec]:
+    """Parse a multipart body once and say which declared input it was aimed at.
 
-    Members land under `<bundle>/library/...` rather than at the root so the connector
-    can point the ordinary adapter at the parent and reuse its confinement unchanged.
-    The caller owns the returned directory and removes it.
+    A connector may declare more than one multipart-shaped input sharing one route —
+    Calibre's folder bundle and export bundle have the same content type, so only the
+    field name in the body says which (DEC-081, generalized). Parsed against the widest
+    cap among the candidates, since which spec's own (possibly smaller) cap applies
+    is not known until a field is seen; each part is re-checked against its actual
+    chosen spec's cap immediately after, in `_bundle`/`_export`. The caller closes the
+    returned form.
     """
-    max_bytes = spec.max_bytes or MAX_IMPORT_BYTES
-    max_files = spec.max_files or MAX_IMPORT_FILES
+    max_bytes = max((spec.max_bytes or MAX_IMPORT_BYTES) for spec in candidates)
+    max_files = max((spec.max_files or MAX_IMPORT_FILES) for spec in candidates)
     parser = _DiskSpooledMultiPart(
         request.headers,
         request.stream(),
@@ -396,8 +410,29 @@ async def _bundle(
     try:
         form = await parser.parse()
     except MultiPartException as error:
-        raise _too_large(spec) from error
+        raise _too_large(candidates[0]) from error
+    spec = next((candidate for candidate in candidates if form.getlist(candidate.field)), None)
+    if spec is None:
+        await form.close()
+        raise LibraryError(
+            "invalid_import_source",
+            "This importer does not accept a source submitted that way",
+            status_code=422,
+        )
+    return form, spec
 
+
+async def _bundle(
+    form: Any, spec: ImportInputSpec, *, form_extras: tuple[str, ...] = ()
+) -> tuple[ImportSource, dict[str, str]]:
+    """Lay an already-parsed folder bundle out on disk as a library the reader understands.
+
+    Members land under `<bundle>/library/...` rather than at the root so the connector
+    can point the ordinary adapter at the parent and reuse its confinement unchanged.
+    The caller owns the returned directory and removes it, and owns `form` too.
+    """
+    max_bytes = spec.max_bytes or MAX_IMPORT_BYTES
+    max_files = spec.max_files or MAX_IMPORT_FILES
     bundle = Path(tempfile.mkdtemp(prefix="akasha-import-"))
     try:
         total = 0
@@ -433,19 +468,64 @@ async def _bundle(
     except BaseException:
         shutil.rmtree(bundle, ignore_errors=True)
         raise
-    finally:
-        await form.close()
+
+
+async def _export(
+    form: Any, spec: ImportInputSpec, *, form_extras: tuple[str, ...] = ()
+) -> tuple[ImportSource, dict[str, str]]:
+    """Lay an already-parsed set of opaque parts out on disk, unread.
+
+    Unlike `_bundle`, this has no idea what the parts mean — no relative-path
+    reshaping, no "does this hold a database" check. Filenames are validated the same
+    universal way (`_bundle_member`, reused: a flat name is a one-segment relative path
+    as far as it cares) plus the connector's own `members` pattern, and each part lands
+    flat at `<export>/parts/<name>`. Only the connector, in `read`, knows how to turn
+    this set of files back into a source it can normalize (DEC-081, generalized).
+    """
+    max_bytes = spec.max_bytes or MAX_IMPORT_BYTES
+    max_files = spec.max_files or MAX_IMPORT_FILES
+    export = Path(tempfile.mkdtemp(prefix="akasha-import-"))
+    try:
+        total = 0
+        written = 0
+        for upload in form.getlist(spec.field):
+            if not isinstance(upload, UploadFile):
+                continue
+            name = _bundle_member(upload.filename or "", spec)
+            written += 1
+            if written > max_files:
+                raise _too_large(spec)
+            target = export / "parts" / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            with target.open("wb") as sink:
+                while chunk := await upload.read(64 * 1024):
+                    total += len(chunk)
+                    if total > max_bytes:
+                        raise _too_large(spec)
+                    sink.write(chunk)
+        if written == 0:
+            raise LibraryError(
+                "invalid_import_source",
+                "At least one exported part file is required",
+                status_code=422,
+                user_message="No files were offered to import.",
+                action="Drop every part file the export produced together.",
+            )
+        extras = {name: value for name in form_extras if isinstance(value := form.get(name), str)}
+        return ImportSource(export=export), extras
+    except BaseException:
+        shutil.rmtree(export, ignore_errors=True)
+        raise
 
 
 def _too_large(spec: ImportInputSpec) -> LibraryError:
     megabytes = (spec.max_bytes or MAX_IMPORT_BYTES) // (1024 * 1024)
-    # An alternate is only ever the mounted-path input today (DEC-081's one level
-    # deep), which is what this sentence names; a connector with no alternate has no
-    # second way in, so the refusal says only what actually happened (deliverable 5,
-    # Sprint 060).
+    # `alternates` is one level deep (DEC-081), which is what this sentence names; a
+    # connector with none has no other way in, so the refusal says only what actually
+    # happened (deliverable 5, Sprint 060).
     action = (
-        "Import it from a mounted path instead, using the option below the folder chooser."
-        if spec.alternate is not None
+        "Try one of the other ways to import this library, shown below."
+        if spec.alternates
         else "Export a smaller file, or split it into more than one."
     )
     return LibraryError(
@@ -470,8 +550,9 @@ async def preview(importer_name: str, request: Request) -> PreviewResponse:
         # Staging has already copied whatever the batch needs into `/data/imports`,
         # so an uploaded bundle has no reason to outlive the request — including when
         # the read failed, where leaving it behind would be a slow disk leak.
-        if source.directory is not None:
-            shutil.rmtree(source.directory, ignore_errors=True)
+        for materialized in (source.directory, source.export):
+            if materialized is not None:
+                shutil.rmtree(materialized, ignore_errors=True)
     return PreviewResponse.model_validate(result)
 
 
@@ -496,7 +577,11 @@ async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
             status_code=404,
         )
     spec = _chosen_input(importer, request)
-    source, _extras = await _bundle(request, spec, form_extras=("manifest",))
+    form, spec = await _multipart_form(request, [spec])
+    try:
+        source, _extras = await _bundle(form, spec, form_extras=("manifest",))
+    finally:
+        await form.close()
     try:
         candidates = _candidates(source.manifest, spec)
         result = planned_upload(
@@ -513,8 +598,9 @@ async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
     except ValueError as error:
         raise LibraryError("invalid_import_plan", str(error), status_code=500) from error
     finally:
-        if source.directory is not None:
-            shutil.rmtree(source.directory, ignore_errors=True)
+        for materialized in (source.directory, source.export):
+            if materialized is not None:
+                shutil.rmtree(materialized, ignore_errors=True)
     return ImportPlanResponse(
         wanted=list(result.wanted), holding=result.holding, reason=result.reason
     )

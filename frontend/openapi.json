@@ -1212,15 +1212,12 @@
             "title": "Accepts Files",
             "type": "boolean"
           },
-          "alternate": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ImportInputResponse"
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "alternates": {
+            "items": {
+              "$ref": "#/components/schemas/ImportInputResponse"
+            },
+            "title": "Alternates",
+            "type": "array"
           },
           "browsable": {
             "default": false,
@@ -1359,6 +1356,11 @@
       "ImportRecordResponse": {
         "additionalProperties": true,
         "properties": {
+          "attachment_staged": {
+            "default": false,
+            "title": "Attachment Staged",
+            "type": "boolean"
+          },
           "candidates": {
             "items": {
               "type": "integer"

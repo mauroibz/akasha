@@ -45,7 +45,7 @@ const importers = [
       accepts_files: false,
       max_bytes: null,
       max_files: null,
-      alternate: null,
+      alternates: [],
     },
   },
   {
@@ -59,7 +59,7 @@ const importers = [
       field: "files",
       accept: null,
       placeholder: null,
-      help: "Akasha reads the library you choose and copies nothing but metadata and covers.",
+      help: "Select your local Calibre folder.",
       guide: [
         "Choose your Calibre library folder — the one that holds metadata.db.",
         "Only metadata.db and the covers are sent; your ebooks are never uploaded.",
@@ -71,23 +71,50 @@ const importers = [
       accepts_files: true,
       max_bytes: 256 * 1024 * 1024,
       max_files: 10000,
-      alternate: {
-        kind: "path",
-        label: "Calibre library path",
-        field: "library_path",
-        accept: null,
-        placeholder: "Library",
-        help: "Or read a library the server can already see.",
-        guide: [],
-        empty_state: "No folders here. Mount your Calibre library and reload.",
-        help_url: null,
-        browsable: true,
-        incremental: false,
-        accepts_files: false,
-        max_bytes: null,
-        max_files: null,
-        alternate: null,
-      },
+      alternates: [
+        {
+          kind: "path",
+          label: "Calibre library path",
+          field: "library_path",
+          accept: null,
+          placeholder: "Library",
+          help: "Or import from a mounted Calibre library.",
+          guide: [
+            "Set CALIBRE_DIR in your .env and restart the container.",
+            "Browse to the right folder below, or type its path.",
+          ],
+          empty_state:
+            "No folders here. Mount your Calibre library and reload.",
+          help_url: null,
+          browsable: true,
+          incremental: false,
+          accepts_files: false,
+          max_bytes: null,
+          max_files: null,
+          alternates: [],
+        },
+        {
+          kind: "export",
+          label: "Calibre export",
+          field: "parts",
+          accept: null,
+          placeholder: null,
+          help: "Or drop the files from Calibre's own export.",
+          guide: [
+            "In Calibre: Preferences → Import/export → export all calibre data.",
+            "Drag every part-*.calibre-data file it produced onto this screen.",
+          ],
+          empty_state:
+            "Drop the part-*.calibre-data files your export produced.",
+          help_url: null,
+          browsable: false,
+          incremental: false,
+          accepts_files: true,
+          max_bytes: 8 * 1024 * 1024 * 1024,
+          max_files: 500,
+          alternates: [],
+        },
+      ],
     },
   },
 ];
@@ -137,7 +164,7 @@ describe("ImportPage", () => {
               accepts_files: false,
               max_bytes: null,
               max_files: null,
-              alternate: null,
+              alternates: [],
             },
           },
         ]),
@@ -211,7 +238,7 @@ describe("ImportPage", () => {
     await userEvent.click(await screen.findByRole("tab", { name: /calibre/i }));
     // The mount is the alternate now, behind a disclosure (DEC-081).
     await userEvent.click(
-      screen.getByRole("button", { name: /server can already see/i }),
+      screen.getByRole("button", { name: /import from a mounted/i }),
     );
     await userEvent.type(screen.getByLabelText(/library path/i), "My Books");
     await userEvent.click(
@@ -620,7 +647,7 @@ describe("ImportPage", () => {
     });
     renderImportPage("/import?tab=calibre");
     await userEvent.click(
-      await screen.findByRole("button", { name: /server can already see/i }),
+      await screen.findByRole("button", { name: /import from a mounted/i }),
     );
 
     expect(
@@ -662,7 +689,7 @@ describe("ImportPage", () => {
     renderImportPage("/import?tab=calibre");
 
     await userEvent.click(
-      await screen.findByRole("button", { name: /server can already see/i }),
+      await screen.findByRole("button", { name: /import from a mounted/i }),
     );
     await userEvent.type(screen.getByLabelText(/library path/i), "Locked");
     await userEvent.click(
@@ -747,7 +774,7 @@ describe("ImportPage", () => {
     expect(await screen.findByLabelText("Calibre folder")).toBeVisible();
     // And the alternate is collapsed again rather than left open from before.
     expect(
-      screen.getByRole("button", { name: /server can already see/i }),
+      screen.getByRole("button", { name: /import from a mounted/i }),
     ).toHaveAttribute("aria-expanded", "false");
   });
 
@@ -805,6 +832,109 @@ describe("ImportPage", () => {
     expect(parts.map((part) => part.name)).toEqual([
       "metadata.db",
       "Sanderson/Mistborn (2)/cover.jpg",
+    ]);
+  });
+
+  it("renders both Calibre alternates independently below the folder chooser", async () => {
+    stubRegistry();
+    renderImportPage("/import?tab=calibre");
+    await screen.findByLabelText("Calibre folder");
+
+    const mountToggle = screen.getByRole("button", {
+      name: /import from a mounted/i,
+    });
+    const exportToggle = screen.getByRole("button", {
+      name: /calibre's own export/i,
+    });
+    expect(mountToggle).toHaveAttribute("aria-expanded", "false");
+    expect(exportToggle).toHaveAttribute("aria-expanded", "false");
+
+    await userEvent.click(exportToggle);
+    expect(exportToggle).toHaveAttribute("aria-expanded", "true");
+    expect(mountToggle).toHaveAttribute("aria-expanded", "false");
+    expect(await screen.findByLabelText("Calibre export")).toBeVisible();
+    expect(screen.queryByLabelText(/library path/i)).toBeNull();
+
+    await userEvent.click(mountToggle);
+    expect(mountToggle).toHaveAttribute("aria-expanded", "true");
+    // Opening one does not close the other.
+    expect(exportToggle).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByLabelText(/library path/i)).toBeVisible();
+  });
+
+  it("shows an alternate's own step-by-step guide only once it is open", async () => {
+    stubRegistry();
+    renderImportPage("/import?tab=calibre");
+    await screen.findByLabelText("Calibre folder");
+
+    // Not shown collapsed — the toggle's own short label is enough until opened.
+    expect(screen.queryByText(/preferences → import\/export/i)).toBeNull();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /calibre's own export/i }),
+    );
+    expect(
+      await screen.findByText(/preferences → import\/export/i),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/drag every part-\*\.calibre-data file/i),
+    ).toBeVisible();
+
+    // The mount alternate has its own guide too, distinct from the export one.
+    await userEvent.click(
+      screen.getByRole("button", { name: /import from a mounted/i }),
+    );
+    expect(await screen.findByLabelText(/library path/i)).toBeVisible();
+    expect(screen.getByText(/set calibre_dir in your \.env/i)).toBeVisible();
+    // Its toggle's own short label is not repeated inside the opened panel.
+    expect(
+      screen.queryAllByText(/or import from a mounted calibre library/i),
+    ).toHaveLength(1);
+  });
+
+  it("sends every dropped export part under its own field, unreshaped", async () => {
+    let sent: FormData | null = null;
+    stubRegistry((url) => {
+      if (!url.endsWith("calibre/preview")) return undefined;
+      return new Response(
+        JSON.stringify({
+          batch_id: "export-1",
+          fingerprint: "db",
+          state: "previewed",
+          summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+          records: [],
+        }),
+        { status: 201 },
+      );
+    });
+    const inner = globalThis.fetch;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      if (init?.body instanceof FormData) sent = init.body;
+      return inner(input, init);
+    });
+    renderImportPage("/import?tab=calibre");
+    await screen.findByLabelText("Calibre folder");
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /calibre's own export/i }),
+    );
+    const part1 = new File(["one"], "part-0001.calibre-data");
+    const part2 = new File(["two"], "part-0002.calibre-data");
+    await userEvent.upload(await screen.findByLabelText("Calibre export"), [
+      part1,
+      part2,
+    ]);
+    expect(await screen.findByText(/2 files selected/i)).toBeVisible();
+
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview calibre library/i }),
+    );
+    await screen.findByRole("heading", { name: /preview: 1 row/i });
+
+    const parts = [...(sent as unknown as FormData).getAll("parts")] as File[];
+    expect(parts.map((part) => part.name)).toEqual([
+      "part-0001.calibre-data",
+      "part-0002.calibre-data",
     ]);
   });
 
@@ -1094,7 +1224,7 @@ describe("ImportPage", () => {
         accepts_files: false,
         max_bytes: null,
         max_files: null,
-        alternate: null,
+        alternates: [],
       },
     };
 

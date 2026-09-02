@@ -4448,3 +4448,83 @@ and state the success condition as "green", not as "seconds".**
   "DEC-124" before DEC-122 (Sprint 059's) was confirmed as the prior number; corrected in place
   to DEC-123 everywhere except the already-pushed commit message itself, which this entry's
   number is the record of.
+
+## DEC-124 — Sprint 061: `alternate` generalizes to `alternates`, and a Calibre export bundle is a third way in
+
+- **Date:** 2026-09-02
+- **Status:** accepted
+- **Extends:** DEC-081 (the folder chooser and its one-deep `alternate`), DEC-082 (planning by
+  identity), DEC-083 (importer-owned ebook attachment).
+- **Context:** The owner exported their Calibre library with Calibre's own *Export/import all
+  calibre data* feature and asked for a third way into the Calibre tab: drag the resulting
+  `part-NNNN.calibre-data` files in directly. Reverse-engineering the two real files that feature
+  produced (one 181,341,317-byte part, one 14,946-byte part) against extracted bytes and their own
+  declared SHA-1 hashes established the format precisely: a JSON manifest — found in one part by
+  content, not position, since it was the smaller, *second* file, not the first — maps a small
+  vocabulary of keys to `[part_number, offset, length, sha1, mtime]`, where the offset is relative
+  to the **start of that specific part**, not a concatenation across parts. The manifest gives
+  `metadata.db`'s key directly, and per book a `.cover` key plus one key per ebook format actually
+  held — `format_data`, keyed by Calibre's own book id. DEC-081's own "Impact on future work" had
+  already named the shape this would need: *"alternate is one level deep by contract, so a source
+  with three ways in needs a different shape rather than a longer chain."* This is that shape.
+- **Decision:**
+  - **`ImportInputSpec.alternate: ImportInputSpec | None` becomes `alternates: tuple[ImportInputSpec, ...]`.**
+    Still exactly one level deep — an alternate's own `alternates` must be empty — and every
+    `field` across the primary and all alternates must now be pairwise distinct, not merely
+    primary-vs-one. The frontend renders one independently-toggleable disclosure per alternate.
+    Every existing single-alternate connector (Calibre's mount, until this sprint its only one)
+    keeps working unchanged; `alternates=()` is simply the empty case.
+  - **A fourth `ImportInputSpec.kind`, `"export"`, for a small set of opaque files a source's own
+    export feature produced.** Unlike `"directory"`, the shared route does not reshape or inspect
+    what the files mean — it validates filenames against a flat `members` pattern
+    (`"*.calibre-data"`) and streams each part to `<bundle>/parts/<name>` (`ImportSource.export`),
+    owning and removing that directory exactly as it already owns a `directory` bundle. Turning a
+    set of opaque parts back into a source the ordinary adapter can read is entirely the
+    connector's business, inside `read`.
+  - **`_chosen_input`'s old assumption — one multipart-shaped input per connector — no longer
+    holds.** Calibre now has two (`directory` primary, `export` alternate) sharing one route with
+    an identical content type. `api/imports.py` gains `_multipart_form`, which parses the body
+    once against the widest cap among the multipart-shaped candidates and picks the one whose
+    declared `field` the body actually carries, re-checking that candidate's own (possibly
+    smaller) cap immediately after. `_bundle` and the new `_export` no longer parse for
+    themselves; both take an already-parsed form.
+  - **Part-to-file mapping is positional (sorted by filename), never pattern-matched on a name
+    like `part-0001.calibre-data`.** The manifest's own `part_number` field is 1-indexed against
+    upload order sorted by filename; Calibre's zero-padded naming already sorts correctly, and
+    this also makes no assumption about what a single-part export would be named, which the two
+    real sample files (both multi-part) cannot confirm either way. The manifest itself is located
+    by content — parsing the leading bytes of every uploaded part as JSON via
+    `json.JSONDecoder().raw_decode` and keeping the one with a `file_metadata` key — rather than
+    trusting a fixed position, since the real sample already contradicted "the manifest is the
+    first file."
+  - **Every reconstructed byte range is hash- and bounds-checked before anything is written**, and
+    every reconstructed book path is confined the same way a read-side Calibre path already is:
+    a crafted `books.path` of `../../etc` is a write-side traversal attempt otherwise, not merely
+    a read-side one, and `CalibreError("invalid_calibre_export", ...)` refuses it before a byte
+    lands outside the reconstructed library root.
+  - **Automatic ebook attachment, only for the export path, and only because the bytes are
+    already local.** DEC-083 built attachment as an opt-in, second-upload flow because a folder
+    upload never has ebook bytes on disk — the browser would have to send them separately no
+    matter what. An export bundle already contains them: extracting the same preferred-format
+    file `CalibreAdapter._formats` would offer, if it happens to exist on disk after
+    reconstruction, costs nothing extra over what was already uploaded. `NormalizedImportRecord`
+    gains `attachment_source`/`attachment_name` (populated only for the export path — a mount or a
+    folder upload never has local bytes, so this is `CalibreImporter.read`'s decision, not a new
+    branch anywhere shared) and `attachment_stage` (parallel to `cover_stage`). `ImportService`
+    enforces `attachment_max_bytes` against the staged copy after `stage` returns — `stage` owns
+    no policy, only bytes it happens to have — falling back to the ordinary declare-only
+    `source_files` path when over cap, and `commit` installs a surviving staged attachment through
+    the same content-addressed store (`store_blob`) and effect ledger (`record_file`) a manual
+    `/batches/{id}/files` attachment already uses, so undo reverses it identically.
+- **Consequences:** `ImportInputResponse`/the frontend's `ImportInputSpec` rename `alternate` to
+  `alternates: []` the same way; every fixture and conformance test asserting the old singular
+  shape is rewritten, not shimmed. Dragging an export necessarily uploads the **entire** library,
+  ebook files included — potentially gigabytes, verified against the real sample at 181 MB for an
+  18-book library of mostly-text epubs alone — because the manifest that would let a client filter
+  first is itself unreadable before the whole thing lands; the export input's cap is set generously
+  (8 GiB / 500 parts) rather than trying to shrink an unshrinkable upload. `./exports/*.calibre-data`
+  — the owner's own two-part export, used throughout to verify the format against ground truth —
+  stays local and untracked; the automated suite uses hand-built synthetic two-part bundles
+  matching the same verified structure. Reading `notes.db`, Calibre custom columns, `config_dir`
+  entries, and multi-library exports remain explicit non-scope, matching what the other two
+  Calibre paths already do not read.

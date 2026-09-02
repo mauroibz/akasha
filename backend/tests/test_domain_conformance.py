@@ -154,16 +154,15 @@ def assert_declared_guidance(importer: Importer) -> None:
         f"{importer.name} declares incremental but has no plan method"
     )
     assert_declared_envelope(importer, spec)
-    if spec.alternate is not None:
-        assert spec.alternate.alternate is None, (
-            f"{importer.name} nests an alternate inside an alternate"
-        )
-        assert spec.alternate.field != spec.field, (
-            f"{importer.name} gives its alternate the same field as its primary"
-        )
-        assert spec.alternate.field and spec.alternate.field.isidentifier()
-        assert spec.alternate.label
-        assert_declared_envelope(importer, spec.alternate)
+    fields = [spec.field, *(alternate.field for alternate in spec.alternates)]
+    assert len(fields) == len(set(fields)), (
+        f"{importer.name} gives two of its inputs the same field"
+    )
+    for alternate in spec.alternates:
+        assert not alternate.alternates, f"{importer.name} nests an alternate inside an alternate"
+        assert alternate.field and alternate.field.isidentifier()
+        assert alternate.label
+        assert_declared_envelope(importer, alternate)
 
 
 def assert_declared_envelope(importer: Importer, spec: ImportInputSpec) -> None:
@@ -171,15 +170,15 @@ def assert_declared_envelope(importer: Importer, spec: ImportInputSpec) -> None:
     for name in ("max_bytes", "max_files"):
         cap = getattr(spec, name)
         assert cap is None or cap > 0, f"{importer.name} declares {name}={cap!r}"
-    # A directory is a set of files, and a reader that cannot take one would accept
-    # the upload and then find nothing it understands.
-    assert spec.kind != "directory" or spec.accepts_files, (
-        f"{importer.name} offers a directory its reader cannot read"
+    # A directory or an export bundle is a set of files, and a reader that cannot
+    # take one would accept the upload and then find nothing it understands.
+    assert spec.kind not in ("directory", "export") or spec.accepts_files, (
+        f"{importer.name} offers a bundle its reader cannot read"
     )
     # The shared route has to refuse a member before it writes a byte, and only the
     # connector knows what its source is shaped like (DEC-083).
-    assert spec.kind != "directory" or spec.members, (
-        f"{importer.name} offers a directory without saying what it may contain"
+    assert spec.kind not in ("directory", "export") or spec.members, (
+        f"{importer.name} offers a bundle without saying what it may contain"
     )
     assert all(valid_member_pattern(pattern) for pattern in spec.members), (
         f"{importer.name} declares a bundle member pattern that cannot be matched safely"
@@ -877,32 +876,62 @@ def test_a_connector_may_declare_a_second_way_in() -> None:
     class TwoWays(_DeclaringImporter):
         input = replace(
             _DeclaringImporter.input,
-            alternate=ImportInputSpec(kind="path", label="Path", field="library_path"),
+            alternates=(ImportInputSpec(kind="path", label="Path", field="library_path"),),
         )
 
     assert_declared_guidance(TwoWays())
 
 
+def test_a_connector_may_declare_more_than_one_alternate() -> None:
+    """A source with three ways in needs a different shape, not a longer chain — this
+    is that shape (DEC-081, generalized)."""
+
+    class ThreeWays(_DeclaringImporter):
+        input = replace(
+            _DeclaringImporter.input,
+            alternates=(
+                ImportInputSpec(kind="path", label="Path", field="library_path"),
+                ImportInputSpec(
+                    kind="export", label="Export", field="parts", accepts_files=True, members=("*",)
+                ),
+            ),
+        )
+
+    assert_declared_guidance(ThreeWays())
+
+
 @pytest.mark.parametrize(
-    ("name", "alternate"),
+    ("name", "alternates"),
     [
         # Depth is exactly one. A chain of alternates is a screen nobody designed.
         (
             "nested",
-            ImportInputSpec(
-                kind="path",
-                label="Path",
-                field="library_path",
-                alternate=ImportInputSpec(kind="upload", label="Deeper", field="deeper"),
+            (
+                ImportInputSpec(
+                    kind="path",
+                    label="Path",
+                    field="library_path",
+                    alternates=(ImportInputSpec(kind="upload", label="Deeper", field="deeper"),),
+                ),
             ),
         ),
         # Two inputs that post the same field are one input with a bug.
-        ("colliding_field", ImportInputSpec(kind="path", label="Path", field="file")),
+        ("colliding_field", (ImportInputSpec(kind="path", label="Path", field="file"),)),
+        # Same bug, one level further out: two alternates sharing a field.
+        (
+            "colliding_with_sibling",
+            (
+                ImportInputSpec(kind="path", label="Path", field="library_path"),
+                ImportInputSpec(kind="path", label="Other path", field="library_path"),
+            ),
+        ),
     ],
 )
-def test_the_suite_rejects_a_malformed_alternate(name: str, alternate: ImportInputSpec) -> None:
+def test_the_suite_rejects_a_malformed_alternate(
+    name: str, alternates: tuple[ImportInputSpec, ...]
+) -> None:
     class Malformed(_DeclaringImporter):
-        input = replace(_DeclaringImporter.input, alternate=alternate)
+        input = replace(_DeclaringImporter.input, alternates=alternates)
 
     with pytest.raises(AssertionError):
         assert_declared_guidance(Malformed())
@@ -1073,13 +1102,23 @@ def test_every_registered_importer_declares_its_error_vocabulary() -> None:
     assert IMPORTERS["goodreads"].error_codes
     assert IMPORTERS["calibre"].error_codes
     assert "calibre_library_not_found" in IMPORTERS["calibre"].error_codes
-    # Calibre leads with the folder chooser; the mount is its alternate (DEC-081).
+    # Calibre leads with the folder chooser; the mount and the export bundle are its
+    # alternates (DEC-081, generalized).
     assert IMPORTERS["calibre"].input.kind == "directory"
     assert IMPORTERS["calibre"].input.accepts_files is True
-    assert IMPORTERS["calibre"].input.alternate is not None
-    assert IMPORTERS["calibre"].input.alternate.browsable is True
+    assert len(IMPORTERS["calibre"].input.alternates) == 2
+    path_alternate = next(
+        alternate for alternate in IMPORTERS["calibre"].input.alternates if alternate.kind == "path"
+    )
+    export_alternate = next(
+        alternate
+        for alternate in IMPORTERS["calibre"].input.alternates
+        if alternate.kind == "export"
+    )
+    assert path_alternate.browsable is True
+    assert export_alternate.accepts_files is True
     assert IMPORTERS["goodreads"].input.browsable is False
-    assert IMPORTERS["goodreads"].input.alternate is None
+    assert IMPORTERS["goodreads"].input.alternates == ()
 
 
 def test_the_suite_covers_every_field_of_the_contract() -> None:

@@ -37,6 +37,7 @@ import {
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
+import { ExportPicker } from "@/features/import/ExportPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
 import { TriagePage } from "@/pages/TriagePage";
@@ -95,10 +96,14 @@ export function ImportPage() {
   const [file, setFile] = useState<File | null>(null);
   const [libraryPath, setLibraryPath] = useState("");
   const [bundle, setBundle] = useState<CalibreBundle | null>(null);
+  const [exportFiles, setExportFiles] = useState<File[]>([]);
   const [filesToAttach, setFilesToAttach] = useState<BundleMember[]>([]);
   const [attachmentProgress, setAttachmentProgress] =
     useState<AttachmentProgress | null>(null);
-  const [showAlternate, setShowAlternate] = useState(false);
+  /** Which alternates are open, keyed by their own field name. */
+  const [openAlternates, setOpenAlternates] = useState<Record<string, boolean>>(
+    {},
+  );
   /**
    * Which libraries this import is for, per connector.
    *
@@ -176,9 +181,10 @@ export function ImportPage() {
     setFile(null);
     setLibraryPath("");
     setBundle(null);
+    setExportFiles([]);
     setFilesToAttach([]);
     setAttachmentProgress(null);
-    setShowAlternate(false);
+    setOpenAlternates({});
     setSkipped(null);
     setPreview(null);
     setResult(null);
@@ -290,25 +296,27 @@ export function ImportPage() {
   /**
    * Which of a connector's inputs the reader actually filled in, if any.
    *
-   * A connector may offer two (DEC-081), so "is this ready to preview" is a
-   * question about the whole tab rather than about one field. The folder wins
-   * when both are filled, because it is the one the tab leads with.
+   * A connector may offer several (DEC-081, generalized), so "is this ready to
+   * preview" is a question about the whole tab rather than about one field. The
+   * primary wins when more than one is filled, because it is the one the tab
+   * leads with.
    */
   const readyInput = (
     importer: ImporterDefinition | undefined,
   ): {
     spec: ImportInputSpec;
-    source: File | string | BundleMember[];
+    source: File | string | BundleMember[] | File[];
   } | null => {
     if (!importer) return null;
-    for (const spec of [importer.input, importer.input.alternate]) {
-      if (!spec) continue;
+    for (const spec of [importer.input, ...importer.input.alternates]) {
       if (
         spec.kind === "directory" &&
         bundle?.database &&
         bundle.members.length
       )
         return { spec, source: bundle.members };
+      if (spec.kind === "export" && exportFiles.length > 0)
+        return { spec, source: exportFiles };
       if (spec.kind === "upload" && file) return { spec, source: file };
       if (spec.kind === "path" && libraryPath.trim())
         return { spec, source: libraryPath.trim() };
@@ -327,9 +335,9 @@ export function ImportPage() {
     importer: ImporterDefinition,
     submission: {
       spec: ImportInputSpec;
-      source: File | string | BundleMember[];
+      source: File | string | BundleMember[] | File[];
     },
-  ): Promise<File | string | BundleMember[]> => {
+  ): Promise<File | string | BundleMember[] | File[]> => {
     if (submission.spec.kind !== "directory") {
       setFilesToAttach([]);
       return submission.source;
@@ -385,6 +393,15 @@ export function ImportPage() {
             setAttachmentProgress(null);
           }}
           attachmentMaxBytes={importer.attachment_max_bytes}
+        />
+      );
+    if (spec.kind === "export")
+      return (
+        <ExportPicker
+          spec={spec}
+          inputId={inputId}
+          files={exportFiles}
+          onFiles={setExportFiles}
         />
       );
     if (spec.kind === "upload")
@@ -534,39 +551,67 @@ export function ImportPage() {
                     >
                       <ConnectorGuide importer={importer} />
                       {renderTargets(importer)}
+                      {/* A short, distinct lead for the primary, the same role an
+                      alternate's own toggle text plays below it. Shown only
+                      alongside a guide — `ConnectorGuide` already renders `help`
+                      itself when there is no guide to show instead, so the two
+                      never duplicate. */}
+                      {importer.input.guide.length > 0 &&
+                        importer.input.help && (
+                          <p className="text-sm font-medium text-foreground">
+                            {importer.input.help}
+                          </p>
+                        )}
                       {renderInput(importer, importer.input, "")}
-                      {/* The second way in, beneath the first. One deep by contract,
-                      so this never recurses further (DEC-081). */}
-                      {importer.input.alternate && (
-                        // A controlled disclosure rather than `<details>`: this is the
-                        // second way in, so it needs an explicit expanded state that a
-                        // screen reader announces and a test can drive.
-                        <div className="rounded-2xl border border-border px-4 py-3">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            aria-expanded={showAlternate}
-                            aria-controls={`${importer.id}-alternate`}
-                            className="h-8 w-full justify-start rounded-lg px-2 text-sm font-normal text-muted-foreground"
-                            onClick={() => setShowAlternate((open) => !open)}
+                      {/* Other ways in, each beneath the primary. One deep by
+                      contract, so this never recurses further (DEC-081,
+                      generalized). */}
+                      {importer.input.alternates.map((alternate, index) => {
+                        const open = openAlternates[alternate.field] ?? false;
+                        const panelId = `${importer.id}-alternate-${alternate.field}`;
+                        return (
+                          // A controlled disclosure rather than `<details>`: this is
+                          // another way in, so it needs an explicit expanded state
+                          // that a screen reader announces and a test can drive.
+                          <div
+                            key={alternate.field}
+                            className="rounded-2xl border border-border px-4 py-3"
                           >
-                            {importer.input.alternate.help ??
-                              `Or use a ${importer.label} library the server can already see`}
-                          </Button>
-                          {showAlternate && (
-                            <div
-                              id={`${importer.id}-alternate`}
-                              className="mt-4"
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              aria-expanded={open}
+                              aria-controls={panelId}
+                              className="h-auto min-h-8 w-full justify-start whitespace-normal rounded-lg px-2 py-1.5 text-left text-sm font-normal text-muted-foreground"
+                              onClick={() =>
+                                setOpenAlternates((current) => ({
+                                  ...current,
+                                  [alternate.field]: !open,
+                                }))
+                              }
                             >
-                              {renderInput(
-                                importer,
-                                importer.input.alternate,
-                                "-alt",
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      )}
+                              {alternate.help ??
+                                `Or use another way to import ${importer.label}`}
+                            </Button>
+                            {open && (
+                              <div id={panelId} className="mt-4 space-y-4">
+                                {alternate.guide.length > 0 && (
+                                  <ConnectorGuide
+                                    importer={importer}
+                                    spec={alternate}
+                                    headingId={`${panelId}-guide-heading`}
+                                  />
+                                )}
+                                {renderInput(
+                                  importer,
+                                  alternate,
+                                  `-alt-${index}`,
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </TabsContent>
                   ))}
                   <Button

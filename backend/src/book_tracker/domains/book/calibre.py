@@ -1,6 +1,7 @@
 import hashlib
+import json
 import sqlite3
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 from typing import Any
@@ -55,6 +56,11 @@ class CalibreError(ImportReadError):
         "invalid_calibre_database": (
             "Akasha could not read this library's metadata.db.",
             "Close Calibre and try again; it locks the database while it is writing.",
+        ),
+        "invalid_calibre_export": (
+            "Akasha could not read this export.",
+            "Make sure every part-*.calibre-data file the export produced is dropped "
+            "in together, from the same export.",
         ),
     }
 
@@ -327,6 +333,23 @@ class CalibreAdapter:
             return None
         return cover if cover.is_relative_to(library) and cover.is_file() else None
 
+    @staticmethod
+    def _attachment(library: Path, formats: list[dict[str, Any]]) -> Path | None:
+        """The preferred ebook file's absolute path, only if it is actually on disk.
+
+        A mounted or plain-uploaded library never has one — `formats` is derived from
+        `metadata.db` alone and the file itself is never sent (DEC-083). A reconstructed
+        export bundle may, since its bytes are already local; when they are, this is
+        what makes automatic post-commit attachment possible with no second upload.
+        """
+        if not formats:
+            return None
+        try:
+            resolved = (library / str(formats[0]["path"])).resolve(strict=True)
+        except OSError:
+            return None
+        return resolved if resolved.is_relative_to(library) and resolved.is_file() else None
+
 
 def _holding_reason(covers: int, files: int) -> str | None:
     """What the screen says it is skipping, naming the two kinds separately.
@@ -342,6 +365,80 @@ def _holding_reason(covers: int, files: int) -> str | None:
     return " and ".join(parts) or None
 
 
+#: How much of a candidate part file is read while looking for the export manifest.
+#: Comfortably larger than any manifest measured in practice (15 KB for 18 books) while
+#: bounding the cost of probing a multi-gigabyte data part that is not it.
+_EXPORT_MANIFEST_PROBE_BYTES = 64 * 1024 * 1024
+
+
+def _decode_export_manifest(part: Path) -> dict[str, Any] | None:
+    """This part's manifest, if it has one at its start.
+
+    Calibre's "Export/import all calibre data" feature keeps the manifest whole inside
+    one part, followed by trailing bytes `json.loads` alone cannot handle, and which are
+    not guaranteed to themselves be valid UTF-8 — `errors="replace"` never raises, and
+    `raw_decode` reads exactly the JSON object and ignores whatever comes after it, so
+    garbage in a trailer that decoding corrupted is never actually looked at. Which part
+    holds the manifest is not guaranteed by naming or position (verified against a real
+    two-part export, where it was the smaller, second part), so every part is tried.
+    """
+    with part.open("rb") as handle:
+        prefix = handle.read(_EXPORT_MANIFEST_PROBE_BYTES)
+    text = prefix.decode("utf-8", errors="replace")
+    try:
+        manifest, _consumed = json.JSONDecoder().raw_decode(text)
+    except ValueError:
+        return None
+    if isinstance(manifest, dict) and isinstance(manifest.get("file_metadata"), dict):
+        return manifest
+    return None
+
+
+def _export_library_key(manifest: Mapping[str, Any]) -> str:
+    """The one top-level key naming the exported library's own path.
+
+    Every other top-level key is a fixed name (`file_metadata`, `libraries`,
+    `config_dir`); whichever key is none of those is the library, by construction
+    (verified against a real export).
+    """
+    candidates = [
+        key for key in manifest if key not in ("file_metadata", "libraries", "config_dir")
+    ]
+    if len(candidates) != 1:
+        raise CalibreError("invalid_calibre_export", "Export does not name exactly one library")
+    return candidates[0]
+
+
+def _export_slice(parts_by_number: Mapping[int, Path], entry: Any) -> bytes:
+    """One file's bytes, sliced out of the part the manifest says holds them.
+
+    The offset is relative to the start of *that* part, never a concatenation across
+    parts — verified against a real two-part export, where a book cover at part 1
+    offset 15186659 length 1216439 matched its manifest SHA-1 exactly. Bounds- and
+    hash-checked before a caller ever sees the bytes, because this is the one place an
+    untrusted upload's own numbers are trusted enough to seek and read with.
+    """
+    try:
+        part_number, offset, length, sha1_hex, _mtime = entry
+        part_number, offset, length = int(part_number), int(offset), int(length)
+    except (TypeError, ValueError) as error:
+        raise CalibreError(
+            "invalid_calibre_export", "Export manifest entry is malformed"
+        ) from error
+    part = parts_by_number.get(part_number)
+    if part is None:
+        raise CalibreError("invalid_calibre_export", f"Export is missing part {part_number}")
+    size = part.stat().st_size
+    if offset < 0 or length < 0 or offset + length > size:
+        raise CalibreError("invalid_calibre_export", "Export manifest entry is out of range")
+    with part.open("rb") as handle:
+        handle.seek(offset)
+        data = handle.read(length)
+    if not isinstance(sha1_hex, str) or hashlib.sha1(data).hexdigest() != sha1_hex.lower():
+        raise CalibreError("invalid_calibre_export", "Export data does not match its checksum")
+    return data
+
+
 class CalibreImporter:
     name = "calibre"
     label = "Calibre"
@@ -355,10 +452,7 @@ class CalibreImporter:
         field="files",
         accepts_files=True,
         placeholder=None,
-        help=(
-            "Akasha reads the library you choose and sends its metadata and covers. "
-            "Ebook files stay where they are unless you opt in below."
-        ),
+        help="Select your local Calibre folder.",
         guide=(
             "Choose your Calibre library folder — the one that holds metadata.db. "
             "Your browser reads it directly; nothing needs to be mounted or configured.",
@@ -393,24 +487,66 @@ class CalibreImporter:
         # A Calibre book carries a uuid that survives edits and re-exports, which is
         # what makes planning by identity honest here (DEC-082).
         incremental=True,
-        # The mount, kept: automation has no browser, and a library too large to
-        # upload still has a way in.
-        alternate=ImportInputSpec(
-            kind="path",
-            label="Calibre library path",
-            field="library_path",
-            placeholder="Library",
-            browsable=True,
-            help=(
-                "Or read a library the server can already see. Akasha opens it "
-                "read-only inside the configured Calibre mount; covers are copied "
-                "during preview."
+        # Two more ways in, kept beneath the folder chooser (DEC-081, generalized):
+        # the mount, for automation with no browser and a library too large to upload;
+        # and Calibre's own "Export/import all calibre data" bundle, for a library you
+        # already exported or one the browser cannot reach as a folder at all.
+        alternates=(
+            ImportInputSpec(
+                kind="path",
+                label="Calibre library path",
+                field="library_path",
+                placeholder="Library",
+                browsable=True,
+                help="Or import from a mounted Calibre library.",
+                guide=(
+                    "Set CALIBRE_DIR in your .env to the folder that holds your "
+                    "Calibre library, then restart the container.",
+                    "Browse to the right folder below, or type its path relative to that mount.",
+                    "The library is opened read-only, with PRAGMA query_only set — "
+                    "nothing is ever written back to Calibre.",
+                    "Covers are copied during preview; nothing references the mount "
+                    "afterward, so it is safe to unmount once you have committed.",
+                ),
+            ),
+            ImportInputSpec(
+                kind="export",
+                label="Calibre export",
+                field="parts",
+                accepts_files=True,
+                help="Or drop the files from Calibre's own export.",
+                guide=(
+                    "In Calibre: Preferences → Import/export → "
+                    "“Export/import all calibre data” → Export all calibre data.",
+                    "Calibre writes one or more part-0001.calibre-data, "
+                    "part-0002.calibre-data, … files.",
+                    "Drag every one of those files onto this screen together — the "
+                    "export is incomplete without all of them.",
+                    "This sends your whole library, ebook files included, because "
+                    "Calibre packs them together. A preferred ebook file per book is "
+                    "attached automatically; nothing needs uploading twice.",
+                ),
+                empty_state="Drop the part-*.calibre-data files your export produced.",
+                # A flat set of opaque part files, not a folder tree: no relative paths,
+                # just this one shape (DEC-083).
+                members=("*.calibre-data",),
+                # Calibre's export packs every ebook file in too, so this has no
+                # comparable ceiling to the folder's — measured at 181 MB for an
+                # 18-book library of mostly-text epubs alone. Generous by design: the
+                # whole point of this input is accepting what the folder option cannot.
+                max_bytes=8 * 1024 * 1024 * 1024,
+                max_files=500,
             ),
         ),
     )
     identity_kinds = frozenset({"isbn", "calibre_uuid"})
     error_codes = frozenset(
-        {"invalid_calibre_path", "calibre_library_not_found", "invalid_calibre_database"}
+        {
+            "invalid_calibre_path",
+            "calibre_library_not_found",
+            "invalid_calibre_database",
+            "invalid_calibre_export",
+        }
     )
 
     def browse(self, path: str, context: ImportReadContext) -> ImportBrowseResult:
@@ -469,18 +605,35 @@ class CalibreImporter:
         )
 
     def read(self, source: ImportSource, context: ImportReadContext) -> ImportSnapshot:
-        # Two ways in, one reader. An uploaded bundle has already been materialized by
-        # the route at `<directory>/library`, so it is a Calibre library on disk like
-        # any other and `CalibreAdapter` cannot tell the difference (DEC-081).
+        # Three ways in, one reader. An uploaded bundle has already been materialized
+        # by the route at `<directory>/library`, so it is a Calibre library on disk
+        # like any other and `CalibreAdapter` cannot tell the difference (DEC-081).
+        # An export bundle is reconstructed into that same shape by `_materialize_export`
+        # before this ever calls `CalibreAdapter` — the adapter never learns a third way
+        # to read either.
         if source.directory is not None:
             root, library_path = source.directory, "library"
+        elif source.export is not None:
+            root, library_path = self._materialize_export(source.export), "library"
         elif source.path is not None:
             root, library_path = context.path_root, source.path
         else:
             raise CalibreError("invalid_calibre_path", "A Calibre library path is required")
         snapshot = CalibreAdapter(root).read(library_path)
+        # Only an export bundle ever has ebook bytes sitting on disk already (DEC-083):
+        # a mount or a plain folder upload never sends them, so `formats` stays a
+        # declaration for the manual attach route rather than something to read here.
+        # This is the one place that distinction is made — `CalibreAdapter` stays
+        # source-agnostic.
+        attach_files = source.export is not None
         records = []
         for payload in snapshot.records:
+            formats: list[dict[str, Any]] = payload.get("formats") or []
+            attachment_source = (
+                CalibreAdapter._attachment(snapshot.library, list(formats))
+                if attach_files
+                else None
+            )
             metadata = {
                 "creators": payload["creators"],
                 **{
@@ -539,23 +692,134 @@ class CalibreImporter:
                         )
                     },
                     cover_source=payload.get("cover_source"),
-                    source_files=tuple(
-                        str(entry["path"]) for entry in payload.get("formats") or ()
-                    ),
+                    source_files=tuple(str(entry["path"]) for entry in formats),
+                    attachment_source=str(attachment_source) if attachment_source else None,
+                    attachment_name=str(formats[0]["path"]) if attachment_source else None,
                 )
             )
+        source_descriptor: dict[str, Any]
+        if source.directory is not None:
+            source_descriptor = {"source": "upload"}
+        elif source.export is not None:
+            source_descriptor = {"source": "export"}
+        else:
+            source_descriptor = {"library_path": source.path}
         return ImportSnapshot(
             fingerprint=snapshot.fingerprint,
             filename="metadata.db",
             # Never the bundle's temporary location: a host path is not the reader's
             # business and outlives nothing useful.
-            source_descriptor=(
-                {"source": "upload"}
-                if source.directory is not None
-                else {"library_path": source.path}
-            ),
+            source_descriptor=source_descriptor,
             records=tuple(records),
         )
+
+    def _materialize_export(self, export: Path) -> Path:
+        """Reconstruct a library on disk from an uploaded export bundle.
+
+        The route has already streamed the raw `part-*.calibre-data` files to
+        `<export>/parts/`, unread (DEC-081, generalized). This locates the manifest,
+        rebuilds `metadata.db`, and rebuilds each book's cover and preferred ebook
+        file at exactly the relative paths `CalibreAdapter`/`_formats` already expect
+        under `<export>/library/`, so the ordinary adapter reads it exactly as it would
+        a mounted or folder-uploaded library — a source that arrived as opaque bytes
+        never invents a fourth thing `CalibreAdapter` has to know about.
+        """
+        parts = sorted((export / "parts").glob("*"))
+        if not parts:
+            raise CalibreError("invalid_calibre_export", "No exported parts were provided")
+        parts_by_number = dict(enumerate(parts, start=1))
+        manifest = next(
+            (found for part in parts if (found := _decode_export_manifest(part)) is not None),
+            None,
+        )
+        if manifest is None:
+            raise CalibreError(
+                "invalid_calibre_export", "No manifest was found among the exported parts"
+            )
+        file_metadata = manifest["file_metadata"]
+        library_manifest = manifest[_export_library_key(manifest)]
+        if not isinstance(library_manifest, dict):
+            raise CalibreError("invalid_calibre_export", "Export manifest is malformed")
+
+        def slice_of(key: object) -> bytes:
+            entry = file_metadata.get(key) if isinstance(key, str) else None
+            if entry is None:
+                raise CalibreError(
+                    "invalid_calibre_export", "Export manifest is missing a required file"
+                )
+            return _export_slice(parts_by_number, entry)
+
+        library = export / "library"
+        library.mkdir(parents=True, exist_ok=True)
+        (library / "metadata.db").write_bytes(slice_of(library_manifest.get("metadata.db")))
+
+        connection = sqlite3.connect(
+            f"file:{quote(str((library / 'metadata.db').resolve()))}?mode=ro", uri=True
+        )
+        try:
+            connection.execute("PRAGMA query_only=ON")
+            tables = {
+                row[0]
+                for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+            }
+            book_paths = {
+                int(book_id): str(book_path or "")
+                for book_id, book_path in connection.execute("SELECT id, path FROM books")
+            }
+            # Optional, same as `CalibreAdapter._formats` already tolerates: a hand-built
+            # or older database simply has no formats and no files to reconstruct.
+            data_rows: dict[int, list[tuple[str, str]]] = {}
+            if "data" in tables:
+                for book_id, book_format, name in connection.execute(
+                    "SELECT book, format, name FROM data"
+                ):
+                    data_rows.setdefault(int(book_id), []).append((str(book_format), str(name)))
+        except sqlite3.DatabaseError as error:
+            raise CalibreError(
+                "invalid_calibre_export", "Export's metadata.db could not be read"
+            ) from error
+        finally:
+            connection.close()
+
+        format_data = library_manifest.get("format_data")
+        preference = {extension.upper(): index for index, extension in enumerate(EBOOK_FORMATS)}
+        for book_id_text, formats in (format_data or {}).items():
+            try:
+                book_id = int(book_id_text)
+            except ValueError:
+                continue
+            book_path = book_paths.get(book_id)
+            if not book_path or not isinstance(formats, dict):
+                continue
+            relative = PurePosixPath(book_path)
+            if relative.is_absolute() or ".." in relative.parts:
+                raise CalibreError(
+                    "invalid_calibre_export", "Export names a book path outside the library"
+                )
+            book_dir = (library / book_path).resolve()
+            if not book_dir.is_relative_to(library.resolve()):
+                raise CalibreError(
+                    "invalid_calibre_export", "Export names a book path outside the library"
+                )
+            cover_key = formats.get(".cover")
+            if isinstance(cover_key, str):
+                book_dir.mkdir(parents=True, exist_ok=True)
+                (book_dir / "cover.jpg").write_bytes(slice_of(cover_key))
+            candidates = sorted(
+                (
+                    (book_format, name)
+                    for book_format, name in data_rows.get(book_id, ())
+                    if book_format.upper() in formats
+                ),
+                key=lambda row: preference.get(row[0].upper(), len(preference)),
+            )
+            if candidates:
+                book_format, name = candidates[0]
+                book_dir.mkdir(parents=True, exist_ok=True)
+                (book_dir / f"{name}.{book_format.lower()}").write_bytes(
+                    slice_of(formats[book_format.upper()])
+                )
+        return export
 
     def stage(self, snapshot: ImportSnapshot, directory: Path, data_dir: Path) -> ImportSnapshot:
         records = []
@@ -572,11 +836,24 @@ class CalibreImporter:
                     relative = str(staged.relative_to(data_dir))
                 except (CoverError, OSError):
                     pass
+            attachment_relative = None
+            if record.attachment_source and record.attachment_name:
+                try:
+                    suffix = PurePosixPath(record.attachment_name).suffix
+                    attachment_staged = directory / "files" / f"{record.row_number}{suffix}"
+                    attachment_staged.parent.mkdir(parents=True, exist_ok=True)
+                    attachment_staged.write_bytes(Path(record.attachment_source).read_bytes())
+                    attachment_relative = str(attachment_staged.relative_to(data_dir))
+                except OSError:
+                    pass
             records.append(
                 replace(
                     record,
                     cover_source=None,
                     cover_stage=relative,
+                    attachment_source=None,
+                    attachment_stage=attachment_relative,
+                    attachment_name=record.attachment_name if attachment_relative else None,
                     source_fields={**record.source_fields, "cover_staged": relative is not None},
                 )
             )

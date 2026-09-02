@@ -31,9 +31,15 @@ export interface ImportRecord {
   };
   source_fields: Record<string, unknown>;
   cover_staged?: boolean;
+  /**
+   * Whether an ebook file was already staged for automatic post-commit
+   * attachment. Only an export bundle ever has this — a mount or a folder
+   * upload never sends ebook bytes up front.
+   */
+  attachment_staged?: boolean;
 }
 export interface ImportInputSpec {
-  kind: "upload" | "path" | "directory";
+  kind: "upload" | "path" | "directory" | "export";
   label: string;
   field: string;
   accept: string | null;
@@ -50,8 +56,8 @@ export interface ImportInputSpec {
   accepts_files: boolean;
   max_bytes: number | null;
   max_files: number | null;
-  /** A second way into the same connector, rendered beneath the primary. One deep. */
-  alternate: ImportInputSpec | null;
+  /** Other ways into the same connector, each rendered beneath the primary. One deep. */
+  alternates: ImportInputSpec[];
 }
 
 export interface ImporterDefinition {
@@ -234,7 +240,7 @@ export function planImport(
 export function previewImport(
   importer: ImporterDefinition,
   spec: ImportInputSpec,
-  source: File | string | BundleMember[],
+  source: File | string | File[] | BundleMember[],
   targets?: string[],
 ) {
   const url = `/api/import/${encodeURIComponent(importer.id)}/preview`;
@@ -247,6 +253,17 @@ export function previewImport(
       // and refuses anything outside the shape it asked for.
       form.append(spec.field, member.file, member.path);
     }
+    if (chosen) form.append("targets", chosen.join(","));
+    return fetch(url, { method: "POST", body: form }).then((response) =>
+      responseJson<ImportPreview>(response),
+    );
+  }
+  if (spec.kind === "export") {
+    const form = new FormData();
+    // A flat set of opaque files, not a tree: each travels under its own name,
+    // with no relative-path reshaping the way a folder bundle needs.
+    for (const file of source as File[])
+      form.append(spec.field, file, file.name);
     if (chosen) form.append("targets", chosen.join(","));
     return fetch(url, { method: "POST", body: form }).then((response) =>
       responseJson<ImportPreview>(response),

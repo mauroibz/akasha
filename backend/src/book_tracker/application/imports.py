@@ -3,14 +3,14 @@ import uuid
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any
 
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.application.enrichment import enqueue_enrichment_backfill
-from book_tracker.application.library import LibraryError, LibraryService
+from book_tracker.application.library import LibraryError, LibraryService, clean_attachment_filename
 from book_tracker.domain.importers import (
     Importer,
     ImportReadContext,
@@ -30,6 +30,7 @@ from book_tracker.domain.spec import (
     validate_metadata_patch,
     validate_status,
 )
+from book_tracker.infrastructure.attachments import AttachmentError, store_blob
 from book_tracker.infrastructure.covers import CoverError, install_cover
 from book_tracker.infrastructure.models import (
     ImportBatchRow,
@@ -84,6 +85,11 @@ def _stored_record(record: NormalizedImportRecord) -> dict[str, Any]:
         # Kept so a file arriving after the commit can be resolved back to the record
         # it belongs to, without the route knowing what any source looks like on disk.
         "source_files": list(record.source_files),
+        # A reader that already had the bytes for one of `source_files` on disk (an
+        # export bundle, never a folder upload) stages it here so commit can attach it
+        # itself — no second upload the way `/batches/{id}/files` needs one.
+        "attachment_stage": record.attachment_stage,
+        "attachment_name": record.attachment_name,
     }
 
 
@@ -112,6 +118,7 @@ def _preview_record(row: ImportRecordRow) -> dict[str, Any]:
         "entry": entry,
         "source_fields": source_fields,
         "cover_staged": payload.get("cover_stage") is not None,
+        "attachment_staged": payload.get("attachment_stage") is not None,
         "item_type": payload.get("item_type"),
         # Compatibility for the two readers that predate the neutral nested shape:
         # flatten what they actually supplied without naming any domain's fields here.
@@ -132,11 +139,18 @@ class ImportService:
         data_dir: Path,
         source_root: Path,
         importer: Importer,
+        *,
+        attachment_max_bytes: int = 25 * 1024 * 1024,
     ) -> None:
         self.engine = engine
         self.data_dir = data_dir
         self.source_root = source_root
         self.importer = importer
+        #: The same per-file ceiling the manual `/batches/{id}/files` route enforces
+        #: (DEC-083), applied here to a reader-staged attachment too: a source that
+        #: already had the bytes on disk does not get a bigger allowance than one that
+        #: needed a second upload.
+        self.attachment_max_bytes = attachment_max_bytes
         #: The domains this connector declared, in declaration order. A batch has no
         #: one domain any more (DEC-106): each record resolves its own, and the first
         #: entry is what a record naming no type of its own becomes.
@@ -222,6 +236,21 @@ class ImportService:
             )
         return chosen
 
+    def _capped_attachment(self, record: NormalizedImportRecord) -> NormalizedImportRecord:
+        """Drop a staged attachment over the cap, falling back to declare-only.
+
+        The record still names the file in `source_files`, so an oversize embedded
+        ebook is exactly as attachable afterwards, by hand, as one a folder upload
+        never had bytes for in the first place.
+        """
+        assert record.attachment_stage is not None
+        staged = self.data_dir / record.attachment_stage
+        if staged.is_file() and staged.stat().st_size <= self.attachment_max_bytes:
+            return record
+        if staged.is_file():
+            staged.unlink(missing_ok=True)
+        return replace(record, attachment_stage=None, attachment_name=None)
+
     def _fingerprint(self, snapshot: ImportSnapshot, targets: Sequence[str]) -> str:
         """The identity of this import, which is the source *and* what was asked of it.
 
@@ -270,6 +299,17 @@ class ImportService:
         batch_id = str(uuid.uuid4())
         directory = self.data_dir / "imports" / batch_id
         snapshot = self.importer.stage(snapshot, directory, self.data_dir)
+        # A reader stages an attachment without knowing the cap that governs one
+        # (`stage` owns no policy, only bytes it happens to have). Enforced once, here,
+        # for every connector — the same cap the manual attach route applies, so a
+        # source that already had the file on disk gets no larger an allowance.
+        snapshot = replace(
+            snapshot,
+            records=tuple(
+                self._capped_attachment(record) if record.attachment_stage else record
+                for record in snapshot.records
+            ),
+        )
         planned: list[dict[str, Any]] = []
         for record in snapshot.records:
             match = self.importer.match(record, self.library)
@@ -447,21 +487,44 @@ class ImportService:
                 session.scalars(select(ImportRecordRow).where(ImportRecordRow.batch_id == batch_id))
             )
             installs = [
-                (row.matched_item_id, json.loads(row.normalized_payload).get("cover_stage"))
+                (
+                    row.matched_item_id,
+                    json.loads(row.normalized_payload).get("cover_stage"),
+                    json.loads(row.normalized_payload).get("attachment_stage"),
+                    json.loads(row.normalized_payload).get("attachment_name"),
+                )
                 for row in rows
                 if row.matched_item_id
             ]
-        for item_id, relative in installs:
-            if not relative:
-                continue
-            staged = self.data_dir / relative
-            if not staged.is_file():
-                continue
-            try:
-                install_cover(staged, self.data_dir, item_id)
-                self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")
-            except CoverError:
-                pass
+        for item_id, cover_relative, attachment_relative, attachment_name in installs:
+            if cover_relative:
+                staged = self.data_dir / cover_relative
+                if staged.is_file():
+                    try:
+                        install_cover(staged, self.data_dir, item_id)
+                        self.library.set_cover_path(item_id, f"covers/{item_id}.jpg")
+                    except CoverError:
+                        pass
+            if attachment_relative and attachment_name:
+                staged = self.data_dir / attachment_relative
+                if staged.is_file():
+                    # Already capped in `preview` (`_capped_attachment`), so this is
+                    # bounded by the same small ceiling every manual attachment is —
+                    # never the size of the export the bytes came from.
+                    try:
+                        stored = store_blob(staged.read_bytes(), self.data_dir)
+                    except AttachmentError:
+                        stored = None
+                    if stored is not None:
+                        self.record_file(
+                            batch_id,
+                            item_id,
+                            filename=clean_attachment_filename(PurePosixPath(attachment_name).name)
+                            or "attachment",
+                            sha256=stored.sha256,
+                            byte_size=stored.byte_size,
+                        )
+                    staged.unlink(missing_ok=True)
         # Any domain this connector can produce, rather than the one it happened to
         # declare first: a mixed batch has no single domain to ask, and asking the
         # wrong one would silently skip half the library's backfill.

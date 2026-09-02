@@ -58,7 +58,7 @@ class ImportInputSpec:
     shipping arbitrary markup into it (DEC-080).
     """
 
-    kind: Literal["upload", "path", "directory"]
+    kind: Literal["upload", "path", "directory", "export"]
     label: str
     field: str
     accept: str | None = None
@@ -79,12 +79,13 @@ class ImportInputSpec:
     #: Whether this connector's `read` can take `ImportSource.files`. Required by
     #: `kind="directory"`, which would otherwise accept an upload it cannot use.
     accepts_files: bool = False
-    #: A second way into the same connector, rendered beneath the primary on the same
-    #: tab. Exactly one level deep: an alternate may not carry its own (DEC-081). It
-    #: exists because a Calibre library is one source you may reach two ways — the
-    #: folder on your machine, or a mount the server can already see — and splitting
-    #: that across two tabs would name one thing twice.
-    alternate: "ImportInputSpec | None" = None
+    #: Other ways into the same connector, each rendered beneath the primary on the
+    #: same tab. Exactly one level deep: an alternate may not carry its own (DEC-081,
+    #: generalized). It exists because a Calibre library is one source you may reach
+    #: several ways — the folder on your machine, a mount the server can already see,
+    #: or an exported bundle — and splitting that across several tabs would name one
+    #: thing more than once.
+    alternates: "tuple[ImportInputSpec, ...]" = ()
     #: What this input will accept, when the shared route's defaults are the wrong
     #: size. `None` means the shared default. A folder of covers is legitimately far
     #: larger than a CSV, and raising the global ceiling for every connector to suit
@@ -206,7 +207,8 @@ class ImportBrowseResult:
 class ImportSource:
     """One source submitted through the generic route.
 
-    Exactly one of `data`, `path` or `directory` is set, matching the input's `kind`.
+    Exactly one of `data`, `path`, `directory` or `export` is set, matching the input's
+    `kind`.
 
     `directory` is a **materialized bundle**: the route has already streamed each
     uploaded member to disk under `<directory>/library/<relative path>`, having refused
@@ -216,12 +218,20 @@ class ImportSource:
     holding the whole bundle in memory to hand it over would put the peak at the size of
     the library instead of the size of one cover. The route owns its lifetime and
     removes it once preview has staged what it needs.
+
+    `export` is the same idea for `kind="export"`: the route has streamed each uploaded
+    part flatly to disk under `<export>/parts/<filename>`, refusing anything the
+    connector did not declare in `members`, but has not tried to interpret what the parts
+    mean — only the connector knows how to turn a set of opaque part files back into a
+    source it can read. The route owns this directory's lifetime the same way it owns
+    `directory`'s.
     """
 
     data: bytes | None = None
     filename: str | None = None
     path: str | None = None
     directory: Path | None = None
+    export: Path | None = None
     #: The client's offer, as raw JSON, when this source came through the plan route.
     manifest: str | None = None
 
@@ -283,6 +293,17 @@ class NormalizedImportRecord:
     #: uploaded path back to the record it belongs to without knowing what any
     #: particular source looks like on disk.
     source_files: tuple[str, ...] = ()
+    #: An absolute host path to one of `source_files`' bytes, when the reader already
+    #: has them on disk rather than only knowing they exist (an uploaded folder never
+    #: sets this; a reconstructed export bundle may). Mirrors `cover_source`: cleared by
+    #: `stage`, never reaches the client.
+    attachment_source: str | None = None
+    #: Which `source_files` entry `attachment_source`/`attachment_stage` satisfies.
+    attachment_name: str | None = None
+    #: `attachment_source`'s bytes, copied into the batch directory by `stage` and named
+    #: relative to `data_dir` — mirrors `cover_stage`. Cleared if it turns out to be
+    #: over the attachment cap, which `stage` does not itself know.
+    attachment_stage: str | None = None
 
 
 @dataclass(frozen=True)

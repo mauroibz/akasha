@@ -75,11 +75,15 @@ Draft targets survive navigation and refresh within the browser tab until you ap
 
 Calibre needs no mount: point it at your library folder and the browser reads it
 directly. Only the database and covers upload by default, which keeps the transfer
-small; turn on **Also attach the ebook files** to also bring in one file per book. A
-library the server can already see can instead be browsed or typed as a path, with no
-upload ceiling. Re-running a source is cheap and safe — Akasha uploads only what
-changed and never overwrites a value you've edited by hand — and a committed batch can
-be undone for 24 hours after commit.
+small; turn on **Also attach the ebook files** to also bring in one file per book. Two
+more ways in sit beneath the folder chooser: a library the server can already see, browsed
+or typed as a path with no upload ceiling; or the files Calibre's own *Export/import all
+calibre data* feature produces — drop every `part-NNNN.calibre-data` file it made
+together. Unlike the folder option, an export sends the entire library, ebook files
+included, because Calibre packs everything together; one preferred ebook file per book
+is attached automatically on commit, with no second upload needed. Re-running a source
+is cheap and safe — Akasha uploads only what changed and never overwrites a value you've
+edited by hand — and a committed batch can be undone for 24 hours after commit.
 
 MyAnimeList's gzipped XML export can be uploaded as downloaded or unpacked first. Status,
 score, dates, rewatches, watched-episode progress, notes and tags come across; imported anime

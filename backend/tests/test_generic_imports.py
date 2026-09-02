@@ -124,18 +124,21 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
     assert goodreads["input"]["kind"] == "upload"
     assert goodreads["input"]["accept"] == ".csv,text/csv"
     assert goodreads["input"]["browsable"] is False
-    assert goodreads["input"]["alternate"] is None
+    assert goodreads["input"]["alternates"] == []
 
-    # Calibre leads with the folder chooser and keeps the mount beneath it, published
-    # as one input with an alternate rather than as two connectors (DEC-081).
+    # Calibre leads with the folder chooser and keeps the mount and the export bundle
+    # beneath it, published as one input with alternates rather than as three
+    # connectors (DEC-081, generalized).
     assert calibre["input"]["kind"] == "directory"
     assert calibre["input"]["accepts_files"] is True
     assert calibre["input"]["max_bytes"] > 5 * 1024 * 1024
     assert calibre["input"]["max_files"] > 0
-    assert calibre["input"]["alternate"]["kind"] == "path"
-    assert calibre["input"]["alternate"]["browsable"] is True
+    alternates = {alternate["kind"]: alternate for alternate in calibre["input"]["alternates"]}
+    assert alternates["path"]["browsable"] is True
+    assert alternates["export"]["accepts_files"] is True
     # One deep, so the screen never has to recurse.
-    assert calibre["input"]["alternate"]["alternate"] is None
+    assert alternates["path"]["alternates"] == []
+    assert alternates["export"]["alternates"] == []
 
     # The screen renders what the connector declares, so what it declares has to
     # arrive intact: ordered steps, an empty state and an https help address.

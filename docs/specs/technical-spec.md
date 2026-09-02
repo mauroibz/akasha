@@ -304,8 +304,8 @@ Explicit item refresh requires `confirm_overwrite: true`. Fetch and validate the
 
 An importer is a domain-owned connector implementing the `Importer` protocol in
 `domain/importers.py`. It declares a permanent `name`, user-facing `label`, the ordered
-`item_types` it can produce, an `ImportInputSpec` (`upload`, `path` or `directory`), the exact
-`identity_kinds` it trusts, and the closed set of `error_codes` its reader may raise. Its `read`
+`item_types` it can produce, an `ImportInputSpec` (`upload`, `path`, `directory` or `export`), the
+exact `identity_kinds` it trusts, and the closed set of `error_codes` its reader may raise. Its `read`
 method normalizes the source into an `ImportSnapshot`; `stage` archives the source or prepares local
 assets after fingerprint replay has been ruled out; and `match` applies its source-specific identity
 and near-match strategy through the narrow `ImportMatcher` view. Importers live under the package of
@@ -342,14 +342,18 @@ connector's declaration as `undeclared_import_error`, so an unknown vocabulary n
 boundary. The conformance suite rejects a malformed guide, a non-https `help_url`, an empty or
 malformed error vocabulary, and `browsable` declared without a `browse` method (DEC-080).
 
-**A connector may offer two ways in, on one tab.** `ImportInputSpec.alternate` is a second spec
-rendered beneath the primary, **exactly one level deep** and using a different `field`. A Calibre
-library is one source reachable two ways — the folder on your machine or a mount the server can
-already see — and splitting that across two tabs would name one thing twice (DEC-081). The route
-picks between them by content type rather than by declaration: a body of parts is the `upload` or
-`directory` input, a JSON body is the `path` one. `max_bytes` and `max_files` are declared per input
-because a folder of covers is legitimately far larger than a CSV, and raising the shared ceiling to
-suit one connector is how a limit stops meaning anything.
+**A connector may offer several ways in, on one tab.** `ImportInputSpec.alternates` is a tuple of
+further specs rendered beneath the primary, each **exactly one level deep** (an alternate's own
+`alternates` must be empty) and using a `field` distinct from the primary's and from every other
+alternate's. A Calibre library is one source reachable several ways — the folder on your machine, a
+mount the server can already see, or an exported bundle — and splitting that across several tabs
+would name one thing more than once (DEC-081, generalized by DEC-124). The route picks among the
+multipart-shaped candidates (`upload`, `directory`, `export`) by which field the body actually
+carries, parsing once against the widest declared cap among them and re-checking the chosen
+candidate's own (possibly smaller) cap immediately after (`_multipart_form` in `api/imports.py`); a
+JSON body is always the `path` input. `max_bytes` and `max_files` are declared per input because a
+folder of covers — or a source's own full export — is legitimately far larger than a CSV, and
+raising the shared ceiling to suit one connector is how a limit stops meaning anything.
 
 **A `directory` connector is a folder read by the browser.** The client selects a folder, filters it,
 and posts the members it kept as multipart parts whose filenames are relative paths. The route
@@ -364,6 +368,33 @@ directory, so an uploaded library and a mounted one normalize through identical 
 the bundle and removes it once preview has staged what it needs, including when the read failed.
 `accepts_files` is the connector's promise that its `read` can take one; conformance refuses
 `kind="directory"` without it.
+
+**An `export` connector is a small set of opaque files a source's own export feature produced.**
+Unlike `directory`, the route has no idea what the files mean — no relative-path reshaping, no
+per-connector content check — it validates each filename against `members` (a flat pattern like
+`"*.calibre-data"`, no path segments) and streams every part flatly to `<bundle>/parts/<name>`
+(`ImportSource.export`), owning and removing that directory exactly as it owns a `directory`
+bundle. Reconstructing a source from those opaque parts is entirely the connector's business,
+inside `read`: Calibre's export bundles the whole library — every ebook file included, not only
+metadata and covers, because the manifest describing what is where is itself only readable after
+everything has landed — split across one or more `part-NNNN.calibre-data` files whose numbering the
+route never interprets (parts are sorted by filename and assigned `1..N` by the connector, not
+matched against a naming convention). `CalibreImporter._materialize_export` finds the manifest by
+content (`json.JSONDecoder().raw_decode` against each part's leading bytes, since the file holding
+it is not fixed by position and its trailing bytes are not guaranteed to be valid UTF-8), verifies
+every extracted byte range's declared SHA-1 and part membership before trusting it, and rebuilds
+`metadata.db` plus each book's cover and preferred ebook file at exactly the paths `CalibreAdapter`
+already expects — every book path is confined the same way a read-side path already is, since a
+crafted `books.path` is otherwise a write-side traversal. The reconstructed root is then handed to
+the **ordinary adapter**, so an export bundle normalizes through identical code to a mount or a
+folder upload; `CalibreAdapter` never learns a fourth way to read. Because reconstruction can put
+real ebook bytes on disk where a mount or folder upload never does, `NormalizedImportRecord` gains
+`attachment_source`/`attachment_name`, populated only when a `source_files` entry's bytes are
+already local — `stage` copies them into the batch directory as `attachment_stage`, the shared
+service enforces `attachment_max_bytes` against the staged copy (falling back to the ordinary
+declare-only `source_files` path if it is over cap), and `commit` installs it through the same
+content-addressed store and effect ledger a manual `/batches/{id}/files` attachment uses. No second
+upload is needed, unlike the folder picker's opt-in attach-after-commit flow.
 
 **A connector may plan an upload before it happens.** Declaring `incremental` and implementing
 `IncrementalImporter` publishes `POST /api/import/{importer}/plan`, which takes the cheap half of the
@@ -580,17 +611,19 @@ The product-spec route list is authoritative, with these refinements:
   byte/pixel/600px limits, and retains the previous valid cover if validation or installation fails.
 - `GET /importers` publishes `{id, label, item_types, input, attachment_max_bytes}` from the importer registry, where
   `input` carries the connector's declared `guide`, `empty_state`, `help_url`, `browsable`,
-  `incremental`, `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternate`, alongside
-  `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
+  `incremental`, `accepts_files`, `max_bytes`, `max_files` and a one-deep `alternates` list
+  (DEC-081, generalized by DEC-124), alongside `kind`/`label`/`field`/`accept`/`placeholder`/`help`.
   `POST /import/{importer}/preview` accepts the declared upload field, path field, or — for a
-  `directory` input — repeated file parts whose filenames are relative paths inside the chosen
-  folder. A connector with an `alternate` accepts either on the same route, chosen by content type.
-  It also accepts an optional `targets` — a comma-separated multipart field or a JSON list — naming
-  which of the connector's `item_types` this import is for; absent means all of them, and a type the
-  connector does not declare is a 422 `invalid_import_targets`. Its `summary` carries
-  `skipped_not_requested`, `skipped_unsupported` and `skipped_reasons` beside the existing counts.
-  An oversize bundle is a 413 naming the alternate; a member outside the declared shape is a 422
-  that names what to choose instead.
+  `directory` or `export` input — repeated file parts, named by relative path inside the chosen
+  folder for `directory` or by bare filename for `export`. A connector with `alternates` accepts
+  any of them on the same route: a JSON body is always `path`; among multipart-shaped candidates,
+  which field the body actually carries decides. It also accepts an optional `targets` — a
+  comma-separated multipart field or a JSON list — naming which of the connector's `item_types`
+  this import is for; absent means all of them, and a type the connector does not declare is a 422
+  `invalid_import_targets`. Its `summary` carries `skipped_not_requested`, `skipped_unsupported` and
+  `skipped_reasons` beside the existing counts. An oversize bundle is a 413 pointing at the other
+  declared alternates when there are any; a member outside the declared shape is a 422 that names
+  what to choose instead.
   `POST /import/{importer}/commit` accepts only the durable preview batch ID and ambiguity choices,
   never client-controlled normalized records. Calibre's path is relative to the configured mount;
   preview responses may expose its normalized UUID/book identity and whether a local cover was

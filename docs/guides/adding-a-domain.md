@@ -342,10 +342,12 @@ class SteamImporter:
         empty_state="Drop your Steam export here, or choose a file.",
         help_url="https://help.steampowered.com/",   # https, or leave it out
         browsable=False,            # `path` connectors may set this; see below
-        # If one source is reachable two ways, declare the second here rather than
-        # registering a second connector — one source, one tab (DEC-081). Exactly
-        # one level deep, and it must use a different `field`.
-        alternate=None,
+        # If one source is reachable several ways, declare the others here rather
+        # than registering a second connector — one source, one tab (DEC-081,
+        # generalized). Exactly one level deep — none of these may carry their own
+        # `alternates` — and every `field` here must differ from the primary's and
+        # from every other alternate's.
+        alternates=(),
         # Per-input, because the shared route's 5 MiB default is the wrong size for
         # some sources and raising it for everyone is how a limit stops meaning
         # anything.
@@ -411,8 +413,24 @@ client-supplied relative path, and materializes them at `<bundle>/library/...`. 
 receives `ImportSource.directory` and should point its **ordinary adapter** at that folder — the
 whole point is that an uploaded source and a local one normalize through the same code, so the
 reader never learns there were two ways in. `CalibreImporter.read` is nine lines and is the worked
-example. Declare `max_bytes`/`max_files` honestly: a refusal that names your `alternate` is far
-better than a timeout.
+example. Declare `max_bytes`/`max_files` honestly: a refusal that names your other `alternates` is
+far better than a timeout.
+
+If your source is instead **a small, fixed-shape set of opaque files** a source's own export
+feature produced — not a filtered folder tree, and not something the shared route can make sense of
+by itself — use `kind="export"` and set `accepts_files=True`. Declare `members` as a flat pattern
+with no path segments (e.g. `"*.calibre-data"`); the route validates filenames and streams each
+part to `<bundle>/parts/<name>` (`ImportSource.export`), same lifetime as `directory`'s bundle, but
+does nothing else with them — it has no idea what the files mean. Turning that set of opaque files
+back into something your **ordinary adapter** can read is entirely your `read`'s job.
+`CalibreImporter._materialize_export` is the worked example: it locates a manifest by content
+(never by a fixed filename or position), verifies every extracted byte range against its declared
+checksum and part before trusting it, confines every path it writes the same way a read-side path
+is already confined, and hands the reconstructed root to the same adapter a mount or a folder
+upload already uses. If a connector declares both `directory` and `export` (or any two multipart
+kinds), the shared route disambiguates by which declared `field` the request body actually carries,
+not by which kind happens to be primary — you do not need to do anything for this beyond declaring
+distinct `field` names, which conformance already requires.
 
 **If a re-import would resend what the library already has**, implement `IncrementalImporter` and set
 `input.incremental = True`. `plan` receives the cheap half of the source, the client's `{path, size}`
@@ -498,10 +516,10 @@ Add parser/adapter fixtures for the source itself and a generic route round-trip
 shared service or screen. `test_domain_conformance.py` is parametrized over registered importers and
 will reject a missing protocol member, an unknown target domain, empty identity kinds, a misplaced
 registration, a malformed guide, a non-https `help_url`, browsing declared without a `browse`
-method, an empty or shouted error vocabulary, a nested `alternate`, an `alternate` reusing the
-primary's `field`, a non-positive `max_bytes`/`max_files`, `kind="directory"` without
-`accepts_files` or `members`, an invalid member pattern, a record whose `source_files` fall outside
-those members, or `incremental` without a `plan` method.
+method, an empty or shouted error vocabulary, a nested `alternate`, two inputs sharing a `field`, a
+non-positive `max_bytes`/`max_files`, `kind="directory"`/`kind="export"` without `accepts_files` or
+`members`, an invalid member pattern, a record whose `source_files` fall outside those members, or
+`incremental` without a `plan` method.
 
 ### Step 6 — Prove it
 
@@ -611,7 +629,7 @@ writing any of it, stop — you are about to duplicate something:
 | The detail page | your metadata fields in your order, your status vocabulary, your panel heading |
 | Triage | your hotkeys, bulk operations, selection across pages |
 | The add flow | search, add-by-URL, manual entry and the confirm screen rendered from your field spec |
-| Import | registry-driven source tab nested under the **1. Import** step, rendering your declared guidance, preview/commit, validation, a folder chooser for a directory source and a picker for a browsable one, your alternate beneath your primary, the shared **2. Triage** step, and undo |
+| Import | registry-driven source tab nested under the **1. Import** step, rendering your declared guidance, preview/commit, validation, a folder chooser for a directory source and a picker for a browsable one, your alternates beneath your primary, the shared **2. Triage** step, and undo |
 | Shelves | the owner's own tier of organisation, across every domain |
 | Import ledger and undo | 24-hour reversal of anything an import did |
 | Export | entity-shaped JSON carrying `type`, identifiers and your opaque metadata |

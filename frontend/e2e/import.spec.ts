@@ -155,7 +155,7 @@ test("Calibre preview and re-sync are keyboard-complete at mobile width", async 
   await page.getByRole("tab", { name: "Calibre" }).press("Enter");
   // The mount is the alternate now; reaching it is part of the keyboard path.
   await page
-    .getByRole("button", { name: /server can already see/i })
+    .getByRole("button", { name: /import from a mounted/i })
     .press("Enter");
   await page.getByLabel(/calibre library path/i).fill("Library");
   await page.getByRole("button", { name: /preview calibre/i }).press("Enter");
@@ -412,7 +412,7 @@ test("the Calibre tab is browsed into rather than typed blind", async ({
   });
 
   await page.goto("/import?tab=calibre");
-  await page.getByRole("button", { name: /server can already see/i }).click();
+  await page.getByRole("button", { name: /import from a mounted/i }).click();
 
   // Guidance the connector published, not copy this screen owns.
   await expect(
@@ -465,7 +465,7 @@ test("a refused read says what to do about it", async ({ page }) => {
   );
 
   await page.goto("/import?tab=calibre");
-  await page.getByRole("button", { name: /server can already see/i }).click();
+  await page.getByRole("button", { name: /import from a mounted/i }).click();
   await page.getByRole("button", { name: "Locked" }).click();
   await page.getByRole("button", { name: /preview calibre library/i }).click();
 
@@ -538,6 +538,56 @@ test("a Calibre folder is chosen in the browser, with no mount involved", async 
     "metadata.db",
     "Brandon Sanderson/Mistborn_ The Final Empire (2)/cover.jpg",
   ]);
+});
+
+test("a Calibre export's part files are dropped in together and sent as-is", async ({
+  page,
+}) => {
+  // The export alternate is the third way in (DEC-081, generalized): unlike the
+  // folder picker, there is no tree to filter, so what arrives is exactly what
+  // was offered — this drives the real `<input type="file" multiple>` the way a
+  // reader dropping two exported files would.
+  let parts: string[] = [];
+  await page.route("**/api/import/calibre/preview", async (route) => {
+    const body = route.request().postData() ?? "";
+    parts = [...body.matchAll(/name="parts"; filename="([^"]+)"/g)].map(
+      (match) => match[1],
+    );
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "export-1",
+        fingerprint: "db",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [{ ...record, title: "Mistborn" }],
+      },
+    });
+  });
+
+  await page.goto("/import?tab=calibre");
+  await page.getByRole("button", { name: /calibre's own export/i }).click();
+  await page.getByLabel("Calibre export", { exact: true }).setInputFiles([
+    {
+      name: "part-0001.calibre-data",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("part one bytes"),
+    },
+    {
+      name: "part-0002.calibre-data",
+      mimeType: "application/octet-stream",
+      buffer: Buffer.from("part two bytes, including a manifest"),
+    },
+  ]);
+
+  await expect(page.getByText(/2 files selected/i)).toBeVisible();
+
+  await page.getByRole("button", { name: /preview calibre library/i }).click();
+  await expect(
+    page.getByRole("heading", { name: /preview: 1 row/i }),
+  ).toBeVisible();
+
+  expect(parts).toEqual(["part-0001.calibre-data", "part-0002.calibre-data"]);
 });
 
 test("Calibre attaches one ebook after commit and sends none on re-sync", async ({

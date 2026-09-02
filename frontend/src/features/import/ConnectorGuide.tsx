@@ -1,4 +1,4 @@
-import type { ImporterDefinition } from "@/api/imports";
+import type { ImporterDefinition, ImportInputSpec } from "@/api/imports";
 
 /**
  * What a connector says about itself, rendered by a screen that never reads it.
@@ -8,11 +8,23 @@ import type { ImporterDefinition } from "@/api/imports";
  * into a shared screen is a rendering dependency and an injection surface for one
  * benefit nobody asked for; ordered steps are what import guidance actually is
  * (DEC-080).
+ *
+ * `spec` defaults to the primary input but may be an alternate's own — an
+ * alternate can have guidance the primary does not (DEC-081, generalized), and
+ * this is what actually renders it rather than leaving it a declared-but-dead field.
  */
-export function ConnectorGuide({ importer }: { importer: ImporterDefinition }) {
-  const { guide, help, help_url: helpUrl, kind, label } = importer.input;
+export function ConnectorGuide({
+  importer,
+  spec = importer.input,
+  headingId: headingIdProp,
+}: {
+  importer: ImporterDefinition;
+  spec?: ImportInputSpec;
+  headingId?: string;
+}) {
+  const { guide, help, help_url: helpUrl, kind, label } = spec;
   if (guide.length === 0 && !help && !helpUrl) return null;
-  const headingId = `${importer.id}-guide-heading`;
+  const headingId = headingIdProp ?? `${importer.id}-guide-heading`;
   return (
     <section className="rounded-xl bg-surface-raised p-4">
       <h2 id={headingId} className="text-sm font-semibold text-foreground">
