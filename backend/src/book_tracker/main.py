@@ -27,7 +27,9 @@ from book_tracker.domain.registry import DOMAINS
 from book_tracker.domains.album.providers import MusicBrainzProvider
 from book_tracker.domains.anime.providers import AniListProvider, KitsuProvider
 from book_tracker.domains.book.providers import GoogleBooksProvider, OpenLibraryProvider
+from book_tracker.domains.movie.cinemeta import CinemetaMovieProvider
 from book_tracker.domains.movie.providers import WikidataMovieProvider
+from book_tracker.domains.series.cinemeta import CinemetaSeriesProvider
 from book_tracker.domains.series.providers import WikidataSeriesProvider
 from book_tracker.domains.series.tvmaze import TvmazeSeriesProvider
 from book_tracker.infrastructure.diskspace import InsufficientDiskSpace, free_bytes
@@ -209,6 +211,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         # merges through the shared layer on the IMDb id; no fallback path is written.
         catalog.append(
             TvmazeSeriesProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
+        # Cinemeta is the third source for both movies and series (Sprint 063): Stremio's
+        # keyless, IMDb-keyed metadata service, already a de facto dependency through
+        # every poster this build renders (DEC-103). Ranked last in both domains'
+        # `source_preference` — complementary and a fallback, never primary.
+        catalog.append(
+            CinemetaMovieProvider(
+                provider_client, configured.user_agent_contact or "local@example.invalid"
+            )
+        )
+        catalog.append(
+            CinemetaSeriesProvider(
                 provider_client, configured.user_agent_contact or "local@example.invalid"
             )
         )
