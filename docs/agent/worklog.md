@@ -3836,3 +3836,46 @@ so 050 adds an adapter, not a declaration.
 - Blocked/open: nothing. Not merged to `main`, not pushed.
 - Next: Sprint 065 (insights) is still ready to claim; this branch is a sibling
   to `sprint-064-spotify-album-import`, not a continuation of it.
+
+## 2026-09-03 — Enrichment now records the resolved provider source (DEC-130, complete)
+- Done: the owner checked the new `Fetch cover` button against their own Docker
+  instance and found "This item has no provider source" on a Letterboxd-imported,
+  fully-enriched movie ("Obsession"). Traced it to a real, pre-existing gap
+  affecting every import connector and every domain: `application/add.py`'s
+  search-add path writes an `ItemSourceRow` (`is_primary=1`); no import connector
+  ever does, and `EnrichmentHandler.process` (`application/enrichment.py`) filled
+  metadata/cover from a resolved provider without ever recording that provider as
+  the item's source. `primary_source()` therefore always failed for an imported
+  item, however completely it had been enriched — silently affecting Sprint 064's
+  own Spotify-album path too, not only Letterboxd. Fixed by writing
+  `payload_data.source_refs` as `ItemSourceRow`s (primary on the one matching
+  `payload_data.source`) inside enrichment's existing write transaction, guarded
+  on the item having no source row at all so a search-added or already-enriched
+  item is never touched twice.
+  Also extended `_backfillable_items` (the query behind the existing operator
+  endpoint `POST /api/enrichment/backfill`) with an unconditional "no source at
+  all" clause, so that one existing call retroactively re-queues every
+  already-enriched, now-stuck item across every domain — no new endpoint, no
+  database surgery, and no per-item action needed for the owner's real data.
+- Verified: `test_movie_enrichment_fills_only_what_is_empty` and
+  `test_an_album_is_enriched_from_its_spotify_identity` both gained a
+  source-row assertion against real recorded fixtures (Wikidata, MusicBrainz);
+  a new `test_an_item_that_already_has_a_source_is_not_given_a_second_one` proves
+  the guard; a new `test_backfill_reaches_a_complete_item_that_was_never_given_a_
+  source` proves the retroactive backfill path directly against an
+  Obsession-shaped fixture (full metadata/cover/year, no source). Two existing
+  backfill tests needed a source added to their "complete, so never queued"
+  fixtures, which had themselves never carried one and would otherwise have
+  started quietly asserting the old behavior. Full backend suite 1,291 passing.
+  `make check` green. No route, schema, or contract changed — verified by
+  diff — so neither OpenAPI nor e2e needed rerunning for this piece.
+- Deviations: none beyond the fix itself; matches the technical spec's own
+  existing wording ("manual-only items have none" — implying every other item
+  has one), which the implementation had simply never satisfied.
+- Blocked/open: nothing. Same branch (`ui-search-refresh-mini-sprint`), still not
+  merged or pushed.
+- Next: tell the owner that a single `curl -X POST .../api/enrichment/backfill`
+  against their running container will re-queue Obsession (and anything else
+  imported and already enriched before this fix) for a fresh enrichment pass —
+  not a schema migration, since the gap was in what enrichment wrote, not in
+  data that is wrong.
