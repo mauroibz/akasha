@@ -16,6 +16,7 @@ from enum import StrEnum
 from book_tracker.domain.importers import Importer
 from book_tracker.domain.spec import Domain
 from book_tracker.domains.album import DOMAIN as ALBUM
+from book_tracker.domains.album.spotify import IMPORTER as SPOTIFY_IMPORTER
 from book_tracker.domains.anime import DOMAIN as ANIME
 from book_tracker.domains.anime.myanimelist import IMPORTER as MYANIMELIST_IMPORTER
 from book_tracker.domains.book import DOMAIN as BOOK
@@ -46,6 +47,7 @@ REGISTERED_IMPORTERS: tuple[Importer, ...] = (
     LETTERBOXD_IMPORTER,
     IMDB_IMPORTER,
     TRAKT_IMPORTER,
+    SPOTIFY_IMPORTER,
 )
 IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
     item_type: tuple(
