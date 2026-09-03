@@ -18,17 +18,47 @@ than assumed (DEC-052):
   reached only from interactive paths, which never touch the job runner's shared
   `RateLimiter`. ~1 request/second is the documented ceiling and throttling arrives as
   **503**, not 429.
+
+Sprint 064 adds `fetch_by_identifier("spotify", value)` — the album domain's first real
+enrichment lookup, keyed on the identity DEC-052 said albums could never have and gets
+away with anyway: MusicBrainz stores a Spotify album link as a URL *relationship*, not
+as an edition field, so this is identity resolution against a source already trusted
+rather than a barcode. Two passes, measured live on 2026-09-03
+(`docs/spotify-import-and-insights-viability.md`):
+
+1. `GET /url?resource=<spotify album URL>&inc=release-rels` — a relation names a
+   **release**, not a release group, so the release is read once more for
+   `release-groups` and the group id is handed to the ordinary `fetch()` above: pass 1
+   resolves an identity and reuses the exact code a search-added album already runs,
+   rather than duplicating `_preferred_release`'s logic.
+2. On a miss (measured as a real **404** for 3 of 4 sampled albums — MusicBrainz simply
+   does not hold every release's Spotify link), a `releasegroup:"…" AND artist:"…"`
+   text search, accepted only when the top result scores 100 **and** its own title and
+   artist-credit both normalize to an exact match. Measured live: the correct group for
+   `In Rainbows` shares its query with three plausible neighbours at 92/87/83
+   (`Live in Rainbows`, `…Disk 2`, `…From the Basement`) — a result merely *arriving*
+   is not evidence, only an exact top match is.
+
+Both passes need the title and artist a `spotify`-identified stub already carries,
+which the standard `fetch_by_identifier(kind, value)` shape cannot supply — every other
+domain's identity value is sufficient on its own (an ISBN, an IMDb id). Rather than
+widen the shared `EnrichingProvider` protocol for every domain to carry a hint only one
+provider uses, `EnrichmentSpec.needs_item_context` (declared `True` only here) asks the
+enrichment handler to pass the item's own title and creators through as keyword-only
+arguments, unused by every provider that does not declare it (DEC-128).
 """
 
 from __future__ import annotations
 
 import asyncio
+import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
 from typing import Any
 
 import httpx
 
+from book_tracker.domain.normalization import normalize_text
 from book_tracker.domain.providers import ItemPayload, SearchCandidate, SourceRef
 from book_tracker.infrastructure.providers import (
     PROVIDER_ATTEMPTS,
@@ -46,6 +76,16 @@ MUSICBRAINZ_MIN_INTERVAL_SECONDS = 1.1
 # anyway and the 500px thumbnail would upscale. The 1200 is 244 KiB.
 COVER_ART_THUMBNAIL = "https://coverartarchive.org/release-group/{release_group}/front-1200"
 USER_AGENT = "Akasha/1.1 ({contact})"
+
+#: Spotify's own album URL shape, keyless and deterministic from the id an export
+#: carries — the same "build it, do not guess it" pattern `infrastructure/posters.py`
+#: uses for a cover URL.
+SPOTIFY_ALBUM_URL = "https://open.spotify.com/album/{spotify_id}"
+_SPOTIFY_ID = re.compile(r"[A-Za-z0-9]{10,30}")
+#: How many text-search candidates are worth reading before giving up. The measured
+#: near-miss case (`In Rainbows`) needed only the top result; more would cost a byte
+#: budget for rows that can never be accepted anyway (DEC-025's exact-match rule).
+TEXT_SEARCH_CANDIDATES = 5
 
 
 def _credit(artist_credit: Sequence[Any]) -> tuple[tuple[str, ...], str, str | None]:
@@ -116,6 +156,30 @@ def _text(value: object) -> str | None:
     return text or None
 
 
+def _http_failure(error: httpx.HTTPStatusError) -> ProviderPayloadError:
+    """A provider's HTTP status as a reason the layer above can act on.
+
+    A 404 is an answer — `/url` has never heard of this resource, which is the
+    real, measured shape for 3 of 4 sampled Spotify albums — while anything else is
+    MusicBrainz being unwell.
+    """
+    status = error.response.status_code
+    if status == 404:
+        return ProviderPayloadError(
+            "MusicBrainz has no record for this id", code="record_not_found"
+        )
+    return ProviderPayloadError(f"MusicBrainz returned HTTP {status}", code="provider_http_error")
+
+
+def _lucene_phrase(value: str) -> str:
+    """A value as one quoted Lucene phrase, safe for `field:"…"` search syntax.
+
+    A title or artist carrying a literal `"` would otherwise close the phrase early
+    and turn the rest of it into unrelated query syntax.
+    """
+    return value.replace("\\", "\\\\").replace('"', '\\"')
+
+
 class MusicBrainzProvider:
     name = "musicbrainz"
     item_type = "album"
@@ -144,19 +208,26 @@ class MusicBrainzProvider:
                 if waiting > 0:
                     await self._sleep(waiting)
             self._last_request = time.monotonic()
-        return await bounded_json_object(
-            self.client,
-            f"{MUSICBRAINZ_BASE}{path}",
-            params={**params, "fmt": "json"},
-            headers={"User-Agent": USER_AGENT.format(contact=self.contact)},
-            # The full budget rather than the interactive two, because MusicBrainz
-            # throttles by design and says so with a 503 and a `Retry-After` this
-            # boundary already honours. An album add makes two sequential reads here, so
-            # a two-attempt allowance spent on one throttled answer failed the add
-            # outright — 5 of 47 requests were throttled when this was measured on
-            # 2026-09-02, and one live add returned 502 (DEC-125).
-            attempts=PROVIDER_ATTEMPTS,
-        )
+        try:
+            return await bounded_json_object(
+                self.client,
+                f"{MUSICBRAINZ_BASE}{path}",
+                params={**params, "fmt": "json"},
+                headers={"User-Agent": USER_AGENT.format(contact=self.contact)},
+                # The full budget rather than the interactive two, because MusicBrainz
+                # throttles by design and says so with a 503 and a `Retry-After` this
+                # boundary already honours. An album add makes two sequential reads here,
+                # so a two-attempt allowance spent on one throttled answer failed the add
+                # outright — 5 of 47 requests were throttled when this was measured on
+                # 2026-09-02, and one live add returned 502 (DEC-125).
+                attempts=PROVIDER_ATTEMPTS,
+            )
+        except httpx.HTTPStatusError as error:
+            raise _http_failure(error) from error
+        except httpx.HTTPError as error:
+            raise ProviderPayloadError(
+                "MusicBrainz could not be reached", code="provider_unreachable"
+            ) from error
 
     def _candidate(self, group: Mapping[str, Any]) -> SearchCandidate | None:
         release_group_id = _text(group.get("id"))
@@ -276,3 +347,98 @@ class MusicBrainzProvider:
             credit=credit or None,
             creator_sort=sort_name,
         )
+
+    # -- Sprint 064: a Spotify album id, resolved in two passes -----------------------
+
+    async def _release_group_by_relation(self, spotify_id: str) -> str | None:
+        """Pass 1: the release group a Spotify URL relationship names, or `None`.
+
+        `/url` names a **release**, not a release group — the domain's item is the
+        group, so the release is read once more for the id that actually is one.
+        """
+        resource = SPOTIFY_ALBUM_URL.format(spotify_id=spotify_id)
+        try:
+            body = await self._json("/url", {"resource": resource, "inc": "release-rels"})
+        except ProviderPayloadError as error:
+            if error.code == "record_not_found":
+                return None
+            raise
+        relations = body.get("relations")
+        if not isinstance(relations, list):
+            return None
+        release_id: str | None = None
+        for relation in relations:
+            if not isinstance(relation, Mapping) or relation.get("target-type") != "release":
+                continue
+            release = relation.get("release")
+            candidate = _text(release.get("id")) if isinstance(release, Mapping) else None
+            if candidate is not None:
+                release_id = candidate
+                break
+        if release_id is None:
+            return None
+        release = await self._json(f"/release/{release_id}", {"inc": "release-groups"})
+        group = release.get("release-group")
+        return _text(group.get("id")) if isinstance(group, Mapping) else None
+
+    async def _release_group_by_text(self, title: str, artist: str) -> str | None:
+        """Pass 2: an exact `releasegroup:"…" AND artist:"…"` match, or `None`.
+
+        Accepted only when the top result scores 100 **and** its own title and
+        artist-credit both normalize to an exact match — a result merely being
+        returned is not evidence. Measured live: `In Rainbows` shares its query with
+        three plausible neighbours scoring 92, 87 and 83, which a bare "did anything
+        come back" check would have no way to refuse.
+        """
+        query = f'releasegroup:"{_lucene_phrase(title)}" AND artist:"{_lucene_phrase(artist)}"'
+        try:
+            body = await self._json(
+                "/release-group", {"query": query, "limit": TEXT_SEARCH_CANDIDATES}
+            )
+        except ProviderPayloadError:
+            return None
+        groups = body.get("release-groups")
+        if not isinstance(groups, list) or not groups:
+            return None
+        top = groups[0]
+        if not isinstance(top, Mapping) or top.get("score") != 100:
+            return None
+        found_title = _text(top.get("title"))
+        if found_title is None or normalize_text(found_title) != normalize_text(title):
+            return None
+        _found_creators, found_credit, _found_sort = _credit(top.get("artist-credit") or [])
+        if normalize_text(found_credit) != normalize_text(artist):
+            return None
+        return _text(top.get("id"))
+
+    async def fetch_by_identifier(
+        self,
+        kind: str,
+        value: str,
+        *,
+        title: str | None = None,
+        creators: Sequence[str] | None = None,
+    ) -> ItemPayload:
+        """Background enrichment's entry point (DEC-067 row 3), and the album
+        domain's first (Sprint 064): `identity_kinds=("spotify",)` is the only key,
+        so `title`/`creators` are always supplied by `EnrichmentSpec.needs_item_context`
+        — the two passes above cannot run without them, and a caller that omits them
+        gets pass 1 alone.
+        """
+        if kind != "spotify":
+            raise ProviderPayloadError(
+                f"MusicBrainz cannot look an album up by {kind!r}",
+                code="unsupported_identity_kind",
+            )
+        spotify_id = value.strip()
+        if not _SPOTIFY_ID.fullmatch(spotify_id):
+            raise ProviderPayloadError(f"{value!r} is not a Spotify album id")
+        release_group_id = await self._release_group_by_relation(spotify_id)
+        if release_group_id is None and title and creators:
+            release_group_id = await self._release_group_by_text(title, creators[0])
+        if release_group_id is None:
+            raise ProviderPayloadError(
+                f"No MusicBrainz release matches Spotify album {spotify_id}",
+                code="record_not_found",
+            )
+        return await self.fetch(release_group_id)

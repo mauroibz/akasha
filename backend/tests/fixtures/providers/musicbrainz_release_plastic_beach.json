@@ -1,1189 +1,1348 @@
 {
   "release-events": [
     {
-      "date": "2010-03-03",
       "area": {
-        "sort-name": "Japan",
-        "type": null,
-        "id": "2db42837-c832-3c27-b4a3-08198f75693c",
-        "iso-3166-1-codes": [
-          "JP"
-        ],
+        "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
         "type-id": null,
+        "iso-3166-1-codes": [
+          "XW"
+        ],
+        "sort-name": "[Worldwide]",
         "disambiguation": "",
-        "name": "Japan"
-      }
+        "name": "[Worldwide]",
+        "type": null
+      },
+      "date": "2010-03-03"
     }
   ],
-  "id": "98ea7ed0-5b4a-49e4-9a18-2bef6185c5eb",
-  "packaging-id": "8f931351-d2e2-310f-afc6-37b89ddba246",
-  "status": "Official",
-  "disambiguation": "experience edition",
-  "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+  "cover-art-archive": {
+    "darkened": false,
+    "artwork": true,
+    "back": false,
+    "front": true,
+    "count": 1
+  },
+  "country": "XW",
+  "artist-credit": [
+    {
+      "name": "Gorillaz",
+      "artist": {
+        "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "sort-name": "Gorillaz",
+        "country": "GB",
+        "disambiguation": "virtual band",
+        "name": "Gorillaz",
+        "type": "Group"
+      },
+      "joinphrase": ""
+    }
+  ],
+  "release-group": {
+    "artist-credit": [
+      {
+        "joinphrase": "",
+        "artist": {
+          "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+          "sort-name": "Gorillaz",
+          "country": "GB",
+          "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+          "disambiguation": "virtual band",
+          "type": "Group",
+          "name": "Gorillaz"
+        },
+        "name": "Gorillaz"
+      }
+    ],
+    "secondary-types": [],
+    "first-release-date": "2010-03-03",
+    "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+    "id": "5a676824-18cd-4f7f-89f0-df21623e2042",
+    "secondary-type-ids": [],
+    "title": "Plastic Beach",
+    "disambiguation": "",
+    "primary-type": "Album"
+  },
+  "asin": null,
+  "title": "Plastic Beach",
+  "packaging": "None",
+  "barcode": "5099962865050",
+  "quality": "normal",
+  "label-info": [
+    {
+      "label": {
+        "name": "Parlophone",
+        "type": "Original Production",
+        "label-code": 299,
+        "disambiguation": "",
+        "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
+        "sort-name": "Parlophone",
+        "id": "df7d1c7f-ef95-425f-8eef-445b3d7bcbd9"
+      },
+      "catalog-number": "[none]"
+    }
+  ],
   "text-representation": {
     "script": "Latn",
     "language": "eng"
   },
-  "artist-credit": [
-    {
-      "artist": {
-        "type": "Group",
-        "sort-name": "Gorillaz",
-        "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-        "disambiguation": "virtual band",
-        "country": "GB",
-        "name": "Gorillaz"
-      },
-      "joinphrase": "",
-      "name": "Gorillaz"
-    }
-  ],
-  "packaging": "Digipak",
-  "label-info": [
-    {
-      "catalog-number": "TOCP-66950",
-      "label": {
-        "type": "Original Production",
-        "sort-name": "Parlophone",
-        "id": "df7d1c7f-ef95-425f-8eef-445b3d7bcbd9",
-        "label-code": 299,
-        "type-id": "7aaa37fe-2def-3476-b359-80245850062d",
-        "disambiguation": "",
-        "name": "Parlophone"
-      }
-    }
-  ],
-  "quality": "normal",
-  "asin": "B00347PLV4",
-  "cover-art-archive": {
-    "darkened": false,
-    "count": 6,
-    "front": true,
-    "artwork": true,
-    "back": false
-  },
   "date": "2010-03-03",
-  "barcode": "4988006878105",
-  "release-group": {
-    "artist-credit": [
-      {
-        "name": "Gorillaz",
-        "joinphrase": "",
-        "artist": {
-          "country": "GB",
-          "name": "Gorillaz",
-          "disambiguation": "virtual band",
-          "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-          "type": "Group",
-          "sort-name": "Gorillaz",
-          "id": "e21857d5-3256-4547-afb3-4b6ded592596"
-        }
-      }
-    ],
-    "title": "Plastic Beach",
-    "disambiguation": "",
-    "primary-type": "Album",
-    "first-release-date": "2010-03-03",
-    "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
-    "secondary-types": [],
-    "secondary-type-ids": [],
-    "id": "5a676824-18cd-4f7f-89f0-df21623e2042"
-  },
+  "status": "Official",
   "media": [
     {
-      "title": "",
-      "track-count": 17,
       "position": 1,
-      "format-id": "9712d52a-4509-3d4b-a1a2-67c88c643e31",
-      "id": "e9c9b265-b23e-3e0c-88a5-564c9c77056f",
-      "format": "CD",
+      "track-count": 16,
+      "id": "1fe69e2a-e17e-3aaa-8ea0-cec05e92646d",
+      "format-id": "907a28d9-b3b2-3ef6-89a8-7b18d91d4794",
+      "format": "Digital Media",
       "track-offset": 0,
+      "title": "",
       "tracks": [
         {
+          "length": 69386,
+          "id": "b8a7d6b9-14fd-44e4-9e45-2397a6026706",
+          "position": 1,
           "artist-credit": [
             {
-              "joinphrase": "",
-              "name": "Gorillaz",
               "artist": {
-                "disambiguation": "virtual band",
-                "country": "GB",
                 "name": "Gorillaz",
                 "type": "Group",
+                "disambiguation": "virtual band",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
                 "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-              }
+                "country": "GB",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              },
+              "joinphrase": " feat. ",
+              "name": "Gorillaz"
+            },
+            {
+              "joinphrase": "",
+              "artist": {
+                "type-id": "a0b36c92-3eb1-3839-a4f9-4799823f54a5",
+                "sort-name": "Sinfonia ViVA",
+                "country": "GB",
+                "id": "a78bb8aa-8004-45d1-a37d-6421ea085bd1",
+                "name": "Sinfonia ViVA",
+                "type": "Orchestra",
+                "disambiguation": "British orchestra"
+              },
+              "name": "Sinfonia ViVA"
             }
           ],
+          "number": "1",
+          "title": "Orchestral Intro",
           "recording": {
-            "title": "Orchestral Intro",
-            "artist-credit": [
-              {
-                "artist": {
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "disambiguation": "virtual band",
-                  "name": "Gorillaz",
-                  "country": "GB"
-                },
-                "name": "Gorillaz",
-                "joinphrase": " feat. "
-              },
-              {
-                "artist": {
-                  "country": "GB",
-                  "name": "Sinfonia ViVA",
-                  "disambiguation": "British orchestra",
-                  "type-id": "a0b36c92-3eb1-3839-a4f9-4799823f54a5",
-                  "type": "Orchestra",
-                  "sort-name": "Sinfonia ViVA",
-                  "id": "a78bb8aa-8004-45d1-a37d-6421ea085bd1"
-                },
-                "name": "Sinfonia ViVA",
-                "joinphrase": ""
-              }
-            ],
-            "length": 69386,
             "video": false,
+            "title": "Orchestral Intro",
+            "disambiguation": "",
+            "length": 69386,
             "first-release-date": "2010-03-03",
             "id": "7f1f889b-1079-4fc5-b672-7becc760678b",
-            "disambiguation": ""
-          },
-          "title": "Orchestral Intro",
-          "id": "ad36c820-e6c9-4122-88c9-c76ad7c01c7c",
-          "number": "1",
-          "position": 1,
-          "length": 69000
-        },
-        {
-          "artist-credit": [
-            {
-              "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "sort-name": "Gorillaz",
-                "type": "Group",
-                "name": "Gorillaz",
-                "country": "GB",
-                "disambiguation": "virtual band"
-              },
-              "joinphrase": "",
-              "name": "Gorillaz"
-            }
-          ],
-          "recording": {
-            "length": 215506,
-            "video": false,
-            "title": "Welcome to the World of the Plastic Beach",
             "artist-credit": [
               {
+                "joinphrase": " feat. ",
                 "artist": {
-                  "name": "Gorillaz",
                   "country": "GB",
-                  "disambiguation": "virtual band",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "type": "Group",
-                  "sort-name": "Gorillaz"
-                },
-                "name": "Gorillaz",
-                "joinphrase": " feat. "
-              },
-              {
-                "name": "Snoop Dogg",
-                "joinphrase": " & ",
-                "artist": {
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "id": "f90e8b26-9e52-4669-a5c9-e28529c47894",
-                  "sort-name": "Snoop Dogg",
-                  "type": "Person",
-                  "name": "Snoop Dogg",
-                  "country": "US",
-                  "disambiguation": "US rapper"
-                }
-              },
-              {
-                "joinphrase": "",
-                "name": "Hypnotic Brass Ensemble",
-                "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "type": "Group",
-                  "sort-name": "Hypnotic Brass Ensemble",
-                  "id": "cc37d0c1-493d-487e-9694-3cf48ae6370d",
-                  "country": "US",
-                  "name": "Hypnotic Brass Ensemble",
-                  "disambiguation": ""
-                }
-              }
-            ],
-            "disambiguation": "",
-            "first-release-date": "2010-03-03",
-            "id": "ab80a174-1b7d-41c8-bddb-5edfd849d512"
-          },
-          "title": "Welcome to the World of the Plastic Beach",
-          "id": "29341aae-eaf0-4b7d-aaba-175f0d72ae75",
-          "number": "2",
-          "length": 215000,
-          "position": 2
-        },
-        {
-          "recording": {
-            "artist-credit": [
-              {
-                "artist": {
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "type": "Group",
                   "sort-name": "Gorillaz",
                   "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "disambiguation": "virtual band",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type": "Group",
                   "name": "Gorillaz",
-                  "country": "GB"
+                  "disambiguation": "virtual band"
                 },
-                "joinphrase": " feat. ",
                 "name": "Gorillaz"
               },
               {
                 "artist": {
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "type": "Person",
-                  "sort-name": "Bashy",
-                  "id": "9452e740-00f8-4941-9214-a0a6f265f2a8",
+                  "type-id": "a0b36c92-3eb1-3839-a4f9-4799823f54a5",
+                  "sort-name": "Sinfonia ViVA",
                   "country": "GB",
-                  "name": "Bashy",
-                  "disambiguation": ""
+                  "id": "a78bb8aa-8004-45d1-a37d-6421ea085bd1",
+                  "name": "Sinfonia ViVA",
+                  "type": "Orchestra",
+                  "disambiguation": "British orchestra"
                 },
+                "joinphrase": "",
+                "name": "Sinfonia ViVA"
+              }
+            ]
+          }
+        },
+        {
+          "recording": {
+            "length": 215506,
+            "id": "ab80a174-1b7d-41c8-bddb-5edfd849d512",
+            "first-release-date": "2010-03-03",
+            "artist-credit": [
+              {
+                "name": "Gorillaz",
+                "joinphrase": " feat. ",
+                "artist": {
+                  "disambiguation": "virtual band",
+                  "type": "Group",
+                  "name": "Gorillaz",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "country": "GB",
+                  "sort-name": "Gorillaz",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+                }
+              },
+              {
+                "artist": {
+                  "id": "f90e8b26-9e52-4669-a5c9-e28529c47894",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "US",
+                  "sort-name": "Snoop Dogg",
+                  "disambiguation": "US rapper",
+                  "name": "Snoop Dogg",
+                  "type": "Person"
+                },
+                "joinphrase": " & ",
+                "name": "Snoop Dogg"
+              },
+              {
+                "name": "Hypnotic Brass Ensemble",
+                "artist": {
+                  "id": "cc37d0c1-493d-487e-9694-3cf48ae6370d",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "country": "US",
+                  "sort-name": "Hypnotic Brass Ensemble",
+                  "disambiguation": "",
+                  "name": "Hypnotic Brass Ensemble",
+                  "type": "Group"
+                },
+                "joinphrase": ""
+              }
+            ],
+            "video": false,
+            "disambiguation": "",
+            "title": "Welcome to the World of the Plastic Beach"
+          },
+          "title": "Welcome to the World of the Plastic Beach",
+          "number": "2",
+          "position": 2,
+          "artist-credit": [
+            {
+              "name": "Gorillaz",
+              "joinphrase": " feat. ",
+              "artist": {
+                "name": "Gorillaz",
+                "type": "Group",
+                "disambiguation": "virtual band",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "country": "GB",
+                "sort-name": "Gorillaz",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              }
+            },
+            {
+              "name": "Snoop Dogg",
+              "artist": {
+                "name": "Snoop Dogg",
+                "type": "Person",
+                "disambiguation": "US rapper",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Snoop Dogg",
+                "country": "US",
+                "id": "f90e8b26-9e52-4669-a5c9-e28529c47894"
+              },
+              "joinphrase": " and "
+            },
+            {
+              "name": "Hypnotic Brass Ensemble",
+              "artist": {
+                "disambiguation": "",
+                "name": "Hypnotic Brass Ensemble",
+                "type": "Group",
+                "id": "cc37d0c1-493d-487e-9694-3cf48ae6370d",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "sort-name": "Hypnotic Brass Ensemble",
+                "country": "US"
+              },
+              "joinphrase": ""
+            }
+          ],
+          "id": "8e8b1447-e723-44ba-9edc-15627fe0a85d",
+          "length": 215506
+        },
+        {
+          "title": "White Flag",
+          "recording": {
+            "video": false,
+            "title": "White Flag",
+            "disambiguation": "",
+            "length": 223466,
+            "first-release-date": "2010-03-03",
+            "id": "0a030414-cd94-4a19-b025-c7f941987bec",
+            "artist-credit": [
+              {
+                "name": "Gorillaz",
+                "artist": {
+                  "disambiguation": "virtual band",
+                  "name": "Gorillaz",
+                  "type": "Group",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "sort-name": "Gorillaz",
+                  "country": "GB"
+                },
+                "joinphrase": " feat. "
+              },
+              {
                 "name": "Bashy",
+                "artist": {
+                  "id": "9452e740-00f8-4941-9214-a0a6f265f2a8",
+                  "sort-name": "Bashy",
+                  "country": "GB",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "disambiguation": "",
+                  "type": "Person",
+                  "name": "Bashy"
+                },
                 "joinphrase": ", "
               },
               {
                 "artist": {
-                  "country": "GB",
-                  "name": "Kano",
-                  "disambiguation": "UK hip‐hop artist",
                   "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "type": "Person",
+                  "country": "GB",
                   "sort-name": "Kano",
-                  "id": "2bf3971e-8595-4bd2-aace-8a71c42afb66"
+                  "id": "2bf3971e-8595-4bd2-aace-8a71c42afb66",
+                  "name": "Kano",
+                  "type": "Person",
+                  "disambiguation": "UK hip‐hop artist"
                 },
-                "name": "Kano",
-                "joinphrase": " & "
+                "joinphrase": " & ",
+                "name": "Kano"
               },
               {
                 "name": "the National Orchestra for Arabic Music",
-                "joinphrase": "",
                 "artist": {
-                  "id": "2f0054f9-3934-44e7-ae61-493fbcfba76f",
-                  "type": "Group",
-                  "sort-name": "National Orchestra for Arabic Music",
                   "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "disambiguation": "",
+                  "country": null,
+                  "sort-name": "National Orchestra for Arabic Music",
+                  "id": "2f0054f9-3934-44e7-ae61-493fbcfba76f",
                   "name": "National Orchestra for Arabic Music",
-                  "country": null
-                }
+                  "type": "Group",
+                  "disambiguation": ""
+                },
+                "joinphrase": ""
               }
-            ],
-            "title": "White Flag",
-            "video": false,
-            "length": 223466,
-            "id": "0a030414-cd94-4a19-b025-c7f941987bec",
-            "first-release-date": "2010-03-03",
-            "disambiguation": ""
+            ]
           },
-          "title": "White Flag",
+          "number": "3",
+          "id": "b2040b82-4146-44a3-abcb-0d2f451fef54",
+          "position": 3,
           "artist-credit": [
             {
+              "joinphrase": " feat. ",
               "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
                 "sort-name": "Gorillaz",
-                "type": "Group",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                 "country": "GB",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "type": "Group",
                 "name": "Gorillaz",
                 "disambiguation": "virtual band"
               },
-              "joinphrase": "",
               "name": "Gorillaz"
+            },
+            {
+              "joinphrase": ", ",
+              "artist": {
+                "sort-name": "Bashy",
+                "country": "GB",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "id": "9452e740-00f8-4941-9214-a0a6f265f2a8",
+                "type": "Person",
+                "name": "Bashy",
+                "disambiguation": ""
+              },
+              "name": "Bashy"
+            },
+            {
+              "joinphrase": " and ",
+              "artist": {
+                "disambiguation": "UK hip‐hop artist",
+                "type": "Person",
+                "name": "Kano",
+                "id": "2bf3971e-8595-4bd2-aace-8a71c42afb66",
+                "sort-name": "Kano",
+                "country": "GB",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+              },
+              "name": "Kano"
+            },
+            {
+              "name": "the National Orchestra for Arabic Music",
+              "joinphrase": "",
+              "artist": {
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "country": null,
+                "sort-name": "National Orchestra for Arabic Music",
+                "id": "2f0054f9-3934-44e7-ae61-493fbcfba76f",
+                "name": "National Orchestra for Arabic Music",
+                "type": "Group",
+                "disambiguation": ""
+              }
             }
           ],
-          "position": 3,
-          "length": 223000,
-          "number": "3",
-          "id": "498b3ed7-cd7d-4cd7-957d-373b8c2fe401"
+          "length": 223466
         },
         {
-          "id": "a99135fb-5815-481c-8d9d-760e01dfc255",
-          "number": "4",
-          "length": 199000,
+          "length": 200173,
           "position": 4,
           "artist-credit": [
             {
-              "joinphrase": "",
               "name": "Gorillaz",
               "artist": {
-                "sort-name": "Gorillaz",
+                "name": "Gorillaz",
                 "type": "Group",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
                 "disambiguation": "virtual band",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
                 "country": "GB",
-                "name": "Gorillaz"
-              }
+                "sort-name": "Gorillaz",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              },
+              "joinphrase": ""
             }
           ],
+          "id": "ccdf03bb-3f72-49e8-956d-35b39b784545",
+          "number": "4",
           "recording": {
             "length": 200173,
-            "video": false,
-            "title": "Rhinestone Eyes",
             "artist-credit": [
               {
+                "name": "Gorillaz",
                 "artist": {
                   "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "type": "Group",
                   "sort-name": "Gorillaz",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                   "country": "GB",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                   "name": "Gorillaz",
+                  "type": "Group",
                   "disambiguation": "virtual band"
                 },
-                "joinphrase": "",
-                "name": "Gorillaz"
+                "joinphrase": ""
               }
             ],
-            "disambiguation": "",
+            "id": "a44db450-2b09-4eca-936f-a939ad56ae16",
             "first-release-date": "2010-03-03",
-            "id": "a44db450-2b09-4eca-936f-a939ad56ae16"
+            "video": false,
+            "disambiguation": "",
+            "title": "Rhinestone Eyes"
           },
           "title": "Rhinestone Eyes"
         },
         {
           "recording": {
             "title": "Stylo",
-            "artist-credit": [
-              {
-                "joinphrase": " feat. ",
-                "name": "Gorillaz",
-                "artist": {
-                  "disambiguation": "virtual band",
-                  "name": "Gorillaz",
-                  "country": "GB",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-                }
-              },
-              {
-                "artist": {
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "id": "f5c4c27e-5902-4fc0-adfb-7775da3d5363",
-                  "sort-name": "Bey, Yasiin",
-                  "type": "Person",
-                  "name": "Yasiin Bey",
-                  "country": "US",
-                  "disambiguation": "fka Mos Def"
-                },
-                "name": "Mos Def",
-                "joinphrase": " & "
-              },
-              {
-                "name": "Bobby Womack",
-                "joinphrase": "",
-                "artist": {
-                  "type": "Person",
-                  "sort-name": "Womack, Bobby",
-                  "id": "48e78462-2f0b-4a1a-9fa4-0585e2991e80",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "disambiguation": "",
-                  "country": "US",
-                  "name": "Bobby Womack"
-                }
-              }
-            ],
-            "length": 270520,
-            "video": false,
-            "first-release-date": "2010-01-26",
-            "id": "ff70f6a8-7cfc-4974-a764-8b332f7cf88f",
-            "disambiguation": ""
-          },
-          "title": "Stylo",
-          "artist-credit": [
-            {
-              "joinphrase": "",
-              "name": "Gorillaz",
-              "artist": {
-                "name": "Gorillaz",
-                "country": "GB",
-                "disambiguation": "virtual band",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "sort-name": "Gorillaz",
-                "type": "Group"
-              }
-            }
-          ],
-          "number": "5",
-          "id": "d8bf76d5-1a05-4067-a229-76b31da92511",
-          "length": 270000,
-          "position": 5
-        },
-        {
-          "artist-credit": [
-            {
-              "artist": {
-                "disambiguation": "virtual band",
-                "country": "GB",
-                "name": "Gorillaz",
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-              },
-              "joinphrase": "",
-              "name": "Gorillaz"
-            }
-          ],
-          "title": "Superfast Jellyfish",
-          "recording": {
             "disambiguation": "",
-            "id": "54f6b49f-8806-42e4-aba8-a65d356d2584",
-            "first-release-date": "2010-03-03",
             "video": false,
-            "length": 174867,
-            "artist-credit": [
-              {
-                "artist": {
-                  "disambiguation": "virtual band",
-                  "country": "GB",
-                  "name": "Gorillaz",
-                  "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-                },
-                "joinphrase": " feat. ",
-                "name": "Gorillaz"
-              },
-              {
-                "name": "Gruff Rhys",
-                "joinphrase": " and ",
-                "artist": {
-                  "disambiguation": "",
-                  "country": "GB",
-                  "name": "Gruff Rhys",
-                  "type": "Person",
-                  "sort-name": "Rhys, Gruff",
-                  "id": "254caf14-7b63-47d1-aa9f-acc7cb541814",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
-                }
-              },
-              {
-                "artist": {
-                  "country": "US",
-                  "name": "De La Soul",
-                  "disambiguation": "",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "type": "Group",
-                  "sort-name": "De La Soul",
-                  "id": "a8ebde98-7e91-46c7-992c-90039ba42017"
-                },
-                "name": "De La Soul",
-                "joinphrase": ""
-              }
-            ],
-            "title": "Superfast Jellyfish"
-          },
-          "id": "ab9b33f9-69f9-4c5c-8ac6-790cd0ea54cc",
-          "number": "6",
-          "length": 174000,
-          "position": 6
-        },
-        {
-          "artist-credit": [
-            {
-              "name": "Gorillaz",
-              "joinphrase": "",
-              "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "country": "GB",
-                "name": "Gorillaz",
-                "disambiguation": "virtual band"
-              }
-            }
-          ],
-          "recording": {
-            "first-release-date": "2010-03-03",
-            "id": "a0481faf-70de-41de-95d6-315735ef8aea",
-            "disambiguation": "",
-            "title": "Empire Ants",
             "artist-credit": [
               {
                 "name": "Gorillaz",
-                "joinphrase": " feat. ",
                 "artist": {
                   "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "type": "Group",
+                  "country": "GB",
                   "sort-name": "Gorillaz",
                   "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "country": "GB",
                   "name": "Gorillaz",
+                  "type": "Group",
                   "disambiguation": "virtual band"
-                }
-              },
-              {
-                "name": "Little Dragon",
-                "joinphrase": "",
-                "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "c8a9ae11-63bf-409b-8bf3-a96b3712a2ff",
-                  "sort-name": "Little Dragon",
-                  "type": "Group",
-                  "name": "Little Dragon",
-                  "country": "SE",
-                  "disambiguation": ""
-                }
-              }
-            ],
-            "length": 283573,
-            "video": false
-          },
-          "title": "Empire Ants",
-          "id": "964996a3-c82d-48c5-8692-c78a33d19792",
-          "number": "7",
-          "position": 7,
-          "length": 283000
-        },
-        {
-          "recording": {
-            "title": "Glitter Freeze",
-            "artist-credit": [
-              {
-                "joinphrase": " feat. ",
-                "name": "Gorillaz",
-                "artist": {
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "disambiguation": "virtual band",
-                  "name": "Gorillaz",
-                  "country": "GB"
-                }
-              },
-              {
-                "artist": {
-                  "id": "35e5ce55-486d-40a4-9ab5-08de9be70d33",
-                  "sort-name": "Smith, Mark E.",
-                  "type": "Person",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "disambiguation": "late lead singer of British post‐punk band The Fall",
-                  "name": "Mark E. Smith",
-                  "country": "GB"
                 },
-                "joinphrase": "",
-                "name": "Mark E. Smith"
-              }
-            ],
-            "length": 243253,
-            "video": false,
-            "first-release-date": "2010-03-03",
-            "id": "00eb9af1-4290-401f-bfd8-cbee5bd6f519",
-            "disambiguation": ""
-          },
-          "title": "Glitter Freeze",
-          "artist-credit": [
-            {
-              "artist": {
-                "disambiguation": "virtual band",
-                "country": "GB",
-                "name": "Gorillaz",
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-              },
-              "name": "Gorillaz",
-              "joinphrase": ""
-            }
-          ],
-          "position": 8,
-          "length": 243000,
-          "number": "8",
-          "id": "2ad46e80-b789-44c4-967b-3a1ecd60ffde"
-        },
-        {
-          "artist-credit": [
-            {
-              "name": "Gorillaz",
-              "joinphrase": "",
-              "artist": {
-                "disambiguation": "virtual band",
-                "name": "Gorillaz",
-                "country": "GB",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "sort-name": "Gorillaz",
-                "type": "Group",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-              }
-            }
-          ],
-          "recording": {
-            "title": "Some Kind of Nature",
-            "artist-credit": [
-              {
-                "artist": {
-                  "name": "Gorillaz",
-                  "country": "GB",
-                  "disambiguation": "virtual band",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
-                  "type": "Group"
-                },
-                "name": "Gorillaz",
                 "joinphrase": " feat. "
-              },
-              {
-                "name": "Lou Reed",
-                "joinphrase": "",
-                "artist": {
-                  "id": "9d1ebcfe-4c15-4d18-95d3-d919898638a1",
-                  "sort-name": "Reed, Lou",
-                  "type": "Person",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "disambiguation": "",
-                  "name": "Lou Reed",
-                  "country": "US"
-                }
-              }
-            ],
-            "length": 179866,
-            "video": false,
-            "first-release-date": "2010-03-03",
-            "id": "4c1116a5-c81c-4355-8b9c-97e90b9af25f",
-            "disambiguation": ""
-          },
-          "title": "Some Kind of Nature",
-          "id": "5c01a079-aea3-4563-9612-9fb66c547d1f",
-          "number": "9",
-          "position": 9,
-          "length": 179000
-        },
-        {
-          "artist-credit": [
-            {
-              "joinphrase": "",
-              "name": "Gorillaz",
-              "artist": {
-                "sort-name": "Gorillaz",
-                "type": "Group",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "disambiguation": "virtual band",
-                "country": "GB",
-                "name": "Gorillaz"
-              }
-            }
-          ],
-          "title": "On Melancholy Hill",
-          "recording": {
-            "first-release-date": "2010-03-03",
-            "id": "842fbdae-8839-46e6-8a02-7f500a2b6597",
-            "disambiguation": "",
-            "title": "On Melancholy Hill",
-            "artist-credit": [
-              {
-                "joinphrase": "",
-                "name": "Gorillaz",
-                "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "name": "Gorillaz",
-                  "country": "GB",
-                  "disambiguation": "virtual band"
-                }
-              }
-            ],
-            "length": 233866,
-            "video": false
-          },
-          "id": "a6bbcc1f-f751-4056-be8d-62411d4d639c",
-          "number": "10",
-          "length": 234000,
-          "position": 10
-        },
-        {
-          "recording": {
-            "artist-credit": [
-              {
-                "artist": {
-                  "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "disambiguation": "virtual band",
-                  "country": "GB",
-                  "name": "Gorillaz"
-                },
-                "joinphrase": "",
-                "name": "Gorillaz"
-              }
-            ],
-            "title": "Broken",
-            "video": false,
-            "length": 197053,
-            "id": "de2151e6-8cae-4561-8eb0-6bb933adeebd",
-            "first-release-date": "2010-03-03",
-            "disambiguation": ""
-          },
-          "title": "Broken",
-          "artist-credit": [
-            {
-              "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "sort-name": "Gorillaz",
-                "type": "Group",
-                "name": "Gorillaz",
-                "country": "GB",
-                "disambiguation": "virtual band"
-              },
-              "joinphrase": "",
-              "name": "Gorillaz"
-            }
-          ],
-          "number": "11",
-          "id": "c04d5112-c44b-41ba-a35b-da2bc728c867",
-          "length": 196000,
-          "position": 11
-        },
-        {
-          "id": "7c2f1678-1a31-4bc2-9e89-d636a88cd3be",
-          "number": "12",
-          "position": 12,
-          "length": 320000,
-          "artist-credit": [
-            {
-              "artist": {
-                "country": "GB",
-                "name": "Gorillaz",
-                "disambiguation": "virtual band",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "sort-name": "Gorillaz",
-                "type": "Group",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
-              },
-              "joinphrase": "",
-              "name": "Gorillaz"
-            }
-          ],
-          "recording": {
-            "first-release-date": "2010-03-03",
-            "id": "10d834ca-36f0-476c-8d38-3689ba3373e5",
-            "disambiguation": "",
-            "title": "Sweepstakes",
-            "artist-credit": [
-              {
-                "artist": {
-                  "name": "Gorillaz",
-                  "country": "GB",
-                  "disambiguation": "virtual band",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
-                  "type": "Group"
-                },
-                "joinphrase": " feat. ",
-                "name": "Gorillaz"
               },
               {
                 "artist": {
                   "disambiguation": "fka Mos Def",
-                  "country": "US",
-                  "name": "Yasiin Bey",
                   "type": "Person",
-                  "sort-name": "Bey, Yasiin",
+                  "name": "Yasiin Bey",
                   "id": "f5c4c27e-5902-4fc0-adfb-7775da3d5363",
+                  "sort-name": "Bey, Yasiin",
+                  "country": "US",
                   "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
                 },
                 "joinphrase": " & ",
                 "name": "Mos Def"
               },
               {
-                "name": "Hypnotic Brass Ensemble",
-                "joinphrase": "",
+                "name": "Bobby Womack",
                 "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "sort-name": "Hypnotic Brass Ensemble",
-                  "type": "Group",
-                  "id": "cc37d0c1-493d-487e-9694-3cf48ae6370d",
+                  "type": "Person",
+                  "name": "Bobby Womack",
+                  "disambiguation": "",
                   "country": "US",
-                  "name": "Hypnotic Brass Ensemble",
-                  "disambiguation": ""
-                }
+                  "sort-name": "Womack, Bobby",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "id": "48e78462-2f0b-4a1a-9fa4-0585e2991e80"
+                },
+                "joinphrase": ""
               }
             ],
-            "length": 320466,
-            "video": false
+            "first-release-date": "2010-01-26",
+            "id": "ff70f6a8-7cfc-4974-a764-8b332f7cf88f",
+            "length": 270520
           },
-          "title": "Sweepstakes"
+          "title": "Stylo",
+          "number": "5",
+          "position": 5,
+          "artist-credit": [
+            {
+              "artist": {
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "country": "GB",
+                "sort-name": "Gorillaz",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "disambiguation": "virtual band",
+                "type": "Group",
+                "name": "Gorillaz"
+              },
+              "joinphrase": " feat. ",
+              "name": "Gorillaz"
+            },
+            {
+              "name": "Mos Def",
+              "joinphrase": " and ",
+              "artist": {
+                "country": "US",
+                "sort-name": "Bey, Yasiin",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "id": "f5c4c27e-5902-4fc0-adfb-7775da3d5363",
+                "type": "Person",
+                "name": "Yasiin Bey",
+                "disambiguation": "fka Mos Def"
+              }
+            },
+            {
+              "name": "Bobby Womack",
+              "artist": {
+                "name": "Bobby Womack",
+                "type": "Person",
+                "disambiguation": "",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Womack, Bobby",
+                "country": "US",
+                "id": "48e78462-2f0b-4a1a-9fa4-0585e2991e80"
+              },
+              "joinphrase": ""
+            }
+          ],
+          "id": "3a23e732-9885-4c81-93fe-8622be5eb4dc",
+          "length": 270520
         },
         {
+          "length": 174866,
+          "id": "8b6c0473-f2dc-4d56-b259-3a4609ebb6e7",
           "artist-credit": [
             {
               "name": "Gorillaz",
-              "joinphrase": "",
+              "joinphrase": " feat. ",
+              "artist": {
+                "disambiguation": "virtual band",
+                "type": "Group",
+                "name": "Gorillaz",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "sort-name": "Gorillaz",
+                "country": "GB",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+              }
+            },
+            {
+              "joinphrase": " and ",
               "artist": {
                 "country": "GB",
+                "sort-name": "Rhys, Gruff",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "id": "254caf14-7b63-47d1-aa9f-acc7cb541814",
+                "type": "Person",
+                "name": "Gruff Rhys",
+                "disambiguation": ""
+              },
+              "name": "Gruff Rhys"
+            },
+            {
+              "joinphrase": "",
+              "artist": {
+                "sort-name": "De La Soul",
+                "country": "US",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "id": "a8ebde98-7e91-46c7-992c-90039ba42017",
+                "type": "Group",
+                "name": "De La Soul",
+                "disambiguation": ""
+              },
+              "name": "De La Soul"
+            }
+          ],
+          "position": 6,
+          "number": "6",
+          "title": "Superfast Jellyfish",
+          "recording": {
+            "disambiguation": "",
+            "title": "Superfast Jellyfish",
+            "video": false,
+            "artist-credit": [
+              {
                 "name": "Gorillaz",
+                "artist": {
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "sort-name": "Gorillaz",
+                  "country": "GB",
+                  "disambiguation": "virtual band",
+                  "name": "Gorillaz",
+                  "type": "Group"
+                },
+                "joinphrase": " feat. "
+              },
+              {
+                "name": "Gruff Rhys",
+                "joinphrase": " and ",
+                "artist": {
+                  "disambiguation": "",
+                  "type": "Person",
+                  "name": "Gruff Rhys",
+                  "id": "254caf14-7b63-47d1-aa9f-acc7cb541814",
+                  "country": "GB",
+                  "sort-name": "Rhys, Gruff",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+                }
+              },
+              {
+                "name": "De La Soul",
+                "joinphrase": "",
+                "artist": {
+                  "id": "a8ebde98-7e91-46c7-992c-90039ba42017",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "country": "US",
+                  "sort-name": "De La Soul",
+                  "disambiguation": "",
+                  "name": "De La Soul",
+                  "type": "Group"
+                }
+              }
+            ],
+            "id": "54f6b49f-8806-42e4-aba8-a65d356d2584",
+            "first-release-date": "2010-03-03",
+            "length": 174867
+          }
+        },
+        {
+          "length": 283573,
+          "artist-credit": [
+            {
+              "name": "Gorillaz",
+              "artist": {
+                "name": "Gorillaz",
+                "type": "Group",
                 "disambiguation": "virtual band",
                 "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "type": "Group",
+                "country": "GB",
                 "sort-name": "Gorillaz",
                 "id": "e21857d5-3256-4547-afb3-4b6ded592596"
-              }
+              },
+              "joinphrase": " feat. "
+            },
+            {
+              "artist": {
+                "id": "c8a9ae11-63bf-409b-8bf3-a96b3712a2ff",
+                "country": "SE",
+                "sort-name": "Little Dragon",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "disambiguation": "",
+                "type": "Group",
+                "name": "Little Dragon"
+              },
+              "joinphrase": "",
+              "name": "Little Dragon"
             }
           ],
+          "position": 7,
+          "id": "341db6ed-c53b-473e-a89c-720c826c3f5f",
+          "number": "7",
           "recording": {
             "disambiguation": "",
-            "first-release-date": "2010-03-03",
-            "id": "74af797a-d3fe-4c21-b33f-bdd1e57a75e7",
-            "length": 227213,
+            "title": "Empire Ants",
             "video": false,
-            "title": "Plastic Beach",
+            "id": "a0481faf-70de-41de-95d6-315735ef8aea",
+            "first-release-date": "2010-03-03",
             "artist-credit": [
               {
-                "joinphrase": " feat. ",
-                "name": "Gorillaz",
                 "artist": {
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
                   "type": "Group",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "name": "Gorillaz",
                   "disambiguation": "virtual band",
-                  "name": "Gorillaz",
-                  "country": "GB"
-                }
-              },
-              {
-                "joinphrase": " & ",
-                "name": "Mick Jones",
-                "artist": {
-                  "type": "Person",
-                  "sort-name": "Jones, Mick",
-                  "id": "01f8343c-06e2-4f05-a137-f8ea7efa85c4",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "disambiguation": "The Clash/Big Audio Dynamite",
-                  "country": "GB",
-                  "name": "Mick Jones"
-                }
-              },
-              {
-                "artist": {
-                  "name": "Paul Simonon",
-                  "country": "GB",
-                  "disambiguation": "",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
-                  "id": "64c43453-f396-42b1-bff5-01644d710d94",
-                  "type": "Person",
-                  "sort-name": "Simonon, Paul"
-                },
-                "joinphrase": "",
-                "name": "Paul Simonon"
-              }
-            ]
-          },
-          "title": "Plastic Beach",
-          "position": 13,
-          "length": 227000,
-          "id": "2f6310c0-f26e-41cc-93b1-462c52cb8bda",
-          "number": "13"
-        },
-        {
-          "position": 14,
-          "length": 233000,
-          "id": "51809595-bb0f-4138-a46b-8356c7362455",
-          "number": "14",
-          "artist-credit": [
-            {
-              "name": "Gorillaz",
-              "joinphrase": "",
-              "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "country": "GB",
-                "name": "Gorillaz",
-                "disambiguation": "virtual band"
-              }
-            }
-          ],
-          "recording": {
-            "artist-credit": [
-              {
-                "joinphrase": " feat. ",
-                "name": "Gorillaz",
-                "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                   "sort-name": "Gorillaz",
-                  "type": "Group",
-                  "name": "Gorillaz",
                   "country": "GB",
-                  "disambiguation": "virtual band"
-                }
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+                },
+                "joinphrase": " feat. ",
+                "name": "Gorillaz"
               },
               {
                 "joinphrase": "",
-                "name": "Little Dragon",
                 "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "c8a9ae11-63bf-409b-8bf3-a96b3712a2ff",
-                  "type": "Group",
-                  "sort-name": "Little Dragon",
+                  "disambiguation": "",
                   "name": "Little Dragon",
+                  "type": "Group",
+                  "id": "c8a9ae11-63bf-409b-8bf3-a96b3712a2ff",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
                   "country": "SE",
-                  "disambiguation": ""
-                }
+                  "sort-name": "Little Dragon"
+                },
+                "name": "Little Dragon"
               }
             ],
-            "title": "To Binge",
-            "video": false,
-            "length": 235706,
-            "id": "6a76d23b-bfa1-424d-b84a-9c2a4425f51e",
-            "first-release-date": "2010-03-03",
-            "disambiguation": ""
+            "length": 283573
           },
-          "title": "To Binge"
+          "title": "Empire Ants"
         },
         {
-          "length": 189000,
-          "position": 15,
-          "number": "15",
-          "id": "60b76855-00fd-480e-9a1a-02e6e229499d",
           "recording": {
-            "length": 186120,
+            "title": "Glitter Freeze",
+            "disambiguation": "",
             "video": false,
-            "title": "Cloud of Unknowing",
             "artist-credit": [
               {
-                "joinphrase": " feat. ",
-                "name": "Gorillaz",
                 "artist": {
-                  "name": "Gorillaz",
-                  "country": "GB",
-                  "disambiguation": "virtual band",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                   "type": "Group",
-                  "sort-name": "Gorillaz"
-                }
-              },
-              {
-                "artist": {
-                  "disambiguation": "",
-                  "name": "Bobby Womack",
-                  "country": "US",
-                  "id": "48e78462-2f0b-4a1a-9fa4-0585e2991e80",
-                  "type": "Person",
-                  "sort-name": "Womack, Bobby",
-                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
-                },
-                "joinphrase": " & ",
-                "name": "Bobby Womack"
-              },
-              {
-                "artist": {
-                  "sort-name": "Sinfonia ViVA",
-                  "type": "Orchestra",
-                  "id": "a78bb8aa-8004-45d1-a37d-6421ea085bd1",
-                  "type-id": "a0b36c92-3eb1-3839-a4f9-4799823f54a5",
-                  "disambiguation": "British orchestra",
+                  "name": "Gorillaz",
+                  "disambiguation": "virtual band",
                   "country": "GB",
-                  "name": "Sinfonia ViVA"
+                  "sort-name": "Gorillaz",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596"
                 },
-                "joinphrase": "",
-                "name": "Sinfonia ViVA"
+                "joinphrase": " feat. ",
+                "name": "Gorillaz"
+              },
+              {
+                "name": "Mark E. Smith",
+                "artist": {
+                  "sort-name": "Smith, Mark E.",
+                  "country": "GB",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "id": "35e5ce55-486d-40a4-9ab5-08de9be70d33",
+                  "type": "Person",
+                  "name": "Mark E. Smith",
+                  "disambiguation": "late lead singer of British post‐punk band The Fall"
+                },
+                "joinphrase": ""
               }
             ],
-            "disambiguation": "",
             "first-release-date": "2010-03-03",
-            "id": "77df78e8-596d-4c9e-bc7e-45c3d98e366f"
+            "id": "00eb9af1-4290-401f-bfd8-cbee5bd6f519",
+            "length": 243253
           },
-          "title": "Cloud of Unknowing",
+          "title": "Glitter Freeze",
+          "number": "8",
           "artist-credit": [
             {
               "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                 "country": "GB",
+                "sort-name": "Gorillaz",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "type": "Group",
                 "name": "Gorillaz",
                 "disambiguation": "virtual band"
               },
+              "joinphrase": " feat. ",
+              "name": "Gorillaz"
+            },
+            {
               "joinphrase": "",
+              "artist": {
+                "name": "Mark E. Smith",
+                "type": "Person",
+                "disambiguation": "late lead singer of British post‐punk band The Fall",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Smith, Mark E.",
+                "country": "GB",
+                "id": "35e5ce55-486d-40a4-9ab5-08de9be70d33"
+              },
+              "name": "Mark E. Smith"
+            }
+          ],
+          "position": 8,
+          "id": "f7a01a58-6c6c-42af-a201-f0adc25df3e9",
+          "length": 243253
+        },
+        {
+          "length": 179866,
+          "position": 9,
+          "artist-credit": [
+            {
+              "artist": {
+                "name": "Gorillaz",
+                "type": "Group",
+                "disambiguation": "virtual band",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "sort-name": "Gorillaz",
+                "country": "GB",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              },
+              "joinphrase": " feat. ",
+              "name": "Gorillaz"
+            },
+            {
+              "artist": {
+                "type": "Person",
+                "name": "Lou Reed",
+                "disambiguation": "",
+                "country": "US",
+                "sort-name": "Reed, Lou",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "id": "9d1ebcfe-4c15-4d18-95d3-d919898638a1"
+              },
+              "joinphrase": "",
+              "name": "Lou Reed"
+            }
+          ],
+          "id": "002b3382-39f1-4cbc-90d9-f5d0b8df634f",
+          "number": "9",
+          "recording": {
+            "id": "4c1116a5-c81c-4355-8b9c-97e90b9af25f",
+            "first-release-date": "2010-03-03",
+            "artist-credit": [
+              {
+                "joinphrase": " feat. ",
+                "artist": {
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "sort-name": "Gorillaz",
+                  "country": "GB",
+                  "disambiguation": "virtual band",
+                  "name": "Gorillaz",
+                  "type": "Group"
+                },
+                "name": "Gorillaz"
+              },
+              {
+                "name": "Lou Reed",
+                "artist": {
+                  "disambiguation": "",
+                  "name": "Lou Reed",
+                  "type": "Person",
+                  "id": "9d1ebcfe-4c15-4d18-95d3-d919898638a1",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "US",
+                  "sort-name": "Reed, Lou"
+                },
+                "joinphrase": ""
+              }
+            ],
+            "length": 179866,
+            "disambiguation": "",
+            "title": "Some Kind of Nature",
+            "video": false
+          },
+          "title": "Some Kind of Nature"
+        },
+        {
+          "number": "10",
+          "title": "On Melancholy Hill",
+          "recording": {
+            "length": 233866,
+            "artist-credit": [
+              {
+                "joinphrase": "",
+                "artist": {
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "country": "GB",
+                  "sort-name": "Gorillaz",
+                  "disambiguation": "virtual band",
+                  "name": "Gorillaz",
+                  "type": "Group"
+                },
+                "name": "Gorillaz"
+              }
+            ],
+            "id": "842fbdae-8839-46e6-8a02-7f500a2b6597",
+            "first-release-date": "2010-03-03",
+            "video": false,
+            "disambiguation": "",
+            "title": "On Melancholy Hill"
+          },
+          "length": 233866,
+          "id": "54039b91-6bcf-419f-b284-7cdeb4ffdada",
+          "position": 10,
+          "artist-credit": [
+            {
+              "joinphrase": "",
+              "artist": {
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "country": "GB",
+                "sort-name": "Gorillaz",
+                "disambiguation": "virtual band",
+                "name": "Gorillaz",
+                "type": "Group"
+              },
               "name": "Gorillaz"
             }
           ]
         },
         {
+          "length": 197053,
+          "id": "0229f9b6-55b3-4857-8b71-4c64087c64e3",
+          "position": 11,
+          "artist-credit": [
+            {
+              "name": "Gorillaz",
+              "joinphrase": "",
+              "artist": {
+                "disambiguation": "virtual band",
+                "name": "Gorillaz",
+                "type": "Group",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "country": "GB",
+                "sort-name": "Gorillaz"
+              }
+            }
+          ],
+          "number": "11",
+          "title": "Broken",
+          "recording": {
+            "artist-credit": [
+              {
+                "name": "Gorillaz",
+                "joinphrase": "",
+                "artist": {
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "sort-name": "Gorillaz",
+                  "country": "GB",
+                  "disambiguation": "virtual band",
+                  "name": "Gorillaz",
+                  "type": "Group"
+                }
+              }
+            ],
+            "first-release-date": "2010-03-03",
+            "id": "de2151e6-8cae-4561-8eb0-6bb933adeebd",
+            "length": 197053,
+            "title": "Broken",
+            "disambiguation": "",
+            "video": false
+          }
+        },
+        {
+          "length": 320466,
+          "id": "99851c6a-53f5-44fd-9536-4b494e043f78",
+          "artist-credit": [
+            {
+              "joinphrase": " feat. ",
+              "artist": {
+                "type": "Group",
+                "name": "Gorillaz",
+                "disambiguation": "virtual band",
+                "sort-name": "Gorillaz",
+                "country": "GB",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              },
+              "name": "Gorillaz"
+            },
+            {
+              "name": "Mos Def",
+              "joinphrase": " and ",
+              "artist": {
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "sort-name": "Bey, Yasiin",
+                "country": "US",
+                "id": "f5c4c27e-5902-4fc0-adfb-7775da3d5363",
+                "name": "Yasiin Bey",
+                "type": "Person",
+                "disambiguation": "fka Mos Def"
+              }
+            },
+            {
+              "joinphrase": "",
+              "artist": {
+                "name": "Hypnotic Brass Ensemble",
+                "type": "Group",
+                "disambiguation": "",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "sort-name": "Hypnotic Brass Ensemble",
+                "country": "US",
+                "id": "cc37d0c1-493d-487e-9694-3cf48ae6370d"
+              },
+              "name": "Hypnotic Brass Ensemble"
+            }
+          ],
+          "position": 12,
+          "number": "12",
+          "title": "Sweepstakes",
+          "recording": {
+            "video": false,
+            "title": "Sweepstakes",
+            "disambiguation": "",
+            "length": 320466,
+            "artist-credit": [
+              {
+                "joinphrase": " feat. ",
+                "artist": {
+                  "sort-name": "Gorillaz",
+                  "country": "GB",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type": "Group",
+                  "name": "Gorillaz",
+                  "disambiguation": "virtual band"
+                },
+                "name": "Gorillaz"
+              },
+              {
+                "name": "Mos Def",
+                "artist": {
+                  "name": "Yasiin Bey",
+                  "type": "Person",
+                  "disambiguation": "fka Mos Def",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "US",
+                  "sort-name": "Bey, Yasiin",
+                  "id": "f5c4c27e-5902-4fc0-adfb-7775da3d5363"
+                },
+                "joinphrase": " & "
+              },
+              {
+                "artist": {
+                  "id": "cc37d0c1-493d-487e-9694-3cf48ae6370d",
+                  "sort-name": "Hypnotic Brass Ensemble",
+                  "country": "US",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "disambiguation": "",
+                  "type": "Group",
+                  "name": "Hypnotic Brass Ensemble"
+                },
+                "joinphrase": "",
+                "name": "Hypnotic Brass Ensemble"
+              }
+            ],
+            "first-release-date": "2010-03-03",
+            "id": "10d834ca-36f0-476c-8d38-3689ba3373e5"
+          }
+        },
+        {
+          "position": 13,
+          "artist-credit": [
+            {
+              "joinphrase": " feat. ",
+              "artist": {
+                "name": "Gorillaz",
+                "type": "Group",
+                "disambiguation": "virtual band",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "sort-name": "Gorillaz",
+                "country": "GB",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              },
+              "name": "Gorillaz"
+            },
+            {
+              "joinphrase": " and ",
+              "artist": {
+                "id": "01f8343c-06e2-4f05-a137-f8ea7efa85c4",
+                "country": "GB",
+                "sort-name": "Jones, Mick",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "disambiguation": "The Clash/Big Audio Dynamite",
+                "type": "Person",
+                "name": "Mick Jones"
+              },
+              "name": "Mick Jones"
+            },
+            {
+              "joinphrase": "",
+              "artist": {
+                "type": "Person",
+                "name": "Paul Simonon",
+                "disambiguation": "",
+                "sort-name": "Simonon, Paul",
+                "country": "GB",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "id": "64c43453-f396-42b1-bff5-01644d710d94"
+              },
+              "name": "Paul Simonon"
+            }
+          ],
+          "id": "b34d0f2c-6ada-4977-9256-ec2f951e24a4",
+          "length": 227213,
+          "recording": {
+            "title": "Plastic Beach",
+            "disambiguation": "",
+            "video": false,
+            "first-release-date": "2010-03-03",
+            "id": "74af797a-d3fe-4c21-b33f-bdd1e57a75e7",
+            "artist-credit": [
+              {
+                "artist": {
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "country": "GB",
+                  "sort-name": "Gorillaz",
+                  "disambiguation": "virtual band",
+                  "name": "Gorillaz",
+                  "type": "Group"
+                },
+                "joinphrase": " feat. ",
+                "name": "Gorillaz"
+              },
+              {
+                "artist": {
+                  "disambiguation": "The Clash/Big Audio Dynamite",
+                  "name": "Mick Jones",
+                  "type": "Person",
+                  "id": "01f8343c-06e2-4f05-a137-f8ea7efa85c4",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "GB",
+                  "sort-name": "Jones, Mick"
+                },
+                "joinphrase": " & ",
+                "name": "Mick Jones"
+              },
+              {
+                "joinphrase": "",
+                "artist": {
+                  "name": "Paul Simonon",
+                  "type": "Person",
+                  "disambiguation": "",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                  "country": "GB",
+                  "sort-name": "Simonon, Paul",
+                  "id": "64c43453-f396-42b1-bff5-01644d710d94"
+                },
+                "name": "Paul Simonon"
+              }
+            ],
+            "length": 227213
+          },
+          "title": "Plastic Beach",
+          "number": "13"
+        },
+        {
+          "length": 235706,
+          "id": "0c239f4c-2bfa-427a-b4a2-43538e2e1572",
+          "position": 14,
+          "artist-credit": [
+            {
+              "name": "Gorillaz",
+              "artist": {
+                "name": "Gorillaz",
+                "type": "Group",
+                "disambiguation": "virtual band",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "country": "GB",
+                "sort-name": "Gorillaz",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+              },
+              "joinphrase": " feat. "
+            },
+            {
+              "name": "Little Dragon",
+              "joinphrase": "",
+              "artist": {
+                "id": "c8a9ae11-63bf-409b-8bf3-a96b3712a2ff",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "country": "SE",
+                "sort-name": "Little Dragon",
+                "disambiguation": "",
+                "name": "Little Dragon",
+                "type": "Group"
+              }
+            }
+          ],
+          "number": "14",
+          "title": "To Binge",
+          "recording": {
+            "video": false,
+            "disambiguation": "",
+            "title": "To Binge",
+            "length": 235706,
+            "artist-credit": [
+              {
+                "name": "Gorillaz",
+                "artist": {
+                  "disambiguation": "virtual band",
+                  "type": "Group",
+                  "name": "Gorillaz",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "sort-name": "Gorillaz",
+                  "country": "GB",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+                },
+                "joinphrase": " feat. "
+              },
+              {
+                "name": "Little Dragon",
+                "joinphrase": "",
+                "artist": {
+                  "name": "Little Dragon",
+                  "type": "Group",
+                  "disambiguation": "",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "country": "SE",
+                  "sort-name": "Little Dragon",
+                  "id": "c8a9ae11-63bf-409b-8bf3-a96b3712a2ff"
+                }
+              }
+            ],
+            "id": "6a76d23b-bfa1-424d-b84a-9c2a4425f51e",
+            "first-release-date": "2010-03-03"
+          }
+        },
+        {
+          "id": "0f0ed88d-35b6-4b12-b1c2-3d5a875a6781",
+          "position": 15,
+          "artist-credit": [
+            {
+              "name": "Gorillaz",
+              "artist": {
+                "country": "GB",
+                "sort-name": "Gorillaz",
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                "type": "Group",
+                "name": "Gorillaz",
+                "disambiguation": "virtual band"
+              },
+              "joinphrase": " feat. "
+            },
+            {
+              "name": "Bobby Womack",
+              "joinphrase": " and ",
+              "artist": {
+                "disambiguation": "",
+                "name": "Bobby Womack",
+                "type": "Person",
+                "id": "48e78462-2f0b-4a1a-9fa4-0585e2991e80",
+                "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+                "country": "US",
+                "sort-name": "Womack, Bobby"
+              }
+            },
+            {
+              "name": "Sinfonia ViVA",
+              "artist": {
+                "type": "Orchestra",
+                "name": "Sinfonia ViVA",
+                "disambiguation": "British orchestra",
+                "sort-name": "Sinfonia ViVA",
+                "country": "GB",
+                "type-id": "a0b36c92-3eb1-3839-a4f9-4799823f54a5",
+                "id": "a78bb8aa-8004-45d1-a37d-6421ea085bd1"
+              },
+              "joinphrase": ""
+            }
+          ],
+          "length": 186120,
+          "title": "Cloud of Unknowing",
+          "recording": {
+            "length": 186120,
+            "id": "77df78e8-596d-4c9e-bc7e-45c3d98e366f",
+            "first-release-date": "2010-03-03",
+            "artist-credit": [
+              {
+                "name": "Gorillaz",
+                "artist": {
+                  "name": "Gorillaz",
+                  "type": "Group",
+                  "disambiguation": "virtual band",
+                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                  "sort-name": "Gorillaz",
+                  "country": "GB",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+                },
+                "joinphrase": " feat. "
+              },
+              {
+                "joinphrase": " & ",
+                "artist": {
+                  "disambiguation": "",
+                  "type": "Person",
+                  "name": "Bobby Womack",
+                  "id": "48e78462-2f0b-4a1a-9fa4-0585e2991e80",
+                  "country": "US",
+                  "sort-name": "Womack, Bobby",
+                  "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+                },
+                "name": "Bobby Womack"
+              },
+              {
+                "artist": {
+                  "name": "Sinfonia ViVA",
+                  "type": "Orchestra",
+                  "disambiguation": "British orchestra",
+                  "type-id": "a0b36c92-3eb1-3839-a4f9-4799823f54a5",
+                  "country": "GB",
+                  "sort-name": "Sinfonia ViVA",
+                  "id": "a78bb8aa-8004-45d1-a37d-6421ea085bd1"
+                },
+                "joinphrase": "",
+                "name": "Sinfonia ViVA"
+              }
+            ],
+            "video": false,
+            "disambiguation": "",
+            "title": "Cloud of Unknowing"
+          },
+          "number": "15"
+        },
+        {
+          "length": 152453,
           "position": 16,
-          "length": 151000,
-          "id": "74771956-6d02-4e1d-8876-b43385c4af19",
-          "number": "16",
           "artist-credit": [
             {
               "artist": {
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
                 "id": "e21857d5-3256-4547-afb3-4b6ded592596",
                 "sort-name": "Gorillaz",
-                "type": "Group",
-                "name": "Gorillaz",
                 "country": "GB",
-                "disambiguation": "virtual band"
+                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+                "disambiguation": "virtual band",
+                "type": "Group",
+                "name": "Gorillaz"
               },
               "joinphrase": "",
               "name": "Gorillaz"
             }
           ],
-          "title": "Pirate Jet",
+          "id": "d843d3d1-7d98-4085-a2d0-f9b6f68c32aa",
+          "number": "16",
           "recording": {
-            "id": "ab6f46b2-4938-450c-b125-14e6f223a662",
-            "first-release-date": "2010-03-03",
+            "video": false,
             "disambiguation": "",
-            "artist-credit": [
-              {
-                "artist": {
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "type": "Group",
-                  "sort-name": "Gorillaz",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "country": "GB",
-                  "name": "Gorillaz",
-                  "disambiguation": "virtual band"
-                },
-                "name": "Gorillaz",
-                "joinphrase": ""
-              }
-            ],
             "title": "Pirate Jet",
-            "video": false,
-            "length": 152453
-          }
-        },
-        {
-          "recording": {
+            "length": 152453,
             "artist-credit": [
               {
-                "artist": {
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "type": "Group",
-                  "sort-name": "Gorillaz",
-                  "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                  "disambiguation": "virtual band",
-                  "name": "Gorillaz",
-                  "country": "GB"
-                },
                 "joinphrase": "",
-                "name": "Gorillaz"
-              }
-            ],
-            "title": "Pirate’s Progress",
-            "video": false,
-            "length": 242827,
-            "id": "c48c9716-c808-4315-95e2-ebbdb3a28704",
-            "first-release-date": "2010-03-03",
-            "disambiguation": ""
-          },
-          "title": "Pirate’s Progress",
-          "artist-credit": [
-            {
-              "artist": {
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
-                "disambiguation": "virtual band",
-                "country": "GB",
-                "name": "Gorillaz"
-              },
-              "name": "Gorillaz",
-              "joinphrase": ""
-            }
-          ],
-          "length": 243000,
-          "position": 17,
-          "number": "17",
-          "id": "cc98e204-4952-495b-9edc-134d7502390f"
-        }
-      ]
-    },
-    {
-      "position": 2,
-      "format-id": "bb71fd58-ff93-32b4-a201-4ad1b2a80e5f",
-      "id": "e41ba762-482e-3300-83da-740fe5b917fc",
-      "format": "DVD-Video",
-      "track-offset": 0,
-      "tracks": [
-        {
-          "id": "4bd7f0d5-8cbc-4e36-bdc8-a54b87832e8f",
-          "number": "1",
-          "length": 2700000,
-          "position": 1,
-          "artist-credit": [
-            {
-              "joinphrase": "",
-              "name": "Gorillaz",
-              "artist": {
-                "disambiguation": "virtual band",
-                "country": "GB",
-                "name": "Gorillaz",
-                "type": "Group",
-                "sort-name": "Gorillaz",
-                "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
-              }
-            }
-          ],
-          "recording": {
-            "first-release-date": "2010-03-03",
-            "id": "80a5299e-8a41-4997-a4ab-b1cf4b854c93",
-            "disambiguation": "",
-            "title": "The Making of Plastic Beach Documentary",
-            "artist-credit": [
-              {
                 "artist": {
                   "disambiguation": "virtual band",
-                  "name": "Gorillaz",
-                  "country": "GB",
-                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
-                  "sort-name": "Gorillaz",
                   "type": "Group",
+                  "name": "Gorillaz",
+                  "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+                  "country": "GB",
+                  "sort-name": "Gorillaz",
                   "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
                 },
-                "name": "Gorillaz",
-                "joinphrase": ""
+                "name": "Gorillaz"
               }
             ],
-            "length": 2700000,
-            "video": true
+            "id": "ab6f46b2-4938-450c-b125-14e6f223a662",
+            "first-release-date": "2010-03-03"
           },
-          "title": "The Making of Plastic Beach Documentary"
+          "title": "Pirate Jet"
         }
-      ],
-      "title": "",
-      "track-count": 1
+      ]
     }
   ],
-  "title": "Plastic Beach",
-  "country": "JP"
+  "id": "574166b1-78c0-4061-8781-b699f1e5b575",
+  "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+  "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+  "disambiguation": ""
 }

@@ -18,6 +18,11 @@ from book_tracker.domains.album.providers import (
 )
 from book_tracker.infrastructure.providers import ProviderPayloadError, create_provider_client
 
+#: The Sprint 064 classes below use bare `async def test_...` methods with no
+#: per-method decorator; this applies anyio to the whole module rather than
+#: repeating it, which the pre-existing functions above already do individually.
+pytestmark = pytest.mark.anyio
+
 KIND_OF_BLUE = "8e8a594f-2175-38c7-a871-abb68ec363e7"
 # The mono pressing: same day as the group's `first-release-date`, and the one the
 # selection rule settles on among the two originals.
@@ -288,3 +293,150 @@ async def test_a_release_with_no_recordings_carries_no_tracklist_key() -> None:
         )
 
     assert "tracklist" not in payload.metadata
+
+
+# ----------------------------------------------------------------------------------
+# Sprint 064: fetch_by_identifier("spotify", ...), the two-pass resolver.
+# ----------------------------------------------------------------------------------
+
+PLASTIC_BEACH_SPOTIFY = "2dIGnmEIy1WZIcZCFSj6i8"
+PLASTIC_BEACH_RELEASE = "574166b1-78c0-4061-8781-b699f1e5b575"
+PLASTIC_BEACH_GROUP = "5a676824-18cd-4f7f-89f0-df21623e2042"
+
+PURPOSE_SPOTIFY = "7fZH0aUAjY3ay25obOUf2a"
+PURPOSE_GROUP = "2660de3c-56db-4bd1-bf99-e162c68e5712"
+PURPOSE_PREFERRED_RELEASE = "006391a6-3f99-4d38-9185-50633c43fe38"
+
+RELATION_HIT_ROUTES = {
+    "/ws/2/url": (200, recording("musicbrainz_url_spotify_plastic_beach.json")),
+    # The relation names this release, and `_preferred_release` (tied on
+    # `first-release-date` among 18 releases) picks this same one back out of the
+    # group — measured, not assumed: `replay` keys purely on path, so one recording
+    # answers both the pass-1 follow-up (`inc=release-groups`) and `fetch()`'s own
+    # full read (`inc=artist-credits+labels+media+release-groups+recordings`), and
+    # the full capture is a strict superset of the narrower one.
+    f"/ws/2/release/{PLASTIC_BEACH_RELEASE}": (
+        200,
+        recording("musicbrainz_release_plastic_beach.json"),
+    ),
+    f"/ws/2/release-group/{PLASTIC_BEACH_GROUP}": (
+        200,
+        recording("musicbrainz_release_group_plastic_beach.json"),
+    ),
+}
+
+TEXT_FALLBACK_ROUTES = {
+    "/ws/2/url": (404, recording("musicbrainz_url_no_relation.json")),
+    "/ws/2/release-group": (200, recording("musicbrainz_search_purpose_justin_bieber.json")),
+    f"/ws/2/release-group/{PURPOSE_GROUP}": (
+        200,
+        recording("musicbrainz_release_group_purpose.json"),
+    ),
+    f"/ws/2/release/{PURPOSE_PREFERRED_RELEASE}": (
+        200,
+        recording("musicbrainz_release_purpose.json"),
+    ),
+}
+
+
+def musicbrainz(routes: dict[str, object]) -> MusicBrainzProvider:
+    client = create_provider_client(replay(routes))  # type: ignore[arg-type]
+    return MusicBrainzProvider(client, CONTACT, min_interval_seconds=0)
+
+
+class TestSpotifyUrlRelation:
+    """Pass 1: a Spotify album id resolves through MusicBrainz's own relationship."""
+
+    async def test_a_url_relation_resolves_to_the_release_group(self) -> None:
+        payload = await musicbrainz(RELATION_HIT_ROUTES).fetch_by_identifier(
+            "spotify", PLASTIC_BEACH_SPOTIFY
+        )
+        assert payload.source_id == PLASTIC_BEACH_GROUP
+        assert payload.title == "Plastic Beach"
+        assert payload.creators == ("Gorillaz",)
+
+    async def test_an_unsupported_kind_is_refused(self) -> None:
+        with pytest.raises(ProviderPayloadError) as error:
+            await musicbrainz({}).fetch_by_identifier("isbn", "9780307474728")
+        assert error.value.code == "unsupported_identity_kind"
+
+
+class TestSpotifyTextFallback:
+    """Pass 2: an exact title-and-artist match, only when pass 1 misses."""
+
+    async def test_a_url_miss_falls_through_to_an_exact_text_match(self) -> None:
+        payload = await musicbrainz(TEXT_FALLBACK_ROUTES).fetch_by_identifier(
+            "spotify", PURPOSE_SPOTIFY, title="Purpose", creators=("Justin Bieber",)
+        )
+        assert payload.source_id == PURPOSE_GROUP
+        assert payload.title == "Purpose"
+
+    async def test_a_near_miss_at_a_lower_score_is_not_accepted(self) -> None:
+        """`In Rainbows` shares its query with three plausible neighbours at
+        92/87/83; only the exact top-scoring, exact-title match is usable."""
+        routes = {
+            "/ws/2/url": (404, recording("musicbrainz_url_no_relation.json")),
+            "/ws/2/release-group": (
+                200,
+                recording("musicbrainz_search_in_rainbows_radiohead.json"),
+            ),
+        }
+        payload = await musicbrainz(
+            {
+                **routes,
+                # The correct top-scoring group's own fetch chain: proves the
+                # resolver picked it and not one of the lower-scoring neighbours.
+                "/ws/2/release-group/6e335887-60ba-38f0-95af-fae7774336bf": (
+                    200,
+                    {
+                        "id": "6e335887-60ba-38f0-95af-fae7774336bf",
+                        "title": "In Rainbows",
+                        "first-release-date": "2007-10-10",
+                        "artist-credit": [
+                            {"name": "Radiohead", "artist": {"sort-name": "Radiohead"}}
+                        ],
+                        "releases": [
+                            {
+                                "id": "aaaaaaaa-0000-0000-0000-000000000000",
+                                "status": "Official",
+                                "date": "2007-10-10",
+                            }
+                        ],
+                    },
+                ),
+                "/ws/2/release/aaaaaaaa-0000-0000-0000-000000000000": (
+                    200,
+                    {
+                        "id": "aaaaaaaa-0000-0000-0000-000000000000",
+                        "title": "In Rainbows",
+                        "release-group": {"id": "6e335887-60ba-38f0-95af-fae7774336bf"},
+                        "media": [],
+                    },
+                ),
+            }
+        ).fetch_by_identifier(
+            "spotify", "0000000000000000000000", title="In Rainbows", creators=("Radiohead",)
+        )
+        assert payload.source_id == "6e335887-60ba-38f0-95af-fae7774336bf"
+
+    async def test_no_usable_result_raises_record_not_found(self) -> None:
+        routes = {
+            "/ws/2/url": (404, recording("musicbrainz_url_no_relation.json")),
+            "/ws/2/release-group": (200, recording("musicbrainz_search_no_match.json")),
+        }
+        with pytest.raises(ProviderPayloadError) as error:
+            await musicbrainz(routes).fetch_by_identifier(
+                "spotify",
+                "zzzzzzzzzzzzzzzzzzzzzz",
+                title="Zzzznonexistentalbumtitle123",
+                creators=("Zzzznonexistentartist456",),
+            )
+        assert error.value.code == "record_not_found"
+
+    async def test_a_url_miss_with_no_context_raises_record_not_found(self) -> None:
+        """A caller that supplies no title/creators (an EnrichmentSpec that does not
+        declare `needs_item_context`) gets pass 1 alone."""
+        routes = {"/ws/2/url": (404, recording("musicbrainz_url_no_relation.json"))}
+        with pytest.raises(ProviderPayloadError) as error:
+            await musicbrainz(routes).fetch_by_identifier("spotify", PURPOSE_SPOTIFY)
+        assert error.value.code == "record_not_found"
