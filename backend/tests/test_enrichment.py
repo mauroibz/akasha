@@ -462,6 +462,84 @@ async def test_an_album_is_enriched_from_its_spotify_identity(engine: Engine) ->
 
 
 @pytest.mark.anyio
+async def test_a_text_matched_album_writes_a_note_only_when_none_exists(engine: Engine) -> None:
+    """Deliverable 4: a text match is weaker evidence than a stored relationship, and
+    Triage should be able to say so. Proven against the real recorded fallback case
+    (Purpose, whose Spotify id has no MusicBrainz relation) rather than a synthetic
+    payload, and proven twice: once where it writes, once where an owner's own note
+    is never touched."""
+    from book_tracker.domains.album.providers import MusicBrainzProvider
+
+    item_id = create_typed_item(engine, "Purpose", "album", ("spotify", "7fZH0aUAjY3ay25obOUf2a"))
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE items SET metadata=:metadata WHERE id=:id"),
+            {"metadata": json.dumps({"creators": ["Justin Bieber"]}), "id": item_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO entries (user_id, item_id, status, date_added, "
+                "created_at, updated_at) VALUES (1, :item, 'owned', 'n', 'n', 'n')"
+            ),
+            {"item": item_id},
+        )
+    job_id = enqueue(
+        engine, {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"}
+    )
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    routes = {
+        "/ws/2/url": (404, recording("musicbrainz_url_no_relation.json")),
+        "/ws/2/release-group": (200, recording("musicbrainz_search_purpose_justin_bieber.json")),
+        "/ws/2/release-group/2660de3c-56db-4bd1-bf99-e162c68e5712": (
+            200,
+            recording("musicbrainz_release_group_purpose.json"),
+        ),
+        "/ws/2/release/006391a6-3f99-4d38-9185-50633c43fe38": (
+            200,
+            recording("musicbrainz_release_purpose.json"),
+        ),
+    }
+    async with create_provider_client(replay(routes)) as client:  # type: ignore[arg-type]
+        providers = {
+            "musicbrainz": MusicBrainzProvider(client, "test@example.invalid", sleep=no_sleep)
+        }
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+
+    assert result["state"] == "succeeded", result
+    assert "notes" in result["progress"]["filled"]
+    with engine.connect() as connection:
+        note = connection.execute(
+            text("SELECT notes FROM entries WHERE item_id=:id"), {"id": item_id}
+        ).scalar_one()
+    assert note is not None
+    assert "title and artist" in note
+
+    # An owner's own note is never overwritten by a later backfill run.
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE entries SET notes='my own note' WHERE item_id=:id"), {"id": item_id}
+        )
+    job_id_2 = enqueue(
+        engine, {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"}
+    )
+    async with create_provider_client(replay(routes)) as client:  # type: ignore[arg-type]
+        providers = {
+            "musicbrainz": MusicBrainzProvider(client, "test@example.invalid", sleep=no_sleep)
+        }
+        result_2 = await EnrichmentHandler(engine, providers).process(job_id_2, datetime.now(UTC))
+    assert result_2["state"] == "succeeded", result_2
+    assert "notes" not in result_2["progress"]["filled"]
+    with engine.connect() as connection:
+        note_after = connection.execute(
+            text("SELECT notes FROM entries WHERE item_id=:id"), {"id": item_id}
+        ).scalar_one()
+    assert note_after == "my own note"
+
+
+@pytest.mark.anyio
 async def test_a_book_provider_is_never_asked_for_an_anime(engine: Engine) -> None:
     """Anime's provider order names `anilist` and `kitsu`. If neither is wired the job
     fails saying so, rather than quietly trying Open Library with a MyAnimeList id."""

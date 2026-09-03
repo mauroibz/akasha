@@ -47,6 +47,13 @@ class ItemPayload(SearchCandidate):
     """
 
     edition_match: str | None = None
+    #: A note worth a person's attention when *this* payload is the one chosen,
+    #: because how it was resolved is weaker evidence than usual (Sprint 064: a
+    #: text-matched Spotify album, as opposed to an exact stored relationship).
+    #: The enrichment handler writes it to the entry's own notes, and only when
+    #: the entry does not already have one — an owner's own note is never
+    #: overwritten, the same rule every other fill already follows.
+    match_note: str | None = None
 
 
 class Provider(Protocol):

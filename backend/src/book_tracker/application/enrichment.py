@@ -21,6 +21,7 @@ from book_tracker.domain.spec import EnrichmentSpec
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import (
+    EntryRow,
     ImportBatchRow,
     ImportEffectRow,
     ImportRecordRow,
@@ -388,7 +389,43 @@ class EnrichmentHandler:
         if needs_cover and await self._install_cover(item_id, payload_data):
             filled.append("cover")
 
+        if payload_data.match_note and self._write_match_note(item_id, payload_data.match_note):
+            filled.append("notes")
+
         return {"state": "succeeded", "progress": {"filled": filled, "provider": source_name}}
+
+    def _write_match_note(self, item_id: int, note: str) -> bool:
+        """A note worth a person's attention when the resolved payload is weaker
+        evidence than usual (Sprint 064). Never overwrites an owner's own note —
+        the same rule every other fill in this handler already follows.
+
+        Not independently undo-tracked: the entry this note lives on is itself a
+        `create` effect of the import, so undoing the batch deletes the whole row,
+        note included, in the common case. The one gap is an entry the owner has
+        since edited (`undo.py`'s "retained" path), where a stale-but-still-true
+        note would survive an undo — accepted rather than adding a second effect
+        type for one edge case a fresh scan already treats as the owner's row.
+        """
+        with self.engine.connect() as connection:
+            connection.exec_driver_sql("BEGIN IMMEDIATE")
+            session = Session(bind=connection)
+            try:
+                entry = session.execute(
+                    select(EntryRow).where(EntryRow.item_id == item_id, EntryRow.user_id == 1)
+                ).scalar_one_or_none()
+                if entry is None or entry.notes:
+                    connection.rollback()
+                    return False
+                entry.notes = note
+                entry.updated_at = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+                session.flush()
+                connection.commit()
+                return True
+            except Exception:
+                connection.rollback()
+                raise
+            finally:
+                session.close()
 
     async def _install_cover(self, item_id: int, payload: ItemPayload) -> bool:
         """Download and install a cover for an item that has none. Never fatal."""

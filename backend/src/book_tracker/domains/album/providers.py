@@ -54,6 +54,7 @@ import asyncio
 import re
 import time
 from collections.abc import Awaitable, Callable, Mapping, Sequence
+from dataclasses import replace
 from typing import Any
 
 import httpx
@@ -434,11 +435,24 @@ class MusicBrainzProvider:
         if not _SPOTIFY_ID.fullmatch(spotify_id):
             raise ProviderPayloadError(f"{value!r} is not a Spotify album id")
         release_group_id = await self._release_group_by_relation(spotify_id)
+        matched_by_text = False
         if release_group_id is None and title and creators:
             release_group_id = await self._release_group_by_text(title, creators[0])
+            matched_by_text = release_group_id is not None
         if release_group_id is None:
             raise ProviderPayloadError(
                 f"No MusicBrainz release matches Spotify album {spotify_id}",
                 code="record_not_found",
             )
-        return await self.fetch(release_group_id)
+        payload = await self.fetch(release_group_id)
+        if matched_by_text:
+            # A text match is weaker evidence than a stored relationship — Triage
+            # should be able to say so rather than presenting both identically.
+            payload = replace(
+                payload,
+                match_note=(
+                    "MusicBrainz release matched by title and artist, not by a stored "
+                    "Spotify link — worth a quick check that this is the right one."
+                ),
+            )
+        return payload
