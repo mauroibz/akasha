@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 34,
-  "project_status": "blocked",
+  "plan_revision": 35,
+  "project_status": "ready",
   "active_sprint": "064",
-  "active_sprint_file": "docs/sprints/064-second-source-anime-albums.md",
-  "active_sprint_status": "blocked",
+  "active_sprint_file": "docs/sprints/064-spotify-album-import.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "063",
   "completed_sprints": [
     "001",
@@ -72,5 +72,5 @@
     "063"
   ],
   "started_at": "",
-  "updated_at": "2026-09-03T13:00:00-03:00"
+  "updated_at": "2026-09-03T14:00:00-03:00"
 }

@@ -1,11 +1,17 @@
-# Handoff — Sprint 063 closed on its own branch; state points to a stub, not a plan
+# Handoff — Sprints 063 and the anime/albums question both closed, on their own branch
 
-`docs/agent/state.json` reads `project_status: "blocked"`, `active_sprint: "064"`,
-pointing at `docs/sprints/064-second-source-anime-albums.md` — which is a **stub, not a
-plan**. Read that file's own "Why this file is a stub" section before doing anything
-with it. Sprint 064 needs two things before real work can start: a live Jikan
-re-measurement, and the owner's answer on whether to reopen DEC-052's "albums have no
-cross-provider identity" finding. **Do not write Sprint 064's plan without both.**
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "064"`, pointing
+at `docs/sprints/064-spotify-album-import.md` (renamed from `065-` — see DEC-127) —
+a **real, fully written plan**, ready to claim. Nothing is blocking it; its dependencies
+(025, 026, 031, 052, 061, 062) are all complete.
+
+The anime/albums placeholder Sprint 063's own closure created is **gone**, not blocked:
+the owner asked directly whether a third anime provider was viable, Jikan was
+re-measured live and reproduced the identical failure DEC-088 recorded a week earlier,
+and anime turned out to have never been single-provider in the first place (AniList +
+Kitsu since Sprint 038). See **DEC-127** for the full account, including why albums'
+half of that question moved to the roadmap's "Not scheduled" section instead of staying
+a numbered sprint with nothing to do until the owner revisits DEC-052.
 
 ## This work is on its own branch, not main
 
@@ -46,7 +52,7 @@ looked like the override had silently failed; it had not.
   197 passing, unchanged. `make check` green (ruff, mypy, ESLint, Prettier, tsc, the
   OpenAPI contract check — untouched, since no route or schema changed). `make
   smoke-container` green, built from this branch.
-- **`docs/decisions.md`** ends at **DEC-126**.
+- **`docs/decisions.md`** ends at **DEC-127**.
 - **E2E was not run and is not owed**: the diff touches zero files under `frontend/src/`
   and changes no request path (`test_a_movie_search_survives_wikidata_raising`, the
   merge tests and the health-endpoint proof are all backend-only; the frontend already
@@ -60,11 +66,15 @@ looked like the override had silently failed; it had not.
 ## Known-degraded, deliberately not fixed (carried from DEC-125, still true)
 
 - `/api/health/providers` reports configuration, not reachability.
-- AniList's API is disabled upstream; the adapter stays for the reason DEC-125 gives.
 - Kitsu's latency tail occasionally exceeds its budget.
 - `languages` mixes vocabularies (Wikidata's localized labels vs. TVmaze's English
   names) — Cinemeta does not add a third vocabulary here, since it emits no
   `languages` value for either domain (measured absence, not an oversight).
+
+**AniList has recovered** — DEC-125 recorded it `403`-disabled upstream on 2026-09-02;
+measured live again on 2026-09-03 (DEC-127) it answered 12/12 searches, fast. Nothing
+about the adapter changed; the upstream outage that prompted DEC-125's note appears to
+have resolved on its own.
 
 ## New, from this sprint, deliberately not fixed
 

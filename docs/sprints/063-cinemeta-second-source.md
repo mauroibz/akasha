@@ -263,16 +263,22 @@ survival).
   and ranking landed as one `[MOD]` commit per domain's declaration (they are the same
   few lines), and all new tests landed in one `[TEST]` commit rather than being split
   to match intermediate, not-yet-integrated states. No behavioral difference.
-- **Sprint 064 does not exist as a written plan yet** (the roadmap always said so:
-  `[PLANNED, not yet written]`), so `docs/agent/state.json` cannot point at a real
+- **Sprint 064 did not exist as a written plan yet** (the roadmap always said so:
+  `[PLANNED, not yet written]`), so `docs/agent/state.json` could not point at a real
   "next sprint" the way the workflow expects. A minimal stub,
   `docs/sprints/064-second-source-anime-albums.md`, was created with `Status: blocked`
-  and the two things it is genuinely blocked on (a Jikan re-measurement, an owner
-  decision on reopening DEC-052's album-identity finding) — not a real plan, and not
-  meant to be treated as one. See DEC-126's closing paragraph and `HANDOFF.md`.
+  naming the two things a real plan needed first (a Jikan re-measurement, an owner
+  decision on reopening DEC-052's album-identity finding). **Superseded the same day**:
+  the owner asked for the anime re-measurement directly; Jikan reproduced the identical
+  `504` DEC-088 recorded a week earlier, and anime turned out never to have been
+  single-provider in the first place (AniList + Kitsu since Sprint 038). The stub was
+  withdrawn, albums moved to the roadmap's "Not scheduled" section, and Sprints 065/066
+  renumbered down to 064/065 to close the gap. See **DEC-127**.
 
-**Impact on future sprints:** Sprint 065 (Spotify import) and 066 (insights) are
-unaffected — neither depends on 063 or touches movies/series. Sprint 064, whenever it
-is actually planned, inherits `imdb_identity` as the pattern its own two candidate
-domains would need if either ever gained a real second provider (anime already has
-one via `mal:`; the album question is exactly what DEC-052 already found blocks it).
+**Impact on future sprints:** the Spotify import (now Sprint 064) and insights (now
+Sprint 065) are unaffected in substance — neither depended on 063 or touches
+movies/series, only on their own file names and cross-references, updated by DEC-127.
+Anime needs no second-provider work of any kind; `imdb_identity`'s pattern (an
+`IdentityStrategy` keyed on a real shared id, unlocking a fallback provider) remains
+available if a *different* anime or album provider is ever proposed, but nothing is
+scheduled against it.

@@ -4690,3 +4690,54 @@ both changes, against 1 of 3 before the second.
   `docs/agent/state.json` records the gap rather than the schema's usual
   fully-sequential assumption; the next agent should not treat that as license to
   invent Sprint 064's plan without the two things it is actually blocked on.
+
+## DEC-127 — Jikan stays rejected on re-measurement; anime gets no third provider; albums moves to Not Scheduled; Sprints 065/066 renumber to 064/065
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Supersedes:** nothing in DEC-088 — reconfirms it. Withdraws the "Sprint 064 — a second source
+  for anime and albums" entry DEC-126's own closing paragraph created a placeholder for.
+- **Cross-references:** DEC-088 (original AniList/Kitsu/Jikan measurement), DEC-125 (AniList's
+  `403` outage), DEC-126 (Cinemeta, and the stub this entry withdraws), DEC-052 (albums have no
+  cross-provider identity), DEC-065 (the precedent for renumbering an unstarted sprint rather than
+  living with a gap).
+- **Context:** closing Sprint 063 left `docs/agent/state.json` needing a next sprint, and none of
+  063's actual work depended on or measured anime/albums — Sprint 064 was a placeholder DEC-126
+  created honestly as a stub, naming what it was blocked on. The owner asked directly: is a third
+  anime provider viable and worth a sprint, or should it come off the roadmap.
+- **Measurement, 2026-09-03, keyless and live, mirroring DEC-088's method:** AniList and Kitsu
+  both answered 12/12 real searches (AniList 0.45–0.93s; Kitsu 0.35–4.22s, the same slow tail
+  DEC-125 measured). **Jikan answered 0/12 searches**, every one `504 "Jikan failed to connect to
+  MyAnimeList"`, and **0/6 again three minutes later** in a second window — the identical failure
+  DEC-088 recorded on 2026-08-27, now reproduced a week apart rather than resolved. By-id lookups
+  succeeded (5/5), all for extremely popular titles (Frieren, Chainsaw Man, Attack on Titan,
+  Fullmetal Alchemist Brotherhood, Steins;Gate) — the same shape DEC-088 already flagged as a
+  cache hit rather than a working path, not new evidence of health. AniList's `403` outage
+  recorded in DEC-125 two days earlier had already resolved by the time of this measurement.
+- **Decision, anime:** no third provider. Two findings compound rather than one deciding it:
+  Jikan remains measurably broken on the one operation an adapter actually needs (search), and —
+  unlike movies before Sprint 063 — anime was never actually single-provider. It has shipped with
+  two independently-reliable adapters sharing a real cross-provider identity (`mal:`) since Sprint
+  038, and Kitsu alone already covers the domain whenever AniList degrades, which is exactly what
+  DEC-125 recorded and what had already self-resolved by this measurement. The "second source"
+  framing this question inherited from Sprint 063 does not actually apply here. Moved to
+  `docs/sprints/ROADMAP.md`'s "Not scheduled" section: revisit only if a *different* candidate
+  provider is proposed, not Jikan again.
+- **Decision, albums:** unaffected by the anime finding — still blocked on reopening DEC-052's
+  "no cross-provider identity" verdict, which is the owner's call, not a measurement. Moved to
+  "Not scheduled" alongside the anime question rather than left as a numbered sprint with nothing
+  to do until that conversation happens.
+- **Decision, renumbering:** `docs/sprints/065-spotify-album-import.md` and
+  `docs/sprints/066-insights.md` renumber to `064` and `065` to close the gap left by withdrawing
+  the anime/albums placeholder, rather than leaving state.json pointing at a permanently-blocked
+  number. DEC-065 forbids exactly this move when it would rewrite forward references inside
+  *closed* sprints' Outcome sections or *accepted* decisions — the cost that made DEC-065 itself
+  choose a gap instead. Neither condition applies here: both sprints are still `planned`, nothing
+  has been built against either number, and grepping every closed sprint file and every accepted
+  decision found no reference to "Sprint 065" or "Sprint 066" by number outside the two files
+  being renamed, this decision, and Sprint 063's own Outcome (amended in the same commit as this
+  entry). Plan revision moves to 35.
+- **Consequences:** `docs/agent/state.json`'s `active_sprint` becomes `064` (the renamed Spotify
+  import, `ready` — its dependencies were already satisfied), `last_completed_sprint` stays `063`.
+  `scripts/validate_project.py`'s `FINAL_SPRINT` moves from 62 to 65, since the plan's last sprint
+  is now Sprint 065 rather than a since-withdrawn 066.

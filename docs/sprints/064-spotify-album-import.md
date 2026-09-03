@@ -1,8 +1,8 @@
-# Sprint 065 — The Spotify import, and the album domain's first enrichment
+# Sprint 064 — The Spotify import, and the album domain's first enrichment
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 025, 026, 031, 052, 061, 062
-**Roadmap revision:** 34
+**Roadmap revision:** 35
 
 ## Objective
 
@@ -151,7 +151,7 @@ Provider assertions run against committed recordings captured in their own commi
 - **Reopening DEC-052's `no_shared_identity`.** This sprint adds an enrichment key, which
   is a different thing from a merge identity: `spotify` keys a *lookup*, and two search
   candidates still merge on nothing.
-- **Insights.** Sprint 066.
+- **Insights.** Sprint 065.
 
 ## Commit checkpoints
 
@@ -159,7 +159,7 @@ Provider assertions run against committed recordings captured in their own commi
 2. `[ADD] Resolve a Spotify album id to a MusicBrainz release`
 3. `[MOD] An imported album is worth enriching`
 4. `[ADD] Import a Spotify library from its account export`
-5. `[DOCS] Close sprint 065 and hand off`
+5. `[DOCS] Close sprint 064 and hand off`
 
 ## Risks and decisions to surface
 

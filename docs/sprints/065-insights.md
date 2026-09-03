@@ -1,8 +1,8 @@
-# Sprint 066 — Insights: rankings from the fields items already declare
+# Sprint 065 — Insights: rankings from the fields items already declare
 
 **Status:** planned
-**Depends on:** 023, 026, 027, 040, 044, 065
-**Roadmap revision:** 34
+**Depends on:** 023, 026, 027, 040, 044, 064
+**Roadmap revision:** 35
 
 ## Objective
 
@@ -52,7 +52,7 @@ insights release**.
   has. The owner's request for "years for both" therefore cannot be served by a `FieldSpec`
   flag alone.
 - **Score density is unknown and is the feature's main risk.** The measurement that would
-  settle it does not exist: the live library holds 13 entries, 6 scored. Sprint 065 exists
+  settle it does not exist: the live library holds 13 entries, 6 scored. Sprint 064 exists
   partly to produce a real dataset. **This sprint is designed so that it is useful even if
   scores turn out to be sparse** — see deliverable 4.
 - Measured proxy for what a ranking will look like, from the owner's Spotify library: 157
@@ -180,13 +180,13 @@ therefore an explicit declaration, one reviewed decision per field, in the style
 - `npx playwright test` — **owed**: a new screen and a new request path. Sprint 061's
   blocker (`frontend/node_modules/.vite/deps` owned by `root`) is a prerequisite; fix the
   ownership or record the gate as blocked, do not quietly skip it.
-- **Walkthrough (DEC-025):** against a library with real imported data — Sprint 065's
+- **Walkthrough (DEC-025):** against a library with real imported data — Sprint 064's
   Spotify albums and the Calibre books — rank each domain by each of its keys, follow a row
   into the library, and **report what the rankings actually looked like**, including whether
   score density made the score metric worth having. That last observation is the sprint's
   most valuable output and belongs in the Outcome whatever it says.
 - **Release:** cut **v1.6.0**, the insights release, with release notes covering it and
-  Sprint 065's importer. Publishing the tag is an owner action
+  Sprint 064's importer. Publishing the tag is an owner action
   (`docs/operations/publishing-images.md`).
 
 ## Explicit non-scope
@@ -210,7 +210,7 @@ therefore an explicit declaration, one reviewed decision per field, in the style
 3. `[ADD] Filter the library by a metadata key and value`
 4. `[ADD] The insights screen`
 5. `[DOCS] Release notes for v1.6.0`
-6. `[DOCS] Close sprint 066 and hand off`
+6. `[DOCS] Close sprint 065 and hand off`
 
 ## Risks and decisions to surface
 

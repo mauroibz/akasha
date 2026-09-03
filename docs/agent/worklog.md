@@ -3724,3 +3724,30 @@ so 050 adds an adapter, not a declaration.
   066 are unaffected and already fully planned, but the workflow's sequential
   numbering means 064 is next per `state.json` regardless of the dependency
   graph — worth flagging to the owner rather than silently reordering.
+
+## 2026-09-03 — Anime provider viability (follow-up to Sprint 063, complete)
+- Done: the owner asked directly whether a third anime provider was viable/needed, or
+  should come off the roadmap. Re-measured AniList, Kitsu and Jikan live, mirroring
+  DEC-088's method: AniList 12/12 (recovered from DEC-125's `403` outage), Kitsu 12/12,
+  **Jikan 0/12 then 0/6 again three minutes later** — the identical `504` DEC-088
+  recorded a week earlier. Also established that anime was never actually
+  single-provider (AniList + Kitsu, real MAL-id cross-merge, since Sprint 038), unlike
+  movies before Sprint 063. Recorded as DEC-127: no third anime provider; the
+  anime/albums stub Sprint 063 created is withdrawn; albums' second-source question
+  moves to `ROADMAP.md`'s "Not scheduled" section (still blocked on the owner's own
+  DEC-052 reopening decision, not a measurement); Sprints 065/066 renumber to 064/065
+  to close the resulting gap (plan revision 35), since both were still `planned` and
+  DEC-065's own precedent only forbids renumbering when it would rewrite forward
+  references inside *closed* sprints or *accepted* decisions — grepped every one and
+  found none outside the two files renamed and Sprint 063's own Outcome (amended in
+  the same commit).
+- Verified: `python scripts/validate_project.py` passes with the new numbering,
+  `FINAL_SPRINT` moved from 62 to 65 in `scripts/validate_project.py` to match.
+  `docs/agent/state.json` now points at `064-spotify-album-import.md` (renamed from
+  `065-`), status `ready` — its dependencies were already satisfied, nothing here
+  implements any of it.
+- Deviations: none beyond the renumbering itself, which is the decision.
+- Blocked/open: nothing for anime (closed). Albums remains genuinely blocked on the
+  owner's own call about DEC-052; not scheduled until that conversation happens.
+- Next: Sprint 064 (Spotify import) is ready to claim per the normal `work` protocol.
+  This session did not start it.

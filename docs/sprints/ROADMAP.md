@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 34
+**Plan revision:** 35
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [064 — A second source for anime and albums](064-second-source-anime-albums.md), **blocked** — its file is a stub pending a Jikan re-measurement and an owner decision on albums; see `docs/agent/state.json` and that file's own "Why this file is a stub" section.
+**Active sprint:** [064 — The Spotify import, and the album domain's first enrichment](064-spotify-album-import.md), ready; see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1145,20 +1145,16 @@ Verified live against a built container with Wikidata's hostnames made unreachab
 search and add survived on Cinemeta (and, for series, TVmaze) alone. See DEC-126 and the sprint
 file's Outcome.
 
-### [Sprint 064 — A second source for anime and albums](064-second-source-anime-albums.md) **[BLOCKED — not yet written]**
+**What was planned as "Sprint 064 — a second source for anime and albums" is withdrawn**, not
+merely deferred. Anime was never actually single-provider the way movies were: it has shipped with
+two independently-reliable adapters (AniList, Kitsu) since Sprint 038, with a real cross-provider
+identity between them (DEC-088). Jikan, the one candidate for a third, was re-measured live on
+2026-09-03 — 0/12 searches succeeded, then 0/6 again three minutes later, the identical `504`
+DEC-088 recorded a week earlier. See **DEC-127**. Albums' half of that entry moves to "Not
+scheduled" below; Sprints 065 and 066 renumber down to 064 and 065 to close the gap (plan revision
+35 — DEC-127 is the decision behind both changes).
 
-The other two single-provider domains, split from 063 because each is blocked on something 063 is
-not. **Anime:** Jikan is the obvious candidate — it is MyAnimeList's API, and `mal:` is already the
-anime domain's declared identity, so it would merge with Kitsu for free. But its search endpoint
-answered `504` on every attempt on 2026-09-02 while MyAnimeList itself was up, so the sprint opens
-by re-measuring whether it is dependable enough to be worth the adapter. **Albums:** blocked by
-DEC-052, which found deliberately that albums have *no* cross-provider identity — barcode
-`888837168625` appeared on three distinct releases — so a second provider means un-mergeable
-duplicate rows in every search. That is a product decision to reopen with the owner, not an adapter
-to write. Deezer and iTunes were both measured keyless and working; neither can merge until the
-identity question is answered.
-
-### [Sprint 065 — The Spotify import, and the album domain's first enrichment](065-spotify-album-import.md) **[PLANNED]**
+### [Sprint 064 — The Spotify import, and the album domain's first enrichment](064-spotify-album-import.md) **[PLANNED]**
 
 The epic DEC-076 declined to commit to, now measured and buildable — see
 [`spotify-import-and-insights-viability.md`](../spotify-import-and-insights-viability.md). The
@@ -1177,7 +1173,7 @@ Scope is narrower than the export: the 157 saved albums, not the 406 reachable t
 and track roll-up opt-in and threshold-gated because it adds only 41 albums of which just 9 have
 more than one saved track.
 
-### [Sprint 066 — Insights: rankings from the fields items already declare](066-insights.md) **[PLANNED — ships as v1.6.0]**
+### [Sprint 065 — Insights: rankings from the fields items already declare](065-insights.md) **[PLANNED — ships as v1.6.0]**
 
 Ask the library a question it already has the answer to — which authors you rate highest, which
 bands you own most of, which decade you keep going back to — and get a ranked answer from the
@@ -1200,7 +1196,7 @@ It ships **two** metrics on purpose: count as well as mean score. Score density 
 one unmeasured risk — the live library holds 13 entries — and a count ranking is meaningful the day
 a library is imported. If scores turn out sparse the feature is diminished, not useless.
 
-**Sequenced after 065**, which produces the first real dataset to judge it against. The release at
+**Sequenced after 064**, which produces the first real dataset to judge it against. The release at
 its end is **v1.6.0, the insights release** — a `v1.Y` feature release in the shape of v1.5, not a
 2.0: `v2` is a reserved term in this product for auth, multiuser and sharing (product spec §9).
 
@@ -1354,6 +1350,18 @@ in DEC-073.
   them; none is scheduled. Wine's weakness is access economics rather than catalogue geography. That
   report's anime verdict — "a good domain, wrong default provider" — is **superseded by DEC-088**,
   which measured the providers instead of reading their documentation and reached a different answer.
+- **A third anime provider.** Jikan was rejected on measurement in DEC-088 and re-measured on
+  2026-09-03 with the identical result — 0/12 searches, then 0/6 again three minutes later, the same
+  `504` a week apart (DEC-127). Anime is not single-provider the way movies were before Sprint 063:
+  AniList and Kitsu already cross-merge on a real MyAnimeList identity, and Kitsu alone covers the
+  domain whenever AniList has a bad day (as it did between DEC-125 and this measurement, and had
+  already recovered by the time of it). Revisit only if a *different* candidate provider surfaces —
+  not this one again.
+- **A second album provider.** DEC-052 found deliberately that albums have *no* cross-provider
+  identity — barcode `888837168625` appeared on three distinct releases — so a second provider means
+  un-mergeable duplicate rows in every search. Deezer and iTunes were both measured keyless and
+  working; neither can merge until that finding is reopened, which is a product decision for the
+  owner, not an adapter to write. Not scheduled until the owner wants to have that conversation.
 - **Re-file an item into another domain** — "this series is really an anime", or "I imported this into
   the wrong library". Raised by the owner on 2026-08-31 while reviewing the series plan, costed, and
   deliberately **not** made a sprint in that line.
