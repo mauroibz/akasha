@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { entryFormats, entryStatuses } from "./library";
+import { entryFormats, entryStatuses, refreshItem } from "./library";
 
 /**
  * The drift assertion for the client half of the domain contract.
@@ -45,6 +45,41 @@ describe("the published vocabulary", () => {
     // a third domain must not need a frontend edit to be nameable.
     expect(schema.components.schemas.ItemTypeName.enum?.length).toBeGreaterThan(
       0,
+    );
+  });
+});
+
+describe("provider-refresh error messages", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  /**
+   * The one canned sentence used to fire for every refusal — a disabled
+   * provider, a fetch that failed live, an item with no source at all — which
+   * left the owner guessing at a cause the server already named.
+   */
+  it("surfaces the server's own reason instead of one canned sentence", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "provider_failure",
+            message: "Metadata could not be fetched",
+          },
+        }),
+        { status: 502 },
+      ),
+    );
+    await expect(refreshItem(3)).rejects.toThrow(
+      "Metadata could not be fetched",
+    );
+  });
+
+  it("falls back to a generic message when the body cannot be read", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("not json", { status: 500 }),
+    );
+    await expect(refreshItem(3)).rejects.toThrow(
+      "Provider refresh failed; your metadata was not changed",
     );
   });
 });

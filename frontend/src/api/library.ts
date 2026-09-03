@@ -281,6 +281,21 @@ export async function patchItem(
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
+/**
+ * The server's own refusal, so the owner reads why rather than one canned
+ * sentence for every cause — a provider outage, a disabled provider, and an
+ * item with no provider source all want a different next step.
+ */
+async function providerErrorMessage(
+  response: Response,
+  fallback: string,
+): Promise<string> {
+  const detail = (await response.json().catch(() => null)) as {
+    error?: { message?: string; user_message?: string };
+  } | null;
+  return detail?.error?.user_message ?? detail?.error?.message ?? fallback;
+}
+
 export async function refreshItem(
   itemId: number,
 ): Promise<LibraryEntry["item"]> {
@@ -290,7 +305,12 @@ export async function refreshItem(
     body: JSON.stringify({ overwrite: true }),
   });
   if (!response.ok)
-    throw new Error("Provider refresh failed; your metadata was not changed");
+    throw new Error(
+      await providerErrorMessage(
+        response,
+        "Provider refresh failed; your metadata was not changed",
+      ),
+    );
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
