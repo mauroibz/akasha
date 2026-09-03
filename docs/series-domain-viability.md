@@ -293,3 +293,44 @@ would need a cross-domain library lookup the importer contract deliberately scop
 The consequence is accepted and stated: a show may exist as both an anime item and a series item.
 They share no identity — anime items are keyed on `mal:` and series items on `imdb:` — so nothing
 merges them silently, and the duplicate is visible rather than hidden.
+
+## Cinemeta — second source, measured 2026-09-03 for Sprint 063
+
+The same AC1 gate as the movie domain's, on ten series chosen to span the popular, the obscure
+(the two titles Wikidata's title search itself misses, per Sprint 050), the animated and the
+recent. Wikidata's column below uses the single **`Q5398426`** (television series) class alone as
+a rough control — not the production five-class filter DEC-104 built — so a miss there is expected
+and already explained; it exists only to confirm Cinemeta is not worse than what a naive
+implementation would have shipped.
+
+| Series | Note | Cinemeta: found | IMDb id | Description | Runtime | Wikidata (single-class control) |
+|---|---|---|---|---|---|---|
+| Breaking Bad | popular, English | yes | tt0903747 | yes | yes | yes |
+| The Wire | popular, English | yes | tt0306414 | yes | yes | yes |
+| Los Simuladores | obscure, Argentine | yes | tt0316613 | yes | yes | yes |
+| Okupas | obscure, Argentine | yes | tt0289649 | yes | yes | yes |
+| Chernobyl | popular, miniseries | yes | tt7366338 | yes | yes | yes |
+| BoJack Horseman | popular, animated | yes | tt3398228 | yes | yes | yes |
+| Rick and Morty | popular, animated | yes | tt2861424 | yes | yes | **no** |
+| Avatar: The Last Airbender | popular, animated | yes | tt9018736 | yes | yes | yes |
+| Fleabag | British, recent-ish | yes | tt5687612 | yes | yes | yes |
+| Shogun (2024) | recent, popular | yes | tt2788316 | yes | yes | yes |
+
+**10/10 found, 10/10 with an IMDb id, a description and an episode-length runtime.** Wikidata's
+single-class control missed `Rick and Morty` (9/10) — the exact title DEC-104 already named as one
+the movie-shaped filter loses, here as live confirmation rather than a repeat of that finding.
+Cinemeta's coverage is not worse than the *production* series adapter either: DEC-104 measured the
+five-class filter at 14/14 on its own larger sample, and nothing here contradicts it.
+
+The `/meta/series/` envelope carries no `network`, `episodes` or `seasons` field — only `videos`, a
+per-episode array (67 entries for Breaking Bad, 39.4 KB of the fixture), which is not read: adding
+an episode or season count derived from Cinemeta would be the same defect DEC-125 fixed for
+TVmaze's `episodes` — a second count for a field the domain already declares a canonical source
+for, disagreeing with it silently. `writer` is read as the fallback for `creators` (Cinemeta has no
+distinct `director` field for a series — `director` measured `null` on every recorded series row,
+`writer` carried the real showrunner, `Vince Gilligan` for Breaking Bad), mirroring the domain's own
+creator → screenwriter fallback.
+
+**Verdict: coverage clears the gate.** The adapter proceeds as planned, contributing `creators`,
+`countries`, `languages` (none — Cinemeta carries none, same absence as the movie mapping),
+`genres`, `episode_minutes`, `cast` and `synopsis`, ranked behind Wikidata and TVmaze.

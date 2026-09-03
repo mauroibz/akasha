@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 33
+**Plan revision:** 34
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — every planned sprint (001–062) is complete; see `docs/agent/state.json`.
+**Active sprint:** [063 — A second source for films and shows](063-cinemeta-second-source.md); see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1122,7 +1122,7 @@ The unifying fix is the second one: a candidate's `language` reaches metadata on
 declares that field. The rest is a provider telling the truth about what it observed, and two budgets
 matched to measurements rather than guesses. See DEC-125.
 
-### [Sprint 063 — A second source for films and shows](063-cinemeta-second-source.md) **[PLANNED]**
+### [Sprint 063 — A second source for films and shows](063-cinemeta-second-source.md) **[IN PROGRESS]**
 
 Sprint 062 removed the self-inflicted half of the movie outage; this adds the redundancy the other
 half needs. Movies are served by one adapter, and the blocker to adding a second is not the adapter

@@ -206,3 +206,54 @@ If the owner creates a genuinely distinct film with the same title and year, the
 the candidates and permits Create new. If no candidate exists, the importer creates the skeletal
 movie and its post-commit enrichment resolves the short URI. A provider miss leaves the valid
 title/year/entry intact with a typed job error; it never sends the importer to scrape a film page.
+
+## Cinemeta — second source, measured 2026-09-03 for Sprint 063
+
+Sprint 062 (DEC-125) removed the self-inflicted half of the movie domain's single-adapter outage
+risk; it did not add redundancy. This section is Sprint 063's AC1 gate: coverage measured before
+the adapter is trusted, over the sample below, compared against Wikidata's own production filter
+(`haswbstatement:P31=Q11424`) on the same fifteen titles.
+
+| Film | Note | Cinemeta: found | IMDb id | Description | Runtime | Wikidata: found |
+|---|---|---|---|---|---|---|
+| Inception | popular, English | yes | tt1375666 | yes | yes | yes |
+| The Godfather | popular, English, classic | yes | tt0068646 | yes | yes | yes |
+| Parasite | popular, Korean | yes | tt6751668 | yes | yes | yes |
+| Seven Samurai | classic, Japanese | yes | tt0047478 | yes | yes | yes |
+| City of God | popular, Portuguese | yes | tt0317248 | yes | yes | yes |
+| Amélie | popular, French | yes | tt0211915 | yes | yes | yes |
+| Come and See | obscure, Russian/Belarusian | yes | tt0091251 | yes | yes | yes |
+| Tokyo Story | arthouse, Japanese | yes | tt0046438 | yes | yes | yes |
+| The Handmaiden | Korean | yes | tt4016934 | yes | yes | yes |
+| Relatos Salvajes | Argentine, Spanish | yes | tt3011894 | yes | yes | yes |
+| El Secreto de Sus Ojos | Argentine, Spanish | yes | tt1305806 | yes | yes | yes |
+| Dune: Part Two | recent (2024), popular | yes | tt15239678 | yes | yes | yes |
+| Oppenheimer | recent (2023), popular | yes | tt15398776 | yes | yes | yes |
+| Aftersun | recent (2022), obscure | yes | tt19770238 | yes | yes | yes |
+| La Ciénaga | obscure, Argentine, Spanish | yes | tt0240419 | yes | yes | yes |
+
+**15/15 found, 15/15 with an IMDb id, a description and a runtime.** Wikidata's own production
+filter matched all fifteen on the same sample, so Cinemeta's coverage here is not worse — it is
+equal. Latency across the run was 0.04–6.16 s (`GET /catalog/movie/top/search=`), with one 6.16 s
+outlier on `The Handmaiden`; every `/meta/movie/` fetch after the first request in a burst answered
+in under 0.5 s, consistent with the endpoint's own `cacheMaxAge`.
+
+Two shapes confirmed live, matching what the sprint's baseline measurement found on 2026-09-02:
+
+- `/meta/movie/<id>.json` occasionally answers **307** to `cinemeta-live.strem.io` rather than
+  serving from `v3-cinemeta.strem.io` directly (observed on `Okupas`' series request and on the
+  2018 `Suspiria` fetch below). The shared provider client already follows redirects
+  (`create_provider_client`'s `follow_redirects=True`), so this needs no adapter-side handling —
+  recorded here because an implementation using a bare non-redirecting client would silently
+  break.
+- The catalog search response's `poster` field is `m.media-amazon.com`, never allowlisted; the
+  `/meta/` response's own `poster` is `images.metahub.space` at the `small` size. Neither is used —
+  the adapter builds the medium-size metahub URL from the IMDb id, exactly as the existing
+  `metahub_poster_url` helper already does for Wikidata and TVmaze.
+
+**Identity pair, confirmed live:** searching `Suspiria` returns both `tt0076786` (Argento, 1977) and
+`tt1034415` (Guadagnino, 2018) as distinct records, each with its own full `/meta/` response — the
+AC4 case.
+
+**Verdict: coverage clears the gate.** Cinemeta answers this sample at parity with Wikidata's own
+filter and with complete field coverage on every hit. The adapter proceeds as planned.

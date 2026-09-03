@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 33,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 34,
+  "project_status": "in_progress",
+  "active_sprint": "063",
+  "active_sprint_file": "docs/sprints/063-cinemeta-second-source.md",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "062",
   "completed_sprints": [
     "001",
@@ -70,6 +70,6 @@
     "061",
     "062"
   ],
-  "started_at": "",
-  "updated_at": "2026-09-02T19:40:00-03:00"
+  "started_at": "2026-09-03T00:00:00-03:00",
+  "updated_at": "2026-09-03T00:00:00-03:00"
 }
