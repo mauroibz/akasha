@@ -4633,3 +4633,60 @@ both changes, against 1 of 3 before the second.
     `Japanese`), so the same field reads differently depending on which provider answered.
     Observed during the walkthrough, out of this sprint's scope, and recorded rather than left
     for someone to rediscover.
+
+## DEC-126 — Cinemeta is the movie and series domains' second/third source; a film's identity becomes its IMDb id
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Supersedes:** DEC-098's Wikidata-`Q`-id movie identity, for the identity question
+  only. DEC-098's provider verdict (Wikidata is the right primary source) is unchanged
+  and is not rewritten.
+- **Cross-references:** DEC-098, DEC-103 (keyless Stremio poster), DEC-104 (measured
+  series providers, `source_preference` ranking), DEC-109 (ranking, not strict order),
+  DEC-125 (the incident this sprint answers the other half of). Evidence:
+  `docs/movie-domain-viability.md` and `docs/series-domain-viability.md`, both amended
+  with a dated Cinemeta section.
+- **Context:** Sprint 062 (DEC-125) removed the self-inflicted half of the movie
+  domain's Wikidata outage risk (the `maxlag` parameter); it left the domain resting on
+  one adapter. The owner asked for the redundancy, gated on a measured coverage
+  assessment (DEC-104's method) rather than assumed.
+- **Measurement, 2026-09-03, keyless and live:** Cinemeta (Stremio's IMDb-keyed
+  metadata service, already a de facto dependency through every poster this build
+  renders per DEC-103) answered **15/15** films and **10/10** series in a sample chosen
+  to span popular, obscure, non-English and recent titles, every hit carrying an IMDb
+  id, a description and a runtime. Wikidata's own production filter matched the same
+  15/15 films; a single-class control (not the real five-class series filter) matched
+  9/10 series, missing exactly the title DEC-104 already named as that filter's known
+  gap. Coverage is not worse than Wikidata's on this sample, so the adapter proceeded.
+- **Decision:** `infrastructure/cinemeta.py` is the shared transport (paced, bounded,
+  retrying, reading the `{metas}`/`{meta}` envelopes and the `"N min"` runtime parse);
+  `domains/movie/cinemeta.py` (`cinemeta`) and `domains/series/cinemeta.py`
+  (`cinemeta-series`) map it to each domain's declared fields. Neither derives an
+  episode/season count from the series `videos` array — the same defect DEC-125 fixed
+  for TVmaze's `episodes`, a second count for a field the domain already has a
+  canonical source for. `source_preference` becomes `("wikidata", "cinemeta")` for
+  movies and `("wikidata-series", "tvmaze", "cinemeta-series")` for series (DEC-109: a
+  ranking, both EnrichmentSpec.provider_order gain the same name).
+- **The identity change:** `MOVIE_IDENTITY` moves from the Wikidata `Q` id to the IMDb
+  id (`imdb_identity`, mirroring `series.imdb_identity`). DEC-098's `Q`-id key existed
+  because one provider made a real cross-provider merge impossible — its whole job was
+  stopping the *same* provider's two `Suspiria` rows (1977, 2018) from colliding. A
+  second adapter removes that premise. The protection is preserved by IMDb instead:
+  both `Suspiria` films carry their own id and stay two rows (confirmed live against
+  Cinemeta's own recorded pair), and a film with neither an IMDb nor identifiable claim
+  merges with nothing — which is what keeps the ~2% of films with a TMDB id and no IMDb
+  id (DEC-103) from collapsing into each other.
+- **Verified against a library already holding Wikidata-sourced films**, not merely
+  assumed: identity is computed over search candidates, not stored rows, so the change
+  touches no existing data. Confirmed live in the walkthrough container by adding a
+  Wikidata+Cinemeta-merged film, a Cinemeta-only film, a three-way-merged series and a
+  Cinemeta-only series, then rebuilding the same container with `www.wikidata.org` and
+  `wikidata.org` resolving to an unreachable address (`--add-host` to `127.0.0.1`) and
+  repeating both searches: both survived on Cinemeta (and, for series, TVmaze) alone,
+  each add installed a real cover, and `X-Provider-Warning` reported the degradation.
+- **Consequences:** Plan revision 34. Sprint 063 delivered this in full; `FINAL_SPRINT`
+  is not moved past 62 by this decision alone, since Sprint 064 (anime/albums, blocked
+  on a re-measurement and an owner decision — see its stub sprint file) is not written.
+  `docs/agent/state.json` records the gap rather than the schema's usual
+  fully-sequential assumption; the next agent should not treat that as license to
+  invent Sprint 064's plan without the two things it is actually blocked on.

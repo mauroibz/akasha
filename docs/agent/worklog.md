@@ -3667,3 +3667,60 @@ so 050 adds an adapter, not a declaration.
   watch the `Release` run. Nothing is pushed: `main` is ahead of `origin` by
   this sprint's commits plus Sprint 061's. Until the tag is published, a fresh
   `docker compose up` on a clean host would fail to pull.
+
+## 2026-09-03 — Sprint 063 (complete)
+- Done: activated Sprint 063 (state.json and ROADMAP.md had drifted — the roadmap
+  header still read revision 33 and "every sprint through 062 is complete" even
+  though 063/065/066 were already planned at revision 34; repaired as a
+  documentation-only inconsistency per AGENTS.md 1.4). Measured Cinemeta's
+  coverage live (AC1: 15/15 films, 10/10 series, parity with Wikidata's own
+  filter) before writing any adapter code. Built `infrastructure/cinemeta.py`
+  (shared transport), `domains/movie/cinemeta.py` and
+  `domains/series/cinemeta.py` (the two field mappings), wired both into
+  main.py's provider catalog, moved `MOVIE_IDENTITY` to the IMDb id
+  (`imdb_identity`, mirroring series), and ranked Cinemeta last in both
+  domains' `source_preference` and `EnrichmentSpec.provider_order`. Recorded
+  11 live Cinemeta fixtures (two synthetic, documented as such) and wrote
+  `test_cinemeta_provider.py` plus one new `test_cached_add.py` case proving a
+  third fuller-answer provider does not regress the existing two-provider
+  rule. Commits `99f9636`, `a0642a0`, `add2dc4`, `f892d32`, `7e0d2d2`.
+- Verified: full gate. `python scripts/validate_project.py`, `make check`
+  (backend ruff/mypy, frontend lint/typecheck/prettier, OpenAPI contract check
+  — unaffected, no route changed), `make test` (1,252 backend + 197 frontend),
+  `make smoke-container` (full pass, built from this branch). Walkthrough:
+  built the image locally, ran it on an isolated Docker volume and a
+  non-default port (18063), searched and added a Wikidata+Cinemeta-merged
+  film, a Cinemeta-only film, a three-way-merged series and a
+  Cinemeta-only series — all four installed real covers. Removed that
+  container, rebuilt it with `www.wikidata.org`/`wikidata.org` resolved to
+  `127.0.0.1` via `docker run --add-host` (confirmed unreachable with a direct
+  `urlopen` probe from inside the container first), and repeated both
+  searches and both adds on port 18064: both survived on Cinemeta (and, for
+  series, TVmaze) alone, `X-Provider-Warning` present, covers still installed.
+  All containers, volumes and the local image removed at closure.
+- Deviations: commit-checkpoint shape differs from the sprint's suggested six
+  (identity+ranking landed as one `[MOD]` commit per domain since they are the
+  same few lines; all new tests landed in one `[TEST]` commit) — no behavioral
+  difference, recorded in the sprint Outcome. Two candidate Cinemeta-sourced
+  titles genuinely have no metahub poster (confirmed with a direct request,
+  clean 404s, matching the same "some titles have none" finding Sprint 062's
+  worklog recorded for TVmaze) — not bugs, just not used for the AC6 proof.
+- Dead ends worth not repeating: `getent hosts` inside a container can report
+  the real DNS answer even when `/etc/hosts` and `--add-host` are correctly
+  applied; `getent ahosts` (or an actual connection attempt) is what proves
+  the override took effect. Cinemeta's `/meta/` occasionally 307-redirects to
+  `cinemeta-live.strem.io` — the shared client's existing
+  `follow_redirects=True` already handles it, nothing to fix.
+- Blocked/open: **Sprint 064 has no written plan** (the roadmap always said
+  `[PLANNED, not yet written]`). `docs/agent/state.json`'s schema requires a
+  next active sprint file to exist, so a stub,
+  `docs/sprints/064-second-source-anime-albums.md`, was created with
+  `Status: blocked` — it is not a plan, only a pointer, and names the two
+  things a real plan needs first: a live Jikan re-measurement, and the
+  owner's answer on whether to reopen DEC-052's "albums have no
+  cross-provider identity" finding. See DEC-126's closing paragraph.
+- Next: whoever picks up Sprint 064 does the actual planning work first (the
+  re-measurement and the owner conversation), not this stub. Sprints 065 and
+  066 are unaffected and already fully planned, but the workflow's sequential
+  numbering means 064 is next per `state.json` regardless of the dependency
+  graph — worth flagging to the owner rather than silently reordering.

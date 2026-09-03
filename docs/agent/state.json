@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 34,
-  "project_status": "in_progress",
-  "active_sprint": "063",
-  "active_sprint_file": "docs/sprints/063-cinemeta-second-source.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "062",
+  "project_status": "blocked",
+  "active_sprint": "064",
+  "active_sprint_file": "docs/sprints/064-second-source-anime-albums.md",
+  "active_sprint_status": "blocked",
+  "last_completed_sprint": "063",
   "completed_sprints": [
     "001",
     "002",
@@ -68,8 +68,9 @@
     "059",
     "060",
     "061",
-    "062"
+    "062",
+    "063"
   ],
-  "started_at": "2026-09-03T00:00:00-03:00",
-  "updated_at": "2026-09-03T00:00:00-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-03T13:00:00-03:00"
 }

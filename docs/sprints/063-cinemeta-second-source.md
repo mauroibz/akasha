@@ -1,6 +1,6 @@
 # Sprint 063 — A second source for films and shows
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 046, 048, 049, 050, 062
 **Roadmap revision:** 34
 
@@ -205,4 +205,74 @@ that ownership is a prerequisite and not a reason to skip the gate.
 
 ## Outcome
 
-_Not started._
+**Delivered 2026-09-03.** All eight acceptance criteria met; see DEC-126 for the full
+decision record.
+
+1. **Measured coverage (AC1):** 15/15 films and 10/10 series, every hit carrying an
+   IMDb id, a description and a runtime; parity with Wikidata's own filter on the same
+   sample. Recorded as dated sections in `docs/movie-domain-viability.md` and
+   `docs/series-domain-viability.md`. The gate cleared, so the adapter proceeded.
+2. **Movie search survives Wikidata failing (AC2):** proven twice — unit-level in
+   `test_a_movie_search_survives_wikidata_raising`, and live against the built
+   container with `www.wikidata.org`/`wikidata.org` resolved to an unreachable address
+   (`docker run --add-host … 127.0.0.1`). A "Seven Samurai" search still returned
+   Cinemeta's result with a cover in 2.09 s, `X-Provider-Warning` set.
+3. **Both-healthy merge (AC3):** live search for "Seven Samurai" returned one row,
+   `source: wikidata`, `source_refs` carrying both `wikidata` and `cinemeta`, Spanish
+   metadata from Wikidata untouched. `test_cinemeta_provider.py::TestWikidataCinemetaMerge`
+   is the recorded-fixture proof.
+4. **The Suspiria pair (AC4):** `tt0076786` (1977) and `tt1034415` (2018) confirmed live
+   as distinct Cinemeta records and proven to stay two rows through `merge_and_rank`
+   (`TestMovieIdentityMerge`).
+5. **Three-way series merge (AC5):** live search for "Breaking Bad" merged Wikidata,
+   TVmaze and Cinemeta into one row; `TestThreeWaySeriesMerge` pins Wikidata's own
+   synopsis surviving the merge and `test_a_third_fuller_answer_provider_does_not_displace_the_second`
+   (test_cached_add.py) proves the add path's fuller-answer rule (DEC-115) still picks
+   TVmaze's longer synopsis over Cinemeta's shorter one.
+6. **Cinemeta-sourced adds install a cover (AC6):** live, in the walkthrough container —
+   "Snow White and the Seven Samurai" (movie, `source=cinemeta`) and "Chernobyl"
+   (series, `source=cinemeta-series`) both added with a real downloaded cover and no
+   metadata key outside each domain's declared fields. (Two other candidate titles
+   genuinely have no metahub poster — confirmed with a direct request, a clean 404, not
+   a bug — and were not used for this proof.)
+7. **No request reaches `m.media-amazon.com` (AC7):** structural — the adapter only
+   ever calls `CINEMETA_BASE`; `ALLOWED_COVER_HOSTS` is untouched.
+8. **`/api/health/providers` lists both adapters (AC8):** confirmed live; `cinemeta`
+   and `cinemeta-series` each appear directly after their domain's other providers,
+   following each domain's declared `source_preference` with no code change to the
+   endpoint itself.
+
+**Verified:** `python scripts/validate_project.py`, `make check` (backend ruff/mypy,
+frontend lint/typecheck/prettier, OpenAPI contract check — untouched, since no route
+changed), `make test` (1,252 backend + 197 frontend, all passing), `make
+smoke-container` (full pass, built from this branch). Walkthrough: a container built
+from this branch, on isolated Docker volumes and a non-default host port (18063,
+later 18064), never the owner's instance — searched and added in both domains with
+every provider healthy, then rebuilt with Wikidata's two hostnames resolving to an
+unreachable address and repeated both searches and both adds. All containers, volumes
+and the local image were removed at closure.
+
+**Commits:** `99f9636` (AC1 measurement), `a0642a0` (recorded fixtures), `add2dc4`
+(the two adapters + shared transport + wiring), `f892d32` (the identity and ranking
+change), `7e0d2d2` (the tests proving the merge, the fuller-answer rule and the outage
+survival).
+
+**Deviations:**
+
+- The commit-checkpoint shape differs from the six suggested in this file: identity
+  and ranking landed as one `[MOD]` commit per domain's declaration (they are the same
+  few lines), and all new tests landed in one `[TEST]` commit rather than being split
+  to match intermediate, not-yet-integrated states. No behavioral difference.
+- **Sprint 064 does not exist as a written plan yet** (the roadmap always said so:
+  `[PLANNED, not yet written]`), so `docs/agent/state.json` cannot point at a real
+  "next sprint" the way the workflow expects. A minimal stub,
+  `docs/sprints/064-second-source-anime-albums.md`, was created with `Status: blocked`
+  and the two things it is genuinely blocked on (a Jikan re-measurement, an owner
+  decision on reopening DEC-052's album-identity finding) — not a real plan, and not
+  meant to be treated as one. See DEC-126's closing paragraph and `HANDOFF.md`.
+
+**Impact on future sprints:** Sprint 065 (Spotify import) and 066 (insights) are
+unaffected — neither depends on 063 or touches movies/series. Sprint 064, whenever it
+is actually planned, inherits `imdb_identity` as the pattern its own two candidate
+domains would need if either ever gained a real second provider (anime already has
+one via `mal:`; the album question is exactly what DEC-052 already found blocks it).

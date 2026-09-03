@@ -2,7 +2,7 @@
 
 **Plan revision:** 34
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [063 — A second source for films and shows](063-cinemeta-second-source.md); see `docs/agent/state.json`.
+**Active sprint:** [064 — A second source for anime and albums](064-second-source-anime-albums.md), **blocked** — its file is a stub pending a Jikan re-measurement and an owner decision on albums; see `docs/agent/state.json` and that file's own "Why this file is a stub" section.
 
 ## Shape of the plan
 
@@ -1122,7 +1122,7 @@ The unifying fix is the second one: a candidate's `language` reaches metadata on
 declares that field. The rest is a provider telling the truth about what it observed, and two budgets
 matched to measurements rather than guesses. See DEC-125.
 
-### [Sprint 063 — A second source for films and shows](063-cinemeta-second-source.md) **[IN PROGRESS]**
+### [Sprint 063 — A second source for films and shows](063-cinemeta-second-source.md)
 
 Sprint 062 removed the self-inflicted half of the movie outage; this adds the redundancy the other
 half needs. Movies are served by one adapter, and the blocker to adding a second is not the adapter
@@ -1138,7 +1138,14 @@ The film identity moves to IMDb, which the Wikidata adapter already emits on eve
 Gated on a measured coverage assessment first (the DEC-104 method, with a stop condition), because a
 fallback that answers worse than the thing it backs up is not a fallback.
 
-### Sprint 064 — A second source for anime and albums **[PLANNED, not yet written]**
+**Delivered 2026-09-03.** The gate cleared (15/15 films, 10/10 series, parity with Wikidata's own
+filter), so `cinemeta` and `cinemeta-series` shipped as declared, `MOVIE_IDENTITY` moved to the IMDb
+id, and both domains' `source_preference` and `EnrichmentSpec.provider_order` rank Cinemeta last.
+Verified live against a built container with Wikidata's hostnames made unreachable: both domains'
+search and add survived on Cinemeta (and, for series, TVmaze) alone. See DEC-126 and the sprint
+file's Outcome.
+
+### [Sprint 064 — A second source for anime and albums](064-second-source-anime-albums.md) **[BLOCKED — not yet written]**
 
 The other two single-provider domains, split from 063 because each is blocked on something 063 is
 not. **Anime:** Jikan is the obvious candidate — it is MyAnimeList's API, and `mal:` is already the
