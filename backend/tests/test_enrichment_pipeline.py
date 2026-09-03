@@ -493,12 +493,37 @@ async def test_an_item_carrying_the_wrong_kind_of_identifier_is_not_queued(
 
 @pytest.mark.anyio
 async def test_a_domain_that_does_not_enrich_is_never_queued(tmp_path: Path) -> None:
-    """Albums declare `enrichment=None`: one release fetch already returns everything."""
+    """Every registered domain declares an `EnrichmentSpec` as of Sprint 064 (albums
+    were the last one), so this is proven against a type outside every registered
+    domain rather than against any one domain's declaration — the schema enforces
+    no CHECK on `items.type` (DEC-057's line), so a stale or mistyped row is real."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         engine = app.state.engine
-        create_typed_item(engine, "An album", "album", ("mal", "1"))
+        create_typed_item(engine, "A widget", "widget", ("mal", "1"))
         assert enqueue_enrichment_backfill(engine) == 0
+
+
+@pytest.mark.anyio
+async def test_a_spotify_identified_album_is_queued_and_a_search_added_one_is_not(
+    tmp_path: Path,
+) -> None:
+    """AC4: the whole reason `enrichment=None` was right until Sprint 064. A
+    search-added album carries no `spotify` identifier at all, so it must never be
+    queued — asserted rather than assumed, since it is the one behaviour this
+    sprint's change could most easily have broken."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        imported = create_typed_item(engine, "Plastic Beach", "album", ("spotify", "abc123"))
+        searched = create_typed_item(engine, "Kind of Blue", "album", None)
+
+        assert enqueue_enrichment_backfill(engine) == 1
+        payloads = {row["item_id"]: row for row in queued_payloads(engine)}
+
+    assert payloads[imported]["kind"] == "spotify"
+    assert payloads[imported]["value"] == "abc123"
+    assert searched not in payloads
 
 
 @pytest.mark.anyio

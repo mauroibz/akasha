@@ -360,9 +360,12 @@ async def test_an_item_with_no_lookup_key_fails_with_a_typed_reason(engine: Engi
 
 @pytest.mark.anyio
 async def test_an_item_whose_domain_does_not_enrich_is_refused(engine: Engine) -> None:
-    """An album declares `enrichment=None`. A job for one should never exist, and if a
-    stale row does, it must not be processed against some other domain's providers."""
-    item_id = create_typed_item(engine, "Kind of Blue", "album", ("mal", "1"))
+    """Every registered domain declares an `EnrichmentSpec` as of Sprint 064 (albums
+    were the last holdout), so this proves the refusal path itself rather than any
+    one domain's declaration: an item typed outside every registered domain — the
+    schema enforces no such CHECK (DEC-057's line) — must not be processed against
+    some other domain's providers, and a stale job for one must fail cleanly."""
+    item_id = create_typed_item(engine, "Some Widget", "widget", ("mal", "1"))
     job_id = enqueue(engine, {"item_id": item_id, "kind": "mal", "value": "1"})
     async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
         result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
@@ -400,6 +403,62 @@ async def test_an_anime_is_enriched_from_its_own_providers(engine: Engine) -> No
     assert metadata["creators"] == ["MAPPA"]
     assert metadata["kind"] == "TV"
     assert "Action" in metadata["genres"]
+
+
+@pytest.mark.anyio
+async def test_an_album_is_enriched_from_its_spotify_identity(engine: Engine) -> None:
+    """Sprint 064, end to end: a `spotify` key, MusicBrainz's own two-pass resolver,
+    and a record filled with everything only a release carries — label, country,
+    track count, tracklist — none of which the importer could have supplied."""
+    from book_tracker.domains.album.providers import MusicBrainzProvider
+
+    item_id = create_typed_item(
+        engine, "Plastic Beach", "album", ("spotify", "2dIGnmEIy1WZIcZCFSj6i8")
+    )
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE items SET metadata=:metadata WHERE id=:id"),
+            {"metadata": json.dumps({"creators": ["Gorillaz"]}), "id": item_id},
+        )
+    job_id = enqueue(
+        engine, {"item_id": item_id, "kind": "spotify", "value": "2dIGnmEIy1WZIcZCFSj6i8"}
+    )
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    routes = {
+        "/ws/2/url": (200, recording("musicbrainz_url_spotify_plastic_beach.json")),
+        # One recording answers both the pass-1 follow-up and fetch()'s own full
+        # read: `_preferred_release` picks this same release back out of its group,
+        # and `replay` keys purely on path (see test_musicbrainz.py for the detail).
+        "/ws/2/release/574166b1-78c0-4061-8781-b699f1e5b575": (
+            200,
+            recording("musicbrainz_release_plastic_beach.json"),
+        ),
+        "/ws/2/release-group/5a676824-18cd-4f7f-89f0-df21623e2042": (
+            200,
+            recording("musicbrainz_release_group_plastic_beach.json"),
+        ),
+    }
+    async with create_provider_client(replay(routes)) as client:  # type: ignore[arg-type]
+        providers = {
+            "musicbrainz": MusicBrainzProvider(client, "test@example.invalid", sleep=no_sleep)
+        }
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+
+    assert result["state"] == "succeeded", result
+    assert result["progress"]["provider"] == "musicbrainz"
+    with engine.connect() as connection:
+        row = connection.execute(
+            text("SELECT metadata FROM items WHERE id=:id"), {"id": item_id}
+        ).one()
+    metadata = json.loads(row.metadata)
+    assert metadata["country"] == "XW"
+    assert metadata["track_count"] == 16
+    assert metadata["tracklist"]
+    # The importer's own creators survive: enrichment fills only what was empty.
+    assert metadata["creators"] == ["Gorillaz"]
 
 
 @pytest.mark.anyio

@@ -12,6 +12,7 @@ from book_tracker.domain.spec import (
     UNSORTED,
     ColumnSpec,
     Domain,
+    EnrichmentSpec,
     FieldSpec,
     FormatSpec,
     StatusSpec,
@@ -80,6 +81,27 @@ def no_shared_identity(_candidate: SearchCandidate) -> None:
 
 ALBUM_IDENTITY = IdentityStrategy(no_shared_identity, ("musicbrainz",))
 
+# Sprint 064 supersedes `enrichment=None` without rewriting its reasoning: that premise
+# — one MusicBrainz fetch already returns everything an album has — was true for the
+# only way an album could be created when it was written, a search add that reaches
+# MusicBrainz directly. An importer is a second way, and its rows arrive as a title and
+# an artist with everything else still to fetch, which is exactly the gap
+# `EnrichmentSpec` exists to fill (DEC-067 row 3).
+ALBUM_ENRICHMENT = EnrichmentSpec(
+    # A Spotify export's saved-album id, and nothing else: a search-added album
+    # carries no `spotify` identifier at all, so it is never queued — the original
+    # decision stays exactly right for the case it was made for.
+    identity_kinds=("spotify",),
+    provider_order=("musicbrainz",),
+    # Fields only MusicBrainz can supply and a resolved release reliably carries;
+    # `creators` and `credit` are deliberately absent because the importer already
+    # fills them from Spotify's own artist field, so they never look incomplete.
+    completeness_fields=("label", "country", "track_count"),
+    # Both passes of the Spotify resolver need the item's own title and artist, which
+    # a bare identifier value cannot carry (see domains/album/providers.py).
+    needs_item_context=True,
+)
+
 
 _MUSICBRAINZ_HOSTS = {"musicbrainz.org", "www.musicbrainz.org", "beta.musicbrainz.org"}
 _MUSICBRAINZ_RELEASE_GROUP = re.compile(
@@ -113,9 +135,9 @@ DOMAIN = Domain(
     entry_fields=frozenset(),
     formats=ALBUM_FORMATS,
     entry_panel_label="Your copy",
-    # One MusicBrainz release fetch already returns everything an album has, so
-    # there is nothing for a background job to fill. A complete answer, not a gap.
-    enrichment=None,
+    # True for a search add, which is why this stayed `None` until Sprint 064 gave
+    # an importer a second way to create an album — see `ALBUM_ENRICHMENT` above.
+    enrichment=ALBUM_ENRICHMENT,
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,
 )

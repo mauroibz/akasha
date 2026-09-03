@@ -213,6 +213,16 @@ class EnrichmentSpec:
     #: Which long-text fields prefer the fuller of the providers' answers. Absent
     #: means every field keeps its first provider's answer, as before.
     fuller_answer_fields: tuple[str, ...] = ()
+    #: Whether this domain's providers need the item's own title and creators to
+    #: resolve `identity_kinds`, not only the bare identifier value (Sprint 064). True
+    #: only for albums: a Spotify id alone tells MusicBrainz which URL relationship to
+    #: look up, but the fallback text search needs a title and an artist to search for,
+    #: and every other domain's identity value (an ISBN, an IMDb id) is sufficient on
+    #: its own. Declared here rather than widening `EnrichingProvider.fetch_by_identifier`
+    #: for every domain to carry a hint only one provider uses: the enrichment handler
+    #: passes `title`/`creators` as keyword-only arguments only when this is `True`, so
+    #: no other provider's signature has to change.
+    needs_item_context: bool = False
 
 
 @dataclass(frozen=True)

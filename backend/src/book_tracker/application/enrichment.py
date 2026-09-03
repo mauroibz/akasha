@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
-from collections.abc import Collection, Mapping
+from collections.abc import Collection, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -93,6 +93,9 @@ class EnrichmentHandler:
         value: str,
         spec: EnrichmentSpec,
         now: datetime | None = None,
+        *,
+        title: str | None = None,
+        creators: Sequence[str] | None = None,
     ) -> tuple[ItemPayload | None, str | None, dict[str, Any] | None]:
         """Try the domain's providers in its order, returning the first usable payload.
 
@@ -134,7 +137,12 @@ class EnrichmentHandler:
             if self.quota is not None:
                 self.quota.record(name, moment)
             try:
-                payload = await provider.fetch_by_identifier(kind, value)
+                if spec.needs_item_context:
+                    payload = await provider.fetch_by_identifier(
+                        kind, value, title=title, creators=creators
+                    )
+                else:
+                    payload = await provider.fetch_by_identifier(kind, value)
             except ProviderPayloadError as error:
                 unreachable = unreachable or error.code in {
                     "provider_unreachable",
@@ -223,15 +231,17 @@ class EnrichmentHandler:
         # than carried in the payload, so a queued job picks up a deployment's current
         # provider order instead of the one that happened to be wired when it was made.
         with self.engine.connect() as connection:
-            item_type = connection.execute(
-                text("SELECT type FROM items WHERE id = :id"), {"id": item_id}
-            ).scalar_one_or_none()
-        if item_type is None:
+            row = connection.execute(
+                text("SELECT type, title, metadata FROM items WHERE id = :id"),
+                {"id": item_id},
+            ).one_or_none()
+        if row is None:
             return {
                 "state": "failed",
                 "error": f"Item {item_id} no longer exists",
                 "error_code": "item_not_found",
             }
+        item_type, item_title, item_metadata_json = row
         domain = DOMAINS.get(str(item_type))
         spec = domain.enrichment if domain is not None else None
         if spec is None:
@@ -240,6 +250,20 @@ class EnrichmentHandler:
                 "error": f"{item_type} records are not enriched in the background",
                 "error_code": "domain_does_not_enrich",
             }
+        # Only read when a domain declares it needs this: every other domain's
+        # identity value is sufficient on its own (an ISBN, an IMDb id), so paying
+        # for a metadata parse on every job would be waste (Sprint 064).
+        context_title: str | None = None
+        context_creators: Sequence[str] | None = None
+        if spec.needs_item_context:
+            context_title = str(item_title) if item_title else None
+            item_metadata = json.loads(item_metadata_json) if item_metadata_json else {}
+            raw_creators = item_metadata.get("creators")
+            context_creators = (
+                tuple(str(name) for name in raw_creators if isinstance(name, str) and name.strip())
+                if isinstance(raw_creators, list)
+                else None
+            )
 
         # The payload shape changed in Sprint 039 from `{item_id, isbn}` to
         # `{item_id, kind, value}`. Jobs survive restart by design, so a row queued
@@ -269,7 +293,9 @@ class EnrichmentHandler:
                 "error_code": "rate_limited",
             }
 
-        payload_data, source_name, failure = await self._fetch(kind, str(value), spec, now)
+        payload_data, source_name, failure = await self._fetch(
+            kind, str(value), spec, now, title=context_title, creators=context_creators
+        )
         if payload_data is None:
             assert failure is not None
             if failure["state"] == "deferred":
