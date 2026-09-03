@@ -4118,6 +4118,66 @@
         "summary": "List Cover Candidates"
       }
     },
+    "/api/items/{item_id}/cover/fetch": {
+      "post": {
+        "description": "Install a cover from the item's own primary provider, and nothing else.\n\n`Refresh from provider` already does this as a side effect, but only after\noverwriting every other provider-managed field and behind a confirmation\ndialog \u2014 the wrong shape for the one case this exists for: a cover that\nnever installed at add time (a transient fetch failure, a since-fixed\nprovider outage) and nothing else about the record is wrong. Nothing here\nis destructive, so unlike refresh it needs no confirmation and no\n`overwrite` flag.",
+        "operationId": "fetch_cover_api_items__item_id__cover_fetch_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "item_id",
+            "required": true,
+            "schema": {
+              "title": "Item Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ItemResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Fetch Cover"
+      }
+    },
     "/api/items/{item_id}/refresh": {
       "post": {
         "operationId": "refresh_item_api_items__item_id__refresh_post",

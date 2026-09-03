@@ -2,7 +2,12 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { entryFormats, entryStatuses, refreshItem } from "./library";
+import {
+  entryFormats,
+  entryStatuses,
+  fetchProviderCover,
+  refreshItem,
+} from "./library";
 
 /**
  * The drift assertion for the client half of the domain contract.
@@ -80,6 +85,23 @@ describe("provider-refresh error messages", () => {
     );
     await expect(refreshItem(3)).rejects.toThrow(
       "Provider refresh failed; your metadata was not changed",
+    );
+  });
+
+  it("reports why a cover fetch failed, the same way", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          error: {
+            code: "cover_unavailable",
+            message: "The provider has no cover for this item",
+          },
+        }),
+        { status: 422 },
+      ),
+    );
+    await expect(fetchProviderCover(3)).rejects.toThrow(
+      "The provider has no cover for this item",
     );
   });
 });

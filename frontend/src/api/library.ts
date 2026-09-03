@@ -314,6 +314,28 @@ export async function refreshItem(
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
+/**
+ * Install a cover from the item's own provider, and nothing else.
+ *
+ * `Refresh from provider` already does this as a side effect, but only after
+ * overwriting every other field and behind a confirmation dialog — the wrong
+ * shape for the one case this exists for: a cover that never installed (a
+ * transient failure, a since-fixed outage) and nothing else wrong.
+ */
+export async function fetchProviderCover(
+  itemId: number,
+): Promise<LibraryEntry["item"]> {
+  const response = await fetch(`/api/items/${itemId}/cover/fetch`, {
+    method: "POST",
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw new Error(
+      await providerErrorMessage(response, "Cover could not be fetched"),
+    );
+  return response.json() as Promise<LibraryEntry["item"]>;
+}
+
 export async function replaceCover(
   itemId: number,
   cover: File,

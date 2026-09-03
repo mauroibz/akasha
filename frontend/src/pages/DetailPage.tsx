@@ -11,6 +11,7 @@ import {
   patchEntry,
   patchItem,
   refreshItem,
+  fetchProviderCover,
   chooseCover,
   replaceCover,
 } from "@/api/library";
@@ -292,6 +293,23 @@ export function DetailPage() {
               Choose a cover
             </Button>
           )}
+          {/* The domain with no cover chooser has one provider's cover, not a list
+              of editions to pick from — so the action a missing one needs is
+              "try that provider again", not "overwrite everything" (which is what
+              `Refresh from provider` does, behind a confirmation, for a much
+              larger reason). Offered only where it can do something: an item
+              with no provider source at all has nowhere to fetch a cover from. */}
+          {!item.cover_url &&
+            !choosesCovers(item.type, itemTypes.data) &&
+            item.sources.some((source) => source.is_primary) && (
+              <Button
+                variant="secondary"
+                className="mt-3 w-full"
+                onClick={() => update.mutate(() => fetchProviderCover(item.id))}
+              >
+                Fetch cover
+              </Button>
+            )}
           <div className="mt-3 block text-sm">
             <Label htmlFor="replace-cover">Replace cover</Label>
             <Input

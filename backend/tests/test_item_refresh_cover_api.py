@@ -208,3 +208,110 @@ async def test_a_corrected_creator_sort_name_is_owner_data_and_outlives_a_refres
     # Clearing it is how the owner goes back to the automatic value.
     assert cleared.json()["creator_sort"] == "Author, Provider"
     assert "creator_sort_override" not in cleared.json()
+
+
+class CoverOnlyProvider:
+    """A provider whose `fetch` reports a cover but different metadata each call.
+
+    The difference is the assertion: `fetch_cover` must install the cover and
+    leave the title/metadata exactly as they were, unlike `refresh`.
+    """
+
+    name = "openlibrary"
+    item_type = "book"
+
+    def __init__(self, *, cover_url: str | None) -> None:
+        self.cover_url = cover_url
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="A title fetch_cover must not write",
+            subtitle=None,
+            creators=("Someone fetch_cover must not write",),
+            year=1999,
+            cover_url=self.cover_url,
+            identifiers={},
+            language=None,
+            metadata={"publisher": "Not written by fetch_cover"},
+        )
+
+
+@pytest.mark.anyio
+async def test_a_missing_cover_can_be_fetched_without_touching_metadata(
+    tmp_path: Path,
+) -> None:
+    # No cover at add time — the scenario this endpoint exists for: an install that
+    # failed (or, here, was never offered) at add time, with nothing else wrong.
+    provider = CoverOnlyProvider(cover_url=None)
+
+    async def cover_handler(_request: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, headers={"content-type": "image/png"}, content=image_bytes())
+
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {provider.name: provider}
+        app.state.provider_client = httpx.AsyncClient(transport=httpx.MockTransport(cover_handler))
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries", json={"source": "openlibrary", "source_id": "OL1M"}
+            )
+            item_id = created.json()["entry"]["item_id"]
+            before = await client.patch(
+                f"/api/items/{item_id}",
+                json={"title": "Kept title", "metadata": {"publisher": "Owner's correction"}},
+            )
+            assert before.json().get("cover_url") is None
+            # The provider now has a cover to offer — a since-fixed outage, in effect.
+            provider.cover_url = "https://covers.openlibrary.org/b/id/12345-L.jpg"
+            fetched = await client.post(f"/api/items/{item_id}/cover/fetch")
+    assert fetched.status_code == 200
+    assert fetched.json()["title"] == "Kept title"
+    assert fetched.json()["metadata"]["publisher"] == "Owner's correction"
+    assert fetched.json()["cover_url"] is not None
+
+
+@pytest.mark.anyio
+async def test_fetching_a_cover_the_provider_does_not_have_reports_why(
+    tmp_path: Path,
+) -> None:
+    provider = CoverOnlyProvider(cover_url=None)
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {provider.name: provider}
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries", json={"source": "openlibrary", "source_id": "OL1M"}
+            )
+            item_id = created.json()["entry"]["item_id"]
+            fetched = await client.post(f"/api/items/{item_id}/cover/fetch")
+    assert fetched.status_code == 422
+    assert fetched.json()["error"]["code"] == "cover_unavailable"
+
+
+@pytest.mark.anyio
+async def test_fetching_a_cover_for_an_item_with_no_provider_source_is_refused(
+    tmp_path: Path,
+) -> None:
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        created = await client.post(
+            "/api/entries",
+            json={
+                "manual": {"item_type": "book", "title": "Manual entry"},
+                "idempotency_key": "manual-cover-fetch",
+            },
+        )
+        item_id = created.json()["entry"]["item_id"]
+        fetched = await client.post(f"/api/items/{item_id}/cover/fetch")
+    assert fetched.status_code == 422
+    assert fetched.json()["error"]["code"] == "provider_disabled"

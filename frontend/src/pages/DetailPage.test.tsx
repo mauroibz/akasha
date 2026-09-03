@@ -461,6 +461,110 @@ describe("DetailPage", () => {
     ).toBeVisible();
   });
 
+  it("offers to fetch a missing cover where there is no chooser, and installs it", async () => {
+    const albumTypes = [
+      {
+        id: "album",
+        label: "Album",
+        fields: [],
+        statuses: [
+          { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+        ],
+        default_status: "owned",
+        entry_fields: [],
+        entry_field_labels: {},
+        formats: [],
+        entry_panel_label: "Your copy",
+        chooses_covers: false,
+      },
+    ];
+    const album = {
+      ...entry,
+      status: "owned",
+      formats: ["vinyl"],
+      item: {
+        ...entry.item,
+        type: "album",
+        title: "Discovery",
+        metadata: {},
+        sources: [
+          { source: "musicbrainz", source_id: "mb-1", is_primary: true },
+        ],
+      },
+    };
+    const request = mockApi(
+      async (input, init) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(albumTypes));
+        if (url.endsWith("/cover/fetch") && init?.method === "POST")
+          return new Response(
+            JSON.stringify({ ...album.item, cover_url: "/api/items/3/cover" }),
+          );
+      },
+      { fallback: album },
+    );
+    renderPage();
+    await screen.findByRole("heading", { name: "Discovery" });
+
+    expect(screen.queryByRole("button", { name: "Choose a cover" })).toBeNull();
+    const fetchButton = screen.getByRole("button", { name: "Fetch cover" });
+    const user = userEvent.setup();
+    await user.click(fetchButton);
+
+    await waitFor(() =>
+      expect(request).toHaveBeenCalledWith(
+        "/api/items/3/cover/fetch",
+        expect.objectContaining({ method: "POST" }),
+      ),
+    );
+  });
+
+  it("offers no Fetch cover button to an item with no provider source", async () => {
+    const albumTypes = [
+      {
+        id: "album",
+        label: "Album",
+        fields: [],
+        statuses: [
+          { value: "owned", label: "Owned", choosable: true, hotkey: "o" },
+        ],
+        default_status: "owned",
+        entry_fields: [],
+        entry_field_labels: {},
+        formats: [],
+        entry_panel_label: "Your copy",
+        chooses_covers: false,
+      },
+    ];
+    const manualAlbum = {
+      ...entry,
+      status: "owned",
+      formats: ["vinyl"],
+      item: {
+        ...entry.item,
+        type: "album",
+        title: "Homemade",
+        metadata: {},
+        sources: [],
+      },
+    };
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(albumTypes));
+      },
+      { fallback: manualAlbum },
+    );
+    renderPage();
+    await screen.findByRole("heading", { name: "Homemade" });
+
+    expect(screen.queryByRole("button", { name: "Fetch cover" })).toBeNull();
+  });
+
   it("keeps a book's reading data, the half DEC-057 did not touch", async () => {
     mockApi(
       async (input) => {

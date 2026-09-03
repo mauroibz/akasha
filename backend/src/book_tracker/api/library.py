@@ -880,16 +880,8 @@ async def delete_attachment(item_id: int, attachment_id: int, request: Request) 
 )
 async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> ItemResponse:
     library = LibraryService(request.app.state.engine)
-    source, source_id = library.primary_source(item_id)
-    provider = request.app.state.providers.get(source)
-    if provider is None:
-        raise LibraryError("provider_disabled", "Metadata provider is not enabled", status_code=422)
-    try:
-        payload = await provider.fetch(source_id)
-    except Exception as error:
-        raise LibraryError(
-            "provider_failure", "Metadata could not be fetched", status_code=502
-        ) from error
+    provider, source_id = _primary_provider(request, library, item_id)
+    payload = await _fetch_from_provider(provider, source_id)
     metadata = dict(payload.metadata)
     metadata["creators"] = list(payload.creators)
     # The same domain question the add path asks (DEC-125): a provider may report a
@@ -902,18 +894,6 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
         and declares_field(refreshed_domain, "language")
     ):
         metadata["language"] = payload.language
-    prepared = None
-    cover_urls = ([payload.cover_url] if payload.cover_url else []) + list(
-        payload.cover_fallback_urls
-    )
-    for cover_url in cover_urls:
-        try:
-            prepared = await prepare_cover(
-                request.app.state.provider_client, cover_url, request.app.state.data_dir
-            )
-            break
-        except CoverError:
-            prepared = None
     refreshed = library.overwrite_provider_fields(
         item_id,
         {
@@ -923,16 +903,85 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
             "metadata": metadata,
         },
     )
-    if prepared is not None:
+    if await _install_cover_from_payload(request, payload, item_id):
+        refreshed = library.get_item(item_id)
+    return ItemResponse.model_validate(refreshed)
+
+
+def _primary_provider(request: Request, library: LibraryService, item_id: int) -> tuple[Any, str]:
+    """The provider and source id a refresh or cover fetch reads from.
+
+    Shared so the two actions refuse on the same two conditions, the same way:
+    an item with no provider source, or one whose source names a provider this
+    deployment does not have enabled.
+    """
+    source, source_id = library.primary_source(item_id)
+    provider = request.app.state.providers.get(source)
+    if provider is None:
+        raise LibraryError("provider_disabled", "Metadata provider is not enabled", status_code=422)
+    return provider, source_id
+
+
+async def _fetch_from_provider(provider: Any, source_id: str) -> Any:
+    try:
+        return await provider.fetch(source_id)
+    except Exception as error:
+        raise LibraryError(
+            "provider_failure", "Metadata could not be fetched", status_code=502
+        ) from error
+
+
+async def _install_cover_from_payload(request: Request, payload: Any, item_id: int) -> bool:
+    """Try each cover url the payload offers, in order; install the first that works.
+
+    Returns whether one was installed, so a caller that only touched the cover
+    (`fetch_cover`) knows whether to report `cover_unavailable`, and a caller that
+    also wrote other fields (`refresh_item`) knows whether to re-read the item.
+    """
+    cover_urls = ([payload.cover_url] if payload.cover_url else []) + list(
+        payload.cover_fallback_urls
+    )
+    for cover_url in cover_urls:
+        try:
+            prepared = await prepare_cover(
+                request.app.state.provider_client, cover_url, request.app.state.data_dir
+            )
+        except CoverError:
+            continue
         try:
             install_cover(prepared, request.app.state.data_dir, item_id)
-            DomainRepository(request.app.state.engine).set_cover_path(
-                item_id, f"covers/{item_id}.jpg"
-            )
-            refreshed = library.get_item(item_id)
         except CoverError:
-            pass
-    return ItemResponse.model_validate(refreshed)
+            continue
+        DomainRepository(request.app.state.engine).set_cover_path(item_id, f"covers/{item_id}.jpg")
+        return True
+    return False
+
+
+@router.post(
+    "/items/{item_id}/cover/fetch",
+    response_model=ItemResponse,
+    response_model_exclude_none=True,
+    responses=ERRORS,
+)
+async def fetch_cover(item_id: int, request: Request) -> ItemResponse:
+    """Install a cover from the item's own primary provider, and nothing else.
+
+    `Refresh from provider` already does this as a side effect, but only after
+    overwriting every other provider-managed field and behind a confirmation
+    dialog — the wrong shape for the one case this exists for: a cover that
+    never installed at add time (a transient fetch failure, a since-fixed
+    provider outage) and nothing else about the record is wrong. Nothing here
+    is destructive, so unlike refresh it needs no confirmation and no
+    `overwrite` flag.
+    """
+    library = LibraryService(request.app.state.engine)
+    provider, source_id = _primary_provider(request, library, item_id)
+    payload = await _fetch_from_provider(provider, source_id)
+    if not await _install_cover_from_payload(request, payload, item_id):
+        raise LibraryError(
+            "cover_unavailable", "The provider has no cover for this item", status_code=422
+        )
+    return ItemResponse.model_validate(library.get_item(item_id))
 
 
 @router.get("/shelves", response_model=list[ShelfResponse])
