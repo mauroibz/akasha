@@ -25,7 +25,7 @@ test("live provider editions add with metadata and cached covers", async ({
   for (const book of books) {
     await page.goto("/");
     await page.getByRole("searchbox").fill(book.query);
-    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("button", { name: "Search", exact: true }).click();
     const result = page
       .getByRole("button", { name: book.author })
       .filter({ hasText: /Edition year:\s*\d{4}/ })

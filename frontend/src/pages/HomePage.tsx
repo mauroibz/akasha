@@ -622,126 +622,135 @@ export function HomePage() {
           className="h-11 shrink-0 rounded-full px-6"
           onClick={searchTheWeb}
         >
-          Add
+          Search
         </Button>
       </section>
-      <section
-        aria-label="Library controls"
-        className="mt-3 flex flex-wrap items-center gap-3"
-      >
-        <Select
-          value={`${filters.sort}:${filters.order}`}
-          onValueChange={(value) => {
-            const [sort, order] = value.split(":") as [SortKey, "asc" | "desc"];
-            updateFilters({ sort, order });
-          }}
+      {/* Hidden exactly when the library has nothing for the current query: sort,
+          shelf, format and view apply to rows that are not on screen, and a reader
+          who searched the web because their own library came up empty gets those
+          results sooner without a row of now-meaningless controls above them. */}
+      {!(filters.query && firstPage?.items.length === 0) && (
+        <section
+          aria-label="Library controls"
+          className="mt-3 flex flex-wrap items-center gap-3"
         >
-          <SelectTrigger
-            aria-label="Sort library"
-            className="h-11 w-auto gap-2 rounded-full bg-surface"
+          <Select
+            value={`${filters.sort}:${filters.order}`}
+            onValueChange={(value) => {
+              const [sort, order] = value.split(":") as [
+                SortKey,
+                "asc" | "desc",
+              ];
+              updateFilters({ sort, order });
+            }}
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            {Object.entries(sortLabels).flatMap(([key, label]) => [
-              <SelectItem key={`${key}:desc`} value={`${key}:desc`}>
-                {label} ↓
-              </SelectItem>,
-              <SelectItem key={`${key}:asc`} value={`${key}:asc`}>
-                {label} ↑
-              </SelectItem>,
-            ])}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.shelves[0] ?? allShelves}
-          onValueChange={(value) =>
-            updateFilters({ shelves: value === allShelves ? [] : [value] })
-          }
-        >
-          <SelectTrigger
-            aria-label="Filter by shelf"
-            className="h-11 w-auto gap-2 rounded-full bg-surface"
+            <SelectTrigger
+              aria-label="Sort library"
+              className="h-11 w-auto gap-2 rounded-full bg-surface"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {Object.entries(sortLabels).flatMap(([key, label]) => [
+                <SelectItem key={`${key}:desc`} value={`${key}:desc`}>
+                  {label} ↓
+                </SelectItem>,
+                <SelectItem key={`${key}:asc`} value={`${key}:asc`}>
+                  {label} ↑
+                </SelectItem>,
+              ])}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.shelves[0] ?? allShelves}
+            onValueChange={(value) =>
+              updateFilters({ shelves: value === allShelves ? [] : [value] })
+            }
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={allShelves}>All shelves</SelectItem>
-            {shelves.map((shelf) => (
-              <SelectItem key={shelf.id} value={shelf.slug}>
-                {shelf.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        <Select
-          value={filters.formats[0] ?? allFormats}
-          onValueChange={(value) =>
-            updateFilters({
-              formats: value === allFormats ? [] : [value as EntryFormat],
-            })
-          }
-        >
-          <SelectTrigger
-            aria-label="Filter by format"
-            className="h-11 w-auto gap-2 rounded-full bg-surface"
+            <SelectTrigger
+              aria-label="Filter by shelf"
+              className="h-11 w-auto gap-2 rounded-full bg-surface"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={allShelves}>All shelves</SelectItem>
+              {shelves.map((shelf) => (
+                <SelectItem key={shelf.id} value={shelf.slug}>
+                  {shelf.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select
+            value={filters.formats[0] ?? allFormats}
+            onValueChange={(value) =>
+              updateFilters({
+                formats: value === allFormats ? [] : [value as EntryFormat],
+              })
+            }
           >
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={allFormats}>All formats</SelectItem>
-            {/* One entry per distinct format, not one per domain that declares it:
+            <SelectTrigger
+              aria-label="Filter by format"
+              className="h-11 w-auto gap-2 rounded-full bg-surface"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value={allFormats}>All formats</SelectItem>
+              {/* One entry per distinct format, not one per domain that declares it:
                 `digital` belongs to books and records both, and listing it twice
                 gave two options with the same value and the same count. The filter
                 itself spans domains, so a flat list is what it actually does. */}
-            {formatChoices.map((format) => (
-              <SelectItem key={format.value} value={format.value}>
-                {format.label}{" "}
-                {firstPage?.facets.format_counts[format.value] ?? 0}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        {/* The fourth filter, in the row of filters.
+              {formatChoices.map((format) => (
+                <SelectItem key={format.value} value={format.value}>
+                  {format.label}{" "}
+                  {firstPage?.facets.format_counts[format.value] ?? 0}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {/* The fourth filter, in the row of filters.
             It was a row of chips of its own -- one whole row of chrome above the
             library for the vocabulary the tab already names. `shownDomains` is at
             most one domain, and empty only until the registry answers, so this
             renders exactly when there is a vocabulary to render. */}
-        {shownDomains.map((type) => (
-          <StatusFilter
-            key={type.id}
-            statuses={type.statuses}
-            counts={firstPage?.facets.status_counts_by_type?.[type.id] ?? {}}
-            value={filters.statuses}
-            onChange={(statuses) => updateFilters({ statuses })}
-          />
-        ))}
-        <div
-          className="flex rounded-full bg-surface p-1"
-          aria-label="Library view"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Grid view"
-            aria-pressed={view === "grid"}
-            className="rounded-full aria-pressed:bg-surface-raised"
-            onClick={() => setLibraryView("grid")}
+          {shownDomains.map((type) => (
+            <StatusFilter
+              key={type.id}
+              statuses={type.statuses}
+              counts={firstPage?.facets.status_counts_by_type?.[type.id] ?? {}}
+              value={filters.statuses}
+              onChange={(statuses) => updateFilters({ statuses })}
+            />
+          ))}
+          <div
+            className="flex rounded-full bg-surface p-1"
+            aria-label="Library view"
           >
-            Grid
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-label="Table view"
-            aria-pressed={view === "table"}
-            className="rounded-full aria-pressed:bg-surface-raised"
-            onClick={() => setLibraryView("table")}
-          >
-            Table
-          </Button>
-        </div>
-      </section>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Grid view"
+              aria-pressed={view === "grid"}
+              className="rounded-full aria-pressed:bg-surface-raised"
+              onClick={() => setLibraryView("grid")}
+            >
+              Grid
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-label="Table view"
+              aria-pressed={view === "table"}
+              className="rounded-full aria-pressed:bg-surface-raised"
+              onClick={() => setLibraryView("table")}
+            >
+              Table
+            </Button>
+          </div>
+        </section>
+      )}
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole
@@ -835,9 +844,19 @@ export function HomePage() {
           data-web-results=""
           className="mt-12"
         >
-          <h2 id="web-results-title" className="text-xl font-semibold">
-            From the web
-          </h2>
+          <div className="flex flex-wrap items-baseline justify-between gap-3">
+            <h2 id="web-results-title" className="text-xl font-semibold">
+              From the web
+            </h2>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full"
+              onClick={() => clearSearch({ refocus: true })}
+            >
+              Clear
+            </Button>
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">
             Not in your library. Results for “{web.query}”.
           </p>

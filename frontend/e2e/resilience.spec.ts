@@ -99,7 +99,7 @@ test("a degraded provider is named on the add screen", async ({ page }) => {
   await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
   await page.goto("/");
   await page.getByRole("searchbox").fill("rayuela");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   const notice = page
     .getByRole("status")
     .filter({ hasText: /fewer providers/i });

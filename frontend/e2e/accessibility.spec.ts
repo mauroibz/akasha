@@ -227,7 +227,7 @@ test("the library with web results on it has no serious accessibility violations
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
   await page.getByRole("searchbox").fill("something not held");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(
     page.getByRole("region", { name: "From the web" }),
   ).toBeVisible();
@@ -265,7 +265,7 @@ test("the add dialog over the library has no serious accessibility violations", 
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
   await page.getByRole("searchbox").fill("something not held");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await page.getByRole("button", { name: /Web result/ }).click();
   await expect(page.getByRole("dialog")).toBeVisible();
   await expectNoSeriousViolations(page, "library (add dialog)");
@@ -482,7 +482,7 @@ test("the degraded provider notice has no serious accessibility violations", asy
   await seedLibrary(page, 1);
   await page.goto("/");
   await page.getByRole("searchbox").fill("rayuela");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(page.getByText(/running on fewer providers/i)).toBeVisible();
   await expectNoSeriousViolations(page, "add (degraded providers)");
 });

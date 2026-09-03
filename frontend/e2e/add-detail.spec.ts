@@ -118,7 +118,7 @@ test("work resolution exposes edition choice and exact duplicate navigates", asy
   // the move onto `/` (Sprint 029, inventory row 2).
   await page.goto("/");
   await page.getByRole("searchbox").fill("https://openlibrary.org/works/OL1W");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(
     page.getByRole("button", { name: /Rayuela.*1963/i }),
   ).toBeVisible();
@@ -231,13 +231,11 @@ test("search results stagger in and selecting one keeps the keyboard flow", asyn
 
   const samples = await sampleAnimations(page, async () => {
     await page.getByRole("searchbox").fill("Rayuela");
-    await page.getByRole("button", { name: "Add", exact: true }).click();
+    await page.getByRole("button", { name: "Search", exact: true }).click();
     await expect(
       page.getByRole("button", { name: /None of these/ }),
     ).toBeVisible();
-    await expect(
-      page.locator("section[aria-labelledby='web-results-title'] button"),
-    ).toHaveCount(7);
+    await expect(page.locator("[data-results-grid] button")).toHaveCount(7);
   });
   // Six results plus the manual fallback, each entering in its own right. The
   // fallback is part of the list, so it arrives last rather than ahead of the

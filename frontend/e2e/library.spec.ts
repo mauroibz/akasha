@@ -156,7 +156,7 @@ test("the 10,000-entry library keeps its DOM budget with web results on the page
   const before = await library.boundingBox();
 
   await page.getByRole("searchbox").fill("something not held");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "From the web" }),
   ).toBeVisible();
@@ -209,7 +209,7 @@ test("web results are a region beside the feed, not rows inside it", async ({
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
   await page.getByRole("searchbox").fill("something not held");
-  await page.getByRole("button", { name: "Add", exact: true }).click();
+  await page.getByRole("button", { name: "Search", exact: true }).click();
 
   const results = page.getByRole("region", { name: "From the web" });
   await expect(results).toBeVisible();
@@ -220,6 +220,64 @@ test("web results are a region beside the feed, not rows inside it", async ({
   );
   await expect(results.locator("[aria-posinset]")).toHaveCount(0);
   await expect(results.getByRole("article")).toHaveCount(0);
+});
+
+test("a settled search with nothing local collapses the controls, and Clear restores them", async ({
+  page,
+}) => {
+  // Unlike the override button above, this is the automatic path (DEC-065): the
+  // library itself has to report zero rows for the query, so the mock answers
+  // by `q` rather than serving the same fixed page regardless of it.
+  // Ids above 2, so none of these carry `entry()`'s deliberately hostile
+  // long-title fixture — this test cares about the search bar, not layout.
+  const seeded = Array.from({ length: 3 }, (_, index) => entry(index + 3));
+  await page.route("**/api/entries?**", async (route) => {
+    const url = new URL(route.request().url());
+    const matches = url.searchParams.get("q") ? [] : seeded;
+    await route.fulfill({
+      json: {
+        items: matches,
+        next_cursor: null,
+        total: matches.length,
+        facets: {
+          status_counts: { read: seeded.length, unsorted: 0 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    });
+  });
+  await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Sort library" }),
+  ).toBeVisible();
+
+  await page.getByRole("searchbox").fill("nothing owned matches this");
+  await expect(
+    page.getByText(/nothing in your library matches/i),
+  ).toBeVisible();
+  const results = page.getByRole("region", { name: "From the web" });
+  await expect(results).toBeVisible();
+
+  // Sort, shelf and format applied to rows that are not on screen — gone with
+  // them, not sitting above an empty list and a results region below it.
+  await expect(
+    page.getByRole("combobox", { name: "Sort library" }),
+  ).toBeHidden();
+
+  await results.getByRole("button", { name: "Clear" }).click();
+  await expect(results).toBeHidden();
+  await expect(page.getByRole("searchbox")).toHaveValue("");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Sort library" }),
+  ).toBeVisible();
 });
 
 test("the edition year line is readable at every width, not clipped", async ({

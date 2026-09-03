@@ -867,7 +867,7 @@ test("Add searches immediately even when the library has the answer", async () =
   expect(bar.providerCalls()).toEqual([]);
 
   // AC3: the override for "I know this is a different edition".
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() => expect(bar.providerCalls().length).toBe(1));
   expect(bar.providerCalls()[0]).toContain("/api/search?");
 });
@@ -880,13 +880,13 @@ test("a pasted ISBN and a pasted URL both take the resolve route", async () => {
   const box = await screen.findByRole("searchbox");
 
   await user.type(box, "9780441013593");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() => expect(bar.providerCalls().length).toBe(1));
   expect(bar.providerCalls()[0]).toContain("/api/search/resolve?url=");
 
   await user.clear(box);
   await user.type(box, "https://openlibrary.org/books/OL1M");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() => expect(bar.providerCalls().length).toBe(2));
   expect(bar.providerCalls()[1]).toContain("/api/search/resolve?url=");
 });
@@ -901,7 +901,7 @@ test("the domain chosen picks the providers as well as the rows", async () => {
   // would have to ask which domain a search means.
   await user.click(screen.getByRole("radio", { name: "Record" }));
   await user.type(await screen.findByRole("searchbox"), "Kind of Blue");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
 
   await waitFor(() => expect(bar.providerCalls().length).toBe(1));
   expect(bar.providerCalls()[0]).toContain("type=album");
@@ -1141,11 +1141,11 @@ test("row 12+13: a superseded search is aborted, and a late response cannot land
   // Two presses of Add for two different strings: the first request must be
   // cancelled rather than left running against a rate-limited free API.
   await user.type(box, "Dune Messiah");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() => expect(bar.signals.length).toBe(1));
   await user.clear(box);
   await user.type(box, "Children of Dune");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await waitFor(() => expect(bar.signals.length).toBe(2));
 
   expect(bar.signals[0].aborted).toBe(true);
@@ -1181,7 +1181,7 @@ test("deliverable 5: the shortcuts belong to the surface the reader is standing 
 
   // Two lists on one page. On a library row the digits still score it.
   await user.type(await screen.findByRole("searchbox"), "Rayuela");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await screen.findByRole("heading", { name: "From the web" });
   const row = screen.getByRole("article", { name: "Rayuela" });
   act(() => row.focus());
@@ -1233,7 +1233,7 @@ test("the clear button empties the bar, the query and the web results in one pre
   expect(screen.queryByRole("button", { name: /clear search/i })).toBeNull();
 
   await user.type(box, "Dune Messiah");
-  await user.click(screen.getByRole("button", { name: "Add" }));
+  await user.click(screen.getByRole("button", { name: "Search" }));
   await screen.findByRole("heading", { name: "From the web" });
 
   await user.click(screen.getByRole("button", { name: /clear search/i }));
@@ -1267,6 +1267,32 @@ test("a query that misses says so in one line, not in a screen of empty state", 
     await screen.findByText(/nothing in your library matches/i),
   ).toBeVisible();
   expect(screen.queryByText("Your library is waiting")).toBeNull();
+  // Sort, shelf and format apply to rows that are not on screen, so they go
+  // away with the rows rather than sitting above an admittedly empty list.
+  expect(screen.queryByRole("combobox", { name: "Sort library" })).toBeNull();
+});
+
+test("a missed local search collapses the library controls, and Clear brings them back", async () => {
+  stubBar({ libraryHasRows: false });
+  renderPage();
+  await screen.findByText("Rayuela");
+  const user = userEvent.setup();
+
+  expect(screen.getByRole("combobox", { name: "Sort library" })).toBeVisible();
+
+  await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
+  await screen.findByText(/nothing in your library matches/i);
+  await screen.findByText("From the web");
+
+  expect(screen.queryByRole("combobox", { name: "Sort library" })).toBeNull();
+
+  await user.click(screen.getByRole("button", { name: "Clear" }));
+
+  expect(screen.queryByText("From the web")).toBeNull();
+  expect(await screen.findByRole("searchbox")).toHaveValue("");
+  expect(
+    await screen.findByRole("combobox", { name: "Sort library" }),
+  ).toBeVisible();
 });
 
 test("the status filter is one control beside the others, and it holds more than one status", async () => {

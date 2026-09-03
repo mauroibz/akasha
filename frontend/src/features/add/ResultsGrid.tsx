@@ -39,6 +39,7 @@ export function ResultsGrid(props: ResultsGridProps) {
       // A `section` is only a landmark once it has an accessible name, so leaving
       // this undefined is what keeps the grid inside the host's region.
       aria-label={props.label}
+      data-results-grid=""
       className="mt-6 grid gap-3 sm:grid-cols-2"
       key={resultsKey}
       initial="hidden"
