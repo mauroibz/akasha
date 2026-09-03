@@ -91,11 +91,13 @@ def imdb_identity(candidate: SearchCandidate) -> str | None:
     return f"imdb:{value}" if _IMDB_ID.fullmatch(value) else None
 
 
-# The provider order is declared now — `("wikidata-series", "tvmaze")` — so Sprint 050
-# adds an adapter and not a declaration. The Wikidata adapter's registered name is
-# `wikidata-series` rather than `wikidata`: the provider catalog is keyed by name, and
-# a second adapter answering to `wikidata` would silently replace the movie domain's.
-SERIES_IDENTITY = IdentityStrategy(imdb_identity, ("wikidata-series", "tvmaze"))
+# The provider order is declared now — `("wikidata-series", "tvmaze", "cinemeta-series")`
+# — so Sprint 050 added TVmaze and Sprint 063 added Cinemeta as adapters, not
+# declarations. The Wikidata adapter's registered name is `wikidata-series` rather than
+# `wikidata`: the provider catalog is keyed by name, and a second adapter answering to
+# `wikidata` would silently replace the movie domain's (likewise `cinemeta-series`
+# beside the movie domain's `cinemeta`).
+SERIES_IDENTITY = IdentityStrategy(imdb_identity, ("wikidata-series", "tvmaze", "cinemeta-series"))
 
 # A series added by hand arrives complete from one fetch. This declaration is for the
 # rows Sprints 051–053's importers create: an IMDb id, a title and a year, with every
@@ -103,7 +105,7 @@ SERIES_IDENTITY = IdentityStrategy(imdb_identity, ("wikidata-series", "tvmaze"))
 # the only identity both exports carry (docs/series-domain-viability.md).
 SERIES_ENRICHMENT = EnrichmentSpec(
     identity_kinds=("imdb",),
-    provider_order=("wikidata-series", "tvmaze"),
+    provider_order=("wikidata-series", "tvmaze", "cinemeta-series"),
     # `creators`, `genres` and the description were present on 13/13 measured entities.
     # `seasons` (absent 2/13) and `cast` (absent 4/13, every animated series) are
     # deliberately absent: naming a legitimately empty field re-queues its row on

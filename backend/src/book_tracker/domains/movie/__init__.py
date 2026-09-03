@@ -74,25 +74,27 @@ MOVIE_FORMATS = (
     FormatSpec("dvd", "DVD"),
 )
 
-_Q_ID = re.compile(r"Q[1-9][0-9]*")
+_IMDB_ID = re.compile(r"tt[0-9]{7,10}")
 
 
-def wikidata_identity(candidate: SearchCandidate) -> str | None:
-    """A film's identity is its Wikidata `Q` id, and nothing weaker.
+def imdb_identity(candidate: SearchCandidate) -> str | None:
+    """A film's identity is its IMDb id, and nothing weaker (Sprint 063).
 
-    One provider means no cross-provider merge is possible today, so this key exists for
-    a different reason than anime's: it is what stops the *same* provider's two rows for
-    `Suspiria` — Dario Argento's in 1977 and Luca Guadagnino's in 2018 — from being
-    treated as one record. Title and year are not identity even between two films that
-    share both, which is exactly the pair Sprint 045 measured.
-
-    `None` for an unusable row, which merges with nothing rather than on a weaker key.
+    This supersedes DEC-098's Wikidata `Q` id without rewriting it: that key's premise
+    was that one provider meant no cross-provider merge was possible at all, which
+    Sprint 063's second adapter removes. The protection it actually gave — two films
+    sharing a title and year staying two rows, the `Suspiria` 1977/2018 pair Sprint 045
+    measured — is preserved by IMDb instead, mirroring `series.imdb_identity`: each
+    carries its own id, and the ~2% of films with a TMDB id and no IMDb id (DEC-103)
+    stay separate rows rather than collapsing, because `None` merges with nothing.
     """
-    value = str(candidate.source_id or "").strip()
-    return f"wikidata:{value}" if _Q_ID.fullmatch(value) else None
+    value = str(candidate.identifiers.get("imdb") or "").strip()
+    return f"imdb:{value}" if _IMDB_ID.fullmatch(value) else None
 
 
-MOVIE_IDENTITY = IdentityStrategy(wikidata_identity, ("wikidata",))
+# Wikidata primary, Cinemeta a fallback and never displacing it (DEC-109: a ranking,
+# not a strict order).
+MOVIE_IDENTITY = IdentityStrategy(imdb_identity, ("wikidata", "cinemeta"))
 
 # A film added through search arrives complete from one fetch, as an album does. This
 # declaration is for the row Sprint 047's Letterboxd export creates: a short URI, a title
@@ -104,7 +106,7 @@ MOVIE_ENRICHMENT = EnrichmentSpec(
     # its `tt` id, and neither carries the other's (DEC-113). Wikidata resolves both
     # exactly, so this is one lookup reachable two ways rather than two lookups.
     identity_kinds=("letterboxd", "imdb"),
-    provider_order=("wikidata",),
+    provider_order=("wikidata", "cinemeta"),
     # All five films Sprint 045 fetched carried director, genre and duration claims.
     # `cast` and `description` are deliberately absent from this rule: a legitimately
     # empty field named here re-queues its row on every backfill for ever.

@@ -107,14 +107,14 @@ def test_progress_counts_episodes_against_the_measured_total() -> None:
 def test_identity_is_the_imdb_id() -> None:
     assert DOMAIN.identity.identity_key(_candidate({"imdb": "tt0944947"})) == "imdb:tt0944947"
     assert DOMAIN.identity.identity_key(_candidate({})) is None
-    assert DOMAIN.identity.source_preference == ("wikidata-series", "tvmaze")
+    assert DOMAIN.identity.source_preference == ("wikidata-series", "tvmaze", "cinemeta-series")
 
 
 def test_enrichment_is_keyed_on_imdb_and_excludes_measured_gaps() -> None:
     spec = DOMAIN.enrichment
     assert spec is not None
     assert spec.identity_kinds == ("imdb",)
-    assert spec.provider_order == ("wikidata-series", "tvmaze")
+    assert spec.provider_order == ("wikidata-series", "tvmaze", "cinemeta-series")
     # Measured 2026-08-31: `seasons` absent on 2/13, `cast` on 4/13 (every animated
     # series). Naming either re-queues those rows on every backfill for ever.
     assert "seasons" not in spec.completeness_fields

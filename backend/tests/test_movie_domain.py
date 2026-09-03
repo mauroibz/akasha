@@ -9,7 +9,7 @@ shapes a reader will paste.
 
 from book_tracker.domain.providers import SearchCandidate
 from book_tracker.domain.spec import UrlMatch
-from book_tracker.domains.movie import DOMAIN, recognize_movie_url, wikidata_identity
+from book_tracker.domains.movie import DOMAIN, imdb_identity, recognize_movie_url
 
 
 def candidate(**overrides: object) -> SearchCandidate:
@@ -22,7 +22,7 @@ def candidate(**overrides: object) -> SearchCandidate:
         "creators": ("Dario Argento",),
         "year": 1977,
         "cover_url": None,
-        "identifiers": {},
+        "identifiers": {"imdb": "tt0076786"},
         "language": None,
         "metadata": {},
     }
@@ -94,26 +94,29 @@ class TestVocabulary:
 
 
 class TestIdentity:
-    """One provider, so a merge is not the question a key answers here.
+    """Sprint 063: the identity moved from the Wikidata `Q` id to the IMDb id, mirroring
+    `series.imdb_identity`, now that a second provider makes a real merge possible.
 
-    What it does answer is the one Sprint 045 measured as the real hazard: two films
-    called `Suspiria`, forty-one years apart, must never collapse into one row.
+    What it must still answer is the hazard Sprint 045 measured: two films called
+    `Suspiria`, forty-one years apart, must never collapse into one row.
     """
 
-    def test_a_q_id_is_the_key(self) -> None:
-        assert wikidata_identity(candidate()) == "wikidata:Q546900"
+    def test_an_imdb_id_is_the_key(self) -> None:
+        assert imdb_identity(candidate()) == "imdb:tt0076786"
 
     def test_two_films_sharing_a_title_keep_separate_keys(self) -> None:
-        remake = candidate(source_id="Q28123467", year=2018)
-        assert wikidata_identity(candidate()) != wikidata_identity(remake)
+        remake = candidate(source_id="Q28123467", year=2018, identifiers={"imdb": "tt1034415"})
+        assert imdb_identity(candidate()) != imdb_identity(remake)
 
-    def test_a_row_with_no_q_id_merges_with_nothing(self) -> None:
-        """`None` means never merge, which is the safe answer for an unusable row."""
-        assert wikidata_identity(candidate(source_id="")) is None
-        assert wikidata_identity(candidate(source_id="not-a-q-id")) is None
+    def test_a_row_with_no_imdb_id_merges_with_nothing(self) -> None:
+        """`None` means never merge, which is the safe answer for an unusable row —
+        and is what keeps the ~2% of films with a TMDB id and no IMDb id (DEC-103)
+        from collapsing into each other."""
+        assert imdb_identity(candidate(identifiers={})) is None
+        assert imdb_identity(candidate(identifiers={"imdb": "not-an-imdb-id"})) is None
 
-    def test_the_only_source_it_prefers_is_the_one_it_has(self) -> None:
-        assert DOMAIN.identity.source_preference == ("wikidata",)
+    def test_it_prefers_wikidata_over_the_cinemeta_fallback(self) -> None:
+        assert DOMAIN.identity.source_preference == ("wikidata", "cinemeta")
 
 
 class TestRecognizer:
@@ -200,9 +203,9 @@ class TestEnrichment:
         assert DOMAIN.enrichment is not None
         assert DOMAIN.enrichment.identity_kinds == ("letterboxd", "imdb")
 
-    def test_wikidata_answers_that_key(self) -> None:
+    def test_wikidata_then_cinemeta_answer_that_key(self) -> None:
         assert DOMAIN.enrichment is not None
-        assert DOMAIN.enrichment.provider_order == ("wikidata",)
+        assert DOMAIN.enrichment.provider_order == ("wikidata", "cinemeta")
 
     def test_incompleteness_names_only_claims_every_measured_film_carried(self) -> None:
         """`cast` and `description` are legitimately absent on real films, and a rule
