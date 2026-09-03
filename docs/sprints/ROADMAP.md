@@ -1170,22 +1170,32 @@ Scope is narrower than the export: the 157 saved albums, not the 406 reachable t
 and track roll-up opt-in and threshold-gated because it adds only 41 albums of which just 9 have
 more than one saved track.
 
-### Sprint 066 — Insights: rankings from the fields items already declare **[PLANNED, not yet written]**
+### [Sprint 066 — Insights: rankings from the fields items already declare](066-insights.md) **[PLANNED — ships as v1.6.0]**
 
-Aggregate entry scores by a keyed field — creators, genres, publisher, label, network — and rank
-the keys, so "top authors" and "top artists" fall out of the ratings already recorded instead of
-each becoming a domain with its own identity, providers and screens. The domain spec already
-publishes the groupable surface, and `creator_sort_override` already solves the name-variant
-problem, so perhaps a quarter of the backend is standing.
+Ask the library a question it already has the answer to — which authors you rate highest, which
+bands you own most of, which decade you keep going back to — and get a ranked answer from the
+fields those items already declare. Authors for books, bands for music, directors for films,
+genres, publishers, labels, networks, and `year`/`decade` in every domain. So "top authors" falls
+out of the ratings already recorded instead of an Author becoming a domain with its own identity,
+providers and screens — the entity DEC-052 and DEC-077 twice declined to create.
 
-Three things make it a real sprint rather than an endpoint: `multiplicity == "many"` is the wrong
-rule for which fields are keyable (`tracklist` is a list of rows; `catalog_number` is near-unique),
-so `FieldSpec` needs an explicit `groupable`; ranking needs a statistic that does not put one 10
-above eleven 9s; and `Various Artists` — 7 albums in the owner's Spotify library — is not an artist.
+**Per-domain by design.** A ranking never merges keys across domains: that would need the
+cross-domain creator identity this feature exists to avoid. The same key name in five domains
+produces five separate rankings.
 
-**Deliberately sequenced after 065**, because the feature is worth exactly as much as the share of
-entries carrying a score, and that is unmeasurable against a 13-entry library. The Spotify import
-produces the dataset this would be judged by.
+Three things make it a sprint rather than an endpoint. `multiplicity == "many"` is the wrong rule
+for what is keyable — `tracklist` is a list of rows, `catalog_number` is near-unique — so
+`FieldSpec` gains an explicit `groupable`. `year` is a column and not metadata, so it and `decade`
+are built-in keys every domain offers. And ranking needs a statistic that does not put one 10 above
+eleven 9s.
+
+It ships **two** metrics on purpose: count as well as mean score. Score density is the feature's
+one unmeasured risk — the live library holds 13 entries — and a count ranking is meaningful the day
+a library is imported. If scores turn out sparse the feature is diminished, not useless.
+
+**Sequenced after 065**, which produces the first real dataset to judge it against. The release at
+its end is **v1.6.0, the insights release** — a `v1.Y` feature release in the shape of v1.5, not a
+2.0: `v2` is a reserved term in this product for auth, multiuser and sharing (product spec §9).
 
 ## Future epics, after this plan
 
