@@ -4820,3 +4820,47 @@ both changes, against 1 of 3 before the second.
 - **Consequences:** Plan revision unchanged at 35. `FINAL_SPRINT` unchanged at 65. Sprint
   065 (insights) is now unblocked by a real dataset — 157 albums with artists attached —
   exactly what its own viability measurement asked for before being built.
+
+## DEC-129 — A cover-only fetch, and the provider's own refusal reaches the owner
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Context:** owner-directed UI polish, made after using the Sprint 064 build directly,
+  outside the numbered roadmap sequence — `docs/agent/state.json` is untouched by this
+  entry and still points at Sprint 065. Reported: the search bar's override button read
+  "Add", the library did not shrink out of the way when a search reached the web because
+  it had nothing locally, there was no quick way to clear a web search back out, and
+  `Refresh from provider` failed on an item whose only real problem was a missing cover,
+  with a message that did not say why.
+- **Decision, the message:** `refreshItem` threw one canned sentence
+  ("Provider refresh failed; your metadata was not changed") for every refusal, even
+  though the server already names the real cause in its response body — `provider_failure`
+  and `provider_disabled` are different problems needing different next steps.
+  `providerErrorMessage()` reads the server's `error.user_message` or `error.message` and
+  falls back to the canned sentence only when the body cannot be parsed at all.
+- **Decision, the cover:** `Refresh from provider` installs a cover as a side effect, but
+  only after overwriting every other provider-managed field and behind an "Overwrite
+  cached metadata?" confirmation — the wrong shape for the one case that needed it: a
+  cover that never installed at add time (a transient fetch failure, a since-fixed
+  outage) with nothing else about the record wrong. `POST /items/{id}/cover/fetch` shares
+  `refresh_item`'s primary-source and provider-fetch plumbing (extracted into
+  `_primary_provider`/`_fetch_from_provider`/`_install_cover_from_payload`) but writes
+  only the cover, needs no confirmation (nothing is overwritten), and reports
+  `cover_unavailable` when the provider genuinely has none. Offered on the detail page
+  only where there is no cover chooser and no cover already installed — a domain with a
+  chooser already has a path to the same end.
+- **Decision, the search bar:** the override button is renamed "Search" (it searches the
+  web regardless of what is already in the library, not "add" anything by itself). When
+  the library has nothing for the settled query, `Library controls` (sort, shelf, format,
+  the grid/table toggle) apply to rows that are not on screen and now hide with them,
+  rather than sitting above an empty message and a results region below it. A "Clear"
+  button beside "From the web" undoes the whole search — query, results, and the
+  controls' collapse — as an alternative to the small clear glyph inside the search box
+  itself, which already did the same thing but was easy to miss.
+- **Verified:** `make check`, `make test` (1,289 backend + 203 frontend), and the full
+  Playwright e2e suite, including a new real-browser test that fetches a cover for an
+  album (no chooser), gets a typed refusal from the server, then succeeds and shows the
+  installed image. Not walked through in a container — nothing here touches persistence,
+  migrations, or deployment shape.
+- **Consequences:** none. No sprint file, roadmap entry, or `state.json` field changes;
+  Sprint 065 remains next and unaffected.

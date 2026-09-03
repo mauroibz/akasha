@@ -3801,3 +3801,38 @@ so 050 adds an adapter, not a declaration.
   attached) before being built.
 - Next: Sprint 065 is ready to claim per the normal `work` protocol. This session
   did not start it.
+
+## 2026-09-03 — UI mini-sprint: search bar copy/collapse/clear, and a cover-only fetch (complete, out of sequence)
+- Done: on branch `ui-search-refresh-mini-sprint` (off Sprint 064's close, not off
+  `sprint-065-insights` — Sprint 065 is untouched and still next). Not a numbered
+  sprint: the owner asked for four small fixes directly after using the Sprint 064
+  build, and `docs/agent/state.json` was left exactly as Sprint 064's closure set
+  it. See DEC-129 for the full account.
+  1. `refreshItem` surfaces the server's own refusal (`error.message`/
+     `user_message`) instead of one canned sentence for every cause.
+  2. `POST /items/{id}/cover/fetch` installs a cover from the item's primary
+     provider without touching any other field and without the confirmation
+     `Refresh from provider` needs — offered on the detail page only where there
+     is no cover chooser and no cover already installed.
+  3. The search bar's override button reads "Search", not "Add".
+  4. `Library controls` (sort/shelf/format/grid-table) hide when the library has
+     nothing for the settled query; a "Clear" button beside "From the web" undoes
+     the whole search.
+- Verified: `make check`, `make test` (1,289 backend + 203 frontend), full
+  Playwright e2e (109/109 passed this run, 2 pre-existing skips) including a new
+  real-browser test for the cover-fetch flow (refusal, then success, on an album
+  with no chooser). `frontend/openapi.json` regenerated for the new endpoint.
+- Deviations: e2e specs referencing the old "Add" button name (7 files) and one
+  locator counting buttons inside the web-results section (broken by the new
+  persistent Clear button, fixed with a `data-results-grid` attribute scoping the
+  count to the staggered result cards) needed updating alongside the rename —
+  recorded here rather than treated as silent test churn.
+- Dead ends: a stray `test-results/.last-run.json` (gitignored Playwright output,
+  written to the repo root rather than under `frontend/`) tripped
+  `validate_project.py`'s text-hygiene check after a local run — not a defect in
+  this change, just an artifact this session generated and removed rather than
+  investigating why the script does not exempt it (`GENERATED_DIRECTORIES` does
+  not list `test-results`; worth fixing sometime, not here).
+- Blocked/open: nothing. Not merged to `main`, not pushed.
+- Next: Sprint 065 (insights) is still ready to claim; this branch is a sibling
+  to `sprint-064-spotify-album-import`, not a continuation of it.
