@@ -2,7 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
-import { stubItemTypes } from "./seed";
+import { albumItemType, stubItemTypes } from "./seed";
 
 const candidate = (id: string, year: number) => ({
   source: "openlibrary",
@@ -214,6 +214,85 @@ test("choosing a cover from another edition installs it and closes the chooser",
 
   await expect(page.getByRole("dialog")).toBeHidden();
   expect(chosen).toBe("https://covers.openlibrary.org/b/id/15103989-L.jpg");
+});
+
+test("fetches a missing cover for a domain with no chooser, and reports why one fails", async ({
+  page,
+}) => {
+  // A domain with no editions to choose from (`chooses_covers: false`, unlike
+  // the book fixture above) offers "Fetch cover" instead, where there is no
+  // cover installed and the item has something to fetch one from.
+  await page.route("**/api/shelves", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/item-types", (route) =>
+    route.fulfill({ json: [{ ...albumItemType, chooses_covers: false }] }),
+  );
+  const album = {
+    id: 7,
+    item_id: 3,
+    status: "owned",
+    score: null,
+    notes: null,
+    date_added: "2026-07-22",
+    date_started: null,
+    date_finished: null,
+    reread_count: 0,
+    score_provisional: false,
+    suggested_status: null,
+    item: {
+      id: 3,
+      type: "album",
+      title: "Discovery",
+      subtitle: null,
+      year: 2001,
+      creator: "Daft Punk",
+      cover_path: null,
+      metadata: {},
+      identifiers: {},
+      sources: [{ source: "musicbrainz", source_id: "mb-1", is_primary: true }],
+    },
+    shelves: [],
+    formats: ["vinyl"],
+  };
+  let coverFetched = false;
+  await page.route("**/api/entries/7", (route) =>
+    route.fulfill({
+      json: coverFetched
+        ? { ...album, item: { ...album.item, cover_url: "/api/items/3/cover" } }
+        : album,
+    }),
+  );
+  await page.goto("/books/7");
+  await expect(page.getByRole("heading", { name: "Discovery" })).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Choose a cover" }),
+  ).toBeHidden();
+
+  await page.route("**/api/items/3/cover/fetch", (route) =>
+    route.fulfill({
+      status: 422,
+      json: {
+        error: {
+          code: "cover_unavailable",
+          message: "The provider has no cover for this item",
+        },
+      },
+    }),
+  );
+  await page.getByRole("button", { name: "Fetch cover" }).click();
+  await expect(page.getByRole("alert")).toContainText(
+    "The provider has no cover for this item",
+  );
+
+  await page.route("**/api/items/3/cover/fetch", (route) => {
+    coverFetched = true;
+    return route.fulfill({
+      json: { ...album.item, cover_url: "/api/items/3/cover" },
+    });
+  });
+  await page.getByRole("button", { name: "Fetch cover" }).click();
+  await expect(
+    page.locator("aside img[alt='Cover of Discovery']"),
+  ).toHaveAttribute("src", "/api/items/3/cover");
 });
 
 test("search results stagger in and selecting one keeps the keyboard flow", async ({
