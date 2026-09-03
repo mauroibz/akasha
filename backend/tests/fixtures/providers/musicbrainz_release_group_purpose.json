@@ -1,0 +1,1095 @@
+{
+  "secondary-types": [],
+  "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+  "id": "2660de3c-56db-4bd1-bf99-e162c68e5712",
+  "secondary-type-ids": [],
+  "title": "Purpose",
+  "artist-credit": [
+    {
+      "name": "Justin Bieber",
+      "joinphrase": "",
+      "artist": {
+        "type": "Person",
+        "sort-name": "Bieber, Justin",
+        "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+        "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+        "disambiguation": "",
+        "country": "CA",
+        "name": "Justin Bieber"
+      }
+    }
+  ],
+  "releases": [
+    {
+      "release-events": [
+        {
+          "date": "2015-11-12",
+          "area": {
+            "iso-3166-1-codes": [
+              "XE"
+            ],
+            "type-id": null,
+            "type": null,
+            "sort-name": "Europe",
+            "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+            "name": "Europe",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "id": "006391a6-3f99-4d38-9185-50633c43fe38",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "",
+            "name": "Justin Bieber",
+            "country": "CA",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+          }
+        }
+      ],
+      "packaging": "Jewel Case",
+      "status": "Official",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "disambiguation": "deluxe edition",
+      "quality": "normal",
+      "date": "2015-11-12",
+      "barcode": "602547576439",
+      "title": "Purpose",
+      "country": "XE"
+    },
+    {
+      "id": "15329bea-514d-4d36-8cce-80e2c87bd19a",
+      "release-events": [
+        {
+          "date": "2015-11-13",
+          "area": {
+            "type": null,
+            "sort-name": "Algeria",
+            "id": "28242750-534a-326b-8ed6-1b03dfb88cd0",
+            "iso-3166-1-codes": [
+              "DZ"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "name": "Algeria"
+          }
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "id": "65f4f7a6-d3c1-3a6b-a726-85e147d555b7",
+            "type": null,
+            "sort-name": "Bahrain",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "BH"
+            ],
+            "disambiguation": "",
+            "name": "Bahrain"
+          }
+        },
+        {
+          "area": {
+            "sort-name": "Egypt",
+            "type": null,
+            "id": "8e0551f2-95c2-3cc0-a0a9-f2d344f10667",
+            "iso-3166-1-codes": [
+              "EG"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "name": "Egypt"
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "iso-3166-1-codes": [
+              "ID"
+            ],
+            "type-id": null,
+            "id": "d3a68bd0-7419-3f99-a5bd-204d6e057089",
+            "sort-name": "Indonesia",
+            "type": null,
+            "name": "Indonesia",
+            "disambiguation": ""
+          }
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "id": "2e40127e-0b8a-3a01-bfbc-58c7fcdba532",
+            "sort-name": "Jordan",
+            "type": null,
+            "iso-3166-1-codes": [
+              "JO"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "name": "Jordan"
+          }
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "id": "f03f2625-dc7d-38b2-a058-4e9ca0e10424",
+            "sort-name": "Kuwait",
+            "type": null,
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "KW"
+            ],
+            "disambiguation": "",
+            "name": "Kuwait"
+          }
+        },
+        {
+          "area": {
+            "disambiguation": "",
+            "name": "Lebanon",
+            "id": "8138206e-5786-3f86-a53b-19a7303e7419",
+            "sort-name": "Lebanon",
+            "type": null,
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "LB"
+            ]
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "area": {
+            "iso-3166-1-codes": [
+              "MY"
+            ],
+            "type-id": null,
+            "id": "305d19c7-c040-349c-8d5f-6ac75d2d2a09",
+            "type": null,
+            "sort-name": "Malaysia",
+            "name": "Malaysia",
+            "disambiguation": ""
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "MA"
+            ],
+            "sort-name": "Morocco",
+            "type": null,
+            "id": "b84d8617-249a-3a06-849d-fc5c25e2249b",
+            "name": "Morocco",
+            "disambiguation": ""
+          }
+        },
+        {
+          "area": {
+            "iso-3166-1-codes": [
+              "OM"
+            ],
+            "type-id": null,
+            "id": "7ccdff29-2e00-3e50-9520-b9ea1e918bc2",
+            "sort-name": "Oman",
+            "type": null,
+            "name": "Oman",
+            "disambiguation": ""
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "id": "7d24dd34-a00f-37a1-8307-f2ef1dd3dbcd",
+            "type": null,
+            "sort-name": "Palestine",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "PS"
+            ],
+            "disambiguation": "",
+            "name": "Palestine"
+          }
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "QA"
+            ],
+            "sort-name": "Qatar",
+            "type": null,
+            "id": "348dcc25-7bb6-3f75-8739-97eabc84a330",
+            "name": "Qatar",
+            "disambiguation": ""
+          }
+        },
+        {
+          "area": {
+            "name": "Saudi Arabia",
+            "disambiguation": "",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "SA"
+            ],
+            "id": "9705be0d-51fb-3990-8726-ec9f56c66ba0",
+            "type": null,
+            "sort-name": "Saudi Arabia"
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "area": {
+            "iso-3166-1-codes": [
+              "SG"
+            ],
+            "type-id": null,
+            "sort-name": "Singapore",
+            "type": null,
+            "id": "aa344640-fd57-3960-afb4-84d0d3b69d3d",
+            "name": "Singapore",
+            "disambiguation": ""
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "date": "2015-11-13",
+          "area": {
+            "disambiguation": "",
+            "name": "Tunisia",
+            "sort-name": "Tunisia",
+            "type": null,
+            "id": "58955071-67c1-3491-8dec-48d28f824bda",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TN"
+            ]
+          }
+        },
+        {
+          "area": {
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "AE"
+            ],
+            "type": null,
+            "sort-name": "United Arab Emirates",
+            "id": "fe40c648-ba74-3e17-b768-58181d5ee563",
+            "name": "United Arab Emirates",
+            "disambiguation": ""
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "packaging": "None",
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "",
+            "country": "CA",
+            "name": "Justin Bieber",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+          }
+        }
+      ],
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "disambiguation": "deluxe",
+      "status": "Official",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "date": "2015-11-13",
+      "barcode": "602547706669",
+      "quality": "normal",
+      "country": "DZ",
+      "title": "Purpose"
+    },
+    {
+      "quality": "normal",
+      "date": "2015-11-13",
+      "barcode": "602547576439",
+      "title": "Purpose",
+      "country": "AR",
+      "id": "e35af483-ddf3-488c-bc8d-a7e44991e1fb",
+      "release-events": [
+        {
+          "area": {
+            "iso-3166-1-codes": [
+              "AR"
+            ],
+            "type-id": null,
+            "id": "0df04709-c7d8-3b55-a6ea-f3e5069a947b",
+            "type": null,
+            "sort-name": "Argentina",
+            "name": "Argentina",
+            "disambiguation": ""
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Justin Bieber",
+          "artist": {
+            "name": "Justin Bieber",
+            "country": "CA",
+            "disambiguation": "",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "sort-name": "Bieber, Justin",
+            "type": "Person"
+          }
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "packaging": "Jewel Case",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "status": "Official",
+      "disambiguation": "Deluxe"
+    },
+    {
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "status": "Official",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Justin Bieber",
+          "artist": {
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "CA",
+            "name": "Justin Bieber"
+          }
+        }
+      ],
+      "packaging": "Jewel Case",
+      "release-events": [
+        {
+          "area": {
+            "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+            "sort-name": "Europe",
+            "type": null,
+            "iso-3166-1-codes": [
+              "XE"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "name": "Europe"
+          },
+          "date": "2015-11-13"
+        },
+        {
+          "area": {
+            "sort-name": "United States",
+            "type": null,
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "name": "United States"
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "id": "d330bfdb-f623-47be-8718-08aec1949748",
+      "title": "Purpose",
+      "country": "XE",
+      "quality": "normal",
+      "barcode": "602547576415",
+      "date": "2015-11-13"
+    },
+    {
+      "id": "d65aa38f-600a-4ce3-a56c-1ed2e27b176b",
+      "release-events": [
+        {
+          "area": {
+            "name": "Japan",
+            "disambiguation": "",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+            "sort-name": "Japan",
+            "type": null
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "packaging": "None",
+      "artist-credit": [
+        {
+          "artist": {
+            "country": "CA",
+            "name": "Justin Bieber",
+            "disambiguation": "",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e"
+          },
+          "joinphrase": "",
+          "name": "Justin Bieber"
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "Japanese Deluxe Edition / Mastered for iTunes",
+      "status": "Official",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "barcode": "00602547656506",
+      "date": "2015-11-13",
+      "quality": "normal",
+      "country": "JP",
+      "title": "Purpose"
+    },
+    {
+      "release-events": [
+        {
+          "area": {
+            "disambiguation": "",
+            "name": "Türkiye",
+            "id": "d3be28b4-41f7-3752-8a05-ed45e1d1e492",
+            "sort-name": "Türkiye",
+            "type": null,
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "TR"
+            ]
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "id": "674ecc85-236b-4a0a-80a9-6f3b3fb4c0e7",
+      "disambiguation": "",
+      "status": "Official",
+      "packaging-id": null,
+      "packaging": null,
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Justin Bieber",
+          "artist": {
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "name": "Justin Bieber",
+            "country": "CA",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "barcode": "602547676412",
+      "date": "2015-11-13",
+      "quality": "normal",
+      "country": "TR",
+      "title": "Purpose"
+    },
+    {
+      "id": "4eaf0312-83a6-4cc8-8c8d-1e2bc365ea36",
+      "release-events": [
+        {
+          "area": {
+            "disambiguation": "",
+            "name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": null,
+            "sort-name": "United States",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "type-id": null
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "disambiguation": "Deluxe, 24-bit / 44.1 kHz",
+      "status": "Official",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "packaging": "None",
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "name": "Justin Bieber",
+            "country": "CA"
+          },
+          "joinphrase": "",
+          "name": "Justin Bieber"
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "barcode": "0602547587442",
+      "date": "2015-11-13",
+      "quality": "normal",
+      "country": "US",
+      "title": "Purpose"
+    },
+    {
+      "id": "844e924b-edb7-4054-b387-cf180ca12b9e",
+      "release-events": [
+        {
+          "date": "2015-11-13",
+          "area": {
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States",
+            "type": null,
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "name": "United States",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "packaging": "Jewel Case",
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "name": "Justin Bieber",
+            "country": "CA"
+          },
+          "name": "Justin Bieber",
+          "joinphrase": ""
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "disambiguation": "deluxe edition",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "status": "Official",
+      "barcode": "602547576439",
+      "date": "2015-11-13",
+      "quality": "normal",
+      "country": "US",
+      "title": "Purpose"
+    },
+    {
+      "release-events": [
+        {
+          "date": "2015-11-13",
+          "area": {
+            "type": null,
+            "sort-name": "United States",
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "type-id": null,
+            "disambiguation": "",
+            "name": "United States"
+          }
+        }
+      ],
+      "id": "b92609ef-405d-4697-b84b-ef0edca7732b",
+      "status": "Official",
+      "packaging-id": null,
+      "disambiguation": "deluxe Walmart exclusive",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "name": "Justin Bieber",
+            "country": "CA"
+          },
+          "name": "Justin Bieber",
+          "joinphrase": ""
+        }
+      ],
+      "packaging": null,
+      "quality": "normal",
+      "date": "2015-11-13",
+      "barcode": "602547613912",
+      "title": "Purpose",
+      "country": "US"
+    },
+    {
+      "id": "c693e88d-a48c-4d10-83eb-6b3b94c0f61f",
+      "release-events": [
+        {
+          "date": "2015-11-13",
+          "area": {
+            "name": "United States",
+            "disambiguation": "",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States",
+            "type": null,
+            "id": "489ce91b-6658-3307-9877-795b68554c98"
+          }
+        }
+      ],
+      "disambiguation": "",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "status": "Official",
+      "packaging": "Jewel Case",
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "sort-name": "Bieber, Justin",
+            "type": "Person",
+            "name": "Justin Bieber",
+            "country": "CA",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "barcode": "602547634085",
+      "date": "2015-11-13",
+      "quality": "normal",
+      "country": "US",
+      "title": "Purpose"
+    },
+    {
+      "quality": "normal",
+      "barcode": "00602547587428",
+      "date": "2015-11-13",
+      "title": "Purpose",
+      "country": "XW",
+      "id": "a6aaae93-32dd-4cb0-b818-9bcc6046d129",
+      "release-events": [
+        {
+          "area": {
+            "disambiguation": "",
+            "name": "[Worldwide]",
+            "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+            "sort-name": "[Worldwide]",
+            "type": null,
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "XW"
+            ]
+          },
+          "date": "2015-11-13"
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "CA",
+            "name": "Justin Bieber"
+          }
+        }
+      ],
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "packaging": "None",
+      "status": "Official",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "disambiguation": "deluxe"
+    },
+    {
+      "title": "Purpose",
+      "country": "XW",
+      "quality": "normal",
+      "barcode": "602547587411",
+      "date": "2015-11-13",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Justin Bieber",
+          "artist": {
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "CA",
+            "name": "Justin Bieber"
+          }
+        }
+      ],
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "packaging": "None",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "status": "Official",
+      "disambiguation": "iTunes",
+      "id": "6f5c8267-7509-4e85-95c1-98a91c30a139",
+      "release-events": [
+        {
+          "area": {
+            "iso-3166-1-codes": [
+              "XW"
+            ],
+            "type-id": null,
+            "sort-name": "[Worldwide]",
+            "type": null,
+            "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+            "name": "[Worldwide]",
+            "disambiguation": ""
+          },
+          "date": "2015-11-13"
+        }
+      ]
+    },
+    {
+      "title": "Purpose",
+      "country": "XW",
+      "quality": "normal",
+      "date": "2015-11-13",
+      "barcode": "602547663962",
+      "status": "Official",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "disambiguation": "deluxe",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Justin Bieber",
+          "artist": {
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "sort-name": "Bieber, Justin",
+            "type": "Person",
+            "name": "Justin Bieber",
+            "country": "CA",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "packaging": "None",
+      "release-events": [
+        {
+          "date": "2015-11-13",
+          "area": {
+            "name": "[Worldwide]",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "XW"
+            ],
+            "type-id": null,
+            "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+            "type": null,
+            "sort-name": "[Worldwide]"
+          }
+        }
+      ],
+      "id": "43e5f577-2eda-46ba-a7e3-7d22767262ac"
+    },
+    {
+      "packaging": "None",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "country": "CA",
+            "name": "Justin Bieber",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "disambiguation": "24-bit / 44.1 kHz",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "status": "Official",
+      "release-events": [
+        {
+          "area": null,
+          "date": "2015-11-13"
+        }
+      ],
+      "id": "9e908e87-d67b-406a-80bf-9e9e910b769d",
+      "country": null,
+      "title": "Purpose",
+      "barcode": "602547587435",
+      "date": "2015-11-13",
+      "quality": "normal"
+    },
+    {
+      "release-events": [
+        {
+          "date": "2015",
+          "area": {
+            "iso-3166-1-codes": [
+              "CA"
+            ],
+            "type-id": null,
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "type": null,
+            "sort-name": "Canada",
+            "name": "Canada",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "id": "59cf1d54-2cb4-483d-9abf-cd4c15d5cb36",
+      "packaging": "Jewel Case",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "name": "Justin Bieber",
+          "artist": {
+            "disambiguation": "",
+            "name": "Justin Bieber",
+            "country": "CA",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+          }
+        }
+      ],
+      "disambiguation": "",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "status": "Official",
+      "date": "2015",
+      "barcode": "602547613912",
+      "quality": "normal",
+      "country": "CA",
+      "title": "Purpose"
+    },
+    {
+      "release-events": [
+        {
+          "date": "2015",
+          "area": {
+            "disambiguation": "",
+            "name": "New Zealand",
+            "sort-name": "New Zealand",
+            "type": null,
+            "id": "8524c7d9-f472-3890-a458-f28d5081d9c4",
+            "iso-3166-1-codes": [
+              "NZ"
+            ],
+            "type-id": null
+          }
+        }
+      ],
+      "id": "03d2119f-c699-4b31-a91b-adbc1ccb6ee2",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "",
+            "country": "CA",
+            "name": "Justin Bieber",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df"
+          }
+        }
+      ],
+      "packaging": "Jewel Case",
+      "status": "Official",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "disambiguation": "deluxe",
+      "quality": "normal",
+      "date": "2015",
+      "barcode": "602547576439",
+      "title": "Purpose",
+      "country": "NZ"
+    },
+    {
+      "status": "Official",
+      "packaging-id": "ec27701a-4a22-37f4-bfac-6616e0f9750a",
+      "disambiguation": "",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "language": "eng",
+        "script": "Qaaa"
+      },
+      "artist-credit": [
+        {
+          "artist": {
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "type": "Person",
+            "sort-name": "Bieber, Justin",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "country": "CA",
+            "name": "Justin Bieber",
+            "disambiguation": ""
+          },
+          "name": "Justin Bieber",
+          "joinphrase": ""
+        }
+      ],
+      "packaging": "Jewel Case",
+      "release-events": [
+        {
+          "area": {
+            "sort-name": "Japan",
+            "type": null,
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "disambiguation": "",
+            "name": "Japan"
+          },
+          "date": "2017-04-12"
+        }
+      ],
+      "id": "e49fe077-ebb9-4139-8fb3-0f18228a8174",
+      "title": "Purpose + Super Hits",
+      "country": "JP",
+      "quality": "normal",
+      "barcode": "4988031219416",
+      "date": "2017-04-12"
+    },
+    {
+      "disambiguation": "Dolby Atmos mix, deluxe",
+      "status": "Official",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "packaging": "None",
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "joinphrase": "",
+          "artist": {
+            "sort-name": "Bieber, Justin",
+            "type": "Person",
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "type-id": "b6e035f4-3ce9-331c-97df-83397230b0df",
+            "disambiguation": "",
+            "country": "CA",
+            "name": "Justin Bieber"
+          }
+        }
+      ],
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "id": "70855856-24e7-437c-aa32-321debe762c5",
+      "release-events": [
+        {
+          "date": "2022-03-16",
+          "area": null
+        }
+      ],
+      "country": null,
+      "title": "Purpose",
+      "barcode": "00602445644681",
+      "date": "2022-03-16",
+      "quality": "normal"
+    }
+  ],
+  "first-release-date": "2015-11-12",
+  "disambiguation": "",
+  "primary-type": "Album"
+}

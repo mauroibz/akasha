@@ -1,0 +1,871 @@
+{
+  "disambiguation": "",
+  "title": "Plastic Beach",
+  "primary-type": "Album",
+  "releases": [
+    {
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "artist": {
+            "name": "Gorillaz",
+            "type": "Group",
+            "disambiguation": "virtual band",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "release-events": [
+        {
+          "date": "2010-03-03",
+          "area": {
+            "type-id": null,
+            "sort-name": "Europe",
+            "iso-3166-1-codes": [
+              "XE"
+            ],
+            "id": "89a675c2-3e37-3518-b83c-418bad59a85a",
+            "name": "Europe",
+            "type": null,
+            "disambiguation": ""
+          }
+        }
+      ],
+      "country": "XE",
+      "title": "Plastic Beach",
+      "quality": "normal",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "date": "2010-03-03",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "e608e272-5721-3a8b-9cfd-cd7ec6583a00",
+      "packaging": "Gatefold Cover",
+      "barcode": "5099962616621",
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "disambiguation": ""
+    },
+    {
+      "packaging-id": "8f931351-d2e2-310f-afc6-37b89ddba246",
+      "disambiguation": "experience edition",
+      "packaging": "Digipak",
+      "barcode": "4988006878105",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "98ea7ed0-5b4a-49e4-9a18-2bef6185c5eb",
+      "quality": "normal",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "date": "2010-03-03",
+      "title": "Plastic Beach",
+      "country": "JP",
+      "release-events": [
+        {
+          "area": {
+            "name": "Japan",
+            "type": null,
+            "disambiguation": "",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "sort-name": "Japan",
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c"
+          },
+          "date": "2010-03-03"
+        }
+      ],
+      "artist-credit": [
+        {
+          "artist": {
+            "disambiguation": "virtual band",
+            "type": "Group",
+            "name": "Gorillaz",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+          },
+          "joinphrase": "",
+          "name": "Gorillaz"
+        }
+      ]
+    },
+    {
+      "disambiguation": "",
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "date": "2010-03-03",
+      "quality": "normal",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "a00fbef0-2a8f-4f68-b787-e8fe10517155",
+      "status": "Official",
+      "barcode": "4988006878112",
+      "packaging": "Gatefold Cover",
+      "title": "Plastic Beach",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "disambiguation": "virtual band",
+            "type": "Group",
+            "name": "Gorillaz"
+          }
+        }
+      ],
+      "release-events": [
+        {
+          "date": "2010-03-03",
+          "area": {
+            "sort-name": "Japan",
+            "iso-3166-1-codes": [
+              "JP"
+            ],
+            "type-id": null,
+            "id": "2db42837-c832-3c27-b4a3-08198f75693c",
+            "type": null,
+            "name": "Japan",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "country": "JP"
+    },
+    {
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "disambiguation": "",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "574166b1-78c0-4061-8781-b699f1e5b575",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "quality": "normal",
+      "date": "2010-03-03",
+      "packaging": "None",
+      "barcode": "5099962865050",
+      "title": "Plastic Beach",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Gorillaz",
+            "country": "GB"
+          }
+        }
+      ],
+      "country": "XW",
+      "release-events": [
+        {
+          "date": "2010-03-03",
+          "area": {
+            "type-id": null,
+            "sort-name": "[Worldwide]",
+            "iso-3166-1-codes": [
+              "XW"
+            ],
+            "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+            "name": "[Worldwide]",
+            "type": null,
+            "disambiguation": ""
+          }
+        }
+      ]
+    },
+    {
+      "release-events": [
+        {
+          "area": {
+            "id": "106e0bec-b638-3b37-b731-f53d507dc00e",
+            "type-id": null,
+            "sort-name": "Australia",
+            "iso-3166-1-codes": [
+              "AU"
+            ],
+            "disambiguation": "",
+            "name": "Australia",
+            "type": null
+          },
+          "date": "2010-03-05"
+        }
+      ],
+      "country": "AU",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "artist": {
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "disambiguation": "virtual band",
+            "type": "Group",
+            "name": "Gorillaz"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "title": "Plastic Beach",
+      "barcode": "5099962686723",
+      "packaging": "Gatefold Cover",
+      "date": "2010-03-05",
+      "quality": "normal",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "id": "cc91709d-4a15-3d62-91e8-25a1464950fd",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "disambiguation": "",
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202"
+    },
+    {
+      "title": "Plastic Beach",
+      "release-events": [
+        {
+          "date": "2010-03-05",
+          "area": {
+            "id": "85752fda-13c4-31a3-bee5-0e5cb1f51dad",
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "DE"
+            ],
+            "sort-name": "Germany",
+            "disambiguation": "",
+            "name": "Germany",
+            "type": null
+          }
+        }
+      ],
+      "country": "DE",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "name": "Gorillaz",
+            "type": "Group",
+            "disambiguation": "virtual band",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+          }
+        }
+      ],
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "disambiguation": "experience edition",
+      "packaging": "Gatefold Cover",
+      "barcode": "5099962616720",
+      "quality": "normal",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "date": "2010-03-05",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "fe267cbc-c3aa-3ae6-9916-455a0bc017cf"
+    },
+    {
+      "title": "Plastic Beach",
+      "release-events": [
+        {
+          "area": {
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "type-id": null,
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ],
+            "disambiguation": "",
+            "name": "United Kingdom",
+            "type": null
+          },
+          "date": "2010-03-08"
+        }
+      ],
+      "country": "GB",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "name": "Gorillaz",
+            "type": "Group",
+            "disambiguation": "virtual band",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+          },
+          "name": "Gorillaz"
+        }
+      ],
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "disambiguation": "experience edition",
+      "packaging": "Gatefold Cover",
+      "barcode": "5099962616720",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "quality": "normal",
+      "date": "2010-03-08",
+      "status": "Official",
+      "id": "28ddf022-0a8a-4ecd-bf18-d80af26c3aff",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe"
+    },
+    {
+      "id": "a63edf19-6437-40e4-aaf2-624ff43f9143",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "date": "2010-03-08",
+      "quality": "normal",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "barcode": null,
+      "packaging": "None",
+      "disambiguation": "deluxe version",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "virtual band",
+            "type": "Group",
+            "name": "Gorillaz",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+          },
+          "name": "Gorillaz"
+        }
+      ],
+      "country": "GB",
+      "release-events": [
+        {
+          "area": {
+            "disambiguation": "",
+            "type": null,
+            "name": "United Kingdom",
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed",
+            "sort-name": "United Kingdom",
+            "iso-3166-1-codes": [
+              "GB"
+            ],
+            "type-id": null
+          },
+          "date": "2010-03-08"
+        }
+      ],
+      "title": "Plastic Beach"
+    },
+    {
+      "date": "2010-03-09",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "quality": "normal",
+      "id": "b08383b8-4384-4516-a4aa-3809968e2563",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "barcode": "5099962754729",
+      "packaging": "Gatefold Cover",
+      "disambiguation": "",
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "name": "Gorillaz",
+            "type": "Group",
+            "disambiguation": "virtual band"
+          }
+        }
+      ],
+      "release-events": [
+        {
+          "date": "2010-03-09",
+          "area": {
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "type-id": null,
+            "sort-name": "Canada",
+            "iso-3166-1-codes": [
+              "CA"
+            ],
+            "disambiguation": "",
+            "name": "Canada",
+            "type": null
+          }
+        }
+      ],
+      "country": "CA",
+      "title": "Plastic Beach"
+    },
+    {
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "disambiguation": "experience edition",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "quality": "normal",
+      "date": "2010-03-09",
+      "status": "Official",
+      "id": "e22e556a-25af-45da-bc60-defee94a7307",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "packaging": "Gatefold Cover",
+      "barcode": "5099962754828",
+      "title": "Plastic Beach",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group"
+          }
+        }
+      ],
+      "release-events": [
+        {
+          "date": "2010-03-09",
+          "area": {
+            "type-id": null,
+            "iso-3166-1-codes": [
+              "CA"
+            ],
+            "sort-name": "Canada",
+            "id": "71bbafaa-e825-3e15-8ca9-017dcad1748b",
+            "name": "Canada",
+            "type": null,
+            "disambiguation": ""
+          }
+        }
+      ],
+      "country": "CA"
+    },
+    {
+      "country": "US",
+      "release-events": [
+        {
+          "date": "2010-03-09",
+          "area": {
+            "name": "United States",
+            "type": null,
+            "disambiguation": "",
+            "type-id": null,
+            "sort-name": "United States",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "id": "489ce91b-6658-3307-9877-795b68554c98"
+          }
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group"
+          }
+        }
+      ],
+      "title": "Plastic Beach",
+      "barcode": "5099962754729",
+      "packaging": "Gatefold Cover",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "e7def36e-04dc-3a80-83c5-4f705c6eab2f",
+      "status": "Official",
+      "date": "2010-03-09",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "quality": "normal",
+      "disambiguation": "",
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202"
+    },
+    {
+      "release-events": [
+        {
+          "date": "2010-03-09",
+          "area": {
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "sort-name": "United States",
+            "type-id": null,
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": null,
+            "name": "United States",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "country": "US",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "artist": {
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "GB",
+            "sort-name": "Gorillaz"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "title": "Plastic Beach",
+      "barcode": "5099962754828",
+      "packaging": "Gatefold Cover",
+      "date": "2010-03-09",
+      "quality": "normal",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "id": "67573821-9b0d-48a9-8651-2a8cdd9382cc",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "disambiguation": "experience edition",
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202"
+    },
+    {
+      "packaging-id": "815b7785-8284-3926-8f04-e48bc6c4d102",
+      "disambiguation": "",
+      "packaging": "Other",
+      "barcode": "5099962616614",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "quality": "normal",
+      "date": "2010-09-13",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "3e2cb919-5c46-4347-80af-d4330b49a2b3",
+      "title": "Plastic Beach",
+      "release-events": [
+        {
+          "area": {
+            "type": null,
+            "name": "United Kingdom",
+            "disambiguation": "",
+            "iso-3166-1-codes": [
+              "GB"
+            ],
+            "sort-name": "United Kingdom",
+            "type-id": null,
+            "id": "8a754a16-0027-3a29-b6d7-2b40ea0481ed"
+          },
+          "date": "2010-09-13"
+        }
+      ],
+      "country": "GB",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "name": "Gorillaz",
+            "type": "Group",
+            "disambiguation": "virtual band",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+          }
+        }
+      ]
+    },
+    {
+      "packaging-id": "e724a489-a7e8-30a1-a17c-30dfd6831202",
+      "disambiguation": "",
+      "packaging": "Gatefold Cover",
+      "barcode": "5099962616607",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "quality": "normal",
+      "date": "2010",
+      "status": "Official",
+      "id": "c6a5a36d-107a-4de1-8736-66e0d3f82eb2",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "title": "Plastic Beach",
+      "release-events": [
+        {
+          "area": {
+            "name": "Russia",
+            "type": null,
+            "disambiguation": "",
+            "type-id": null,
+            "sort-name": "Russia",
+            "iso-3166-1-codes": [
+              "RU"
+            ],
+            "id": "1f1fc3a4-9500-39b8-9f10-f0a465557eef"
+          },
+          "date": "2010"
+        }
+      ],
+      "country": "RU",
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "GB",
+            "sort-name": "Gorillaz"
+          }
+        }
+      ]
+    },
+    {
+      "title": "Plastic Beach",
+      "country": "US",
+      "release-events": [
+        {
+          "date": "2010",
+          "area": {
+            "sort-name": "United States",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "type-id": null,
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "type": null,
+            "name": "United States",
+            "disambiguation": ""
+          }
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "joinphrase": "",
+          "artist": {
+            "type": "Group",
+            "name": "Gorillaz",
+            "disambiguation": "virtual band",
+            "country": "GB",
+            "sort-name": "Gorillaz",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596"
+          }
+        }
+      ],
+      "packaging-id": "f7101ce3-0384-39ce-9fde-fbbd0044d35f",
+      "disambiguation": "",
+      "packaging": "Cardboard/Paper Sleeve",
+      "barcode": "603497913343",
+      "status": "Official",
+      "id": "ecfd35c8-cdb4-4a20-bef9-8530f5feaa7e",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "quality": "normal",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "date": "2010"
+    },
+    {
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "disambiguation": "",
+      "packaging": "None",
+      "barcode": "825646291038",
+      "status": "Official",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "id": "410533c0-f355-4f10-b9a2-871ba2cec532",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "quality": "normal",
+      "date": "2014-04-11",
+      "title": "Plastic Beach",
+      "country": null,
+      "release-events": [
+        {
+          "area": null,
+          "date": "2014-04-11"
+        }
+      ],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group"
+          },
+          "name": "Gorillaz"
+        }
+      ]
+    },
+    {
+      "barcode": "5099962829359",
+      "packaging": "None",
+      "id": "4513f772-f496-46f5-a82d-7ab1f4c59849",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "date": "2014",
+      "quality": "normal",
+      "text-representation": {
+        "language": "eng",
+        "script": "Latn"
+      },
+      "disambiguation": "deluxe version",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "country": null,
+      "release-events": [
+        {
+          "date": "2014",
+          "area": null
+        }
+      ],
+      "artist-credit": [
+        {
+          "name": "Gorillaz",
+          "artist": {
+            "disambiguation": "virtual band",
+            "type": "Group",
+            "name": "Gorillaz",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "sort-name": "Gorillaz",
+            "country": "GB",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b"
+          },
+          "joinphrase": ""
+        }
+      ],
+      "title": "Plastic Beach"
+    },
+    {
+      "disambiguation": "deluxe",
+      "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+      "barcode": null,
+      "packaging": "None",
+      "id": "0c56ce9d-2cd4-4618-b837-02d7543334e7",
+      "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+      "status": "Official",
+      "date": "2025-01-30",
+      "quality": "normal",
+      "text-representation": {
+        "script": "Latn",
+        "language": "eng"
+      },
+      "title": "Plastic Beach",
+      "country": "US",
+      "release-events": [
+        {
+          "date": "2025-01-30",
+          "area": {
+            "type-id": null,
+            "sort-name": "United States",
+            "iso-3166-1-codes": [
+              "US"
+            ],
+            "id": "489ce91b-6658-3307-9877-795b68554c98",
+            "name": "United States",
+            "type": null,
+            "disambiguation": ""
+          }
+        }
+      ],
+      "artist-credit": [
+        {
+          "joinphrase": "",
+          "artist": {
+            "disambiguation": "virtual band",
+            "name": "Gorillaz",
+            "type": "Group",
+            "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+            "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+            "country": "GB",
+            "sort-name": "Gorillaz"
+          },
+          "name": "Gorillaz"
+        }
+      ]
+    }
+  ],
+  "artist-credit": [
+    {
+      "artist": {
+        "id": "e21857d5-3256-4547-afb3-4b6ded592596",
+        "sort-name": "Gorillaz",
+        "country": "GB",
+        "type-id": "e431f5f6-b5d2-343d-8b36-72607fffb74b",
+        "disambiguation": "virtual band",
+        "type": "Group",
+        "name": "Gorillaz"
+      },
+      "joinphrase": "",
+      "name": "Gorillaz"
+    }
+  ],
+  "id": "5a676824-18cd-4f7f-89f0-df21623e2042",
+  "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+  "secondary-type-ids": [],
+  "first-release-date": "2010-03-03",
+  "secondary-types": []
+}

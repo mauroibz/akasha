@@ -1,0 +1,226 @@
+{
+  "created": "2026-09-03T17:11:51.819Z",
+  "count": 1,
+  "offset": 0,
+  "release-groups": [
+    {
+      "id": "2660de3c-56db-4bd1-bf99-e162c68e5712",
+      "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "score": 100,
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "artist-credit-id": "048f16aa-01fa-3a61-97a0-3ff5d88194ee",
+      "count": 18,
+      "title": "Purpose",
+      "first-release-date": "2015-11-12",
+      "primary-type": "Album",
+      "artist-credit": [
+        {
+          "name": "Justin Bieber",
+          "artist": {
+            "id": "e0140a67-e4d1-4f13-8a01-364355bee46e",
+            "name": "Justin Bieber",
+            "sort-name": "Bieber, Justin",
+            "aliases": [
+              {
+                "sort-name": "저스틴 비버",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "Justin Bieber",
+                "locale": "ko_KR",
+                "type": "Artist name",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Justin Beiber",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Justin Beiber",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "ジャスティン・ビーバー",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "ジャスティン・ビーバー",
+                "locale": "ja",
+                "type": "Artist name",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Bieber, Justin Drew",
+                "type-id": "d4dcd0c0-b341-3612-a332-c0ce797b25cf",
+                "name": "Justin Drew Bieber",
+                "locale": null,
+                "type": "Legal name",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              }
+            ]
+          }
+        }
+      ],
+      "releases": [
+        {
+          "id": "006391a6-3f99-4d38-9185-50633c43fe38",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "e49fe077-ebb9-4139-8fb3-0f18228a8174",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose + Super Hits",
+          "status": "Official"
+        },
+        {
+          "id": "d330bfdb-f623-47be-8718-08aec1949748",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "e35af483-ddf3-488c-bc8d-a7e44991e1fb",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "59cf1d54-2cb4-483d-9abf-cd4c15d5cb36",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "70855856-24e7-437c-aa32-321debe762c5",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "9e908e87-d67b-406a-80bf-9e9e910b769d",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "4eaf0312-83a6-4cc8-8c8d-1e2bc365ea36",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "43e5f577-2eda-46ba-a7e3-7d22767262ac",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "15329bea-514d-4d36-8cce-80e2c87bd19a",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "03d2119f-c699-4b31-a91b-adbc1ccb6ee2",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "6f5c8267-7509-4e85-95c1-98a91c30a139",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "c693e88d-a48c-4d10-83eb-6b3b94c0f61f",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "844e924b-edb7-4054-b387-cf180ca12b9e",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "b92609ef-405d-4697-b84b-ef0edca7732b",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "674ecc85-236b-4a0a-80a9-6f3b3fb4c0e7",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "a6aaae93-32dd-4cb0-b818-9bcc6046d129",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        },
+        {
+          "id": "d65aa38f-600a-4ce3-a56c-1ed2e27b176b",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "Purpose",
+          "status": "Official"
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "electronic"
+        },
+        {
+          "count": 3,
+          "name": "pop"
+        },
+        {
+          "count": 1,
+          "name": "hip hop"
+        },
+        {
+          "count": 2,
+          "name": "electropop"
+        },
+        {
+          "count": 3,
+          "name": "dance-pop"
+        },
+        {
+          "count": 1,
+          "name": "pop rock"
+        },
+        {
+          "count": 1,
+          "name": "edm"
+        },
+        {
+          "count": 2,
+          "name": "pop soul"
+        },
+        {
+          "count": 4,
+          "name": "contemporary r&b"
+        },
+        {
+          "count": 2,
+          "name": "tropical house"
+        },
+        {
+          "count": 0,
+          "name": "pop rnb dance"
+        }
+      ]
+    }
+  ]
+}

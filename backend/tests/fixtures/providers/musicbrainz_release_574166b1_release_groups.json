@@ -1,0 +1,51 @@
+{
+  "date": "2010-03-03",
+  "packaging": "None",
+  "cover-art-archive": {
+    "front": true,
+    "artwork": true,
+    "darkened": false,
+    "back": false,
+    "count": 1
+  },
+  "quality": "normal",
+  "id": "574166b1-78c0-4061-8781-b699f1e5b575",
+  "country": "XW",
+  "release-events": [
+    {
+      "date": "2010-03-03",
+      "area": {
+        "disambiguation": "",
+        "sort-name": "[Worldwide]",
+        "type-id": null,
+        "type": null,
+        "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+        "iso-3166-1-codes": [
+          "XW"
+        ],
+        "name": "[Worldwide]"
+      }
+    }
+  ],
+  "text-representation": {
+    "language": "eng",
+    "script": "Latn"
+  },
+  "barcode": "5099962865050",
+  "asin": null,
+  "packaging-id": "119eba76-b343-3e02-a292-f0f00644bb9b",
+  "release-group": {
+    "title": "Plastic Beach",
+    "disambiguation": "",
+    "primary-type": "Album",
+    "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+    "secondary-type-ids": [],
+    "secondary-types": [],
+    "id": "5a676824-18cd-4f7f-89f0-df21623e2042",
+    "first-release-date": "2010-03-03"
+  },
+  "status": "Official",
+  "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+  "disambiguation": "",
+  "title": "Plastic Beach"
+}

@@ -1,0 +1,695 @@
+{
+  "created": "2026-09-03T17:12:01.644Z",
+  "count": 4,
+  "offset": 0,
+  "release-groups": [
+    {
+      "id": "6e335887-60ba-38f0-95af-fae7774336bf",
+      "type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "score": 100,
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "artist-credit-id": "021661c1-84c5-30d7-9bb2-f0766affb734",
+      "count": 18,
+      "title": "In Rainbows",
+      "first-release-date": "2007-10-10",
+      "primary-type": "Album",
+      "artist-credit": [
+        {
+          "name": "Radiohead",
+          "artist": {
+            "id": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            "name": "Radiohead",
+            "sort-name": "Radiohead",
+            "aliases": [
+              {
+                "sort-name": "r/head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "r/head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "电台司令",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "电台司令",
+                "locale": "zh",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "れでぃおへっど",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "レディオヘッド",
+                "locale": "ja",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radiohead & Thom Yorke",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radiohead & Thom Yorke",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radio Head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radio Head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              }
+            ]
+          }
+        }
+      ],
+      "releases": [
+        {
+          "id": "d4e08a8b-375d-474d-b960-9aaad7c04d30",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "2ea2402a-1c7a-4d11-a250-afdf7067d81a",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "55bd8c9d-1230-423e-bf26-77e8d542c5e2",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "e9b0f69e-ee3d-36ed-8c12-f8ee65f87e45",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "219e7d7c-806c-44b3-9972-cdb3614b3411",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "a58f4eb2-9829-37d5-b46c-e8163038e0f5",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "3b408cb5-7d51-4188-b07c-fabcf308cda3",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "cba282c5-dd83-3157-afb6-9af6a5af7709",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "cd061329-348f-46f7-b6c1-7460a88e5edb",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "ea92a194-2d60-35c7-9d56-0e1dba20cd45",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "3e71085d-35ce-4e75-92bf-a5437f80a41f",
+          "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+          "title": "In Rainbows",
+          "status": "Promotion"
+        },
+        {
+          "id": "90cf3f7e-a93a-45e0-8391-8863635ae0d5",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "1475431a-cfd3-43ad-bf09-b3826118446f",
+          "status-id": "518ffc83-5cde-34df-8627-81bff5093d92",
+          "title": "In Rainbows",
+          "status": "Promotion"
+        },
+        {
+          "id": "fdaed873-1acf-3cbd-b340-964fb5f6b193",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "cb05d8c5-f86f-4fe5-a7a0-37ac339a492d",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "200f0a5a-41c4-49f3-b997-1ef5f975f060",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "68e18fe3-1c1c-406f-83b0-26ae08642f19",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        },
+        {
+          "id": "1a33443c-3fff-450f-8298-efbc65659d32",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows",
+          "status": "Official"
+        }
+      ],
+      "tags": [
+        {
+          "count": 12,
+          "name": "rock"
+        },
+        {
+          "count": 4,
+          "name": "electronic"
+        },
+        {
+          "count": 1,
+          "name": "post-rock"
+        },
+        {
+          "count": 1,
+          "name": "pop"
+        },
+        {
+          "count": 20,
+          "name": "alternative rock"
+        },
+        {
+          "count": 1,
+          "name": "owned"
+        },
+        {
+          "count": 2,
+          "name": "krautrock"
+        },
+        {
+          "count": 1,
+          "name": "i own this"
+        },
+        {
+          "count": 2,
+          "name": "experimental"
+        },
+        {
+          "count": 1,
+          "name": "british"
+        },
+        {
+          "count": 2,
+          "name": "uk"
+        },
+        {
+          "count": 1,
+          "name": "britannique"
+        },
+        {
+          "count": 1,
+          "name": "2007"
+        },
+        {
+          "count": 4,
+          "name": "indie rock"
+        },
+        {
+          "count": 1,
+          "name": "mp3"
+        },
+        {
+          "count": 1,
+          "name": "2007-10-22"
+        },
+        {
+          "count": 2,
+          "name": "progressive"
+        },
+        {
+          "count": 2,
+          "name": "melodic"
+        },
+        {
+          "count": 1,
+          "name": "psychedelic"
+        },
+        {
+          "count": 2,
+          "name": "death"
+        },
+        {
+          "count": 9,
+          "name": "art rock"
+        },
+        {
+          "count": 2,
+          "name": "hypnotic"
+        },
+        {
+          "count": 2,
+          "name": "experimental rock"
+        },
+        {
+          "count": 1,
+          "name": "pop rock"
+        },
+        {
+          "count": 2,
+          "name": "space rock"
+        },
+        {
+          "count": 2,
+          "name": "dream pop"
+        },
+        {
+          "count": 2,
+          "name": "alternative pop"
+        },
+        {
+          "count": 1,
+          "name": "english"
+        },
+        {
+          "count": 1,
+          "name": "independent"
+        },
+        {
+          "count": 3,
+          "name": "alt rock"
+        },
+        {
+          "count": 1,
+          "name": "rock and indie"
+        },
+        {
+          "count": 2,
+          "name": "eclectic"
+        },
+        {
+          "count": 2,
+          "name": "existential"
+        },
+        {
+          "count": 2,
+          "name": "passionate"
+        },
+        {
+          "count": 1,
+          "name": "pop/rock"
+        },
+        {
+          "count": 2,
+          "name": "alternative/indie rock"
+        },
+        {
+          "count": 1,
+          "name": "alternative pop/rock"
+        },
+        {
+          "count": 2,
+          "name": "rhythmic"
+        },
+        {
+          "count": 2,
+          "name": "art pop"
+        },
+        {
+          "count": 2,
+          "name": "autumn"
+        },
+        {
+          "count": 2,
+          "name": "lush"
+        },
+        {
+          "count": 1,
+          "name": "discogs/the most popular album released every year from 1950 to 2020"
+        },
+        {
+          "count": 2,
+          "name": "uncommon time signatures"
+        },
+        {
+          "count": 1,
+          "name": "vyrzukhisuc-album"
+        }
+      ]
+    },
+    {
+      "id": "f4eff0d1-d561-4bd1-9fc4-ed1b4e0441de",
+      "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+      "score": 92,
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "artist-credit-id": "021661c1-84c5-30d7-9bb2-f0766affb734",
+      "count": 1,
+      "title": "Live in Rainbows",
+      "first-release-date": "2008",
+      "primary-type": "Album",
+      "secondary-types": [
+        "Live"
+      ],
+      "secondary-type-ids": [
+        "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+      ],
+      "artist-credit": [
+        {
+          "name": "Radiohead",
+          "artist": {
+            "id": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            "name": "Radiohead",
+            "sort-name": "Radiohead",
+            "aliases": [
+              {
+                "sort-name": "r/head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "r/head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "电台司令",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "电台司令",
+                "locale": "zh",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "れでぃおへっど",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "レディオヘッド",
+                "locale": "ja",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radiohead & Thom Yorke",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radiohead & Thom Yorke",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radio Head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radio Head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              }
+            ]
+          }
+        }
+      ],
+      "releases": [
+        {
+          "id": "aa6ca545-6116-4450-b32a-300a24cdc28e",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "title": "Live in Rainbows",
+          "status": "Bootleg"
+        }
+      ]
+    },
+    {
+      "id": "30eb21a4-b9df-435f-b779-590617fe9b44",
+      "type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+      "score": 87,
+      "primary-type-id": "6d0c5bf6-7a33-3420-a519-44fc63eedebf",
+      "artist-credit-id": "021661c1-84c5-30d7-9bb2-f0766affb734",
+      "count": 4,
+      "title": "In Rainbows Disk 2",
+      "first-release-date": "2009-06-09",
+      "primary-type": "EP",
+      "artist-credit": [
+        {
+          "name": "Radiohead",
+          "artist": {
+            "id": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            "name": "Radiohead",
+            "sort-name": "Radiohead",
+            "aliases": [
+              {
+                "sort-name": "r/head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "r/head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "电台司令",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "电台司令",
+                "locale": "zh",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "れでぃおへっど",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "レディオヘッド",
+                "locale": "ja",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radiohead & Thom Yorke",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radiohead & Thom Yorke",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radio Head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radio Head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              }
+            ]
+          }
+        }
+      ],
+      "releases": [
+        {
+          "id": "5e5c1d63-480a-45da-acaf-2f2d413521c6",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows Disk 2",
+          "status": "Official"
+        },
+        {
+          "id": "f35640cf-a70d-476d-b274-cff43cbf528b",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows Disk 2",
+          "status": "Official"
+        },
+        {
+          "id": "f05ab735-40e8-4aef-a140-7df60b194a6a",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows Disk 2",
+          "status": "Official"
+        },
+        {
+          "id": "2f742e01-1a66-4592-bf8f-269e2b34f356",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows Disk 2",
+          "status": "Official"
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "rock"
+        },
+        {
+          "count": 2,
+          "name": "alternative rock"
+        },
+        {
+          "count": 1,
+          "name": "art rock"
+        }
+      ]
+    },
+    {
+      "id": "d2f48ef0-9a77-42bc-95af-89dd0c8452b4",
+      "type-id": "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0",
+      "score": 83,
+      "primary-type-id": "f529b476-6e62-324f-b0aa-1f3e33d313fc",
+      "artist-credit-id": "021661c1-84c5-30d7-9bb2-f0766affb734",
+      "count": 5,
+      "title": "In Rainbows: From the Basement",
+      "first-release-date": "2008-06-24",
+      "primary-type": "Album",
+      "secondary-types": [
+        "Live"
+      ],
+      "secondary-type-ids": [
+        "6fd474e2-6b58-3102-9d17-d6f7eb7da0a0"
+      ],
+      "artist-credit": [
+        {
+          "name": "Radiohead",
+          "artist": {
+            "id": "a74b1b7f-71a5-4011-9441-d0b5e4122711",
+            "name": "Radiohead",
+            "sort-name": "Radiohead",
+            "aliases": [
+              {
+                "sort-name": "r/head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "r/head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "电台司令",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "电台司令",
+                "locale": "zh",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "れでぃおへっど",
+                "type-id": "894afba6-2816-3c24-8072-eadb66bd04bc",
+                "name": "レディオヘッド",
+                "locale": "ja",
+                "type": "Artist name",
+                "primary": true,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radiohead & Thom Yorke",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radiohead & Thom Yorke",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              },
+              {
+                "sort-name": "Radio Head",
+                "type-id": "1937e404-b981-3cb7-8151-4c86ebfc8d8e",
+                "name": "Radio Head",
+                "locale": null,
+                "type": "Search hint",
+                "primary": null,
+                "begin-date": null,
+                "end-date": null
+              }
+            ]
+          }
+        }
+      ],
+      "releases": [
+        {
+          "id": "28dd0f7c-6b26-4b2b-86d8-85629d6b6c4e",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows From the Basement",
+          "status": "Official"
+        },
+        {
+          "id": "73b5f683-d9a5-4b51-a06e-f7f68b8ae58d",
+          "title": "In Rainbows: From the Basement"
+        },
+        {
+          "id": "c17124e2-8f91-4286-a513-35da45d97ab4",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "title": "In Rainbows From the Basement",
+          "status": "Bootleg"
+        },
+        {
+          "id": "023abf42-e340-4a45-84d1-1fc95eaa46e9",
+          "status-id": "4e304316-386d-3409-af2e-78857eec5cfe",
+          "title": "In Rainbows: From the Basement",
+          "status": "Official"
+        },
+        {
+          "id": "aa70b625-e60d-4bb5-86b2-23c827a7a375",
+          "status-id": "1156806e-d06a-38bd-83f0-cf2284a808b9",
+          "title": "In Rainbows: From the Basement",
+          "status": "Bootleg"
+        }
+      ],
+      "tags": [
+        {
+          "count": 1,
+          "name": "rock"
+        },
+        {
+          "count": 1,
+          "name": "electronic"
+        },
+        {
+          "count": 1,
+          "name": "experimental"
+        },
+        {
+          "count": 1,
+          "name": "indie rock"
+        }
+      ]
+    }
+  ]
+}

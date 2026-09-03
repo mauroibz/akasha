@@ -1,0 +1,53 @@
+{
+  "id": "6c080efc-1d6c-43dc-80f7-42a2f84640ca",
+  "relations": [
+    {
+      "attribute-values": {},
+      "attributes": [],
+      "source-credit": "",
+      "direction": "backward",
+      "release": {
+        "text-representation": {
+          "language": "eng",
+          "script": "Latn"
+        },
+        "status-id": null,
+        "date": "2010-03-03",
+        "id": "574166b1-78c0-4061-8781-b699f1e5b575",
+        "packaging-id": null,
+        "release-events": [
+          {
+            "date": "2010-03-03",
+            "area": {
+              "name": "[Worldwide]",
+              "iso-3166-1-codes": [
+                "XW"
+              ],
+              "id": "525d4e18-3d00-31b9-a58b-a146a916de8f",
+              "sort-name": "[Worldwide]",
+              "type-id": null,
+              "disambiguation": "",
+              "type": null
+            }
+          }
+        ],
+        "title": "Plastic Beach",
+        "barcode": "5099962865050",
+        "packaging": null,
+        "quality": "normal",
+        "disambiguation": "",
+        "country": "XW",
+        "status": null
+      },
+      "end": null,
+      "attribute-ids": {},
+      "begin": null,
+      "type-id": "08445ccf-7b99-4438-9f9a-fb9ac18099ee",
+      "type": "free streaming",
+      "target-credit": "",
+      "target-type": "release",
+      "ended": false
+    }
+  ],
+  "resource": "https://open.spotify.com/album/2dIGnmEIy1WZIcZCFSj6i8"
+}

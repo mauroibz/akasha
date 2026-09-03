@@ -243,3 +243,24 @@ Two shapes an implementation would otherwise guess wrong:
 | `cinemeta_meta_movie_no_imdb_id.json` | **Synthetic**: the same base with `meta.imdb_id` removed. Cinemeta's catalog is IMDb-keyed by construction, so no live record without one exists to capture; this exercises the "no identity, no cover" path a malformed or defensive response would take. |
 | `cinemeta_search_breaking_bad_series.json` | `GET /catalog/series/top/search=Breaking Bad.json` — one hit, `tt0903747`, the same IMDb id `wikidata_series_entity_Q1079_breaking_bad.json` and `tvmaze_show_169_breaking_bad.json` carry. This is the three-way merge fixture (AC5): Wikidata primary, TVmaze's fuller synopsis, Cinemeta filling anything still empty. |
 | `cinemeta_meta_series_tt0903747_breaking_bad.json` | `GET /meta/series/tt0903747.json` — 49 KB, mostly a 67-entry `videos` array that is not read: the envelope carries no `network`, `episodes` or `seasons` field at all, and deriving an episode count from `videos.length` would be the DEC-125 defect again (a second count for a field the domain already has a declared canonical source for). `director` is `null`; `writer` (`["Vince Gilligan"]`) is the real showrunner and is what `creators` reads, mirroring the domain's own creator → screenwriter fallback. |
+
+## MusicBrainz — Spotify identity resolution (Sprint 064, captured 2026-09-03)
+
+Nine files proving the two-pass resolver `docs/spotify-import-and-insights-viability.md`
+measured: a Spotify album id resolves through MusicBrainz's own URL relationship first,
+and a `releasegroup:"…" AND artist:"…"` text search second. Captured live with
+`User-Agent: Akasha/1.6 (mauro0094@gmail.com)`, paced at ≥1.5 s with backoff on `503`
+(hit twice during capture — MusicBrainz's documented throttling shape, unchanged from
+DEC-125). All four albums are real rows from the owner's own Spotify library.
+
+| File | Source |
+|---|---|
+| `musicbrainz_url_spotify_plastic_beach.json` | `GET /url?resource=https://open.spotify.com/album/2dIGnmEIy1WZIcZCFSj6i8&inc=release-rels` — the pass-1 hit: one `free streaming` relation to release `574166b1-…`. |
+| `musicbrainz_release_574166b1_release_groups.json` | `GET /release/574166b1-…?inc=release-groups` — the release the relation names, read only for its `release-group.id` (`5a676824-…`), since the domain's item is the release group and not the specific pressing Spotify happened to link. |
+| `musicbrainz_release_group_plastic_beach.json` | `GET /release-group/5a676824-…?inc=releases+artist-credits` — the ordinary `fetch()` path, reused rather than duplicated: pass 1 resolves an id and hands it to the same code a search-added album already uses. |
+| `musicbrainz_release_plastic_beach.json` | `GET /release/98ea7ed0-…?inc=artist-credits+labels+media+release-groups+recordings` — `_preferred_release`'s choice among the group's 18 releases tied on `first-release-date`. |
+| `musicbrainz_url_no_relation.json` | `GET /url?resource=…` for a Spotify id MusicBrainz has never heard of — **404**, `{"error": "Not Found", ...}`. Real, not synthetic: this is the shape for three of the owner's own saved albums (*Purpose*, *In Rainbows*, *Strangeland*), none of which carry a stored Spotify relation, so pass 1 misses and pass 2 runs. |
+| `musicbrainz_search_purpose_justin_bieber.json` | `GET /release-group?query=releasegroup:"Purpose" AND artist:"Justin Bieber"` — pass 2's clean hit: one result, score 100. |
+| `musicbrainz_release_group_purpose.json`, `musicbrainz_release_purpose.json` | The same `fetch()` chain as Plastic Beach, for the release group pass 2 resolved (`2660de3c-…`) — proving pass 2 hands off to the identical code pass 1 does. |
+| `musicbrainz_search_in_rainbows_radiohead.json` | `GET /release-group?query=releasegroup:"In Rainbows" AND artist:"Radiohead"` — the **near-miss-adjacent** case: the correct release group scores 100, but three plausible others (`Live in Rainbows` 92, `In Rainbows Disk 2` 87, `In Rainbows: From the Basement` 83) share the same query. Proves the resolver reads the top result's own title rather than trusting "a result came back" — a score-92 near-title-match must not be accepted as an exact one. |
+| `musicbrainz_search_no_match.json` | The same query shape for a title and artist that do not exist — `count: 0`, an empty `release-groups` list. The genuine "no usable result" case pass 2 must turn into `record_not_found`, never a guess. |
