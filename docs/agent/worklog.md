@@ -3751,3 +3751,53 @@ so 050 adds an adapter, not a declaration.
   owner's own call about DEC-052; not scheduled until that conversation happens.
 - Next: Sprint 064 (Spotify import) is ready to claim per the normal `work` protocol.
   This session did not start it.
+
+## 2026-09-03 — Sprint 064: the Spotify import, and the album domain's first enrichment (complete)
+- Done: `domains/album/spotify.py`'s `SpotifyImporter` reads `YourLibrary.json`'s
+  `albums` array and refuses the Technical Log Information export by name.
+  `MusicBrainzProvider.fetch_by_identifier("spotify", ...)` resolves an exported
+  `spotify:album:` id in two passes — a URL-relation lookup, then on a miss a strict
+  title-and-artist search accepted only at score 100 with both fields normalizing
+  exact. `ALBUM_ENRICHMENT` replaces `enrichment=None`, keyed on `identity_kinds=
+  ("spotify",)` so a search-added album is never queued; `EnrichmentSpec.
+  needs_item_context` threads the item's own title/creators into the resolver
+  without widening every other domain's provider signature. `ItemPayload.
+  match_note` records which pass matched, written to the entry's own notes only
+  when empty — added mid-sprint once the gap was noticed. Full account and DEC-128.
+- Verified: both of the owner's real export bundles, not only fixtures — Technical
+  Log refused on the first try, Account Data's 157 albums previewed/committed with
+  zero errors, a second commit of the same batch left the library at exactly 157
+  (idempotent), background resolve reached 87/157 (55%) before the owner asked to
+  wrap up rather than wait for the rest, in line with the ~95% measured, including
+  `Purpose` resolved by the text-search pass with its weaker-evidence note attached.
+  A separate throwaway container confirmed `match_note` specifically, since the
+  first container was already running before that fix was written. `python
+  scripts/validate_project.py`, `make check`, `make test` (1,286 backend + 197
+  frontend), `make smoke-container` all green. Full Playwright e2e now green too
+  (96/98 parallel + 2/2 serial re-run, 7/7 heavy-library, 2/2 production-bundle) —
+  see below.
+- Deviations: recording which resolution pass matched (deliverable 4) was missed on
+  the first implementation pass and added once noticed while preparing the
+  walkthrough. Track roll-up (deliverable 5) is implemented and tested
+  (`records_from_library(..., rollup=True, ...)`) but not wired to any API toggle —
+  this repository's import boundary has no generic per-read options mechanism, and
+  the measured recommendation is "off" regardless (41 genuinely new albums from
+  1,362 saved tracks, only 9 with two or more).
+- Side effect, not this sprint's own scope: Sprint 061's long-standing Playwright
+  blocker is **resolved, not worked around**. `frontend/node_modules/.vite/deps`
+  and `frontend/dist/assets` were both root-owned in this environment; the owner
+  ran `sudo chown -R $(whoami):$(whoami)` on each after being asked directly. The
+  full e2e suite ran for the first time since that blocker appeared and passed.
+- Dead ends: the container built for the live walkthrough predates the
+  `match_note` fix, so its earliest resolved albums (including the first `Purpose`
+  observation) show no note despite being text-matched — confirmed as a stale
+  image, not a bug, by calling the provider directly and then building a second,
+  fresh container. `_preferred_release`'s tie-break for a release group with many
+  tied releases can pick a release a quick manual sample would miss (Plastic
+  Beach's 18 releases) — checking only the first few produced a wrong fixture once;
+  caught by a failing assertion, not by review.
+- Blocked/open: nothing. Sprint 065 (insights) is unblocked — its own viability
+  measurement asked for exactly this dataset (157 real albums with artists
+  attached) before being built.
+- Next: Sprint 065 is ready to claim per the normal `work` protocol. This session
+  did not start it.

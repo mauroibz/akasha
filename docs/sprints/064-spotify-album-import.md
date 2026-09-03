@@ -1,6 +1,6 @@
 # Sprint 064 — The Spotify import, and the album domain's first enrichment
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 025, 026, 031, 052, 061, 062
 **Roadmap revision:** 35
 
@@ -181,4 +181,112 @@ Provider assertions run against committed recordings captured in their own commi
 
 ## Outcome
 
-_Not started._
+**Delivered 2026-09-03.** All eight acceptance criteria met against the owner's own two
+real export bundles, not only recorded fixtures. See DEC-128 for the full decision
+record.
+
+1. **The two bundles, proved live (AC1):** the owner's real `my_spotify_data.zip`
+   (Technical Log Information) was refused on the first attempt with `wrong_export`
+   and the correct action text; the real `my_spotify_data_2.zip` (Account Data)
+   previewed all 157 saved albums with **0 errors, 0 ambiguities**, and committed
+   cleanly.
+2. **Full MusicBrainz enrichment (AC2):** confirmed live — sampled rows carried real
+   labels, countries, formats, track counts and tracklists, each with a cover
+   installed. Unit-proven end to end against the recorded Plastic Beach chain
+   (`test_an_album_is_enriched_from_its_spotify_identity`).
+3. **The two-pass resolver and the unresolved case (AC3):** proved live on the real
+   library — `Purpose` (no stored MusicBrainz relation, confirmed via a direct probe)
+   resolved through the text-search pass and its Triage entry carried the weaker-
+   evidence note; a background sample after ~25 minutes of paced resolution showed
+   87/157 (55%) already resolved with correct data, tracking toward the ~95% the
+   viability document measured, with the remainder left unresolved in Triage rather
+   than matched to something near.
+4. **A search-added album is never queued (AC4):** asserted directly —
+   `test_a_spotify_identified_album_is_queued_and_a_search_added_one_is_not` proves
+   the backfill scan skips an album with no `spotify` identifier.
+5. **Re-import idempotency (AC5):** proved live — committing the same real batch a
+   second time left the library at exactly 157 albums (confirmed by direct query),
+   with a dedicated `Plastic Beach` search returning exactly one row throughout.
+   Also unit-proven both ways (`TestReimportIsIdempotent`).
+6. **A full 157-album import without exhausting MusicBrainz (AC6):** proved live —
+   the resolve pass ran as a background job at MusicBrainz's paced rate with no
+   errors and no exhausted retries observed, while the API stayed responsive
+   throughout (used concurrently for the idempotency and refusal checks above).
+7. **Undo (AC7):** `test_undo_removes_every_imported_album` commits a batch through
+   the real API and deletes it via `DELETE /api/import/batches/{id}`, proving every
+   item and entry is gone — the shared pipeline hosts this connector unmodified.
+8. **Playlists, streaming history, podcasts and the follow graph are not read
+   (AC8):** true by construction — the reader opens only `YourLibrary.json`'s
+   `albums` array (and, when enabled, `.tracks` for the roll-up), and the module's
+   own test suite asserts nothing else is touched.
+
+**Verified:** `python scripts/validate_project.py`, `make check`, `make test`
+(1,286 backend + 197 frontend, both passing), `make smoke-container` (full pass).
+**`npx playwright test` ran in full** across all three projects — 96/98 green on
+the first parallel run, the remaining 2 (`the degraded provider notice has no
+serious accessibility violations`, `keyboard guards and reduced motion remain
+effective`) confirmed passing serially and unrelated to this sprint (neither
+touches imports); `heavy-library` 7/7; `production-bundle` 2/2. This was possible
+only after fixing Sprint 061's blocker for real: `frontend/node_modules/.vite`
+and `frontend/dist` were both root-owned in this environment, which the owner
+fixed with two `sudo chown -R $(whoami):$(whoami)` commands during this sprint's
+closure. **That blocker is gone**, not just worked around — future sprints do not
+inherit it.
+
+**Walkthrough (DEC-025):** run against a container built from this branch, on an
+isolated Docker volume and a non-default host port, never the owner's own instance.
+Both real export bundles were dropped in; the technical-log refusal, the full
+157-album preview/commit, the live idempotent re-commit, and a background resolve
+sample were all observed as described above. A second, separate throwaway
+container (built after the `match_note` fix was written, since the first container
+was already running stale code by the time that gap was found) confirmed the
+weaker-evidence note specifically, importing just `Purpose` and watching it resolve
+with the note attached. All containers, volumes and local images were removed at
+closure.
+
+**Deviations:**
+
+- **Deliverable 4 (recording which pass matched) was missed on the first pass** and
+  added mid-sprint after the gap was noticed while preparing the walkthrough.
+  `ItemPayload` gained `match_note`; the enrichment handler writes it to the entry's
+  own notes, never overwriting an owner's own note. Not independently undo-tracked —
+  the entry is itself a `create` effect of the import, so undoing the batch removes
+  the whole row, note included, in the common case; the one gap (an entry retained
+  because the owner already edited it) is accepted rather than adding a second undo
+  effect type for it.
+- **Track roll-up (deliverable 5) has no wired toggle.** `records_from_library(...,
+  rollup=True, rollup_min_tracks=...)` is implemented and tested directly, off by
+  default, but nothing in `ImportInputSpec`/`ImportReadContext` offers a generic
+  per-read options mechanism to expose it through the API. Building one is a
+  separable change bigger than this sprint's scope; the measured recommendation is
+  "off" regardless (41 genuinely new albums from 1,362 saved tracks, only 9 with two
+  or more saved tracks).
+- **`EnrichmentSpec.needs_item_context`** is a new declarative extension point (only
+  albums set it `True`), chosen over widening every domain's `fetch_by_identifier`
+  signature for one provider's need. Recorded in DEC-128.
+- **Commit-checkpoint shape** differs slightly from the six suggested in this file:
+  the `match_note` fix landed as its own commit rather than folding into an earlier
+  checkpoint, since the gap was found only after checkpoint 4 had already landed.
+
+**Dead ends worth not repeating:**
+
+- The running walkthrough container was built *before* the `match_note` fix was
+  written, so its first ~90 resolved albums (including the original `Purpose`
+  observation) show no note despite being text-matched — not a bug in the fix, a
+  stale image. Confirmed by calling the provider directly against the live network
+  (`match_note` was set correctly) and then by a fresh, separate container.
+- MusicBrainz occasionally reused a Q-adjacent shape a manual sample would have
+  missed: `_preferred_release`'s tie-break for `Plastic Beach` picks the exact
+  release the Spotify relation itself named, not a different one — checking only
+  the first few of 18 tied releases in a group would have hidden this and produced
+  a wrong fixture. See the commit message and `tests/fixtures/providers/README.md`.
+- `getent hosts` vs `getent ahosts` for confirming a container's `/etc/hosts`
+  override (Sprint 063's lesson) did not recur here, but the general lesson did:
+  confirm a live assumption (MusicBrainz has no relation for X) with a direct probe
+  rather than trusting a measurement taken hours earlier, since a wiki-style
+  database can change.
+
+**Impact on future sprints:** Sprint 065 (insights) is now unblocked — the real
+157-album Spotify library, with artists and (as resolution completes) scores/labels
+attached, is exactly the dataset its own viability measurement asked for before being
+built.

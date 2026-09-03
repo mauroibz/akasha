@@ -2,7 +2,7 @@
 
 **Plan revision:** 35
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [064 — The Spotify import, and the album domain's first enrichment](064-spotify-album-import.md), ready; see `docs/agent/state.json`.
+**Active sprint:** [065 — Insights: rankings from the fields items already declare](065-insights.md), ready; see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1154,7 +1154,7 @@ DEC-088 recorded a week earlier. See **DEC-127**. Albums' half of that entry mov
 scheduled" below; Sprints 065 and 066 renumber down to 064 and 065 to close the gap (plan revision
 35 — DEC-127 is the decision behind both changes).
 
-### [Sprint 064 — The Spotify import, and the album domain's first enrichment](064-spotify-album-import.md) **[PLANNED]**
+### [Sprint 064 — The Spotify import, and the album domain's first enrichment](064-spotify-album-import.md)
 
 The epic DEC-076 declined to commit to, now measured and buildable — see
 [`spotify-import-and-insights-viability.md`](../spotify-import-and-insights-viability.md). The
@@ -1172,6 +1172,17 @@ search-added album is still never queued.
 Scope is narrower than the export: the 157 saved albums, not the 406 reachable through playlists,
 and track roll-up opt-in and threshold-gated because it adds only 41 albums of which just 9 have
 more than one saved track.
+
+**Delivered 2026-09-03 (DEC-128).** Both real export bundles proved it live: the Technical Log
+export refused by name, the Account Data export's 157 albums previewed and committed with zero
+errors, a second commit of the same batch left the library at exactly 157 (idempotent), and the
+background resolve pass reached 87/157 (55%) — in line with the ~95% measured — before the owner
+asked to wrap up rather than wait for the rest, including at least one album resolved by the
+text-search pass and carrying its weaker-evidence note. One gap found late: recording which
+resolution pass matched (`ItemPayload.match_note`) was missed on the first pass and added once
+noticed. Track roll-up shipped implemented and tested but with no wired toggle — this
+repository's import boundary has no generic per-read options mechanism, and the measured
+recommendation is "off" regardless. See the sprint file's Outcome.
 
 ### [Sprint 065 — Insights: rankings from the fields items already declare](065-insights.md) **[PLANNED — ships as v1.6.0]**
 

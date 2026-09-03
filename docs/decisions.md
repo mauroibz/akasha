@@ -4741,3 +4741,82 @@ both changes, against 1 of 3 before the second.
   import, `ready` — its dependencies were already satisfied), `last_completed_sprint` stays `063`.
   `scripts/validate_project.py`'s `FINAL_SPRINT` moves from 62 to 65, since the plan's last sprint
   is now Sprint 065 rather than a since-withdrawn 066.
+
+## DEC-128 — The Spotify import, and albums' first background enrichment
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Supersedes:** `ALBUM_DOMAIN`'s `enrichment=None`, for the "an importer can create an
+  album" case only. The reasoning behind `None` is not rewritten — it is still true
+  for a search-added album, which is exactly why `identity_kinds=("spotify",)` keeps
+  a search-added album unqueued.
+- **Cross-references:** DEC-052 (albums have no cross-provider identity, and why),
+  DEC-067 row 3 (enrichment is per-domain), DEC-076/DEC-077 (Spotify as an architecture
+  goal, and why a track is metadata on the album rather than a child entity), DEC-080
+  (a connector guides its own users), DEC-113 (a domain enriches on every key its
+  sources supply), DEC-116 (backfill conditions are a declaration), DEC-125 (MusicBrainz's
+  retry budget). Evidence: `docs/spotify-import-and-insights-viability.md`.
+- **Context:** Sprint 031 carried `spotify → albums` as an architecture goal since
+  DEC-076, deliberately uncommitted. The viability document measured it directly against
+  the owner's own two real export bundles and the live MusicBrainz API on 2026-09-02, and
+  found the one thing that changes the shape of the whole importer: MusicBrainz stores a
+  Spotify album link as a URL *relationship*, which resolves an export's
+  `spotify:album:` id to an exact release without the fuzzy title-matching DEC-052 would
+  otherwise force.
+- **Decision, the importer:** `domains/album/spotify.py`'s `SpotifyImporter` reads
+  `YourLibrary.json`'s `albums` array — 157 rows in the owner's real library, each a
+  deliberate "save this album" act — and refuses Spotify's other export (Technical Log
+  Information) by name: it carries 291 `spotify:album:` ids too, but they are
+  recommendation-carousel impressions, not chosen albums. Both bundles nest every member
+  one directory deep; the reader matches by basename rather than a fixed root.
+- **Decision, identity resolution:** `MusicBrainzProvider.fetch_by_identifier("spotify",
+  value)` — two passes. First, `GET /url?resource=<spotify album URL>&inc=release-rels`,
+  which resolved 44 of 60 sampled albums (73%) to an exact release with no text matching
+  at all. On a miss, `releasegroup:"…" AND artist:"…"`, accepted only when the top result
+  scores 100 and its own title and artist-credit both normalize to an exact match — not
+  merely "a result came back", since `In Rainbows` shares its query with three plausible
+  neighbours at 92/87/83. Combined, measured at ~95% resolving to an exact release; the
+  remainder is left unresolved rather than matched to something near.
+- **Decision, the enrichment declaration:** `ALBUM_ENRICHMENT` replaces `enrichment=None`.
+  `identity_kinds=("spotify",)` means a search-added album — which carries no `spotify`
+  identifier — is never queued, asserted directly rather than assumed. Both resolver
+  passes need the item's own title and artist, which a bare identifier value cannot
+  carry; rather than widen every domain's `fetch_by_identifier` signature for one
+  provider's need, `EnrichmentSpec.needs_item_context` (declared `True` only for
+  albums) asks the enrichment handler to pass them as keyword-only arguments, so no
+  other provider's signature changes.
+- **Decision, recording which resolution pass matched:** a text-matched album carries
+  weaker evidence than a URL-relation match — same shape as a score-below-100 provider
+  match elsewhere, worth a quick human glance rather than silent trust. `ItemPayload`
+  gained `match_note: str | None`; the enrichment handler writes it to the entry's own
+  `notes` only when empty, never overwriting an owner's own edit. Missed on the first
+  implementation pass and added once the gap was noticed while preparing the
+  walkthrough — recorded in the sprint file's Outcome rather than folded in silently.
+  Not independently undo-tracked: the entry is itself a `create` effect of the import,
+  so undoing the batch removes the note along with the row in the common case.
+- **Verified live**, not only against recorded fixtures: the owner's real Technical Log
+  Information export was refused with the correct message on the first try; the real
+  Account Data export previewed and committed all 157 albums with zero errors and zero
+  ambiguities; a second commit of the same batch left the library at exactly 157 albums,
+  proving idempotency live and not only in tests; the background resolve pass installed
+  real MusicBrainz metadata with no errors and no exhausted retries, reaching 87/157
+  (55%) resolved before the owner asked to wrap up rather than wait for all 157 — in
+  line with the ~95% this decision's own measurement predicted for the full run — and
+  included at least one album (`Purpose`) resolved by the text-search pass rather than
+  the URL relation, carrying the weaker-evidence note. Full gate green: `make check`,
+  `make test` (1,286 backend + 197 frontend), `make smoke-container`, and the full
+  Playwright e2e suite (96/98 parallel + 2/2 serial, 7/7 heavy-library, 2/2
+  production-bundle) — the last of these possible only after the owner fixed a
+  root-owned `frontend/node_modules/.vite` and `frontend/dist` left over from Sprint
+  061, which this sprint's own verification needs surfaced and which is now resolved
+  for good, not just worked around. Full account in the sprint file's Outcome.
+- **Deviation, recorded rather than silently dropped:** track roll-up (deliverable 5) is
+  implemented and tested (`records_from_library(..., rollup=True, rollup_min_tracks=...)`)
+  but not wired to any API toggle. This repository's import boundary
+  (`ImportInputSpec`/`ImportReadContext`) has no generic per-read options mechanism, and
+  building one is a separable change bigger than "read a zip a second way" — the roll-up
+  ships off by default regardless, which is the measured recommendation either way (41
+  genuinely new albums from 1,362 saved tracks, only 9 with two or more).
+- **Consequences:** Plan revision unchanged at 35. `FINAL_SPRINT` unchanged at 65. Sprint
+  065 (insights) is now unblocked by a real dataset — 157 albums with artists attached —
+  exactly what its own viability measurement asked for before being built.

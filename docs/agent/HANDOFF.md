@@ -1,105 +1,121 @@
-# Handoff — Sprints 063 and the anime/albums question both closed, on their own branch
+# Handoff — Sprint 064 closed, on its own branch
 
-`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "064"`, pointing
-at `docs/sprints/064-spotify-album-import.md` (renamed from `065-` — see DEC-127) —
-a **real, fully written plan**, ready to claim. Nothing is blocking it; its dependencies
-(025, 026, 031, 052, 061, 062) are all complete.
-
-The anime/albums placeholder Sprint 063's own closure created is **gone**, not blocked:
-the owner asked directly whether a third anime provider was viable, Jikan was
-re-measured live and reproduced the identical failure DEC-088 recorded a week earlier,
-and anime turned out to have never been single-provider in the first place (AniList +
-Kitsu since Sprint 038). See **DEC-127** for the full account, including why albums'
-half of that question moved to the roadmap's "Not scheduled" section instead of staying
-a numbered sprint with nothing to do until the owner revisits DEC-052.
+`docs/agent/state.json` reads `project_status: "in_progress"`, `active_sprint: "065"`,
+pointing at `docs/sprints/065-insights.md` — a **real, fully written plan**, ready to
+claim. Its one dependency, Sprint 064, is complete: the 157-album real Spotify library
+its own viability measurement asked for now exists.
 
 ## This work is on its own branch, not main
 
-The owner asked to "branch and work on the next sprint." All five of Sprint 063's
-commits are on `sprint-063-cinemeta-second-source`, branched from `main` at `344b94d`.
+All five feature commits plus this closing commit are on
+`sprint-064-spotify-album-import`, branched from `main` after Sprint 063's close.
 `main` itself is untouched. **Nothing has been merged, pushed, or opened as a PR** —
-that is the owner's call (a fast-forward merge is clean; `main` has not moved since the
-branch point). Confirm with the owner before merging.
+that is the owner's call. Confirm before merging.
 
-## What Sprint 063 was, in one paragraph
+## What Sprint 064 was, in one paragraph
 
-Sprint 062 (DEC-125) removed the self-inflicted half of the movie domain's single-adapter
-outage risk; it left the domain resting on one adapter. This sprint measured Cinemeta
-(Stremio's keyless, IMDb-keyed metadata service — already a de facto dependency through
-every poster this build renders) at 15/15 films and 10/10 series, parity with Wikidata's
-own filter, and shipped it as a second source for movies and a third for series. The
-identity change that made this possible: `MOVIE_IDENTITY` moved from the Wikidata `Q` id
-to the IMDb id, mirroring the series domain, since a second provider makes a real
-cross-provider merge possible where one adapter could not. See **DEC-126** for the full
-account; the sprint file carries the per-criterion evidence.
+The epic DEC-076 declined to commit to: importing the owner's real Spotify library as
+albums. The finding that unlocked it — measured in
+`docs/spotify-import-and-insights-viability.md` — is that MusicBrainz stores a Spotify
+album link as a URL *relationship*, resolving an exported `spotify:album:` id to an
+exact release without the fuzzy title-matching DEC-052 would otherwise force (73% by
+relation alone, ~95% once a strict title-and-artist search covers the rest).
+`domains/album/spotify.py`'s `SpotifyImporter` reads `YourLibrary.json`'s `albums`
+array (157 rows in the owner's real library) and refuses the other Spotify export
+(Technical Log Information — 291 `spotify:album:` ids, but recommendation-carousel
+impressions, not chosen albums) by name. The album domain gained its first
+`EnrichmentSpec`, keyed on `identity_kinds=("spotify",)` so a search-added album is
+still never queued. See **DEC-128** for the full account; the sprint file carries the
+per-criterion evidence.
 
-Verified live, not just in unit tests: built the image, ran it on an isolated volume and
-port, searched and added in both domains with everything healthy, then rebuilt it with
-Wikidata's two hostnames resolved to an unreachable address and repeated both — both
-domains' search and add survived on Cinemeta (and, for series, TVmaze) alone, each add
-installing a real cover.
+## Verified live, not just in unit tests
 
-## One lesson worth not re-learning
+Both of the owner's real export bundles, not only recorded fixtures: the Technical Log
+export refused on the first try with the right message; the Account Data export's 157
+albums previewed and committed with **zero errors, zero ambiguities**; a second commit
+of the same batch left the library at exactly 157 (idempotency proved live, not only in
+tests); the background resolve pass ran at MusicBrainz's paced rate and reached
+**87/157 (55%) resolved** before the owner asked to wrap up rather than wait for the
+rest — in line with the ~95% the viability measurement predicted for a full run —
+including `Purpose`, resolved by the text-search pass and carrying its weaker-evidence
+note. A second, separate throwaway container confirmed that note specifically, since
+the first container predated the fix that added it.
 
-**`getent hosts` inside a container can report the real DNS answer even when
-`/etc/hosts` and `--add-host` are correctly applied.** `getent ahosts` (or an actual
-connection attempt) is what proves an override took effect — the first check here
-looked like the override had silently failed; it had not.
+## Side effect: Sprint 061's Playwright blocker is resolved, not just worked around
+
+`frontend/node_modules/.vite/deps`, and later `frontend/dist/assets`, were both
+root-owned in this environment — the exact blocker Sprint 061 left open, which had
+made e2e "not owed" for every sprint since. Asked the owner directly each time; they
+ran `sudo chown -R $(whoami):$(whoami)` on each path. With both fixed, the full
+Playwright suite ran for the first time in this environment and passed: 96/98 on the
+parallel run, the remaining 2 (an accessibility check and a reduced-motion check,
+neither touching imports) confirmed green on a serial re-run; `heavy-library` 7/7;
+`production-bundle` 2/2. **This blocker does not carry forward.**
+
+## One thing missed on the first pass, then added
+
+Deliverable 4 — recording which resolution pass matched an album — was absent from
+the first implementation. Noticed while preparing the walkthrough (a text-matched
+album looked identical to a relation-matched one), and added as its own commit:
+`ItemPayload.match_note`, written by the enrichment handler to the entry's own notes
+only when empty. Not independently undo-tracked — the entry is itself a `create`
+effect of the import, so undoing the batch removes the note with the row in the
+common case.
+
+## One thing scoped out, deliberately
+
+**Track roll-up (deliverable 5) has no wired toggle.**
+`records_from_library(..., rollup=True, rollup_min_tracks=...)` is implemented and
+tested directly but off by default; this repository's import boundary
+(`ImportInputSpec`/`ImportReadContext`) has no generic per-read options mechanism to
+expose it through the API, and building one is a separable change bigger than this
+sprint. The measured recommendation is "off" regardless: 41 genuinely new albums from
+1,362 saved tracks, only 9 with two or more saved tracks.
+
+## Two lessons worth not re-learning
+
+- **A stale container looks like a bug in new code.** The walkthrough container was
+  built before the `match_note` fix was written, so its earliest resolved albums show
+  no note despite being text-matched. Confirmed by calling the provider directly
+  against the live network (correct), then by a fresh, separate container — not by
+  assuming the running container reflected the latest commit.
+- **A release group's tie-break needs checking past the first few candidates.**
+  `_preferred_release`'s tie-break for `Plastic Beach` (18 releases, several tied on
+  `first-release-date`) picks the exact release the Spotify relation itself named —
+  not whichever one a quick look at the first 3 suggests. Caught by a failing
+  assertion (`country`), not by review. See the commit message and
+  `tests/fixtures/providers/README.md`.
 
 ## Current state, concretely
 
-- **Backend:** 1,252 tests passing (1,236 at Sprint 062's close + 16 new). **Frontend:**
-  197 passing, unchanged. `make check` green (ruff, mypy, ESLint, Prettier, tsc, the
-  OpenAPI contract check — untouched, since no route or schema changed). `make
-  smoke-container` green, built from this branch.
-- **`docs/decisions.md`** ends at **DEC-127**.
-- **E2E was not run and is not owed**: the diff touches zero files under `frontend/src/`
-  and changes no request path (`test_a_movie_search_survives_wikidata_raising`, the
-  merge tests and the health-endpoint proof are all backend-only; the frontend already
-  renders provider-degradation banners generically per Sprint 062). Sprint 061's
-  pre-existing blocker (`frontend/node_modules/.vite/deps` owned by `root`, stopping
-  Vite's dev server and Playwright's `webServer` auto-launch) is unrelated to this
-  sprint and was not touched.
-- New adapters registered in `main.state.provider_catalog`: `cinemeta` (movie),
-  `cinemeta-series` (series). Neither needs a credential.
+- **Backend:** 1,286 tests passing (1,252 at Sprint 063's close + 34 new). **Frontend:**
+  197 passing, unchanged. `make check` green. `make smoke-container` green, built from
+  this branch. Full e2e green (see above) for the first time since Sprint 061.
+- **`docs/decisions.md`** ends at **DEC-128**.
+- New: `infrastructure` gains no new module (MusicBrainz was already shared); the new
+  surface is entirely `domains/album/spotify.py`, `MusicBrainzProvider.
+  fetch_by_identifier`, and the `needs_item_context`/`match_note` extension points on
+  the shared `EnrichmentSpec`/`ItemPayload` dataclasses.
 
-## Known-degraded, deliberately not fixed (carried from DEC-125, still true)
+## Known-degraded, deliberately not fixed (carried forward, still true)
 
 - `/api/health/providers` reports configuration, not reachability.
 - Kitsu's latency tail occasionally exceeds its budget.
-- `languages` mixes vocabularies (Wikidata's localized labels vs. TVmaze's English
-  names) — Cinemeta does not add a third vocabulary here, since it emits no
-  `languages` value for either domain (measured absence, not an oversight).
-
-**AniList has recovered** — DEC-125 recorded it `403`-disabled upstream on 2026-09-02;
-measured live again on 2026-09-03 (DEC-127) it answered 12/12 searches, fast. Nothing
-about the adapter changed; the upstream outage that prompted DEC-125's note appears to
-have resolved on its own.
-
-## New, from this sprint, deliberately not fixed
-
-- **Two Cinemeta-sourced titles measured with no metahub poster** (`tt32142616`,
-  `tt0470183` and `tt0794240` — a clean 404 each, confirmed with a direct request).
-  Not a bug: DEC-103 already established a poster is a nicety on a complete record, and
-  the same "some titles have none" shape was already recorded for TVmaze in Sprint
-  062's worklog.
-- **`/api/health/providers` reporting configuration, not reachability** still means the
-  endpoint said `available: true` for `wikidata`/`wikidata-series` throughout the
-  forced-outage half of this sprint's own walkthrough. Still worth fixing, still not
-  here (DEC-125 already named this; this sprint just re-confirmed it applies here too).
+- `languages` mixes vocabularies across movie/series sources — unrelated to this
+  sprint, unchanged.
 
 ## Private data and operational constraints
 
 Unchanged. `exports/` is the owner's private source archive, gitignored whole,
-read-only walkthrough input. Secrets, databases, uploaded imports and covers are never
-committed. v1 has no auth and stays LAN-only; Calibre is opened read-only.
+read-only walkthrough input — this sprint's own two real Spotify export bundles live
+there. Secrets, databases, uploaded imports and covers are never committed. v1 has no
+auth and stays LAN-only; Calibre is opened read-only.
 
 The owner's own instance runs on `127.0.0.1:8000` (or `4441` published). This sprint's
-walkthrough ran two throwaway containers in turn, on an isolated Docker volume set and
-non-default host ports (18063, then 18064), and never touched the owner's own. Both
-containers, their volumes, and the local `akasha-wt063:latest` image were removed at
-closure — `docker ps -a` / `docker volume ls` / `docker images` all confirmed clean.
+walkthrough ran on isolated Docker volumes and non-default host ports, never the
+owner's own. All containers, volumes, and local images (`akasha-wt064`, `akasha-wt064b`)
+were removed at closure.
 
-Authorization does not carry forward: this session was asked to branch and implement a
-sprint, and did exactly that locally. It does not extend to merging into `main`,
+Authorization does not carry forward: this session was asked to continue sprint work
+on this branch and did exactly that. It does not extend to merging into `main`,
 pushing, or any remote action.

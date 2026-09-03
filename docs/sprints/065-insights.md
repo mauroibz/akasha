@@ -1,6 +1,6 @@
 # Sprint 065 — Insights: rankings from the fields items already declare
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 023, 026, 027, 040, 044, 064
 **Roadmap revision:** 35
 

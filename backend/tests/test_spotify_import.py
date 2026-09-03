@@ -25,6 +25,15 @@ from book_tracker.domains.album.spotify import (
     records_from_library,
 )
 
+#: TestReimportIsIdempotent and TestUndo below use bare `async def test_...`
+#: methods with no per-method decorator.
+pytestmark = pytest.mark.anyio
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    return "asyncio"
+
 
 def account_data(
     members: dict[str, Any] | None = None, *, prefix: str = "Spotify Account Data"
@@ -260,6 +269,58 @@ class TestReimportIsIdempotent:
 # ----------------------------------------------------------------------------------
 # Archive safety: the same shape Trakt's reader is held to.
 # ----------------------------------------------------------------------------------
+
+
+class TestUndo:
+    """AC7: undo reverses a Spotify import exactly as it reverses a Trakt one — the
+    shared route hosts this connector unmodified, so this proves the pipeline rather
+    than anything Spotify-specific."""
+
+    async def test_undo_removes_every_imported_album(self, tmp_path: Path) -> None:
+        import httpx
+        from sqlalchemy import text
+        from sqlalchemy.orm import Session
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(
+            Settings(data_dir=tmp_path / "data", user_agent_contact="test@example.invalid")
+        )
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            preview = await client.post(
+                "/api/import/spotify/preview",
+                files={
+                    "file": (
+                        "spotify.zip",
+                        your_library(
+                            [
+                                album_row(uri="spotify:album:aaaaaaaaaaaaaaaaaaaaaa"),
+                                album_row(
+                                    artist="Radiohead",
+                                    album="In Rainbows",
+                                    uri="spotify:album:bbbbbbbbbbbbbbbbbbbbbb",
+                                ),
+                            ]
+                        ),
+                        "application/zip",
+                    )
+                },
+                data={"targets": "album"},
+            )
+            batch_id = preview.json()["batch_id"]
+            committed = await client.post("/api/import/spotify/commit", json={"batch_id": batch_id})
+            assert committed.json()["created_items"] == 2
+
+            undone = await client.delete(f"/api/import/batches/{batch_id}")
+            assert undone.status_code == 200, undone.text
+
+        with Session(app.state.engine) as session:
+            assert session.execute(text("SELECT count(*) FROM items")).scalar_one() == 0
+            assert session.execute(text("SELECT count(*) FROM entries")).scalar_one() == 0
 
 
 class TestArchiveSafety:
