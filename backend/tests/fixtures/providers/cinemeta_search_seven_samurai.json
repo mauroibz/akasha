@@ -1,0 +1,63 @@
+{
+  "query": "Seven Samurai",
+  "rank": 33.125,
+  "cacheMaxAge": 86400,
+  "metas": [
+    {
+      "id": "tt0047478",
+      "imdb_id": "tt0047478",
+      "type": "movie",
+      "name": "Seven Samurai",
+      "poster": "https://m.media-amazon.com/images/M/MV5BZjliMWExOTMtZDQ3ZS00NWU3LWIyN2EtMjllNzk3ZTNlYzg4XkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0047478/img",
+      "releaseInfo": "1954",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0047478",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt31530596",
+      "imdb_id": "tt31530596",
+      "type": "movie",
+      "name": "Snow White and the Seven Samurai",
+      "poster": "https://m.media-amazon.com/images/M/MV5BZjYzMTljMjktYmQwMC00OGVjLThmMmQtNTEzZDBiMTk3OTcwXkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt31530596/img",
+      "releaseInfo": "2024",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt31530596",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt2002738",
+      "imdb_id": "tt2002738",
+      "type": "movie",
+      "name": "The Truth of Nanking: The Death of Seven Samurai",
+      "poster": "https://m.media-amazon.com/images/M/MV5BOTNlMDc5NDctMTczNS00NjY0LWFiNzQtN2E0ODM1MjUyYjRlXkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt2002738/img",
+      "releaseInfo": "2008",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt2002738",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt32142616",
+      "imdb_id": "tt32142616",
+      "type": "movie",
+      "name": "The Notorious Bored Samurai 7",
+      "poster": "https://images.metahub.space/poster/small/tt32142616/img",
+      "background": "https://images.metahub.space/background/medium/tt32142616/img",
+      "releaseInfo": "1992",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt32142616",
+        "hasScheduledVideos": false
+      }
+    }
+  ]
+}

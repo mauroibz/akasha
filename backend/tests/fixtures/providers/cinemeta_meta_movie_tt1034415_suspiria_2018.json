@@ -1,0 +1,150 @@
+{
+  "meta": {
+    "imdb_id": "tt1034415",
+    "name": "Suspiria",
+    "year": "2018",
+    "runtime": "152 min",
+    "genre": [
+      "Drama",
+      "Fantasy",
+      "Horror"
+    ],
+    "released": "2018-11-02T00:00:00.000Z",
+    "director": [
+      "Luca Guadagnino"
+    ],
+    "writer": [
+      "Dario Argento",
+      "Daria Nicolodi",
+      "David Kajganich"
+    ],
+    "cast": [
+      "Chloë Grace Moretz",
+      "Tilda Swinton",
+      "Doris Hick"
+    ],
+    "imdbRating": "6.7",
+    "poster": "https://images.metahub.space/poster/small/tt1034415/img",
+    "description": "A darkness swirls at the center of a world-renowned dance company, one that will engulf the artistic director, an ambitious young dancer, and a grieving psychotherapist. Some will succumb to the nightmare. Others will finally wake...",
+    "country": "Italy, United States",
+    "type": "movie",
+    "trailers": [
+      {
+        "source": "gh728YmlSFE",
+        "type": "Trailer"
+      },
+      {
+        "source": "wWPrzN6tTNE",
+        "type": "Trailer"
+      },
+      {
+        "source": "BY6QKRl56Ok",
+        "type": "Trailer"
+      }
+    ],
+    "moviedb_id": 361292,
+    "popularities": {
+      "moviedb": 4.2186,
+      "stremio": 0.14062000000000002,
+      "trakt": 2,
+      "stremio_lib": 0
+    },
+    "background": "https://images.metahub.space/background/medium/tt1034415/img",
+    "logo": "https://images.metahub.space/logo/medium/tt1034415/img",
+    "slug": "movie/suspiria-1034415",
+    "affiliates": {
+      "fandango_embed": "<p><a href=\"http://www.qksrv.net/click-7949808-10576760?url=http%3a%2f%2fwww.fandango.com%2fsuspiria2018_212329%2fmovieoverview%3fwssaffid%3d11840%26wssac%3d123\"><img src=\"https://images.fandango.com/r1.0.555/ImageRenderer/111/168/images/no_image_111x168.jpg/212329/images/masterrepository/fandango/212329/suspiria2018-payoff.jpg\" alt=\"Suspiria (2018)\" title=\"Suspiria (2018)\" border=\"0\" /></a> Now Playing</p><p><a href=\"http://www.qksrv.net/click-7949808-10576760?url=http%3a%2f%2fwww.fandango.com%2fsuspiria2018_212329%2fmovieoverview%3fwssaffid%3d11840%26wssac%3d123\">Movie Details</a> <a href=\"http://www.qksrv.net/click-7949808-10576760?url=http%3a%2f%2fwww.fandango.com%2fmovie-trailer%2fsuspiria2018-trailer%2f212329%3fwssaffid%3d11840%26wssac%3d123\">Play Trailers</a></p><p><a href=\"http://www.qksrv.net/click-7949808-10576760?url=http%3a%2f%2fwww.fandango.com%2fsuspiria2018_212329%2fmovietimes%3fwssaffid%3d11840%26wssac%3d123\"><img src=\"https://images.fandango.com/r1.0.555//images/global/buy_tickets.gif\" alt=\"Buy Tickets\" title=\"Click here to see showtimes and buy tickets!\" border=\"0\" /></a></p>",
+      "fandango_link": "http://www.qksrv.net/click-7949808-10576760?url=http%3a%2f%2fwww.fandango.com%2fsuspiria2018_212329%2fmovieoverview%3fwssaffid%3d11840%26wssac%3d123"
+    },
+    "dvdRelease": "2019-01-15T00:00:00.000Z",
+    "awards": "28 wins & 75 nominations total",
+    "popularity": 0.14062000000000002,
+    "id": "tt1034415",
+    "genres": [
+      "Drama",
+      "Fantasy",
+      "Horror"
+    ],
+    "releaseInfo": "2018",
+    "trailerStreams": [
+      {
+        "title": "Suspiria",
+        "ytId": "gh728YmlSFE"
+      },
+      {
+        "title": "Suspiria",
+        "ytId": "wWPrzN6tTNE"
+      },
+      {
+        "title": "Suspiria",
+        "ytId": "BY6QKRl56Ok"
+      }
+    ],
+    "links": [
+      {
+        "name": "6.7",
+        "category": "imdb",
+        "url": "https://imdb.com/title/tt1034415"
+      },
+      {
+        "name": "Suspiria",
+        "category": "share",
+        "url": "https://www.strem.io/s/movie/suspiria-1034415"
+      },
+      {
+        "name": "Drama",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Drama"
+      },
+      {
+        "name": "Fantasy",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Fantasy"
+      },
+      {
+        "name": "Horror",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Horror"
+      },
+      {
+        "name": "Chloë Grace Moretz",
+        "category": "Cast",
+        "url": "stremio:///search?search=Chlo%C3%AB%20Grace%20Moretz"
+      },
+      {
+        "name": "Tilda Swinton",
+        "category": "Cast",
+        "url": "stremio:///search?search=Tilda%20Swinton"
+      },
+      {
+        "name": "Doris Hick",
+        "category": "Cast",
+        "url": "stremio:///search?search=Doris%20Hick"
+      },
+      {
+        "name": "Dario Argento",
+        "category": "Writers",
+        "url": "stremio:///search?search=Dario%20Argento"
+      },
+      {
+        "name": "Daria Nicolodi",
+        "category": "Writers",
+        "url": "stremio:///search?search=Daria%20Nicolodi"
+      },
+      {
+        "name": "David Kajganich",
+        "category": "Writers",
+        "url": "stremio:///search?search=David%20Kajganich"
+      },
+      {
+        "name": "Luca Guadagnino",
+        "category": "Directors",
+        "url": "stremio:///search?search=Luca%20Guadagnino"
+      }
+    ],
+    "behaviorHints": {
+      "defaultVideoId": "tt1034415",
+      "hasScheduledVideos": false
+    }
+  }
+}

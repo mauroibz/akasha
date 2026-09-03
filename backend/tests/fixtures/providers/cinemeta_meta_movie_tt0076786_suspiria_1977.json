@@ -1,0 +1,132 @@
+{
+  "meta": {
+    "awards": "1 win & 4 nominations total",
+    "cast": [
+      "Jessica Harper",
+      "Stefania Casini",
+      "Flavio Bucci"
+    ],
+    "country": "Italy",
+    "description": "An American newcomer to a prestigious German ballet academy comes to realize that the school is a front for something sinister amid a series of grisly murders.",
+    "director": [
+      "Dario Argento"
+    ],
+    "dvdRelease": "2017-07-13T00:00:00.000Z",
+    "genre": [
+      "Horror"
+    ],
+    "imdbRating": "7.3",
+    "imdb_id": "tt0076786",
+    "moviedb_id": 11906,
+    "name": "Suspiria",
+    "popularity": 0.16822666666666666,
+    "poster": "https://images.metahub.space/poster/small/tt0076786/img",
+    "released": "1977-08-12T00:00:00.000Z",
+    "runtime": "99 min",
+    "trailers": [
+      {
+        "source": "x_FfT98QJks",
+        "type": "Trailer"
+      },
+      {
+        "source": "nhSzBqLJ1xg",
+        "type": "Trailer"
+      },
+      {
+        "source": "hPs2ExUL_bc",
+        "type": "Trailer"
+      }
+    ],
+    "type": "movie",
+    "writer": [
+      "Dario Argento",
+      "Daria Nicolodi",
+      "Thomas De Quincey"
+    ],
+    "year": "1977",
+    "background": "https://images.metahub.space/background/medium/tt0076786/img",
+    "logo": "https://images.metahub.space/logo/medium/tt0076786/img",
+    "popularities": {
+      "moviedb": 5.0468,
+      "stremio": 0.16822666666666666,
+      "trakt": 2,
+      "stremio_lib": 0
+    },
+    "slug": "movie/suspiria-0076786",
+    "id": "tt0076786",
+    "genres": [
+      "Horror"
+    ],
+    "releaseInfo": "1977",
+    "trailerStreams": [
+      {
+        "title": "Suspiria",
+        "ytId": "x_FfT98QJks"
+      },
+      {
+        "title": "Suspiria",
+        "ytId": "nhSzBqLJ1xg"
+      },
+      {
+        "title": "Suspiria",
+        "ytId": "hPs2ExUL_bc"
+      }
+    ],
+    "links": [
+      {
+        "name": "7.3",
+        "category": "imdb",
+        "url": "https://imdb.com/title/tt0076786"
+      },
+      {
+        "name": "Suspiria",
+        "category": "share",
+        "url": "https://www.strem.io/s/movie/suspiria-0076786"
+      },
+      {
+        "name": "Horror",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Horror"
+      },
+      {
+        "name": "Jessica Harper",
+        "category": "Cast",
+        "url": "stremio:///search?search=Jessica%20Harper"
+      },
+      {
+        "name": "Stefania Casini",
+        "category": "Cast",
+        "url": "stremio:///search?search=Stefania%20Casini"
+      },
+      {
+        "name": "Flavio Bucci",
+        "category": "Cast",
+        "url": "stremio:///search?search=Flavio%20Bucci"
+      },
+      {
+        "name": "Dario Argento",
+        "category": "Writers",
+        "url": "stremio:///search?search=Dario%20Argento"
+      },
+      {
+        "name": "Daria Nicolodi",
+        "category": "Writers",
+        "url": "stremio:///search?search=Daria%20Nicolodi"
+      },
+      {
+        "name": "Thomas De Quincey",
+        "category": "Writers",
+        "url": "stremio:///search?search=Thomas%20De%20Quincey"
+      },
+      {
+        "name": "Dario Argento",
+        "category": "Directors",
+        "url": "stremio:///search?search=Dario%20Argento"
+      }
+    ],
+    "behaviorHints": {
+      "defaultVideoId": "tt0076786",
+      "hasScheduledVideos": false
+    }
+  }
+}

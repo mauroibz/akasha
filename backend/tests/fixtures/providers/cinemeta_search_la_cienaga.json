@@ -1,0 +1,207 @@
+{
+  "query": "La Cienaga",
+  "rank": 33.125,
+  "cacheMaxAge": 86400,
+  "metas": [
+    {
+      "id": "tt0240419",
+      "imdb_id": "tt0240419",
+      "type": "movie",
+      "name": "The Swamp",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMTYwNTI0OTE3MV5BMl5BanBnXkFtZTcwMDAxODcyMQ@@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0240419/img",
+      "releaseInfo": "2001",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0240419",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt5278836",
+      "imdb_id": "tt5278836",
+      "type": "movie",
+      "name": "Between Sea and Land",
+      "poster": "https://m.media-amazon.com/images/M/MV5BODI0NTFlMDQtNDUyMS00M2MwLTk0NGItNGQxODdlODE3YzM4XkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt5278836/img",
+      "releaseInfo": "2016",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt5278836",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0090305",
+      "imdb_id": "tt0090305",
+      "type": "movie",
+      "name": "Weird Science",
+      "poster": "https://m.media-amazon.com/images/M/MV5BYjI2N2Q4ZjEtZjMyNC00MDM5LTkxZTQtNzA4MTE1ZGQyYTgwXkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0090305/img",
+      "releaseInfo": "1985",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0090305",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0354899",
+      "imdb_id": "tt0354899",
+      "type": "movie",
+      "name": "The Science of Sleep",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMTg3NTcxNzY5NV5BMl5BanBnXkFtZTcwODk5NTQzMQ@@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0354899/img",
+      "releaseInfo": "2006",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0354899",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt39006133",
+      "imdb_id": "tt39006133",
+      "type": "movie",
+      "name": "The Housewives of La Cienega",
+      "poster": "https://m.media-amazon.com/images/M/MV5BZWFiZWQ2NjktNTExZS00OWJkLWE1MDItOTNjMjI4NTQ4MTliXkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt39006133/img",
+      "releaseInfo": "2025",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt39006133",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0033149",
+      "imdb_id": "tt0033149",
+      "type": "movie",
+      "name": "They Drive by Night",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMjExOTM1ZjMtOTZjZC00ODE1LTlhM2QtZGUwZmNhZDQzZmNhXkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0033149/img",
+      "releaseInfo": "1940",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0033149",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0140384",
+      "imdb_id": "tt0140384",
+      "type": "movie",
+      "name": "Blind Beast",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMTgxYmY4MDktNDg2MC00Nzk2LTg0N2MtODZmMGQxMDcwMzNjXkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0140384/img",
+      "releaseInfo": "1969",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0140384",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "imdb_id": "tt4581412",
+      "name": "La séance",
+      "year": "2014",
+      "runtime": "13 min",
+      "genre": [
+        "Short",
+        "Fantasy",
+        "Mystery"
+      ],
+      "released": "2014-12-28T00:00:00.000Z",
+      "director": [
+        "Edouard de La Poëze"
+      ],
+      "writer": [
+        "Edouard de La Poëze"
+      ],
+      "cast": [
+        "Paul Hamy",
+        "Fanny Ardant",
+        "Fabienne Chaudat"
+      ],
+      "imdbRating": "7.4",
+      "poster": "https://images.metahub.space/poster/small/tt4581412/img",
+      "description": "A photographer gets to take a last picture of a muse he is obsessed with during a rather strange session.",
+      "type": "movie",
+      "slug": "movie/la-sance-4581412",
+      "popularities": {
+        "moviedb": 0.2828,
+        "stremio": 0.0009426666666666666,
+        "stremio_lib": 0
+      },
+      "trailers": [],
+      "background": "https://images.metahub.space/background/medium/tt4581412/img",
+      "logo": "https://images.metahub.space/logo/medium/tt4581412/img",
+      "popularity": 0.0009426666666666666,
+      "id": "tt4581412",
+      "score": 10.791666666666666,
+      "genres": [
+        "Short",
+        "Fantasy",
+        "Mystery"
+      ],
+      "releaseInfo": "2014",
+      "trailerStreams": [],
+      "links": [
+        {
+          "name": "7.4",
+          "category": "imdb",
+          "url": "https://imdb.com/title/tt4581412"
+        },
+        {
+          "name": "La séance",
+          "category": "share",
+          "url": "https://www.strem.io/s/movie/la-sance-4581412"
+        },
+        {
+          "name": "Short",
+          "category": "Genres",
+          "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Short"
+        },
+        {
+          "name": "Fantasy",
+          "category": "Genres",
+          "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Fantasy"
+        },
+        {
+          "name": "Mystery",
+          "category": "Genres",
+          "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Mystery"
+        },
+        {
+          "name": "Paul Hamy",
+          "category": "Cast",
+          "url": "stremio:///search?search=Paul%20Hamy"
+        },
+        {
+          "name": "Fanny Ardant",
+          "category": "Cast",
+          "url": "stremio:///search?search=Fanny%20Ardant"
+        },
+        {
+          "name": "Fabienne Chaudat",
+          "category": "Cast",
+          "url": "stremio:///search?search=Fabienne%20Chaudat"
+        },
+        {
+          "name": "Edouard de La Poëze",
+          "category": "Writers",
+          "url": "stremio:///search?search=Edouard%20de%20La%20Po%C3%ABze"
+        },
+        {
+          "name": "Edouard de La Poëze",
+          "category": "Directors",
+          "url": "stremio:///search?search=Edouard%20de%20La%20Po%C3%ABze"
+        }
+      ],
+      "behaviorHints": {
+        "defaultVideoId": "tt4581412",
+        "hasScheduledVideos": false
+      }
+    }
+  ]
+}

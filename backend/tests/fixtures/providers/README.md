@@ -209,3 +209,37 @@ otherwise guess wrong are pinned here:
 | `tvmaze_show_76954_samantha_oups.json` | `GET /shows/76954` — both `runtime` and `averageRuntime` null, so `episode_minutes` stays empty; `network.name` is `France 2`. |
 | `tvmaze_show_10577_los_simuladores.json` | `GET /shows/10577` — the AC2 series' full record. |
 | `tvmaze_show_45942_okupas.json` | `GET /shows/45942` — the second AC2 series' full record. |
+
+## Cinemeta (Sprint 063, captured 2026-09-03)
+
+Eleven files for the movie and series domains' third adapter, captured live from
+`https://v3-cinemeta.strem.io` with `User-Agent: Akasha/1.6 (mauro0094@gmail.com)`, paced
+at ~0.6 s between requests. Nine are verbatim; two are **synthetic**, built from a verbatim
+capture by removing one field, and say so below. `docs/movie-domain-viability.md` and
+`docs/series-domain-viability.md` carry the coverage measurement (AC1) these files support.
+
+Two shapes an implementation would otherwise guess wrong:
+
+- **`/meta/` sometimes answers `307` to `cinemeta-live.strem.io`** rather than serving from
+  `v3-cinemeta.strem.io` directly (observed on the 2018 `Suspiria` fetch and on `Okupas`
+  during the coverage measurement). The shared provider client already follows redirects,
+  so no adapter code is needed for this — recorded so nobody "fixes" a client that isn't
+  broken.
+- **The catalog search's `poster` is `m.media-amazon.com`; the `/meta/` response's own
+  `poster` is `images.metahub.space` at the `small` size.** Neither is used: the adapter
+  builds the medium-size metahub URL from the IMDb id, the same helper Wikidata and TVmaze
+  already call.
+
+| File | Source |
+|---|---|
+| `cinemeta_search_seven_samurai.json` | `GET /catalog/movie/top/search=Seven Samurai.json` — three hits; rank 1 is the 1954 film, ranks 2–3 are unrelated titles that merely share a word, which is the search-then-fetch case (search carries no `year`, only `/meta/` does). |
+| `cinemeta_meta_movie_tt0047478_seven_samurai.json` | `GET /meta/movie/tt0047478.json` — the ordinary full-coverage case: `runtime: "207 min"`, `country: "Japan"` (a single string, not an array — the adapter wraps it), `director`, `genre`, `cast`, `description` all present. |
+| `cinemeta_search_suspiria.json` | `GET /catalog/movie/top/search=Suspiria.json` — five hits, ranks 1–2 the AC4 pair: `tt1034415` (2018) and `tt0076786` (1977). |
+| `cinemeta_meta_movie_tt0076786_suspiria_1977.json` | `GET /meta/movie/tt0076786.json` — the Argento film's full record, the same identity pair `wikidata_entities_suspiria_pair.json` exists for. |
+| `cinemeta_meta_movie_tt1034415_suspiria_2018.json` | `GET /meta/movie/tt1034415.json` — the Guadagnino remake. Answered via the `307` redirect described above. Two films sharing a title, each with its own IMDb id, is AC4's executable evidence that the identity change keeps them as two rows. |
+| `cinemeta_search_la_cienaga.json` | `GET /catalog/movie/top/search=La Cienaga.json` — the Argentine Spanish-language case from the coverage sample, six hits. |
+| `cinemeta_meta_movie_tt0240419_la_cienaga.json` | `GET /meta/movie/tt0240419.json` — its full record, a non-English hit with complete field coverage. |
+| `cinemeta_meta_movie_missing_runtime.json` | **Synthetic**: `cinemeta_meta_movie_tt0047478_seven_samurai.json` with `meta.runtime` removed. No live record without a runtime was found in the coverage sample (15/15 carried one), so this pins the missing-value path the same way `wikidata_search_ambiguous.json` pins its own defensive branch — the envelope is real, only the one field is gone. |
+| `cinemeta_meta_movie_no_imdb_id.json` | **Synthetic**: the same base with `meta.imdb_id` removed. Cinemeta's catalog is IMDb-keyed by construction, so no live record without one exists to capture; this exercises the "no identity, no cover" path a malformed or defensive response would take. |
+| `cinemeta_search_breaking_bad_series.json` | `GET /catalog/series/top/search=Breaking Bad.json` — one hit, `tt0903747`, the same IMDb id `wikidata_series_entity_Q1079_breaking_bad.json` and `tvmaze_show_169_breaking_bad.json` carry. This is the three-way merge fixture (AC5): Wikidata primary, TVmaze's fuller synopsis, Cinemeta filling anything still empty. |
+| `cinemeta_meta_series_tt0903747_breaking_bad.json` | `GET /meta/series/tt0903747.json` — 49 KB, mostly a 67-entry `videos` array that is not read: the envelope carries no `network`, `episodes` or `seasons` field at all, and deriving an episode count from `videos.length` would be the DEC-125 defect again (a second count for a field the domain already has a declared canonical source for). `director` is `null`; `writer` (`["Vince Gilligan"]`) is the real showrunner and is what `creators` reads, mirroring the domain's own creator → screenwriter fallback. |

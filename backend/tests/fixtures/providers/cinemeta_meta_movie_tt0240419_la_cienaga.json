@@ -1,0 +1,110 @@
+{
+  "meta": {
+    "awards": "16 wins & 8 nominations total",
+    "cast": [
+      "Mercedes Morán",
+      "Graciela Borges",
+      "Martín Adjemián"
+    ],
+    "country": "Argentina, France, Spain, Japan",
+    "description": "The life of two women and their families in a small provincial town of Salta, Argentina.",
+    "director": [
+      "Lucrecia Martel"
+    ],
+    "dvdRelease": "2017-03-17T00:00:00.000Z",
+    "genre": [
+      "Comedy",
+      "Drama"
+    ],
+    "imdbRating": "7.0",
+    "imdb_id": "tt0240419",
+    "moviedb_id": 58429,
+    "name": "The Swamp",
+    "popularity": 0.044386666666666665,
+    "poster": "https://images.metahub.space/poster/small/tt0240419/img",
+    "released": "2001-04-12T00:00:00.000Z",
+    "runtime": "101 min",
+    "trailers": [
+      {
+        "source": "iHikpCDL2_I",
+        "type": "Trailer"
+      }
+    ],
+    "type": "movie",
+    "writer": [
+      "Lucrecia Martel"
+    ],
+    "year": "2001",
+    "popularities": {
+      "moviedb": 1.3316,
+      "stremio": 0.044386666666666665,
+      "stremio_lib": 0
+    },
+    "slug": "movie/the-swamp-0240419",
+    "background": "https://images.metahub.space/background/medium/tt0240419/img",
+    "logo": "https://images.metahub.space/logo/medium/tt0240419/img",
+    "id": "tt0240419",
+    "genres": [
+      "Comedy",
+      "Drama"
+    ],
+    "releaseInfo": "2001",
+    "trailerStreams": [
+      {
+        "title": "The Swamp",
+        "ytId": "iHikpCDL2_I"
+      }
+    ],
+    "links": [
+      {
+        "name": "7.0",
+        "category": "imdb",
+        "url": "https://imdb.com/title/tt0240419"
+      },
+      {
+        "name": "The Swamp",
+        "category": "share",
+        "url": "https://www.strem.io/s/movie/the-swamp-0240419"
+      },
+      {
+        "name": "Comedy",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Comedy"
+      },
+      {
+        "name": "Drama",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Drama"
+      },
+      {
+        "name": "Mercedes Morán",
+        "category": "Cast",
+        "url": "stremio:///search?search=Mercedes%20Mor%C3%A1n"
+      },
+      {
+        "name": "Graciela Borges",
+        "category": "Cast",
+        "url": "stremio:///search?search=Graciela%20Borges"
+      },
+      {
+        "name": "Martín Adjemián",
+        "category": "Cast",
+        "url": "stremio:///search?search=Mart%C3%ADn%20Adjemi%C3%A1n"
+      },
+      {
+        "name": "Lucrecia Martel",
+        "category": "Writers",
+        "url": "stremio:///search?search=Lucrecia%20Martel"
+      },
+      {
+        "name": "Lucrecia Martel",
+        "category": "Directors",
+        "url": "stremio:///search?search=Lucrecia%20Martel"
+      }
+    ],
+    "behaviorHints": {
+      "defaultVideoId": "tt0240419",
+      "hasScheduledVideos": false
+    }
+  }
+}

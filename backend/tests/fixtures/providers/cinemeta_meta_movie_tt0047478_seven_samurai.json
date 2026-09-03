@@ -1,0 +1,148 @@
+{
+  "meta": {
+    "awards": "Nominated for 2 Oscars. 5 wins & 9 nominations total",
+    "cast": [
+      "Toshirô Mifune",
+      "Takashi Shimura",
+      "Keiko Tsushima"
+    ],
+    "country": "Japan",
+    "description": "Farmers from a village exploited by bandits hire a veteran samurai for protection, and he gathers six other samurai to join him.",
+    "director": [
+      "Akira Kurosawa"
+    ],
+    "dvdRelease": "2011-11-29T00:00:00.000Z",
+    "genre": [
+      "Action",
+      "Drama"
+    ],
+    "imdbRating": "8.6",
+    "imdb_id": "tt0047478",
+    "moviedb_id": 346,
+    "name": "Seven Samurai",
+    "popularity": 0.43940666666666667,
+    "poster": "https://images.metahub.space/poster/small/tt0047478/img",
+    "released": "1956-11-19T00:00:00.000Z",
+    "runtime": "207 min",
+    "trailers": [
+      {
+        "source": "RsRN65PlaIM",
+        "type": "Trailer"
+      },
+      {
+        "source": "fRUsjrkGs_A",
+        "type": "Trailer"
+      },
+      {
+        "source": "5dZioLIejeo",
+        "type": "Trailer"
+      },
+      {
+        "source": "7mw6LyyoeGE",
+        "type": "Trailer"
+      }
+    ],
+    "type": "movie",
+    "writer": [
+      "Akira Kurosawa",
+      "Shinobu Hashimoto",
+      "Hideo Oguni"
+    ],
+    "year": "1954",
+    "background": "https://images.metahub.space/background/medium/tt0047478/img",
+    "logo": "https://images.metahub.space/logo/medium/tt0047478/img",
+    "popularities": {
+      "moviedb": 13.1822,
+      "stremio": 0.43940666666666667,
+      "trakt": 3,
+      "stremio_lib": 0
+    },
+    "slug": "movie/seven-samurai-0047478",
+    "id": "tt0047478",
+    "genres": [
+      "Action",
+      "Drama"
+    ],
+    "releaseInfo": "1954",
+    "videos": [],
+    "trailerStreams": [
+      {
+        "title": "Seven Samurai",
+        "ytId": "RsRN65PlaIM"
+      },
+      {
+        "title": "Seven Samurai",
+        "ytId": "fRUsjrkGs_A"
+      },
+      {
+        "title": "Seven Samurai",
+        "ytId": "5dZioLIejeo"
+      },
+      {
+        "title": "Seven Samurai",
+        "ytId": "7mw6LyyoeGE"
+      }
+    ],
+    "links": [
+      {
+        "name": "8.6",
+        "category": "imdb",
+        "url": "https://imdb.com/title/tt0047478"
+      },
+      {
+        "name": "Seven Samurai",
+        "category": "share",
+        "url": "https://www.strem.io/s/movie/seven-samurai-0047478"
+      },
+      {
+        "name": "Action",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Action"
+      },
+      {
+        "name": "Drama",
+        "category": "Genres",
+        "url": "stremio:///discover/https%3A%2F%2Fv3-cinemeta.strem.io%2Fmanifest.json/movie/top?genre=Drama"
+      },
+      {
+        "name": "Toshirô Mifune",
+        "category": "Cast",
+        "url": "stremio:///search?search=Toshir%C3%B4%20Mifune"
+      },
+      {
+        "name": "Takashi Shimura",
+        "category": "Cast",
+        "url": "stremio:///search?search=Takashi%20Shimura"
+      },
+      {
+        "name": "Keiko Tsushima",
+        "category": "Cast",
+        "url": "stremio:///search?search=Keiko%20Tsushima"
+      },
+      {
+        "name": "Akira Kurosawa",
+        "category": "Writers",
+        "url": "stremio:///search?search=Akira%20Kurosawa"
+      },
+      {
+        "name": "Shinobu Hashimoto",
+        "category": "Writers",
+        "url": "stremio:///search?search=Shinobu%20Hashimoto"
+      },
+      {
+        "name": "Hideo Oguni",
+        "category": "Writers",
+        "url": "stremio:///search?search=Hideo%20Oguni"
+      },
+      {
+        "name": "Akira Kurosawa",
+        "category": "Directors",
+        "url": "stremio:///search?search=Akira%20Kurosawa"
+      }
+    ],
+    "behaviorHints": {
+      "defaultVideoId": "tt0047478",
+      "hasScheduledVideos": false
+    }
+  }
+}

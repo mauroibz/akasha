@@ -1,0 +1,77 @@
+{
+  "query": "Suspiria",
+  "rank": 7.5,
+  "cacheMaxAge": 86400,
+  "metas": [
+    {
+      "id": "tt1034415",
+      "imdb_id": "tt1034415",
+      "type": "movie",
+      "name": "Suspiria",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMjQ2MTIyNjM2MF5BMl5BanBnXkFtZTgwMDE3NDMyNjM@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt1034415/img",
+      "releaseInfo": "2018",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt1034415",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0076786",
+      "imdb_id": "tt0076786",
+      "type": "movie",
+      "name": "Suspiria",
+      "poster": "https://m.media-amazon.com/images/M/MV5BZGIyYmI3ZjMtODI3ZC00NGQwLTk3ZGUtYWU4MDE3MzI3ZTk1XkEyXkFqcGc@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0076786/img",
+      "releaseInfo": "1977",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0076786",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt33183038",
+      "imdb_id": "tt33183038",
+      "type": "movie",
+      "name": "Suspiria",
+      "poster": "https://images.metahub.space/poster/small/tt33183038/img",
+      "background": "https://images.metahub.space/background/medium/tt33183038/img",
+      "releaseInfo": "2003",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt33183038",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0804507",
+      "imdb_id": "tt0804507",
+      "type": "movie",
+      "name": "Mother of Tears",
+      "poster": "https://m.media-amazon.com/images/M/MV5BMTIyNTQ2NDgwN15BMl5BanBnXkFtZTcwMTI2MjM3MQ@@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0804507/img",
+      "releaseInfo": "2007",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0804507",
+        "hasScheduledVideos": false
+      }
+    },
+    {
+      "id": "tt0116284",
+      "imdb_id": "tt0116284",
+      "type": "movie",
+      "name": "Fatal Frames",
+      "poster": "https://m.media-amazon.com/images/M/MV5BODE3Njg0NjMwM15BMl5BanBnXkFtZTcwNjc2MDU1MQ@@._V1_SX250.jpg",
+      "background": "https://images.metahub.space/background/medium/tt0116284/img",
+      "releaseInfo": "1996",
+      "links": [],
+      "behaviorHints": {
+        "defaultVideoId": "tt0116284",
+        "hasScheduledVideos": false
+      }
+    }
+  ]
+}
