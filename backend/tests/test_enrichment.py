@@ -453,12 +453,20 @@ async def test_an_album_is_enriched_from_its_spotify_identity(engine: Engine) ->
         row = connection.execute(
             text("SELECT metadata FROM items WHERE id=:id"), {"id": item_id}
         ).one()
+        sources = connection.execute(
+            text("SELECT source, is_primary FROM item_sources WHERE item_id=:id"),
+            {"id": item_id},
+        ).all()
     metadata = json.loads(row.metadata)
     assert metadata["country"] == "XW"
     assert metadata["track_count"] == 16
     assert metadata["tracklist"]
     # The importer's own creators survive: enrichment fills only what was empty.
     assert metadata["creators"] == ["Gorillaz"]
+    # The Spotify import has no MusicBrainz source to record at commit time
+    # (Sprint 064) -- without this row, a later Refresh or Fetch cover would
+    # fail with "no provider source" despite the record being fully resolved.
+    assert [(s.source, s.is_primary) for s in sources] == [("musicbrainz", 1)]
 
 
 @pytest.mark.anyio

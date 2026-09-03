@@ -26,6 +26,7 @@ from book_tracker.infrastructure.models import (
     ImportEffectRow,
     ImportRecordRow,
     ItemRow,
+    ItemSourceRow,
 )
 from book_tracker.infrastructure.providers import ProviderPayloadError
 from book_tracker.infrastructure.quota import ProviderQuota
@@ -325,6 +326,34 @@ class EnrichmentHandler:
                         "error_code": "item_not_found",
                     }
 
+                # An imported item reaches this handler with an identifier
+                # (an ISBN, a Letterboxd slug) but no `item_sources` row at
+                # all — the import path that creates it has no provider to
+                # record one from, unlike a search-added item, which always
+                # gets one (`add.py`). Left unfixed, a successful enrichment
+                # fills the record's metadata and cover but leaves it
+                # permanently unable to satisfy `primary_source()` — every
+                # later refresh or cover-fetch fails with "no provider
+                # source", on a record a provider plainly did resolve.
+                # Guarded on the item having no source at all, not on this
+                # one being new, so an item search-added from a *different*
+                # provider (which already has a primary source) is untouched.
+                if not session.scalar(
+                    select(ItemSourceRow.source).where(ItemSourceRow.item_id == item_id).limit(1)
+                ):
+                    for ref in payload_data.source_refs:
+                        session.add(
+                            ItemSourceRow(
+                                item_id=item_id,
+                                source=ref.source,
+                                source_id=ref.source_id,
+                                is_primary=int(ref.source == payload_data.source),
+                                created_at=now_iso,
+                                updated_at=now_iso,
+                            )
+                        )
+                    session.flush()
+
                 before: dict[str, Any] = {}
                 after: dict[str, Any] = {}
 
@@ -527,6 +556,16 @@ def _backfillable_items(
             conditions.append("items.cover_path = ''")
         if spec.wants_year:
             conditions.append("items.year IS NULL")
+        # An item an import connector created and enrichment already filled
+        # completely is still worth asking once more, for a reason none of the
+        # domain's own declarations name: nothing ever recorded *which*
+        # provider resolved it (DEC-130), so it can never be refreshed or have
+        # a missing cover fetched again. Unconditional, and listed first, so a
+        # domain declaring no cover/year interest and no completeness fields
+        # never leaves this OR empty.
+        conditions.insert(
+            0, "NOT EXISTS (SELECT 1 FROM item_sources WHERE item_sources.item_id = items.id)"
+        )
         scope = ""
         if item_ids is not None:
             # Bound and parameterised rather than interpolated.

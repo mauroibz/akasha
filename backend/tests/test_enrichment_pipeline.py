@@ -295,6 +295,10 @@ async def test_backfill_selects_only_items_that_an_isbn_lookup_could_still_help(
             cover_path="covers/9.jpg",
             metadata={"creators": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
         )
+        # Genuinely nothing left to ask for (DEC-130): a source recorded too, not
+        # only complete metadata — otherwise this fixture would itself prove the
+        # opposite of what it is meant to.
+        add_source(engine, complete)
 
         assert enqueue_enrichment_backfill(engine) == 1
         queued = queued_item_ids(engine)
@@ -302,6 +306,30 @@ async def test_backfill_selects_only_items_that_an_isbn_lookup_could_still_help(
     assert queued == [empty]
     assert no_isbn not in queued
     assert complete not in queued
+
+
+@pytest.mark.anyio
+async def test_backfill_reaches_a_complete_item_that_was_never_given_a_source(
+    tmp_path: Path,
+) -> None:
+    """DEC-130's retroactive path: an item enriched before that fix — full metadata,
+    cover, and year, but zero `item_sources` rows — could never be reached by the
+    ordinary completeness scan above, and would stay permanently unrefreshable
+    without this. `queued` is asserted rather than the ordinary-complete item's own
+    exclusion, since that is already this file's first backfill test."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        stuck = create_item_with_isbn(
+            engine,
+            "Obsession",
+            "9780141187761",
+            year=1949,
+            cover_path="covers/9.jpg",
+            metadata={"creators": ["A"], "publisher": "P", "page_count": 10, "description": "d"},
+        )
+        assert enqueue_enrichment_backfill(engine) == 1
+        assert queued_item_ids(engine) == [stuck]
 
 
 @pytest.mark.anyio
@@ -449,6 +477,20 @@ def create_typed_item(
     return item_id
 
 
+def add_source(engine: Engine, item_id: int, source: str = "openlibrary") -> None:
+    """A provider source already recorded (DEC-130) — what a search-added item
+    always has and an imported one, before this fix, never did. A "complete"
+    fixture needs one too, or it only proves the old, narrower rule."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO item_sources(item_id,source,source_id,is_primary,"
+                "created_at,updated_at) VALUES(:item,:source,:item,1,'n','n')"
+            ),
+            {"item": item_id, "source": source},
+        )
+
+
 def queued_payloads(engine: Engine) -> list[dict[str, Any]]:
     with engine.connect() as connection:
         rows = connection.execute(
@@ -543,6 +585,7 @@ async def test_completeness_is_judged_by_each_domain_s_own_fields(tmp_path: Path
             cover_path="covers/1.jpg",
             metadata={"creators": ["White Fox"], "genres": ["Action"], "synopsis": "..."},
         )
+        add_source(engine, complete, "anilist")
         thin = create_typed_item(engine, "A thin anime", "anime", ("mal", "44511"))
 
         assert enqueue_enrichment_backfill(engine) == 1
@@ -559,7 +602,7 @@ async def test_a_book_missing_only_an_anime_field_is_still_complete(tmp_path: Pa
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
         engine = app.state.engine
-        create_typed_item(
+        book = create_typed_item(
             engine,
             "A complete book",
             "book",
@@ -568,6 +611,7 @@ async def test_a_book_missing_only_an_anime_field_is_still_complete(tmp_path: Pa
             cover_path="covers/1.jpg",
             metadata={"publisher": "P", "page_count": 10, "description": "d"},
         )
+        add_source(engine, book)
         assert enqueue_enrichment_backfill(engine) == 0
 
 
@@ -667,6 +711,10 @@ async def test_movie_enrichment_fills_only_what_is_empty(tmp_path: Path) -> None
             row = connection.execute(
                 text("SELECT title, year, metadata FROM items WHERE id = :id"), {"id": item_id}
             ).one()
+            sources = connection.execute(
+                text("SELECT source, source_id, is_primary FROM item_sources WHERE item_id = :id"),
+                {"id": item_id},
+            ).all()
         await client.aclose()
 
     metadata = json.loads(row.metadata)
@@ -676,6 +724,71 @@ async def test_movie_enrichment_fills_only_what_is_empty(tmp_path: Path) -> None
     assert metadata["creators"] == ["Dario Argento"]
     assert metadata["runtime"] == 94
     assert "cine de terror" in metadata["genres"]
+    # The import path that created this item (Letterboxd) has no provider of its
+    # own to record a source from, so it reached enrichment with none at all.
+    # Left unrecorded, the item would enrich successfully here and then fail
+    # every later refresh or cover-fetch with "no provider source" -- exactly
+    # the gap a real Letterboxd import surfaced.
+    assert [(s.source, s.is_primary) for s in sources] == [("wikidata", 1)]
+    assert sources[0].source_id
+
+
+@pytest.mark.anyio
+async def test_an_item_that_already_has_a_source_is_not_given_a_second_one(
+    tmp_path: Path,
+) -> None:
+    """A source recorded by any earlier path is left alone.
+
+    Guarded on "no source at all", not on "this job's own provider" — an item
+    that already carries the primary source a search-add or an earlier
+    enrichment recorded must not have that pick disturbed just because a
+    second provider also happens to resolve it.
+    """
+    from recordings import recording  # noqa: PLC0415
+    from test_wikidata_provider import FETCH_1977, claim_key, wikidata_route_key  # noqa: PLC0415
+
+    from book_tracker.domains.movie.providers import WikidataMovieProvider  # noqa: PLC0415
+    from book_tracker.infrastructure.providers import create_provider_client  # noqa: PLC0415
+
+    routes = {
+        claim_key("P6127", "suspiria"): (200, recording("wikidata_search_p6127_suspiria.json")),
+        **FETCH_1977,
+    }
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        engine = app.state.engine
+        item_id = create_typed_item(
+            engine, "Suspiria (mi copia)", "movie", ("letterboxd", "suspiria")
+        )
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO item_sources(item_id,source,source_id,is_primary,"
+                    "created_at,updated_at) VALUES(:item,'cinemeta','tt0076786',1,'n','n')"
+                ),
+                {"item": item_id},
+            )
+        client = create_provider_client(replay(routes, key=wikidata_route_key))
+        handler = EnrichmentHandler(
+            engine,
+            {"wikidata": WikidataMovieProvider(client, "test@example.invalid")},
+            rate_limiter=None,
+            data_dir=tmp_path,
+        )
+        job_id = JobRepository(engine).enqueue(
+            None, "enrich_item", {"item_id": item_id, "kind": "letterboxd", "value": "suspiria"}
+        )
+        assert (await handler.process(job_id, datetime.now(UTC)))["state"] == "succeeded"
+        with engine.connect() as connection:
+            sources = connection.execute(
+                text("SELECT source, source_id, is_primary FROM item_sources WHERE item_id = :id"),
+                {"id": item_id},
+            ).all()
+        await client.aclose()
+
+    assert [(s.source, s.source_id, s.is_primary) for s in sources] == [
+        ("cinemeta", "tt0076786", 1)
+    ]
 
 
 @pytest.mark.anyio
