@@ -42,3 +42,52 @@ def decode_cursor(
     if state.null_bucket not in (0, 1) or state.entry_id < 1:
         raise CursorError("cursor values are invalid")
     return state
+
+
+@dataclass(frozen=True)
+class InsightCursorState:
+    """A ranking's cursor. Unlike `CursorState`, a row here is a group, not an entry —
+    there is no single `entry_id` to break a tie on, so the normalized key does that
+    job instead (Sprint 065).
+    """
+
+    type: str
+    key: str
+    metric: str
+    min_rated: int
+    include_suppressed: bool
+    value: Any
+    norm: str
+    v: int = 1
+
+
+def encode_insight_cursor(state: InsightCursorState) -> str:
+    raw = json.dumps(asdict(state), separators=(",", ":"), sort_keys=True).encode()
+    return base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
+
+def decode_insight_cursor(
+    value: str,
+    *,
+    type: str,
+    key: str,
+    metric: str,
+    min_rated: int,
+    include_suppressed: bool,
+) -> InsightCursorState:
+    try:
+        raw = base64.urlsafe_b64decode(value + "=" * (-len(value) % 4))
+        payload = json.loads(raw)
+        state = InsightCursorState(**payload)
+    except (ValueError, TypeError, KeyError, json.JSONDecodeError) as error:
+        raise CursorError("cursor is malformed") from error
+    if (
+        state.v != 1
+        or state.type != type
+        or state.key != key
+        or state.metric != metric
+        or state.min_rated != min_rated
+        or state.include_suppressed != include_suppressed
+    ):
+        raise CursorError("cursor does not match this query")
+    return state

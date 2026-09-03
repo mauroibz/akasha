@@ -94,6 +94,8 @@ class FieldSpecResponse(BaseModel):
     maximum: int | None = None
     #: Present only on a `rows` field: what one row of it holds.
     columns: list[ColumnSpecResponse] | None = None
+    #: Whether an insights ranking may group by this field (Sprint 065).
+    groupable: bool = False
 
 
 class StatusSpecResponse(BaseModel):
@@ -198,6 +200,41 @@ class EntryListResponse(BaseModel):
     next_cursor: str | None
     total: int
     facets: FacetsResponse
+
+
+class InsightRowResponse(BaseModel):
+    #: The normalized grouping value — stable, and what `/api/entries`' `value` param
+    #: expects back for a ranking row's "show me these" link.
+    key: str
+    #: The commonest original spelling among this row's members (AC5).
+    label: str
+    count: int
+    rated_count: int
+    mean_score: float | None
+    score_spread: float | None
+
+
+class InsightSuppressedResponse(BaseModel):
+    key: str
+    label: str
+    count: int
+
+
+class InsightResponse(BaseModel):
+    type: str
+    key: str
+    metric: Literal["count", "score"]
+    min_rated: int
+    rows: list[InsightRowResponse]
+    next_cursor: str | None
+    #: What a ranking left out by default, so the screen can say so rather than let
+    #: the rows silently shrink (Sprint 065 deliverable 6).
+    suppressed: list[InsightSuppressedResponse]
+    #: True only when `metric="score"` and every group failed `min_rated` — distinct
+    #: from an empty result because the domain has nothing to rank at all (AC10).
+    no_rated_groups: bool
+    #: Entries excluded from a `year`/`decade` ranking for having no year (AC3).
+    null_count: int
 
 
 class AffectedResponse(BaseModel):
@@ -366,6 +403,11 @@ async def list_entries(
     #: Which domains to show. Repeated like `status`; absent means every domain.
     type: Annotated[list[ItemTypeName] | None, Query()] = None,
     q: str | None = None,
+    #: A precise metadata (or `year`/`decade`) filter (Sprint 065) — how a ranking row
+    #: links back to the library. Both or neither: a value with no key, or vice versa,
+    #: is not a filter that means anything.
+    key: str | None = None,
+    value: str | None = None,
     sort: Literal[
         "date_added", "score", "title", "creator", "year", "date_finished"
     ] = "date_added",
@@ -373,17 +415,48 @@ async def list_entries(
     after: str | None = None,
     limit: int = Query(default=100, ge=1, le=200),
 ) -> EntryListResponse:
+    if (key is None) != (value is None):
+        raise LibraryError(
+            "invalid_insight_key", "key and value must be provided together", status_code=422
+        )
     return EntryListResponse.model_validate(
         library.list_entries(
-            statuses=[value.value for value in status] if status is not None else None,
+            statuses=[item.value for item in status] if status is not None else None,
             shelves=shelf or [],
-            formats=[value.value for value in format or []],
-            types=[value.value for value in type or []],
+            formats=[item.value for item in format or []],
+            types=[item.value for item in type or []],
+            key=key,
+            value=value,
             q=q,
             sort=sort,
             order=order,
             after=after,
             limit=limit,
+        )
+    )
+
+
+@router.get("/insights", response_model=InsightResponse, responses={422: {"model": ErrorResponse}})
+async def get_insights(
+    library: Library,
+    type: ItemTypeName,
+    key: str,
+    metric: Literal["count", "score"] = "count",
+    min_rated: int = Query(default=2, ge=1),
+    include_suppressed: bool = False,
+    limit: int = Query(default=50, ge=1, le=200),
+    after: str | None = None,
+) -> InsightResponse:
+    """Rank one domain's entries by a declared key (Sprint 065)."""
+    return InsightResponse.model_validate(
+        library.rank(
+            item_type=type.value,
+            key=key,
+            metric=metric,
+            min_rated=min_rated,
+            include_suppressed=include_suppressed,
+            limit=limit,
+            after=after,
         )
     )
 

@@ -6,21 +6,48 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
-from sqlalchemy import Engine, and_, case, delete, func, or_, select
+from sqlalchemy import (
+    Column,
+    Engine,
+    Integer,
+    MetaData,
+    Table,
+    Text,
+    and_,
+    case,
+    delete,
+    false,
+    func,
+    or_,
+    select,
+    text,
+    true,
+)
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from book_tracker.domain.normalization import normalize_text, shelf_slug
-from book_tracker.domain.pagination import CursorError, CursorState, decode_cursor, encode_cursor
+from book_tracker.domain.pagination import (
+    CursorError,
+    CursorState,
+    InsightCursorState,
+    decode_cursor,
+    decode_insight_cursor,
+    encode_cursor,
+    encode_insight_cursor,
+)
 from book_tracker.domain.registry import DOMAINS
 from book_tracker.domain.spec import (
+    BUILTIN_INSIGHT_KEYS,
     Domain,
     InvalidEntryField,
     InvalidFormat,
+    InvalidGroupableKey,
     InvalidProgress,
     InvalidStatus,
     validate_entry_values,
     validate_formats,
+    validate_groupable_key,
     validate_status,
 )
 from book_tracker.infrastructure.attachments import (
@@ -600,24 +627,64 @@ class LibraryService:
         q: str | None,
         formats: Sequence[str] = (),
         types: Sequence[str] = (),
+        key: str | None = None,
+        value: str | None = None,
     ) -> str:
         """What a cursor is bound to. Every filter has to be in here.
 
         A key that omits one lets a cursor cut for one filter be accepted under
         another, which skips or repeats a page silently rather than failing.
         """
-        value = json.dumps(
+        payload = json.dumps(
             {
                 "q": q or "",
                 "shelves": sorted(shelves),
                 "statuses": sorted(statuses or []),
                 "formats": sorted(formats),
                 "types": sorted(types),
+                "key": key or "",
+                "value": value or "",
             },
             separators=(",", ":"),
             sort_keys=True,
         )
-        return hashlib.sha256(value.encode()).hexdigest()[:16]
+        return hashlib.sha256(payload.encode()).hexdigest()[:16]
+
+    def _items_matching_key_value(self, item_type: str, key: str, value: str) -> Any:
+        """Item ids whose ranking key (Sprint 065) normalizes to `value`.
+
+        Shares its branching with `_insight_explode` deliberately: a ranking row and
+        this filter must never disagree about which entries belong to it (AC8) — the
+        precise `key`/`value` filter on `/api/entries` exists *because* the fuzzy `q`
+        search is not a substitute (it would match `Gorillaz` inside a description).
+        """
+        domain = DOMAINS[item_type]
+        try:
+            field = validate_groupable_key(domain, key)
+        except InvalidGroupableKey as error:
+            raise LibraryError("invalid_insight_key", str(error), status_code=422) from error
+
+        if key in BUILTIN_INSIGHT_KEYS:
+            try:
+                target = int(value)
+            except ValueError:
+                return select(ItemRow.id).where(false())
+            year = ItemRow.year
+            raw = year if key == "year" else (year.op("/")(10)) * 10
+            return select(ItemRow.id).where(ItemRow.type == item_type, raw == target)
+
+        assert field is not None  # BUILTIN_INSIGHT_KEYS handled above
+        norm = normalize_text(value)
+        if field.multiplicity == "many":
+            each = func.json_each(ItemRow.metadata_json, f"$.{key}").table_valued("value")
+            return (
+                select(ItemRow.id)
+                .select_from(ItemRow)
+                .join(each, true())
+                .where(ItemRow.type == item_type, func.normalize_text(each.c.value) == norm)
+            )
+        raw = func.json_extract(ItemRow.metadata_json, f"$.{key}")
+        return select(ItemRow.id).where(ItemRow.type == item_type, func.normalize_text(raw) == norm)
 
     def _filtered_entries(
         self,
@@ -626,6 +693,8 @@ class LibraryService:
         q: str | None,
         formats: Sequence[str] = (),
         types: Sequence[str] = (),
+        key: str | None = None,
+        value: str | None = None,
     ) -> Any:
         query = (
             select(EntryRow)
@@ -672,6 +741,18 @@ class LibraryService:
                     ItemRow.creator_primary_normalized.like(pattern),
                 )
             )
+        if key is not None and value is not None:
+            # A key is only meaningful within one domain, so this filter requires the
+            # caller to have already narrowed to exactly one (Sprint 065 deliverable 7).
+            if len(types) != 1:
+                raise LibraryError(
+                    "invalid_insight_key",
+                    "A key/value filter requires exactly one type",
+                    status_code=422,
+                )
+            query = query.where(
+                EntryRow.item_id.in_(self._items_matching_key_value(types[0], key, value))
+            )
         return query
 
     def list_entries(
@@ -682,6 +763,8 @@ class LibraryService:
         q: str | None = None,
         formats: Sequence[str] = (),
         types: Sequence[str] = (),
+        key: str | None = None,
+        value: str | None = None,
         sort: str = "date_added",
         order: Literal["asc", "desc"] = "desc",
         after: str | None = None,
@@ -700,7 +783,7 @@ class LibraryService:
         }
         expression = sort_expressions[sort]
         bucket = case((expression.is_(None), 1), else_=0)
-        filter_key = self._filter_key(statuses, shelves, q, formats, types)
+        filter_key = self._filter_key(statuses, shelves, q, formats, types, key, value)
         state = None
         if after:
             try:
@@ -708,7 +791,7 @@ class LibraryService:
             except CursorError as error:
                 raise LibraryError("invalid_cursor", str(error), status_code=400) from error
 
-        query = self._filtered_entries(statuses, shelves, q, formats, types)
+        query = self._filtered_entries(statuses, shelves, q, formats, types, key, value)
         if state is not None:
             id_comparison = (
                 EntryRow.id > state.entry_id if order == "asc" else EntryRow.id < state.entry_id
@@ -737,7 +820,7 @@ class LibraryService:
             has_more = len(entries) > limit
             entries = entries[:limit]
             total_query = select(func.count()).select_from(
-                self._filtered_entries(statuses, shelves, q, formats, types)
+                self._filtered_entries(statuses, shelves, q, formats, types, key, value)
                 .order_by(None)
                 .subquery()
             )
@@ -812,6 +895,315 @@ class LibraryService:
                     "format_counts": {row[0]: row[1] for row in format_rows},
                 },
             }
+
+    def _insight_explode(
+        self, session: Session, base: Any, item_type: str, key: str
+    ) -> tuple[Any, int]:
+        """One row per (entry, value) this ranking key produces, plus how many
+        entries were excluded for having none (Sprint 065).
+
+        `base` is a `_filtered_entries(...)` subquery already scoped to one domain.
+        `year`/`decade` read `items.year` directly — not metadata, and already
+        canonical, so `raw` and `norm` are the same expression. Every other key reads
+        `items.metadata` through `json_extract` (`multiplicity="one"`) or `json_each`
+        (`multiplicity="many"`), normalized through the SQLite `normalize_text` UDF
+        registered in `database.py` so a ranking groups exactly the way search and sort
+        already do.
+        """
+        joined = base.join(ItemRow, ItemRow.id == base.c.item_id)
+        if key in BUILTIN_INSIGHT_KEYS:
+            year = ItemRow.year
+            # `/` on two SQLAlchemy Integer columns coerces to Numeric for correctness
+            # under Python's true-division semantics; `.op("/")` bypasses that and asks
+            # SQLite for its native (floor) integer division instead.
+            raw = year if key == "year" else (year.op("/")(10)) * 10
+            exploded = (
+                select(
+                    base.c.id.label("entry_id"),
+                    base.c.score.label("score"),
+                    raw.label("raw"),
+                    raw.label("norm"),
+                )
+                .select_from(joined)
+                .where(year.isnot(None))
+            ).subquery()
+            null_count = (
+                session.scalar(select(func.count()).select_from(joined).where(year.is_(None))) or 0
+            )
+            return exploded, null_count
+
+        domain = DOMAINS[item_type]
+        field = validate_groupable_key(domain, key)
+        assert field is not None  # BUILTIN_INSIGHT_KEYS handled above
+        if field.multiplicity == "many":
+            each = func.json_each(ItemRow.metadata_json, f"$.{key}").table_valued("value")
+            exploded_query = (
+                select(
+                    base.c.id.label("entry_id"),
+                    base.c.score.label("score"),
+                    each.c.value.label("raw"),
+                    func.normalize_text(each.c.value).label("norm"),
+                )
+                .select_from(joined)
+                .join(each, true())
+                .where(each.c.value.isnot(None), each.c.value != "")
+            )
+            # Every downstream query below (the count/mean aggregate, the best-spelling
+            # window function, and the suppressed-row lookup) references `exploded`
+            # separately, and each reference re-runs its own `json_each` + UDF pass —
+            # measured at 5,000 entries under write contention (`scripts/
+            # benchmark_library.py`) to push the score metric over the same budget the
+            # library list holds itself to (AC9). Materializing the explosion once,
+            # here, turns every reference after this one into a scan of a plain table
+            # instead — the fallback the sprint's own risk section named, done as a
+            # per-request temp table rather than a schema migration since nothing here
+            # needs to survive past this one call.
+            return self._materialize_insight_explode(session, exploded_query), 0
+        raw = func.json_extract(ItemRow.metadata_json, f"$.{key}")
+        exploded = (
+            select(
+                base.c.id.label("entry_id"),
+                base.c.score.label("score"),
+                raw.label("raw"),
+                func.normalize_text(raw).label("norm"),
+            )
+            .select_from(joined)
+            .where(raw.isnot(None), raw != "")
+        ).subquery()
+        return exploded, 0
+
+    @staticmethod
+    def _materialize_insight_explode(session: Session, exploded_query: Any) -> Any:
+        rows = session.execute(exploded_query).all()
+        session.execute(text("DROP TABLE IF EXISTS insight_explode"))
+        session.execute(
+            text(
+                "CREATE TEMP TABLE insight_explode "
+                "(entry_id INTEGER, score INTEGER, raw TEXT, norm TEXT)"
+            )
+        )
+        if rows:
+            session.execute(
+                text(
+                    "INSERT INTO insight_explode (entry_id, score, raw, norm) "
+                    "VALUES (:entry_id, :score, :raw, :norm)"
+                ),
+                [dict(row._mapping) for row in rows],  # noqa: SLF001
+            )
+        return Table(
+            "insight_explode",
+            MetaData(),
+            Column("entry_id", Integer),
+            Column("score", Integer),
+            Column("raw", Text),
+            Column("norm", Text),
+        )
+
+    def _insight_labels(
+        self, session: Session, exploded: Any, norms: Sequence[str]
+    ) -> dict[str, str]:
+        """The commonest original spelling among each key's members (AC5).
+
+        Grouping already folds case and diacritics through `norm`; this answers the
+        separate question of what to show for a group whose members disagree on
+        spelling. Ties break lexicographically — arbitrary but deterministic.
+        """
+        if not norms:
+            return {}
+        spellings = (
+            select(exploded.c.norm, exploded.c.raw, func.count().label("n"))
+            .where(exploded.c.norm.in_(norms))
+            .group_by(exploded.c.norm, exploded.c.raw)
+        ).subquery()
+        ranked = select(
+            spellings.c.norm,
+            spellings.c.raw,
+            func.row_number()
+            .over(
+                partition_by=spellings.c.norm,
+                order_by=(spellings.c.n.desc(), spellings.c.raw.asc()),
+            )
+            .label("rn"),
+        ).subquery()
+        best = select(ranked.c.norm, ranked.c.raw).where(ranked.c.rn == 1)
+        return {row.norm: row.raw for row in session.execute(best)}
+
+    def rank(
+        self,
+        *,
+        item_type: str,
+        key: str,
+        metric: Literal["count", "score"] = "count",
+        min_rated: int = 2,
+        include_suppressed: bool = False,
+        statuses: Sequence[str] | None = None,
+        shelves: Sequence[str] = (),
+        q: str | None = None,
+        formats: Sequence[str] = (),
+        limit: int = 50,
+        after: str | None = None,
+    ) -> dict[str, Any]:
+        """Rank one domain's entries by a declared key (Sprint 065).
+
+        Reuses `_filtered_entries` exactly as `list_entries`'s `facets` block already
+        does, so a ranking can later be taken over a filtered library rather than the
+        whole domain. Never crosses domains: `item_type` narrows `_filtered_entries` to
+        one, and the explode step reads only that domain's own metadata shape.
+        """
+        domain = DOMAINS[item_type]
+        try:
+            validate_groupable_key(domain, key)
+        except InvalidGroupableKey as error:
+            raise LibraryError("invalid_insight_key", str(error), status_code=422) from error
+
+        cursor_state: InsightCursorState | None = None
+        if after:
+            try:
+                cursor_state = decode_insight_cursor(
+                    after,
+                    type=item_type,
+                    key=key,
+                    metric=metric,
+                    min_rated=min_rated,
+                    include_suppressed=include_suppressed,
+                )
+            except CursorError as error:
+                raise LibraryError("invalid_cursor", str(error), status_code=400) from error
+
+        is_numeric_key = key in BUILTIN_INSIGHT_KEYS
+        suppressed_keys = domain.insight_suppressed_keys
+
+        with Session(self.engine) as session:
+            base = self._filtered_entries(statuses, shelves, q, formats, [item_type]).subquery()
+            exploded, null_count = self._insight_explode(session, base, item_type, key)
+
+            per_entry = (
+                select(exploded.c.norm, exploded.c.entry_id, exploded.c.score).distinct()
+            ).subquery()
+            aggregates = (
+                select(
+                    per_entry.c.norm,
+                    func.count().label("count"),
+                    func.count(per_entry.c.score).label("rated_count"),
+                    func.avg(per_entry.c.score).label("mean_score"),
+                    func.avg(per_entry.c.score * per_entry.c.score).label("mean_sq"),
+                ).group_by(per_entry.c.norm)
+            ).subquery()
+
+            visible_query = select(aggregates)
+            if not include_suppressed and suppressed_keys:
+                visible_query = visible_query.where(aggregates.c.norm.not_in(suppressed_keys))
+            visible = visible_query.subquery()
+
+            order_expr = visible.c.count if metric == "count" else visible.c.mean_score
+            query = select(visible)
+            if metric == "score":
+                query = query.where(visible.c.rated_count >= min_rated)
+            if cursor_state is not None:
+                query = query.where(
+                    or_(
+                        order_expr < cursor_state.value,
+                        and_(order_expr == cursor_state.value, visible.c.norm > cursor_state.norm),
+                    )
+                )
+            query = query.order_by(order_expr.desc(), visible.c.norm.asc()).limit(limit + 1)
+
+            raw_rows = session.execute(query).all()
+            has_more = len(raw_rows) > limit
+            raw_rows = raw_rows[:limit]
+
+            # AC10 needs to tell "nothing meets min_rated" from "no more pages" — the
+            # distinction only exists on an empty *first* page, so this is checked
+            # lazily rather than unconditionally: the common case (a page with rows)
+            # never pays for it, which is one fewer pass over `visible` per call.
+            no_rated_groups = False
+            if metric == "score" and not raw_rows and cursor_state is None:
+                rated_groups = (
+                    session.scalar(
+                        select(func.count())
+                        .select_from(visible)
+                        .where(visible.c.rated_count >= min_rated)
+                    )
+                    or 0
+                )
+                no_rated_groups = rated_groups == 0
+
+            labels: dict[str, str] = {}
+            if not is_numeric_key:
+                labels = self._insight_labels(session, exploded, [row.norm for row in raw_rows])
+
+            rows = [self._insight_row(row, key, is_numeric_key, labels) for row in raw_rows]
+
+            next_cursor = None
+            if has_more and raw_rows:
+                last = raw_rows[-1]
+                cursor_value = last.count if metric == "count" else last.mean_score
+                next_cursor = encode_insight_cursor(
+                    InsightCursorState(
+                        type=item_type,
+                        key=key,
+                        metric=metric,
+                        min_rated=min_rated,
+                        include_suppressed=include_suppressed,
+                        value=cursor_value,
+                        norm=last.norm,
+                    )
+                )
+
+            suppressed_rows: list[dict[str, Any]] = []
+            if suppressed_keys:
+                supp_raw = session.execute(
+                    select(aggregates.c.norm, aggregates.c.count).where(
+                        aggregates.c.norm.in_(suppressed_keys)
+                    )
+                ).all()
+                supp_labels = (
+                    {}
+                    if is_numeric_key
+                    else self._insight_labels(session, exploded, [row.norm for row in supp_raw])
+                )
+                for row in supp_raw:
+                    label = self._insight_label(row.norm, key, is_numeric_key, supp_labels)
+                    suppressed_rows.append({"key": row.norm, "label": label, "count": row.count})
+
+            return {
+                "type": item_type,
+                "key": key,
+                "metric": metric,
+                "min_rated": min_rated,
+                "rows": rows,
+                "next_cursor": next_cursor,
+                "suppressed": suppressed_rows,
+                "no_rated_groups": no_rated_groups,
+                "null_count": null_count,
+            }
+
+    @staticmethod
+    def _insight_label(norm: str, key: str, is_numeric_key: bool, labels: Mapping[str, str]) -> str:
+        if is_numeric_key:
+            return str(norm) if key == "year" else f"{norm}s"
+        return labels.get(norm, norm)
+
+    def _insight_row(
+        self, row: Any, key: str, is_numeric_key: bool, labels: Mapping[str, str]
+    ) -> dict[str, Any]:
+        spread = None
+        if (
+            row.rated_count
+            and row.rated_count >= 2
+            and row.mean_sq is not None
+            and row.mean_score is not None
+        ):
+            variance = max(row.mean_sq - row.mean_score**2, 0.0)
+            spread = variance**0.5
+        return {
+            "key": row.norm,
+            "label": self._insight_label(row.norm, key, is_numeric_key, labels),
+            "count": row.count,
+            "rated_count": row.rated_count,
+            "mean_score": row.mean_score,
+            "score_spread": spread,
+        }
 
     def _selection(
         self,

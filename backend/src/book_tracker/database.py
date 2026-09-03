@@ -6,6 +6,7 @@ from sqlalchemy import create_engine as sqlalchemy_create_engine
 from sqlalchemy.engine import Connection
 
 from book_tracker.config import Settings
+from book_tracker.domain.normalization import normalize_text
 
 
 def create_engine(settings: Settings) -> Engine:
@@ -19,6 +20,14 @@ def create_engine(settings: Settings) -> Engine:
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute(f"PRAGMA busy_timeout={settings.sqlite_busy_timeout_ms:d}")
         cursor.close()
+        # Insights (Sprint 065) groups a ranking key the same way search/sort already
+        # fold text — case and diacritics — which only holds if it is the same function.
+        # Registered unconditionally: SQLite UDF registration has no per-call cost until
+        # a query actually invokes it, so every connection carries it whether or not a
+        # given request ranks anything.
+        dbapi_connection.create_function(
+            "normalize_text", 1, lambda value: normalize_text(value) if value is not None else None
+        )
 
     return engine
 

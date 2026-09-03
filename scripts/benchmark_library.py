@@ -117,7 +117,15 @@ def seed(engine: Engine, count: int) -> None:
     for index in range(1, count + 1):
         title = f"{TITLE_STEMS[index % len(TITLE_STEMS)]} {index:05d}"
         author = AUTHOR_STEMS[index % len(AUTHOR_STEMS)]
-        metadata = {"creators": [author], "publisher": f"Editorial {index % 97}"}
+        # A second, sometimes third, creator on roughly two books in three — realistic
+        # enough to exercise `json_each`'s row explosion (Sprint 065's insights ranking)
+        # rather than the degenerate one-value-per-item case a single creator would be.
+        creators = [author]
+        if index % 3 != 0:
+            creators.append(AUTHOR_STEMS[(index + 1) % len(AUTHOR_STEMS)])
+        if index % 5 == 0:
+            creators.append(AUTHOR_STEMS[(index + 3) % len(AUTHOR_STEMS)])
+        metadata = {"creators": creators, "publisher": f"Editorial {index % 97}"}
         items.append(
             {
                 "id": index,
@@ -304,6 +312,50 @@ def scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[[], objec
             statuses=["read"], shelves=["shelf-3"], sort="title", order="asc", limit=PAGE_SIZE
         ),
     )
+
+
+def insights_scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[[], object]]]:
+    """AC9: an insights ranking is held to the same first-page budget as the library.
+
+    `creators` is the `json_each` path — the one with no existing query to mirror and
+    the sprint's named performance risk. `publisher` exercises `json_extract` instead
+    (no row explosion), and `year`/`decade` read `items.year` directly with no metadata
+    JSON involved at all — three different query shapes under one budget.
+    """
+    yield (
+        "insights     creators/count",
+        lambda: service.rank(item_type="book", key="creators", metric="count", limit=50),
+    )
+    yield (
+        "insights     creators/score min_rated=2",
+        lambda: service.rank(
+            item_type="book", key="creators", metric="score", min_rated=2, limit=50
+        ),
+    )
+    yield (
+        "insights     publisher/count",
+        lambda: service.rank(item_type="book", key="publisher", metric="count", limit=50),
+    )
+    yield (
+        "insights     year/count",
+        lambda: service.rank(item_type="book", key="year", metric="count", limit=50),
+    )
+    yield (
+        "insights     decade/count",
+        lambda: service.rank(item_type="book", key="decade", metric="count", limit=50),
+    )
+
+
+def insight_query_plan(engine: Engine) -> list[str]:
+    """The `json_each` explosion's own plan — new code with nothing else to mirror it."""
+    statement = (
+        "SELECT items.id, json_each.value, normalize_text(json_each.value) "
+        "FROM items, json_each(items.metadata, '$.creators') "
+        "WHERE items.type = 'book'"
+    )
+    with engine.connect() as connection:
+        rows = connection.execute(text(f"EXPLAIN QUERY PLAN {statement}")).all()
+    return [str(row[-1]) for row in rows]
 
 
 def query_plans(engine: Engine, service: LibraryService) -> list[tuple[str, list[str]]]:
@@ -525,6 +577,11 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
                 print(f"    {line}")
         print()
 
+        print("QUERY PLAN (insights, creators/count — the json_each path)")
+        for line in insight_query_plan(engine):
+            print(f"    {line}")
+        print()
+
         breaches: list[str] = []
         for label, condition in (("idle", None), (f"contended ({jobs} jobs queued)", jobs)):
             print(f"LATENCY — {label}")
@@ -532,7 +589,7 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
             drainer = QueueDrainer(engine, condition) if condition else None
             context: Any = drainer if drainer else _NullContext()
             with context:
-                for name, callable_ in scenarios(service):
+                for name, callable_ in (*scenarios(service), *insights_scenarios(service)):
                     p50, p95, worst = measure(callable_, iterations)
                     flag = "" if p95 < FIRST_PAGE_BUDGET_MS else "  OVER BUDGET"
                     if flag:
