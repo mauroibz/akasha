@@ -1151,6 +1151,42 @@ duplicate rows in every search. That is a product decision to reopen with the ow
 to write. Deezer and iTunes were both measured keyless and working; neither can merge until the
 identity question is answered.
 
+### [Sprint 065 — The Spotify import, and the album domain's first enrichment](065-spotify-album-import.md) **[PLANNED]**
+
+The epic DEC-076 declined to commit to, now measured and buildable — see
+[`spotify-import-and-insights-viability.md`](../spotify-import-and-insights-viability.md). The
+finding that unlocks it is that MusicBrainz stores Spotify links as URL relationships, so an
+exported `spotify:album:` id resolves to an exact release: 73% of the owner's saved albums by
+relation alone, ~95% once a strict title-and-artist search covers the rest. That turns what DEC-052
+would otherwise force into a fuzzy-matching exercise into an ordinary importer, and the remainder
+goes to Triage rather than being guessed at.
+
+Its one structural change is giving the album domain an `EnrichmentSpec`, which it deliberately
+lacks: one MusicBrainz fetch really does return everything a *search-added* album has, but an
+imported stub is the case background enrichment was built for. Keyed on `spotify`, so a
+search-added album is still never queued.
+
+Scope is narrower than the export: the 157 saved albums, not the 406 reachable through playlists,
+and track roll-up opt-in and threshold-gated because it adds only 41 albums of which just 9 have
+more than one saved track.
+
+### Sprint 066 — Insights: rankings from the fields items already declare **[PLANNED, not yet written]**
+
+Aggregate entry scores by a keyed field — creators, genres, publisher, label, network — and rank
+the keys, so "top authors" and "top artists" fall out of the ratings already recorded instead of
+each becoming a domain with its own identity, providers and screens. The domain spec already
+publishes the groupable surface, and `creator_sort_override` already solves the name-variant
+problem, so perhaps a quarter of the backend is standing.
+
+Three things make it a real sprint rather than an endpoint: `multiplicity == "many"` is the wrong
+rule for which fields are keyable (`tracklist` is a list of rows; `catalog_number` is near-unique),
+so `FieldSpec` needs an explicit `groupable`; ranking needs a statistic that does not put one 10
+above eleven 9s; and `Various Artists` — 7 albums in the owner's Spotify library — is not an artist.
+
+**Deliberately sequenced after 065**, because the feature is worth exactly as much as the share of
+entries carrying a score, and that is unmeasurable against a 13-entry library. The Spotify import
+produces the dataset this would be judged by.
+
 ## Future epics, after this plan
 
 These are not sprints and remain deliberately unnumbered (DEC-058). Each becomes an epic on top of
