@@ -51,6 +51,7 @@ from book_tracker.domain.importers import (
     planned_upload,
     valid_member_pattern,
 )
+from book_tracker.domain.normalization import normalize_text
 from book_tracker.domain.providers import (
     EnrichingProvider,
     IdentityStrategy,
@@ -408,6 +409,37 @@ def fields_are_described_completely(domain: Domain) -> None:
             assert field.minimum <= field.maximum, (
                 f"{domain.item_type}.{field.name} admits no value at all"
             )
+
+
+@registry_check
+def groupable_fields_are_keyable(domain: Domain) -> None:
+    """Sprint 065: `groupable` is a declaration, and it must name something rankable.
+
+    `rows` is a list of structured cells, not a key; `long_text` groups on nearly
+    unique prose, which is noise dressed as an insight. Every domain must offer at
+    least one groupable field, or the feature has nothing to show for it by
+    construction.
+    """
+    groupable = [field for field in domain.fields if field.groupable]
+    assert groupable, f"{domain.item_type} declares no groupable field"
+    for field in groupable:
+        assert field.type not in ("rows", "long_text"), (
+            f"{domain.item_type}.{field.name} is {field.type} and marked groupable"
+        )
+
+
+@registry_check
+def suppressed_keys_are_normalized(domain: Domain) -> None:
+    """A suppressed value is compared against a normalized grouping key.
+
+    A raw, unnormalized string here (`"Various Artists"` rather than
+    `normalize_text("Various Artists")`) would silently never match anything a
+    ranking query produces, and the suppression would look like it did nothing.
+    """
+    for value in domain.insight_suppressed_keys:
+        assert value == normalize_text(value), (
+            f"{domain.item_type} suppresses {value!r}, which is not normalized"
+        )
 
 
 @registry_check
@@ -1142,6 +1174,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "chooses_covers": "the_cover_chooser_is_only_declared_where_it_can_work",
         "enrichment": "enrichment_is_answerable_by_this_domain",
         "progress": "progress_counts_something_this_domain_declares",
+        "insight_suppressed_keys": "suppressed_keys_are_normalized",
     }
     declared = set(Domain.__dataclass_fields__)
     assert declared == set(covered), (
@@ -1178,7 +1211,7 @@ def a_third_domain(**overrides: object) -> Domain:
         "label": "Game",
         "identity": IdentityStrategy(lambda _candidate: None, ("igdb",)),
         "fields": (
-            FieldSpec("creators", "Studios", multiplicity="many"),
+            FieldSpec("creators", "Studios", multiplicity="many", groupable=True),
             FieldSpec("platform", "Platform"),
         ),
         "enrichment": None,
@@ -1302,6 +1335,31 @@ MALFORMED: list[tuple[str, str, Domain]] = [
         "fields_are_described_completely",
         "metadata shadowing a neutral item column",
         a_third_domain(fields=(FieldSpec("title", "Title"),)),
+    ),
+    (
+        "groupable_fields_are_keyable",
+        "no groupable field declared at all",
+        a_third_domain(
+            fields=(
+                FieldSpec("creators", "Studios", multiplicity="many"),
+                FieldSpec("platform", "Platform"),
+            )
+        ),
+    ),
+    (
+        "groupable_fields_are_keyable",
+        "a long_text field marked groupable",
+        a_third_domain(
+            fields=(
+                FieldSpec("creators", "Studios", multiplicity="many", groupable=True),
+                FieldSpec("synopsis", "Synopsis", type="long_text", groupable=True),
+            )
+        ),
+    ),
+    (
+        "suppressed_keys_are_normalized",
+        "a suppressed value that is not normalized",
+        a_third_domain(insight_suppressed_keys=frozenset({"Various Artists"})),
     ),
     (
         "identity_is_a_strategy",

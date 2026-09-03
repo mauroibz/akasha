@@ -45,13 +45,13 @@ from book_tracker.domain.spec import (
 # Argento" — and not a synopsis. Wikidata does not publish one, and calling this field
 # `synopsis` would promise something no measured record contained.
 MOVIE_FIELDS = (
-    FieldSpec("creators", "Directors", multiplicity="many"),
+    FieldSpec("creators", "Directors", multiplicity="many", groupable=True),
     FieldSpec("original_title", "Original title"),
-    FieldSpec("countries", "Countries", multiplicity="many"),
-    FieldSpec("languages", "Original languages", multiplicity="many"),
-    FieldSpec("genres", "Genres", multiplicity="many"),
+    FieldSpec("countries", "Countries", multiplicity="many", groupable=True),
+    FieldSpec("languages", "Original languages", multiplicity="many", groupable=True),
+    FieldSpec("genres", "Genres", multiplicity="many", groupable=True),
     FieldSpec("runtime", "Runtime (minutes)", type="number", minimum=1, maximum=10_000),
-    FieldSpec("cast", "Cast", multiplicity="many"),
+    FieldSpec("cast", "Cast", multiplicity="many", groupable=True),
     FieldSpec("description", "Description", type="long_text"),
 )
 

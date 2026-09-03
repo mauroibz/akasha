@@ -53,6 +53,12 @@ class FieldSpec:
     maximum: int | None = None
     #: Only for `type="rows"`: what one row holds.
     columns: tuple[ColumnSpec, ...] = ()
+    #: Whether this field is meaningful to rank a domain's entries by (Sprint 065). A
+    #: declaration, not a derivation from `multiplicity`: `tracklist` is `many` and is
+    #: a list of rows, not keys; `catalog_number` and `original_title` are `one` and
+    #: near-unique scalar text. Reviewed per field, in the style of
+    #: `EnrichmentSpec.completeness_fields`.
+    groupable: bool = False
 
 
 # The four item columns the dialog edits beside the metadata — `title`, `subtitle`,
@@ -282,6 +288,12 @@ class Domain:
     #: a domain that has not thought about covers offers no chooser, rather than one
     #: that cannot answer.
     chooses_covers: bool = False
+    #: Normalized (`normalize_text`) values an insights ranking omits by default
+    #: (Sprint 065). Not an identity claim — an album domain suppresses "Various
+    #: Artists" because the owner said so, not because it fails some test of what an
+    #: artist is. A ranking still reports what it left out rather than silently
+    #: shrinking, and a query parameter can bring suppressed rows back.
+    insight_suppressed_keys: frozenset[str] = frozenset()
 
     def status(self, value: str) -> StatusSpec | None:
         return next((row for row in self.statuses if row.value == value), None)
@@ -310,6 +322,35 @@ class InvalidEntryField(ValueError):
 
 class InvalidProgress(ValueError):
     """A progress count on a domain that has no such concept, or a negative one."""
+
+
+class InvalidGroupableKey(ValueError):
+    """A ranking key the item's own domain does not declare as groupable.
+
+    Includes a real field on this domain that simply is not declared groupable — the
+    message says which, so "why can't I rank by description" has an answer better than
+    a bare 404.
+    """
+
+
+#: The two ranking keys every domain offers without declaring anything: `year` is
+#: `items.year`, not metadata, and `decade` is derived from it. Sprint 065.
+BUILTIN_INSIGHT_KEYS = frozenset({"year", "decade"})
+
+
+def validate_groupable_key(domain: Domain, key: str) -> FieldSpec | None:
+    """The one place a ranking key is checked against the domain holding the item.
+
+    Returns the `FieldSpec` for a declared groupable metadata key, or `None` for the
+    built-in `year`/`decade` keys, which have no `FieldSpec` at all. Raises for
+    anything else.
+    """
+    if key in BUILTIN_INSIGHT_KEYS:
+        return None
+    field = next((row for row in domain.fields if row.name == key), None)
+    if field is None or not field.groupable:
+        raise InvalidGroupableKey(f"{domain.label} has no groupable key named {key!r}")
+    return field
 
 
 def validate_status(domain: Domain, value: str) -> str:

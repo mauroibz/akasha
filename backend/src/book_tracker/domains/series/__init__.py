@@ -42,17 +42,17 @@ from book_tracker.domain.spec import (
 # seasons, `P2047` episode duration, `P449` original broadcaster, `P161` cast member,
 # and the entity's own localized description.
 SERIES_FIELDS = (
-    FieldSpec("creators", "Creators", multiplicity="many"),
+    FieldSpec("creators", "Creators", multiplicity="many", groupable=True),
     FieldSpec("original_title", "Original title"),
-    FieldSpec("countries", "Countries", multiplicity="many"),
-    FieldSpec("languages", "Original languages", multiplicity="many"),
-    FieldSpec("genres", "Genres", multiplicity="many"),
+    FieldSpec("countries", "Countries", multiplicity="many", groupable=True),
+    FieldSpec("languages", "Original languages", multiplicity="many", groupable=True),
+    FieldSpec("genres", "Genres", multiplicity="many", groupable=True),
     FieldSpec("episodes", "Episodes", type="number", minimum=1, maximum=100_000),
     FieldSpec("seasons", "Seasons", type="number", minimum=1, maximum=1_000),
     FieldSpec("episode_minutes", "Episode length", type="number", minimum=1, maximum=1_000),
-    FieldSpec("network", "Network"),
+    FieldSpec("network", "Network", groupable=True),
     FieldSpec("airing_status", "Airing"),
-    FieldSpec("cast", "Cast", multiplicity="many"),
+    FieldSpec("cast", "Cast", multiplicity="many", groupable=True),
     FieldSpec("synopsis", "Synopsis", type="long_text"),
 )
 

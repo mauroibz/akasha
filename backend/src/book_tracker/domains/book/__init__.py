@@ -23,13 +23,13 @@ from book_tracker.domain.spec import (
 )
 
 BOOK_FIELDS = (
-    FieldSpec("creators", "Creators", multiplicity="many"),
-    FieldSpec("publisher", "Publisher"),
-    FieldSpec("language", "Language"),
+    FieldSpec("creators", "Creators", multiplicity="many", groupable=True),
+    FieldSpec("publisher", "Publisher", groupable=True),
+    FieldSpec("language", "Language", groupable=True),
     FieldSpec("page_count", "Page count", type="number", minimum=1, maximum=100_000),
     FieldSpec("description", "Description", type="long_text"),
-    FieldSpec("subjects", "Subjects", multiplicity="many"),
-    FieldSpec("series", "Series"),
+    FieldSpec("subjects", "Subjects", multiplicity="many", groupable=True),
+    FieldSpec("series", "Series", groupable=True),
     FieldSpec("original_year", "Original publication year", type="number", minimum=0, maximum=9999),
 )
 

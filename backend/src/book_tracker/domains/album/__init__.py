@@ -7,6 +7,7 @@ merge" rather than a barcode.
 
 import re
 
+from book_tracker.domain.normalization import normalize_text
 from book_tracker.domain.providers import IdentityStrategy, SearchCandidate
 from book_tracker.domain.spec import (
     UNSORTED,
@@ -24,13 +25,13 @@ from book_tracker.domain.spec import (
 # is label plus catalogue number (obs. 9), language lives on the release (obs. 8), and
 # the credit is a rendered string rather than the join of the artist list (obs. 4).
 ALBUM_FIELDS = (
-    FieldSpec("creators", "Artists", multiplicity="many"),
+    FieldSpec("creators", "Artists", multiplicity="many", groupable=True),
     FieldSpec("credit", "Artist credit"),
-    FieldSpec("label", "Label"),
+    FieldSpec("label", "Label", groupable=True),
     FieldSpec("catalog_number", "Catalogue number"),
-    FieldSpec("country", "Country"),
-    FieldSpec("language", "Language"),
-    FieldSpec("format", "Format"),
+    FieldSpec("country", "Country", groupable=True),
+    FieldSpec("language", "Language", groupable=True),
+    FieldSpec("format", "Format", groupable=True),
     FieldSpec("track_count", "Tracks", type="number", minimum=1, maximum=10_000),
     # The first field the spec could not describe: an ordered list of structured
     # rows. It costs one `inc=…+recordings` parameter on a request the adapter
@@ -140,4 +141,7 @@ DOMAIN = Domain(
     enrichment=ALBUM_ENRICHMENT,
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,
+    # "Various Artists" is not an artist; ranking by creator would put it third in the
+    # owner's own library (measured, docs/spotify-import-and-insights-viability.md).
+    insight_suppressed_keys=frozenset({normalize_text("Various Artists")}),
 )

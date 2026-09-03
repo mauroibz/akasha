@@ -33,16 +33,16 @@ from book_tracker.domain.spec import (
 # unchanged and the DEC-051 heuristic never runs on `MAPPA` (DEC-068 predicted exactly
 # this for IGDB's companies).
 ANIME_FIELDS = (
-    FieldSpec("creators", "Studios", multiplicity="many"),
+    FieldSpec("creators", "Studios", multiplicity="many", groupable=True),
     FieldSpec("english_title", "English title"),
     FieldSpec("japanese_title", "Japanese title"),
-    FieldSpec("kind", "Type"),
+    FieldSpec("kind", "Type", groupable=True),
     FieldSpec("episodes", "Episodes", type="number", minimum=1, maximum=10_000),
     FieldSpec("episode_minutes", "Episode length", type="number", minimum=1, maximum=1_000),
-    FieldSpec("season", "Season"),
-    FieldSpec("source", "Adapted from"),
-    FieldSpec("genres", "Genres", multiplicity="many"),
-    FieldSpec("airing_status", "Airing"),
+    FieldSpec("season", "Season", groupable=True),
+    FieldSpec("source", "Adapted from", groupable=True),
+    FieldSpec("genres", "Genres", multiplicity="many", groupable=True),
+    FieldSpec("airing_status", "Airing", groupable=True),
     FieldSpec("synopsis", "Synopsis", type="long_text"),
 )
 
