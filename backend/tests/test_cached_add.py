@@ -680,6 +680,46 @@ class SeriesSecondary:
         return await self.fetch(value)
 
 
+class SeriesTertiary:
+    """Cinemeta-shaped: a real but shorter synopsis than TVmaze's (Sprint 063).
+
+    Measured live 2026-09-03: Cinemeta's `description` is plot-summary length, not an
+    episode-guide synopsis, so it is shorter than TVmaze's real one on every series this
+    build has recorded. `provider_order` now names it third, and this is what proves
+    that presence does not regress the fuller-answer winner already established.
+    """
+
+    name = "cinemeta-series"
+    item_type = "series"
+    fetches = 0
+
+    async def search(self, query: str, limit: int = 20):  # type: ignore[no-untyped-def]
+        return []
+
+    async def fetch(self, source_id: str) -> ItemPayload:
+        self.fetches += 1
+        return ItemPayload(
+            source=self.name,
+            source_id=source_id,
+            source_refs=(SourceRef(self.name, source_id),),
+            title="Bojack Horseman",
+            subtitle=None,
+            creators=("Raphael Bob-Waksberg",),
+            year=2014,
+            cover_url=None,
+            identifiers={"imdb": "tt3398228"},
+            language=None,
+            metadata={
+                "creators": ["Raphael Bob-Waksberg"],
+                "synopsis": "A washed-up sitcom star navigates the meaninglessness of "
+                "his own success.",
+            },
+        )
+
+    async def fetch_by_identifier(self, kind: str, value: str) -> ItemPayload:
+        return await self.fetch(value)
+
+
 # ----------------------------------------------------------------------------------
 # Sprint 062: a candidate's `language` reaches metadata only where the domain has that
 # field (DEC-125).
@@ -815,6 +855,38 @@ async def test_an_added_series_keeps_the_first_provider_s_other_fields(
     metadata = created.json()["entry"]["item"]["metadata"]
     assert metadata["genres"] == ["animation"]
     assert "airing_status" not in metadata
+
+
+@pytest.mark.anyio
+async def test_a_third_fuller_answer_provider_does_not_displace_the_second(
+    tmp_path: Path,
+) -> None:
+    """Sprint 063: Cinemeta joins `provider_order` as the third series adapter.
+    TVmaze's synopsis is still the fuller of the three actually recorded, so adding
+    a third provider must not change which one wins (DEC-115)."""
+    primary = SeriesPrimary()
+    secondary = SeriesSecondary()
+    tertiary = SeriesTertiary()
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    async with app.router.lifespan_context(app):
+        app.state.providers = {
+            primary.name: primary,
+            secondary.name: secondary,
+            tertiary.name: tertiary,
+        }
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            created = await client.post(
+                "/api/entries",
+                json={"source": "wikidata-series", "source_id": "Q17733404", "status": "completed"},
+            )
+
+    assert created.status_code == 201, created.text
+    metadata = created.json()["entry"]["item"]["metadata"]
+    assert metadata["synopsis"].startswith("A depressed horseman")
+    assert secondary.fetches == 1
+    assert tertiary.fetches == 1
 
 
 @pytest.mark.anyio
