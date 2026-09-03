@@ -71,6 +71,10 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
+    // An insights ranking row links here as `/?type=...&key=...&value=...` — without
+    // reading them back out, the library page would silently ignore the link.
+    key: params.get("key") ?? "",
+    value: params.get("value") ?? "",
   };
 }
 
@@ -81,6 +85,10 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   filters.formats.forEach((s) => params.append("format", s));
   filters.types.forEach((s) => params.append("type", s));
   if (filters.query.trim()) params.set("q", filters.query.trim());
+  if (filters.key && filters.value) {
+    params.set("key", filters.key);
+    params.set("value", filters.value);
+  }
   params.set("sort", filters.sort);
   params.set("order", filters.order);
   return params;

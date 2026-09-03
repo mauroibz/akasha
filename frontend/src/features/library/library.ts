@@ -13,6 +13,8 @@ export const defaultLibraryFilters: LibraryFilters = {
   query: "",
   sort: "date_added",
   order: "desc",
+  key: "",
+  value: "",
 };
 
 /**

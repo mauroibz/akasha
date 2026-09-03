@@ -81,6 +81,8 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     query: params.get("q") ?? "",
     sort: (params.get("sort") as SortKey) ?? "date_added",
     order: (params.get("order") as "asc" | "desc") ?? "desc",
+    key: "",
+    value: "",
   };
 }
 

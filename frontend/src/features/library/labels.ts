@@ -1,6 +1,7 @@
 import type {
   EntryFormat,
   EntryStatus,
+  FieldSpec,
   FormatSpec,
   ItemType,
   ProgressSpec,
@@ -245,3 +246,27 @@ export const sortLabels: Record<SortKey, string> = {
   year: "Year",
   date_finished: "Finished",
 };
+
+export interface InsightKeyOption {
+  name: string;
+  label: string;
+}
+
+/**
+ * `year` and `decade` are not `FieldSpec`s — they read `items.year`, not metadata —
+ * so they are built here rather than invented as fake fields (Sprint 065).
+ */
+const builtinInsightKeys: InsightKeyOption[] = [
+  { name: "year", label: "Year" },
+  { name: "decade", label: "Decade" },
+];
+
+export function insightKeyOptions(fields: FieldSpec[]): InsightKeyOption[] {
+  const groupable = fields
+    .filter((field) => field.groupable)
+    .map((field) => ({ name: field.name, label: field.label }));
+  // Metadata keys first: "top authors" is the question the feature was built to
+  // answer, and `year`/`decade` are declared on every domain regardless, so leading
+  // with them would default every domain's first load to the same generic question.
+  return [...groupable, ...builtinInsightKeys];
+}

@@ -1,4 +1,4 @@
-import { Bookmark, LibraryBig, Plus, Upload } from "lucide-react";
+import { Bookmark, ChartBar, LibraryBig, Plus, Upload } from "lucide-react";
 import { LazyMotion, domAnimation } from "motion/react";
 import { type ReactNode } from "react";
 import { NavLink, useLocation } from "react-router-dom";
@@ -22,6 +22,7 @@ const navItems: readonly NavItem[] = [
   { to: "/add", label: "Add", icon: <Plus aria-hidden="true" /> },
   { to: "/import", label: "Import", icon: <Upload aria-hidden="true" /> },
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
+  { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {

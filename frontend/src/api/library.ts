@@ -61,6 +61,8 @@ export interface FieldSpec {
   maximum?: number | null;
   /** Present only on a `rows` field: what one row of it holds. */
   columns?: ColumnSpec[] | null;
+  /** Whether an insights ranking may group by this field. */
+  groupable?: boolean;
 }
 
 /** One status a domain's entries can be in, with the key that sets it in triage. */
@@ -193,6 +195,13 @@ export interface LibraryFilters {
   query: string;
   sort: SortKey;
   order: SortOrder;
+  /**
+   * A precise metadata (or `year`/`decade`) filter (Sprint 065) — how an insights
+   * ranking row links back to the library. Both empty, or both set: a value with no
+   * key (or vice versa) is not a filter that means anything.
+   */
+  key: string;
+  value: string;
 }
 
 export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
@@ -206,6 +215,10 @@ export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
   filters.formats.forEach((format) => params.append("format", format));
   filters.types.forEach((type) => params.append("type", type));
   if (filters.query.trim()) params.set("q", filters.query.trim());
+  if (filters.key && filters.value) {
+    params.set("key", filters.key);
+    params.set("value", filters.value);
+  }
   if (cursor) params.set("after", cursor);
   return params.toString();
 }
@@ -227,6 +240,62 @@ export async function getLibraryPage(
   );
   if (!response.ok) throw new Error("Your library could not be loaded");
   return (await response.json()) as LibraryPage;
+}
+
+/** One ranked row: a groupable key's value, and what the library says about it. */
+export interface InsightRow {
+  /** The normalized grouping value — pass straight through as `value` on `/`. */
+  key: string;
+  /** The commonest original spelling among this row's members. */
+  label: string;
+  count: number;
+  rated_count: number;
+  mean_score: number | null;
+  score_spread: number | null;
+}
+
+export interface InsightSuppressed {
+  key: string;
+  label: string;
+  count: number;
+}
+
+export interface Insight {
+  type: string;
+  key: string;
+  metric: "count" | "score";
+  min_rated: number;
+  rows: InsightRow[];
+  next_cursor: string | null;
+  /** What a ranking left out by default — reported rather than silently shrunk. */
+  suppressed: InsightSuppressed[];
+  /** `metric="score"` and every group failed `min_rated` — distinct from "nothing to rank". */
+  no_rated_groups: boolean;
+  /** Entries excluded from a `year`/`decade` ranking for having no year. */
+  null_count: number;
+}
+
+export async function getInsights(params: {
+  type: string;
+  key: string;
+  metric: "count" | "score";
+  minRated?: number;
+  includeSuppressed?: boolean;
+  after?: string;
+}): Promise<Insight> {
+  const query = new URLSearchParams({
+    type: params.type,
+    key: params.key,
+    metric: params.metric,
+  });
+  if (params.minRated) query.set("min_rated", String(params.minRated));
+  if (params.includeSuppressed) query.set("include_suppressed", "true");
+  if (params.after) query.set("after", params.after);
+  const response = await fetch(`/api/insights?${query.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("Insights could not be loaded");
+  return (await response.json()) as Insight;
 }
 
 export async function patchEntry(
