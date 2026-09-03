@@ -3879,3 +3879,60 @@ so 050 adds an adapter, not a declaration.
   imported and already enriched before this fix) for a fresh enrichment pass —
   not a schema migration, since the gap was in what enrichment wrote, not in
   data that is wrong.
+
+## 2026-09-03 — Sprint 065: Insights — rankings from the fields items already declare (complete)
+- Done: `FieldSpec.groupable` and `Domain.insight_suppressed_keys` declared per
+  domain (`domain/spec.py`, per-domain field files); `LibraryService.rank()` and
+  `GET /api/insights` (count/score metrics, `min_rated`, suppression,
+  `year`/`decade` built-ins, AC5's commonest-spelling display); a `key`/`value`
+  precise filter on `/api/entries` sharing its match logic with `rank()` so a
+  ranking row and its library link can never disagree; the `/insights` screen
+  (domain picker, key picker sourced from `/api/item-types`'s new `groupable`
+  field, metric toggle, threshold control, suppressed-values toggle, ranked
+  table linking into the filtered library), reachable from main navigation.
+  Full account and every material decision in **DEC-131**.
+- Verified: `test_insights.py` (11), `test_insights_api.py` (5),
+  `test_library_queries.py` (4, new file), two new `test_domain_conformance.py`
+  registry checks with `MALFORMED` fixtures, `InsightsPage.test.tsx` (3). Full
+  backend suite 1,326 (up from 1,306), frontend suite 206 (up from 203). `make
+  check`, `make smoke-container`, full Playwright e2e (111; 7 failed only under
+  111-test parallel contention and passed individually on re-run — pre-existing
+  flakiness, none touching Insights) all green. `scripts/benchmark_library.py`
+  extended with `insights_scenarios()` and a multi-creator seed shape, per AC9's
+  own requirement. Manually walked through in a real browser (Playwright driven
+  directly, no `chromium-cli`/Claude-in-Chrome available in this environment)
+  against a throwaway backend on an unused port, seeded through the real HTTP
+  API — not mocks, not the owner's data.
+- Deviations: the first working version of `rank()` breached the library's own
+  500 ms p95 budget at 5,000 entries under write contention (670 ms for
+  `creators`/`score`, `scripts/benchmark_library.py --entries 5000 --jobs 100`)
+  because every downstream query re-ran its own `json_each` + `normalize_text`
+  pass over the same exploded rows. Fixed by materializing the explosion once
+  per request into a SQLite `TEMP TABLE` (`_materialize_insight_explode`)
+  rather than the sprint doc's named fallback (a maintained key table via
+  migration) — no schema change, since nothing here needs to survive past one
+  call. Re-measured: ~290 ms p95, stable across repeated runs. `normalize_text`
+  is registered as a SQLite connection function again in `database.py` —
+  DEC-036 removed exactly this registration from the *hot* per-keystroke
+  search/sort path; Insights is a different, much colder path, and reusing the
+  real function is what keeps a ranking's grouping identical to what search
+  and sort already trust. Both are recorded in DEC-131, not just here.
+- Dead ends: `(ItemRow.year / 10) * 10` for `decade` silently produced
+  SQLAlchemy `Numeric`/`Decimal` results (Python `/` coerces for true-division
+  correctness) instead of SQLite's native integer division — caught by a
+  smoke script before it reached a test, fixed with `.op("/")` to emit the raw
+  SQL operator.
+- Blocked/open: the DEC-025 walkthrough against the *owner's real, already-
+  imported* library (Sprint 064's 157 Spotify albums, the Calibre books) is
+  owed and could not be done from this session — that data lives in the
+  owner's own running container, not this git working tree. Recorded as open
+  in the sprint file's Outcome. A container already listening on `:8000` on
+  this development host (not started by this session, and answering
+  `/api/item-types` without `groupable` — an older build) was noticed and left
+  alone; flagged so it is not mistaken for something this session started.
+- Next: nothing is queued. `docs/agent/state.json` reads `project_status:
+  "complete"` — Sprint 065 was the last one this roadmap had planned
+  (`FINAL_SPRINT = 65` in `scripts/validate_project.py`); `docs/sprints/
+  ROADMAP.md`'s "Owner feedback" and "Not scheduled" sections hold real
+  candidates for a Sprint 066 the owner has not chosen yet. Cutting the
+  `v1.6.0` tag is the owner's own action.

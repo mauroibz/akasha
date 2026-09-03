@@ -4926,3 +4926,96 @@ both changes, against 1 of 3 before the second.
   refreshed and have `Fetch cover` retried, matching what the technical spec always
   said was true. Existing stuck records are one `POST /api/enrichment/backfill` call
   away from being fixed, not a migration. No sprint, roadmap, or `state.json` changes.
+
+## DEC-131 — Insights ranks live over `json_each`, and the SQLite UDF DEC-036 removed comes back for it alone
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Context:** Sprint 065 (`docs/sprints/065-insights.md`) built `GET /api/insights` —
+  a per-domain ranking by a declared groupable metadata field (`creators`, `publisher`,
+  …) or by the built-in `year`/`decade`, by `count` or mean `score` — plus a precise
+  `key`/`value` filter on `/api/entries` so a ranking row links to exactly the entries
+  behind it. Two choices needed recording because each one runs against an existing,
+  explicit decision elsewhere in this log.
+- **Decision, the normalization UDF:** `database.py` registers `normalize_text` as a
+  SQLite connection function again. DEC-036 (migration `0007_normalized_sort_projection`)
+  removed exactly this registration from the *hot* path — `list_entries`'s per-keystroke
+  search and sort — after Sprint 017 measured it at 8× an indexed column, and replaced
+  it with stored `*_normalized` columns. Insights cannot use a stored column: grouping
+  needs every position of a `many` field (`json_each(items.metadata, '$.creators')`),
+  which nothing precomputes, so the value being grouped is only known inside the query
+  itself. Reusing `normalize_text` as a UDF there is what keeps a ranking's grouping
+  identical to what search and sort already trust — the alternative (re-implementing
+  the fold in SQL, or fetching every raw value into Python) risks a ranking merging
+  `Julio Cortázar`/`julio cortazar` slightly differently than the rest of the app does.
+  It is a different frequency class from the path DEC-036 fixed — once per Insights
+  screen visit, not once per keystroke — and registration itself is free until a query
+  calls it, so every connection carries it unconditionally rather than behind a toggle.
+- **Decision, the query shape:** `LibraryService.rank()` reuses `_filtered_entries`
+  exactly as the existing `facets` block does, then explodes the scoped rows through
+  `json_each` (`multiplicity="many"`) or `json_extract` (`multiplicity="one"`) or
+  `items.year` directly (`year`/`decade`, canonical already, no normalization needed),
+  dedupes per entry, and aggregates `count`/`rated_count`/`mean_score`/spread. Display
+  spelling (AC5) is a `row_number() OVER (PARTITION BY norm ORDER BY count DESC, raw
+  ASC)` pick of the commonest original spelling per group — the tie-break is
+  lexicographic and arbitrary, not specified by the sprint doc. `key`/`value` on
+  `/api/entries` shares the same explode branching through a factored-out
+  `_items_matching_key_value`, so a ranking row and the library filter it links to can
+  never disagree about which entries belong to it (AC8).
+- **Decision, the AC9 finding and its fix:** the first working version breached the
+  library's own 500 ms p95 budget at 5,000 entries under write contention — 670 ms for
+  `creators`/`score` (`scripts/benchmark_library.py --entries 5000 --jobs 100`, the
+  sprint's own required benchmark) — not because `json_each` itself is slow, but
+  because every downstream query (the aggregate, the best-spelling window function, the
+  suppressed-row lookup) re-ran its *own* `json_each` + `normalize_text` pass over the
+  same exploded rows: 2–3 full passes per `rank()` call. The sprint's risk section named
+  a maintained key table (a migration) as the fallback if the budget was missed.
+  Implemented instead: `_materialize_insight_explode` runs the explosion once per
+  request into a per-connection SQLite `TEMP TABLE`, and every downstream query reads
+  that instead — no schema change, since nothing here needs to survive past the one
+  call. `no_rated_groups` (AC10) is also now computed lazily, only when the page comes
+  back empty on a first request, since the common case (a page with rows) never needs
+  it. Re-measured after both fixes: `creators/score` p95 dropped from 670.6 ms to
+  ~290 ms, `creators/count` from 457.9 ms to ~300 ms, both comfortably inside budget
+  and stable across repeated runs.
+- **Decision, suppression and the built-in keys:** `Domain.insight_suppressed_keys`
+  holds normalized values a ranking omits by default — only the album domain declares
+  one, `normalize_text("Various Artists")`, matching
+  `docs/spotify-import-and-insights-viability.md`'s measured finding that it would rank
+  third in the owner's own library. A suppressed group is still computed and reported
+  in the response's `suppressed` list, and `include_suppressed=true` brings it back.
+  `year`/`decade` are declared nowhere per-domain (`BUILTIN_INSIGHT_KEYS`,
+  `domain/spec.py`) since they read `items.year`, not metadata; `validate_groupable_key`
+  is the one place a ranking key is checked, raising `invalid_insight_key` (422) with
+  the domain's own name for anything the domain neither declares groupable nor is a
+  built-in key.
+- **Verified:** `test_insights.py` (11, repository layer, direct `rank()` calls) and
+  `test_insights_api.py` (5, over HTTP) cover every row/AC the sprint doc's Required
+  Tests table names — count/score ranking, `min_rated`, scalar and `many` keys,
+  `year`/`decade` with null-year counting, case/diacritic grouping and display,
+  suppression and its reversal, cross-domain isolation, the zero-score domain's two
+  metrics, invalid-key refusal, and pagination. `test_library_queries.py` (4, new file —
+  the sprint doc names it as though it already existed) proves `key`/`value` returns
+  exactly a ranking row's members, both at the repository layer and over HTTP, and that
+  it requires exactly one `type`. `test_domain_conformance.py` gained
+  `groupable_fields_are_keyable` and `suppressed_keys_are_normalized` registry checks,
+  each with a `MALFORMED` fixture proving it can fail; `insight_suppressed_keys` was
+  added to `test_the_suite_covers_every_field_of_the_contract`'s `covered` dict, since
+  it is a new `Domain` dataclass field. `InsightsPage.test.tsx` (3) proves the page
+  renders, switches metric, and a row's click carries `type`/`key`/`value` into the
+  library route. Full backend suite (1,326) and frontend suite (206) green; `make
+  check` green (lint, typecheck, `openapi-check`, `validate_project.py`); the container
+  smoke test passed; the full Playwright suite passed (7 of 111 failed only under
+  111-test parallel contention and passed individually on re-run, matching the same
+  flakiness Sprint 064's handoff already recorded — none touched Insights). Manually
+  walked through in a real browser against a throwaway backend seeded via the real
+  API (not the owner's live data): ranking rendered, domain and metric switching
+  worked, the album domain's zero-scored-enough state rendered correctly, and clicking
+  a ranking row landed on the library filtered to exactly its members.
+- **Consequences:** `database.py` now always registers one SQLite connection function;
+  no measurable effect outside Insights, since nothing else calls it. No migration, no
+  schema change. `docs/sprints/065-insights.md`'s own DEC-025 walkthrough — against the
+  owner's real, previously-imported library (Sprint 064's 157 Spotify albums, the
+  Calibre books) rather than seeded data — is still owed and belongs to the owner's own
+  running instance, which this session had no access to; recorded as open in the
+  sprint's Outcome.

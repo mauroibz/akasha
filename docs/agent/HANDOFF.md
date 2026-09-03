@@ -1,121 +1,99 @@
-# Handoff — Sprint 064 closed, on its own branch
+# Handoff — Sprint 065 closed; nothing queued next
 
-`docs/agent/state.json` reads `project_status: "in_progress"`, `active_sprint: "065"`,
-pointing at `docs/sprints/065-insights.md` — a **real, fully written plan**, ready to
-claim. Its one dependency, Sprint 064, is complete: the 157-album real Spotify library
-its own viability measurement asked for now exists.
+`docs/agent/state.json` reads `project_status: "complete"`, `active_sprint: null`.
+Sprint 065 was the last sprint this roadmap had planned — `FINAL_SPRINT = 65` in
+`scripts/validate_project.py` — not a claim that the product is finished.
+`docs/sprints/ROADMAP.md`'s "Owner feedback" and "Not scheduled" sections hold real,
+already-costed candidates for a Sprint 066 the owner hasn't chosen yet.
 
-## This work is on its own branch, not main
+## This work is on `ui-search-refresh-mini-sprint`, not a new branch
 
-All five feature commits plus this closing commit are on
-`sprint-064-spotify-album-import`, branched from `main` after Sprint 063's close.
-`main` itself is untouched. **Nothing has been merged, pushed, or opened as a PR** —
-that is the owner's call. Confirm before merging.
+Same branch as the session before this one (the DEC-129/130 mini-sprint), which itself
+sits on unmerged Sprint 063/064 work off `main`. The owner explicitly chose to continue
+on this branch rather than open a new `sprint-065-insights` one. **Nothing has been
+merged, pushed, or opened as a PR.**
 
-## What Sprint 064 was, in one paragraph
+## What Sprint 065 was, in one paragraph
 
-The epic DEC-076 declined to commit to: importing the owner's real Spotify library as
-albums. The finding that unlocked it — measured in
-`docs/spotify-import-and-insights-viability.md` — is that MusicBrainz stores a Spotify
-album link as a URL *relationship*, resolving an exported `spotify:album:` id to an
-exact release without the fuzzy title-matching DEC-052 would otherwise force (73% by
-relation alone, ~95% once a strict title-and-artist search covers the rest).
-`domains/album/spotify.py`'s `SpotifyImporter` reads `YourLibrary.json`'s `albums`
-array (157 rows in the owner's real library) and refuses the other Spotify export
-(Technical Log Information — 291 `spotify:album:` ids, but recommendation-carousel
-impressions, not chosen albums) by name. The album domain gained its first
-`EnrichmentSpec`, keyed on `identity_kinds=("spotify",)` so a search-added album is
-still never queued. See **DEC-128** for the full account; the sprint file carries the
-per-criterion evidence.
+`GET /api/insights` ranks one domain's entries by a declared groupable metadata field
+(`creators`, `publisher`, `genres`, …) or by the built-in `year`/`decade`, by count or
+mean score — "which authors do I rate highest," "which bands do I own most of." Scope
+is deliberately per-domain: DEC-052 and DEC-077 twice declined to build the
+cross-domain creator identity a merged ranking would need, and this feature exists to
+keep it that way. A `key`/`value` filter added to `/api/entries` lets a ranking row
+link straight into the library, filtered to exactly the entries it counted. The
+`/insights` screen: domain picker, key picker, count/score toggle, a minimum-rated
+threshold, a suppressed-values toggle (the album domain suppresses `Various Artists`),
+and a ranked table. Full account and every material decision: **DEC-131**.
 
-## Verified live, not just in unit tests
+## A real performance finding, and the fix
 
-Both of the owner's real export bundles, not only recorded fixtures: the Technical Log
-export refused on the first try with the right message; the Account Data export's 157
-albums previewed and committed with **zero errors, zero ambiguities**; a second commit
-of the same batch left the library at exactly 157 (idempotency proved live, not only in
-tests); the background resolve pass ran at MusicBrainz's paced rate and reached
-**87/157 (55%) resolved** before the owner asked to wrap up rather than wait for the
-rest — in line with the ~95% the viability measurement predicted for a full run —
-including `Purpose`, resolved by the text-search pass and carrying its weaker-evidence
-note. A second, separate throwaway container confirmed that note specifically, since
-the first container predated the fix that added it.
+The sprint's own required benchmark (`scripts/benchmark_library.py --entries 5000
+--jobs 100`, matching AC9) caught a genuine budget breach: `creators`/`score` measured
+670 ms p95 against the library's own 500 ms budget, under write contention. Not because
+`json_each` is slow — because the first working version re-ran its own `json_each` +
+`normalize_text` pass three separate times per request (the aggregate, the
+best-spelling window function, and an eagerly-computed `no_rated_groups` check).
+Fixed by materializing the exploded rows once per request into a SQLite `TEMP TABLE`
+rather than the sprint doc's named fallback (a maintained key table via migration) —
+no schema change needed. Re-measured stable at ~290 ms p95. See DEC-131 for the
+`normalize_text`-UDF decision this sits beside (DEC-036 removed that exact
+registration from the *hot* search/sort path; Insights is registering it again for a
+much colder one, and the two are explicitly reconciled there, not left in tension).
 
-## Side effect: Sprint 061's Playwright blocker is resolved, not just worked around
+## Verified, with one real limitation stated plainly
 
-`frontend/node_modules/.vite/deps`, and later `frontend/dist/assets`, were both
-root-owned in this environment — the exact blocker Sprint 061 left open, which had
-made e2e "not owed" for every sprint since. Asked the owner directly each time; they
-ran `sudo chown -R $(whoami):$(whoami)` on each path. With both fixed, the full
-Playwright suite ran for the first time in this environment and passed: 96/98 on the
-parallel run, the remaining 2 (an accessibility check and a reduced-motion check,
-neither touching imports) confirmed green on a serial re-run; `heavy-library` 7/7;
-`production-bundle` 2/2. **This blocker does not carry forward.**
+Full backend (1,326) and frontend (206) suites, `make check`, `make smoke-container`,
+and the full Playwright suite (111; 7 failed only under parallel-worker contention and
+passed individually on re-run — the same flakiness Sprint 064's handoff already
+recorded, none touching Insights) are all green. Also walked through manually in a
+real browser: a throwaway backend on an unused port (`8010`), seeded through the real
+HTTP API, driving Chromium directly via the `playwright` package already in
+`frontend/node_modules` (`chromium-cli`/Claude-in-Chrome was not available in this
+environment) — domain switching, metric switching, the suppressed-state and
+zero-rated-state renders, and a ranking row's click landing on the library filtered to
+exactly its members, all confirmed with screenshots and an empty console-error log.
 
-## One thing missed on the first pass, then added
-
-Deliverable 4 — recording which resolution pass matched an album — was absent from
-the first implementation. Noticed while preparing the walkthrough (a text-matched
-album looked identical to a relation-matched one), and added as its own commit:
-`ItemPayload.match_note`, written by the enrichment handler to the entry's own notes
-only when empty. Not independently undo-tracked — the entry is itself a `create`
-effect of the import, so undoing the batch removes the note with the row in the
-common case.
-
-## One thing scoped out, deliberately
-
-**Track roll-up (deliverable 5) has no wired toggle.**
-`records_from_library(..., rollup=True, rollup_min_tracks=...)` is implemented and
-tested directly but off by default; this repository's import boundary
-(`ImportInputSpec`/`ImportReadContext`) has no generic per-read options mechanism to
-expose it through the API, and building one is a separable change bigger than this
-sprint. The measured recommendation is "off" regardless: 41 genuinely new albums from
-1,362 saved tracks, only 9 with two or more saved tracks.
-
-## Two lessons worth not re-learning
-
-- **A stale container looks like a bug in new code.** The walkthrough container was
-  built before the `match_note` fix was written, so its earliest resolved albums show
-  no note despite being text-matched. Confirmed by calling the provider directly
-  against the live network (correct), then by a fresh, separate container — not by
-  assuming the running container reflected the latest commit.
-- **A release group's tie-break needs checking past the first few candidates.**
-  `_preferred_release`'s tie-break for `Plastic Beach` (18 releases, several tied on
-  `first-release-date`) picks the exact release the Spotify relation itself named —
-  not whichever one a quick look at the first 3 suggests. Caught by a failing
-  assertion (`country`), not by review. See the commit message and
-  `tests/fixtures/providers/README.md`.
+**What this is not**: the sprint doc's own DEC-025 walkthrough, which asks for this
+against the *owner's real, already-imported* library — Sprint 064's 157 real Spotify
+albums, the Calibre books. That data lives in the owner's own running container, which
+this session did not have access to. Recorded as open in the sprint file's Outcome.
+**The owner's own instance is running on this host, on `127.0.0.1:8000`** (noticed
+while looking for a free port for the throwaway backend above — its `/api/item-types`
+response predates this sprint, confirming it wasn't started by this session). It was
+not touched, inspected further, or used for anything; the throwaway backend used
+`8010` instead precisely to avoid it.
 
 ## Current state, concretely
 
-- **Backend:** 1,286 tests passing (1,252 at Sprint 063's close + 34 new). **Frontend:**
-  197 passing, unchanged. `make check` green. `make smoke-container` green, built from
-  this branch. Full e2e green (see above) for the first time since Sprint 061.
-- **`docs/decisions.md`** ends at **DEC-128**.
-- New: `infrastructure` gains no new module (MusicBrainz was already shared); the new
-  surface is entirely `domains/album/spotify.py`, `MusicBrainzProvider.
-  fetch_by_identifier`, and the `needs_item_context`/`match_note` extension points on
-  the shared `EnrichmentSpec`/`ItemPayload` dataclasses.
+- **Backend:** 1,326 tests passing (1,306 at this session's start + 20 new).
+  **Frontend:** 206 passing (203 + 3 new). `make check` green. `make smoke-container`
+  green. Full e2e green (see above).
+- **`docs/decisions.md`** ends at **DEC-131**.
+- **New surface:** `GET /api/insights`, `/api/entries`'s `key`/`value` params,
+  `FieldSpec.groupable`, `Domain.insight_suppressed_keys`, `LibraryService.rank()`,
+  `frontend/src/pages/InsightsPage.tsx`, the `/insights` route and nav entry.
+- **Version bumped to `1.6.0`** (`backend/pyproject.toml`, `main.py`'s FastAPI
+  `version=`, `frontend/package.json`, regenerated `frontend/openapi.json`). Release
+  notes at `docs/operations/release-notes-v1.6.md`, covering this sprint and Sprint
+  064's Spotify import together, per the sprint doc's own instruction. **Cutting the
+  `v1.6.0` tag is the owner's action** (`docs/operations/publishing-images.md`) —
+  nothing here pushed a tag.
 
 ## Known-degraded, deliberately not fixed (carried forward, still true)
 
 - `/api/health/providers` reports configuration, not reachability.
 - Kitsu's latency tail occasionally exceeds its budget.
-- `languages` mixes vocabularies across movie/series sources — unrelated to this
-  sprint, unchanged.
+- `languages` mixes vocabularies across movie/series sources.
 
 ## Private data and operational constraints
 
-Unchanged. `exports/` is the owner's private source archive, gitignored whole,
-read-only walkthrough input — this sprint's own two real Spotify export bundles live
-there. Secrets, databases, uploaded imports and covers are never committed. v1 has no
-auth and stays LAN-only; Calibre is opened read-only.
-
-The owner's own instance runs on `127.0.0.1:8000` (or `4441` published). This sprint's
-walkthrough ran on isolated Docker volumes and non-default host ports, never the
-owner's own. All containers, volumes, and local images (`akasha-wt064`, `akasha-wt064b`)
-were removed at closure.
+Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has
+no auth and stays LAN-only; Calibre is opened read-only. The owner's own instance runs
+on `127.0.0.1:8000` (or `4441` published) — see above; this sprint's manual browser
+verification ran on an isolated throwaway backend (port `8010`) and frontend (port
+`5180`) against a `/tmp` data directory, both stopped and removed at close.
 
 Authorization does not carry forward: this session was asked to continue sprint work
 on this branch and did exactly that. It does not extend to merging into `main`,
-pushing, or any remote action.
+pushing, or any remote action, or to cutting the `v1.6.0` release tag.

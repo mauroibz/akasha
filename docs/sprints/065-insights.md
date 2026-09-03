@@ -1,6 +1,6 @@
 # Sprint 065 — Insights: rankings from the fields items already declare
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 023, 026, 027, 040, 044, 064
 **Roadmap revision:** 35
 
@@ -232,4 +232,54 @@ therefore an explicit declaration, one reviewed decision per field, in the style
 
 ## Outcome
 
-_Not started._
+**Delivered.** All eight deliverables and acceptance criteria 1–10 are built and
+tested. Full account, including a real AC9 budget breach and its fix, is in
+**DEC-131**.
+
+- **Deliverables 1–2 (declaration):** `FieldSpec.groupable` and
+  `Domain.insight_suppressed_keys` added to `domain/spec.py`, alongside
+  `validate_groupable_key`/`InvalidGroupableKey`/`BUILTIN_INSIGHT_KEYS`. Every domain's
+  field list flipped `groupable=True` on exactly the sprint's target set; the album
+  domain declares `insight_suppressed_keys={normalize_text("Various Artists")}`. Two
+  new `test_domain_conformance.py` registry checks, each with a `MALFORMED` fixture.
+- **Deliverables 3–6 (the ranking query and endpoint):** `LibraryService.rank()` and
+  `GET /api/insights`, covered in `test_insights.py`/`test_insights_api.py`. See
+  DEC-131 for the query design, the AC9 budget breach measured under write contention
+  at 5,000 entries, and the per-request temp-table materialization that fixed it
+  (670 ms → ~290 ms p95).
+- **Deliverable 7 (`key`/`value` filter):** added to `_filtered_entries`/`list_entries`
+  and the `/api/entries` route, sharing its match logic with `rank()` so a ranking row
+  and its library link can never disagree (AC8). `test_library_queries.py` (new file).
+- **Deliverable 8 (the screen):** `/insights` — domain picker, key picker (built from
+  `/api/item-types`'s new `groupable` field), a count/score metric toggle, a minimum-
+  rated threshold, a suppressed-values toggle, and a ranked table whose rows link into
+  the filtered library. Reachable from main navigation. `InsightsPage.test.tsx` (3).
+- **The walkthrough (DEC-025), partial.** This session had no access to the owner's
+  live, running instance — Sprint 064's 157 real Spotify albums and the Calibre books
+  live in the owner's own container, not this git working tree. What *was* done: a
+  full manual walkthrough in a real browser against a throwaway backend seeded through
+  the real HTTP API (not mocks, not the owner's data) — ranking rendered correctly for
+  both `count` and `score`, domain switching changed the key picker's vocabulary and
+  labels (`Creators` for books, `Artists` for albums), the zero-rated-enough state
+  rendered plainly when an artist had only one scored album under `min_rated=2`, and
+  clicking a ranking row landed on the library filtered to exactly its members. **Owed
+  to the owner:** running the same walkthrough against the real library, and reporting
+  what the rankings actually look like and whether score density (13 entries, 6 scored,
+  per the viability doc — since grown by Sprint 064's import) makes the score metric
+  worth having. That finding is still the sprint's most valuable output and belongs
+  here once it exists.
+- **Verification:** `make check`, full backend suite (1,326) and frontend suite (206),
+  `make smoke-container`, and the full Playwright suite (111; 7 failed only under
+  111-test parallel contention and passed individually on re-run — pre-existing
+  flakiness Sprint 064's handoff already recorded, none touching Insights) all green.
+  `scripts/benchmark_library.py` extended with `insights_scenarios()` and a
+  multi-creator seed shape (AC9's own requirement — a single-creator seed cannot
+  exercise `json_each` realistically).
+- **Release:** not cut. Preparing `v1.6.0`'s release notes is this sprint's own
+  deliverable; pushing the tag is the owner's action
+  (`docs/operations/publishing-images.md`) and is unaffected by anything above.
+- **Also noticed and left alone:** a container already listening on `:8000` on this
+  development host (not started by this session) answered `/api/item-types` without
+  `groupable` — an existing build, older than this sprint. Not touched, not
+  inspected further; flagged here only so it isn't mistaken for something this
+  session started.
