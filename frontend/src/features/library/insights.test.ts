@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   keyLead,
+  magnitude,
   orderKeys,
   orderRows,
   quietSummary,
@@ -158,5 +159,17 @@ describe("quietSummary", () => {
 
   it("has an honest sentence for a key with nothing in it", () => {
     expect(quietSummary([])).toBe("nothing recorded yet");
+  });
+});
+
+describe("magnitude", () => {
+  it("is a share of the leader, not of the whole", () => {
+    expect(magnitude(7, 7)).toBe(1);
+    expect(magnitude(3, 7)).toBe(0.429);
+    expect(magnitude(2, 7)).toBe(0.286);
+  });
+
+  it("survives an empty ranking rather than dividing by zero", () => {
+    expect(magnitude(0, 0)).toBe(0);
   });
 });

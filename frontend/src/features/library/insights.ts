@@ -22,6 +22,17 @@ export interface OrderedRanking {
   unplaced: InsightRow[];
 }
 
+/**
+ * A row's share of its ranking's leader, rounded once and used for both the bar's
+ * width and the attribute a test reads.
+ *
+ * Three decimals is far beyond what a bar can show, and is a stable number to
+ * assert against — the alternative is a test that measures rendered pixels.
+ */
+export function magnitude(count: number, max: number): number {
+  return Number((count / Math.max(max, 1)).toFixed(3));
+}
+
 /** Ties break on the normalized key, which is the order the server itself used. */
 const byKey = (a: InsightRow, b: InsightRow) => a.key.localeCompare(b.key);
 

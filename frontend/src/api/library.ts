@@ -202,6 +202,14 @@ export interface LibraryFilters {
    */
   key: string;
   value: string;
+  /**
+   * How to *say* `value`, which is normalized — case folded, diacritics
+   * stripped — because that is what groups a ranking row. "julio cortazar" is
+   * the filter; "Julio Cortázar" is the name, and the breadcrumb has to show
+   * the name. Display only: `libraryQueryString` never sends it, and its
+   * absence just means the breadcrumb falls back to the normalized value.
+   */
+  valueLabel: string;
 }
 
 export function libraryQueryString(

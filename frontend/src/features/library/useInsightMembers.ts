@@ -38,6 +38,7 @@ export function useInsightMembers(params: {
           order: "desc",
           key: params.insightKey,
           value: params.value,
+          valueLabel: "",
         },
         undefined,
         signal,

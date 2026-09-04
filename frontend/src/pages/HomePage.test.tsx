@@ -1377,3 +1377,76 @@ test("the shell's Library link lands on a library, not on a permanent loading st
   expect(await screen.findByText("Rayuela")).toBeVisible();
   expect(screen.queryByText(/loading your library/i)).toBeNull();
 });
+
+test("a library reached from a ranking says which filter it is under, and drops it", async () => {
+  // Sprint 065 linked here and left key/value applying invisibly: a library
+  // filtered to one author looked like a library that had lost most of its books.
+  const requests: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((request: string | URL | Request) => {
+      const url = String(request);
+      requests.push(url);
+      if (url.startsWith("/api/item-types"))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: "book",
+                label: "Book",
+                fields: [
+                  {
+                    name: "creators",
+                    label: "Authors",
+                    type: "text",
+                    multiplicity: "many",
+                    groupable: true,
+                  },
+                ],
+                statuses: [],
+                default_status: "to_read",
+                entry_fields: [],
+                entry_field_labels: {},
+                progress: null,
+                formats: [],
+                entry_panel_label: "Your reading data",
+                chooses_covers: false,
+              },
+            ]),
+          ),
+        );
+      if (url.startsWith("/api/shelves"))
+        return Promise.resolve(new Response("[]"));
+      return Promise.resolve(new Response(JSON.stringify(populated)));
+    }),
+  );
+  const user = userEvent.setup();
+  renderPage(
+    "/?type=book&key=creators&value=julio+cortazar&label=Julio+Cort%C3%A1zar",
+  );
+
+  // Named by the domain's own word for the key, and by the spelling a person
+  // recognizes rather than the normalized value that does the grouping.
+  const chip = await screen.findByRole("button", {
+    name: /Insights · Authors · Julio Cortázar/,
+  });
+  await waitFor(() =>
+    expect(
+      requests.some(
+        (url) =>
+          url.includes("key=creators") && url.includes("value=julio+cortazar"),
+      ),
+    ).toBe(true),
+  );
+
+  await user.click(chip);
+
+  expect(
+    screen.queryByRole("button", { name: /Insights · Authors/ }),
+  ).toBeNull();
+  await waitFor(() => {
+    const last = requests[requests.length - 1];
+    expect(last.startsWith("/api/entries")).toBe(true);
+    expect(last).not.toContain("key=creators");
+  });
+});

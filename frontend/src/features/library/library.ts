@@ -15,6 +15,7 @@ export const defaultLibraryFilters: LibraryFilters = {
   order: "desc",
   key: "",
   value: "",
+  valueLabel: "",
 };
 
 /**

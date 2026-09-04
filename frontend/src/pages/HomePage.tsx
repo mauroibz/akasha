@@ -12,6 +12,7 @@ import { toast } from "sonner";
 import {
   getLibraryPage,
   patchEntry,
+  type ItemType,
   type EntryFormat,
   type EntryStatus,
   type LibraryEntry,
@@ -33,7 +34,12 @@ import {
 } from "@/components/ui/select";
 import { StatusFilter } from "@/features/library/StatusFilter";
 import { VirtualLibrary } from "@/features/library/VirtualLibrary";
-import { domainsFrom, labelFor, sortLabels } from "@/features/library/labels";
+import {
+  domainsFrom,
+  insightKeyOptions,
+  labelFor,
+  sortLabels,
+} from "@/features/library/labels";
 import { AddForm } from "@/features/add/AddForm";
 import { ResultsGrid } from "@/features/add/ResultsGrid";
 import { useWebSearch } from "@/features/add/useWebSearch";
@@ -75,6 +81,7 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     // reading them back out, the library page would silently ignore the link.
     key: params.get("key") ?? "",
     value: params.get("value") ?? "",
+    valueLabel: params.get("label") ?? "",
   };
 }
 
@@ -88,6 +95,7 @@ function paramsFromFilters(filters: LibraryFilters): URLSearchParams {
   if (filters.key && filters.value) {
     params.set("key", filters.key);
     params.set("value", filters.value);
+    if (filters.valueLabel) params.set("label", filters.valueLabel);
   }
   params.set("sort", filters.sort);
   params.set("order", filters.order);
@@ -732,6 +740,19 @@ export function HomePage() {
               onChange={(statuses) => updateFilters({ statuses })}
             />
           ))}
+          {filters.key && filters.value && (
+            <InsightFilterChip
+              keyLabel={insightKeyLabel(
+                filters.key,
+                filters.types[0],
+                itemTypes.data,
+              )}
+              value={filters.valueLabel || filters.value}
+              onClear={() =>
+                updateFilters({ key: "", value: "", valueLabel: "" })
+              }
+            />
+          )}
           <div
             className="flex rounded-full bg-surface p-1"
             aria-label="Library view"
@@ -941,4 +962,46 @@ export function HomePage() {
       </Dialog>
     </main>
   );
+}
+
+/**
+ * What a `key`/`value` filter is, and how to drop it.
+ *
+ * Sprint 065 linked here from an insights ranking and left the params applying
+ * invisibly: a library filtered to one author looked like a library that had lost
+ * most of its books, with nothing on screen saying why or how to undo it.
+ */
+function InsightFilterChip({
+  keyLabel,
+  value,
+  onClear,
+}: {
+  keyLabel: string;
+  value: string;
+  onClear: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClear}
+      className="flex min-h-11 items-center gap-2 rounded-full bg-primary/15 px-4 text-sm font-medium text-primary hover:bg-primary/25 focus-ring"
+    >
+      <span>
+        Insights · {keyLabel} · {value}
+      </span>
+      <span aria-hidden="true">✕</span>
+      <span className="sr-only">Clear this filter</span>
+    </button>
+  );
+}
+
+/** The domain's own name for the key a ranking filtered by, when it has one. */
+function insightKeyLabel(
+  key: string,
+  type: string | undefined,
+  types: ItemType[] | undefined,
+): string {
+  const domain = types?.find((candidate) => candidate.id === type);
+  const options = domain ? insightKeyOptions(domain.fields) : [];
+  return options.find((option) => option.name === key)?.label ?? key;
 }

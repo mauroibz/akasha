@@ -177,10 +177,14 @@ export function InsightsPage() {
               minRated={minRated}
               showSuppressed={includeSuppressed}
               onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
+              // `label` is display only, so the library can name the filter
+              // rather than echo the normalized value that groups it.
               hrefFor={(row) =>
                 `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
                   option.name,
-                )}&value=${encodeURIComponent(row.key)}`
+                )}&value=${encodeURIComponent(
+                  row.key,
+                )}&label=${encodeURIComponent(row.label)}`
               }
             />
           ))}

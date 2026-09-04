@@ -2,6 +2,7 @@ import { useId, useState } from "react";
 
 import type { InsightRow } from "@/api/library";
 import { InsightsMembers } from "@/features/library/InsightsMembers";
+import { magnitude } from "@/features/library/insights";
 import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -20,13 +21,6 @@ import { cn } from "@/lib/utils";
  * many, the chip carries how good, and a short bar under an emerald chip is the
  * reading the shipped screen could not produce at all.
  */
-
-/** A row's share of the leader, rounded once and used for both the bar and its label. */
-export function magnitude(count: number, max: number): number {
-  // Three decimals is far beyond what a bar can show, and is a stable number to
-  // assert against — the alternative is a test that measures rendered pixels.
-  return Number((count / Math.max(max, 1)).toFixed(3));
-}
 
 /** What a screen reader is told a row holds, since the visible cells are terse. */
 function rowLabel(row: InsightRow): string {

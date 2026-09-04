@@ -83,6 +83,7 @@ function filtersFromParams(params: URLSearchParams): LibraryFilters {
     order: (params.get("order") as "asc" | "desc") ?? "desc",
     key: "",
     value: "",
+    valueLabel: "",
   };
 }
 
