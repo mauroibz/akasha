@@ -266,6 +266,8 @@ export interface InsightRow {
   rated_count: number;
   mean_score: number | null;
   score_spread: number | null;
+  /** Up to three cover URLs from this row's own members, highest scored first. */
+  covers: string[];
 }
 
 export interface InsightSuppressed {
@@ -287,6 +289,9 @@ export interface Insight {
   no_rated_groups: boolean;
   /** Entries excluded from a `year`/`decade` ranking for having no year. */
   null_count: number;
+  /** The ranked set's own totals — independent of `key`, not a sum of rows. */
+  total_entries: number;
+  rated_entries: number;
 }
 
 export async function getInsights(params: {
@@ -295,6 +300,11 @@ export async function getInsights(params: {
   metric: "count" | "score";
   minRated?: number;
   includeSuppressed?: boolean;
+  /** Rank inside the library's current filters (Sprint 067), off by default. */
+  statuses?: EntryStatus[];
+  shelves?: string[];
+  formats?: EntryFormat[];
+  q?: string;
   limit?: number;
   after?: string;
 }): Promise<Insight> {
@@ -306,6 +316,10 @@ export async function getInsights(params: {
   if (params.limit) query.set("limit", String(params.limit));
   if (params.minRated) query.set("min_rated", String(params.minRated));
   if (params.includeSuppressed) query.set("include_suppressed", "true");
+  params.statuses?.forEach((status) => query.append("status", status));
+  params.shelves?.forEach((shelf) => query.append("shelf", shelf));
+  params.formats?.forEach((format) => query.append("format", format));
+  if (params.q?.trim()) query.set("q", params.q.trim());
   if (params.after) query.set("after", params.after);
   const response = await fetch(`/api/insights?${query.toString()}`, {
     headers: { Accept: "application/json" },

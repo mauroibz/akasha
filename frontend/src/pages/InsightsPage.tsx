@@ -5,10 +5,12 @@ import { Input } from "@/components/ui/input";
 import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
 import { InsightsCard } from "@/features/library/InsightsCard";
 import {
+  computeSuperlatives,
   orderKeys,
   quietSummary,
   type InsightSort,
 } from "@/features/library/insights";
+import { SuperlativeStrip } from "@/features/library/SuperlativeStrip";
 import { useInsights } from "@/features/library/useInsights";
 import type { Insight } from "@/api/library";
 import { useItemTypes } from "@/features/library/useItemTypes";
@@ -69,6 +71,15 @@ export function InsightsPage() {
     .map((option, index) => ({ option, insight: rankings[index]?.data }))
     .filter((entry): entry is Answered => Boolean(entry.insight));
   const { carded, quiet } = orderKeys(answered, (entry) => entry.insight.rows);
+
+  // Above the fold, and drawn from the leading key alone (proposal §2.7):
+  // pooling every key's rows found "most collected" answering with a subject
+  // tag like `Fiction`, true and useless. The leading key is already the
+  // library's own most concentrated answer to "collect what".
+  const leading = carded[0]?.insight;
+  const superlatives = leading
+    ? computeSuperlatives(leading.rows, minRated)
+    : [];
 
   const pending = rankings.some((query) => query.isPending);
   const failed =
@@ -152,6 +163,14 @@ export function InsightsPage() {
       </div>
 
       <ScoreLegend />
+
+      {leading && (
+        <SuperlativeStrip
+          superlatives={superlatives}
+          totalEntries={leading.total_entries}
+          ratedEntries={leading.rated_entries}
+        />
+      )}
 
       {pending && carded.length === 0 && (
         <p role="status" className="mt-8 text-muted-foreground">

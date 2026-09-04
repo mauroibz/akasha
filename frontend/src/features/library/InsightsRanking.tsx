@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import type { InsightRow } from "@/api/library";
+import { CoverImage } from "@/components/CoverImage";
 import { InsightsMembers } from "@/features/library/InsightsMembers";
 import { magnitude } from "@/features/library/insights";
 import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
@@ -21,6 +22,33 @@ import { cn } from "@/lib/utils";
  * many, the chip carries how good, and a short bar under an emerald chip is the
  * reading the shipped screen could not produce at all.
  */
+
+/**
+ * The covers behind a row's number, up to three, collapsed (Sprint 067). Rows
+ * paint their numbers the instant the ranking response arrives; the covers are
+ * on the very same response, and `CoverImage` fades each one in on its own once
+ * loaded rather than holding up the row that names it. A row with no covered
+ * member (an empty `covers`) shows no cover slot at all, rather than an empty one.
+ */
+function CoverStack({ covers }: { covers: string[] }) {
+  if (covers.length === 0) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="relative isolate flex shrink-0 -space-x-3"
+    >
+      {covers.slice(0, 3).map((src) => (
+        <CoverImage
+          key={src}
+          src={src}
+          alt=""
+          className="h-8 w-6 rounded-sm object-cover ring-2 ring-surface"
+          placeholderClassName="h-8 w-6 rounded-sm ring-2 ring-surface"
+        />
+      ))}
+    </span>
+  );
+}
 
 /** What a screen reader is told a row holds, since the visible cells are terse. */
 function rowLabel(row: InsightRow): string {
@@ -87,6 +115,7 @@ export function InsightsRanking({
               expanded ? "bg-primary/30" : "bg-primary/15",
             )}
           />
+          <CoverStack covers={row.covers} />
           <span
             data-row-label=""
             className="relative min-w-0 flex-1 truncate text-sm font-medium"

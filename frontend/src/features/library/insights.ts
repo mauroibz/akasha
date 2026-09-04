@@ -114,6 +114,62 @@ export function orderKeys<T>(
   };
 }
 
+/** One of the three superlatives a leading key's ranking can answer. */
+export interface Superlative {
+  kind: "most_collected" | "highest_rated" | "steadiest";
+  row: InsightRow;
+}
+
+/**
+ * Up to three answers about the leading key's ranking, above the fold (Sprint 067).
+ *
+ * Drawn from one key rather than pooled across all of them, on purpose: pooling
+ * found "most collected" answered with a subject tag like `Fiction` in practice,
+ * which is true and useless — the superlatives should name things you collect, and
+ * a leading key already is the library's own most concentrated answer to "collect
+ * what".
+ *
+ * A superlative with no honest answer is left out rather than guessed at: "highest
+ * rated" needs at least one row meeting `minRated` with a mean at all, and
+ * "steadiest" needs one of those with a spread — which the server only computes
+ * from two or more ratings, so a library with one rating per creator answers
+ * neither.
+ */
+export function computeSuperlatives(
+  rows: InsightRow[],
+  minRated: number,
+): Superlative[] {
+  if (rows.length === 0) return [];
+  const superlatives: Superlative[] = [];
+
+  const byCount = (a: InsightRow, b: InsightRow) =>
+    b.count - a.count || byKey(a, b);
+  superlatives.push({
+    kind: "most_collected",
+    row: [...rows].sort(byCount)[0],
+  });
+
+  const rated = rows.filter(
+    (row) => row.mean_score !== null && row.rated_count >= minRated,
+  );
+  if (rated.length > 0) {
+    const highestRated = [...rated].sort(
+      (a, b) => (b.mean_score ?? 0) - (a.mean_score ?? 0) || byKey(a, b),
+    )[0];
+    superlatives.push({ kind: "highest_rated", row: highestRated });
+  }
+
+  const steady = rated.filter((row) => row.score_spread !== null);
+  if (steady.length > 0) {
+    const steadiest = [...steady].sort(
+      (a, b) => (a.score_spread ?? 0) - (b.score_spread ?? 0) || byKey(a, b),
+    )[0];
+    superlatives.push({ kind: "steadiest", row: steadiest });
+  }
+
+  return superlatives;
+}
+
 /**
  * The whole truth about a key that did not earn a card, in one clause.
  *

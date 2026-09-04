@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  computeSuperlatives,
   keyLead,
   magnitude,
   orderKeys,
@@ -14,6 +15,8 @@ function row(
   count: number,
   rated: number,
   mean: number | null,
+  spread: number | null = null,
+  covers: string[] = [],
 ): InsightRow {
   return {
     key,
@@ -21,7 +24,8 @@ function row(
     count,
     rated_count: rated,
     mean_score: mean,
-    score_spread: null,
+    score_spread: spread,
+    covers,
   };
 }
 
@@ -171,5 +175,52 @@ describe("magnitude", () => {
 
   it("survives an empty ranking rather than dividing by zero", () => {
     expect(magnitude(0, 0)).toBe(0);
+  });
+});
+
+describe("computeSuperlatives", () => {
+  it("names most collected, highest rated and steadiest, drawn from one key", () => {
+    const withSpread = [
+      row("cortazar", 7, 6, 8.8, 0.9),
+      row("le guin", 5, 5, 9.2, 0.3),
+      row("calvino", 3, 3, 7.7, 1.2),
+    ];
+    const superlatives = computeSuperlatives(withSpread, 2);
+    expect(superlatives).toEqual([
+      { kind: "most_collected", row: withSpread[0] },
+      { kind: "highest_rated", row: withSpread[1] },
+      { kind: "steadiest", row: withSpread[1] },
+    ]);
+  });
+
+  it("leaves out highest rated and steadiest when nothing meets minRated", () => {
+    const oneRatingEach = [
+      row("cortazar", 3, 1, 9.0, null),
+      row("le guin", 2, 1, 8.0, null),
+    ];
+    expect(computeSuperlatives(oneRatingEach, 2)).toEqual([
+      { kind: "most_collected", row: oneRatingEach[0] },
+    ]);
+  });
+
+  it("can name a different row for highest rated than for steadiest", () => {
+    // A single rating gives a mean but never a spread (the server needs two), so
+    // the best mean and the best spread need not belong to the same row.
+    const rows = [
+      row("cortazar", 3, 2, 9.0, 0.5),
+      row("le guin", 2, 1, 10, null),
+    ];
+    const superlatives = computeSuperlatives(rows, 1);
+    expect(superlatives.map((s) => s.kind)).toEqual([
+      "most_collected",
+      "highest_rated",
+      "steadiest",
+    ]);
+    expect(superlatives[1].row.key).toBe("le guin");
+    expect(superlatives[2].row.key).toBe("cortazar");
+  });
+
+  it("answers nothing for an empty ranking", () => {
+    expect(computeSuperlatives([], 2)).toEqual([]);
   });
 });

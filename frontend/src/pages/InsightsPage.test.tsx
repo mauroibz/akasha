@@ -67,6 +67,7 @@ function row(
   rated: number,
   mean: number | null,
   spread: number | null = null,
+  covers: string[] = [],
 ) {
   return {
     key: label.toLowerCase(),
@@ -75,6 +76,7 @@ function row(
     rated_count: rated,
     mean_score: mean,
     score_spread: spread,
+    covers,
   };
 }
 
@@ -82,7 +84,10 @@ function row(
  * One ranking carrying every case the screen has to draw: a clear leader, groups
  * that are rated enough to place under the score order, and two that are not.
  */
-function ranking(rows = defaultRows()) {
+function ranking(
+  rows = defaultRows(),
+  totals: { total_entries?: number; rated_entries?: number } = {},
+) {
   return {
     type: "book",
     key: "creators",
@@ -93,13 +98,18 @@ function ranking(rows = defaultRows()) {
     suppressed: [],
     no_rated_groups: false,
     null_count: 0,
+    total_entries: totals.total_entries ?? 20,
+    rated_entries: totals.rated_entries ?? 17,
   };
 }
 
 /** In the order the server returns: count descending, then normalized key. */
 function defaultRows() {
   return [
-    row("Julio Cortázar", 7, 6, 8.8, 0.9),
+    row("Julio Cortázar", 7, 6, 8.8, 0.9, [
+      "/api/items/1/cover?v=1",
+      "/api/items/2/cover?v=1",
+    ]),
     row("Ursula K. Le Guin", 5, 5, 9.2, 0.7),
     row("Italo Calvino", 3, 3, 7.7, 1.2),
     // Below `min_rated`: present in the ranking, not placeable by score.
@@ -232,7 +242,7 @@ describe("InsightsPage", () => {
     // rank gets a line rather than a two-row table.
     stubApi();
     renderPage();
-    await screen.findByText("Julio Cortázar");
+    await screen.findByRole("heading", { name: "Authors" });
 
     expect(cardTitles()).toEqual(["Authors", "Publisher", "Decade"]);
     expect(screen.getByText("Nothing much to rank yet")).toBeVisible();
@@ -246,7 +256,7 @@ describe("InsightsPage", () => {
     stubApi();
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Julio Cortázar");
+    await screen.findByRole("heading", { name: "Authors" });
     expect(screen.getByRole("heading", { name: "Authors" })).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: "Album" }));
@@ -265,7 +275,7 @@ describe("InsightsPage", () => {
     stubApi();
     renderPage();
 
-    await screen.findByText("Julio Cortázar");
+    await screen.findByRole("heading", { name: "Authors" });
 
     // 8.8 is nearly a 9 and reads as one; 7.7 is an 8; 3.0 is a 3.
     const authors = card("Authors");
@@ -280,7 +290,7 @@ describe("InsightsPage", () => {
     // measured against them.
     stubApi();
     renderPage();
-    await screen.findByText("Julio Cortázar");
+    await screen.findByRole("heading", { name: "Authors" });
 
     const bars = screen
       .getByRole("region", { name: /^Authors/ })
@@ -303,7 +313,7 @@ describe("InsightsPage", () => {
     const calls = stubApi();
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Julio Cortázar");
+    await screen.findByRole("heading", { name: "Authors" });
 
     // Sorted by how many: the leader is first, and its score is on the row.
     expect(rowOrder("Authors")).toEqual([
@@ -340,7 +350,7 @@ describe("InsightsPage", () => {
     stubApi();
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Julio Cortázar");
+    await screen.findByRole("heading", { name: "Authors" });
 
     await user.click(screen.getByRole("button", { name: "Best rated" }));
 
@@ -362,7 +372,7 @@ describe("InsightsPage", () => {
     });
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Gene Wolfe");
+    await screen.findByRole("heading", { name: "Authors" });
 
     await user.click(screen.getByRole("button", { name: "Best rated" }));
 
@@ -425,6 +435,55 @@ describe("InsightsPage", () => {
 
     expect(first).toHaveAttribute("aria-expanded", "false");
     expect(second).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("names three superlatives from the leading key, and fewer when it must", async () => {
+    stubApi();
+    renderPage();
+    await screen.findByRole("heading", { name: "Authors" });
+
+    // Leading key is Authors (the widest lead); most collected is its count
+    // leader, highest rated its best mean, steadiest its tightest spread --
+    // three different rows, drawn above the cards.
+    expect(screen.getByText("Holds the most")).toBeVisible();
+    expect(screen.getByText("Highest rated")).toBeVisible();
+    expect(screen.getByText("Steadiest")).toBeVisible();
+  });
+
+  it("leaves out a superlative with no honest answer", async () => {
+    // Nothing meets min_rated=2, so neither a highest-rated nor a steadiest
+    // row exists to name -- only "most collected" survives.
+    stubApi({
+      creators: [
+        row("Gene Wolfe", 3, 1, 5.0),
+        row("Kazuo Ishiguro", 2, 1, 7.0),
+        row("Samanta Schweblin", 2, 0, null),
+      ],
+    });
+    renderPage();
+    await screen.findByRole("heading", { name: "Authors" });
+
+    expect(screen.getByText("Holds the most")).toBeVisible();
+    expect(screen.queryByText("Highest rated")).toBeNull();
+    expect(screen.queryByText("Steadiest")).toBeNull();
+  });
+
+  it("renders a row's numbers before its cover has loaded", async () => {
+    // The covers arrive on the very same ranking response; nothing about them
+    // should hold up the numbers a row exists to show.
+    stubApi();
+    renderPage();
+    await screen.findByRole("heading", { name: "Authors" });
+
+    const authors = card("Authors");
+    expect(authors.getByText("7")).toBeVisible();
+    expect(authors.getByText("8.8")).toBeVisible();
+    // jsdom never fires the cover's `load` event, so if this is visible the
+    // row rendered its numbers without waiting for it.
+    const authorsRegion = screen.getByRole("region", { name: /^Authors/ });
+    const cover = authorsRegion.querySelector("img");
+    expect(cover).not.toBeNull();
+    expect(cover?.className).toContain("opacity-0");
   });
 });
 
