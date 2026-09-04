@@ -2,11 +2,10 @@
 
 **Status:** planned
 **Depends on:** 066
-**Roadmap revision:** 35
+**Roadmap revision:** 36
 
-> **Not scheduled.** Drafted from [`../insights-redesign-proposal.md`](../insights-redesign-proposal.md)
-> at the owner's request, and dependent on Sprint 066 having landed first. See that sprint's
-> header note about `state.json` and `FINAL_SPRINT`.
+> Planned from [`../insights-redesign-proposal.md`](../insights-redesign-proposal.md) and
+> **accepted by the owner as DEC-132.** Activates when Sprint 066 closes.
 
 ## Objective
 

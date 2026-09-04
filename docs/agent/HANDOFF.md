@@ -1,10 +1,17 @@
-# Handoff — Sprint 065 closed; nothing queued next
+# Handoff — Sprint 065 closed; Sprint 066 is active
 
-`docs/agent/state.json` reads `project_status: "complete"`, `active_sprint: null`.
-Sprint 065 was the last sprint this roadmap had planned — `FINAL_SPRINT = 65` in
-`scripts/validate_project.py` — not a claim that the product is finished.
-`docs/sprints/ROADMAP.md`'s "Owner feedback" and "Not scheduled" sections hold real,
-already-costed candidates for a Sprint 066 the owner hasn't chosen yet.
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "066"`.
+
+The owner used what Sprint 065 shipped, reported that the data is right and the screen
+is not, and accepted the redesign in `docs/insights-redesign-proposal.md` as **DEC-132**.
+That schedules **[066 — Insights you can read](../sprints/066-insights-you-can-read.md)**
+(active, `ready`) and **067 — Insights with faces** (planned). `FINAL_SPRINT` in
+`scripts/validate_project.py` moved from 65 to 67; plan revision is 36.
+
+**Read DEC-132 before touching `InsightsPage.tsx`.** Sprint 066's binding contract is that
+it needs **no backend change**: the endpoint already serves everything the redesign draws,
+including `score_spread`, which is computed, serialized and rendered nowhere today. The
+rest of this file is Sprint 065's closing state and remains accurate.
 
 ## This work is on `ui-search-refresh-mini-sprint`, not a new branch
 

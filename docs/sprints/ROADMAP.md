@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 35
+**Plan revision:** 36
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [065 — Insights: rankings from the fields items already declare](065-insights.md), ready; see `docs/agent/state.json`.
+**Active sprint:** [066 — Insights you can read](066-insights-you-can-read.md), ready; see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1184,7 +1184,7 @@ noticed. Track roll-up shipped implemented and tested but with no wired toggle �
 repository's import boundary has no generic per-read options mechanism, and the measured
 recommendation is "off" regardless. See the sprint file's Outcome.
 
-### [Sprint 065 — Insights: rankings from the fields items already declare](065-insights.md) **[PLANNED — ships as v1.6.0]**
+### [Sprint 065 — Insights: rankings from the fields items already declare](065-insights.md)
 
 Ask the library a question it already has the answer to — which authors you rate highest, which
 bands you own most of, which decade you keep going back to — and get a ranked answer from the
@@ -1210,6 +1210,48 @@ a library is imported. If scores turn out sparse the feature is diminished, not 
 **Sequenced after 064**, which produces the first real dataset to judge it against. The release at
 its end is **v1.6.0, the insights release** — a `v1.Y` feature release in the shape of v1.5, not a
 2.0: `v2` is a reserved term in this product for auth, multiuser and sharing (product spec §9).
+
+[Closed 2026-09-03. All eight deliverables and all ten acceptance criteria built and tested; the
+full account, including a real AC9 budget breach at 5,000 entries and the per-request temp-table
+materialization that fixed it, is **DEC-131**. Release notes for v1.6.0 written; cutting the tag is
+the owner's action. The DEC-025 walkthrough against the owner's *own* imported library is recorded
+as still owed, and Sprints 066 and 067 do not discharge it.]
+
+### [Sprint 066 — Insights you can read](066-insights-you-can-read.md) **[ACTIVE]**
+
+The screen Sprint 065 shipped, redrawn. Owner feedback traced to eight defects, every one of them
+in `InsightsPage.tsx`: see the section below and **DEC-132**.
+
+The contract is that **no backend change is required**. `GET /api/insights` already returns
+everything this sprint draws — including `rated_count` and `mean_score` in both metrics, and
+`score_spread`, which is computed, serialized, and rendered nowhere today. A sprint that finds
+itself editing `application/library.py` has either found a real defect (record it) or has taken
+Sprint 067's work.
+
+Mean score gets the DEC-026 ramp through the existing `scoreChipClass`. Each row is filled to its
+own share of its ranking's leader, so amber encodes a quantity instead of decorating twelve
+identical links. Count and score stop being modes and are shown together, with the toggle demoted
+to a sort order — a short bar under an emerald chip is a reading the current table cannot produce.
+The key popover becomes a card per key. A row expands in place over the `key`/`value` filter 065
+already built, and the library says where a `key`/`value` filter came from.
+
+**Which insights are offered stops being `__init__.py` order.** A key earns a card when at least
+three of its values hold two or more entries; cards sort by how far the leader stands above the
+middle of its own ranking; keys that fail collapse into one line naming each key and its values.
+Client-side arithmetic over data already loaded, deliberately one sentence, deliberately cheap to
+change one's mind about — the same reasoning that made `groupable` a declaration.
+
+### [Sprint 067 — Insights with faces](067-insights-with-faces.md)
+
+The half that needs the backend. `InsightRowResponse.covers` — a deterministic lateral top-3, so a
+ranking row shows the jackets behind its number; `total_entries`/`rated_entries`, so a superlative
+can say "7 of your 47" without summing rows (which over-counts a many-valued key); and forwarding
+`rank()`'s existing `statuses`/`shelves`/`q`/`formats` parameters through the route, which is the
+cheap half of making Insights a lens on the library rather than a separate place.
+
+DEC-131's measured budget is the constraint: covers add work to a query whose budget was breached
+once already and repaired with a per-request temp table. That is re-measured with
+`scripts/benchmark_library.py`, not assumed unchanged.
 
 ## Future epics, after this plan
 
@@ -1350,9 +1392,9 @@ measured.
 thirteen carried over; the firing rule gained three clauses in the building and is recorded as built
 in DEC-073.
 
-## Owner feedback — recorded 2026-09-03, proposed and not yet scheduled
-
 ### The insights screen is the right feature on the wrong surface
+
+**Owner feedback, 2026-09-03, accepted as DEC-132 and scheduled as Sprints 066 and 067.**
 
 Raised after using what Sprint 065 shipped: *"I really like the data this feature provides, but
 dislike its implementation on the frontend… At the very least I expected there to be colored numbers
@@ -1375,8 +1417,7 @@ carry the rest:
   visit, and the only interaction navigates away. Which key is offered first is `__init__.py` order,
   which is the "how we select the current insights" half of the feedback.
 
-Drafted as two sprints, both **`planned` and neither scheduled** — `docs/agent/state.json` still
-reads `complete`, and `FINAL_SPRINT` in `scripts/validate_project.py` is still 65:
+Scheduled as two sprints, split at the backend boundary:
 
 - **[066 — Insights you can read](066-insights-you-can-read.md)**: the score ramp, magnitude bars,
   both metrics on one row, a card per key ordered by what it has to say, inline expansion, and the
@@ -1386,9 +1427,10 @@ reads `complete`, and `FINAL_SPRINT` in `scripts/validate_project.py` is still 6
   totals a superlative needs, and forwarding `rank()`'s existing `statuses`/`shelves`/`q`/`formats`
   parameters through the endpoint, which the service already accepts and only the route withholds.
 
-Split at the backend boundary deliberately: 066 ships the whole felt improvement against the
-contract as it stands, and the split follows the standing rule that a design is delivered across the
-sprints it needs rather than trimmed into one.
+Split deliberately: 066 ships the whole felt improvement against the contract as it stands, and the
+split follows the standing rule that a design is delivered across the sprints it needs rather than
+trimmed into one. `FINAL_SPRINT` in `scripts/validate_project.py` moves from 65 to 67 with this
+revision.
 
 **Sprint 065's outstanding walkthrough is not discharged by either.** Running the rankings against
 the owner's real library, and reporting whether score density makes the score metric worth having,

@@ -5019,3 +5019,72 @@ both changes, against 1 of 3 before the second.
   Calibre books) rather than seeded data — is still owed and belongs to the owner's own
   running instance, which this session had no access to; recorded as open in the
   sprint's Outcome.
+
+## DEC-132 — The insights screen is redesigned rather than adjusted; the roadmap extends to Sprint 067
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Supersedes:** nothing. Sprint 065's ranking query, `groupable` declaration, suppression
+  list and `key`/`value` filter all stand unchanged; this entry is about the screen in front
+  of them.
+- **Cross-references:** DEC-026 (the design tokens and the four-band score ramp this screen
+  failed to use), DEC-131 (the ranking query and its measured budget, which neither sprint
+  may regress), DEC-052 and DEC-077 (why a ranking row still links to a filtered library
+  rather than to an entity page), DEC-067 row 7 (`chooses_covers`: not every domain has a
+  cover to show), DEC-127 (the precedent for moving `FINAL_SPRINT` and recording the move
+  here), DEC-114 (pay once for evidence).
+- **Context:** the owner used what Sprint 065 shipped and reported liking the data and
+  disliking the screen, naming coloured scores as the floor and "how we select the current
+  insights" as the ceiling. The screen was photographed from the running application against
+  a ranking shaped the way `docs/spotify-import-and-insights-viability.md` measured a real
+  library to rank — one leader, two contenders, a long tail of ones — and the complaint was
+  traced to source rather than taken as an impression.
+- **Finding, and why it is a presentation finding only:** eight defects, every one of them in
+  `frontend/src/pages/InsightsPage.tsx`. Three carry the rest. **The score ramp is not
+  applied**: `mean_score.toFixed(1)` renders as body text (line 214) while `scoreChipClass`
+  colours the same number on the library card, the triage row and the detail page — the one
+  screen whose entire subject is scores is the only one that opts out of the ramp DEC-026
+  built so that "the colour means the same thing wherever the eye lands". **Half of every
+  response is discarded**: `rated_count` and `mean_score` arrive in both metrics and render
+  only under `score`; `score_spread` — the population standard deviation
+  `_insight_row` computes from `mean_sq` — renders under neither, and is dead payload today.
+  **The page is a query builder**: four controls above one table, one question per visit, the
+  key picker a popover so the alternatives are invisible while choosing, and the only
+  interaction navigating away. Smaller, and recorded so they are not rediscovered:
+  `<th>{key}</th>` prints the raw field name where the domain declares a label, every row
+  label is `text-primary` so the accent distinguishes nothing, and which key a domain opens
+  on is `__init__.py` order.
+- **Decision, the design:** accepted as written in `docs/insights-redesign-proposal.md`. The
+  score ramp through the existing `scoreChipClass`; the row filled to its own share of its
+  ranking's leader, so the accent encodes a quantity instead of decorating twelve links;
+  count and score shown together with the toggle demoted to a sort order; a card per key in
+  place of the popover; inline expansion over the `key`/`value` filter Sprint 065 already
+  built; covers on a row; and a superlative strip that finally renders `score_spread`.
+- **Decision, how insights are selected:** ordering becomes a stated rule rather than
+  declaration order — *a key earns a card when at least three of its values hold two or more
+  entries, and cards are ordered by how far the leader stands above the middle of its own
+  ranking.* Deliberately client-side arithmetic over data already loaded, and deliberately one
+  sentence: it is a judgement that will be argued with, and the cost of changing one's mind
+  must stay a small diff and a test — the same reasoning that made `groupable` a declaration
+  rather than a derivation. Keys that fail it are not hidden; they collapse to one line naming
+  each key and its values, which is the whole truth about that key in less space than a card.
+- **Decision, placement:** `/insights` stays a destination in the main navigation. Folding it
+  into the library as a third view mode was costed and declined: the library page already
+  carries search, filters, sort, virtualization, web results and the add dialog, and insights
+  would stop being a named feature weeks after becoming one. The half of that option worth
+  having is taken instead — `LibraryService.rank()` already accepts `statuses`, `shelves`,
+  `q` and `formats` and only the route withholds them, so forwarding four parameters buys
+  "rank inside the filters I already set" without giving the library page a fourth job. The
+  library gains a breadcrumb naming where a `key`/`value` filter came from, which today
+  applies invisibly.
+- **Decision, the split:** two sprints, divided at the backend boundary. **066 requires no
+  backend change at all** — the endpoint already returns everything it draws — so the whole
+  felt improvement ships against the contract as it stands, and **067** adds covers, library
+  totals and the filter passthrough. The design is delivered across the sprints it needs
+  rather than trimmed to fit one. Plan revision moves to 36.
+- **Consequences:** `docs/agent/state.json` leaves `complete` — `active_sprint` becomes `066`,
+  `ready`, `last_completed_sprint` stays `065`. `scripts/validate_project.py`'s `FINAL_SPRINT`
+  moves from 65 to 67. `docs/insights-redesign-proposal.md` stays in the documentation map as
+  the accepted proposal these two sprints implement. Sprint 065's own DEC-025 walkthrough —
+  against the owner's real, already-imported library — is **not** discharged by either sprint
+  and remains open.

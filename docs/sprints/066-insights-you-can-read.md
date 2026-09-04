@@ -1,13 +1,11 @@
 # Sprint 066 — Insights you can read
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 065
-**Roadmap revision:** 35
+**Roadmap revision:** 36
 
-> **Not scheduled.** Drafted from [`../insights-redesign-proposal.md`](../insights-redesign-proposal.md)
-> at the owner's request. `docs/agent/state.json` still reads `complete` and
-> `FINAL_SPRINT` in `scripts/validate_project.py` is still 65; both move only when the owner
-> accepts this sprint and the one after it.
+> Planned from [`../insights-redesign-proposal.md`](../insights-redesign-proposal.md) and
+> **accepted by the owner as DEC-132.**
 
 ## Objective
 

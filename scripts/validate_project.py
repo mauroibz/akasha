@@ -42,8 +42,9 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # before the line, pushing it to 60, and DEC-124's Calibre export bundle to 61, and DEC-125's
 # provider-resilience sprint to 62, and DEC-126's Cinemeta sprint to 63, and DEC-127 to 65 —
 # withdrawing the anime/albums placeholder at 64 and renumbering the Spotify import and
-# insights sprints down to 64 and 65 to close the gap, rather than leaving one).
-FINAL_SPRINT = 65
+# insights sprints down to 64 and 65 to close the gap, rather than leaving one, and
+# DEC-132's accepted insights redesign to 67).
+FINAL_SPRINT = 67
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
