@@ -204,7 +204,12 @@ test("row errors and ambiguity require an explicit choice", async ({
     buffer: Buffer.from("csv"),
   });
   await page.getByRole("button", { name: /preview import/i }).click();
-  await expect(page.getByText("date_read: invalid_date")).toBeVisible();
+  // Finding 3 (AC3): a legible sentence, not the raw field/code a reader
+  // used to see.
+  await expect(page.getByText("date_read: invalid_date")).toHaveCount(0);
+  await expect(
+    page.getByText("Date read isn't a date we can read."),
+  ).toBeVisible();
   const commit = page.getByRole("button", { name: /import 1 ready row/i });
   await expect(commit).toBeDisabled();
   await chooseOption(
