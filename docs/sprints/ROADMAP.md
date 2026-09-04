@@ -2,7 +2,7 @@
 
 **Plan revision:** 36
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [067 — Insights with faces](067-insights-with-faces.md), ready; see `docs/agent/state.json`.
+**Active sprint:** none — every planned sprint (001–067) is complete; see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1241,6 +1241,11 @@ middle of its own ranking; keys that fail collapse into one line naming each key
 Client-side arithmetic over data already loaded, deliberately one sentence, deliberately cheap to
 change one's mind about — the same reasoning that made `groupable` a declaration.
 
+[Closed 2026-09-03. All nine deliverables and acceptance criteria 1–10 built and tested; the
+material findings — a `key=year`/`decade` 500 the walkthrough found and repaired as a prerequisite
+defect, the batched `keys=` parameter measured and deliberately not added, and what the ordering
+rule does to a real album library — are **DEC-133**.]
+
 ### [Sprint 067 — Insights with faces](067-insights-with-faces.md)
 
 The half that needs the backend. `InsightRowResponse.covers` — a deterministic lateral top-3, so a
@@ -1252,6 +1257,22 @@ cheap half of making Insights a lens on the library rather than a separate place
 DEC-131's measured budget is the constraint: covers add work to a query whose budget was breached
 once already and repaired with a per-request temp table. That is re-measured with
 `scripts/benchmark_library.py`, not assumed unchanged.
+
+[Closed 2026-09-04. All six deliverables built and tested, with one corrected reading of this
+sprint's own text along the way (**DEC-134**): the doc gated `covers` on a domain's
+`chooses_covers`, which is `False` for every shipped domain but book even though album, anime,
+movie and series entries all carry real cover art — that flag is the Open Library manual
+cover-picker (DEC-067 row 7), unrelated to whether a domain's items have covers at all. Gating on
+it as written would have left every non-book ranking without a face, the opposite of what this
+sprint is for. Built instead: a row's covers come from whichever of its own members actually carry
+`ItemRow.cover_path`, regardless of domain. Re-measured at 5,000 entries with a seed that actually
+gives most items a cover (the prior seed's `cover_path` was always null, which would have measured
+an always-empty join): every scenario stays inside the 500ms budget. The DEC-025 walkthrough, run
+against a throwaway backend seeded through the real HTTP API — including uploaded covers on most
+entries and none on a few, deliberately — found one out-of-scope defect worth recording and not
+fixing here: the domain radiogroup (five real domains: book, album, anime, movie, series)
+overflows the viewport by about 39px at 390px width, unchanged code from Sprint 066 that only ever
+had one or two domains in its own tests.]
 
 ## Future epics, after this plan
 

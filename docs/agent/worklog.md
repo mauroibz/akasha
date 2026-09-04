@@ -3999,3 +3999,77 @@ so 050 adds an adapter, not a declaration.
 - Next: Sprint 067 (`ready`) — covers on a ranking row, library totals for the
   superlative strip, and forwarding `rank()`'s existing `statuses`/`shelves`/`q`/
   `formats` parameters through the endpoint. Read DEC-132 §3 and DEC-133 first.
+
+## 2026-09-04 — Sprint 067 (complete) — the final planned sprint; project state is `complete`
+
+- Done: all six deliverables. `InsightRowResponse.covers` (a deterministic lateral
+  top-3 per row); `InsightResponse.total_entries`/`rated_entries` (the ranked set's
+  own totals, not a sum of rows); the superlative strip (`computeSuperlatives` —
+  most collected, highest rated, steadiest, drawn from the leading key only, a
+  superlative left out rather than guessed at when nothing meets `min_rated` or
+  nothing has two ratings to spread); a cover stack on the collapsed row
+  (`InsightsRanking`'s `CoverStack`) alongside the already-covered expanded member
+  list; `GET /api/insights` forwarding `status`/`shelf`/`format`/`q` to `rank()`,
+  validated identically to `/api/entries`; and a "within my current filters"
+  toggle, off by default, reading a `localStorage` snapshot `HomePage` now writes
+  on every filter change (`rememberLibraryFilters`, the same pattern the
+  remembered domain already used).
+- **One corrected reading of the sprint's own text, raised to the owner before
+  building rather than guessed past:** the doc gated `covers` on `chooses_covers`,
+  which is `False` for every domain but book even though album/anime/movie/series
+  all have real cover art — that flag is the Open Library manual cover-picker
+  (DEC-067 row 7), unrelated to whether a domain has covers at all. Built instead:
+  gated on whether a row's own members actually carry `ItemRow.cover_path`,
+  domain-agnostic. Full account, plus the AC7 benchmark-seed fix and the
+  walkthrough's findings, is **DEC-134**.
+- Five commits: `[ADD] A ranking row carries the covers behind its number` (covers
+  + library totals), `[ADD] Rank inside the filters you already set` (backend
+  passthrough), `[ADD] The three things worth saying about a domain` (superlative
+  strip + row covers), `[ADD] Rank inside the filters you already set` (frontend
+  toggle — same title as the backend commit by oversight, different diff), and
+  `[TEST] Hold Sprint 067 to a real budget and a real browser` (the AC7 seed fix,
+  e2e/accessibility fixture updates for the new response fields).
+- Verified: `make check` green. Backend **1,333** passed (1,328 + 5). Frontend
+  **243** passed (231 + 12). Full Playwright **113 passed, 2 skipped, 0 failed**.
+  `scripts/benchmark_library.py --entries 5000 --jobs 100` re-measured with a seed
+  that actually gives most items a cover (the old seed's `cover_path` was always
+  null, which would have measured an always-empty join): every insights scenario
+  stays inside the 500ms budget (`creators/count` 294.2ms p95, `publisher/count`
+  365.9ms p95 — the largest jump, still comfortable). `python
+  scripts/validate_project.py` green. `make smoke-container` not owed — no
+  deployment configuration touched.
+- **Walkthrough (DEC-025), done.** Throwaway backend (`scripts/walkthrough.py`) on
+  an ephemeral port against a fresh `/tmp` data directory, seeded through the real
+  HTTP API: 12 books, 13 albums, real creators/scores/statuses, a real image
+  uploaded through `POST /api/items/{id}/cover` to all but two entries per domain,
+  left uncovered on purpose. Verified over HTTP first, then in a real browser (dev
+  frontend on `:5180` proxied at the throwaway backend via `AKASHA_E2E_BACKEND`):
+  covers rendered on both the book and the **album** domain
+  (`chooses_covers=False`) with counts matching each row's actual covered
+  membership; the deliberately-uncovered book row showed no cover slot; the
+  superlative strip and library-totals line rendered; the filters toggle was off
+  by default, said the library had none set until one was written to the
+  remembered key, then named it and the next request carried `status=read`; zero
+  console errors. The owner's own instance at `:8000` was untouched; the
+  throwaway backend, frontend and data directory were torn down at close.
+- Dead end worth not repeating: `scripts/benchmark_library.py`'s seed had set
+  `cover_path=None` on every item since it was written, which would have measured
+  this sprint's own AC7 against a join that can never match anything — caught
+  before trusting the first "every scenario inside budget" run, by noticing the
+  covers query's plan showed an index scan with nothing to actually join against.
+- Blocked/open, unchanged from Sprint 066's handoff: **Sprint 065's DEC-025
+  walkthrough against the owner's real imported library is still owed** — Sprint
+  064's Spotify albums, the Calibre books — and needs the owner's own container;
+  neither 066 nor 067 discharges it. Cutting the `v1.6.0` tag is still the
+  owner's action.
+- **One defect found on this sprint's own walkthrough, out of scope, not fixed:**
+  at 390px the domain radiogroup (five real domains — book, album, anime, movie,
+  series) overflows the viewport by about 39px. `InsightsPage.tsx`'s header
+  markup is unchanged since Sprint 066's close (diffed to confirm); neither
+  sprint's own mocked tests ever exercised more than one or two domains, which is
+  why the existing 390px check stayed green through both. Recorded in **DEC-134**
+  rather than fixed here.
+- **This was the final planned sprint.** `docs/agent/state.json` now reads
+  `project_status: "complete"`, `active_sprint: null`. `scripts/validate_project.py`'s
+  `FINAL_SPRINT` (67) matches `completed_sprints`' length. No sprint is active;
+  the owner decides what comes next.

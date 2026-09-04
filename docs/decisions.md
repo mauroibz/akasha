@@ -5178,3 +5178,83 @@ both changes, against 1 of 3 before the second.
   (1,326 + 2 new API tests), `make check`, 231 frontend tests, and the full Playwright suite
   (113 passed, 2 skipped, 0 failed — no contention flakiness this run, unlike Sprint 065's).
   No schema change, no migration, no OpenAPI surface change beyond the corrected value type.
+
+## DEC-134 — Sprint 067's covers gate on cover art, not on `chooses_covers`; the AC7 seed needed covers too; one out-of-scope defect the walkthrough found
+
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Cross-references:** DEC-132 (the redesign Sprint 067 completes), DEC-133 (Sprint 066's
+  findings), the technical spec's `chooses_covers` field and DEC-067 row 7 (what that flag
+  actually governs).
+- **Context:** Sprint 067 (`docs/sprints/067-insights-with-faces.md`) added
+  `InsightRowResponse.covers`, `total_entries`/`rated_entries`, and forwarded `rank()`'s
+  existing filter parameters through `GET /api/insights`. Its own deliverable 1 and AC2 said,
+  twice, that a row's covers should be empty for a domain declaring `chooses_covers=False`.
+
+- **Finding 1, and the one thing this sprint corrected before building it: gating covers on
+  `chooses_covers` would have shipped covers for exactly one domain.** `chooses_covers` is
+  whether a domain offers Open Library's manual alternate-cover picker (DEC-067 row 7) — it
+  says nothing about whether a domain's items carry cover art at all. Checking the registry:
+  book is the only domain declaring it `True`; album, anime, movie and series all declare
+  `False`, and all four carry real cover art from their own providers (Spotify/MusicBrainz art,
+  TMDB posters, TVMaze images, MAL covers — Sprints 048, 050, and the movie/anime/series
+  domains generally). Implemented as written, only book rankings would ever show a face, which
+  is the opposite of what the sprint's own motivation says ("an author has jackets... the
+  difference between a database and a shelf" — true of movie posters and album art at least as
+  much as of book jackets). Raised to the owner before building rather than guessed past, since
+  it materially changes user-visible behavior for four of five domains; the owner chose the
+  corrected reading.
+
+  Built instead: `LibraryService._insight_covers` selects up to three `item.cover_path is not
+  null` members per row, ordered by score desc (SQLite already sorts `NULL` last under `DESC`),
+  then `entries.date_added` desc, then entry id desc — domain-agnostic, and empty only when no
+  member of a row actually has a cover, which the walkthrough confirmed on both a book and an
+  album domain from the same request shape.
+
+- **Finding 2, the AC7 seed measured an always-empty join until this was noticed.**
+  `scripts/benchmark_library.py`'s `seed()` set `cover_path=None` on every item, which was
+  correct for the query DEC-131 measured but silently made Sprint 067's own re-measurement
+  measure a `LEFT`-shaped join against nothing — a covers query that can never actually join is
+  not the query the feature runs. Twelve items in thirteen now get a `cover_path`, one in
+  thirteen kept null (the empty case, not made the common one). Re-measured at 5,000 entries
+  under write contention: `creators/count` 294.2ms p95 (was 277.8ms without covers, DEC-133),
+  `creators/score` 307.9ms, `publisher/count` 365.9ms (was 208.3ms — the largest jump, still
+  comfortably inside the 500ms budget), `year`/`decade` unaffected since they read `items.year`
+  directly and carry no per-row cover lookup cost proportionate to metadata explosion in the
+  same way. Every scenario stays inside budget; numbers are DEC-131's format, re-measured
+  rather than assumed unchanged, per the sprint's own AC7.
+
+- **Finding 3, the DEC-025 walkthrough, done, and what it found.** A throwaway backend
+  (`scripts/walkthrough.py`) on an ephemeral port against a fresh `/tmp` data directory, seeded
+  through the real HTTP API: 12 books and 13 albums with real creators/scores/statuses, and a
+  real cover image uploaded through `POST /api/items/{id}/cover` to all but two entries per
+  domain, left uncovered on purpose. Confirmed over HTTP and then in a real browser (a dev
+  frontend on `:5180` proxied at the throwaway backend, `AKASHA_E2E_BACKEND`): covers appear on
+  both the book and the **album** domain (chooses_covers=`False`) with counts matching exactly
+  what each row's covered membership predicts; a row with no covered member (the deliberately
+  uncovered book) shows an empty list and the screen renders it without a cover slot; the
+  superlative strip named three different rows with the library totals line ("9 of your 12 are
+  rated"); the "within my current filters" toggle was off by default, said plainly that the
+  library had no filters set until one was written to the remembered-filters key, then named it
+  in words and the following request carried `status=read`; zero console errors throughout.
+  Owner's own instance at `:8000` was untouched; the throwaway backend, frontend and data
+  directory were torn down at close.
+
+  **One defect found, out of scope, not fixed here:** at 390px the domain radiogroup (five real
+  domains — book, album, anime, movie, series) overflows the viewport by about 39px. The
+  markup is unchanged by this sprint (confirmed by diffing `InsightsPage.tsx` against Sprint
+  066's close); it was never exercised at more than one or two domains by either sprint's own
+  mocked tests, which is why AC9's 390px check has stayed green through both. Recorded here
+  rather than fixed, per the walkthrough gate's own rule: report what looked wrong even when
+  it is out of scope, because a defect noticed and left unrecorded is the failure this gate
+  exists to prevent.
+
+- **Consequences:** `InsightRowResponse.covers` and `InsightResponse.total_entries`/
+  `rated_entries` are new OpenAPI surface; `GET /api/insights` gains `status`/`shelf`/`format`/
+  `q` query parameters, validated identically to `/api/entries`. No schema change, no
+  migration. `frontend/src/features/library/library.ts` gains a `localStorage`-backed
+  "remembered library filters" key, written by `HomePage` on every filter change and read once
+  by `InsightsPage` — the same pattern the remembered domain already uses, extended rather than
+  duplicated. The domain-radiogroup overflow is carried forward as a known, unscoped defect;
+  fixing it belongs to whichever future sprint next touches `InsightsPage.tsx`'s header, or a
+  dedicated one if none does soon.
