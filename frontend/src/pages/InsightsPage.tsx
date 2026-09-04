@@ -133,7 +133,7 @@ export function InsightsPage() {
               variant="ghost"
               size="sm"
               aria-pressed={sort === "count"}
-              className="rounded-full aria-pressed:bg-surface-raised"
+              className="min-h-11 rounded-full aria-pressed:bg-surface-raised"
               onClick={() => setSort("count")}
             >
               Most collected
@@ -142,7 +142,7 @@ export function InsightsPage() {
               variant="ghost"
               size="sm"
               aria-pressed={sort === "score"}
-              className="rounded-full aria-pressed:bg-surface-raised"
+              className="min-h-11 rounded-full aria-pressed:bg-surface-raised"
               onClick={() => setSort("score")}
             >
               Best rated

@@ -61,16 +61,20 @@ export function InsightsRanking({
   // the divider.
   const max = Math.max(...[...rows, ...unplaced].map((row) => row.count), 1);
 
-  const draw = (row: InsightRow) => {
+  // Indexed, not keyed: a panel id has to be a valid IDREF and a grouping value
+  // is arbitrary text — "julio cortázar" has a space in it, which makes
+  // `aria-controls` point at nothing. Caught by the axe gate, not by review.
+  const draw = (row: InsightRow, index: number) => {
     const share = magnitude(row.count, max);
     const expanded = open === row.key;
+    const panel = `${panelId}-${index}`;
     return (
       <li key={row.key}>
         <button
           type="button"
           aria-label={rowLabel(row)}
           aria-expanded={expanded}
-          aria-controls={`${panelId}-${row.key}`}
+          aria-controls={panel}
           className="group relative flex min-h-11 w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left focus-ring"
           onClick={() => setOpen(expanded ? null : row.key)}
         >
@@ -104,7 +108,7 @@ export function InsightsRanking({
         </button>
         {expanded && (
           <InsightsMembers
-            id={`${panelId}-${row.key}`}
+            id={panel}
             type={type}
             insightKey={insightKey}
             value={row.key}
@@ -118,7 +122,7 @@ export function InsightsRanking({
 
   return (
     <ul className="flex flex-col gap-0.5">
-      {rows.map(draw)}
+      {rows.map((row, index) => draw(row, index))}
       {unplaced.length > 0 && (
         <li
           aria-hidden="true"
@@ -128,7 +132,7 @@ export function InsightsRanking({
           <span className="h-px flex-1 bg-border" />
         </li>
       )}
-      {unplaced.map(draw)}
+      {unplaced.map((row, index) => draw(row, rows.length + index))}
     </ul>
   );
 }

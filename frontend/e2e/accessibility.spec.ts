@@ -500,3 +500,152 @@ test("shelves has no serious accessibility violations", async ({ page }) => {
   await expect(page.getByRole("heading", { name: /shelves/i })).toBeVisible();
   await expectNoSeriousViolations(page, "shelves");
 });
+
+/**
+ * Insights had no axe check at all before Sprint 066 — it was the one screen
+ * added since this file was written and not added to it. Both orders and an open
+ * row, because those are three different trees.
+ */
+async function stubInsightsScreen(page: Page) {
+  await stubItemTypes(page, [insightsBookType]);
+  await page.route("**/api/insights**", (route) => {
+    const key = new URL(route.request().url()).searchParams.get("key") ?? "";
+    route.fulfill({
+      json: {
+        type: "book",
+        key,
+        metric: "count",
+        min_rated: 2,
+        rows:
+          key === "creators"
+            ? [
+                ["Julio Cortázar", 7, 6, 8.8],
+                ["Ursula K. Le Guin", 5, 5, 9.2],
+                ["Italo Calvino", 3, 3, 7.7],
+                ["Gene Wolfe", 2, 1, 5],
+              ].map(([label, count, rated, mean]) => ({
+                key: String(label).toLowerCase(),
+                label,
+                count,
+                rated_count: rated,
+                mean_score: mean,
+                score_spread: 1,
+              }))
+            : [
+                {
+                  key: "es",
+                  label: "Spanish",
+                  count: 9,
+                  rated_count: 4,
+                  mean_score: 8,
+                  score_spread: 1,
+                },
+              ],
+        next_cursor: null,
+        suppressed:
+          key === "creators"
+            ? [{ key: "various authors", label: "Various Authors", count: 3 }]
+            : [],
+        no_rated_groups: false,
+        null_count: 0,
+      },
+    });
+  });
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            id: 1,
+            item_id: 1,
+            status: "read",
+            score: 10,
+            notes: null,
+            date_added: "2026-01-01",
+            date_started: null,
+            date_finished: null,
+            reread_count: 0,
+            progress: null,
+            score_provisional: false,
+            suggested_status: null,
+            shelves: [],
+            formats: [],
+            item: {
+              id: 1,
+              type: "book",
+              title: "Rayuela",
+              subtitle: null,
+              year: 1963,
+              creator: "Julio Cortázar",
+              cover_url: null,
+              metadata: {},
+              identifiers: {},
+              sources: [],
+            },
+          },
+        ],
+        next_cursor: null,
+        total: 7,
+        facets: {
+          status_counts: {},
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+}
+
+const insightsBookType = {
+  id: "book",
+  label: "Book",
+  fields: [
+    {
+      name: "creators",
+      label: "Authors",
+      type: "text",
+      multiplicity: "many",
+      groupable: true,
+    },
+    {
+      name: "language",
+      label: "Language",
+      type: "text",
+      multiplicity: "one",
+      groupable: true,
+    },
+  ],
+  statuses: [{ value: "read", label: "Read", choosable: true, hotkey: "r" }],
+  default_status: "read",
+  entry_fields: [],
+  entry_field_labels: {},
+  progress: null,
+  formats: [],
+  entry_panel_label: "Your reading data",
+  chooses_covers: true,
+};
+
+test("insights has no serious accessibility violations, in either order", async ({
+  page,
+}) => {
+  await stubInsightsScreen(page);
+  await page.goto("/insights");
+  await expect(page.getByText("Julio Cortázar")).toBeVisible();
+  await expectNoSeriousViolations(page, "insights (most collected)");
+
+  await page.getByRole("button", { name: "Best rated" }).click();
+  await expect(page.getByText(/not rated enough to place/)).toBeVisible();
+  await expectNoSeriousViolations(page, "insights (best rated)");
+});
+
+test("insights has no serious accessibility violations with a row open", async ({
+  page,
+}) => {
+  await stubInsightsScreen(page);
+  await page.goto("/insights");
+  await page
+    .getByRole("button", { name: /^Julio Cortázar: 7 entries/ })
+    .click();
+  await expect(page.getByText("Rayuela")).toBeVisible();
+  await expectNoSeriousViolations(page, "insights (row open)");
+});

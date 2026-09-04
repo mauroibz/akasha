@@ -51,6 +51,7 @@ export function InsightsCard({
   return (
     <section
       aria-labelledby={headingId}
+      data-insight-card=""
       className="flex flex-col rounded-xl border border-border bg-surface"
     >
       <div className="flex items-baseline justify-between gap-3 px-4 pb-2 pt-4">
