@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { scoreBand, scoreChipClass, scoreFillClass } from "@/lib/score";
+import {
+  meanScoreChipClass,
+  scoreBand,
+  scoreChipClass,
+  scoreFillClass,
+} from "@/lib/score";
 
 describe("scoreChipClass", () => {
   it("fills a scored chip with its band colour and knocks the numeral out", () => {
@@ -34,5 +39,30 @@ describe("scoreChipClass", () => {
     for (let score = 1; score <= 10; score += 1) {
       expect(scoreChipClass(score)).toBe(scoreFillClass[scoreBand(score)]);
     }
+  });
+});
+
+describe("meanScoreChipClass", () => {
+  it("bands a mean by the score it is nearest, not by the one below it", () => {
+    // 8.8 is nearly a 9 and must read as one. Banding the raw value would put it
+    // in 7-8 with 7.0, which is the reading an insights ranking most needs to
+    // separate.
+    expect(meanScoreChipClass(8.8)).toBe(scoreFillClass.top);
+    expect(meanScoreChipClass(8.4)).toBe(scoreFillClass.high);
+    expect(meanScoreChipClass(6.5)).toBe(scoreFillClass.high);
+    expect(meanScoreChipClass(6.4)).toBe(scoreFillClass.mid);
+    expect(meanScoreChipClass(3.5)).toBe(scoreFillClass.mid);
+    expect(meanScoreChipClass(3.4)).toBe(scoreFillClass.low);
+  });
+
+  it("lands on the same band as a whole score", () => {
+    for (let score = 1; score <= 10; score += 1) {
+      expect(meanScoreChipClass(score)).toBe(scoreChipClass(score));
+    }
+  });
+
+  it("leaves a group with nothing rated as an absence, not a band", () => {
+    expect(meanScoreChipClass(null)).toBe(scoreChipClass(null));
+    expect(meanScoreChipClass(null)).not.toContain("bg-score");
   });
 });

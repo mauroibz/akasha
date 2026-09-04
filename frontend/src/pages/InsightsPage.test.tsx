@@ -67,6 +67,46 @@ function countInsight() {
   };
 }
 
+/** A score ranking with rows in it, spanning three bands of the ramp. */
+function scoreInsight() {
+  return {
+    type: "book",
+    key: "creators",
+    metric: "score",
+    min_rated: 2,
+    rows: [
+      {
+        key: "julio cortazar",
+        label: "Julio Cortázar",
+        count: 7,
+        rated_count: 6,
+        mean_score: 8.8,
+        score_spread: 0.9,
+      },
+      {
+        key: "italo calvino",
+        label: "Italo Calvino",
+        count: 3,
+        rated_count: 3,
+        mean_score: 7.7,
+        score_spread: 1.2,
+      },
+      {
+        key: "mariana enriquez",
+        label: "Mariana Enríquez",
+        count: 2,
+        rated_count: 2,
+        mean_score: 3.0,
+        score_spread: 0.5,
+      },
+    ],
+    next_cursor: null,
+    suppressed: [],
+    no_rated_groups: false,
+    null_count: 0,
+  };
+}
+
 function scoreInsightWithNothingRated() {
   return {
     type: "book",
@@ -140,6 +180,35 @@ describe("InsightsPage", () => {
     expect(
       await screen.findByText(/Nothing is rated enough to rank by score yet/),
     ).toBeVisible();
+  });
+
+  it("paints a mean score with the band the ramp gives it", async () => {
+    // DEC-026's whole point is that the colour means the same thing wherever the
+    // eye lands, and this was the one screen showing a score that opted out.
+    // Asserted through the class the shared helper returns, the way ScorePicker
+    // and the detail page already assert theirs.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
+      if (url.includes("metric=score"))
+        return new Response(JSON.stringify(scoreInsight()));
+      if (url.startsWith("/api/insights"))
+        return new Response(JSON.stringify(countInsight()));
+      return new Response("[]");
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Julio Cortázar");
+
+    await user.click(screen.getByRole("button", { name: "Rank by score" }));
+
+    // 8.8 is nearly a 9 and reads as one; 7.7 is an 8; 3.0 is a 3.
+    expect((await screen.findByText("8.8")).className).toContain(
+      "bg-score-top",
+    );
+    expect(screen.getByText("7.7").className).toContain("bg-score-high");
+    expect(screen.getByText("3.0").className).toContain("bg-score-low");
   });
 
   it("links a ranking row into the filtered library", async () => {

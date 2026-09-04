@@ -7,6 +7,8 @@ import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
 import { InsightsKeyPicker } from "@/features/library/InsightsKeyPicker";
 import { useInsights } from "@/features/library/useInsights";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
+import { cn } from "@/lib/utils";
 
 /**
  * Ask the library a question it already has the answer to — which authors you rate
@@ -211,9 +213,16 @@ export function InsightsPage() {
                   <>
                     <td className="py-2 pr-3">{row.rated_count}</td>
                     <td className="py-2 pr-3">
-                      {row.mean_score !== null
-                        ? row.mean_score.toFixed(1)
-                        : "—"}
+                      <span
+                        className={cn(
+                          scoreChipShape,
+                          meanScoreChipClass(row.mean_score),
+                        )}
+                      >
+                        {row.mean_score !== null
+                          ? row.mean_score.toFixed(1)
+                          : "—"}
+                      </span>
                     </td>
                   </>
                 )}

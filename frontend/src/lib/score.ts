@@ -54,6 +54,19 @@ export function scoreChipClass(score: number | null): string {
 }
 
 /**
+ * The chip for a *mean* rather than for a score somebody gave.
+ *
+ * The ramp is defined on the ten scores a person can choose; a mean is a real
+ * number between them, so it is banded by the score it is nearest. 8.8 reads as
+ * a 9 because that is what it nearly is — banding the raw value would file it
+ * with 7.0 in the 7-8 band, and separating those two is most of what an insights
+ * ranking is for.
+ */
+export function meanScoreChipClass(mean: number | null): string {
+  return scoreChipClass(mean === null ? null : Math.round(mean));
+}
+
+/**
  * Shared chip geometry for the read-only surfaces, so the triage row and the
  * detail page cannot drift apart. The `ScorePicker` trigger deliberately keeps
  * its own box: its height and padding are part of the geometry DEC-023 pins
