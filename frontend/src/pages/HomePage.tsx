@@ -59,6 +59,7 @@ import {
   mergeUniqueEntries,
   readDomainPreference,
   readViewPreference,
+  rememberLibraryFilters,
   viewPreferenceKey,
   type LibraryView,
 } from "@/features/library/library";
@@ -108,6 +109,9 @@ export function HomePage() {
     () => filtersFromParams(searchParams),
     [searchParams],
   );
+  // Remembered so Insights can offer "within my current filters" without a
+  // store shared between two separate pages (Sprint 067 deliverable 6).
+  useEffect(() => rememberLibraryFilters(filters), [filters]);
   const [search, setSearch] = useState(filters.query);
   const [view, setView] = useState<LibraryView>(readViewPreference);
   const [focusedId, setFocusedId] = useState<number | null>(null);

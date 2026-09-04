@@ -1,6 +1,11 @@
 import { useQueries } from "@tanstack/react-query";
 
-import { getInsights, type Insight } from "@/api/library";
+import {
+  getInsights,
+  type EntryFormat,
+  type EntryStatus,
+  type Insight,
+} from "@/api/library";
 
 /**
  * How deep a ranking is fetched.
@@ -36,16 +41,34 @@ export function useInsights(params: {
   type: string;
   keys: string[];
   includeSuppressed: boolean;
+  /** Rank inside the library's current filters (Sprint 067), off by default. */
+  statuses?: EntryStatus[];
+  shelves?: string[];
+  formats?: EntryFormat[];
+  q?: string;
 }) {
   return useQueries({
     queries: params.keys.map((key) => ({
-      queryKey: ["insights", params.type, key, params.includeSuppressed],
+      queryKey: [
+        "insights",
+        params.type,
+        key,
+        params.includeSuppressed,
+        params.statuses,
+        params.shelves,
+        params.formats,
+        params.q,
+      ],
       queryFn: (): Promise<Insight> =>
         getInsights({
           type: params.type,
           key,
           metric: "count" as const,
           includeSuppressed: params.includeSuppressed,
+          statuses: params.statuses,
+          shelves: params.shelves,
+          formats: params.formats,
+          q: params.q,
           limit: insightDepth,
         }),
       enabled: Boolean(params.type && key),

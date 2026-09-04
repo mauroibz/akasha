@@ -1,8 +1,14 @@
+import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
+import {
+  domainsFrom,
+  formatLabels,
+  insightKeyOptions,
+  statusLabelFor,
+} from "@/features/library/labels";
 import { InsightsCard } from "@/features/library/InsightsCard";
 import {
   computeSuperlatives,
@@ -10,9 +16,15 @@ import {
   quietSummary,
   type InsightSort,
 } from "@/features/library/insights";
+import {
+  hasRememberedFilters,
+  readLibraryFiltersPreference,
+  type RememberedLibraryFilters,
+} from "@/features/library/library";
 import { SuperlativeStrip } from "@/features/library/SuperlativeStrip";
 import { useInsights } from "@/features/library/useInsights";
-import type { Insight } from "@/api/library";
+import { getShelves } from "@/api/shelves";
+import type { ItemType, Insight } from "@/api/library";
 import { useItemTypes } from "@/features/library/useItemTypes";
 
 /**
@@ -41,6 +53,15 @@ export function InsightsPage() {
   const [sort, setSort] = useState<InsightSort>("count");
   const [minRated, setMinRated] = useState(2);
   const [includeSuppressed, setIncludeSuppressed] = useState(false);
+  // Off by default (proposal §3): most of a library view mode's value at none
+  // of its cost, without giving the library page a fourth responsibility.
+  // Read once, the way the remembered domain is: the library page keeps it
+  // current in `localStorage` on every filter change it makes.
+  const [withinFilters, setWithinFilters] = useState(false);
+  const [remembered] = useState<RememberedLibraryFilters>(
+    readLibraryFiltersPreference,
+  );
+  const shelfQuery = useQuery({ queryKey: ["shelves"], queryFn: getShelves });
 
   // The registry loads after this component mounts, so the first domain is chosen
   // once it arrives rather than assumed up front.
@@ -55,10 +76,15 @@ export function InsightsPage() {
     [selectedDomain],
   );
 
+  const activeFilters = withinFilters ? remembered : undefined;
   const rankings = useInsights({
     type,
     keys: keyOptions.map((option) => option.name),
     includeSuppressed,
+    statuses: activeFilters?.statuses,
+    shelves: activeFilters?.shelves,
+    formats: activeFilters?.formats,
+    q: activeFilters?.query,
   });
 
   // Which keys are worth a card, and in what order, is a judgement about this
@@ -164,6 +190,30 @@ export function InsightsPage() {
 
       <ScoreLegend />
 
+      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
+        <label className="flex min-h-11 items-center gap-2 text-muted-foreground">
+          <input
+            type="checkbox"
+            checked={withinFilters}
+            onChange={(event) => setWithinFilters(event.target.checked)}
+            className="h-4 w-4 rounded border-border"
+          />
+          Within my current filters
+        </label>
+        {withinFilters && (
+          <span className="text-muted-foreground">
+            {hasRememberedFilters(remembered)
+              ? `Ranking only entries matching ${describeRememberedFilters(
+                  remembered,
+                  type,
+                  itemTypes.data,
+                  shelfQuery.data,
+                )}.`
+              : "Your library has no filters set right now."}
+          </span>
+        )}
+      </div>
+
       {leading && (
         <SuperlativeStrip
           superlatives={superlatives}
@@ -250,6 +300,43 @@ export function InsightsPage() {
       )}
     </main>
   );
+}
+
+/**
+ * What "within my current filters" actually means, in words (Sprint 067
+ * deliverable 6) — drawn instead of left for the reader to infer from a
+ * narrower ranking they cannot otherwise account for.
+ */
+function describeRememberedFilters(
+  filters: RememberedLibraryFilters,
+  type: string,
+  types: ItemType[] | undefined,
+  shelves: Array<{ slug: string; name: string }> | undefined,
+): string {
+  const parts: string[] = [];
+  if (filters.statuses.length > 0) {
+    parts.push(
+      filters.statuses
+        .map((status) => statusLabelFor(type, types, status))
+        .join("/"),
+    );
+  }
+  if (filters.shelves.length > 0) {
+    const names = new Map(
+      (shelves ?? []).map((shelf) => [shelf.slug, shelf.name]),
+    );
+    parts.push(
+      filters.shelves.map((slug) => names.get(slug) ?? slug).join("/"),
+    );
+  }
+  if (filters.formats.length > 0) {
+    const labels = formatLabels(types);
+    parts.push(
+      filters.formats.map((value) => labels[value] ?? value).join("/"),
+    );
+  }
+  if (filters.query.trim()) parts.push(`"${filters.query.trim()}"`);
+  return parts.join(" · ");
 }
 
 /** The ramp, explained once, because every card leans on it. */

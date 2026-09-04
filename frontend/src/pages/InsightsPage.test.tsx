@@ -231,7 +231,10 @@ function renderPage() {
   );
 }
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  localStorage.clear();
+});
 
 describe("InsightsPage", () => {
   it("answers on arrival, best key first, and says so about the rest", async () => {
@@ -484,6 +487,62 @@ describe("InsightsPage", () => {
     const cover = authorsRegion.querySelector("img");
     expect(cover).not.toBeNull();
     expect(cover?.className).toContain("opacity-0");
+  });
+
+  it("offers to rank within the library's remembered filters, off by default", async () => {
+    localStorage.setItem(
+      "akasha.library.filters",
+      JSON.stringify({
+        statuses: ["read"],
+        shelves: [],
+        formats: [],
+        query: "",
+      }),
+    );
+    const calls = stubApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Authors" });
+
+    // Off by default: nothing has narrowed the request yet.
+    expect(
+      calls.some(
+        (url) => url.startsWith("/api/insights") && url.includes("status="),
+      ),
+    ).toBe(false);
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Within my current filters" }),
+    );
+
+    expect(
+      await screen.findByText(/Ranking only entries matching Read\./),
+    ).toBeVisible();
+    await waitFor(() => {
+      expect(
+        calls.some(
+          (url) =>
+            url.startsWith("/api/insights") && url.includes("status=read"),
+        ),
+      ).toBe(true);
+    });
+  });
+
+  it("says plainly when the library has no filters set to rank within", async () => {
+    localStorage.setItem(
+      "akasha.library.filters",
+      JSON.stringify({ statuses: [], shelves: [], formats: [], query: "" }),
+    );
+    stubApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Authors" });
+
+    await user.click(
+      screen.getByRole("checkbox", { name: "Within my current filters" }),
+    );
+
+    expect(await screen.findByText(/no filters set right now/)).toBeVisible();
   });
 });
 

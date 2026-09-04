@@ -1,9 +1,81 @@
-import type { LibraryEntry, LibraryFilters } from "@/api/library";
+import type {
+  EntryFormat,
+  EntryStatus,
+  LibraryEntry,
+  LibraryFilters,
+} from "@/api/library";
 
 export type LibraryView = "grid" | "table";
 export const viewPreferenceKey = "akasha.library.view";
 /** The domain the library was last showing, so a fresh visit lands where you left. */
 export const domainPreferenceKey = "akasha.library.domain";
+/**
+ * The library's current status/shelf/format/search filters, remembered so
+ * Insights can offer to rank inside them (Sprint 067 deliverable 6) without a
+ * shared store between two separate pages. Deliberately not `types`, `sort`,
+ * `order`, `key` or `value`: those are not among the four `rank()` already
+ * forwards to `_filtered_entries`, and the domain is remembered separately
+ * (`domainPreferenceKey`).
+ */
+export const libraryFiltersPreferenceKey = "akasha.library.filters";
+
+export interface RememberedLibraryFilters {
+  statuses: EntryStatus[];
+  shelves: string[];
+  formats: EntryFormat[];
+  query: string;
+}
+
+const emptyRememberedFilters: RememberedLibraryFilters = {
+  statuses: [],
+  shelves: [],
+  formats: [],
+  query: "",
+};
+
+export function rememberLibraryFilters(filters: LibraryFilters): void {
+  const remembered: RememberedLibraryFilters = {
+    statuses: filters.statuses,
+    shelves: filters.shelves,
+    formats: filters.formats,
+    query: filters.query,
+  };
+  localStorage.setItem(libraryFiltersPreferenceKey, JSON.stringify(remembered));
+}
+
+/** The remembered filters, or the empty set if none were ever saved or the
+ * stored value cannot be parsed (a private window, a cleared store, a shape
+ * from an older version). */
+export function readLibraryFiltersPreference(): RememberedLibraryFilters {
+  const raw = localStorage.getItem(libraryFiltersPreferenceKey);
+  if (!raw) return emptyRememberedFilters;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null)
+      return emptyRememberedFilters;
+    const candidate = parsed as Partial<RememberedLibraryFilters>;
+    return {
+      statuses: Array.isArray(candidate.statuses) ? candidate.statuses : [],
+      shelves: Array.isArray(candidate.shelves) ? candidate.shelves : [],
+      formats: Array.isArray(candidate.formats) ? candidate.formats : [],
+      query: typeof candidate.query === "string" ? candidate.query : "",
+    };
+  } catch {
+    return emptyRememberedFilters;
+  }
+}
+
+/** Whether any of the remembered filters would actually narrow a ranking. */
+export function hasRememberedFilters(
+  filters: RememberedLibraryFilters,
+): boolean {
+  return (
+    filters.statuses.length > 0 ||
+    filters.shelves.length > 0 ||
+    filters.formats.length > 0 ||
+    filters.query.trim().length > 0
+  );
+}
 
 export const defaultLibraryFilters: LibraryFilters = {
   statuses: [],

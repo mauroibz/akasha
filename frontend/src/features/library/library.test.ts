@@ -1,14 +1,18 @@
 import { describe, expect, it, test } from "vitest";
 
-import type { LibraryEntry } from "@/api/library";
+import type { LibraryEntry, LibraryFilters } from "@/api/library";
 import {
   defaultLibraryFilters,
   gridColumnCount,
   gridLayout,
+  hasRememberedFilters,
   isEditableTarget,
+  libraryFiltersPreferenceKey,
   libraryMotionKey,
   mergeUniqueEntries,
+  readLibraryFiltersPreference,
   readViewPreference,
+  rememberLibraryFilters,
 } from "./library";
 
 const entry = (id: number) => ({ id }) as LibraryEntry;
@@ -116,5 +120,73 @@ describe("libraryMotionKey", () => {
     expect(libraryMotionKey({ ...base, shelves: ["2", "9"] })).toBe(
       libraryMotionKey({ ...base, shelves: ["9", "2"] }),
     );
+  });
+});
+
+describe("the remembered library filters (Sprint 067)", () => {
+  it("defaults to empty, and is not confused by a value from an older version", () => {
+    localStorage.clear();
+    expect(readLibraryFiltersPreference()).toEqual({
+      statuses: [],
+      shelves: [],
+      formats: [],
+      query: "",
+    });
+
+    localStorage.setItem(libraryFiltersPreferenceKey, "not json");
+    expect(readLibraryFiltersPreference()).toEqual({
+      statuses: [],
+      shelves: [],
+      formats: [],
+      query: "",
+    });
+
+    localStorage.setItem(libraryFiltersPreferenceKey, JSON.stringify(42));
+    expect(readLibraryFiltersPreference()).toEqual({
+      statuses: [],
+      shelves: [],
+      formats: [],
+      query: "",
+    });
+  });
+
+  it("round-trips what the library page last had set, and only that", () => {
+    localStorage.clear();
+    const filters: LibraryFilters = {
+      ...defaultLibraryFilters,
+      statuses: ["read"],
+      shelves: ["fiction"],
+      formats: ["physical"],
+      query: "borges",
+      types: ["book"],
+      key: "creators",
+      value: "borges",
+    };
+    rememberLibraryFilters(filters);
+    expect(readLibraryFiltersPreference()).toEqual({
+      statuses: ["read"],
+      shelves: ["fiction"],
+      formats: ["physical"],
+      query: "borges",
+    });
+  });
+
+  it("says whether any remembered filter would actually narrow a ranking", () => {
+    expect(
+      hasRememberedFilters({
+        statuses: [],
+        shelves: [],
+        formats: [],
+        query: "  ",
+      }),
+    ).toBe(false);
+    expect(
+      hasRememberedFilters({
+        statuses: ["read"],
+        shelves: [],
+        formats: [],
+        query: "",
+      }),
+    ).toBe(true);
   });
 });
