@@ -205,3 +205,73 @@ async def test_a_year_ranking_row_filters_the_library_to_its_members(tmp_path: P
     assert members.status_code == 200, members.text
     titles = [item["item"]["title"] for item in members.json()["items"]]
     assert titles == ["Bestiario"]
+
+
+@pytest.mark.anyio
+async def test_a_status_filter_narrows_a_ranking_and_agrees_with_entries(tmp_path: Path) -> None:
+    """Sprint 067 deliverable 5, AC5: the row counts equal what `/api/entries` returns
+    for the same filters plus `key`/`value`."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        read = repository.create_or_get_entry(title="Read one", creators=("Cortázar",))
+        wishlisted = repository.create_or_get_entry(title="Wishlisted one", creators=("Cortázar",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET status='read' WHERE id=:id"), {"id": read.entry_id}
+            )
+            connection.execute(
+                text("UPDATE entries SET status='wishlist' WHERE id=:id"),
+                {"id": wishlisted.entry_id},
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            unfiltered = await client.get(
+                "/api/insights", params={"type": "book", "key": "creators", "metric": "count"}
+            )
+            filtered = await client.get(
+                "/api/insights",
+                params={
+                    "type": "book",
+                    "key": "creators",
+                    "metric": "count",
+                    "status": "read",
+                },
+            )
+            entries = await client.get(
+                "/api/entries",
+                params={"type": "book", "status": "read", "key": "creators", "value": "cortazar"},
+            )
+
+    assert unfiltered.json()["rows"][0]["count"] == 2
+    assert filtered.status_code == 200, filtered.text
+    assert filtered.json()["rows"] == [
+        {
+            "key": "cortazar",
+            "label": "Cortázar",
+            "count": 1,
+            "rated_count": 0,
+            "mean_score": None,
+            "score_spread": None,
+            "covers": [],
+        }
+    ]
+    assert filtered.json()["total_entries"] == 1
+    assert entries.json()["total"] == filtered.json()["rows"][0]["count"]
+
+
+@pytest.mark.anyio
+async def test_an_invalid_status_filter_is_refused_as_entries_refuses_it(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        insights = await client.get(
+            "/api/insights",
+            params={"type": "book", "key": "creators", "status": "not-a-real-status"},
+        )
+        entries = await client.get("/api/entries", params={"status": "not-a-real-status"})
+
+    assert insights.status_code == entries.status_code == 422

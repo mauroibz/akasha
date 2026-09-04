@@ -451,6 +451,13 @@ async def get_insights(
     metric: Literal["count", "score"] = "count",
     min_rated: int = Query(default=2, ge=1),
     include_suppressed: bool = False,
+    #: Rank inside the library's current filters (Sprint 067 deliverable 5), validated
+    #: exactly as `/api/entries` validates them and forwarded to `rank()`, which has
+    #: accepted them since Sprint 065.
+    status: Annotated[list[EntryStatus] | None, Query()] = None,
+    shelf: Annotated[list[str] | None, Query()] = None,
+    format: Annotated[list[EntryFormat] | None, Query()] = None,
+    q: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
     after: str | None = None,
 ) -> InsightResponse:
@@ -462,6 +469,10 @@ async def get_insights(
             metric=metric,
             min_rated=min_rated,
             include_suppressed=include_suppressed,
+            statuses=[item.value for item in status] if status is not None else None,
+            shelves=shelf or [],
+            q=q,
+            formats=[item.value for item in format or []],
             limit=limit,
             after=after,
         )
