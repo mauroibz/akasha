@@ -1550,6 +1550,10 @@
             "title": "Null Count",
             "type": "integer"
           },
+          "rated_entries": {
+            "title": "Rated Entries",
+            "type": "integer"
+          },
           "rows": {
             "items": {
               "$ref": "#/components/schemas/InsightRowResponse"
@@ -1563,6 +1567,10 @@
             },
             "title": "Suppressed",
             "type": "array"
+          },
+          "total_entries": {
+            "title": "Total Entries",
+            "type": "integer"
           },
           "type": {
             "title": "Type",
@@ -1578,7 +1586,9 @@
           "next_cursor",
           "suppressed",
           "no_rated_groups",
-          "null_count"
+          "null_count",
+          "total_entries",
+          "rated_entries"
         ],
         "title": "InsightResponse",
         "type": "object"
@@ -1588,6 +1598,13 @@
           "count": {
             "title": "Count",
             "type": "integer"
+          },
+          "covers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Covers",
+            "type": "array"
           },
           "key": {
             "title": "Key",
@@ -1630,7 +1647,8 @@
           "count",
           "rated_count",
           "mean_score",
-          "score_spread"
+          "score_spread",
+          "covers"
         ],
         "title": "InsightRowResponse",
         "type": "object"

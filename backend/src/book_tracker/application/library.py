@@ -1075,6 +1075,16 @@ class LibraryService:
 
         with Session(self.engine) as session:
             base = self._filtered_entries(statuses, shelves, q, formats, [item_type]).subquery()
+            # The ranked set's own totals (Sprint 067 deliverable 2) — independent of
+            # `key`, and deliberately not a sum of rows: an entry with two creators is
+            # two rows under `creators`, and summing them would over-count the library.
+            total_entries = session.scalar(select(func.count()).select_from(base)) or 0
+            rated_entries = (
+                session.scalar(
+                    select(func.count()).select_from(base).where(base.c.score.isnot(None))
+                )
+                or 0
+            )
             exploded, null_count = self._insight_explode(session, base, item_type, key)
 
             per_entry = (
@@ -1132,7 +1142,16 @@ class LibraryService:
             if not is_numeric_key:
                 labels = self._insight_labels(session, exploded, [row.norm for row in raw_rows])
 
-            rows = [self._insight_row(row, key, is_numeric_key, labels) for row in raw_rows]
+            covers_by_norm = self._insight_covers(
+                session, per_entry, [row.norm for row in raw_rows]
+            )
+
+            rows = [
+                self._insight_row(
+                    row, key, is_numeric_key, labels, covers_by_norm.get(row.norm, [])
+                )
+                for row in raw_rows
+            ]
 
             next_cursor = None
             if has_more and raw_rows:
@@ -1176,7 +1195,60 @@ class LibraryService:
                 "suppressed": suppressed_rows,
                 "no_rated_groups": no_rated_groups,
                 "null_count": null_count,
+                "total_entries": total_entries,
+                "rated_entries": rated_entries,
             }
+
+    @staticmethod
+    def _insight_covers(
+        session: Session, per_entry: Any, norms: Sequence[str]
+    ) -> dict[str, list[str]]:
+        """Up to three cover URLs behind each of `norms`' rows (Sprint 067).
+
+        Highest scored first, then most recently added, then by entry id — pinned
+        rather than left to the query planner, because three covers that reshuffle
+        between renders reads as a bug. Only members whose item actually carries a
+        cover contribute (`ItemRow.cover_path is not None`); a row with no covered
+        member returns an empty list. This is *not* gated on a domain's
+        `chooses_covers` — that flag is about the manual Open Library cover-picker
+        (DEC-067 row 7) and is `False` for every shipped domain but book, even
+        though album, anime, movie and series entries all carry real cover art. Gating
+        on it here would leave every non-book ranking without a face at all, which is
+        the opposite of what this sprint is for (DEC-134).
+        """
+        if not norms:
+            return {}
+        ranked = (
+            select(
+                per_entry.c.norm,
+                ItemRow.id.label("item_id"),
+                ItemRow.updated_at,
+                func.row_number()
+                .over(
+                    partition_by=per_entry.c.norm,
+                    order_by=(
+                        per_entry.c.score.desc(),
+                        EntryRow.date_added.desc(),
+                        per_entry.c.entry_id.desc(),
+                    ),
+                )
+                .label("rn"),
+            )
+            .select_from(per_entry)
+            .join(EntryRow, EntryRow.id == per_entry.c.entry_id)
+            .join(ItemRow, ItemRow.id == EntryRow.item_id)
+            .where(ItemRow.cover_path.isnot(None), per_entry.c.norm.in_(norms))
+        ).subquery()
+        rows = session.execute(
+            select(ranked.c.norm, ranked.c.item_id, ranked.c.updated_at)
+            .where(ranked.c.rn <= 3)
+            .order_by(ranked.c.norm, ranked.c.rn)
+        ).all()
+        covers: dict[str, list[str]] = {}
+        for row in rows:
+            version = row.updated_at.replace(":", "").replace("-", "")
+            covers.setdefault(row.norm, []).append(f"/api/items/{row.item_id}/cover?v={version}")
+        return covers
 
     @staticmethod
     def _insight_label(norm: str, key: str, is_numeric_key: bool, labels: Mapping[str, str]) -> str:
@@ -1185,7 +1257,12 @@ class LibraryService:
         return labels.get(norm, norm)
 
     def _insight_row(
-        self, row: Any, key: str, is_numeric_key: bool, labels: Mapping[str, str]
+        self,
+        row: Any,
+        key: str,
+        is_numeric_key: bool,
+        labels: Mapping[str, str],
+        covers: Sequence[str],
     ) -> dict[str, Any]:
         spread = None
         if (
@@ -1211,6 +1288,7 @@ class LibraryService:
             "rated_count": row.rated_count,
             "mean_score": row.mean_score,
             "score_spread": spread,
+            "covers": list(covers),
         }
 
     def _selection(

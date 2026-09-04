@@ -139,6 +139,7 @@ async def test_scalar_metadata_keys_rank(tmp_path: Path) -> None:
                 "rated_count": 0,
                 "mean_score": None,
                 "score_spread": None,
+                "covers": [],
             }
         ]
 
@@ -168,6 +169,7 @@ async def test_year_and_decade_rank_and_null_years_are_counted_not_dropped(tmp_p
                 "rated_count": 0,
                 "mean_score": None,
                 "score_spread": None,
+                "covers": [],
             }
         ]
         assert by_year["null_count"] == 1
@@ -294,3 +296,88 @@ async def test_pagination_covers_every_row_exactly_once(tmp_path: Path) -> None:
 
         seen = {row["key"] for row in page1["rows"]} | {row["key"] for row in page2["rows"]}
         assert seen == {"alice", "bob", "carol"}
+
+
+@pytest.mark.anyio
+async def test_covers_come_from_the_rows_own_members_deterministically_ordered(
+    tmp_path: Path,
+) -> None:
+    """Sprint 067 AC1: highest scored first, then most recently added; stable on repeat."""
+    async with _fixture(tmp_path) as fx:
+        best_older = fx.repository.create_or_get_entry(title="Best older", creators=["Author"])
+        best_newer = fx.repository.create_or_get_entry(title="Best newer", creators=["Author"])
+        middling = fx.repository.create_or_get_entry(title="Middling", creators=["Author"])
+        weakest = fx.repository.create_or_get_entry(title="Weakest", creators=["Author"])
+        uncovered = fx.repository.create_or_get_entry(title="Uncovered", creators=["Author"])
+        for entry in (best_older, best_newer, middling, weakest, uncovered):
+            fx.set_status(entry.entry_id, "read")
+        fx.set_score(best_older.entry_id, 9)
+        fx.set_score(best_newer.entry_id, 9)
+        fx.set_score(middling.entry_id, 6)
+        fx.set_score(weakest.entry_id, 2)
+        for entry in (best_older, best_newer, middling, weakest):
+            fx.repository.set_cover_path(entry.item_id, f"{entry.item_id}.jpg")
+        with fx.app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET date_added=:d WHERE id=:id"),
+                {"d": "2020-01-01T00:00:00", "id": best_older.entry_id},
+            )
+            connection.execute(
+                text("UPDATE entries SET date_added=:d WHERE id=:id"),
+                {"d": "2020-06-01T00:00:00", "id": best_newer.entry_id},
+            )
+
+        first = fx.service.rank(item_type="book", key="creators", metric="count")
+        second = fx.service.rank(item_type="book", key="creators", metric="count")
+
+        row = first["rows"][0]
+        assert len(row["covers"]) == 3
+        item_ids = [int(url.split("/")[3]) for url in row["covers"]]
+        assert item_ids == [best_newer.item_id, best_older.item_id, middling.item_id]
+        assert uncovered.item_id not in item_ids
+        assert weakest.item_id not in item_ids
+        assert second["rows"][0]["covers"] == row["covers"]
+
+
+@pytest.mark.anyio
+async def test_a_ranking_row_with_no_covered_members_returns_an_empty_list(
+    tmp_path: Path,
+) -> None:
+    """Sprint 067 AC2 (corrected reading, DEC-134): empty when no member has a cover, not
+    gated on `chooses_covers` — every shipped domain but book declares that `False` while
+    still carrying real cover art, so gating on it would empty every domain's covers but
+    book's."""
+    async with _fixture(tmp_path) as fx:
+        entry = fx.repository.create_or_get_entry(title="No cover", creators=["Author"])
+        fx.set_status(entry.entry_id, "read")
+
+        result = fx.service.rank(item_type="book", key="creators", metric="count")
+
+        assert result["rows"][0]["covers"] == []
+
+
+@pytest.mark.anyio
+async def test_total_entries_and_rated_entries_honour_the_ranked_sets_filters(
+    tmp_path: Path,
+) -> None:
+    """Sprint 067 deliverable 2: library totals for the ranked set, not a sum of rows —
+    a many-valued field over-counts (one entry with two creators is two rows)."""
+    async with _fixture(tmp_path) as fx:
+        two_creators = fx.repository.create_or_get_entry(title="A", creators=["Alice", "Bob"])
+        one_creator = fx.repository.create_or_get_entry(title="B", creators=["Carol"])
+        unread = fx.repository.create_or_get_entry(title="C", creators=["Dana"])
+        fx.set_status(two_creators.entry_id, "read")
+        fx.set_status(one_creator.entry_id, "read")
+        fx.set_status(unread.entry_id, "to_read")
+        fx.set_score(two_creators.entry_id, 8)
+
+        unfiltered = fx.service.rank(item_type="book", key="creators", metric="count")
+        filtered = fx.service.rank(
+            item_type="book", key="creators", metric="count", statuses=["read"]
+        )
+
+        assert sum(row["count"] for row in unfiltered["rows"]) == 4
+        assert unfiltered["total_entries"] == 3
+        assert unfiltered["rated_entries"] == 1
+        assert filtered["total_entries"] == 2
+        assert filtered["rated_entries"] == 1

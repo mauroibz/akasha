@@ -50,8 +50,11 @@ async def test_a_groupable_key_ranks_over_http(tmp_path: Path) -> None:
             "rated_count": 0,
             "mean_score": None,
             "score_spread": None,
+            "covers": [],
         }
     ]
+    assert body["total_entries"] == 1
+    assert body["rated_entries"] == 0
 
 
 @pytest.mark.anyio

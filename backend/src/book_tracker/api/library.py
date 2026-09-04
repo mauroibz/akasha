@@ -212,6 +212,9 @@ class InsightRowResponse(BaseModel):
     rated_count: int
     mean_score: float | None
     score_spread: float | None
+    #: Up to three cover URLs from the row's own members (Sprint 067), highest
+    #: scored first. Empty when no member carries a cover, regardless of domain.
+    covers: list[str]
 
 
 class InsightSuppressedResponse(BaseModel):
@@ -235,6 +238,10 @@ class InsightResponse(BaseModel):
     no_rated_groups: bool
     #: Entries excluded from a `year`/`decade` ranking for having no year (AC3).
     null_count: int
+    #: The ranked set's own totals (Sprint 067) — independent of `key`, and not a sum
+    #: of rows, which a many-valued key over-counts.
+    total_entries: int
+    rated_entries: int
 
 
 class AffectedResponse(BaseModel):
