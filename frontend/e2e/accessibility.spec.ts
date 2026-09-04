@@ -2,7 +2,7 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
-import { seedLibrary, stubImporters, stubItemTypes } from "./seed";
+import { seedLibrary, stubExports, stubImporters, stubItemTypes } from "./seed";
 
 /**
  * Automated WCAG 2.1 A/AA checks on every screen a user can reach.
@@ -492,6 +492,14 @@ test("import has no serious accessibility violations", async ({ page }) => {
   await page.goto("/import");
   await expect(page.getByLabel("Goodreads CSV", { exact: true })).toBeVisible();
   await expectNoSeriousViolations(page, "import");
+});
+
+test("export has no serious accessibility violations", async ({ page }) => {
+  await stubExports(page);
+  await page.goto("/import?tab=export");
+  await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Goodreads" })).toBeVisible();
+  await expectNoSeriousViolations(page, "export");
 });
 
 test("shelves has no serious accessibility violations", async ({ page }) => {

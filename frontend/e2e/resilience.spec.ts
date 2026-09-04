@@ -24,7 +24,7 @@ test(
       page.getByRole("heading", { name: "Seeded book 0003" }),
     ).toBeVisible();
 
-    await page.getByRole("link", { name: "Import", exact: true }).click();
+    await page.getByRole("link", { name: "Data", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: /went wrong/i }),
     ).toBeVisible();

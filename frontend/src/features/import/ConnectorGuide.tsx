@@ -49,8 +49,12 @@ export function DeclarationGuide({
         // The one place this application sends you off the LAN, so it is marked
         // as leaving and opens beside the flow rather than replacing it. The
         // wording follows the caller: Calibre has no export page, it has a manual.
+        // `min-h-11 items-center` rather than the plain `inline-block` this had
+        // before Sprint 069: a text-sized link is under the 44px tap target the
+        // export tab's own 390px check measures for the first time, and the
+        // deficiency was already here on the import side (Sprint 069 finding).
         <a
-          className="focus-ring mt-3 inline-block text-sm text-primary"
+          className="focus-ring mt-3 inline-flex min-h-11 items-center text-sm text-primary"
           href={helpUrl}
           target="_blank"
           rel="noreferrer noopener"

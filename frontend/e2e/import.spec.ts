@@ -3,7 +3,7 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "./console";
 
 import { chooseOption } from "./radix";
-import { entry, stubImporters } from "./seed";
+import { entry, stubExports, stubImporters } from "./seed";
 
 const record = {
   record_id: 1,
@@ -748,4 +748,83 @@ test("a second import of the same folder sends the database and nothing else", a
   ).toBeVisible();
   // The cover stayed home even though the reader chose the same folder.
   expect(previews.at(-1)).toEqual(["metadata.db"]);
+});
+
+test.describe("the export tab (Sprint 069)", () => {
+  test.beforeEach(async ({ page }) => {
+    await stubExports(page);
+  });
+
+  test("/export reaches the tab, and it survives a reload", async ({
+    page,
+  }) => {
+    await page.goto("/export");
+    await expect(page).toHaveURL(/\/import\?tab=export/);
+    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+
+    await page.reload();
+    await expect(page).toHaveURL(/\/import\?tab=export/);
+    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+  });
+
+  test("downloads a real file end to end, for the lossless row and a declared view", async ({
+    page,
+  }) => {
+    await page.goto("/import?tab=export");
+    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+
+    const losslessRow = page.locator('[data-export-row="lossless"]');
+    const [lossless] = await Promise.all([
+      page.waitForEvent("download"),
+      losslessRow.getByRole("button", { name: /download/i }).click(),
+    ]);
+    expect(lossless.suggestedFilename()).toBe("akasha-export.json");
+
+    const bookRow = page.locator("article", { hasText: "Goodreads" });
+    const [goodreads] = await Promise.all([
+      page.waitForEvent("download"),
+      bookRow.getByRole("button", { name: /download/i }).click(),
+    ]);
+    expect(goodreads.suggestedFilename()).toBe("akasha-book-goodreads.csv");
+    const path = await goodreads.path();
+    expect(path).not.toBeNull();
+  });
+
+  test("a zero-entry domain offers no download and says why", async ({
+    page,
+  }) => {
+    await page.goto("/import?tab=export");
+    const albumRow = page.locator("article", { hasText: "Table (Albums)" });
+    await expect(albumRow.getByText("0 entries")).toBeVisible();
+    await expect(
+      albumRow.getByRole("button", { name: /download/i }),
+    ).toBeDisabled();
+    await expect(albumRow.getByText(/nothing to export yet/i)).toBeVisible();
+  });
+
+  test("the export tab fits a phone, and nothing makes the body scroll sideways", async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/import?tab=export");
+    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+
+    const overflow = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    );
+    expect(overflow).toBeLessThanOrEqual(0);
+
+    const short = await page.evaluate(() =>
+      [...document.querySelectorAll("main button, main a[href]")]
+        .filter((node) => (node as HTMLElement).offsetParent !== null)
+        .map((node) => ({
+          text: (node.textContent ?? "").trim().slice(0, 30),
+          height: node.getBoundingClientRect().height,
+        }))
+        .filter((row) => row.height > 0 && row.height < 44),
+    );
+    expect(short).toEqual([]);
+  });
 });

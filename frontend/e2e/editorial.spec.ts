@@ -261,7 +261,8 @@ test("navigation shell exposes every destination at desktop width", async ({
   await stubEntry(page);
   await page.goto("/");
   // Triage is absent on purpose: it folded into Import as a tab (DEC-079).
-  for (const label of ["Library", "Add", "Import", "Shelves"]) {
+  // The Import/Triage/Export destination reads "Data" as of Sprint 069.
+  for (const label of ["Library", "Add", "Data", "Shelves"]) {
     await expect(
       page.getByRole("link", { name: new RegExp(label, "i") }).first(),
     ).toBeVisible();
@@ -273,10 +274,7 @@ test("navigation shell exposes every destination at desktop width", async ({
     .first()
     .click();
   await expect(page).toHaveURL("/shelves");
-  await page
-    .getByRole("link", { name: /import/i })
-    .first()
-    .click();
+  await page.getByRole("link", { name: /data/i }).first().click();
   await expect(page).toHaveURL("/import");
   await page.getByRole("link", { name: /add/i }).first().click();
   await expect(page).toHaveURL("/add");

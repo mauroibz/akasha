@@ -292,3 +292,80 @@ export async function stubImporters(page: Page) {
     });
   });
 }
+
+/**
+ * The export registry Sprint 068 declares, and a real byte-for-byte download
+ * behind every row it lists.
+ *
+ * Regexes rather than glob strings for the two download routes: `/api/export`
+ * (the bare lossless path) and `/api/export/{view}` both carry a `?` query
+ * string, and a glob's own `?` is a single-character wildcard — a regex says
+ * exactly what must follow without relying on `**` to swallow the ambiguity.
+ */
+export async function stubExports(page: Page) {
+  await page.route(/\/api\/exports$/, (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: "goodreads",
+          label: "Goodreads",
+          item_types: ["book"],
+          media_type: "text/csv; charset=utf-8",
+          lossless: false,
+          guide: [
+            "On goodreads.com, open My Books → Import and export and choose Import Library.",
+            "Upload this file. Goodreads reads it as its own export, because it is one.",
+          ],
+          help_url: "https://www.goodreads.com/review/import",
+          carries: ["title", "author", "ISBN", "rating", "shelves", "review"],
+          count: 2,
+        },
+        {
+          id: "table",
+          label: "Table (Books)",
+          item_types: ["book"],
+          media_type: "text/csv; charset=utf-8",
+          lossless: false,
+          guide: ["Open this file in any spreadsheet application."],
+          help_url: null,
+          carries: ["Title", "Creator", "Year", "Status", "Score"],
+          count: 2,
+        },
+        {
+          id: "table",
+          label: "Table (Albums)",
+          item_types: ["album"],
+          media_type: "text/csv; charset=utf-8",
+          lossless: false,
+          guide: ["Open this file in any spreadsheet application."],
+          help_url: null,
+          carries: ["Title", "Creator", "Year", "Status", "Score"],
+          count: 0,
+        },
+      ],
+    }),
+  );
+  await page.route(/\/api\/export\/.+/, (route) => {
+    const url = new URL(route.request().url());
+    const view = url.pathname.split("/").pop();
+    const type = url.searchParams.get("type");
+    route.fulfill({
+      status: 200,
+      contentType: "text/csv; charset=utf-8",
+      headers: {
+        "Content-Disposition": `attachment; filename="akasha-${type}-${view}.csv"`,
+      },
+      body: "Title,Creator\r\nFicciones,Jorge Luis Borges\r\n",
+    });
+  });
+  await page.route(/\/api\/export(\?.*)?$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      headers: {
+        "Content-Disposition": 'attachment; filename="akasha-export.json"',
+      },
+      body: JSON.stringify([{ title: "Ficciones", type: "book" }]),
+    }),
+  );
+}
