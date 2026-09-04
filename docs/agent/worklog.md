@@ -4081,3 +4081,62 @@ so 050 adds an adapter, not a declaration.
   `project_status: "complete"`, `active_sprint: null`. `scripts/validate_project.py`'s
   `FINAL_SPRINT` (67) matches `completed_sprints`' length. No sprint is active;
   the owner decides what comes next.
+
+## 2026-09-04 — Sprints 068–072 drafted, export line accepted, Sprint 068 (complete)
+
+- **Docs, before any code.** Two proposals (`export-proposal.md`,
+  `ui-cohesion-proposal.md`) and Sprints 068–072 had been written and left uncommitted
+  by an earlier session. Verified against `scripts/validate_project.py` (passed) and
+  committed as-is. The owner then accepted the export line: **DEC-135**, `FINAL_SPRINT`
+  67→70, plan revision 37, `docs/agent/state.json` off `complete` with 068 active/ready.
+  UI-cohesion (071–072) stays proposed and unaccepted, unchanged.
+- **Sprint 068 — Export the way we import — done.** All 8 deliverables, all 8
+  acceptance criteria. `domain/exports.py`: the `ExportView` protocol, `ExportRow`,
+  `safe_cell`, and a generic `table` view built per domain from its own `Domain` object.
+  `GoodreadsExportView`/`EXPORT` moved into `domains/book/goodreads.py`, byte-identical
+  to the pre-sprint `export_csv`. `application/export.py`'s shared walk
+  (`iter_export_rows`/`stream_export_view`) replaces the old Goodreads-specific
+  `export_csv` and removes the last item-type branch in a shared layer.
+  `domain/registry.py` gets the fifth registration point (`REGISTERED_EXPORTS`,
+  `EXPORTS_BY_DOMAIN`, `find_export_view`). `api/export.py` adds `GET /api/exports` and
+  `GET /api/export/{view}?type=<domain>`; `?format=csv` is now an alias, proven
+  byte-identical rather than merely left alone.
+- **Two decisions the sprint left open, resolved and recorded in the sprint's own
+  Outcome (no DEC needed — reversible implementation detail, no product behavior
+  shipped yet since 069's UI doesn't exist):** one `table` view instance per domain
+  rather than one shared instance (so `GET /api/exports` lists six views, not two, and
+  each has its own fixed columns/count without inferring from row data); `type` on
+  `GET /api/export/{view}` made a required query parameter.
+- **Commits combined from the sprint's suggested six checkpoints down to three**
+  (`bf86712`, `7c93377`, `c358e66`) — the module boundaries didn't split more finely
+  without leaving an intermediate commit red. Verified each was independently green
+  before committing (1333, 1333, 1352 backend tests) by temporarily reverting
+  not-yet-committed files to `HEAD` and rerunning the full suite, rather than trusting
+  the diff by inspection.
+- **Verified:** `make check` green. Backend **1,352** passed (1,333 + 19). No frontend
+  gate owed (`git diff --stat` against pre-sprint `main` touches no `frontend/src`
+  path); `frontend/openapi.json` regenerated, `npm run api:check` passes.
+  `python scripts/validate_project.py` green.
+- **Walkthrough (DEC-025), done.** `scripts/walkthrough.py --keep` on an ephemeral port,
+  fresh `/tmp` data directory. Seeded directly through `DomainRepository` against the
+  walkthrough backend's own SQLite file rather than through search providers — this
+  sprint touches no add/import behavior, so a provider-driven seed would have measured
+  the wrong boundary. One book (ISBN, a shelf, a `=SUM(A1:A2)...` formula-injection
+  note), one bare book, one album, one anime, one movie, one series. Over real HTTP:
+  `GET /api/exports` listed all six views with correct counts/labels/guide/help_url;
+  every view's CSV was downloaded and read back with Python's own `csv` module, headers
+  and values all correct per domain; `?format=csv` confirmed programmatically
+  byte-identical to `/api/export/goodreads?type=book`; the formula note came back
+  neutralized in the `table` view too; `/api/export/nonsense` and
+  `/api/export/goodreads?type=album` both 404'd with the standard envelope; the
+  exported Goodreads CSV was fed back through the real `POST /api/import/goodreads`
+  preview→commit pipeline — the ISBN book matched its own item exactly, the bare book
+  came back as an expected ambiguity and was resolved, and commit landed one
+  already-known entry in Triage exactly as Goodreads import always has. Nothing looked
+  wrong; no defect found. Torn down at close.
+- **State:** `active_sprint` → `069`, `ready`; `last_completed_sprint` → `068`. Sprint
+  069's own file flipped to `Status: ready` (it was `planned` while 068 was open).
+  Sprint 070 stays `planned`.
+- **Next:** Sprint 069 — the export tab on `/import`, rendering `GET /api/exports`'s
+  declarations. Frontend work; no backend change expected beyond what 068 already
+  shipped.

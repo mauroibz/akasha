@@ -1,11 +1,11 @@
 # Sprint 069 — A door out of the app
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 068
 **Roadmap revision:** 37
 
-> Planned from [`../export-proposal.md`](../export-proposal.md). **Accepted as DEC-135;**
-> remains `planned` until 068 closes.
+> Planned from [`../export-proposal.md`](../export-proposal.md). **Accepted as DEC-135.**
+> 068 closed 2026-09-04; this sprint is next.
 
 ## Objective
 

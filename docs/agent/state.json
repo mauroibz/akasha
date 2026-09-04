@@ -2,10 +2,10 @@
   "schema_version": 1,
   "plan_revision": 37,
   "project_status": "ready",
-  "active_sprint": "068",
-  "active_sprint_file": "docs/sprints/068-export-the-way-we-import.md",
+  "active_sprint": "069",
+  "active_sprint_file": "docs/sprints/069-a-door-out-of-the-app.md",
   "active_sprint_status": "ready",
-  "last_completed_sprint": "067",
+  "last_completed_sprint": "068",
   "completed_sprints": [
     "001",
     "002",
@@ -73,8 +73,9 @@
     "064",
     "065",
     "066",
-    "067"
+    "067",
+    "068"
   ],
   "started_at": null,
-  "updated_at": "2026-09-04T00:45:00-03:00"
+  "updated_at": "2026-09-04T14:20:00-03:00"
 }
