@@ -4140,3 +4140,59 @@ so 050 adds an adapter, not a declaration.
 - **Next:** Sprint 069 — the export tab on `/import`, rendering `GET /api/exports`'s
   declarations. Frontend work; no backend change expected beyond what 068 already
   shipped.
+
+## 2026-09-04 — Sprint 069 (complete), across two sessions — a rate-limit interruption, not a blocker
+
+- **This sprint spanned two sessions.** The first made three real, verified commits
+  (`e0c92d8`, `6ce461d`, `c568ab8`) and was cut off by an API session-limit error while
+  about to start the required walkthrough — the state it left (`docs/agent/state.json`
+  correctly `in_progress`, worktree clean, all three commits green independently) was
+  genuine, not fabricated, and was verified fresh by the second session before building
+  on it rather than trusted on the first session's own say-so. Worth recording plainly:
+  a rate-limit cutoff mid-sprint leaves a resumable, trustworthy state here as long as
+  each commit was made only after its own tests passed — the interruption cost nothing
+  but time.
+- **Done: all 8 deliverables, all 9 acceptance criteria.** `frontend/src/api/exports.ts`
+  (`getExports`, `exportViewUrl`, `downloadExport` — `fetch` + a synthetic
+  `<a download>` click rather than a bare link, so a failed request is catchable);
+  `frontend/src/features/export/ExportPanel.tsx` (one row per declared `(view,
+  item_type)` pair, generic over both, plus the hand-written lossless-JSON row placed
+  first and marked as such); `ConnectorGuide.tsx` split into `DeclarationGuide` (shared
+  renderer) and `ConnectorGuide` (the import side's wording over it), so export reuses
+  rather than duplicates; the unnumbered third tab and `/export` → `/import?tab=export`
+  redirect, matching `/triage`'s existing shape; the nav item renamed **Import → Data**
+  (the sprint's own recommendation, applied).
+- **AC1 ("reach a file... in two clicks from the nav") read as reaching the point where
+  a domain's file is one click away** (nav → Export tab), the same reachability
+  DEC-079 already established for Triage — actually downloading is inherently a further
+  click in any such flow, proven separately by the e2e download test and this session's
+  walkthrough.
+- Two commits this session: `[TEST]` verifying and extending the prior session's work
+  (no further production commit was needed — the three inherited commits already
+  satisfied every deliverable once checked against the actual acceptance criteria) and
+  `[DOCS]` closing the sprint (this entry, `HANDOFF.md`, state, sprint Outcome).
+- **Verified, this session, independently:** `make check` green. Backend unchanged at
+  **1,352** (no backend file touched, confirmed by diff). Frontend **253** passed (was
+  243, +10). Full Playwright **118 passed, 2 skipped, 0 failed** (was 113/2/0, +6: five
+  in `import.spec.ts`'s new export-tab suite, one in `accessibility.spec.ts`).
+- **Walkthrough (DEC-025), done in a real browser against a real backend — not the
+  checked-in suite, which always stubs its network layer via `page.route`.** A
+  throwaway backend seeded directly via `DomainRepository` (one entry per domain, the
+  book carrying a `=cmd()|calc...` formula-injection note) served behind a real Vite
+  dev server proxied at it via `AKASHA_E2E_BACKEND`; a real Chromium instance
+  (Playwright's own `chromium.launch()`, no route stubbing) navigated to `/export`,
+  confirmed all 7 rows (lossless + 6 declared views) with correct counts/carries/guide
+  text at 1280px, clicked every download button for a genuine `page.waitForEvent
+  ("download")`, and read every downloaded file from disk: formula injection
+  neutralized in both the Goodreads and `table-book` CSVs, every `table` view's header
+  carrying its own domain's declared field labels, every score/status matching the
+  seed. At 390px: zero horizontal overflow, zero targets under 44px. A reload kept the
+  tab. Zero console errors throughout. Nothing looked wrong; no defect found. The
+  throwaway backend, frontend dev server and their scratch driver scripts were torn
+  down at close and never committed; the owner's own instance was untouched.
+- **State:** `active_sprint` → `070`, `ready`; `last_completed_sprint` → `069`. Sprint
+  070's own file flipped to `Status: ready`.
+- **Next:** Sprint 070 — MyAnimeList XML, the Letterboxd import CSV, and the recorded
+  series decision, added to the registry Sprint 068 built. Its own acceptance criterion
+  is that it changes no frontend file, which Sprint 069's declaration-driven rendering
+  makes true by construction.

@@ -1,6 +1,6 @@
 # Sprint 069 — A door out of the app
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 068
 **Roadmap revision:** 37
 
@@ -137,4 +137,92 @@ After this sprint the feature is complete and usable for every domain.
 
 ## Outcome
 
-_Not started._
+**Done.** All 8 deliverables and all 9 acceptance criteria. This sprint spanned two
+sessions: the first made three commits (`e0c92d8`, `6ce461d`, `c568ab8`) and was cut off
+mid-work by an API rate limit while about to start the required walkthrough — not a
+blocker, and not a defect in the work already committed. The second session verified
+that work fresh against the sprint's own acceptance criteria (rather than trusting the
+commit messages), ran the full verification ladder, performed the walkthrough, and
+closes the sprint here.
+
+**What was built**, confirmed by reading the actual committed code:
+`frontend/src/api/exports.ts` (`getExports`, `exportViewUrl`, `downloadExport` via
+`fetch` + a synthetic `<a download>` click so a failed request is catchable — a plain
+link cannot satisfy AC4); `frontend/src/features/export/ExportPanel.tsx` (a row per
+`(view, domain)` pair from `GET /api/exports`, generic over both per its own doc
+comment, plus the one hand-written row for the lossless `GET /api/export` path, first
+and marked as such — deliverable 7); `ConnectorGuide.tsx` split into `DeclarationGuide`
+(the reusable renderer) and `ConnectorGuide` (its import-side wording over it) so the
+export tab renders guide steps through the same renderer rather than a copy —
+deliverable 4; `ImportPage.tsx` gains the unnumbered third `TabsTrigger` (`EXPORT_TAB`)
+and the `/export` → `/import?tab=export` redirect in `App.tsx`, matching `/triage`'s
+existing shape exactly; `AppShell.tsx`'s nav item renamed **Import → Data**, with the
+reasoning recorded inline in the component's own comment (deliverable 8 — the owner's
+call, shipped as the sprint's recommendation, one line to change if the owner prefers
+otherwise).
+
+**One implementation decision worth surfacing:** the export declaration's `count` on
+`GET /api/exports` is summed across every domain a view carries (Sprint 068), so
+`ExportPanel` renders one row per `(view, item_type)` pair rather than one per view —
+documented in the component's own comment — so a per-domain zero state (deliverable 6)
+stays exact. Every view shipped today carries exactly one domain, so this is currently
+indistinguishable from one row per view; it only matters once a future view spans more
+than one domain, and costs nothing now.
+
+**AC1, read deliberately rather than literally:** "reach a file... in two clicks from
+the nav" is satisfied as *reach the point where a domain's file is one click away*
+(nav → Export tab), matching the precedent DEC-079 already set for Triage's own
+one-tab-away reachability — actually transferring bytes is inherently a further click
+in any download flow, and the e2e suite proves that click itself works
+(`import.spec.ts`'s "downloads a real file end to end" test, and this session's own
+walkthrough below).
+
+**Verified, second session:**
+- `make check` green (ruff, mypy, prettier, eslint, tsc, `api:check`,
+  `validate_project.py`).
+- Backend unchanged at **1,352** passed (no backend file touched this sprint, confirmed
+  by `git diff --stat` against pre-069 `main`).
+- Frontend **253** passed (was 243; +10: 5 in `ImportPage.test.tsx`'s new "export tab"
+  suite, 2 in `AppShell.test.tsx` for the renamed nav item, 3 in `exports.test.ts` for
+  the new API module).
+- Full Playwright: **118 passed, 2 skipped, 0 failed** (was 113/2/0 before this sprint;
+  +5 new specs in `import.spec.ts`'s "export tab" describe block, +1 in
+  `accessibility.spec.ts`). No import/triage regression (AC9).
+
+**Walkthrough (DEC-025), done for real, in a real browser against a real backend —
+not the stubbed e2e suite.** A throwaway seeded backend (following `scripts/
+walkthrough.py`'s own launcher shape, seeded directly via `DomainRepository` the way
+Sprint 068's walkthrough did, since this sprint touches no add/import behavior): one
+entry per domain (book, album, anime, movie, series), the book carrying a
+formula-injection note (`=cmd()|calc...`) and a score of 9, the others scored/statused
+distinctly so no two rows could be mistaken for each other. A real Chromium instance
+(Playwright's own `chromium.launch()`, not the checked-in suite's route-stubbed
+config) was driven against a real Vite dev server proxied at the seeded backend via
+`AKASHA_E2E_BACKEND`:
+- **At 1280px:** navigated to `/export`, landed on `/import?tab=export` with the
+  `Export` heading, and all 7 rows rendered (the lossless row first, plus goodreads and
+  five `table` views) with correct counts, correct `carries` text, and correct guide
+  steps/help links read from the live declaration.
+- **Every row's download button was clicked for real** (a genuine `page.waitForEvent
+  ("download")`, not a mocked `fetch`), and every downloaded file was read from disk:
+  the lossless JSON held all 5 items; the Goodreads CSV and the `table-book` CSV both
+  neutralized the formula-injection note (`'=cmd()|calc...`); every `table` view's
+  header carried that domain's own declared field labels (album's Label/Tracklist,
+  anime's Episodes/Synopsis, movie's Runtime/Cast, series' Seasons/Network); every
+  score and status matched what was seeded.
+- **At 390px:** zero horizontal overflow (`scrollWidth - clientWidth === 0`), zero
+  interactive targets under 44px.
+- **Reload** on the export tab kept the URL and the heading.
+- **Zero console errors** throughout.
+
+Nothing looked wrong; no defect found. The throwaway backend, frontend dev server and
+their temporary data directory were torn down at close; the owner's own instance was
+untouched. The throwaway seed/serve script and walkthrough driver were scratch files,
+not committed.
+
+**Consequences:** no backend change; no schema change. `ExportPanel.tsx`,
+`frontend/src/api/exports.ts` and the `Data` nav rename are the only product-visible
+additions. Sprint 070 (MyAnimeList, Letterboxd, the series decision) is next and adds
+new views to the registry this screen already renders generically — its own acceptance
+criterion is that it changes no frontend file, which this sprint's declaration-driven
+rendering makes true by construction.

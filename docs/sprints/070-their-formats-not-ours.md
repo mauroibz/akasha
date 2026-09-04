@@ -1,13 +1,13 @@
 # Sprint 070 — Their formats, not ours
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 069
 **Roadmap revision:** 37
 
 > Planned from [`../export-proposal.md`](../export-proposal.md) §2.3. **Accepted as
-> DEC-135;** remains `planned` until 069 closes. Proposal §4: *if the release has to be cut,
-> cut this sprint* — after 069 every domain can already leave in JSON and in a CSV, from a
-> button.
+> DEC-135.** 069 closed 2026-09-04; this sprint is next. Proposal §4: *if the release
+> has to be cut, cut this sprint* — after 069 every domain can already leave in JSON
+> and in a CSV, from a button.
 
 ## Objective
 
