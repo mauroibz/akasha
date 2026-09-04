@@ -4,7 +4,7 @@ import { toast } from "sonner";
 
 import type { ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
-import { Button } from "@/components/ui/button";
+import { PageHeader } from "@/components/PageHeader";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -48,14 +48,11 @@ export function AddPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
-        ← Library
-      </Button>
-      <h1 className="mt-6 text-4xl font-semibold">Enter by hand</h1>
-      <p className="mt-2 text-muted-foreground">
-        For something no provider lists. To add from a provider, search from the
-        library.
-      </p>
+      <PageHeader
+        back
+        title="Enter by hand"
+        lede="For something no provider lists. To add from a provider, search from the library."
+      />
       {itemTypes.length > 0 && (
         <div className="mt-7 max-w-xs">
           <Label htmlFor="manual-domain">Domain</Label>

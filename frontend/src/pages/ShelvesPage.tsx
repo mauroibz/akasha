@@ -1,8 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import { PageHeader } from "@/components/PageHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -26,7 +26,6 @@ import {
 } from "@/api/shelves";
 
 export function ShelvesPage() {
-  const navigate = useNavigate();
   const cache = useQueryClient();
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
@@ -84,20 +83,12 @@ export function ShelvesPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-5 py-8">
-      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
-        ← Library
-      </Button>
-      <h1
-        ref={headingRef}
-        tabIndex={-1}
-        className="mt-6 text-4xl font-semibold focus:outline-none"
-      >
-        Shelves
-      </h1>
-      <p className="mt-2 text-muted-foreground">
-        Organize your library with custom shelves. Deleting a shelf removes the
-        tag from what is on it, but never deletes anything itself.
-      </p>
+      <PageHeader
+        back
+        headingRef={headingRef}
+        title="Shelves"
+        lede="Organize your library with custom shelves. Deleting a shelf removes the tag from what is on it, but never deletes anything itself."
+      />
 
       {/* Create shelf */}
       <section className="mt-6 flex gap-2">
@@ -150,7 +141,7 @@ export function ShelvesPage() {
           {shelves.data.map((shelf) => (
             <li
               key={shelf.id}
-              className="flex items-center justify-between rounded-xl border border-border px-5 py-4"
+              className="flex items-center justify-between rounded-xl border border-border bg-surface px-5 py-4"
             >
               {renamingId === shelf.id ? (
                 <div className="flex flex-1 items-center gap-2">
