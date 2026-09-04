@@ -1,5 +1,11 @@
 import { expect, test } from "./console";
-import { stubItemTypes } from "./seed";
+import {
+  albumItemType,
+  animeItemType,
+  movieItemType,
+  seriesItemType,
+  stubItemTypes,
+} from "./seed";
 
 /**
  * The insights screen at the sizes and in the states a person actually uses it
@@ -75,8 +81,11 @@ const rankings: Record<
   ],
 };
 
-async function stubInsights(page: import("@playwright/test").Page) {
-  await stubItemTypes(page, [bookType]);
+async function stubInsights(
+  page: import("@playwright/test").Page,
+  types: unknown[] = [bookType],
+) {
+  await stubItemTypes(page, types as Parameters<typeof stubItemTypes>[1]);
   await page.route("**/api/insights**", (route) => {
     const key = new URL(route.request().url()).searchParams.get("key") ?? "";
     route.fulfill({
@@ -148,13 +157,26 @@ async function stubInsights(page: import("@playwright/test").Page) {
   );
 }
 
-test("the page fits a phone, and nothing makes the body scroll sideways", async ({
+test("the page fits a phone, and nothing makes the body scroll sideways — five domains, DEC-134", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
-  await stubInsights(page);
+  // DEC-134 measured the overflow with five real domains; the checked-in
+  // suite ran this page with one and stayed green through both redesign
+  // sprints without ever exercising the defect. Five is what actually
+  // reproduces it (Sprint 070, finding 9).
+  await stubInsights(page, [
+    bookType,
+    albumItemType,
+    animeItemType,
+    movieItemType,
+    seriesItemType,
+  ]);
   await page.goto("/insights");
   await page.getByRole("heading", { name: "Authors" }).waitFor();
+
+  const strip = page.getByRole("radiogroup", { name: "Choose a domain" });
+  await expect(strip.getByRole("radio")).toHaveCount(5);
 
   // The row labels are the widest thing on the page and they truncate rather
   // than push the layout out.
@@ -164,6 +186,17 @@ test("the page fits a phone, and nothing makes the body scroll sideways", async 
       document.documentElement.clientWidth,
   );
   expect(overflow).toBeLessThanOrEqual(0);
+
+  // The strip itself scrolls within its own box instead of overflowing it
+  // (DEC-134's fix): its scrollable content is wider than the box, and the
+  // box itself never grows past the viewport.
+  const stripBox = await strip.evaluate((node) => ({
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth,
+    boundingWidth: node.getBoundingClientRect().width,
+  }));
+  expect(stripBox.scrollWidth).toBeGreaterThan(stripBox.clientWidth);
+  expect(stripBox.boundingWidth).toBeLessThanOrEqual(390);
 
   // Cards stack rather than sit two abreast at this width.
   const boxes = await page

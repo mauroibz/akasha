@@ -163,6 +163,57 @@ export const albumItemType = {
   entry_panel_label: "Your copy",
 };
 
+/**
+ * The three domains beyond book and album — minimal on purpose, since these
+ * exist for one reason: a five-domain registry is what actually reproduces
+ * DEC-134's 390px domain-strip overflow (measured with five real domains;
+ * fewer never showed it).
+ */
+export const animeItemType = {
+  id: "anime",
+  label: "Anime",
+  fields: [],
+  statuses: [
+    { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+    { value: "watching", label: "Watching", choosable: true, hotkey: "w" },
+    { value: "completed", label: "Completed", choosable: true, hotkey: "c" },
+  ],
+  default_status: "completed",
+  entry_fields: [],
+  formats: [],
+  entry_panel_label: "Your watch data",
+};
+
+export const movieItemType = {
+  id: "movie",
+  label: "Movie",
+  fields: [],
+  statuses: [
+    { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+    { value: "watched", label: "Watched", choosable: true, hotkey: "w" },
+    { value: "to_watch", label: "To watch", choosable: true, hotkey: "t" },
+  ],
+  default_status: "watched",
+  entry_fields: [],
+  formats: [],
+  entry_panel_label: "Your watch data",
+};
+
+export const seriesItemType = {
+  id: "series",
+  label: "Series",
+  fields: [],
+  statuses: [
+    { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+    { value: "watching", label: "Watching", choosable: true, hotkey: "w" },
+    { value: "completed", label: "Completed", choosable: true, hotkey: "c" },
+  ],
+  default_status: "watching",
+  entry_fields: [],
+  formats: [],
+  entry_panel_label: "Your watch data",
+};
+
 /** Every screen that renders metadata needs the spec that describes it. */
 export async function stubItemTypes(page: Page, types = [bookItemType]) {
   await page.route("**/api/item-types", (route) =>

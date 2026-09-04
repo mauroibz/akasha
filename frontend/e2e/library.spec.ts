@@ -8,7 +8,17 @@ import {
   sampleAnimations,
 } from "./motion";
 import { chooseOption, expectSelected } from "./radix";
-import { entry, pixelCover, seedLibrary, stubItemTypes } from "./seed";
+import {
+  albumItemType,
+  animeItemType,
+  bookItemType,
+  entry,
+  movieItemType,
+  pixelCover,
+  seedLibrary,
+  seriesItemType,
+  stubItemTypes,
+} from "./seed";
 
 interface Box {
   x: number;
@@ -888,4 +898,53 @@ test("the shell's Library link lands on a library, from the library", async ({
   ).toBeVisible();
   await expect(page.getByText(/loading your library/i)).toHaveCount(0);
   await expect(page).toHaveURL(/type=book/);
+});
+
+test("the library fits a phone with five domains, and the domain strip scrolls within itself (DEC-134)", async ({
+  page,
+}) => {
+  // DEC-134 measured this overflow on /insights with five real domains and
+  // left `/` unmeasured, despite the identical markup. It never showed up
+  // here either, because every prior library spec stubbed at most one
+  // domain — one or two buttons never overflow a 390px strip (Sprint 070,
+  // finding 9).
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubItemTypes(page, [
+    bookItemType,
+    albumItemType,
+    animeItemType,
+    movieItemType,
+    seriesItemType,
+  ]);
+  await seedLibrary(page, 20);
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+
+  const strip = page.getByRole("radiogroup", { name: "Choose a domain" });
+  await expect(strip.getByRole("radio")).toHaveCount(5);
+
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow, "horizontal page overflow").toBeLessThanOrEqual(0);
+
+  const stripBox = await strip.evaluate((node) => ({
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth,
+    boundingWidth: node.getBoundingClientRect().width,
+  }));
+  expect(stripBox.scrollWidth).toBeGreaterThan(stripBox.clientWidth);
+  expect(stripBox.boundingWidth).toBeLessThanOrEqual(390);
+
+  // Every domain button keeps its 44px target even while the strip scrolls.
+  const heights = await strip
+    .getByRole("radio")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getBoundingClientRect().height),
+    );
+  for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
 });
