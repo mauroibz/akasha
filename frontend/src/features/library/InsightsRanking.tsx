@@ -1,4 +1,7 @@
+import { useId, useState } from "react";
+
 import type { InsightRow } from "@/api/library";
+import { InsightsMembers } from "@/features/library/InsightsMembers";
 import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 
@@ -37,7 +40,9 @@ function rowLabel(row: InsightRow): string {
 export function InsightsRanking({
   rows,
   unplaced = [],
-  onOpen,
+  type,
+  insightKey,
+  hrefFor,
 }: {
   rows: InsightRow[];
   /**
@@ -47,27 +52,42 @@ export function InsightsRanking({
    * the server to omit them, so a group with one rating left the screen silently.
    */
   unplaced?: InsightRow[];
-  onOpen: (row: InsightRow) => void;
+  /** Both identify the entries behind a row, for opening it in place. */
+  type: string;
+  insightKey: string;
+  /** Where "open all of these in the library" goes. */
+  hrefFor: (row: InsightRow) => string;
 }) {
+  // One row open at a time: a card is six rows tall and two panels turn it into
+  // a scroll. Opening another closes the first, which is also how a reader
+  // compares two of them.
+  const [open, setOpen] = useState<string | null>(null);
+  const panelId = useId();
   // Both groups share one scale, so a bar means the same thing on either side of
   // the divider.
   const max = Math.max(...[...rows, ...unplaced].map((row) => row.count), 1);
 
   const draw = (row: InsightRow) => {
     const share = magnitude(row.count, max);
+    const expanded = open === row.key;
     return (
       <li key={row.key}>
         <button
           type="button"
           aria-label={rowLabel(row)}
+          aria-expanded={expanded}
+          aria-controls={`${panelId}-${row.key}`}
           className="group relative flex min-h-11 w-full items-center gap-3 overflow-hidden rounded-md px-3 py-2 text-left focus-ring"
-          onClick={() => onOpen(row)}
+          onClick={() => setOpen(expanded ? null : row.key)}
         >
           <span
             aria-hidden="true"
             data-magnitude={String(share)}
             style={{ width: `${Number((share * 100).toFixed(1))}%` }}
-            className="absolute inset-y-0 left-0 rounded-md bg-primary/15 transition-colors group-hover:bg-primary/25"
+            className={cn(
+              "absolute inset-y-0 left-0 rounded-md transition-colors group-hover:bg-primary/25",
+              expanded ? "bg-primary/30" : "bg-primary/15",
+            )}
           />
           <span
             data-row-label=""
@@ -88,6 +108,16 @@ export function InsightsRanking({
             {row.mean_score !== null ? row.mean_score.toFixed(1) : "—"}
           </span>
         </button>
+        {expanded && (
+          <InsightsMembers
+            id={`${panelId}-${row.key}`}
+            type={type}
+            insightKey={insightKey}
+            value={row.key}
+            count={row.count}
+            href={hrefFor(row)}
+          />
+        )}
       </li>
     );
   };

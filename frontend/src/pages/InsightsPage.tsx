@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -28,7 +27,6 @@ import { useItemTypes } from "@/features/library/useItemTypes";
  * spent on encoding a quantity rather than on colouring every label alike.
  */
 export function InsightsPage() {
-  const navigate = useNavigate();
   const headingRef = useRef<HTMLHeadingElement>(null);
   useEffect(() => {
     headingRef.current?.focus();
@@ -172,17 +170,17 @@ export function InsightsPage() {
             <InsightsCard
               key={option.name}
               title={option.label}
+              type={type}
+              insightKey={option.name}
               insight={insight}
               sort={sort}
               minRated={minRated}
               showSuppressed={includeSuppressed}
               onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
-              onOpen={(row) =>
-                navigate(
-                  `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
-                    option.name,
-                  )}&value=${encodeURIComponent(row.key)}`,
-                )
+              hrefFor={(row) =>
+                `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
+                  option.name,
+                )}&value=${encodeURIComponent(row.key)}`
               }
             />
           ))}

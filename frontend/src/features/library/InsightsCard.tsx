@@ -21,20 +21,24 @@ const preview = 6;
  */
 export function InsightsCard({
   title,
+  type,
+  insightKey,
   insight,
   sort,
   minRated,
   showSuppressed,
   onToggleSuppressed,
-  onOpen,
+  hrefFor,
 }: {
   title: string;
+  type: string;
+  insightKey: string;
   insight: Insight;
   sort: InsightSort;
   minRated: number;
   showSuppressed: boolean;
   onToggleSuppressed: () => void;
-  onOpen: (row: InsightRow) => void;
+  hrefFor: (row: InsightRow) => string;
 }) {
   const [showAll, setShowAll] = useState(false);
   const headingId = useId();
@@ -72,7 +76,13 @@ export function InsightsCard({
       )}
 
       <div className="px-2 pb-1">
-        <InsightsRanking rows={shown} unplaced={unplaced} onOpen={onOpen} />
+        <InsightsRanking
+          rows={shown}
+          unplaced={unplaced}
+          type={type}
+          insightKey={insightKey}
+          hrefFor={hrefFor}
+        />
       </div>
 
       {hidden > 0 && (

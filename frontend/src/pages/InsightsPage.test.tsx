@@ -132,6 +132,49 @@ const defaultRankings: Record<string, Rows> = {
   ],
 };
 
+/** The entries behind a ranking row, as `/api/entries` returns them. */
+function entriesPage() {
+  const item = (
+    id: number,
+    title: string,
+    year: number,
+    score: number | null,
+  ) => ({
+    id,
+    item_id: id,
+    status: "read",
+    score,
+    notes: null,
+    date_added: "2026-01-01T00:00:00Z",
+    date_started: null,
+    date_finished: null,
+    reread_count: 0,
+    progress: null,
+    score_provisional: false,
+    suggested_status: null,
+    shelves: [],
+    formats: [],
+    item: {
+      id,
+      type: "book",
+      title,
+      subtitle: null,
+      year,
+      creator: "Julio Cortázar",
+      cover_url: null,
+      metadata: {},
+      identifiers: {},
+      sources: [],
+    },
+  });
+  return {
+    items: [item(1, "Rayuela", 1963, 10), item(2, "Bestiario", 1951, 9)],
+    next_cursor: null,
+    total: 7,
+    facets: { status_counts: {}, status_counts_by_type: {}, format_counts: {} },
+  };
+}
+
 /** Every screen request, with the rankings swappable per key. */
 function stubApi(rankings: Record<string, Rows> = defaultRankings) {
   const calls: string[] = [];
@@ -144,6 +187,8 @@ function stubApi(rankings: Record<string, Rows> = defaultRankings) {
       const key = new URL(url, "http://library.test").searchParams.get("key");
       return new Response(JSON.stringify(ranking(rankings[key ?? ""] ?? [])));
     }
+    if (url.startsWith("/api/entries"))
+      return new Response(JSON.stringify(entriesPage()));
     return new Response("[]");
   });
   return calls;
@@ -326,17 +371,35 @@ describe("InsightsPage", () => {
     ).toBeVisible();
   });
 
-  it("links a ranking row into the filtered library", async () => {
-    stubApi();
+  it("opens the entries behind a row in place, and still links out", async () => {
+    // Sprint 065's only interaction navigated away, so reading a ranking was
+    // back-button ping-pong. The row is a disclosure now; the library link is
+    // the end of what it opens rather than the whole of what it does.
+    const calls = stubApi();
     const user = userEvent.setup();
     renderPage();
-    // The row's accessible name carries what it holds, since its visible cells
-    // are a label, a numeral and a chip.
-    const row = await screen.findByRole("button", {
+    const authorRow = await screen.findByRole("button", {
       name: "Julio Cortázar: 7 entries, mean score 8.8 from 6 rated",
     });
+    expect(authorRow).toHaveAttribute("aria-expanded", "false");
 
-    await user.click(row);
+    await user.click(authorRow);
+
+    expect(authorRow).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByText("Rayuela")).toBeVisible();
+    expect(screen.getByText("Bestiario")).toBeVisible();
+    // Exactly the filter the row's own link carries, asked for a handful of rows.
+    const entries = calls.find((url) => url.startsWith("/api/entries")) ?? "";
+    expect(entries).toContain("type=book");
+    expect(entries).toContain("key=creators");
+    expect(entries).toContain("value=julio+cort");
+    expect(entries).toContain("limit=4");
+    // Still on the insights page.
+    expect(screen.queryByText(/^Library:/)).toBeNull();
+
+    await user.click(
+      screen.getByRole("link", { name: /Open all 7 in the library/ }),
+    );
 
     await waitFor(() => {
       const text = screen.getByText(/Library:/).textContent ?? "";
@@ -344,6 +407,24 @@ describe("InsightsPage", () => {
       expect(text).toContain("key=creators");
       expect(text).toContain("value=julio+cort");
     });
+  });
+
+  it("opens one row at a time, so a card cannot become a scroll", async () => {
+    stubApi();
+    const user = userEvent.setup();
+    renderPage();
+    const first = await screen.findByRole("button", {
+      name: "Julio Cortázar: 7 entries, mean score 8.8 from 6 rated",
+    });
+    const second = screen.getByRole("button", {
+      name: "Ursula K. Le Guin: 5 entries, mean score 9.2 from 5 rated",
+    });
+
+    await user.click(first);
+    await user.click(second);
+
+    expect(first).toHaveAttribute("aria-expanded", "false");
+    expect(second).toHaveAttribute("aria-expanded", "true");
   });
 });
 

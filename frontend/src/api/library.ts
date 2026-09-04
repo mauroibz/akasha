@@ -204,11 +204,16 @@ export interface LibraryFilters {
   value: string;
 }
 
-export function libraryQueryString(filters: LibraryFilters, cursor?: string) {
+export function libraryQueryString(
+  filters: LibraryFilters,
+  cursor?: string,
+  /** The library's own page size, unless a caller wants a handful (Sprint 066). */
+  limit = 100,
+) {
   const params = new URLSearchParams({
     sort: filters.sort,
     order: filters.order,
-    limit: "100",
+    limit: String(limit),
   });
   filters.statuses.forEach((status) => params.append("status", status));
   filters.shelves.forEach((shelf) => params.append("shelf", shelf));
@@ -233,9 +238,10 @@ export async function getLibraryPage(
   filters: LibraryFilters,
   cursor?: string,
   signal?: AbortSignal,
+  limit?: number,
 ): Promise<LibraryPage> {
   const response = await fetch(
-    `/api/entries?${libraryQueryString(filters, cursor)}`,
+    `/api/entries?${libraryQueryString(filters, cursor, limit)}`,
     { headers: { Accept: "application/json" }, signal },
   );
   if (!response.ok) throw new Error("Your library could not be loaded");
