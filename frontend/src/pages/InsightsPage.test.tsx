@@ -119,11 +119,17 @@ const defaultRankings: Record<string, Rows> = {
   creators: defaultRows(),
   publisher: [
     row("Alfaguara", 4, 3, 8.0),
+    row("Minotauro", 3, 2, 6.5),
     row("Anagrama", 2, 2, 9.0),
     row("Gollancz", 1, 0, null),
   ],
+  // Two values: a fact, not a ranking. Earns a line, not a card.
   year: [row("1963", 2, 2, 9.5), row("1974", 1, 1, 10)],
-  decade: [row("1960s", 4, 3, 9.1), row("1970s", 3, 2, 8.2)],
+  decade: [
+    row("1960s", 4, 3, 9.1),
+    row("1970s", 3, 2, 8.2),
+    row("2000s", 2, 1, 6.0),
+  ],
 };
 
 /** Every screen request, with the rankings swappable per key. */
@@ -173,22 +179,20 @@ function renderPage() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("InsightsPage", () => {
-  it("answers on arrival, with a card for every key the domain declares", async () => {
-    // Sprint 065 asked one question per visit: a popover, a refetch, and no way
-    // to see two answers beside each other.
+  it("answers on arrival, best key first, and says so about the rest", async () => {
+    // Sprint 065 asked one question per visit -- a popover, a refetch, and no
+    // way to see two answers beside each other -- and opened on whichever key
+    // the domain happened to declare first. Cards are ordered by how far each
+    // ranking's leader stands above its own middle, and a key with nothing to
+    // rank gets a line rather than a two-row table.
     stubApi();
     renderPage();
     await screen.findByText("Julio Cortázar");
 
-    expect(
-      screen
-        .getAllByRole("region")
-        .map(
-          (node) =>
-            node.getAttribute("aria-label") ??
-            within(node).getByRole("heading").textContent,
-        ),
-    ).toEqual(["Authors", "Publisher", "Year", "Decade"]);
+    expect(cardTitles()).toEqual(["Authors", "Publisher", "Decade"]);
+    expect(screen.getByText("Nothing much to rank yet")).toBeVisible();
+    expect(screen.getByText(/1963 2, 1974 1/)).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Year" })).toBeNull();
   });
 
   it("titles a card the way the domain itself names that key", async () => {
@@ -306,8 +310,9 @@ describe("InsightsPage", () => {
   it("says plainly when nothing is rated enough to sort by score", async () => {
     stubApi({
       creators: [
-        row("Gene Wolfe", 2, 1, 5.0),
-        row("Kazuo Ishiguro", 1, 0, null),
+        row("Gene Wolfe", 3, 1, 5.0),
+        row("Kazuo Ishiguro", 2, 1, 7.0),
+        row("Samanta Schweblin", 2, 0, null),
       ],
     });
     const user = userEvent.setup();
@@ -341,6 +346,14 @@ describe("InsightsPage", () => {
     });
   });
 });
+
+/** The cards on the page, in the order they are drawn. */
+function cardTitles(): string[] {
+  return screen
+    .getAllByRole("region")
+    .map((node) => within(node).getByRole("heading").textContent ?? "")
+    .filter((title) => title !== "Nothing much to rank yet");
+}
 
 /** One card's row labels, in the order they are drawn. */
 function rowOrder(name: string): string[] {

@@ -5,8 +5,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
 import { InsightsCard } from "@/features/library/InsightsCard";
-import { type InsightSort } from "@/features/library/insights";
+import {
+  orderKeys,
+  quietSummary,
+  type InsightSort,
+} from "@/features/library/insights";
 import { useInsights } from "@/features/library/useInsights";
+import type { Insight } from "@/api/library";
 import { useItemTypes } from "@/features/library/useItemTypes";
 
 /**
@@ -56,9 +61,17 @@ export function InsightsPage() {
     includeSuppressed,
   });
 
-  const cards = keyOptions
-    .map((option, index) => ({ option, query: rankings[index] }))
-    .filter((card) => card.query?.data);
+  // Which keys are worth a card, and in what order, is a judgement about this
+  // library rather than the order a domain happens to declare its fields
+  // (DEC-132). The rest are stated in a line rather than hidden. Not memoized:
+  // it is a sort of at most a handful of keys, and a dependency array over an
+  // array rebuilt every render would only pretend otherwise.
+  type Answered = { option: (typeof keyOptions)[number]; insight: Insight };
+  const answered = keyOptions
+    .map((option, index) => ({ option, insight: rankings[index]?.data }))
+    .filter((entry): entry is Answered => Boolean(entry.insight));
+  const { carded, quiet } = orderKeys(answered, (entry) => entry.insight.rows);
+
   const pending = rankings.some((query) => query.isPending);
   const failed =
     rankings.length > 0 && rankings.every((query) => query.isError);
@@ -142,7 +155,7 @@ export function InsightsPage() {
 
       <ScoreLegend />
 
-      {pending && cards.length === 0 && (
+      {pending && carded.length === 0 && (
         <p role="status" className="mt-8 text-muted-foreground">
           Ranking…
         </p>
@@ -153,13 +166,13 @@ export function InsightsPage() {
         </p>
       )}
 
-      {cards.length > 0 && (
+      {carded.length > 0 && (
         <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {cards.map(({ option, query }) => (
+          {carded.map(({ option, insight }) => (
             <InsightsCard
               key={option.name}
               title={option.label}
-              insight={query.data!}
+              insight={insight}
               sort={sort}
               minRated={minRated}
               showSuppressed={includeSuppressed}
@@ -176,7 +189,29 @@ export function InsightsPage() {
         </div>
       )}
 
-      {sort === "score" && cards.length > 0 && (
+      {quiet.length > 0 && (
+        <section
+          aria-labelledby="quiet-keys"
+          className="mt-4 rounded-xl border border-border px-4 py-3"
+        >
+          <h2
+            id="quiet-keys"
+            className="text-xs font-semibold text-muted-foreground"
+          >
+            Nothing much to rank yet
+          </h2>
+          <ul className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
+            {quiet.map(({ option, insight }) => (
+              <li key={option.name}>
+                <span className="text-foreground">{option.label}</span> —{" "}
+                {quietSummary(insight.rows)}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {sort === "score" && carded.length > 0 && (
         <label className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
           A value is placed in the score order from
           <Input

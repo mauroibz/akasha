@@ -49,3 +49,73 @@ export function orderRows(
     unplaced: rows.filter((row) => !placeable(row)).sort(byCount),
   };
 }
+
+/**
+ * How far a ranking's leader stands above the middle of its own ranking.
+ *
+ * This is the whole of "which insights are worth showing" (DEC-132). Sprint 065
+ * offered keys in `__init__.py` order and opened every domain on whichever one its
+ * field list happened to declare first, which is not a judgement about the library
+ * at all.
+ *
+ * Only values held more than once count toward it: a long tail of ones is what
+ * every key in a personal library has, and it says nothing about that key. A key
+ * with fewer than three such values is not a ranking — it is a fact, and a fact is
+ * better stated in a line than drawn as a card.
+ *
+ * Deliberately one paragraph of arithmetic over data already loaded. It is a
+ * judgement that will be argued with, so changing one's mind about it has to stay
+ * a small diff and a test — the same reasoning that made `groupable` a declaration
+ * rather than a derivation.
+ */
+export function keyLead(rows: InsightRow[]): number {
+  const deep = rows
+    .filter((row) => row.count >= 2)
+    .map((row) => row.count)
+    .sort((a, b) => b - a);
+  if (deep.length < 3) return 0;
+  const middle = deep[Math.floor(deep.length / 2)];
+  return deep[0] / Math.max(middle, 1);
+}
+
+/**
+ * The keys worth a card, best first, and the ones that are not.
+ *
+ * Ties keep the order the domain declared, so its own sense of which of two
+ * equally interesting keys comes first is not thrown away for nothing.
+ */
+export function orderKeys<T>(
+  rankings: T[],
+  rowsOf: (ranking: T) => InsightRow[],
+): { carded: T[]; quiet: T[] } {
+  const scored = rankings.map((ranking) => ({
+    lead: keyLead(rowsOf(ranking)),
+    ranking,
+  }));
+  return {
+    carded: scored
+      .filter((entry) => entry.lead > 0)
+      .sort((a, b) => b.lead - a.lead)
+      .map((entry) => entry.ranking),
+    quiet: scored
+      .filter((entry) => entry.lead === 0)
+      .map((entry) => entry.ranking),
+  };
+}
+
+/**
+ * The whole truth about a key that did not earn a card, in one clause.
+ *
+ * Not hidden, and not padded out into a two-row table: "Spanish 31, English 16" is
+ * everything that key has to say, and it fits in less space than the card would
+ * have taken.
+ */
+export function quietSummary(rows: InsightRow[]): string {
+  if (rows.length === 0) return "nothing recorded yet";
+  if (rows.every((row) => row.count === 1))
+    return `${rows.length} ${rows.length === 1 ? "value" : "values"}, each appearing once`;
+  return rows
+    .slice(0, 3)
+    .map((row) => `${row.label} ${row.count}`)
+    .join(", ");
+}

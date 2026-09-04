@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { orderRows } from "@/features/library/insights";
+import {
+  keyLead,
+  orderKeys,
+  orderRows,
+  quietSummary,
+} from "@/features/library/insights";
 import type { InsightRow } from "@/api/library";
 
 function row(
@@ -73,5 +78,85 @@ describe("orderRows", () => {
       "b",
       "c",
     ]);
+  });
+});
+
+describe("keyLead", () => {
+  it("is zero for a key with fewer than three values held more than once", () => {
+    // Two rows is a fact, not a ranking, however lopsided it is.
+    expect(keyLead([row("es", 31, 0, null), row("en", 16, 0, null)])).toBe(0);
+    expect(keyLead([])).toBe(0);
+  });
+
+  it("is zero when every value appears exactly once", () => {
+    const ones = ["a", "b", "c", "d"].map((key) => row(key, 1, 0, null));
+    expect(keyLead(ones)).toBe(0);
+  });
+
+  it("measures the leader against the middle of its own ranking", () => {
+    // 7, 5, 3, 2, 2, 2: the middle of the six is 2, so the leader is 3.5x it.
+    const deep = [7, 5, 3, 2, 2, 2].map((count, i) =>
+      row(`d${i}`, count, 0, null),
+    );
+    expect(keyLead(deep)).toBe(3.5);
+
+    // A shallower ranking: the median of 4, 3, 2 is 3.
+    const shallow = [4, 3, 2].map((count, i) => row(`s${i}`, count, 0, null));
+    expect(keyLead(shallow)).toBeCloseTo(1.333, 3);
+
+    // A ranking with no leader at all scores 1 -- still a ranking, just a flat
+    // one, and it keeps its card behind everything with more to say.
+    const flat = [4, 4, 3].map((count, i) => row(`f${i}`, count, 0, null));
+    expect(keyLead(flat)).toBe(1);
+  });
+
+  it("ignores the long tail of ones every key in a personal library has", () => {
+    const deep = [6, 3, 2].map((count, i) => row(`d${i}`, count, 0, null));
+    const tail = Array.from({ length: 40 }, (_, i) => row(`t${i}`, 1, 0, null));
+    expect(keyLead([...deep, ...tail])).toBe(keyLead(deep));
+  });
+});
+
+describe("orderKeys", () => {
+  const key = (name: string, counts: number[]) => ({
+    name,
+    rows: counts.map((count, i) => row(`${name}-${i}`, count, 0, null)),
+  });
+
+  it("cards the keys that rank and sets the rest aside, best first", () => {
+    const keys = [
+      key("language", [31, 16]),
+      key("publisher", [4, 3, 2]),
+      key("creators", [7, 5, 3, 2, 2, 2]),
+    ];
+    const { carded, quiet } = orderKeys(keys, (entry) => entry.rows);
+    expect(carded.map((entry) => entry.name)).toEqual([
+      "creators",
+      "publisher",
+    ]);
+    expect(quiet.map((entry) => entry.name)).toEqual(["language"]);
+  });
+
+  it("keeps the domain's own order between equally interesting keys", () => {
+    const keys = [key("first", [4, 3, 2]), key("second", [8, 6, 4])];
+    const { carded } = orderKeys(keys, (entry) => entry.rows);
+    expect(carded.map((entry) => entry.name)).toEqual(["first", "second"]);
+  });
+});
+
+describe("quietSummary", () => {
+  it("states a two-value key in full, because that is all of it", () => {
+    expect(
+      quietSummary([row("Spanish", 31, 0, null), row("English", 16, 0, null)]),
+    ).toBe("Spanish 31, English 16");
+  });
+
+  it("says so when everything appears once, rather than listing three", () => {
+    const ones = ["a", "b", "c"].map((k) => row(k, 1, 0, null));
+    expect(quietSummary(ones)).toBe("3 values, each appearing once");
+  });
+
+  it("has an honest sentence for a key with nothing in it", () => {
+    expect(quietSummary([])).toBe("nothing recorded yet");
   });
 });
