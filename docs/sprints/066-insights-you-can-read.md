@@ -1,6 +1,6 @@
 # Sprint 066 — Insights you can read
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 065
 **Roadmap revision:** 36
 
@@ -151,4 +151,79 @@ domain contract, or the response contract is required by this sprint.
 
 ## Outcome
 
-_Not started._
+**Delivered.** All nine deliverables and acceptance criteria 1–10 are built and tested.
+The material findings — a defect this sprint had to repair, deliverable 9 answered by
+measurement, and what the ordering rule does to a real album library — are **DEC-133**.
+
+- **Deliverable 1 (the score chip).** `meanScoreChipClass` added to `lib/score.ts` and used
+  for every mean on the screen; the ramp legend sits once under the header. The helper is the
+  only new thing rather than a straight reuse of `scoreChipClass`: the ramp is defined on the
+  ten scores a person can give and a mean is a real number between them, so it bands by the
+  score it is nearest — 8.8 reads as a 9, where banding the raw value would file it with 7.0.
+- **Deliverable 2 (magnitude bars).** `InsightsRanking` replaces the table. The row *is* the
+  bar, filled to its share of its own ranking's leader; labels returned to `foreground` ink,
+  so the accent encodes a quantity instead of colouring twelve identical links.
+- **Deliverable 3 (both metrics, one row).** `orderRows` in the new
+  `features/library/insights.ts`. The toggle is a sort order and both numbers are on every
+  row under either one. Rows below `min_rated` render under an `n not rated enough to place`
+  divider instead of being dropped by the server.
+- **Deliverable 4 (a card per key).** `InsightsCard`, in a responsive grid, one per groupable
+  key plus `year`/`decade`, six rows and *Show n more*. Titled with the label the **domain**
+  declares — the shipped `<th>{key}</th>` printed the raw field name for every domain alike.
+  `InsightsKeyPicker.tsx` deleted; nothing else imported it.
+- **Deliverable 5 (ordering, and a quiet line).** `keyLead`, `orderKeys` and `quietSummary`,
+  unit-tested in `insights.test.ts`. A key with fewer than three values held more than once
+  states itself in one line rather than rendering a two-row table.
+- **Deliverable 6 (inline expansion).** `InsightsMembers` + `useInsightMembers`, over the
+  `key`/`value` filter Sprint 065 already built, four entries highest-scored first, fetched
+  only when a row is opened, one row open at a time. The library link is a `Link` at the end
+  of the panel rather than the whole of what a row does.
+- **Deliverable 7 (the breadcrumb).** `LibraryFilters.valueLabel` carries the display
+  spelling (the `value` is normalized and unreadable); `libraryQueryString` still does not
+  send it. The chip names the filter and clears it.
+- **Deliverable 8 (chrome demoted).** `min_rated` is a sentence below the cards, shown only
+  under the score order; suppression, the null-year count and the depth bound are inline
+  notes in the card that owns them.
+- **Deliverable 9 (the batch parameter): measured, and deliberately not added.** Seven
+  parallel rankings cost a 17 ms median on a 60-entry library, and at 5,000 entries each is
+  inside its own budget (`creators/count` 277.8 ms p95, unchanged from DEC-131). A batch
+  would remove none of that work and would trade card-by-card painting for one slow paint.
+  Full numbers and reasoning in DEC-133.
+
+- **Prerequisite defect repaired (recorded, per AGENTS.md §2.4):**
+  `GET /api/insights?key=year` and `key=decade` returned **500** and had since Sprint 065
+  shipped them — `rank()` produced integer keys against a response schema declaring strings.
+  A screen that ranks every key a domain offers cannot render with two of them 500ing, so it
+  was fixed here: `_insight_row` coerces, two API tests cover the ranking and the round trip
+  into the library, and `test_insights.py`'s assertion — which had asserted the int — is
+  corrected. Found on the walkthrough's first real request. **DEC-133 finding 1.**
+
+- **Verification.** `make check` green. Backend **1,328** passed (1,326 + 2). Frontend
+  **231** passed (218 + 13). Full Playwright suite: **113 passed, 2 skipped, 0 failed** —
+  including the two new `e2e/insights.spec.ts` layout tests and the three new axe checks in
+  `e2e/accessibility.spec.ts` (Insights had none before this sprint).
+  `scripts/benchmark_library.py --entries 5000 --jobs 100`: every scenario inside the 500 ms
+  budget. `python scripts/validate_project.py` green. `make smoke-container` **not owed** —
+  the diff touches no deployment configuration, and the sprint's Verification section does
+  not name it.
+
+- **Two acceptance criteria found real defects, which is why they were browser-level.** The
+  sort toggle was 36 px, short of the 44 px target every other control keeps (AC9); and
+  `aria-controls` on a ranking row pointed at nothing, because the panel id was built from
+  the grouping value and `julio cortázar` has a space in it (AC10). Neither would have
+  survived review.
+
+- **Walkthrough (DEC-025), done.** A throwaway backend on `:8010` and a dev frontend on
+  `:5180` against a `/tmp` data directory — the owner's own instance on `:8000` was left
+  alone — seeded through the real HTTP API with 60 entries shaped after the viability
+  measurement. Every domain ranked, both orders, rows opened, a link followed into the
+  library and the breadcrumb cleared, at 1280 px and at 390 px, with an empty console-error
+  log. Normalization merged `julio cortazar`, `China Mieville`, `Bjork` and
+  `Angelica Gorodischer` into their accented rows; `Various Artists` was suppressed with the
+  note offering it back. What the rankings actually looked like, including the album
+  ordering that puts Label above Artists, is DEC-133 finding 3.
+
+  **Still owed to the owner, and not discharged by this:** the same walkthrough against the
+  owner's *real* imported library — Sprint 064's Spotify albums and the Calibre books — and
+  the report of whether score density makes the score order worth having. That data lives in
+  the owner's own container.

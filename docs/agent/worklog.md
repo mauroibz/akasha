@@ -3936,3 +3936,66 @@ so 050 adds an adapter, not a declaration.
   ROADMAP.md`'s "Owner feedback" and "Not scheduled" sections hold real
   candidates for a Sprint 066 the owner has not chosen yet. Cutting the
   `v1.6.0` tag is the owner's own action.
+
+## 2026-09-03 — Sprint 066 (complete)
+- Done: proposed a redesign of the insights *screen* at the owner's request
+  (`docs/insights-redesign-proposal.md`, accepted as **DEC-132**), scheduled it as
+  Sprints 066 and 067 — plan revision 36, `FINAL_SPRINT` 65 → 67 — and executed 066.
+  Seven implementation commits following the sprint's own checkpoints: the score
+  ramp; magnitude bars (the table is gone, the row *is* the bar); the metric toggle
+  demoted to a sort order with both numbers on every row; a card per key titled with
+  the domain's declared label; the ordering rule and the quiet-keys line; inline row
+  expansion over the existing `key`/`value` filter; and the library breadcrumb. Plus
+  one `[TEST]` commit for the browser-level criteria and one `[FIX]` for a
+  prerequisite defect (below). New: `features/library/insights.ts` (pure — `orderRows`,
+  `keyLead`, `orderKeys`, `quietSummary`, `magnitude`), `InsightsCard`,
+  `InsightsRanking`, `InsightsMembers`, `useInsightMembers`, `e2e/insights.spec.ts`.
+  Deleted: `InsightsKeyPicker.tsx` (nothing else imported it).
+- Verified: `make check` green. Backend **1,328** passed (1,326 + 2 new API tests),
+  frontend **231** (218 + 13), full Playwright **113 passed, 2 skipped, 0 failed** —
+  no contention flakiness this run, unlike Sprint 065's. `scripts/benchmark_library.py
+  --entries 5000 --jobs 100`: every scenario inside the 500 ms budget
+  (`creators/count` 277.8 ms p95, unchanged from DEC-131). **Walkthrough (DEC-025)
+  done**: throwaway backend on `:8010` + dev frontend on `:5180` against a `/tmp` data
+  dir, seeded through the real HTTP API with 60 entries (32 books, 28 albums) shaped
+  after the viability measurement, including deliberate spelling variants and three
+  `Various Artists` compilations. Every domain ranked, both orders, rows opened, a link
+  followed into the library and the breadcrumb cleared, at 1280 px and 390 px, empty
+  console-error log. Normalization merged `julio cortazar`, `China Mieville`, `Bjork`,
+  `Angelica Gorodischer`; `Various Artists` suppressed with the note offering it back.
+  The owner's own instance on `:8000` was not touched; the throwaway servers and DB
+  were removed at close.
+- Deviations, all in **DEC-133**: (1) **`GET /api/insights?key=year` and `key=decade`
+  returned 500 and had since Sprint 065 shipped them** — `rank()` builds a built-in key
+  from `items.year`, an integer column, against a response schema declaring a string.
+  Found by the walkthrough on its first real request. Repaired here as a prerequisite
+  defect (a screen that ranks every key cannot render with two of them 500ing):
+  `_insight_row` coerces with `str`, two new API tests cover the ranking and the round
+  trip into the library, and `test_insights.py`'s assertion — which asserted the int and
+  so locked the defect in — is corrected with a note. This means the sprint touched
+  `backend/src/` after declaring it would not, so the exhaustive backend gate was run
+  rather than the narrowed one. (2) **Deliverable 9's batched `keys=` parameter was
+  measured and deliberately not added**: seven parallel rankings cost a 17 ms median at
+  60 entries and each is inside budget at 5,000; a batch removes none of that work and
+  would trade card-by-card painting for one slow paint. (3) The ordering rule puts
+  **Label above Artists** on an album library — concentration favours coarse keys, and
+  the viability numbers say a real library is worse. Left as designed; which judgement
+  should lead is the owner's.
+- Dead ends worth not repeating: two acceptance criteria found real defects only a
+  browser could see — the sort toggle was 36 px (inherited `size="sm"` from the metric
+  toggle it replaced), and `aria-controls` pointed at nothing because the panel id was
+  built from the grouping value and `julio cortázar` has a space in it, which is not a
+  valid IDREF. A class-name collision (`.quiet` on both a segmented control and a
+  footer box) silently stacked a toggle's buttons in the design mockup — the same
+  cascade hazard the artifact-design guidance warns about. `stubApi` replacements in
+  the test file missed twice because Prettier had reflowed the target text between
+  edits; match against the file as it is, not as it was written.
+- Blocked/open: **Sprint 065's DEC-025 walkthrough against the owner's real imported
+  library is still owed** and is not discharged by this sprint's walkthrough, which ran
+  on seeded data. It needs the owner's own container. Also still open: cutting the
+  `v1.6.0` tag (owner action). Out of scope but recorded in DEC-133: a `language`
+  ranking lists raw ISO codes; the book domain declares `Creators` where `Authors`
+  would read better.
+- Next: Sprint 067 (`ready`) — covers on a ranking row, library totals for the
+  superlative strip, and forwarding `rank()`'s existing `statuses`/`shelves`/`q`/
+  `formats` parameters through the endpoint. Read DEC-132 §3 and DEC-133 first.

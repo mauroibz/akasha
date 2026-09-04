@@ -1,6 +1,6 @@
 # Sprint 067 — Insights with faces
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 066
 **Roadmap revision:** 36
 

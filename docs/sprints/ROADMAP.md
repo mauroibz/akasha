@@ -2,7 +2,7 @@
 
 **Plan revision:** 36
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [066 — Insights you can read](066-insights-you-can-read.md), ready; see `docs/agent/state.json`.
+**Active sprint:** [067 — Insights with faces](067-insights-with-faces.md), ready; see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1217,7 +1217,7 @@ materialization that fixed it, is **DEC-131**. Release notes for v1.6.0 written;
 the owner's action. The DEC-025 walkthrough against the owner's *own* imported library is recorded
 as still owed, and Sprints 066 and 067 do not discharge it.]
 
-### [Sprint 066 — Insights you can read](066-insights-you-can-read.md) **[ACTIVE]**
+### [Sprint 066 — Insights you can read](066-insights-you-can-read.md)
 
 The screen Sprint 065 shipped, redrawn. Owner feedback traced to eight defects, every one of them
 in `InsightsPage.tsx`: see the section below and **DEC-132**.

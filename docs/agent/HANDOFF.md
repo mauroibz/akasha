@@ -1,106 +1,89 @@
-# Handoff — Sprint 065 closed; Sprint 066 is active
+# Handoff — Sprint 066 closed; Sprint 067 is active
 
-`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "066"`.
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "067"`.
 
-The owner used what Sprint 065 shipped, reported that the data is right and the screen
-is not, and accepted the redesign in `docs/insights-redesign-proposal.md` as **DEC-132**.
-That schedules **[066 — Insights you can read](../sprints/066-insights-you-can-read.md)**
-(active, `ready`) and **067 — Insights with faces** (planned). `FINAL_SPRINT` in
-`scripts/validate_project.py` moved from 65 to 67; plan revision is 36.
+## What just happened
 
-**Read DEC-132 before touching `InsightsPage.tsx`.** Sprint 066's binding contract is that
-it needs **no backend change**: the endpoint already serves everything the redesign draws,
-including `score_spread`, which is computed, serialized and rendered nowhere today. The
-rest of this file is Sprint 065's closing state and remains accurate.
+The owner used what Sprint 065 shipped, said the data was right and the screen was
+not, and accepted `docs/insights-redesign-proposal.md` as **DEC-132**. That scheduled
+two sprints; **066 is closed** and **[067 — Insights with faces](../sprints/067-insights-with-faces.md)**
+is `ready`. Plan revision 36; `FINAL_SPRINT` in `scripts/validate_project.py` is 67.
 
-## This work is on `ui-search-refresh-mini-sprint`, not a new branch
+**`/insights` is redrawn.** One card per key instead of a popover and one table; the
+row *is* its own bar; the count/score toggle is a sort order with both numbers on every
+row; rows too thinly rated to place sit under a divider instead of being dropped; a row
+opens in place over the `key`/`value` filter; and the library says which ranking filtered
+it. Which keys get a card, and in what order, is a stated rule (`features/library/insights.ts`)
+rather than `__init__.py` order.
 
-Same branch as the session before this one (the DEC-129/130 mini-sprint), which itself
-sits on unmerged Sprint 063/064 work off `main`. The owner explicitly chose to continue
-on this branch rather than open a new `sprint-065-insights` one. **Nothing has been
-merged, pushed, or opened as a PR.**
+**Read DEC-133 before Sprint 067.** Three findings: `GET /api/insights?key=year` had
+returned **500 since Sprint 065 shipped it** and was repaired in 066 as a prerequisite
+defect; the batched `keys=` parameter was **measured and deliberately not added**, so do
+not add it on a hunch; and the ordering rule puts **Label above Artists** on an album
+library, which is left as designed because which judgement should lead is the owner's
+call, not an agent's.
 
-## What Sprint 065 was, in one paragraph
+**Sprint 067 owes a re-measurement, not an assumption.** It adds a lateral top-3 to a
+query whose budget DEC-131 already had to repair once. The benchmark harness
+(`insights_scenarios()`) exists; AC7 is written to be measured.
+
+## Current numbers
+
+- Backend **1,328** tests, frontend **231**, Playwright **113 passed / 2 skipped / 0
+  failed**. `make check` green. `docs/decisions.md` ends at **DEC-133**.
+- `scripts/benchmark_library.py --entries 5000 --jobs 100`: every scenario inside the
+  500 ms budget; `insights creators/count` 277.8 ms p95.
+
+## Still owed to the owner
+
+- **Sprint 065's DEC-025 walkthrough against the owner's real imported library** —
+  Sprint 064's Spotify albums and the Calibre books — and the report of whether score
+  density makes the score order worth having. Sprint 066's walkthrough ran on seeded
+  data and does **not** discharge it. That data lives in the owner's own container.
+- Cutting the `v1.6.0` tag (`docs/operations/publishing-images.md`).
+
+## Branch and authorization
+
+This work is on **`insights-redesign`**, branched from `ui-search-refresh-mini-sprint`,
+which itself sits on unmerged Sprint 063/064/065 work off `main`. **Nothing has been
+merged, pushed, or opened as a PR.** Authorization does not carry forward: this session
+was asked to propose the redesign, schedule it, and build it, and did exactly that. It
+does not extend to merging into `main`, pushing, any remote action, or cutting the
+`v1.6.0` tag.
+
+## What Insights is, in one paragraph
 
 `GET /api/insights` ranks one domain's entries by a declared groupable metadata field
-(`creators`, `publisher`, `genres`, …) or by the built-in `year`/`decade`, by count or
-mean score — "which authors do I rate highest," "which bands do I own most of." Scope
-is deliberately per-domain: DEC-052 and DEC-077 twice declined to build the
-cross-domain creator identity a merged ranking would need, and this feature exists to
-keep it that way. A `key`/`value` filter added to `/api/entries` lets a ranking row
-link straight into the library, filtered to exactly the entries it counted. The
-`/insights` screen: domain picker, key picker, count/score toggle, a minimum-rated
-threshold, a suppressed-values toggle (the album domain suppresses `Various Artists`),
-and a ranked table. Full account and every material decision: **DEC-131**.
-
-## A real performance finding, and the fix
-
-The sprint's own required benchmark (`scripts/benchmark_library.py --entries 5000
---jobs 100`, matching AC9) caught a genuine budget breach: `creators`/`score` measured
-670 ms p95 against the library's own 500 ms budget, under write contention. Not because
-`json_each` is slow — because the first working version re-ran its own `json_each` +
-`normalize_text` pass three separate times per request (the aggregate, the
-best-spelling window function, and an eagerly-computed `no_rated_groups` check).
-Fixed by materializing the exploded rows once per request into a SQLite `TEMP TABLE`
-rather than the sprint doc's named fallback (a maintained key table via migration) —
-no schema change needed. Re-measured stable at ~290 ms p95. See DEC-131 for the
-`normalize_text`-UDF decision this sits beside (DEC-036 removed that exact
-registration from the *hot* search/sort path; Insights is registering it again for a
-much colder one, and the two are explicitly reconciled there, not left in tension).
-
-## Verified, with one real limitation stated plainly
-
-Full backend (1,326) and frontend (206) suites, `make check`, `make smoke-container`,
-and the full Playwright suite (111; 7 failed only under parallel-worker contention and
-passed individually on re-run — the same flakiness Sprint 064's handoff already
-recorded, none touching Insights) are all green. Also walked through manually in a
-real browser: a throwaway backend on an unused port (`8010`), seeded through the real
-HTTP API, driving Chromium directly via the `playwright` package already in
-`frontend/node_modules` (`chromium-cli`/Claude-in-Chrome was not available in this
-environment) — domain switching, metric switching, the suppressed-state and
-zero-rated-state renders, and a ranking row's click landing on the library filtered to
-exactly its members, all confirmed with screenshots and an empty console-error log.
-
-**What this is not**: the sprint doc's own DEC-025 walkthrough, which asks for this
-against the *owner's real, already-imported* library — Sprint 064's 157 real Spotify
-albums, the Calibre books. That data lives in the owner's own running container, which
-this session did not have access to. Recorded as open in the sprint file's Outcome.
-**The owner's own instance is running on this host, on `127.0.0.1:8000`** (noticed
-while looking for a free port for the throwaway backend above — its `/api/item-types`
-response predates this sprint, confirming it wasn't started by this session). It was
-not touched, inspected further, or used for anything; the throwaway backend used
-`8010` instead precisely to avoid it.
-
-## Current state, concretely
-
-- **Backend:** 1,326 tests passing (1,306 at this session's start + 20 new).
-  **Frontend:** 206 passing (203 + 3 new). `make check` green. `make smoke-container`
-  green. Full e2e green (see above).
-- **`docs/decisions.md`** ends at **DEC-131**.
-- **New surface:** `GET /api/insights`, `/api/entries`'s `key`/`value` params,
-  `FieldSpec.groupable`, `Domain.insight_suppressed_keys`, `LibraryService.rank()`,
-  `frontend/src/pages/InsightsPage.tsx`, the `/insights` route and nav entry.
-- **Version bumped to `1.6.0`** (`backend/pyproject.toml`, `main.py`'s FastAPI
-  `version=`, `frontend/package.json`, regenerated `frontend/openapi.json`). Release
-  notes at `docs/operations/release-notes-v1.6.md`, covering this sprint and Sprint
-  064's Spotify import together, per the sprint doc's own instruction. **Cutting the
-  `v1.6.0` tag is the owner's action** (`docs/operations/publishing-images.md`) —
-  nothing here pushed a tag.
+(`creators`, `publisher`, `genres`, …) or by the built-in `year`/`decade`. Scope is
+deliberately per-domain: DEC-052 and DEC-077 twice declined to build the cross-domain
+creator identity a merged ranking would need, and this feature exists to keep it that
+way. A `key`/`value` filter on `/api/entries` is how a ranking row reaches the entries
+behind it — used by both the library link and, since Sprint 066, the in-place expansion.
+The query, the `groupable` declaration, the suppression list and the per-request
+temp-table materialization that keeps it inside budget are **DEC-131**; the screen in
+front of them is **DEC-132** and **DEC-133**.
 
 ## Known-degraded, deliberately not fixed (carried forward, still true)
 
 - `/api/health/providers` reports configuration, not reachability.
 - Kitsu's latency tail occasionally exceeds its budget.
-- `languages` mixes vocabularies across movie/series sources.
+- `languages` mixes vocabularies across movie/series sources, and a `language` insights
+  ranking lists raw ISO codes because that is what the metadata holds (DEC-133).
+- The book domain declares `Creators` where `Authors` would read better on an insights
+  card. One line in `domains/book/__init__.py`; a vocabulary decision, not a screen one.
+
+## Version
+
+`1.6.0` across `backend/pyproject.toml`, `main.py`'s FastAPI `version=`,
+`frontend/package.json` and the generated `frontend/openapi.json`. Release notes at
+`docs/operations/release-notes-v1.6.md`. Sprint 066 changed no version and no OpenAPI
+surface beyond correcting an insights row key from an integer to the string the schema
+had always declared.
 
 ## Private data and operational constraints
 
 Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has
-no auth and stays LAN-only; Calibre is opened read-only. The owner's own instance runs
-on `127.0.0.1:8000` (or `4441` published) — see above; this sprint's manual browser
-verification ran on an isolated throwaway backend (port `8010`) and frontend (port
-`5180`) against a `/tmp` data directory, both stopped and removed at close.
-
-Authorization does not carry forward: this session was asked to continue sprint work
-on this branch and did exactly that. It does not extend to merging into `main`,
-pushing, or any remote action, or to cutting the `v1.6.0` release tag.
+no auth and stays LAN-only; Calibre is opened read-only. **The owner's own instance runs
+on this host at `127.0.0.1:8000`** — Sprint 066's walkthrough used a throwaway backend on
+`:8010` and frontend on `:5180` against a `/tmp` data directory precisely to avoid it,
+and removed both at close. Do not point a walkthrough at `:8000` without asking.

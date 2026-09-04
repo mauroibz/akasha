@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 36,
-  "project_status": "in_progress",
-  "active_sprint": "066",
-  "active_sprint_file": "docs/sprints/066-insights-you-can-read.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "065",
+  "project_status": "ready",
+  "active_sprint": "067",
+  "active_sprint_file": "docs/sprints/067-insights-with-faces.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "066",
   "completed_sprints": [
     "001",
     "002",
@@ -71,8 +71,9 @@
     "062",
     "063",
     "064",
-    "065"
+    "065",
+    "066"
   ],
-  "started_at": "2026-09-03T22:30:00-03:00",
-  "updated_at": "2026-09-03T22:31:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-09-03T23:30:00-03:00"
 }

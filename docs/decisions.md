@@ -5088,3 +5088,93 @@ both changes, against 1 of 3 before the second.
   the accepted proposal these two sprints implement. Sprint 065's own DEC-025 walkthrough —
   against the owner's real, already-imported library — is **not** discharged by either sprint
   and remains open.
+
+## DEC-133 — Sprint 066's three findings: a 500 nobody had hit, a batch not worth adding, and what the ordering rule does to a real library
+
+- **Date:** 2026-09-03
+- **Status:** accepted
+- **Cross-references:** DEC-132 (the redesign this sprint implements), DEC-131 (the ranking
+  query and its budget, re-measured here), DEC-025 (the walkthrough gate that found the
+  first of these), DEC-114 (pay once for evidence).
+- **Context:** Sprint 066 redrew `/insights` against `GET /api/insights` unchanged. Its
+  walkthrough ran the redesigned screen against a 60-entry library seeded through the real
+  HTTP API — 32 books and 28 albums shaped after
+  `docs/spotify-import-and-insights-viability.md`'s measured distribution, including
+  deliberate spelling variants (`julio cortazar`, `China Mieville`, `Bjork`,
+  `Angelica Gorodischer`) and three `Various Artists` compilations.
+
+- **Finding 1, and the one thing this sprint had to repair: `GET /api/insights?key=year`
+  returned 500, and had since Sprint 065 shipped it.** `rank()` builds a built-in key
+  straight from `items.year`, an integer column, while `InsightRowResponse.key` has declared
+  a string since the day it was written; every row failed response validation. It was the
+  first request the walkthrough made that Sprint 065's own tests had not made: AC3 was proven
+  at the repository layer, where an `int` is a perfectly good grouping value, and
+  `test_insights.py` asserted `"key": 1994` — locking the defect in rather than catching it.
+  Nothing exercised either built-in key over HTTP.
+
+  Fixed at the serialization boundary (`_insight_row` coerces with `str`), which is the
+  contract both halves were already written for: `_items_matching_key_value` `int()`s
+  whatever a client hands back, so the round trip from a ranking row to the filtered library
+  works as soon as the row carries a string. Two API tests cover the ranking and that round
+  trip, and the repository assertion is corrected with a note saying why it was wrong.
+
+  **This is the walkthrough gate paying for itself, and it is worth naming as such.** Sprint
+  065 closed with 1,326 tests green, `make check` green, the container smoke test green and a
+  manual browser walkthrough — and two of its eight declared keys had never once been
+  requested over HTTP. The rule that follows: a key, parameter or enum value the API accepts
+  is not covered until one request has been made with it through the routing layer, because
+  that is where a response schema is enforced.
+
+- **Finding 2, deliverable 9 answered by measurement: no batched `keys=` parameter.** The
+  screen fetches one ranking per key — seven for books, seven for albums — and the sprint
+  said to add a batch parameter only if that count was measured to cost something. It does
+  not, and a batch would make it worse.
+
+  Measured on the walkthrough's 60-entry library: seven rankings in parallel complete in a
+  17 ms median (worst 58 ms), against a 3–5 ms slowest single request. Measured at 5,000
+  entries with `scripts/benchmark_library.py --entries 5000 --jobs 100`: `creators/count`
+  277.8 ms p95, `creators/score` 278.4 ms, `publisher/count` 208.3 ms, `year/count` 6.1 ms,
+  `decade/count` 4.2 ms — every scenario inside the 500 ms budget, and unchanged from
+  DEC-131's numbers.
+
+  The reasoning that settles it: a batch endpoint would not remove any of that work, since
+  the server computes all seven rankings either way. It would only fold seven HTTP round
+  trips — 1–2 ms each — into one, and in exchange the page would paint once, at the speed of
+  the slowest ranking, instead of card by card as each arrives. **The parameter is not
+  added.** Revisit only if a domain appears whose key count is much larger, which is a
+  declaration change and would be noticed.
+
+- **Finding 3, what the ordering rule actually does, reported rather than tuned.** DEC-132's
+  rule — a key earns a card when at least three of its values hold two or more entries;
+  cards sort by how far the leader stands above the middle of its own ranking — behaved as
+  designed and produced one result worth the owner's attention.
+
+  For books it ordered `Creators, Publisher, Decade, Year, Subjects, Language`, and put
+  `Series` (nothing recorded) in the quiet line. Good. **For albums it ordered
+  `Label, Year, Artists, Decade` — the artists third.** The rule measures concentration, and
+  a coarse key concentrates harder than a fine one: 28 albums span 8 labels and 12 artists,
+  and the viability measurement says a real library is worse (157 albums, 88 artists). So
+  this is not an artifact of seeded data and will reproduce.
+
+  Left as designed, deliberately. Whether "the most concentrated ranking" or "the people who
+  made these things" should lead is a product judgement and the owner's to make — they asked
+  for the selection rule to become a judgement rather than `__init__.py` order, and it has;
+  which judgement it should be is the next question, not this sprint's to answer alone. The
+  rule is a dozen lines of client-side arithmetic with its own unit tests, so changing it is
+  a small diff, which is why it was built that way.
+
+- **Also observed, out of scope, recorded so they are not rediscovered:** a `language`
+  ranking lists raw codes (`en`, `es`, `it`) because that is what the metadata holds — the
+  ranking is faithful and the card is unreadable, and a code-to-name mapping is a metadata
+  concern rather than an insights one. The book domain declares `Creators` where `Authors`
+  would read better on that card; it is a one-line declaration change in
+  `domains/book/__init__.py` and belongs to whoever decides the domain's vocabulary, not to
+  the screen rendering it. A `Year` ranking over a library spanning many years is a long card
+  (25 values, six held more than once) — it passes the rule honestly, and `decade` beside it
+  is the readable one.
+
+- **Consequences:** one backend file changed in a sprint that declared no backend change
+  required, so the exhaustive backend gate was run rather than the narrowed one: 1,328 tests
+  (1,326 + 2 new API tests), `make check`, 231 frontend tests, and the full Playwright suite
+  (113 passed, 2 skipped, 0 failed — no contention flakiness this run, unlike Sprint 065's).
+  No schema change, no migration, no OpenAPI surface change beyond the corrected value type.
