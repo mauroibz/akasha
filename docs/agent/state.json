@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 37,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "069",
   "active_sprint_file": "docs/sprints/069-a-door-out-of-the-app.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "068",
   "completed_sprints": [
     "001",
@@ -76,6 +76,6 @@
     "067",
     "068"
   ],
-  "started_at": null,
-  "updated_at": "2026-09-04T14:20:00-03:00"
+  "started_at": "2026-09-04T14:35:00-03:00",
+  "updated_at": "2026-09-04T14:35:00-03:00"
 }

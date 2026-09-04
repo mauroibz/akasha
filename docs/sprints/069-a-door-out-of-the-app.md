@@ -1,6 +1,6 @@
 # Sprint 069 — A door out of the app
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 068
 **Roadmap revision:** 37
 

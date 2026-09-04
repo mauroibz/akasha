@@ -149,7 +149,14 @@ export interface UndoResult {
   retained_items: number;
 }
 
-async function responseJson<T>(response: Response): Promise<T> {
+/**
+ * Parse a JSON response, or raise the standard error envelope as an `ImportRequestError`.
+ *
+ * Exported so `api/exports.ts` can hold its declarations to the same envelope rather
+ * than re-parsing it — the export side has no connector-specific `action` to add, but
+ * the shape and the "prefer `user_message`" rule are identical (DEC-080).
+ */
+export async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
     const value = (await response.json().catch(() => null)) as {
       error?: {
