@@ -5258,3 +5258,19 @@ both changes, against 1 of 3 before the second.
   duplicated. The domain-radiogroup overflow is carried forward as a known, unscoped defect;
   fixing it belongs to whichever future sprint next touches `InsightsPage.tsx`'s header, or a
   dedicated one if none does soon.
+
+- **Addendum, the owner's own review: Sprints 066/067 ship as `v1.7.0`, not folded into
+  `v1.6.0`.** This sprint's first close left the version at `1.6.0` — Sprint 065's own number,
+  which its release notes already described before 066/067 existed — and edited that same
+  `docs/operations/release-notes-v1.6.md` to also describe the redesign, on the reasoning that
+  neither sprint had bumped the version and the tag was still uncut. The owner asked for a new
+  minor version instead. Corrected: `release-notes-v1.6.md` restored to describe only Sprints
+  064–065 as originally written; `docs/operations/release-notes-v1.7.md` written for 066/067;
+  version bumped to `1.7.0` across `backend/pyproject.toml`, `backend/uv.lock`'s `book-tracker`
+  entry, `main.py`'s FastAPI `version=`, `frontend/package.json`, and the regenerated
+  `frontend/openapi.json`. One collateral mistake caught before it shipped: a blanket
+  `sed 's/1\.6\.0/1\.7\.0/'` over `uv.lock` also renumbered `pluggy`'s own pinned version (an
+  unrelated third-party dependency that happened to sit at the same version string), which
+  `uv` immediately refused as an inconsistent wheel filename on the next `make openapi` —
+  reverted to `pluggy`'s real `1.6.0` before anything else ran. The lesson: a version bump
+  belongs to one named package's line, never to a string pattern across a lockfile.

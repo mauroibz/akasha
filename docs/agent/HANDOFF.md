@@ -43,7 +43,8 @@ Sprint 066 that neither sprint's own mocked tests ever exercised past one or two
   do **not** discharge it. That data lives in the owner's own container.
 - **The 390px domain-radiogroup overflow** (DEC-134). Not urgent — it is a five-domain layout
   edge that neither prior sprint's tests caught — but it is real and unfixed.
-- Cutting the `v1.6.0` tag (`docs/operations/publishing-images.md`).
+- Cutting the `v1.6.0` tag (Sprints 064–065) and/or the `v1.7.0` tag (Sprints 066–067)
+  (`docs/operations/publishing-images.md`).
 - **A product decision the redesign proposal's DEC-133 already raised and did not answer:**
   the ordering rule puts an album library's `Label` ahead of `Artists`. Left as designed;
   whether concentration or "who made it" should lead is the owner's call, not an agent's.
@@ -54,7 +55,7 @@ Still on **`insights-redesign`**, off `ui-search-refresh-mini-sprint`, off unmer
 063/064/065 work off `main`. **Nothing has been merged, pushed, or opened as a PR.**
 Authorization does not carry forward: this session was asked to work the active sprint and
 did exactly that. It does not extend to merging into `main`, pushing, any remote action, or
-cutting the `v1.6.0` tag.
+cutting either version's tag.
 
 ## What Insights is, in one paragraph
 
@@ -79,13 +80,15 @@ superlative strip, library totals and filter passthrough are **DEC-134**.
 
 ## Version
 
-`1.6.0` across `backend/pyproject.toml`, `main.py`'s FastAPI `version=`,
-`frontend/package.json` and the generated `frontend/openapi.json`. Release notes at
-`docs/operations/release-notes-v1.6.md` (written for Sprint 065; Sprint 066's and 067's
-changes are additive to the same release and are not yet reflected in that file's prose —
-worth a pass before the tag is cut). Sprint 067 changed OpenAPI surface:
-`InsightRowResponse.covers`, `InsightResponse.total_entries`/`rated_entries`, and four new
-query parameters on `GET /api/insights`.
+`1.7.0` across `backend/pyproject.toml`, `backend/uv.lock`'s `book-tracker` entry, `main.py`'s
+FastAPI `version=`, `frontend/package.json` and the generated `frontend/openapi.json` — a new
+minor version on top of `v1.6.0` (Sprints 064–065), not folded into it: the owner asked for
+Sprints 066/067's redesign to ship as its own release rather than be retrofitted into
+`v1.6.0`'s already-written notes. `docs/operations/release-notes-v1.6.md` is back to
+describing only Sprints 064–065, as originally written;
+`docs/operations/release-notes-v1.7.md` is new, for 066/067. Sprint 067 changed OpenAPI
+surface: `InsightRowResponse.covers`, `InsightResponse.total_entries`/`rated_entries`, and
+four new query parameters on `GET /api/insights` — all under `v1.7.0`.
 
 ## Private data and operational constraints
 

@@ -4060,8 +4060,16 @@ so 050 adds an adapter, not a declaration.
 - Blocked/open, unchanged from Sprint 066's handoff: **Sprint 065's DEC-025
   walkthrough against the owner's real imported library is still owed** — Sprint
   064's Spotify albums, the Calibre books — and needs the owner's own container;
-  neither 066 nor 067 discharges it. Cutting the `v1.6.0` tag is still the
-  owner's action.
+  neither 066 nor 067 discharges it.
+- **Versioning, corrected after the owner's own review:** this entry originally
+  left Sprints 066/067 undated version-wise, at `1.6.0` alongside Sprints 064/065.
+  The owner asked for a new minor version instead of folding the redesign into
+  066/067's already-written `v1.6.0` notes. Bumped to **`v1.7.0`**:
+  `backend/pyproject.toml`, `backend/uv.lock`'s `book-tracker` entry, `main.py`'s
+  FastAPI `version=`, `frontend/package.json`, regenerated `frontend/openapi.json`;
+  `docs/operations/release-notes-v1.6.md` restored to describe only Sprints
+  064–065 as originally written; `docs/operations/release-notes-v1.7.md` written
+  for 066/067. Cutting either tag is still the owner's action.
 - **One defect found on this sprint's own walkthrough, out of scope, not fixed:**
   at 390px the domain radiogroup (five real domains — book, album, anime, movie,
   series) overflows the viewport by about 39px. `InsightsPage.tsx`'s header

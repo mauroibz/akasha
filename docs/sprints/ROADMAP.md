@@ -1272,7 +1272,9 @@ against a throwaway backend seeded through the real HTTP API — including uploa
 entries and none on a few, deliberately — found one out-of-scope defect worth recording and not
 fixing here: the domain radiogroup (five real domains: book, album, anime, movie, series)
 overflows the viewport by about 39px at 390px width, unchanged code from Sprint 066 that only ever
-had one or two domains in its own tests.]
+had one or two domains in its own tests. Sprints 066 and 067 ship as their own release,
+**`v1.7.0`** on top of v1.6.0 (Sprints 064–065), rather than being folded into v1.6.0's already-
+written notes — `docs/operations/release-notes-v1.7.md`; cutting the tag is the owner's action.]
 
 ## Future epics, after this plan
 
