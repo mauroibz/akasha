@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -136,6 +136,102 @@ describe("ShelvesPage", () => {
     await waitFor(() => expect(deleted).toBe(true));
     expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
     expect(await findToast("Shelf deleted")).toBeInTheDocument();
+  });
+
+  it("a shelf row links into the library filtered to that shelf", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves")
+        return new Response(JSON.stringify(shelves));
+      return new Response("[]");
+    });
+    renderPage();
+    const link = await screen.findByRole("link", { name: /Favorites/ });
+    expect(link).toHaveAttribute("href", "/?shelf=favorites");
+  });
+
+  it("renders bars proportional to shelf size, decorative to assistive technology", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves")
+        return new Response(
+          JSON.stringify([
+            { id: 1, name: "Big", slug: "big", entry_count: 30, covers: [] },
+            {
+              id: 2,
+              name: "Small",
+              slug: "small",
+              entry_count: 10,
+              covers: [],
+            },
+          ]),
+        );
+      return new Response("[]");
+    });
+    renderPage();
+    await screen.findByText("Big");
+    const bars = document.querySelectorAll("[data-magnitude]");
+    expect(bars).toHaveLength(2);
+    const magnitudes = Array.from(bars).map((bar) =>
+      bar.getAttribute("data-magnitude"),
+    );
+    // 30 is the leader: its own share is 1; 10 is a third of it.
+    expect(magnitudes).toEqual(["1", "0.333"]);
+    for (const bar of bars) {
+      expect(bar).toHaveAttribute("aria-hidden", "true");
+    }
+  });
+
+  it("shows up to three covers, the shared placeholder, or nothing for an empty shelf", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves")
+        return new Response(
+          JSON.stringify([
+            {
+              id: 1,
+              name: "Covered",
+              slug: "covered",
+              entry_count: 2,
+              covers: ["/api/items/1/cover?v=1", "/api/items/2/cover?v=1"],
+            },
+            {
+              id: 2,
+              name: "Coverless",
+              slug: "coverless",
+              entry_count: 3,
+              covers: [],
+            },
+            {
+              id: 3,
+              name: "Unstarted",
+              slug: "unstarted",
+              entry_count: 0,
+              covers: [],
+            },
+          ]),
+        );
+      return new Response("[]");
+    });
+    renderPage();
+    const coveredRow = (await screen.findByText("Covered")).closest("li");
+    expect(coveredRow).not.toBeNull();
+    // Decorative like the ranking's own `CoverStack` (empty `alt`), so these
+    // are real `<img>` elements rather than accessible-role ones.
+    expect((coveredRow as HTMLElement).querySelectorAll("img")).toHaveLength(2);
+
+    const coverlessRow = screen.getByText("Coverless").closest("li");
+    expect(coverlessRow).not.toBeNull();
+    expect(
+      within(coverlessRow as HTMLElement).getByRole("img", {
+        name: "No cover",
+      }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("3 items")).toBeVisible();
+
+    const emptyRow = screen.getByText("Unstarted").closest("li");
+    expect(emptyRow).not.toBeNull();
+    expect(
+      within(emptyRow as HTMLElement).queryByRole("img"),
+    ).not.toBeInTheDocument();
+    expect(within(emptyRow as HTMLElement).getByText("Empty")).toBeVisible();
   });
 
   it("surfaces duplicate slug errors", async () => {

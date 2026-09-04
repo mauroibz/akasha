@@ -29,8 +29,15 @@ import { cn } from "@/lib/utils";
  * on the very same response, and `CoverImage` fades each one in on its own once
  * loaded rather than holding up the row that names it. A row with no covered
  * member (an empty `covers`) shows no cover slot at all, rather than an empty one.
+ *
+ * Exported for the shelves screen (Sprint 071), which is the same kind of row
+ * — a magnitude bar, up to three faces, a count, a name — reused rather than
+ * re-derived. Shelves draws its own placeholder for the "has entries but none
+ * of them carry a cover" case, which this component deliberately does not: an
+ * insights row and a shelf disagree about whether that state is worth a
+ * placeholder at all (a shelf says so explicitly; a ranking row stays silent).
  */
-function CoverStack({ covers }: { covers: string[] }) {
+export function CoverStack({ covers }: { covers: string[] }) {
   if (covers.length === 0) return null;
   return (
     <span

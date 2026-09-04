@@ -2,6 +2,10 @@ import type { Shelf } from "./library";
 
 export interface ShelfWithCount extends Shelf {
   entry_count: number;
+  //: Up to three cover URLs from the shelf's own members (Sprint 071).
+  //: Optional: `AddForm` and `ShelfPicker` build shelf-shaped values of their
+  //: own that never carry it, and `GET /api/shelves` always does.
+  covers?: string[];
 }
 
 async function jsonOrThrow<T>(
