@@ -156,9 +156,13 @@ async def test_year_and_decade_rank_and_null_years_are_counted_not_dropped(tmp_p
         by_year = fx.service.rank(item_type="book", key="year", metric="count")
         by_decade = fx.service.rank(item_type="book", key="decade", metric="count")
 
+        # A string, not the `int` this asserted when it was written. `key` is the
+        # value a client hands back to `/api/entries`, the response schema has
+        # declared it a string since Sprint 065, and asserting the int here is what
+        # let every `key=year` request 500 over HTTP without a test noticing.
         assert by_year["rows"] == [
             {
-                "key": 1994,
+                "key": "1994",
                 "label": "1994",
                 "count": 1,
                 "rated_count": 0,
@@ -167,6 +171,7 @@ async def test_year_and_decade_rank_and_null_years_are_counted_not_dropped(tmp_p
             }
         ]
         assert by_year["null_count"] == 1
+        assert by_decade["rows"][0]["key"] == "1990"
         assert by_decade["rows"][0]["label"] == "1990s"
         assert by_decade["null_count"] == 1
 

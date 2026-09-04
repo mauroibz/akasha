@@ -1197,7 +1197,15 @@ class LibraryService:
             variance = max(row.mean_sq - row.mean_score**2, 0.0)
             spread = variance**0.5
         return {
-            "key": row.norm,
+            # `str`, always. A built-in key groups on `items.year`, which is an integer
+            # column, and this is the boundary where a grouping value becomes the
+            # `value` a client hands back to `/api/entries` — which `int()`s it again
+            # (`_items_matching_key_value`). Sprint 065 proved the built-in keys at the
+            # repository layer, where an int is a perfectly good grouping value, and
+            # `InsightRowResponse.key` has declared a string since the day it was
+            # written: every `key=year` request over HTTP was a 500 until Sprint 066's
+            # walkthrough ran one.
+            "key": str(row.norm),
             "label": self._insight_label(row.norm, key, is_numeric_key, labels),
             "count": row.count,
             "rated_count": row.rated_count,
