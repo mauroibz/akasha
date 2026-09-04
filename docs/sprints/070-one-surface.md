@@ -1,6 +1,6 @@
 # Sprint 070 — One surface
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 067
 **Roadmap revision:** 38
 
@@ -166,4 +166,167 @@ Confirm each at activation; the proposal's §2 table carries the lines.
 
 ## Outcome
 
-_Not started._
+**Status: completed, 2026-09-04.** All 8 deliverables and all 10 acceptance criteria met.
+Commits: `bc0323f` (primitives), `abebbe2` (domain strip/toggle extracted), `a7e383a`
+(Detail's cover and panels), `5ba37ef` (Shelves/Add headers), `e82481c` (import score/
+cover-staged chips), `6085448` (DEC-134 fix), `90d8600` (e2e finding-3 assertion),
+`d48817d` (amber heading retired everywhere it hid).
+
+**Delivered.**
+
+1. **`Panel`** (`frontend/src/components/Panel.tsx`) — `rounded-xl border border-border
+   bg-surface`, optional heading + right-hand stat row, `bodyClassName` for callers that
+   need their own internal spacing rather than one imposed scale. `InsightsCard` now
+   builds on it (the generalization); Detail's personal region, Files region, Edition
+   facts and tracklist regions, and Import's form/preview-row/undo boxes all carry the
+   same chrome now.
+2. **The amber uppercase heading retired**, everywhere it appeared — not only the four
+   box idioms finding 7 cited, but two more instances the same pass found nested inside
+   already-touched content: `Attachments.tsx` (mounted inside Detail's Files panel) and
+   `CandidateFacts.tsx` (the add-flow confirm card). `git grep "uppercase tracking-wider
+   text-primary"` returns nothing in `frontend/src`.
+3. **`PageHeader`** (`frontend/src/components/PageHeader.tsx`) — eyebrow/title/count/
+   lede/actions, applied to Library, Shelves, Add, Import and Triage. `BackToLibrary`
+   (`frontend/src/components/BackToLibrary.tsx`) is the one *"← Library"* control,
+   replacing the ghost button (Detail/Shelves/Add), the outline pill (Triage), the bare
+   `<Link>` (Import) and the words *"← Back to library"* (Import's undo panel) — four
+   spellings down to one.
+4. **`SegmentedControl`** (`frontend/src/components/SegmentedControl.tsx`), extracted
+   from Grid/Table and Most collected/Best rated, `min-h-11` on every option now (only
+   one copy had it before).
+5. **`DomainStrip`** (`frontend/src/components/DomainStrip.tsx`), extracted from the two
+   radiogroups, scrolling within itself (`overflow-x-auto`, `min-w-0`, `max-w-full` on
+   the strip, `shrink-0` moved to its buttons) instead of refusing to shrink and pushing
+   the document sideways. Paid DEC-134 once for both `/` and `/insights` — see the
+   deviation below on what else that actually took.
+6. **Every cover through `CoverImage`**, including Detail's — decode-reveal, the shared
+   placeholder, "Cover failed to load" on a 404 instead of a broken-image glyph.
+7. **The import preview speaks the application's language**: the score renders in
+   `scoreChipClass`/`scoreChipShape`, the same chip Detail and the library card use;
+   *Local cover staged* is a neutral `bg-surface-raised` chip, not `text-score-top`; a
+   field error renders through `frontend/src/features/import/errors.ts`'s
+   `describeRowError` — the domain's declared label (from `/api/item-types`, when the
+   active importer names exactly one domain) or a small static/humanized fallback, plus
+   a wording table covering every code the shipped readers raise — instead of
+   `{field}: {code}`.
+8. **Justified differences kept, one sentence each**: the library's translucent
+   `bg-surface/60`/`bg-surface/40` cards sit under a virtualized list with a pinned
+   geometry (DEC-023) and were not touched; the connector guide's quieter
+   `bg-surface-raised` box (no border) stays deliberately quieter than the form beside
+   it; Detail's title/subtitle/creator/year block stays beside the cover rather than
+   becoming a `PageHeader`, because it is item detail rather than a listing page (only
+   its back control unified); `/insights` itself keeps its own existing header (it is
+   the screen these primitives generalize *from*, not one of the six being unified) —
+   `DomainStrip` and `SegmentedControl` replace its two duplicated controls, `Panel`
+   generalizes `InsightsCard`, `PageHeader` does not apply to it.
+
+**Acceptance criteria.**
+
+1. No surface outside a score renders in a score-ramp colour — `ImportPage.test.tsx`
+   and `e2e/import.spec.ts` assert the staged-cover chip carries no `text-score-*`
+   class; `git grep` confirms no remaining literal use outside `lib/score.ts`,
+   `ScorePicker`, and the insights legend.
+2. A preview score renders in the same band class as the library card and the detail
+   page — `ImportPage.test.tsx` asserts `bg-score-top` on a score of 9, matching
+   `scoreChipClass(9)`.
+3. A failed preview row names the domain's declared label and a legible wording, never
+   `field: code` — `ImportPage.test.tsx` and `e2e/import.spec.ts` both updated (see
+   deviation below on what "declared" actually means with no backend change).
+4. A 404'd Detail cover shows the shared `CoverImage` failure fallback —
+   `DetailPage.test.tsx`, two new tests (the 404 case and the no-cover case).
+5. Every page renders its header through one component — Library, Shelves, Add, Import,
+   Triage all render through `PageHeader`; `git grep` for the old per-screen header
+   markup (the brand-lockup eyebrow pattern, the bare `text-4xl` h1 outside
+   `PageHeader.tsx`) returns nothing except Detail's and Insights' own, both justified
+   above.
+6. One way back, reading the same on Detail, Shelves, Add, Triage and Import —
+   `BackToLibrary`, five places, one string. `e2e/live-metadata.spec.ts` updated (its
+   Detail assertion moved from `role: "button"` to `role: "link"`, finding 8).
+7. `/` and `/insights` hold at 390px with five domains, the strip scrolling within
+   itself, 44px targets — new e2e tests in `e2e/library.spec.ts` and extended
+   `e2e/insights.spec.ts` (both needed a real fix, not just a test — see the deviation
+   below).
+8. Zero serious axe violations on Library, Detail, Shelves, Add, Import, Triage —
+   `e2e/accessibility.spec.ts`, full run, unchanged assertions, all green.
+9. Existing suites pass unchanged except where a test asserted one of the eleven
+   findings, each named here: `ImportPage.test.tsx` ("previews and commits a confined
+   Calibre library...", finding 1/2; "previews once, exposes errors...", finding 3);
+   `e2e/import.spec.ts` ("row errors and ambiguity require an explicit choice", finding
+   3); `e2e/live-metadata.spec.ts` (its Detail back-button assertion, finding 8).
+   `e2e/library.spec.ts` and `e2e/insights.spec.ts` gained new/extended tests rather
+   than changed assertions — deliverable 5's own instruction that the viewport test
+   "extends to `/`".
+10. `VirtualLibrary.tsx` untouched — confirmed by `git diff --stat`, zero lines.
+
+**Deviations, recorded rather than guessed past.**
+
+- **AC3's "domain's declared label" and "connector's declared wording" do not exist as
+  backend declarations for row-level field errors** — only `ImportReadError` (a whole-
+  file refusal) carries `user_message`/`action` (DEC-080). A field error's `field`/`code`
+  pair is either already a human phrase (`imdb.py`, `letterboxd.py`, `trakt.py` pass
+  `"Your Rating"`, `"Watched Date"`) or a raw internal name (`goodreads.py`,
+  `calibre.py`, `myanimelist.py` pass `isbn`, `my_rating`, `series_animedb_id`), and this
+  sprint's own Verification section says no Python file changes. `describeRowError`
+  resolves what it honestly can — an entry field or a metadata `FieldSpec` from
+  `/api/item-types`, when the active importer names exactly one domain — and humanizes
+  the rest (`date_read` → `Date read`) rather than inventing a backend contract. This is
+  the ceiling of a presentation-only fix; a connector-declared field/error vocabulary
+  would be new backend scope for a future sprint if the humanized fallback ever reads
+  wrong for a specific code.
+- **Paying DEC-134 took one more line than the strip itself.** `DomainStrip`'s own
+  `overflow-x-auto`/`min-w-0`/`max-w-full` was not sufficient on `/insights`: its
+  immediate parent (the `role="group" aria-label="Ranking controls"` wrapper) was itself
+  an unconstrained flex item, so the strip's `max-w-full` resolved against that parent's
+  own unclamped width rather than the viewport. Fixed at the parent
+  (`min-w-0 max-w-full` added to `InsightsPage.tsx`'s Ranking-controls group) — the
+  actual mechanism, found only by measuring computed styles once the naive fix still
+  measured 47px of overflow. `/` needed no equivalent fix; its domain strip's immediate
+  parent is a plain flex row directly inside `<main>`, not nested inside a second flex
+  group.
+- **`useItemTypes` in `ImportPage.tsx` is now enabled whenever a previewed record has an
+  error**, not only when an importer declares more than one target domain. Narrowly
+  scoped to avoid an unconditional new fetch on every Import visit; guarded with
+  `Array.isArray` since a test's fetch mock can answer the wrong shape and must not
+  crash the page.
+
+**Verified.**
+
+- `make check` — green (backend ruff format/check, mypy; frontend prettier, eslint,
+  tsc, `npm run api:check`; `scripts/validate_project.py`).
+- `make test` — backend **1,352** passed (unchanged: no Python file touched). Frontend
+  **266** passed (was ~253 before this sprint's new/changed tests).
+- `npx playwright test` (parallel, chromium + heavy-library + production-bundle
+  projects) — **119 passed, 2 skipped** (the two `LIVE_METADATA_MODE`-gated tests),
+  three consecutive runs; one run hit a single pre-existing timing flake
+  (`library.spec.ts` "keyboard guards and reduced motion remain effective", a
+  search-debounce race unrelated to any file this sprint touched — green in isolation
+  and on both full reruns).
+- **Walkthrough (DEC-025), done.** A throwaway backend (`scripts/walkthrough.py --keep`
+  on an ephemeral port) seeded through the real HTTP API — 5 domains, 11 entries, real
+  1x1-pixel JPEG covers uploaded to 6 of them via `POST /api/items/{id}/cover`, one
+  book left `unsorted` for Triage, a "Favorites" shelf holding 5 entries — served behind
+  a real Vite dev server (`AKASHA_E2E_BACKEND`) on a scratch port. A real Chromium
+  instance (Playwright, no route stubbing) visited Library, Detail, Shelves, Add, Import
+  and Triage at 1280px and 390px: zero console errors and zero horizontal body overflow
+  on every one of the twelve combinations but one (below); every screen's header, back
+  control and box chrome visually consistent (screenshots inspected); Detail's cover
+  the shared `CoverImage` treatment at full size; Triage's header now identical in shape
+  to Library's and Import's. `/insights` also checked (not in scope, to confirm the
+  extracted primitives did not regress it): unaffected, zero overflow at both widths.
+  The owner's own instance at `:8000` was untouched throughout (confirmed reachable and
+  healthy before and after); the throwaway backend, frontend dev server and data
+  directory were torn down at close.
+
+  **One defect found, out of scope, not fixed here, per the walkthrough gate's own
+  rule:** `/import`'s "Choose an import source" connector strip (`ImportPage.tsx`'s
+  `sourceStrip`, a shadcn `TabsList` with no width constraint) overflows a 390px
+  viewport by about 205px with the real backend's seven registered importers (Goodreads,
+  Calibre, MyAnimeList, Letterboxd, IMDb, Trakt, Spotify). This is a different control
+  from DEC-134's domain radiogroup — not named by any of the proposal's eleven findings,
+  not one of this sprint's deliverables — and confirmed pre-existing by `git diff` (this
+  sprint's diff touches no line of `sourceStrip` or its container). Recorded in
+  `docs/decisions.md` DEC-137 and carried forward in `docs/agent/HANDOFF.md`.
+
+**Next:** Sprint 071 — What the numbers say (shelves as an openable ranking, an
+active-filters row, weighted counts). It depends on this sprint's primitives, which are
+now built and available.

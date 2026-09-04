@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 38,
-  "project_status": "in_progress",
-  "active_sprint": "070",
-  "active_sprint_file": "docs/sprints/070-one-surface.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "069",
+  "project_status": "ready",
+  "active_sprint": "071",
+  "active_sprint_file": "docs/sprints/071-what-the-numbers-say.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "070",
   "completed_sprints": [
     "001",
     "002",
@@ -75,8 +75,9 @@
     "066",
     "067",
     "068",
-    "069"
+    "069",
+    "070"
   ],
-  "started_at": "2026-09-04T18:00:00-03:00",
-  "updated_at": "2026-09-04T18:00:00-03:00"
+  "started_at": null,
+  "updated_at": "2026-09-04T21:15:00-03:00"
 }

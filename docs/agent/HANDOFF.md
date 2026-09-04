@@ -1,110 +1,98 @@
-# Handoff — the export line closed at 069; Sprint 070 is the UI-cohesion line's first sprint
+# Handoff — Sprint 070 closed; Sprint 071 (What the numbers say) is ready
 
-`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "070"`,
-`active_sprint_file: "docs/sprints/070-one-surface.md"`, `active_sprint_status: "ready"`,
-`last_completed_sprint: "069"`. Plan revision 38; `FINAL_SPRINT` in
-`scripts/validate_project.py` is 71. `docs/sprints/070-one-surface.md`'s own `Status` is
-`ready`.
-
-**If you read a Sprint 070 called "Their formats, not ours" in an older summary or in
-your own memory of this session, that sprint no longer exists.** It was built in full,
-then reverted the same day at the owner's direction for exceeding scope. Read "What just
-happened" below before doing anything else — this is not the export line's Sprint 070
-any more, it is the UI-cohesion line's Sprint 070, a completely different piece of work.
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "071"`,
+`active_sprint_file: "docs/sprints/071-what-the-numbers-say.md"`,
+`active_sprint_status: "ready"`, `last_completed_sprint: "070"`. Plan revision 38;
+`FINAL_SPRINT` in `scripts/validate_project.py` is 71 — **071 is the last planned
+sprint**, so closing it correctly triggers `WORKFLOW.md`'s final-sprint rule (project
+`complete`, active fields `null`) rather than advancing to a 072 that does not exist.
+`docs/sprints/071-what-the-numbers-say.md`'s own `Status` is `ready`.
 
 ## What just happened
 
-**The export line closed at Sprint 069, not 070.** DEC-135 originally accepted three
-sprints (068, 069, 070). 068 (the `ExportView` contract, a generic per-domain `table`
-CSV) and 069 (the Export tab) shipped and are unaffected by anything below — see their
-own Outcome sections. Sprint 070 as originally planned — `myanimelist`, `letterboxd` and
-an IMDb-shaped series exporter, one `ExportView` per external ecosystem — was built in
-full in this session (implemented, 1,367 backend tests passing, verified live against
-real parsers and a real browser) and then **reverted in full** (`git reset --hard` back
-to the commit closing 069) after the owner reviewed it and said the actual request was
-narrower: *"a simple exporter for your data... complete enough that you can rebuild your
-akasha later, but that's it,"* not exporters "compatible with every other provider," and
-that a provider-specific exporter, if one exists, should be modular. **DEC-136** records
-the full reasoning. `docs/sprints/070-their-formats-not-ours.md` no longer exists.
+Sprint 070 ("One surface") shipped in full: the `Panel`, `PageHeader`,
+`SegmentedControl` and `DomainStrip` primitives (generalized from what Sprints 066/067
+built for `/insights`) now cover Library, Detail, Shelves, Add, Import and Triage; every
+cover routes through `CoverImage` including Detail's; the import preview stopped
+misusing the score ramp, painting a staged cover like a 9 or a 10, and printing raw
+`field: code` at a reader. All 8 deliverables, all 10 acceptance criteria — see
+`docs/sprints/070-one-surface.md`'s own Outcome for the full account, and DEC-137 for
+the three things worth a decision record: what AC3's field-label fix can honestly do
+with no backend change, the actual mechanism behind DEC-134's fix (one flex-item level
+higher than the strip itself), and one new out-of-scope defect the walkthrough found.
 
-**In the same decision, the owner accepted the UI-cohesion proposal** and asked for it to
-be the next work. `docs/sprints/071-one-surface.md` and
-`docs/sprints/072-what-the-numbers-say.md` are renamed to `070-one-surface.md` and
-`071-what-the-numbers-say.md` — filling the slot the withdrawal freed rather than leaving
-a gap, the same renumbering precedent DEC-065 and DEC-127 already set. **Sprint 070 is
-now "One surface"**, the first sprint of that line, and it is `ready` to start.
+**Read `070-one-surface.md`'s Outcome before touching any of the six screens it
+touched** — it names five new shared components, where each one is now used, and three
+deliberately kept differences (the library's translucent virtualized cards, the
+connector guide's quieter box, Detail's title staying beside the cover rather than
+becoming a `PageHeader`).
 
-## What is actually true about export, right now
+## What comes next: Sprint 071 — What the numbers say
 
-- `GET /api/export` — the lossless entity-shaped JSON (Sprint 024). This is the
-  rebuild-your-Akasha artifact.
-- `GET /api/exports` / `GET /api/export/{view}?type=<domain>` — the declared-view
-  machinery (Sprint 068): `goodreads` (books, pre-existing) and a generic `table` CSV
-  for every domain, driven entirely by that domain's own field declarations.
-- The Export tab on `/import` (Sprint 069) renders all of the above with no view named
-  in any `.tsx` file.
-- **No MyAnimeList, Letterboxd, or other ecosystem-specific exporter exists.** If one is
-  wanted later, it needs its own proposal, sized to what's actually being asked for, and
-  — per DEC-136 — it needs to be modular: not compiled unconditionally into
-  `domain/registry.py`'s `REGISTERED_EXPORTS`, which is how the reverted attempt worked
-  and exactly what made it "not modular" in the owner's own words. This codebase has no
-  optional-feature mechanism today; building one is new scope, not something to assume
-  is free next time this comes up.
+Read [`071-what-the-numbers-say.md`](../sprints/071-what-the-numbers-say.md) in full
+before starting — this handoff is not a substitute for it. In one sentence: shelves
+becomes an openable ranking (a magnitude bar, up to three covers, the count, a link into
+`/?shelf=slug`), the library gains an active-filters row generalized from
+`InsightFilterChip`, and counts that describe a whole carry visible weight. It depends
+on Sprint 070's primitives, which are built and available now.
 
-## What comes next: Sprint 070 — One surface
+**This is the final planned sprint** (`FINAL_SPRINT` = 71). Closing it correctly means
+following `WORKFLOW.md`'s final-sprint rule: `project_status` becomes `complete`,
+`active_sprint`/`active_sprint_file`/`active_sprint_status` become `null`, and
+`completed_sprints` gains `071` — not "advance to the next ready sprint," because there
+isn't one yet.
 
-Read [`070-one-surface.md`](../sprints/070-one-surface.md) in full before starting —
-this handoff is not a substitute for it. In one sentence: apply the `Panel`,
-`PageHeader`, `SegmentedControl` and `DomainStrip` primitives (generalized from what
-Sprints 066/067 built for `/insights`) across Detail, Shelves, Import, Add, Triage and
-Library, put every cover through `CoverImage`, fix the import preview's score-ramp
-misuse, and pay DEC-134's outstanding 390px domain-strip overflow once for both screens
-it appears on. Frontend only; no screen changes what it does. Its own acceptance
-criterion 9 is the load-bearing one: the existing component and e2e suites pass
-unchanged except where a test asserts one of the proposal's eleven named findings.
-
-`071-what-the-numbers-say.md` follows it (shelves as an openable ranking, an
-active-filters row, weighted counts) — do not start it before 070 lands; it depends on
-070's primitives.
-
-## Still owed to the owner
-
-- **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
-  outstanding, unrelated to either the export or UI-cohesion line, needs the owner's own
-  container.
-- **The 390px domain-radiogroup overflow on `/insights`** (DEC-134) — Sprint 070 (One
-  surface) is where this finally gets paid, per its own deliverable 5.
-- Cutting the `v1.6.0` and/or `v1.7.0` tags.
-- **DEC-133's open product question** (album ranking ordering `Label` ahead of
-  `Artists`) — still the owner's call.
-
-## Branch and authorization
-
-On **`main`**, committed directly — **nothing pushed**. The reverted Sprint 070 attempt
-existed only as local commits (`0ec94dc`, `1f844ce`, `9c14629`, `3e4700d`, `d0ff170`)
-that are no longer reachable on `main` after the reset this session performed; they were
-never pushed, so nothing shared needed to change. Authorization does not carry forward:
-a session picking this up was asked to work the active sprint and should do exactly
-that. It does not extend to pushing, merging, tagging, or any remote action.
-
-## Known-degraded, deliberately not fixed (carried forward, still true)
+## Known-degraded, deliberately not fixed (carried forward, still true, plus one new one)
 
 - `/api/health/providers` reports configuration, not reachability.
 - Kitsu's latency tail occasionally exceeds its budget.
 - `languages` mixes vocabularies across movie/series sources.
 - The book domain declares `Creators` where `Authors` would read better.
-- The domain radiogroup on `/insights` overflows at 390px with five real domains
-  (DEC-134) — see "What comes next" above.
+- **New, found by Sprint 070's own walkthrough (DEC-137):** `/import`'s "Choose an
+  import source" connector strip (`ImportPage.tsx`'s `sourceStrip`, a bare shadcn
+  `TabsList`) overflows a 390px viewport by about 205px against the real backend's seven
+  registered importers (Goodreads, Calibre, MyAnimeList, Letterboxd, IMDb, Trakt,
+  Spotify). Confirmed pre-existing (not something Sprint 070 touched) and distinct from
+  DEC-134's domain-radiogroup overflow, which Sprint 070 did pay for. Belongs to whichever
+  future sprint next touches `ImportPage.tsx`'s connector strip, or a dedicated one if
+  none does soon.
+- The domain radiogroup's 390px overflow (DEC-134) — **paid**, Sprint 070, for both `/`
+  and `/insights`. No longer degraded; kept here only so a stale memory of it does not
+  resurface as a re-opened item.
+
+## Still owed to the owner
+
+- **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
+  outstanding, needs the owner's own container. (Sprint 070's own walkthrough used a
+  throwaway seeded backend, per its own instructions — it does not satisfy this one.)
+- Cutting the `v1.6.0` and/or `v1.7.0` tags.
+- **DEC-133's open product question** (album ranking ordering `Label` ahead of
+  `Artists`) — still the owner's call.
+- **DEC-137's new finding**, above: the import connector strip's 390px overflow — the
+  owner has not been asked whether it is worth a dedicated fix or should wait for
+  whichever sprint next touches that screen.
+
+## Branch and authorization
+
+On **`main`**, committed directly (this session's worktree) — **nothing pushed**. Eight
+commits landed for Sprint 070 (`bc0323f` through `d48817d`; see the Outcome for the full
+list) plus this closing documentation commit. Authorization does not carry forward: a
+session picking this up was asked to work the active sprint and should do exactly that.
+It does not extend to pushing, merging, tagging, or any remote action.
 
 ## Version
 
-Unchanged at `1.7.0`. Nothing shipped this session (built, then reverted). A version
-bump belongs to whoever closes the UI-cohesion line.
+Unchanged at `1.7.0`. Sprint 070 was frontend-only presentation work; a version bump
+belongs to whoever closes the UI-cohesion line (Sprint 071) or decides one is warranted
+sooner.
 
 ## Private data and operational constraints
 
 Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has
 no auth and stays LAN-only; Calibre is opened read-only. **The owner's own instance runs
-on this host at `127.0.0.1:8000`.** Any walkthrough for the UI-cohesion sprints needs a
-throwaway seeded backend and a throwaway dev server on scratch ports, torn down at
-close — do not point one at `:8000` without asking.
+on this host at `127.0.0.1:8000`.** Sprint 070's walkthrough used a throwaway seeded
+backend and a throwaway dev server on scratch ports (35251/38755/5180 in that session,
+all ephemeral and already torn down) — the owner's own instance was confirmed reachable
+and healthy both before and after, and was never pointed at. Sprint 071's own
+walkthrough needs the same discipline: a throwaway backend and dev server, never `:8000`,
+torn down at close.

@@ -5381,3 +5381,50 @@ both changes, against 1 of 3 before the second.
   rejected). `scripts/validate_project.py`'s `FINAL_SPRINT` moves from 70 (DEC-135's value) to 71.
   Plan revision moves to 38. `docs/README.md`'s historical-table entries for `export-proposal.md`
   and `ui-cohesion-proposal.md` are updated to record this decision.
+
+## DEC-137 — Sprint 070 closes: the primitives generalized, DEC-134 paid for both screens, and one new out-of-scope defect the walkthrough found
+
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Cross-references:** DEC-134 (the 390px domain-strip overflow this sprint pays), DEC-026 (the
+  score ramp, DEC-080 (per-connector error declarations — the boundary this sprint's field-error
+  fix stops at), DEC-136 (accepted the UI-cohesion line this sprint is the first of).
+- **Context:** [`070-one-surface.md`](sprints/070-one-surface.md) unified Detail, Shelves, Import,
+  Add, Triage and Library around four shared primitives (`Panel`, `PageHeader`, `SegmentedControl`,
+  `DomainStrip`), generalized from what Sprints 066/067 built for `/insights`, plus every cover
+  through `CoverImage` and an import preview that stops misusing the score ramp and printing
+  `field: code` at a reader. Frontend only, exactly as scoped; `git diff --stat` against `main`
+  touches no file under `backend/src`.
+- **Decision:** accepted as built, with three points worth recording rather than letting the sprint
+  Outcome carry alone.
+  - **AC3's "domain's declared label" and "connector's declared wording" are honored to the limit a
+    no-backend-change sprint allows.** No backend declaration of a row-level field's label or a
+    code's wording exists — only `ImportReadError` (a whole-file refusal) carries
+    `user_message`/`action` (DEC-080). `frontend/src/features/import/errors.ts` resolves what
+    `/api/item-types` already declares (an entry field, a metadata `FieldSpec`) when the active
+    importer names exactly one domain, and humanizes the rest. A connector-declared field/error
+    vocabulary, if a future sprint finds the humanized fallback reading wrong for a specific reader,
+    is new backend scope this sprint does not invent.
+  - **DEC-134's fix needed one more line than the strip itself.** `DomainStrip`'s own
+    `overflow-x-auto`/`min-w-0`/`max-w-full` did not clamp `/insights`: its immediate parent (the
+    `role="group" aria-label="Ranking controls"` wrapper) was itself an unconstrained flex item, so
+    the strip's `max-w-full` resolved against that parent's own unclamped width rather than the
+    viewport — measured at 47px of overflow with the naive fix in place, traced by comparing
+    computed styles up the flex-item chain rather than guessed at. Fixed at the parent
+    (`InsightsPage.tsx` gains `min-w-0 max-w-full` on that group). `/` needed no equivalent change;
+    its strip's immediate parent is a plain flex row directly inside `<main>`, one nesting level
+    shallower than insights' own controls group.
+  - **One new out-of-scope defect, found by the walkthrough, not fixed here.** `/import`'s "Choose
+    an import source" connector strip (`ImportPage.tsx`'s `sourceStrip`, a shadcn `TabsList` with no
+    width constraint) overflows a 390px viewport by about 205px against the real backend's seven
+    registered importers (Goodreads, Calibre, MyAnimeList, Letterboxd, IMDb, Trakt, Spotify) —
+    confirmed live during the DEC-025 walkthrough, and confirmed pre-existing by `git diff` (this
+    sprint's diff touches no line of `sourceStrip` or its container). Distinct from DEC-134's
+    domain radiogroup: a different control, never named by any of the proposal's eleven findings,
+    not a deliverable of this sprint. Recorded rather than fixed, per the walkthrough gate's own
+    rule that a defect noticed and left unrecorded is the failure mode the gate exists to prevent.
+- **Consequences:** `docs/agent/state.json` advances `active_sprint` to `071`, `active_sprint_status`
+  and `project_status` to `ready`; `last_completed_sprint` becomes `070`; `completed_sprints` gains
+  `070`. Sprint 071 ("What the numbers say") depends on this sprint's primitives, which are now
+  built. The `sourceStrip` overflow above is carried forward in `docs/agent/HANDOFF.md`'s
+  known-degraded list until a sprint that touches `ImportPage.tsx`'s connector strip picks it up.

@@ -4257,3 +4257,67 @@ so 050 adds an adapter, not a declaration.
   reverted existence is not recorded as completed). Plan revision → 38.
 - **Next:** Sprint 070 — One surface. Read its own file; this entry and `HANDOFF.md`
   are not a substitute for it.
+
+## 2026-09-04 — Sprint 070 (complete)
+
+- **Done: all 8 deliverables, all 10 acceptance criteria.** Built five shared
+  primitives (`Panel`, `PageHeader`, `SegmentedControl`, `DomainStrip`,
+  `BackToLibrary`, all in `frontend/src/components/`) and applied them across
+  Library, Detail, Shelves, Add, Import and Triage; `InsightsCard` generalized
+  onto `Panel`; every cover through `CoverImage` including Detail's; the
+  import preview's score-ramp misuse, staged-cover chip and raw `field: code`
+  error text all fixed. Full detail, every acceptance criterion, and the
+  deviations are in `docs/sprints/070-one-surface.md`'s own Outcome — not
+  repeated here.
+- **Eight commits**, one per coherent slice, matching the sprint's own
+  suggested checkpoints closely enough not to force an artificial split:
+  `bc0323f` primitives, `abebbe2` domain strip/toggle extracted and wired into
+  Home/Insights, `a7e383a` Detail's cover and panels, `5ba37ef` Shelves/Add
+  headers, `e82481c` import score/cover-staged chips, `6085448` DEC-134's
+  actual fix, `90d8600` one more e2e assertion the same finding needed,
+  `d48817d` the amber heading retired in two places found while reading, not
+  named by the proposal's own citation list.
+- **DEC-134 took real debugging, not just a component.** The naive
+  `DomainStrip` fix (`overflow-x-auto`/`min-w-0`/`max-w-full` on the strip
+  itself) left `/insights` still 47px over at 390px; the actual cause was one
+  level up — `InsightsPage.tsx`'s "Ranking controls" flex group had no
+  `max-width` of its own, so the strip's `max-w-full` resolved against that
+  unconstrained parent rather than the viewport. Found by comparing computed
+  styles up the flex-item chain in a scratch Playwright script, not by
+  guessing a second time. `/` needed no equivalent fix — one nesting level
+  shallower there.
+- **AC3 has a real ceiling with no backend change.** No connector declares a
+  label for a field or wording for a code at the row level (only whole-file
+  `ImportReadError` does, per DEC-080). `frontend/src/features/import/errors.ts`
+  resolves what `/api/item-types` already declares when it can and humanizes
+  the rest — documented as the honest limit of a presentation-only fix, not
+  hidden.
+- **Verified:** `make check` green. Backend unchanged at **1,352** (no Python
+  file touched, confirmed by `git diff --stat`). Frontend **266** passed (was
+  253). Full Playwright: **119 passed, 2 skipped**, three consecutive runs —
+  one run hit a single pre-existing debounce-timing flake in
+  `library.spec.ts`, green in isolation and on both full reruns.
+  `python scripts/validate_project.py` green.
+- **Walkthrough (DEC-025), done.** `scripts/walkthrough.py --keep` on an
+  ephemeral port, seeded through the real HTTP API: 5 domains, 11 entries, 6
+  real covers uploaded, one book left `unsorted`, a "Favorites" shelf. Served
+  behind a real Vite dev server (`AKASHA_E2E_BACKEND`) on a scratch port. A
+  real Chromium instance visited all six screens at 1280px and 390px: zero
+  console errors, zero horizontal overflow on eleven of twelve combinations,
+  screenshots inspected for visual consistency (header shape, back control,
+  box chrome, the big cover). `/insights` checked too, unaffected. Owner's own
+  `:8000` instance confirmed untouched before and after; throwaway backend,
+  dev server and data directory torn down at close.
+
+  **One new defect found, out of scope, recorded (DEC-137), not fixed:**
+  `/import`'s connector-choice strip (`sourceStrip` in `ImportPage.tsx`, a
+  bare shadcn `TabsList`) overflows a 390px viewport by ~205px against the
+  real backend's seven registered importers. A different control from
+  DEC-134's domain radiogroup, not named by any of the proposal's eleven
+  findings, confirmed pre-existing by `git diff` (this sprint touches no line
+  of it).
+- **State:** `active_sprint` → `071`, `ready`; `last_completed_sprint` → `070`.
+  Sprint 071's own file flipped to `Status: ready`.
+- **Next:** Sprint 071 — shelves as an openable ranking with covers and
+  magnitude bars, an active-filters row on the library, weighted counts. Its
+  own file names what it needs from this sprint's primitives.

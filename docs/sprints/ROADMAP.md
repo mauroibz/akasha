@@ -2,7 +2,7 @@
 
 **Plan revision:** 38
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [070 — One surface](070-one-surface.md); see `docs/agent/state.json`.
+**Active sprint:** [071 — What the numbers say](071-what-the-numbers-say.md); see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1521,6 +1521,11 @@ library's five filters saying it is set.
   `DomainStrip` primitives applied across every screen; every cover through `CoverImage`; the import
   preview's chips and labels; **and DEC-134's outstanding 390px domain-strip overflow paid once, for
   both screens.** Frontend only.
+
+  [Closed 2026-09-04 (DEC-137). All 8 deliverables, all 10 acceptance criteria — see the sprint's
+  own Outcome. One new out-of-scope defect found by the walkthrough and recorded rather than fixed:
+  `/import`'s connector-choice strip overflows a 390px viewport with the real backend's seven
+  registered importers, a different control from DEC-134's domain radiogroup and pre-existing.]
 - **[071 — What the numbers say](071-what-the-numbers-say.md)** — shelves as an openable ranking with
   covers and magnitude bars, an active-filters row on the library, and weight on counts that
   describe a whole. `ShelfResponse.covers` is the only backend change in the line, and it is the
