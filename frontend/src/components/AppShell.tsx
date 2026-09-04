@@ -17,10 +17,18 @@ interface NavItem {
 // Triage is not here on purpose: it is the tail of the import flow, not a
 // destination of its own, and as a top-level item it was a dead page unless an
 // import had just run (DEC-079). It is a tab on `/import`.
+//
+// The item reads "Data" rather than "Import" as of Sprint 069: `/import` grew a
+// third tab that takes a library out rather than bringing one in, and "Import"
+// on its own reads as one direction only (docs/export-proposal.md §3). "Data"
+// is this sprint's recommendation over the proposal's other option, "Import &
+// export" — shorter, and it still names what the destination is for rather than
+// what you do there. One label, easy to change if the owner prefers the longer
+// one; nothing downstream depends on the exact word.
 const navItems: readonly NavItem[] = [
   { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
   { to: "/add", label: "Add", icon: <Plus aria-hidden="true" /> },
-  { to: "/import", label: "Import", icon: <Upload aria-hidden="true" /> },
+  { to: "/import", label: "Data", icon: <Upload aria-hidden="true" /> },
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];

@@ -1390,4 +1390,147 @@ describe("ImportPage", () => {
       expect(screen.getByText(/0 have errors/)).toBeVisible();
     });
   });
+
+  describe("the export tab (Sprint 069)", () => {
+    const itemTypes = [
+      { id: "book", label: "Books" },
+      { id: "album", label: "Albums" },
+      { id: "anime", label: "Anime" },
+    ];
+
+    const tableBook = {
+      id: "table",
+      label: "Table (Books)",
+      item_types: ["book"],
+      media_type: "text/csv; charset=utf-8",
+      lossless: false,
+      guide: ["Open this file in any spreadsheet application."],
+      help_url: null,
+      carries: ["Title", "Creator", "Year"],
+      count: 3,
+    };
+    const tableAnimeEmpty = {
+      id: "table",
+      label: "Table (Anime)",
+      item_types: ["anime"],
+      media_type: "text/csv; charset=utf-8",
+      lossless: false,
+      guide: ["Open this file in any spreadsheet application."],
+      help_url: null,
+      carries: ["Title", "Creator", "Year"],
+      count: 0,
+    };
+    const invented = {
+      id: "myfakeformat",
+      label: "Fake Format",
+      item_types: ["album"],
+      media_type: "text/csv; charset=utf-8",
+      lossless: false,
+      guide: ["**Bold** should not become bold.", "Step two."],
+      help_url: "https://example.com/help",
+      carries: ["title", "rating"],
+      count: 5,
+    };
+    const exportViews = [tableBook, tableAnimeEmpty, invented];
+
+    function stubExports(
+      extra: (url: string) => Response | undefined = () => undefined,
+    ) {
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+        const url = String(input);
+        const answered = extra(url);
+        if (answered) return answered;
+        if (url === "/api/importers")
+          return new Response(JSON.stringify(importers));
+        if (url === "/api/exports")
+          return new Response(JSON.stringify(exportViews));
+        if (url.startsWith("/api/item-types"))
+          return new Response(JSON.stringify(itemTypes));
+        return new Response(JSON.stringify({}), { status: 404 });
+      });
+    }
+
+    it("renders a row entirely from the declaration, an invented view included", async () => {
+      stubExports();
+      renderImportPage("/import?tab=export");
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Export" }),
+      ).toBeVisible();
+      // Nothing in ImportPage.tsx or ExportPanel.tsx names "myfakeformat" — the
+      // row exists purely because the server declared it (AC2).
+      expect(screen.getByText("Fake Format")).toBeVisible();
+      expect(screen.getByText(/title, rating/i)).toBeVisible();
+      expect(screen.getByText("5 entries")).toBeVisible();
+      expect(
+        screen.getByRole("link", { name: /import documentation/i }),
+      ).toHaveAttribute("href", "https://example.com/help");
+    });
+
+    it("renders guide steps as the literal text they are, not as markdown", async () => {
+      stubExports();
+      renderImportPage("/import?tab=export");
+
+      await screen.findByText("Fake Format");
+      expect(
+        screen.getByText("**Bold** should not become bold."),
+      ).toBeVisible();
+      expect(screen.queryByRole("strong")).toBeNull();
+    });
+
+    it("shows a zero-entry domain as a zero with a disabled, explained control", async () => {
+      stubExports();
+      renderImportPage("/import?tab=export");
+
+      const row = (await screen.findByText("Table (Anime)")).closest(
+        "article",
+      ) as HTMLElement;
+      expect(within(row).getByText("0 entries")).toBeVisible();
+      const button = within(row).getByRole("button", { name: /download/i });
+      expect(button).toBeDisabled();
+      expect(within(row).getByText(/nothing to export yet/i)).toBeVisible();
+    });
+
+    it("surfaces a failed download visibly and leaves the screen usable", async () => {
+      stubExports((url) =>
+        url.startsWith("/api/export/table?type=book")
+          ? new Response(
+              JSON.stringify({
+                error: { code: "boom", user_message: "The disk is full." },
+              }),
+              { status: 500 },
+            )
+          : undefined,
+      );
+      renderImportPage("/import?tab=export");
+
+      const row = (await screen.findByText("Table (Books)")).closest(
+        "article",
+      ) as HTMLElement;
+      await userEvent.click(
+        within(row).getByRole("button", { name: /download/i }),
+      );
+      expect(await within(row).findByText("The disk is full.")).toBeVisible();
+      // The rest of the screen is still there and still interactive.
+      expect(
+        screen.getByRole("heading", { level: 1, name: "Export" }),
+      ).toBeVisible();
+      expect(
+        within(row).getByRole("button", { name: /download/i }),
+      ).toBeEnabled();
+    });
+
+    it("opens on the export tab when the URL asks for it, with no click needed", async () => {
+      stubExports();
+      renderImportPage("/import?tab=export");
+
+      expect(
+        await screen.findByRole("heading", { level: 1, name: "Export" }),
+      ).toBeVisible();
+      expect(screen.queryByLabelText("Goodreads CSV")).toBeNull();
+      expect(
+        screen.queryByRole("heading", { level: 1, name: "Inbox" }),
+      ).toBeNull();
+    });
+  });
 });

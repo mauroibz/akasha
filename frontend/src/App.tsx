@@ -70,6 +70,12 @@ export function App() {
                   path="/triage"
                   element={<Navigate to="/import?tab=triage" replace />}
                 />
+                {/* A real address for the export tab, the same shape as
+                    /triage above (Sprint 069 deliverable 2). */}
+                <Route
+                  path="/export"
+                  element={<Navigate to="/import?tab=export" replace />}
+                />
                 <Route path="*" element={<NotFoundPage />} />
               </Routes>
             </Suspense>

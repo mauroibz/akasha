@@ -16,7 +16,7 @@ function renderShell(routes: React.ReactNode) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("AppShell", () => {
-  it("renders Library, Add, Import, and Shelves navigation links", () => {
+  it("renders Library, Add, Data, and Shelves navigation links", () => {
     renderShell(
       <Routes>
         <Route path="/" element={<div>Library page</div>} />
@@ -27,7 +27,7 @@ describe("AppShell", () => {
     );
     // Both desktop and mobile navs exist in the DOM; in jsdom the hidden class
     // removes the desktop nav from the accessibility tree, so check all links.
-    for (const label of ["Library", "Add", "Import", "Shelves"]) {
+    for (const label of ["Library", "Add", "Data", "Shelves"]) {
       const links = screen.getAllByRole("link", {
         name: new RegExp(label, "i"),
       });

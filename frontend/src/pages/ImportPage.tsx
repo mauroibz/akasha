@@ -37,6 +37,7 @@ import {
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
+import { ExportPanel } from "@/features/export/ExportPanel";
 import { ExportPicker } from "@/features/import/ExportPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
@@ -76,6 +77,14 @@ function asFailure(reason: Error): ImportFailure {
  * (DEC-079).
  */
 export const TRIAGE_TAB = "triage";
+/**
+ * The tab that lets data leave.
+ *
+ * Unnumbered in the workflow strip beside it (Sprint 069): Import and Triage are
+ * steps of one flow, and Export is not a step of importing — it is the same screen's
+ * other direction (`docs/export-proposal.md` §3).
+ */
+export const EXPORT_TAB = "export";
 const IMPORT_STEP = "import";
 
 /** The importer used last, so a second Calibre re-sync opens where you left. */
@@ -160,22 +169,30 @@ export function ImportPage() {
   // moment before the registry has arrived.
   const asked = searchParams.get("tab") ?? "";
   const source =
-    asked === TRIAGE_TAB || importers.some((importer) => importer.id === asked)
+    asked === TRIAGE_TAB ||
+    asked === EXPORT_TAB ||
+    importers.some((importer) => importer.id === asked)
       ? asked
       : fallbackSource;
   const triageActive = source === TRIAGE_TAB;
+  const exportActive = source === EXPORT_TAB;
 
   useEffect(() => setError(null), [source]);
 
   // A staged source, its preview and its undo window belong to the connector
   // that produced them. Moving to another connector starts clean; moving to
-  // Triage and back does not, because Triage is not a connector — and the undo
-  // window is only reachable from the result panel it would otherwise discard.
-  // The walkthrough found this: after a Goodreads commit, the Calibre tab
-  // showed the Goodreads result and no Calibre form at all.
+  // Triage or Export and back does not, because neither is a connector — and
+  // the undo window is only reachable from the result panel it would
+  // otherwise discard. The walkthrough found this: after a Goodreads commit,
+  // the Calibre tab showed the Goodreads result and no Calibre form at all.
   const belongsTo = useRef("");
   useEffect(() => {
-    if (!source || source === TRIAGE_TAB || belongsTo.current === source)
+    if (
+      !source ||
+      source === TRIAGE_TAB ||
+      source === EXPORT_TAB ||
+      belongsTo.current === source
+    )
       return;
     belongsTo.current = source;
     setFile(null);
@@ -194,7 +211,7 @@ export function ImportPage() {
   }, [source]);
 
   const selectTab = (value: string) => {
-    if (value !== TRIAGE_TAB) {
+    if (value !== TRIAGE_TAB && value !== EXPORT_TAB) {
       try {
         localStorage.setItem(importSourcePreferenceKey, value);
       } catch {
@@ -213,8 +230,8 @@ export function ImportPage() {
 
   const selectStep = (value: string) => {
     selectTab(
-      value === TRIAGE_TAB
-        ? TRIAGE_TAB
+      value === TRIAGE_TAB || value === EXPORT_TAB
+        ? value
         : fallbackSource || importers[0]?.id || "",
     );
   };
@@ -441,7 +458,7 @@ export function ImportPage() {
   const workflowStrip = (
     <TabsList
       aria-label="Import workflow"
-      className="grid h-auto w-full grid-cols-2 gap-2 rounded-2xl bg-surface p-2"
+      className="grid h-auto w-full grid-cols-3 gap-2 rounded-2xl bg-surface p-2"
     >
       <TabsTrigger
         value={IMPORT_STEP}
@@ -471,6 +488,20 @@ export function ImportPage() {
           </span>
         </span>
       </TabsTrigger>
+      {/* Unnumbered on purpose: Import and Triage are steps of one flow, and
+      Export is not a step of importing — it is the same screen's other
+      direction (docs/export-proposal.md §3, Sprint 069 deliverable 1). */}
+      <TabsTrigger
+        value={EXPORT_TAB}
+        className="h-auto min-w-0 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left"
+      >
+        <span className="min-w-0">
+          <span className="block font-semibold">Export</span>
+          <span className="block text-xs font-normal text-muted-foreground">
+            Take your library elsewhere
+          </span>
+        </span>
+      </TabsTrigger>
     </TabsList>
   );
 
@@ -486,7 +517,9 @@ export function ImportPage() {
 
   return (
     <Tabs
-      value={triageActive ? TRIAGE_TAB : IMPORT_STEP}
+      value={
+        exportActive ? EXPORT_TAB : triageActive ? TRIAGE_TAB : IMPORT_STEP
+      }
       onValueChange={selectStep}
     >
       <div className="mx-auto max-w-7xl px-5 pt-7 sm:px-8">{workflowStrip}</div>
@@ -959,6 +992,9 @@ export function ImportPage() {
       </TabsContent>
       <TabsContent value={TRIAGE_TAB} className="mt-0">
         <TriagePage />
+      </TabsContent>
+      <TabsContent value={EXPORT_TAB} className="mt-0">
+        <ExportPanel />
       </TabsContent>
     </Tabs>
   );
