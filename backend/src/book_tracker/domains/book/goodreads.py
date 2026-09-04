@@ -1,11 +1,13 @@
 import csv
 import hashlib
 import io
+from collections.abc import Iterator
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from book_tracker.domain.exports import ExportRow, safe_cell
 from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.importers import (
     ImportEntry,
@@ -286,3 +288,128 @@ class GoodreadsImporter:
 
 
 IMPORTER = GoodreadsImporter()
+
+
+#: Product spec 5.1, in Goodreads' own order. Moved here from `application/export.py`
+#: (Sprint 068): this view is allowed to be book-shaped because it is one domain's
+#: export view, not the export (DEC-052 seam 3), and it now sits beside the reader
+#: of the same file it writes.
+GOODREADS_COLUMNS = (
+    "Book Id",
+    "Title",
+    "Author",
+    "Additional Authors",
+    "ISBN",
+    "ISBN13",
+    "My Rating",
+    "Publisher",
+    "Number of Pages",
+    "Year Published",
+    "Original Publication Year",
+    "Date Read",
+    "Date Added",
+    "Bookshelves",
+    "Exclusive Shelf",
+    "My Review",
+    "Read Count",
+)
+
+#: The inverse of the import's suggestion map (product spec 5.1). Goodreads has no
+#: wishlist or dropped concept, so those statuses -- and `unsorted` -- have no
+#: Goodreads spelling and are written verbatim rather than flattened into a
+#: neighbouring shelf, which would silently move a row.
+_EXCLUSIVE_SHELF = {"read": "read", "reading": "currently-reading", "to_read": "to-read"}
+
+
+def _goodreads_date(value: str | None) -> str:
+    """ISO `2026-01-05` to Goodreads' `2026/01/05`; timestamps lose their time."""
+    if not value:
+        return ""
+    return value[:10].replace("-", "/")
+
+
+class GoodreadsExportView:
+    """The mirror of `GoodreadsImporter`: writes the same file it reads.
+
+    Holds no session and writes no SQL — `application/export.py`'s shared walk hands
+    it one `ExportRow` at a time, already joined and filtered to books. Round-tripped
+    through `parse_goodreads` above by `test_export.py`, per DEC-025.
+    """
+
+    name = "goodreads"
+    label = "Goodreads"
+    item_types: tuple[str, ...] = (DOMAIN.item_type,)
+    media_type = "text/csv; charset=utf-8"
+    #: The 1-10 score halves to Goodreads' 1-5 and the exact value survives only in
+    #: the lossless JSON export (proposal §2.6/finding 6).
+    lossless = False
+    #: Kept from the pre-sprint route so `?format=csv` stays a byte-identical alias
+    #: (Sprint 068 AC4) rather than a rename dressed up as a deprecation.
+    filename = "akasha-export.csv"
+    guide: tuple[str, ...] = (
+        "On goodreads.com, open My Books → Import and export "
+        "(goodreads.com/review/import) and choose Import Library.",
+        "Upload this file. Goodreads reads it as its own export, because it is one.",
+    )
+    help_url: str | None = "https://www.goodreads.com/review/import"
+    carries: tuple[str, ...] = (
+        "title",
+        "author",
+        "ISBN",
+        "rating",
+        "publisher",
+        "page count",
+        "year published",
+        "date read",
+        "date added",
+        "shelves",
+        "review",
+        "read count",
+    )
+
+    def write(self, rows: Iterator[ExportRow]) -> Iterator[str]:
+        buffer = io.StringIO()
+        writer = csv.DictWriter(buffer, fieldnames=list(GOODREADS_COLUMNS), lineterminator="\r\n")
+
+        def flush() -> str:
+            value = buffer.getvalue()
+            buffer.seek(0)
+            buffer.truncate(0)
+            return value
+
+        writer.writeheader()
+        yield flush()
+        for row in rows:
+            authors = row.metadata.get("creators")
+            authors = [str(name) for name in authors] if isinstance(authors, list) else []
+            # Goodreads rates 1-5 and the importer doubled it (product spec 5.1).
+            # Halving rounds a hand-set odd score up rather than down; the exact
+            # 1-10 value is in the JSON export, which is the lossless one. `0` is
+            # Goodreads for unrated.
+            rating = (row.score + 1) // 2 if row.score else 0
+            values = {
+                "Book Id": row.item_id,
+                "Title": row.title,
+                "Author": authors[0] if authors else "",
+                "Additional Authors": ", ".join(authors[1:]),
+                "ISBN": row.identifiers.get("isbn10", ""),
+                "ISBN13": row.identifiers.get("isbn", row.identifiers.get("isbn13", "")),
+                "My Rating": rating,
+                "Publisher": row.metadata.get("publisher") or "",
+                "Number of Pages": row.metadata.get("page_count") or "",
+                "Year Published": row.year if row.year is not None else "",
+                "Original Publication Year": row.metadata.get("original_year") or "",
+                "Date Read": _goodreads_date(row.date_finished),
+                "Date Added": _goodreads_date(row.date_added),
+                "Bookshelves": ", ".join(row.shelves),
+                "Exclusive Shelf": _EXCLUSIVE_SHELF.get(row.status, row.status),
+                "My Review": row.notes or "",
+                # We store rereads; Goodreads counts total reads, and the importer
+                # took `Read Count - 1`. This is that inverse.
+                "Read Count": (row.reread_count or 0) + 1,
+            }
+            writer.writerow({key: safe_cell(value) for key, value in values.items()})
+            yield flush()
+
+
+EXPORT = GoodreadsExportView()
