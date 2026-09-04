@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -130,6 +136,53 @@ function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("DetailPage", () => {
+  it("draws its cover through CoverImage, and a 404 shows the shared fallback (finding 4)", async () => {
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      {
+        fallback: {
+          ...entry,
+          item: { ...entry.item, cover_url: "/api/items/3/cover" },
+        },
+      },
+    );
+    renderPage();
+    const cover = await screen.findByRole("img", { name: "Cover of Rayuela" });
+    // Loading, not yet failed: the decode-reveal placeholder, same as every
+    // other surface — not a bare `<img>` with no state at all.
+    expect(cover).toHaveAttribute("data-cover-state", "loading");
+
+    fireEvent.error(cover);
+
+    // The same shared fallback every other surface shows for a cover URL that
+    // fails to load — not a browser broken-image glyph, and not a hand-rolled
+    // empty box (finding 4).
+    expect(
+      await screen.findByRole("img", { name: "Cover failed to load" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("img", { name: "Cover of Rayuela" })).toBeNull();
+  });
+
+  it("shows the shared placeholder — not a broken-image glyph — when the item has no cover", async () => {
+    mockApi(
+      async (input) => {
+        const url = String(input);
+        if (url === "/api/shelves") return new Response("[]");
+        if (url === "/api/item-types")
+          return new Response(JSON.stringify(itemTypes));
+      },
+      { fallback: entry },
+    );
+    renderPage();
+    await screen.findByRole("heading", { name: "Rayuela" });
+    expect(screen.getByRole("img", { name: "No cover" })).toBeVisible();
+  });
+
   it("offers the editions of the work as covers and installs the chosen one", async () => {
     const candidates = {
       candidates: [

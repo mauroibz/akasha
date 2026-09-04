@@ -26,6 +26,9 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { BackToLibrary } from "@/components/BackToLibrary";
+import { CoverImage } from "@/components/CoverImage";
+import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
@@ -94,15 +97,15 @@ function RowsField({ field, value }: { field: FieldSpec; value: unknown }) {
   // neither does a release with no recordings.
   if (!rows.length || !field.columns?.length) return null;
   const columns = field.columns;
+  const headingId = `rows-field-${field.name}-heading`;
   return (
-    <section
-      className="mt-6 rounded-xl border border-border p-5"
-      aria-label={field.label}
+    <Panel
+      className="mt-6"
+      aria-labelledby={headingId}
+      heading={field.label}
+      headingId={headingId}
     >
-      <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
-        {field.label}
-      </h2>
-      <ol className="mt-4 grid gap-1" data-rows={field.name}>
+      <ol className="grid gap-1" data-rows={field.name}>
         {rows.map((row, index) => {
           const cells = (row ?? {}) as Record<string, unknown>;
           return (
@@ -129,7 +132,7 @@ function RowsField({ field, value }: { field: FieldSpec; value: unknown }) {
           );
         })}
       </ol>
-    </section>
+    </Panel>
   );
 }
 
@@ -263,24 +266,14 @@ export function DetailPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
-        ← Library
-      </Button>
+      <BackToLibrary />
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
-          {item.cover_url ? (
-            <img
-              className="aspect-[2/3] w-full rounded-xl object-cover"
-              src={item.cover_url}
-              alt={`Cover of ${item.title}`}
-            />
-          ) : (
-            <div
-              className="aspect-[2/3] rounded-xl bg-surface-raised"
-              role="img"
-              aria-label="No cover"
-            />
-          )}
+          <CoverImage
+            src={item.cover_url}
+            alt={`Cover of ${item.title}`}
+            className="aspect-[2/3] w-full rounded-xl"
+          />
           {/* Asked of the domain, not branched on the type: the chooser is Open
               Library's work-editions path, and an album has no work and no
               editions, so the control could only ever say no (DEC-067 row 7). */}
@@ -349,14 +342,13 @@ export function DetailPage() {
           {/* The personal region. Its heading is the domain's: an album's entry
               records possession rather than reading, so "Your reading data" over a
               record was seam 5a showing through (DEC-057). */}
-          <section
-            className="mt-6 rounded-xl border border-border p-5"
-            aria-label={entryPanelLabel(item.type, itemTypes.data)}
+          <Panel
+            className="mt-6"
+            aria-labelledby="entry-panel-heading"
+            heading={entryPanelLabel(item.type, itemTypes.data)}
+            headingId="entry-panel-heading"
           >
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
-              {entryPanelLabel(item.type, itemTypes.data)}
-            </h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4">
+            <dl className="grid grid-cols-2 gap-4">
               <Fact name="status" label="Status">
                 {statusLabelFor(item.type, itemTypes.data, entry.status)}
               </Fact>
@@ -448,7 +440,7 @@ export function DetailPage() {
                 Delete entry
               </Button>
             </div>
-          </section>
+          </Panel>
 
           {/* Files, at the weight of the thing it is.
               It was a small outline button in the corner of Edition facts, which
@@ -457,22 +449,18 @@ export function DetailPage() {
               something the reader does, like editing an opinion. Its own region,
               between the two, keeps the control beside the list it produces --
               which putting the button under the cover would not. */}
-          <section
-            className="mt-6 rounded-xl border border-border p-5"
-            aria-label="Files"
-          >
+          <Panel className="mt-6" aria-label="Files" bodyClassName="p-4">
             <Attachments itemId={item.id} />
-          </section>
+          </Panel>
 
           {/* Edition facts region */}
-          <section
-            className="mt-6 rounded-xl border border-border p-5"
-            aria-label="Edition facts"
+          <Panel
+            className="mt-6"
+            aria-labelledby="edition-facts-heading"
+            heading="Edition facts"
+            headingId="edition-facts-heading"
           >
-            <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
-              Edition facts
-            </h2>
-            <dl className="mt-4 grid grid-cols-2 gap-4">
+            <dl className="grid grid-cols-2 gap-4">
               {inlineFields.map((field) => (
                 <Fact key={field.name} name={field.name} label={field.label}>
                   {formatFact(item.metadata[field.name], field)}
@@ -526,7 +514,7 @@ export function DetailPage() {
                 Refresh from provider
               </Button>
             </div>
-          </section>
+          </Panel>
 
           {rowFields.map((field) => (
             <RowsField
