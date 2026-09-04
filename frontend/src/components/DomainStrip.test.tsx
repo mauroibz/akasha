@@ -21,7 +21,11 @@ describe("DomainStrip", () => {
 
   it("renders the declared domains and marks the active one", () => {
     render(
-      <DomainStrip domains={domains} value="album" onChange={() => undefined} />,
+      <DomainStrip
+        domains={domains}
+        value="album"
+        onChange={() => undefined}
+      />,
     );
     const strip = screen.getByRole("radiogroup", { name: "Choose a domain" });
     const radios = within(strip).getAllByRole("radio");

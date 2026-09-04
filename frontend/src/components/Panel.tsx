@@ -2,8 +2,10 @@ import type { HTMLAttributes, ReactNode } from "react";
 
 import { cn } from "@/lib/utils";
 
-export interface PanelProps
-  extends Omit<HTMLAttributes<HTMLElement>, "className"> {
+export interface PanelProps extends Omit<
+  HTMLAttributes<HTMLElement>,
+  "className"
+> {
   /** The panel's own heading. Absent means no header row at all. */
   heading?: ReactNode;
   headingId?: string;
@@ -60,11 +62,7 @@ export function Panel({
           )}
         </div>
       )}
-      <div
-        className={cn(
-          bodyClassName ?? (hasHeader ? "px-4 pb-4" : "p-4"),
-        )}
-      >
+      <div className={cn(bodyClassName ?? (hasHeader ? "px-4 pb-4" : "p-4"))}>
         {children}
       </div>
     </section>

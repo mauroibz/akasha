@@ -244,8 +244,17 @@ describe("ImportPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /preview calibre/i }),
     );
-    expect(await screen.findByText(/local cover staged/i)).toBeVisible();
-    expect(screen.getByText(/rating 9/i)).toBeVisible();
+    // Finding 1 (AC1): a staged cover is a fact about provenance, not a score,
+    // so it must not carry the score-ramp colour that means a 9 or a 10
+    // everywhere else.
+    const stagedChip = await screen.findByText(/local cover staged/i);
+    expect(stagedChip).toBeVisible();
+    expect(stagedChip.className).not.toMatch(/text-score-top/);
+    // Finding 2 (AC2): the score renders in the same band chip the library
+    // card and the detail page use for this score, not as prose.
+    const scoreChip = screen.getByText("9", { selector: "span" });
+    expect(scoreChip.className).toMatch(/bg-score-top/);
+    expect(screen.queryByText(/rating 9/i)).toBeNull();
     await userEvent.click(
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
@@ -335,7 +344,12 @@ describe("ImportPage", () => {
     expect(
       await screen.findByRole("heading", { name: /preview: 2 rows/i }),
     ).toHaveFocus();
-    expect(screen.getByText(/date_read: invalid_date/i)).toBeVisible();
+    // Finding 3 (AC3): no raw field name or error code reaches the reader —
+    // a legible sentence naming the field and what is wrong with it does.
+    expect(screen.queryByText(/date_read: invalid_date/i)).toBeNull();
+    expect(
+      screen.getByText("Date read isn't a date we can read."),
+    ).toBeVisible();
     await userEvent.click(
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );

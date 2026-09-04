@@ -37,9 +37,7 @@ describe("PageHeader", () => {
         />
       </MemoryRouter>,
     );
-    expect(
-      screen.getByRole("button", { name: "Create shelf" }),
-    ).toBeVisible();
+    expect(screen.getByRole("button", { name: "Create shelf" })).toBeVisible();
   });
 
   it("renders no back control unless asked for one", () => {

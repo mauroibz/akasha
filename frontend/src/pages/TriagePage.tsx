@@ -25,6 +25,7 @@ import { getShelves } from "@/api/shelves";
 import { Check } from "lucide-react";
 
 import { CoverImage } from "@/components/CoverImage";
+import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -626,31 +627,24 @@ export function TriagePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-            Triage
-          </p>
-          <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-            Inbox
-            {firstPage?.total ? (
-              <span className="ml-3 text-lg text-muted-foreground">
-                {firstPage.total} unsorted
-              </span>
-            ) : null}
-          </h1>
-          {entries.some((entry) => entry.score_provisional) ? (
+      <PageHeader
+        back
+        eyebrow="Triage"
+        title="Inbox"
+        count={firstPage?.total ? `${firstPage.total} unsorted` : undefined}
+        lede={
+          entries.some((entry) => entry.score_provisional) ? (
             // The bare interpunct that used to mark these read as a typo. A
             // marker nobody can decode is not a marker.
-            <p className="mt-2 text-xs text-muted-foreground">
+            <span className="text-xs">
               <span aria-hidden="true">*</span> a provisional score, converted
               from an imported rating and not yet confirmed. &ldquo;Clear
               provisional&rdquo; removes it from a selection.
-            </p>
-          ) : null}
-        </div>
-        <div className="flex items-center gap-3">
-          {firstPage?.total ? (
+            </span>
+          ) : undefined
+        }
+        actions={
+          firstPage?.total ? (
             <Button
               className="rounded-full px-5"
               disabled={acceptMutation.isPending}
@@ -658,16 +652,9 @@ export function TriagePage() {
             >
               {acceptMutation.isPending ? "Accepting…" : "Accept all suggested"}
             </Button>
-          ) : null}
-          <Button
-            variant="outline"
-            className="rounded-full"
-            onClick={() => void navigate("/")}
-          >
-            ← Library
-          </Button>
-        </div>
-      </header>
+          ) : undefined
+        }
+      />
       <section
         aria-label="Triage filters"
         className="mt-6 flex flex-wrap items-center gap-3"

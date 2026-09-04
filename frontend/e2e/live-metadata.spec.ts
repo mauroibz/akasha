@@ -53,7 +53,9 @@ test("live provider editions add with metadata and cached covers", async ({
     // The URL changes before the detail view paints, so wait for a control only the
     // detail page has. Without this the assertions below race the library list, whose
     // cards also carry an "Edition year:".
-    await expect(page.getByRole("button", { name: "← Library" })).toBeVisible({
+    // Detail's back control is the shared BackToLibrary link now, not its own
+    // ghost button (Sprint 070, finding 8).
+    await expect(page.getByRole("link", { name: "← Library" })).toBeVisible({
       timeout: 20_000,
     });
     await expect(page.locator("main img").first()).toBeVisible();

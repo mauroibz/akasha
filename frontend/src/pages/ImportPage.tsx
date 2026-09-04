@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
+import { BackToLibrary } from "@/components/BackToLibrary";
+import { PageHeader } from "@/components/PageHeader";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -35,12 +37,15 @@ import {
   narrowedTo,
 } from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
+import { describeRowError } from "@/features/import/errors";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { ExportPanel } from "@/features/export/ExportPanel";
 import { ExportPicker } from "@/features/import/ExportPicker";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
+import { scoreChipClass, scoreChipShape } from "@/lib/score";
+import { cn } from "@/lib/utils";
 import { TriagePage } from "@/pages/TriagePage";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
@@ -244,11 +249,24 @@ export function ImportPage() {
   const ready =
     (preview?.summary.ready ?? 0) + (preview?.summary.ambiguous ?? 0);
   const activeImporter = importers.find((importer) => importer.id === source);
-  // Only a connector that can fill more than one library needs their names, and
-  // none of the four that ship today can.
+  // A connector that can fill more than one library needs their names for the
+  // target checkboxes, and a failed preview row needs the domain's own field
+  // labels to describe what went wrong (AC3) — fetched only once either is
+  // actually true, since most visits need neither.
   const itemTypes = useItemTypes(
-    importers.some((importer) => importer.item_types.length > 1),
+    importers.some((importer) => importer.item_types.length > 1) ||
+      (preview?.records.some((record) => record.errors.length > 0) ?? false),
   );
+  // A record carries no domain of its own — only a connector that fills more
+  // than one library could need it, and none that ships today does — so a
+  // failed row's field label is resolved against the single domain the active
+  // importer declares. A future multi-domain connector without a per-record
+  // type falls back to the honest, still-legible default (AC3's humanized
+  // fallback) rather than guessing which domain a row belongs to.
+  const recordDomain =
+    activeImporter?.item_types.length === 1 && Array.isArray(itemTypes.data)
+      ? itemTypes.data.find((type) => type.id === activeImporter.item_types[0])
+      : undefined;
 
   /** What this connector is currently set to bring in. Everything, by default. */
   const chosenFor = (importer: ImporterDefinition) =>
@@ -526,15 +544,11 @@ export function ImportPage() {
       <TabsContent value={IMPORT_STEP} className="mt-0">
         <Tabs value={source} onValueChange={selectTab} asChild>
           <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-            <Link className="focus-ring" to="/">
-              ← Library
-            </Link>
-            <h1 className="mt-6 text-4xl font-semibold">Import</h1>
-            <p className="mt-2 text-muted-foreground">
-              Preview a source before anything enters your library. Existing
-              values are preserved when a re-sync only supplies missing
-              metadata.
-            </p>
+            <PageHeader
+              back
+              title="Import"
+              lede="Preview a source before anything enters your library. Existing values are preserved when a re-sync only supplies missing metadata."
+            />
             {importers.length > 0 && (
               <section className="mt-7" aria-labelledby="import-source-heading">
                 <h2
@@ -553,7 +567,7 @@ export function ImportPage() {
               critical invalid attribute value and which leaves a screen reader
               unable to reach the fields the tab just switched to (DEC-038). */}
                 <form
-                  className="mt-8 space-y-5 rounded-2xl bg-surface p-5"
+                  className="mt-8 space-y-5 rounded-xl border border-border bg-surface p-5"
                   onSubmit={(event) => {
                     event.preventDefault();
                     const submission = readyInput(activeImporter);
@@ -723,33 +737,55 @@ export function ImportPage() {
                   {preview.records.map((record) => (
                     <article
                       key={record.record_id}
-                      className="rounded-2xl bg-surface p-4"
+                      className="rounded-xl border border-border bg-surface p-4"
                     >
                       <h3 className="font-semibold">
                         {record.title || `Row ${record.row_number}`}
                       </h3>
-                      <p className="text-sm text-muted-foreground">
-                        {record.creators.join(", ") || "Creator missing"}
-                        {record.score
-                          ? record.score_provisional
-                            ? ` · provisional score ${record.score}`
-                            : ` · rating ${record.score}`
-                          : ""}
-                        {record.suggested_status
-                          ? ` · suggested ${record.suggested_status}`
-                          : ""}
+                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                        <span>
+                          {record.creators.join(", ") || "Creator missing"}
+                        </span>
+                        {/* The score every other surface paints — the same
+                            band the library card and the detail page use for
+                            this score, not prose (finding 2, AC2). */}
+                        {record.score !== null && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span
+                              className={cn(
+                                scoreChipShape,
+                                scoreChipClass(record.score),
+                              )}
+                            >
+                              {record.score}
+                            </span>
+                            {record.score_provisional && (
+                              <span className="text-xs">(provisional)</span>
+                            )}
+                          </>
+                        )}
+                        {record.suggested_status && (
+                          <>
+                            <span aria-hidden="true">·</span>
+                            <span>suggested {record.suggested_status}</span>
+                          </>
+                        )}
                       </p>
                       {record.cover_staged && (
-                        <p className="text-sm text-score-top">
+                        // A fact about where the cover came from, not a score
+                        // — it stops borrowing the emerald that means a 9 or a
+                        // 10 everywhere else (finding 1, AC1).
+                        <span className="mt-1 inline-block rounded-full bg-surface-raised px-2 py-0.5 text-xs text-muted-foreground">
                           Local cover staged
-                        </p>
+                        </span>
                       )}
                       {record.errors.map((row, index) => (
                         <p
                           key={`${row.field}-${index}`}
                           className="text-sm text-destructive"
                         >
-                          {row.field}: {row.code}
+                          {describeRowError(row, recordDomain)}
                         </p>
                       ))}
                       {record.planned_action === "ambiguous" && (
@@ -915,7 +951,7 @@ export function ImportPage() {
               </div>
             )}
             {result && !undoResult && !pending && (
-              <div className="mt-5 rounded-2xl bg-surface p-4">
+              <div className="mt-5 rounded-xl border border-border bg-surface p-4">
                 <p className="text-sm text-muted-foreground">
                   You can undo this import for 24 hours after commit. The undo
                   reverses only fields that still match the imported values —
@@ -969,7 +1005,7 @@ export function ImportPage() {
               <div
                 ref={undoRef}
                 tabIndex={-1}
-                className="mt-5 rounded-2xl bg-surface p-4"
+                className="mt-5 rounded-xl border border-border bg-surface p-4"
                 role="status"
               >
                 <h2 className="text-lg font-semibold">Import undone</h2>
@@ -979,12 +1015,7 @@ export function ImportPage() {
                   {undoResult.retained > 0 &&
                     ` · ${undoResult.retained} retained (edited after import)`}
                 </p>
-                <Link
-                  className="focus-ring mt-3 inline-block text-primary"
-                  to="/"
-                >
-                  ← Back to library
-                </Link>
+                <BackToLibrary className="mt-3" />
               </div>
             )}
           </main>

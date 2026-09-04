@@ -30,9 +30,10 @@ describe("SegmentedControl", () => {
       "aria-pressed",
       "true",
     );
-    expect(
-      screen.getByRole("button", { name: "Table view" }),
-    ).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Table view" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
   });
 
   it("gives every option at least a 44px target", () => {
