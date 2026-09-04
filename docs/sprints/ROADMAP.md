@@ -1459,6 +1459,54 @@ revision.
 the owner's real library, and reporting whether score density makes the score metric worth having,
 still needs the owner's own instance.
 
+## Proposed and not yet scheduled — the v1.8.0 candidates
+
+Two proposals written 2026-09-04 at the owner's request, as the features that would close the next
+minor release. **Neither is accepted.** Accepting one is the owner's decision and would carry its own
+decision record, the way DEC-132 accepted the insights redesign. Until then:
+`docs/agent/state.json` still reads `complete`, `FINAL_SPRINT` in `scripts/validate_project.py` is
+still 67, and Sprints 068–072 exist only as drafts with `Status: planned`.
+
+**[`../export-proposal.md`](../export-proposal.md) — getting your data out.** Export shipped in
+Sprint 024 and has not been touched since: `GET /api/export` is the entire surface, there is no
+button anywhere in the application, and of five domains only books can leave in a format another
+application reads. The Goodreads column list also lives in a shared module and branches on item
+type — the last such branch in the codebase, and Sprint 028's contract says it belongs beside the
+reader of the same file. The proposal mirrors the import side: an `ExportView` declares itself the
+way an `Importer` does (DEC-080), a shared walk owns the streaming and the view owns only the
+spelling, and a registry-declared `table` CSV means no domain can exist that cannot be exported.
+Every format proposed except the series target is one this repository already parses, so an
+exporter is proven by round-tripping its bytes through the domain's own reader (DEC-025).
+
+- **[068 — Export the way we import](068-export-the-way-we-import.md)** — the contract, the registry
+  point, the shared walk, the `table` view, the Goodreads writer moved into `domains/book/`,
+  `GET /api/exports` and `GET /api/export/{view}`. Backend only.
+- **[069 — A door out of the app](069-a-door-out-of-the-app.md)** — a third tab on `/import` that
+  renders the declarations, with counts, guide steps, download and failure states. After this sprint
+  the feature is complete for every domain.
+- **[070 — Their formats, not ours](070-their-formats-not-ours.md)** — MyAnimeList XML, the
+  Letterboxd import CSV, and the recorded series decision. Its acceptance criterion is that it
+  changes no frontend file. **If the release has to be cut, cut this one.**
+
+**[`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md) — the rest of the app, redrawn.**
+Sprints 066 and 067 did not invent a style; they applied decisions this application already had to
+one screen. The proposal names the seven rules that produced and eleven places the other screens
+disagree with them, each traced to a line: the score ramp painting something that is not a score,
+the biggest cover in the product not drawn by `CoverImage`, a shelves screen that cannot open a
+shelf, six box idioms, three page headers and four ways back, the domain strip and the segmented
+control each written twice, and only one of the library's five filters saying it is set.
+
+- **[071 — One surface](071-one-surface.md)** — the `Panel`, `PageHeader`, `SegmentedControl` and
+  `DomainStrip` primitives applied across every screen; every cover through `CoverImage`; the import
+  preview's chips and labels; **and DEC-134's outstanding 390px domain-strip overflow paid once, for
+  both screens.** Frontend only.
+- **[072 — What the numbers say](072-what-the-numbers-say.md)** — shelves as an openable ranking with
+  covers and magnitude bars, an active-filters row on the library, and weight on counts that
+  describe a whole. `ShelfResponse.covers` is the only backend change in the line, and it is the
+  same lateral top-3 join DEC-134 already benchmarked.
+
+The two lines are independent. Either can be taken alone, in either order.
+
 ## Not scheduled
 
 - **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
