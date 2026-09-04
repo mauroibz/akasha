@@ -473,3 +473,202 @@ async def test_an_exported_entry_keeps_its_progress(tmp_path: Path) -> None:
     # A book records none, and the key is present carrying null rather than absent: a
     # consumer must be able to tell "not recorded" from "this export predates the field".
     assert entries[book.item_id]["progress"] is None
+
+
+# ----------------------------------------------------------------------------------
+# Sprint 068: a declared view per format, a shared walk, and a table for every domain
+# ----------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_the_goodreads_view_round_trips_through_our_own_reader(tmp_path: Path) -> None:
+    """DEC-025: a registered view is proven by round-tripping through the domain's
+    own reader, not by asserting the bytes look right."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        created = repository.create_or_get_entry(
+            title="Rayuela", creators=("Julio Cortázar", "Jorge Luis Borges")
+        )
+        shelf_id = repository.create_shelf("Favorites")
+        repository.attach_shelf(created.entry_id, shelf_id)
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE entries SET status='read', score=8, reread_count=2,"
+                    " notes=:notes, date_finished='2026-01-05', date_added='2026-01-01'"
+                    " WHERE id=:id"
+                ),
+                {"notes": "Loved it.", "id": created.entry_id},
+            )
+        body = "".join(_export_csv(app.state.engine)).encode("utf-8")
+
+    records = parse_goodreads(body)
+    assert len(records) == 1
+    record = records[0]
+    assert record["title"] == "Rayuela"
+    assert record["creators"] == ["Julio Cortázar", "Jorge Luis Borges"]
+    # An even score round-trips exactly through the 1-10 <-> 1-5 halving/doubling;
+    # the exact value for an odd score is only ever preserved in the lossless JSON.
+    assert record["score"] == 8
+    assert record["date_finished"] == "2026-01-05"
+    assert record["date_added"] == "2026-01-01"
+    assert record["review"] == "Loved it."
+    # Import took `Read Count - 1`; export inverted it, so 2 rereads write "3" and
+    # read back as 2 again.
+    assert record["reread_count"] == 2
+    assert record["shelves"] == ["favorites"]
+    assert record["suggested_status"] == "read"
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("domain", list(DOMAINS.values()), ids=lambda row: str(row.item_type))
+async def test_every_registered_domain_has_a_non_empty_table_view(domain, tmp_path: Path) -> None:
+    """AC2/AC3: registering a domain is enough to export it, with no code path naming
+    one. Parametrized over `DOMAINS`, the same discipline
+    `test_domain_conformance.py` holds the rest of the contract to."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        repository.create_or_get_entry(
+            title="Conformance row", creators=("Nobody",), item_type=domain.item_type
+        )
+        response = await client.get(f"/api/export/table?type={domain.item_type}")
+
+    assert response.status_code == 200
+    assert response.headers["content-type"].startswith("text/csv")
+    rows = list(csv.reader(io.StringIO(response.text)))
+    assert len(rows) == 2, f"{domain.item_type} table view produced no data row"
+    header = rows[0]
+    assert "Title" in header
+    assert "Creator" in header
+    for field in domain.fields:
+        if field.name == "creators":
+            continue
+        assert field.label in header, f"{domain.item_type} table header is missing {field.label!r}"
+    assert rows[1][header.index("Title")] == "Conformance row"
+    assert rows[1][header.index("Creator")] == "Nobody"
+
+
+@pytest.mark.anyio
+async def test_format_csv_is_a_byte_identical_alias_of_the_goodreads_view(tmp_path: Path) -> None:
+    """AC4: `?format=csv` is an alias, not a deprecation."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        alias_response = await client.get("/api/export", params={"format": "csv"})
+        view_response = await client.get("/api/export/goodreads", params={"type": "book"})
+
+    assert alias_response.status_code == view_response.status_code == 200
+    assert alias_response.text == view_response.text
+    assert alias_response.headers["content-type"] == view_response.headers["content-type"]
+    assert (
+        alias_response.headers["content-disposition"]
+        == view_response.headers["content-disposition"]
+        == 'attachment; filename="akasha-export.csv"'
+    )
+
+
+@pytest.mark.anyio
+async def test_the_table_view_neutralizes_spreadsheet_formulas_too(tmp_path: Path) -> None:
+    """AC5: every spreadsheet view inherits `_safe_cell`'s rule, not only Goodreads."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        created = repository.create_or_get_entry(title="Ledger", creators=("A. Nobody",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET notes=:notes WHERE id=:id"),
+                {"notes": "=1+1", "id": created.entry_id},
+            )
+        response = await client.get("/api/export/table", params={"type": "book"})
+
+    row = next(iter(csv.DictReader(io.StringIO(response.text))))
+    assert not row["Notes"].startswith("=")
+    assert "1+1" in row["Notes"]
+
+
+@pytest.mark.parametrize("view_name", ["goodreads", "table"])
+def test_export_view_memory_is_flat_against_library_size(tmp_path: Path, view_name: str) -> None:
+    """AC6: the memory test is load-bearing for every view, not only JSON (Sprint 068
+    risk 1) — a view that sorted or buffered rows would undo it quietly."""
+    view = find_export_view("book", view_name)
+    assert view is not None
+
+    def generate(engine):
+        return stream_export_view(engine, view, "book")
+
+    small_app = create_app(settings(tmp_path / "small"))
+    with TestClient(small_app):
+        _seed(small_app.state.engine, 200)
+        small_peak, small_total = _peak_bytes(small_app.state.engine, generate)
+
+    large_app = create_app(settings(tmp_path / "large"))
+    with TestClient(large_app):
+        _seed(large_app.state.engine, 2000)
+        large_peak, large_total = _peak_bytes(large_app.state.engine, generate)
+
+    assert large_total > small_total * 8
+    assert large_peak < small_peak * 3, (
+        f"{view_name} view peak grew with library size: {small_peak} -> {large_peak} bytes "
+        f"while output grew {small_total} -> {large_total}"
+    )
+
+
+@pytest.mark.anyio
+async def test_unknown_export_view_and_undeclared_domain_are_404s(tmp_path: Path) -> None:
+    """AC7: not a 500, not an empty file — the standard error envelope."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        unknown_view = await client.get("/api/export/nonsense", params={"type": "book"})
+        wrong_domain = await client.get("/api/export/goodreads", params={"type": "album"})
+
+    for response in (unknown_view, wrong_domain):
+        assert response.status_code == 404, response.text
+        assert response.json()["error"]["code"] == "export_view_not_found"
+
+
+@pytest.mark.anyio
+async def test_get_exports_declares_every_view(tmp_path: Path) -> None:
+    """AC8: enough for a screen to render a row without knowing any view's name."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        repository.create_or_get_entry(
+            title="Kind of Blue", creators=("Miles Davis",), item_type="album"
+        )
+        response = await client.get("/api/exports")
+
+    assert response.status_code == 200
+    views = response.json()
+    assert len(views) == len(REGISTERED_EXPORTS)
+    by_id = {(row["id"], tuple(row["item_types"])): row for row in views}
+    goodreads = by_id[("goodreads", ("book",))]
+    assert goodreads["label"]
+    assert goodreads["carries"]
+    assert goodreads["guide"]
+    assert goodreads["help_url"]
+    assert goodreads["count"] == 1
+    book_table = by_id[("table", ("book",))]
+    assert book_table["count"] == 1
+    album_table = by_id[("table", ("album",))]
+    assert album_table["count"] == 1
+    anime_table = by_id[("table", ("anime",))]
+    assert anime_table["count"] == 0

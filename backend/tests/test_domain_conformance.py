@@ -39,6 +39,7 @@ from book_tracker.application.library import LibraryError
 from book_tracker.application.providers import resolve_input
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
+from book_tracker.domain.exports import ExportView
 from book_tracker.domain.importers import (
     BrowsableImporter,
     ImportCandidate,
@@ -61,8 +62,10 @@ from book_tracker.domain.providers import (
 from book_tracker.domain.registry import (
     ALL_STATUSES,
     DOMAINS,
+    EXPORTS_BY_DOMAIN,
     IMPORTERS,
     IMPORTERS_BY_DOMAIN,
+    REGISTERED_EXPORTS,
     EntryFormat,
     EntryStatus,
     ItemTypeName,
@@ -736,6 +739,50 @@ async def test_the_built_application_wires_a_registered_domain(name: str, tmp_pa
 def test_a_registered_importer_satisfies_the_contract(importer: object) -> None:
     """A connector is held to the import contract merely by being registered."""
     assert_importer_contract(importer)
+
+
+def assert_export_view_contract(view: object) -> None:
+    """An export view is complete enough for the generic pipeline to host it
+    (Sprint 068), the export analogue of `assert_importer_contract`."""
+    assert isinstance(view, ExportView)
+    assert view.name and view.name.isidentifier() and view.name.islower()
+    assert view.label
+    assert isinstance(view.item_types, tuple), (
+        f"{view.name} declares item_types as {type(view.item_types).__name__}, not a tuple"
+    )
+    assert view.item_types, f"{view.name} declares no target domain"
+    unknown = [item_type for item_type in view.item_types if item_type not in DOMAINS]
+    assert not unknown, f"{view.name} declares domains that are not registered: {unknown}"
+    assert view.media_type
+    assert view.filename
+    assert isinstance(view.guide, tuple), f"{view.name} guide must be ordered steps"
+    assert all(isinstance(step, str) and step.strip() for step in view.guide), (
+        f"{view.name} guide has an empty step"
+    )
+    assert view.help_url is None or view.help_url.startswith("https://"), (
+        f"{view.name} help_url is not an https address"
+    )
+    assert isinstance(view.carries, tuple) and view.carries, (
+        f"{view.name} declares nothing it carries"
+    )
+    assert callable(view.write), f"{view.name} declares no writer"
+
+
+@pytest.mark.parametrize(
+    "view", list(REGISTERED_EXPORTS), ids=lambda row: f"{row.name}-{'-'.join(row.item_types)}"
+)
+def test_a_registered_export_view_satisfies_the_contract(view: object) -> None:
+    """A view is held to the export contract merely by being registered."""
+    assert_export_view_contract(view)
+
+
+def test_every_registered_domain_has_at_least_the_table_view() -> None:
+    """Sprint 068 AC3: registering a domain is what makes it exportable, and the
+    `table` floor means no domain can be added that cannot leave in something
+    another application opens."""
+    for item_type in DOMAINS:
+        names = {view.name for view in EXPORTS_BY_DOMAIN[item_type]}
+        assert "table" in names, f"{item_type} has no table export view"
 
 
 def assert_registration_matches_declaration(
