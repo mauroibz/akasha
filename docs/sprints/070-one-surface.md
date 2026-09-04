@@ -1,12 +1,14 @@
-# Sprint 071 — One surface
+# Sprint 070 — One surface
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 067
-**Roadmap revision:** 36
+**Roadmap revision:** 38
 
 > Planned from [`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md) §3.1–3.4 and
-> §3.6. **Not accepted; not scheduled.** Independent of the export line: it can run before
-> it, after it, or instead of it.
+> §3.6. **Accepted by the owner as DEC-136.** Renumbered from 071 to 070: the export
+> line's own Sprint 070 (ecosystem-specific exporters) was built, found to exceed the
+> owner's intended scope, and withdrawn the same day — see DEC-136. This sprint takes
+> the freed number.
 
 ## Objective
 
@@ -129,7 +131,7 @@ Confirm each at activation; the proposal's §2 table carries the lines.
 
 ## Explicit non-scope
 
-- **Shelves as a ranking, the active-filters row, and weighted counts** — Sprint 072. This
+- **Shelves as a ranking, the active-filters row, and weighted counts** — Sprint 071. This
   sprint does not add a field to any response.
 - The virtualized library's geometry (DEC-023) and triage's interaction model
   (DEC-095, DEC-096).

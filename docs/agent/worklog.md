@@ -4196,3 +4196,64 @@ so 050 adds an adapter, not a declaration.
   series decision, added to the registry Sprint 068 built. Its own acceptance criterion
   is that it changes no frontend file, which Sprint 069's declaration-driven rendering
   makes true by construction.
+
+## 2026-09-04 — Sprint 070 built, then withdrawn by owner direction; UI-cohesion line accepted and renumbered in
+
+- **Built the export line's originally-planned Sprint 070 in full**: `myanimelist`
+  (gzipped MyAnimeList XML), `letterboxd` (their documented import CSV, confirmed via
+  cross-referenced community tooling after the primary docs page 403'd a direct
+  fetch), and an IMDb-shaped list CSV for series — each registered, round-trip tested
+  (1,367 backend tests passing), and verified live: real HTTP against a throwaway
+  backend, real parsers reading the downloaded bytes back, and a real Chromium browser
+  clicking the actual download buttons on a real dev server. Four implementation/test
+  commits plus a closing commit, and `docs/agent/state.json` briefly reached
+  `project_status: "complete"` since Sprint 070 was `FINAL_SPRINT`.
+- **The owner reviewed it and said the scope was wrong**, not the execution: the actual
+  request (quoted in `export-proposal.md`) was "a simple exporter for your data...
+  complete enough that you can rebuild your akasha later, but that's it" — not a suite
+  of exporters mirroring every other application's own import shape, and any
+  provider-specific exporter that does exist should be modular. Sprint 068's generic
+  `table` CSV and the pre-existing lossless JSON already satisfy the actual ask; the
+  ecosystem-specific formats were real, unbounded scope this repository does not
+  control (its own risk section: "a target changes its columns and our view silently
+  stops fitting"), never asked for at that size, and not modular — hardwired into
+  `domain/registry.py`'s always-on `REGISTERED_EXPORTS`.
+- **Reverted in full**: `git reset --hard` to the commit that closed Sprint 069
+  (`b936958`), before any of Sprint 070's commits. Nothing was ever pushed, so nothing
+  shared needed to change. The reverted commits (`0ec94dc`, `1f844ce`, `9c14629`,
+  `3e4700d`, `d0ff170`) are not reachable on `main` after this session.
+- **Replanned in the same conversation**, per the owner's explicit direction: the
+  subject is closed (no ecosystem-specific exporter exists, and none is planned), and
+  the next sprints are the UI-cohesion line. `docs/sprints/070-their-formats-not-ours.md`
+  removed from the numbered sequence (not kept as a stale placeholder — DEC-127's own
+  precedent for a withdrawn, unstarted sprint). `docs/sprints/071-one-surface.md` and
+  `072-what-the-numbers-say.md` renamed to `070-one-surface.md` and
+  `071-what-the-numbers-say.md`, filling the freed slot rather than leaving a gap
+  (DEC-065/DEC-127's renumbering precedent) — checked every closed sprint's own text
+  and every accepted decision for a forward reference to "Sprint 071"/"Sprint 072"
+  first, per that same precedent's discipline: found and corrected one, in closed
+  Sprint 069's own "Risks and decisions to surface" section (not its Outcome, which
+  DEC-065's rule protects).
+- **Decision log:** DEC-136 records the withdrawal, the acceptance of
+  `ui-cohesion-proposal.md`, and the renumbering, all as one decision since the owner
+  asked for both together.
+- **Docs reconciled:** `docs/sprints/ROADMAP.md` (top summary, the export-line
+  narrative section rewritten to record the withdrawal, a new "The rest of the app,
+  redrawn" narrative section replacing "Proposed and not yet scheduled"), `docs/
+  README.md` (both proposals' historical-table rows), `docs/export-proposal.md` and the
+  pre-existing, already-accepted DEC-135 (only their now-dead link to the deleted
+  sprint file de-linked to plain text — their substance was not rewritten, per the
+  "historical documents are dated, not rewritten" rule), `scripts/validate_project.py`
+  (`FINAL_SPRINT` 70 → 71, its own historical comment extended).
+- **Verified:** `python scripts/validate_project.py` green (caught two broken links
+  from the deleted sprint file on the first run — both fixed). `make check` not
+  re-run for this closing commit: the diff after the code-level revert is
+  documentation/state only (`git diff --stat` confirms nothing under `backend/src/`,
+  `frontend/src/`, `backend/tests/` or migrations), which is the narrowed
+  documentation-only case `TESTING.md`'s post-gate matrix names.
+- **State:** `project_status`/`active_sprint_status` → `ready`, `active_sprint` → `070`,
+  `active_sprint_file` → `docs/sprints/070-one-surface.md`. `last_completed_sprint`
+  stays `069`; `completed_sprints` stays `001`–`069` (Sprint 070's brief, same-day,
+  reverted existence is not recorded as completed). Plan revision → 38.
+- **Next:** Sprint 070 — One surface. Read its own file; this entry and `HANDOFF.md`
+  are not a substitute for it.

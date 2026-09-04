@@ -1,11 +1,12 @@
-# Sprint 072 — What the numbers say
+# Sprint 071 — What the numbers say
 
 **Status:** planned
-**Depends on:** 071
-**Roadmap revision:** 36
+**Depends on:** 070
+**Roadmap revision:** 38
 
 > Planned from [`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md) §3.5, §3.7 and
-> §3.8. **Not accepted; not scheduled.**
+> §3.8. **Accepted by the owner as DEC-136.** Renumbered from 072 to 071 — see
+> `070-one-surface.md`'s own note and DEC-136.
 
 ## Objective
 
@@ -18,7 +19,7 @@ the library says what it is showing.
 
 - [`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md) §1 rules 2, 3 and 4; §2
   findings 5, 6 and 11; §3.5, §3.7, §3.8; §6 (the join is measured, not assumed).
-- [`071-one-surface.md`](071-one-surface.md) — the primitives this sprint builds on. Read
+- [`070-one-surface.md`](070-one-surface.md) — the primitives this sprint builds on. Read
   what actually shipped.
 - `docs/decisions.md` DEC-134 (the covers-on-a-ranking-row work: the lateral top-3 join
   and **its measured cost** — this sprint repeats that join on a much smaller list),
@@ -118,7 +119,7 @@ the library says what it is showing.
 
 ## Explicit non-scope
 
-- Everything Sprint 071 owns: the primitives, the covers on detail, the import preview's
+- Everything Sprint 070 owns: the primitives, the covers on detail, the import preview's
   language, the 390px strip.
 - Shelf reordering, nesting, colours or icons. A shelf is a name and a set.
 - New library filters. The chips name the filters that exist.
@@ -138,7 +139,7 @@ the library says what it is showing.
   backend change with a benchmark precedent, and DEC-134 measured the same join rather
   than assuming it. Do the same.
 - **Chips can crowd the library header at 390px** where four filters are set. Decide
-  whether they wrap or scroll, and measure it; the strip's answer in Sprint 071 is the
+  whether they wrap or scroll, and measure it; the strip's answer in Sprint 070 is the
   precedent.
 - **Covers on a shelf row invite a shelf detail page.** It is not in scope, and the library
   filtered by shelf is that page.

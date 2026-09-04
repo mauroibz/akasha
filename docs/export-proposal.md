@@ -154,7 +154,7 @@ Three sprints, split so that the release stays coherent if it is cut short.
 |---|---|---|
 | **[068 — Export the way we import](sprints/068-export-the-way-we-import.md)** | The `ExportView` contract, the registry point, the shared streaming walk, the `table` view for every domain, the Goodreads writer moved into `domains/book/`, `GET /api/exports` and `GET /api/export/{view}`. Round-trip tests through the existing importers. | **None.** |
 | **[069 — A door out of the app](sprints/069-a-door-out-of-the-app.md)** | The export tab: declarations rendered, entry counts, guide steps, download, empty and failure states, 390px and axe. After this sprint the feature is complete and usable for every domain. | All of it. |
-| **[070 — Their formats, not ours](sprints/070-their-formats-not-ours.md)** | The MyAnimeList XML view, the Letterboxd CSV view, and the recorded decision for series. Each verified by round trip. | **None** — and that is the acceptance criterion that proves §2.5. |
+| **070 — Their formats, not ours** (no surviving file — withdrawn by DEC-136) | The MyAnimeList XML view, the Letterboxd CSV view, and the recorded decision for series. Each verified by round trip. | **None** — and that is the acceptance criterion that proves §2.5. |
 
 **If the release has to be cut, cut 070.** After 069 every domain can leave in JSON and in
 a CSV, from a button, which satisfies the owner's principle. 070 makes the landing softer

@@ -5303,7 +5303,7 @@ both changes, against 1 of 3 before the second.
   - **[069 — A door out of the app](sprints/069-a-door-out-of-the-app.md)**: a third tab on
     `/import` rendering the declarations, with counts, guide steps, download and failure
     states.
-  - **[070 — Their formats, not ours](sprints/070-their-formats-not-ours.md)**: MyAnimeList
+  - **070 — Their formats, not ours** (no surviving file — withdrawn by DEC-136): MyAnimeList
     XML, the Letterboxd import CSV, and the recorded series decision. Changes no frontend file.
 - **The UI-cohesion line stays proposed.** `docs/ui-cohesion-proposal.md` and Sprints 071–072
   are unaffected by this decision; they remain unaccepted, and the roadmap's "Proposed and not
@@ -5312,3 +5312,72 @@ both changes, against 1 of 3 before the second.
   `ready`; `last_completed_sprint` stays `067`. `scripts/validate_project.py`'s `FINAL_SPRINT`
   moves from 67 to 70. Plan revision moves to 37. `docs/export-proposal.md` stays in the
   documentation map as the accepted proposal Sprints 068–070 implement.
+
+## DEC-136 — Sprint 070's ecosystem-specific exporters exceeded the export line's intended scope and are withdrawn; the UI-cohesion proposal is accepted and renumbers into the freed slot
+
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Supersedes:** nothing in DEC-135 — 068 and 069 are reconfirmed exactly as delivered. Narrows
+  DEC-135's own account of what "Sprint 070" would deliver; withdraws that sprint's content
+  without rewriting DEC-135's text, which stands as a dated record of the plan at the moment it
+  was accepted.
+- **Cross-references:** DEC-065 and DEC-127 (the precedent for renumbering an unstarted sprint
+  rather than living with a gap, and the forward-reference check that precedent requires before
+  doing it), DEC-132 (accepted the insights redesign, the same acceptance pattern used here for
+  the UI-cohesion line), DEC-054 (owner data in, derived data out — the JSON export is already the
+  lossless, rebuild-capable artifact this decision reaffirms as the actual scope).
+- **Context:** DEC-135 accepted `export-proposal.md` in full, including a third sprint (070)
+  mirroring the *entire* import architecture onto export — one `ExportView` per external
+  ecosystem, the same way there is one `Importer` per source. That sprint was built in full this
+  session: `myanimelist` (gzipped MyAnimeList XML), `letterboxd` (their documented import CSV) and
+  an IMDb-shaped list CSV for series, each registered, tested (1,367 backend tests passing) and
+  verified live against real parsers and a real browser. Reviewing it, the owner said plainly that
+  the actual request was narrower: *"a simple exporter for your data... complete enough that you
+  can rebuild your akasha later, but that's it,"* not exporters "compatible with every other
+  provider," and that any provider-specific exporter that does exist should be modular rather than
+  baked into the core.
+- **Decision, what stays:** Sprint 068 (the `ExportView` contract, the shared streaming walk, and
+  — the actual point — a generic `table` CSV that every domain gets, driven by its own field
+  declarations) and Sprint 069 (the door: a tab on `/import`, download buttons, guide steps) are
+  unaffected and remain delivered. Between the pre-existing lossless JSON (`GET /api/export`,
+  Sprint 024) and the generic `table` CSV, every domain already has a complete, rebuild-capable
+  export reachable from a button — which is the actual scope that was asked for. `goodreads`
+  (pre-existing since Sprint 024, relocated but not changed by Sprint 068) also stays: it predates
+  this conversation and users may already depend on `?format=csv` as a published contract.
+- **Decision, what's withdrawn:** every commit made under the "070 — Their formats, not ours"
+  sprint was reverted in full (`git reset --hard` to the commit closing Sprint 069, before any of
+  Sprint 070's commits — `0ec94dc`, `1f844ce`, `9c14629`, `3e4700d`, `d0ff170` — none of which are
+  reachable on `main` after this decision). `docs/sprints/070-their-formats-not-ours.md` is removed
+  from the numbered sequence rather than kept as a stale placeholder, the same way DEC-127 did not
+  keep a dedicated file for the anime/albums placeholder it withdrew. No ecosystem-specific
+  exporter (MyAnimeList, Letterboxd, an IMDb-shaped file, or any other) exists in this repository
+  as of this decision. If one is wanted later, it is a new proposal to evaluate on its own, sized
+  correctly from the start, and it must be **modular** — not unconditionally compiled into
+  `domain/registry.py`'s always-on `REGISTERED_EXPORTS` tuple and shown on every installation's
+  Export tab the way this attempt was, since this codebase currently has no mechanism for an
+  optional feature at all (`registry.py`'s own docstring: "code, not a plugin runtime"). Building
+  that mechanism is itself new scope and is not authorized by this decision.
+- **Decision, the UI-cohesion proposal is accepted.** `docs/ui-cohesion-proposal.md`, written the
+  same day as the export proposal from the owner's own words (*"look at the rest of the app and
+  apply some of the new design principles to it, so everything feels cohesive"*), is accepted as
+  written and scheduled next — the withdrawal above and the acceptance below happen in the same
+  decision because the owner asked for both together: revert the wrong-scoped sprint, and make the
+  UI line the next active work.
+- **Decision, renumbering:** `docs/sprints/071-one-surface.md` → `070-one-surface.md`;
+  `docs/sprints/072-what-the-numbers-say.md` → `071-what-the-numbers-say.md`, filling the slot
+  withdrawing 070 left rather than leaving a gap or an out-of-order jump to 073. Checked for
+  forward references to "Sprint 071"/"Sprint 072" (or their filenames) in every closed sprint's own
+  text and every accepted decision before renaming, per DEC-065/DEC-127's own discipline: found one,
+  a "Sprint 071" mention in closed Sprint 069's own "Risks and decisions to surface" section (not
+  its Outcome, which DEC-065's rule specifically protects), corrected to "Sprint 070" in the same
+  commit as this decision since it would otherwise point at the wrong sprint rather than merely
+  describe the past. No reference inside any Outcome section or any other accepted decision was
+  found.
+- **Consequences:** `docs/agent/state.json` sets `project_status` and `active_sprint_status` to
+  `ready`, `active_sprint` to `070`, `active_sprint_file` to
+  `docs/sprints/070-one-surface.md`; `last_completed_sprint` stays `069`; `completed_sprints` stays
+  `001`–`069` (070's brief, same-day existence and withdrawal is not recorded as a completed
+  sprint — it never satisfied its own acceptance criteria as anything but a scope the owner then
+  rejected). `scripts/validate_project.py`'s `FINAL_SPRINT` moves from 70 (DEC-135's value) to 71.
+  Plan revision moves to 38. `docs/README.md`'s historical-table entries for `export-proposal.md`
+  and `ui-cohesion-proposal.md` are updated to record this decision.

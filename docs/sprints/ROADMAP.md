@@ -1,8 +1,8 @@
 # Implementation Roadmap
 
-**Plan revision:** 36
+**Plan revision:** 38
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — every planned sprint (001–067) is complete; see `docs/agent/state.json`.
+**Active sprint:** [070 — One surface](070-one-surface.md); see `docs/agent/state.json`.
 
 ## Shape of the plan
 
@@ -1481,43 +1481,52 @@ spelling, and a registry-declared `table` CSV means no domain can exist that can
 
 - **[068 — Export the way we import](068-export-the-way-we-import.md)** — the contract, the registry
   point, the shared walk, the `table` view, the Goodreads writer moved into `domains/book/`,
-  `GET /api/exports` and `GET /api/export/{view}`. Backend only. **Active.**
+  `GET /api/exports` and `GET /api/export/{view}`. Backend only.
 - **[069 — A door out of the app](069-a-door-out-of-the-app.md)** — a third tab on `/import` that
   renders the declarations, with counts, guide steps, download and failure states. After this sprint
   the feature is complete for every domain.
-- **[070 — Their formats, not ours](070-their-formats-not-ours.md)** — MyAnimeList XML, the
-  Letterboxd import CSV, and the recorded series decision. Its acceptance criterion is that it
-  changes no frontend file. **If the release has to be cut, cut this one.**
+- ~~**070 — Their formats, not ours** — MyAnimeList XML, the Letterboxd import CSV, and the
+  recorded series decision.~~ **Withdrawn 2026-09-04 (DEC-136).** Built and verified in full, then
+  reverted the same day: the owner's actual request was a simple exporter complete enough to
+  rebuild a library from, not a suite of formats mirroring every other application's own import
+  shape. `GET /api/export` (JSON) and the `table` CSV from Sprint 068 already satisfy that; a
+  target-specific exporter is real scope, real ongoing maintenance against services this repository
+  does not control, and was never asked for at that size. Read DEC-136 before proposing another
+  one — the bar for a provider-specific exporter now is that it is modular, not compiled into the
+  always-on core registry every install carries and shows.
 
-`FINAL_SPRINT` in `scripts/validate_project.py` moves from 67 to 70 with this revision. Every format
-proposed except the series target is one this repository already parses, so an exporter is proven
-by round-tripping its bytes through the domain's own reader (DEC-025).
+[Closed 2026-09-04. 068 and 069 shipped as planned — see their own Outcome sections. `FINAL_SPRINT`
+in `scripts/validate_project.py` reached 70 briefly while 070 was built, then returned to 069's
+line and moved on with the renumbering below (DEC-136): the freed slot goes to the UI-cohesion
+line, not to a gap.]
 
-## Proposed and not yet scheduled — the v1.8.0 candidate
+### The rest of the app, redrawn
 
-**[`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md) — the rest of the app, redrawn.**
-Written 2026-09-04 at the owner's request. **Not accepted.** Accepting it is the owner's decision
-and would carry its own decision record, the way DEC-132 accepted the insights redesign and
-DEC-135 accepted the export line above. Until then Sprints 071–072 exist only as drafts with
-`Status: planned`.
+**Owner feedback, 2026-09-04, accepted as DEC-136 and scheduled as Sprints 070–071** (renumbered
+from 071–072 to close the gap left by withdrawing the export line's own Sprint 070 above).
+
+> *"the last sprints involved a redesign to the UI of the new insights feature. I want you to look
+> at the rest of the app and apply some of the new design principles to it, so everything feels
+> cohesive."*
 
 Sprints 066 and 067 did not invent a style; they applied decisions this application already had to
-one screen. The proposal names the seven rules that produced and eleven places the other screens
-disagree with them, each traced to a line: the score ramp painting something that is not a score,
-the biggest cover in the product not drawn by `CoverImage`, a shelves screen that cannot open a
-shelf, six box idioms, three page headers and four ways back, the domain strip and the segmented
-control each written twice, and only one of the library's five filters saying it is set.
+one screen. **[`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md)** names the seven rules
+that produced and eleven places the other screens disagree with them, each traced to a line: the
+score ramp painting something that is not a score, the biggest cover in the product not drawn by
+`CoverImage`, a shelves screen that cannot open a shelf, six box idioms, three page headers and
+four ways back, the domain strip and the segmented control each written twice, and only one of the
+library's five filters saying it is set.
 
-- **[071 — One surface](071-one-surface.md)** — the `Panel`, `PageHeader`, `SegmentedControl` and
+- **[070 — One surface](070-one-surface.md)** — the `Panel`, `PageHeader`, `SegmentedControl` and
   `DomainStrip` primitives applied across every screen; every cover through `CoverImage`; the import
   preview's chips and labels; **and DEC-134's outstanding 390px domain-strip overflow paid once, for
   both screens.** Frontend only.
-- **[072 — What the numbers say](072-what-the-numbers-say.md)** — shelves as an openable ranking with
+- **[071 — What the numbers say](071-what-the-numbers-say.md)** — shelves as an openable ranking with
   covers and magnitude bars, an active-filters row on the library, and weight on counts that
   describe a whole. `ShelfResponse.covers` is the only backend change in the line, and it is the
   same lateral top-3 join DEC-134 already benchmarked.
 
-This line is independent of the export line above and can be taken in either order relative to it.
+`FINAL_SPRINT` in `scripts/validate_project.py` moves from 69 to 71 with this revision (DEC-136).
 
 ## Not scheduled
 

@@ -1,9 +1,9 @@
 {
   "schema_version": 1,
-  "plan_revision": 37,
+  "plan_revision": 38,
   "project_status": "ready",
   "active_sprint": "070",
-  "active_sprint_file": "docs/sprints/070-their-formats-not-ours.md",
+  "active_sprint_file": "docs/sprints/070-one-surface.md",
   "active_sprint_status": "ready",
   "last_completed_sprint": "069",
   "completed_sprints": [
@@ -78,5 +78,5 @@
     "069"
   ],
   "started_at": null,
-  "updated_at": "2026-09-04T15:20:00-03:00"
+  "updated_at": "2026-09-04T17:10:00-03:00"
 }

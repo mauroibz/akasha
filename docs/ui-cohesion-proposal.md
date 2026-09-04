@@ -145,8 +145,8 @@ needs no new data first, everything that does second.
 
 | Sprint | Delivers | Backend |
 |---|---|---|
-| **[071 — One surface](sprints/071-one-surface.md)** | §3.1–3.4 and §3.6: the `Panel`, `PageHeader`, `SegmentedControl` and `DomainStrip` primitives, applied across Detail, Shelves, Import, Add, Triage and Library; every cover through `CoverImage`; the import preview's chips, labels and misused ramp; the 390px overflow paid once. | **None.** |
-| **[072 — What the numbers say](sprints/072-what-the-numbers-say.md)** | §3.5, §3.7 and §3.8: shelves as an openable ranking with covers and bars, the active-filters row, and weight on the counts that describe a whole. | `ShelfWithCount.covers`, one lateral join. |
+| **[070 — One surface](sprints/070-one-surface.md)** | §3.1–3.4 and §3.6: the `Panel`, `PageHeader`, `SegmentedControl` and `DomainStrip` primitives, applied across Detail, Shelves, Import, Add, Triage and Library; every cover through `CoverImage`; the import preview's chips, labels and misused ramp; the 390px overflow paid once. | **None.** |
+| **[071 — What the numbers say](sprints/071-what-the-numbers-say.md)** | §3.5, §3.7 and §3.8: shelves as an openable ranking with covers and bars, the active-filters row, and weight on the counts that describe a whole. | `ShelfWithCount.covers`, one lateral join. |
 
 Neither sprint changes a screen's behaviour, and that is the acceptance criterion that
 holds them honest: **the existing component and e2e suites pass unchanged**, except where a
@@ -176,7 +176,7 @@ named in the sprint.
   no test is rewritten to fit a new class name unless the sprint names that test.
 - **Extracting a primitive can flatten a deliberate difference.** Three of the boxes above
   differ for reasons — the library's translucent surface sits under a virtualized list, the
-  connector guide is deliberately quieter than the form it sits beside. Sprint 071 must
+  connector guide is deliberately quieter than the form it sits beside. Sprint 070 must
   keep a difference it can justify in one sentence and unify the rest, rather than making
   everything identical and calling that coherence.
 - **Screenshots are the only real evidence for this work, and this repository's gates do not

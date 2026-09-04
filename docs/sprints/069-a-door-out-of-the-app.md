@@ -130,7 +130,7 @@ After this sprint the feature is complete and usable for every domain.
   report *working* honestly but cannot report *42%*. Do not invent a percentage.
 - **A three-tab strip at 390px is where the workflow strip gets tight.** It is the same
   class of problem as DEC-134's domain strip; this sprint measures it rather than
-  assuming, and if it needs the scrolling treatment it says so for Sprint 071.
+  assuming, and if it needs the scrolling treatment it says so for Sprint 070.
 - **Counts cost a query per view.** If `GET /api/exports` is slow on a real library,
   measure before adding a parameter — the precedent is DEC-133's answer to the same
   question.
