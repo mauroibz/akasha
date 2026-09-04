@@ -22,6 +22,9 @@ import {
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
 import { AkashaMark } from "@/components/AkashaMark";
+import { DomainStrip } from "@/components/DomainStrip";
+import { PageHeader } from "@/components/PageHeader";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { useMotionPresets } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -530,42 +533,38 @@ export function HomePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
-      <header className="flex flex-wrap items-end justify-between gap-5 border-b border-border pb-6">
-        {/* The horizontal lockup: mark at 48px, then the wide-tracked eyebrow
+      {/* The horizontal lockup: mark at 48px, then the wide-tracked eyebrow
           over the tight-tracked wordmark. Mirrors
           docs/brand/source/lockup-horizontal.svg. */}
-        <div className="flex items-center gap-4">
+      <PageHeader
+        icon={
           <AkashaMark
             size={48}
             className="shrink-0 text-foreground"
             aria-hidden="true"
           />
-          <div>
-            <p className="text-xs font-semibold uppercase tracking-[0.3em] text-primary">
-              Personal library
-            </p>
-            <h1 className="mt-2 text-4xl font-semibold tracking-tight">
-              Akasha
-            </h1>
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="rounded-full aria-pressed:border-primary aria-pressed:text-primary"
-            aria-pressed={filters.statuses.includes("unsorted")}
-            onClick={() => void navigate("/import?tab=triage")}
-          >
-            Inbox {inboxCount}
-          </Button>
-          <Button
-            className="rounded-full px-5"
-            onClick={() => searchRef.current?.focus()}
-          >
-            Add to library
-          </Button>
-        </div>
-      </header>
+        }
+        eyebrow="Personal library"
+        title="Akasha"
+        actions={
+          <>
+            <Button
+              variant="outline"
+              className="rounded-full aria-pressed:border-primary aria-pressed:text-primary"
+              aria-pressed={filters.statuses.includes("unsorted")}
+              onClick={() => void navigate("/import?tab=triage")}
+            >
+              Inbox {inboxCount}
+            </Button>
+            <Button
+              className="rounded-full px-5"
+              onClick={() => searchRef.current?.focus()}
+            >
+              Add to library
+            </Button>
+          </>
+        }
+      />
       {/* One bar, one row: which domain, the query, and the override.
           The domain strip sits inside it rather than under the filters, because it
           now picks two things at once — the rows shown and the providers a search
@@ -576,28 +575,11 @@ export function HomePage() {
         className="mt-6 flex flex-wrap items-center gap-3"
       >
         {domains.length > 1 && (
-          <div
-            role="radiogroup"
-            aria-label="Choose a domain"
-            className="inline-flex shrink-0 rounded-full bg-surface p-1"
-          >
-            {domains.map((choice) => (
-              <button
-                key={choice.id}
-                type="button"
-                role="radio"
-                aria-checked={selectedDomain === choice.id}
-                className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                  selectedDomain === choice.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                } focus-ring`}
-                onClick={() => chooseDomain(choice.id)}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
+          <DomainStrip
+            domains={domains}
+            value={selectedDomain}
+            onChange={chooseDomain}
+          />
         )}
         <label className="relative min-w-60 flex-1">
           <span className="sr-only">
@@ -757,31 +739,15 @@ export function HomePage() {
               }
             />
           )}
-          <div
-            className="flex rounded-full bg-surface p-1"
-            aria-label="Library view"
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Grid view"
-              aria-pressed={view === "grid"}
-              className="rounded-full aria-pressed:bg-surface-raised"
-              onClick={() => setLibraryView("grid")}
-            >
-              Grid
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label="Table view"
-              aria-pressed={view === "table"}
-              className="rounded-full aria-pressed:bg-surface-raised"
-              onClick={() => setLibraryView("table")}
-            >
-              Table
-            </Button>
-          </div>
+          <SegmentedControl
+            ariaLabel="Library view"
+            value={view}
+            onChange={setLibraryView}
+            options={[
+              { value: "grid", label: "Grid", ariaLabel: "Grid view" },
+              { value: "table", label: "Table", ariaLabel: "Table view" },
+            ]}
+          />
         </section>
       )}
       {library.isPending && (

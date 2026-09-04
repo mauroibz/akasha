@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { Button } from "@/components/ui/button";
+import { DomainStrip } from "@/components/DomainStrip";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { Input } from "@/components/ui/input";
 import {
   domainsFrom,
@@ -135,56 +136,20 @@ export function InsightsPage() {
           className="flex flex-wrap items-center gap-3"
         >
           {domains.length > 1 && (
-            <div
-              role="radiogroup"
-              aria-label="Choose a domain"
-              className="inline-flex shrink-0 rounded-full bg-surface p-1"
-            >
-              {domains.map((choice) => (
-                <button
-                  key={choice.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={type === choice.id}
-                  className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                    type === choice.id
-                      ? "bg-primary text-primary-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  } focus-ring`}
-                  onClick={() => setType(choice.id)}
-                >
-                  {choice.label}
-                </button>
-              ))}
-            </div>
+            <DomainStrip domains={domains} value={type} onChange={setType} />
           )}
 
           {/* A sort order, not a choice of which numbers arrive: every row carries
               both under either one. */}
-          <div
-            className="flex rounded-full bg-surface p-1"
-            role="group"
-            aria-label="Sort by"
-          >
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-pressed={sort === "count"}
-              className="min-h-11 rounded-full aria-pressed:bg-surface-raised"
-              onClick={() => setSort("count")}
-            >
-              Most collected
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-pressed={sort === "score"}
-              className="min-h-11 rounded-full aria-pressed:bg-surface-raised"
-              onClick={() => setSort("score")}
-            >
-              Best rated
-            </Button>
-          </div>
+          <SegmentedControl
+            ariaLabel="Sort by"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "count", label: "Most collected" },
+              { value: "score", label: "Best rated" },
+            ]}
+          />
         </div>
       </div>
 

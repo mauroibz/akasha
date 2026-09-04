@@ -1,6 +1,7 @@
 import { useId, useState } from "react";
 
 import type { Insight, InsightRow } from "@/api/library";
+import { Panel } from "@/components/Panel";
 import { InsightsRanking } from "@/features/library/InsightsRanking";
 import { orderRows, type InsightSort } from "@/features/library/insights";
 import { insightDepth } from "@/features/library/useInsights";
@@ -49,20 +50,19 @@ export function InsightsCard({
   const deep = insight.rows.filter((row) => row.count > 1).length;
 
   return (
-    <section
+    <Panel
       aria-labelledby={headingId}
       data-insight-card=""
-      className="flex flex-col rounded-xl border border-border bg-surface"
-    >
-      <div className="flex items-baseline justify-between gap-3 px-4 pb-2 pt-4">
-        <h2 id={headingId} className="text-sm font-semibold">
-          {title}
-        </h2>
-        <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+      className="flex flex-col"
+      bodyClassName=""
+      heading={title}
+      headingId={headingId}
+      stat={
+        <>
           {insight.rows.length} in all · {deep} held more than once
-        </span>
-      </div>
-
+        </>
+      }
+    >
       {placed.length === 0 && unplaced.length === 0 && (
         <p className="px-4 pb-4 text-sm text-muted-foreground">
           Nothing to rank here yet.
@@ -101,7 +101,7 @@ export function InsightsCard({
         showSuppressed={showSuppressed}
         onToggleSuppressed={onToggleSuppressed}
       />
-    </section>
+    </Panel>
   );
 }
 
