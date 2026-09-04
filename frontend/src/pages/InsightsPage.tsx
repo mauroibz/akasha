@@ -5,10 +5,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
 import { InsightsKeyPicker } from "@/features/library/InsightsKeyPicker";
+import { InsightsRanking } from "@/features/library/InsightsRanking";
 import { useInsights } from "@/features/library/useInsights";
 import { useItemTypes } from "@/features/library/useItemTypes";
-import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
-import { cn } from "@/lib/utils";
 
 /**
  * Ask the library a question it already has the answer to — which authors you rate
@@ -175,61 +174,19 @@ export function InsightsPage() {
       )}
 
       {insights.data && insights.data.rows.length > 0 && (
-        <table className="mt-8 w-full border-collapse text-left">
-          <thead>
-            <tr className="border-b border-border text-sm text-muted-foreground">
-              <th className="py-2 pr-3 font-medium">#</th>
-              <th className="py-2 pr-3 font-medium">{key}</th>
-              <th className="py-2 pr-3 font-medium">Count</th>
-              {metric === "score" && (
-                <>
-                  <th className="py-2 pr-3 font-medium">Rated</th>
-                  <th className="py-2 pr-3 font-medium">Mean score</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {insights.data.rows.map((row, index) => (
-              <tr key={row.key} className="border-b border-border/60">
-                <td className="py-2 pr-3 text-muted-foreground">{index + 1}</td>
-                <td className="py-2 pr-3">
-                  <button
-                    type="button"
-                    className="text-left font-medium text-primary hover:underline focus-ring"
-                    onClick={() =>
-                      navigate(
-                        `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
-                          key,
-                        )}&value=${encodeURIComponent(row.key)}`,
-                      )
-                    }
-                  >
-                    {row.label}
-                  </button>
-                </td>
-                <td className="py-2 pr-3">{row.count}</td>
-                {metric === "score" && (
-                  <>
-                    <td className="py-2 pr-3">{row.rated_count}</td>
-                    <td className="py-2 pr-3">
-                      <span
-                        className={cn(
-                          scoreChipShape,
-                          meanScoreChipClass(row.mean_score),
-                        )}
-                      >
-                        {row.mean_score !== null
-                          ? row.mean_score.toFixed(1)
-                          : "—"}
-                      </span>
-                    </td>
-                  </>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="mt-8">
+          <InsightsRanking
+            rows={insights.data.rows}
+            showScore={metric === "score"}
+            onOpen={(row) =>
+              navigate(
+                `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
+                  key,
+                )}&value=${encodeURIComponent(row.key)}`,
+              )
+            }
+          />
+        </div>
       )}
 
       {insights.data && insights.data.suppressed.length > 0 && (

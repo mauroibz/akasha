@@ -211,6 +211,34 @@ describe("InsightsPage", () => {
     expect(screen.getByText("3.0").className).toContain("bg-score-low");
   });
 
+  it("sizes each row's bar to its share of the ranking's leader", async () => {
+    // A bare numeral carries no proportion: the shipped table drew 7 and 3 the
+    // same size. The bar is the row, so the leader fills it and everyone else is
+    // measured against them.
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify(itemTypes));
+      if (url.includes("metric=score"))
+        return new Response(JSON.stringify(scoreInsight()));
+      if (url.startsWith("/api/insights"))
+        return new Response(JSON.stringify(countInsight()));
+      return new Response("[]");
+    });
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole("button", { name: "Rank by score" }));
+    await screen.findByText("Julio Cortázar");
+
+    const bars = document.querySelectorAll<HTMLElement>("[data-magnitude]");
+    expect([...bars].map((bar) => bar.dataset.magnitude)).toEqual([
+      "1",
+      "0.429",
+      "0.286",
+    ]);
+    expect(bars[0].style.width).toBe("100%");
+  });
+
   it("links a ranking row into the filtered library", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       const url = String(input);
@@ -222,7 +250,11 @@ describe("InsightsPage", () => {
     });
     const user = userEvent.setup();
     renderPage();
-    const row = await screen.findByRole("button", { name: "Julio Cortázar" });
+    // The row's accessible name carries what it holds, since its visible cells are
+    // a label, a numeral and a chip.
+    const row = await screen.findByRole("button", {
+      name: "Julio Cortázar: 3 entries, mean score 9.0 from 2 rated",
+    });
 
     await user.click(row);
 
