@@ -2,11 +2,12 @@
 
 **Status:** planned
 **Depends on:** 069
-**Roadmap revision:** 36
+**Roadmap revision:** 37
 
-> Planned from [`../export-proposal.md`](../export-proposal.md) §2.3. **Not accepted; not
-> scheduled.** Proposal §4: *if the release has to be cut, cut this sprint* — after 069
-> every domain can already leave in JSON and in a CSV, from a button.
+> Planned from [`../export-proposal.md`](../export-proposal.md) §2.3. **Accepted as
+> DEC-135;** remains `planned` until 069 closes. Proposal §4: *if the release has to be cut,
+> cut this sprint* — after 069 every domain can already leave in JSON and in a CSV, from a
+> button.
 
 ## Objective
 

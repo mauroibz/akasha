@@ -1459,28 +1459,29 @@ revision.
 the owner's real library, and reporting whether score density makes the score metric worth having,
 still needs the owner's own instance.
 
-## Proposed and not yet scheduled — the v1.8.0 candidates
+### Export gets the shape import already has
 
-Two proposals written 2026-09-04 at the owner's request, as the features that would close the next
-minor release. **Neither is accepted.** Accepting one is the owner's decision and would carry its own
-decision record, the way DEC-132 accepted the insights redesign. Until then:
-`docs/agent/state.json` still reads `complete`, `FINAL_SPRINT` in `scripts/validate_project.py` is
-still 67, and Sprints 068–072 exist only as drafts with `Status: planned`.
+**Owner feedback, 2026-09-04, accepted as DEC-135 and scheduled as Sprints 068–070.**
 
-**[`../export-proposal.md`](../export-proposal.md) — getting your data out.** Export shipped in
-Sprint 024 and has not been touched since: `GET /api/export` is the entire surface, there is no
-button anywhere in the application, and of five domains only books can leave in a format another
-application reads. The Goodreads column list also lives in a shared module and branches on item
-type — the last such branch in the codebase, and Sprint 028's contract says it belongs beside the
-reader of the same file. The proposal mirrors the import side: an `ExportView` declares itself the
-way an `Importer` does (DEC-080), a shared walk owns the streaming and the view owns only the
+Export shipped in Sprint 024 and has not been touched since: `GET /api/export` is the entire
+surface, there is no button anywhere in the application, and of five domains only books can leave
+in a format another application reads. The full evidence, the design, and the costing are in
+**[`../export-proposal.md`](../export-proposal.md)**. The findings that carry the rest:
+
+- **No door.** `GET /api/export` has no button anywhere in the application.
+- **One domain out of five round-trips.** Only books leave in a format (Goodreads CSV) another
+  application reads; the other four have no export at all.
+- **The last item-type branch in a shared layer.** The Goodreads column list lives in
+  `application/export.py` and branches on `item.type` — Sprint 028's contract says format-specific
+  code belongs beside the reader of the same file, and every other domain already follows it.
+
+Scheduled as three sprints, mirroring the import side's `Importer` contract (DEC-080): an
+`ExportView` declares itself, a shared walk owns the streaming and the view owns only the
 spelling, and a registry-declared `table` CSV means no domain can exist that cannot be exported.
-Every format proposed except the series target is one this repository already parses, so an
-exporter is proven by round-tripping its bytes through the domain's own reader (DEC-025).
 
 - **[068 — Export the way we import](068-export-the-way-we-import.md)** — the contract, the registry
   point, the shared walk, the `table` view, the Goodreads writer moved into `domains/book/`,
-  `GET /api/exports` and `GET /api/export/{view}`. Backend only.
+  `GET /api/exports` and `GET /api/export/{view}`. Backend only. **Active.**
 - **[069 — A door out of the app](069-a-door-out-of-the-app.md)** — a third tab on `/import` that
   renders the declarations, with counts, guide steps, download and failure states. After this sprint
   the feature is complete for every domain.
@@ -1488,7 +1489,18 @@ exporter is proven by round-tripping its bytes through the domain's own reader (
   Letterboxd import CSV, and the recorded series decision. Its acceptance criterion is that it
   changes no frontend file. **If the release has to be cut, cut this one.**
 
+`FINAL_SPRINT` in `scripts/validate_project.py` moves from 67 to 70 with this revision. Every format
+proposed except the series target is one this repository already parses, so an exporter is proven
+by round-tripping its bytes through the domain's own reader (DEC-025).
+
+## Proposed and not yet scheduled — the v1.8.0 candidate
+
 **[`../ui-cohesion-proposal.md`](../ui-cohesion-proposal.md) — the rest of the app, redrawn.**
+Written 2026-09-04 at the owner's request. **Not accepted.** Accepting it is the owner's decision
+and would carry its own decision record, the way DEC-132 accepted the insights redesign and
+DEC-135 accepted the export line above. Until then Sprints 071–072 exist only as drafts with
+`Status: planned`.
+
 Sprints 066 and 067 did not invent a style; they applied decisions this application already had to
 one screen. The proposal names the seven rules that produced and eleven places the other screens
 disagree with them, each traced to a line: the score ramp painting something that is not a score,
@@ -1505,7 +1517,7 @@ control each written twice, and only one of the library's five filters saying it
   describe a whole. `ShelfResponse.covers` is the only backend change in the line, and it is the
   same lateral top-3 join DEC-134 already benchmarked.
 
-The two lines are independent. Either can be taken alone, in either order.
+This line is independent of the export line above and can be taken in either order relative to it.
 
 ## Not scheduled
 

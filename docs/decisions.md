@@ -5274,3 +5274,41 @@ both changes, against 1 of 3 before the second.
   `uv` immediately refused as an inconsistent wheel filename on the next `make openapi` —
   reverted to `pluggy`'s real `1.6.0` before anything else ran. The lesson: a version bump
   belongs to one named package's line, never to a string pattern across a lockfile.
+
+## DEC-135 — The export line is accepted; the roadmap extends to Sprint 070
+
+- **Date:** 2026-09-04
+- **Status:** accepted
+- **Supersedes:** nothing.
+- **Cross-references:** DEC-080 (a connector declares itself and the screen renders the
+  declaration — the pattern this line applies to export), DEC-025 (a mock in place of the
+  unit under test does not satisfy a correctness criterion — why the round trip goes through
+  the domain's own reader), DEC-054 (owner data in, derived data out), DEC-127 (the precedent
+  for moving `FINAL_SPRINT` and recording the move here), DEC-132 (the same acceptance pattern
+  for the insights redesign).
+- **Context:** [`export-proposal.md`](export-proposal.md), written 2026-09-04 at the
+  owner's request, found that export shipped in Sprint 024 and has not changed since: `GET
+  /api/export` is the entire surface, no button exists anywhere in the application, and of
+  five domains only books can leave in a format another application reads. It also found the
+  last item-type branch in a shared module — `application/export.py`'s Goodreads columns,
+  which belong beside the reader of the same file the way every other domain's format-specific
+  code already does.
+- **Decision:** accepted as written. Export gets the shape import already has — an
+  `ExportView` declares itself the way an `Importer` does, a shared streaming walk owns the
+  keyset batching and hands the view one row at a time, and a registry-declared `table` view
+  means no domain can exist that cannot be exported. Scheduled as three sprints:
+  - **[068 — Export the way we import](sprints/068-export-the-way-we-import.md)**: the
+    contract, the registry point, the shared walk, the `table` view, the Goodreads writer
+    moved into `domains/book/`, `GET /api/exports` and `GET /api/export/{view}`. Backend only.
+  - **[069 — A door out of the app](sprints/069-a-door-out-of-the-app.md)**: a third tab on
+    `/import` rendering the declarations, with counts, guide steps, download and failure
+    states.
+  - **[070 — Their formats, not ours](sprints/070-their-formats-not-ours.md)**: MyAnimeList
+    XML, the Letterboxd import CSV, and the recorded series decision. Changes no frontend file.
+- **The UI-cohesion line stays proposed.** `docs/ui-cohesion-proposal.md` and Sprints 071–072
+  are unaffected by this decision; they remain unaccepted, and the roadmap's "Proposed and not
+  yet scheduled" section is trimmed to that line alone.
+- **Consequences:** `docs/agent/state.json` leaves `complete` — `active_sprint` becomes `068`,
+  `ready`; `last_completed_sprint` stays `067`. `scripts/validate_project.py`'s `FINAL_SPRINT`
+  moves from 67 to 70. Plan revision moves to 37. `docs/export-proposal.md` stays in the
+  documentation map as the accepted proposal Sprints 068–070 implement.

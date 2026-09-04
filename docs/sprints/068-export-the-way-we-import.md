@@ -1,12 +1,10 @@
 # Sprint 068 — Export the way we import
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 067
-**Roadmap revision:** 36
+**Roadmap revision:** 37
 
-> Planned from [`../export-proposal.md`](../export-proposal.md). **Not accepted; not
-> scheduled.** Accepting this line is the owner's decision and would carry its own
-> decision record.
+> Planned from [`../export-proposal.md`](../export-proposal.md). **Accepted as DEC-135.**
 
 ## Objective
 

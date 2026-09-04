@@ -2,10 +2,10 @@
 
 **Status:** planned
 **Depends on:** 068
-**Roadmap revision:** 36
+**Roadmap revision:** 37
 
-> Planned from [`../export-proposal.md`](../export-proposal.md). **Not accepted; not
-> scheduled.**
+> Planned from [`../export-proposal.md`](../export-proposal.md). **Accepted as DEC-135;**
+> remains `planned` until 068 closes.
 
 ## Objective
 

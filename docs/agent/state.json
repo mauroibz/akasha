@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 36,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 37,
+  "project_status": "ready",
+  "active_sprint": "068",
+  "active_sprint_file": "docs/sprints/068-export-the-way-we-import.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "067",
   "completed_sprints": [
     "001",
@@ -76,5 +76,5 @@
     "067"
   ],
   "started_at": null,
-  "updated_at": "2026-09-04T00:20:00-03:00"
+  "updated_at": "2026-09-04T00:45:00-03:00"
 }
