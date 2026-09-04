@@ -1350,6 +1350,50 @@ measured.
 thirteen carried over; the firing rule gained three clauses in the building and is recorded as built
 in DEC-073.
 
+## Owner feedback — recorded 2026-09-03, proposed and not yet scheduled
+
+### The insights screen is the right feature on the wrong surface
+
+Raised after using what Sprint 065 shipped: *"I really like the data this feature provides, but
+dislike its implementation on the frontend… At the very least I expected there to be colored numbers
+at the score/ranking, but there is a lot of room to grow, from how we select the current insights to
+how they are displayed."*
+
+Traced rather than taken as an impression, and the causes are all in the presentation layer —
+`GET /api/insights`, the ranking query, the `groupable` declaration and the suppression list are
+unaffected. The full evidence, the design, the placement alternatives and the costing are in
+**[`../insights-redesign-proposal.md`](../insights-redesign-proposal.md)**. The three findings that
+carry the rest:
+
+- **The one screen whose subject is scores is the only one that does not use the score ramp.**
+  `mean_score.toFixed(1)` renders as body text while `scoreChipClass` colours the same number on the
+  library card, the triage row and the detail page.
+- **Half of every response is discarded.** `rated_count` and `mean_score` are dropped in `count`
+  mode; `score_spread` — computed in the query and serialized on every row — is rendered in neither
+  mode.
+- **The page is a query builder, not an answer.** Four controls above one table, one question per
+  visit, and the only interaction navigates away. Which key is offered first is `__init__.py` order,
+  which is the "how we select the current insights" half of the feedback.
+
+Drafted as two sprints, both **`planned` and neither scheduled** — `docs/agent/state.json` still
+reads `complete`, and `FINAL_SPRINT` in `scripts/validate_project.py` is still 65:
+
+- **[066 — Insights you can read](066-insights-you-can-read.md)**: the score ramp, magnitude bars,
+  both metrics on one row, a card per key ordered by what it has to say, inline expansion, and the
+  library breadcrumb. **No backend change is required** — the endpoint already returns everything it
+  draws, which is why this is the first sprint and why it can be taken alone.
+- **[067 — Insights with faces](067-insights-with-faces.md)**: covers on a ranking row, the library
+  totals a superlative needs, and forwarding `rank()`'s existing `statuses`/`shelves`/`q`/`formats`
+  parameters through the endpoint, which the service already accepts and only the route withholds.
+
+Split at the backend boundary deliberately: 066 ships the whole felt improvement against the
+contract as it stands, and the split follows the standing rule that a design is delivered across the
+sprints it needs rather than trimmed into one.
+
+**Sprint 065's outstanding walkthrough is not discharged by either.** Running the rankings against
+the owner's real library, and reporting whether score density makes the score metric worth having,
+still needs the owner's own instance.
+
 ## Not scheduled
 
 - **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
