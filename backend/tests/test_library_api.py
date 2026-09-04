@@ -124,6 +124,9 @@ async def test_shelf_entry_counts_and_deletion_retains_entries(tmp_path: Path) -
             shelves = await client.get("/api/shelves")
             assert shelves.status_code == 200
             assert shelves.json()[0]["entry_count"] == 1
+            # No cover installed: `covers` is present on the schema and empty
+            # (Sprint 071 deliverable 1), not simply absent.
+            assert shelves.json()[0]["covers"] == []
 
             # Delete shelf detaches entries but does not delete them
             assert (await client.delete(f"/api/shelves/{shelf_id}")).status_code == 204
@@ -135,6 +138,30 @@ async def test_shelf_entry_counts_and_deletion_retains_entries(tmp_path: Path) -
             item = await client.get(f"/api/items/{created.item_id}")
             assert item.status_code == 200
             assert item.json()["title"] == "Rayuela"
+
+
+@pytest.mark.anyio
+async def test_get_shelves_carries_covers_in_its_schema(tmp_path: Path) -> None:
+    """Sprint 071 deliverable 1: `GET /api/shelves` carries `covers`, over real HTTP."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        repository.set_cover_path(created.item_id, f"{created.item_id}.jpg")
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            shelf = await client.post("/api/shelves", json={"name": "Favorites"})
+            shelf_id = shelf.json()["id"]
+            await client.patch(
+                f"/api/entries/{created.entry_id}",
+                json={"status": "read", "shelf_ids": [shelf_id]},
+            )
+            shelves = await client.get("/api/shelves")
+    assert shelves.status_code == 200
+    row = shelves.json()[0]
+    assert len(row["covers"]) == 1
+    assert row["covers"][0].startswith(f"/api/items/{created.item_id}/cover?v=")
 
 
 # --------------------------------------------------------------------------------------

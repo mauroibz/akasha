@@ -1,6 +1,6 @@
 # Sprint 071 — What the numbers say
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 070
 **Roadmap revision:** 38
 

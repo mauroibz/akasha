@@ -71,6 +71,10 @@ class ShelfResponse(BaseModel):
     name: str
     slug: str
     entry_count: int = 0
+    #: Up to three cover URLs from the shelf's own members (Sprint 071), the same
+    #: lateral top-3 join `InsightRowResponse.covers` already does (DEC-134). Empty
+    #: when no member carries a cover, or when the shelf is empty.
+    covers: list[str] = Field(default_factory=list)
 
 
 class SourceResponse(BaseModel):

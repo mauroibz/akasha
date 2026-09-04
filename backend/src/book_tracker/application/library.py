@@ -585,7 +585,63 @@ class LibraryService:
                 .where(ShelfRow.user_id == self.user_id)
                 .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
             ).all()
-            return [{**self._shelf_dict(row[0]), "entry_count": row[1]} for row in rows]
+            covers_by_shelf = self._shelf_covers(session, [row[0].id for row in rows])
+            return [
+                {
+                    **self._shelf_dict(row[0]),
+                    "entry_count": row[1],
+                    "covers": covers_by_shelf.get(row[0].id, []),
+                }
+                for row in rows
+            ]
+
+    @staticmethod
+    def _shelf_covers(session: Session, shelf_ids: Sequence[int]) -> dict[int, list[str]]:
+        """Up to three cover URLs behind each shelf (Sprint 071 deliverable 1).
+
+        The same lateral top-3 join `_insight_covers` built and DEC-134 benchmarked for
+        insights rows, keyed by shelf id rather than a ranking's normalized grouping
+        value. Highest scored first, then most recently added, then by entry id — pinned
+        rather than left to the query planner, for the same reason a reshuffling stack of
+        faces would read as a bug. Only members whose item actually carries a cover
+        contribute; a shelf with no covered member returns an empty list, and so does an
+        empty shelf.
+        """
+        if not shelf_ids:
+            return {}
+        ranked = (
+            select(
+                EntryShelfRow.shelf_id,
+                ItemRow.id.label("item_id"),
+                ItemRow.updated_at,
+                func.row_number()
+                .over(
+                    partition_by=EntryShelfRow.shelf_id,
+                    order_by=(
+                        EntryRow.score.desc(),
+                        EntryRow.date_added.desc(),
+                        EntryRow.id.desc(),
+                    ),
+                )
+                .label("rn"),
+            )
+            .select_from(EntryShelfRow)
+            .join(EntryRow, EntryRow.id == EntryShelfRow.entry_id)
+            .join(ItemRow, ItemRow.id == EntryRow.item_id)
+            .where(ItemRow.cover_path.isnot(None), EntryShelfRow.shelf_id.in_(shelf_ids))
+        ).subquery()
+        rows = session.execute(
+            select(ranked.c.shelf_id, ranked.c.item_id, ranked.c.updated_at)
+            .where(ranked.c.rn <= 3)
+            .order_by(ranked.c.shelf_id, ranked.c.rn)
+        ).all()
+        covers: dict[int, list[str]] = {}
+        for row in rows:
+            version = row.updated_at.replace(":", "").replace("-", "")
+            covers.setdefault(row.shelf_id, []).append(
+                f"/api/items/{row.item_id}/cover?v={version}"
+            )
+        return covers
 
     def create_shelf(self, name: str) -> dict[str, Any]:
         try:

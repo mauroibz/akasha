@@ -96,3 +96,72 @@ async def test_an_undeclared_key_is_refused(tmp_path: Path) -> None:
         with pytest.raises(LibraryError) as refused:
             service.list_entries(types=["book"], key="description", value="x")
     assert refused.value.code == "invalid_insight_key"
+
+
+# --------------------------------------------------------------------------------------
+# Sprint 071 deliverable 1: `list_shelves` gains up to three covers per shelf, the same
+# lateral top-3 join DEC-134 built and benchmarked for insights rows.
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_list_shelves_returns_up_to_three_covers_highest_scored_first(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        service = LibraryService(app.state.engine)
+        shelf = service.create_shelf("Favorites")
+
+        best = repository.create_or_get_entry(title="Best", creators=["Author"])
+        middling = repository.create_or_get_entry(title="Middling", creators=["Author"])
+        weakest = repository.create_or_get_entry(title="Weakest", creators=["Author"])
+        uncovered = repository.create_or_get_entry(title="Uncovered", creators=["Author"])
+        for entry, score in ((best, 9), (middling, 6), (weakest, 2), (uncovered, 8)):
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    text("UPDATE entries SET status='read', score=:score WHERE id=:id"),
+                    {"score": score, "id": entry.entry_id},
+                )
+        for entry in (best, middling, weakest):
+            repository.set_cover_path(entry.item_id, f"{entry.item_id}.jpg")
+
+        for entry in (best, middling, weakest, uncovered):
+            service.update_entry(entry.entry_id, {"shelf_ids": [shelf["id"]]})
+
+        shelves = service.list_shelves()
+        row = next(row for row in shelves if row["id"] == shelf["id"])
+        assert len(row["covers"]) == 3
+        item_ids = [int(url.split("/")[3]) for url in row["covers"]]
+        assert item_ids == [best.item_id, middling.item_id, weakest.item_id]
+        assert uncovered.item_id not in item_ids
+
+
+@pytest.mark.anyio
+async def test_a_shelf_with_no_covered_members_returns_an_empty_list(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        service = LibraryService(app.state.engine)
+        shelf = service.create_shelf("Favorites")
+        entry = repository.create_or_get_entry(title="Uncovered", creators=["Author"])
+        service.update_entry(entry.entry_id, {"shelf_ids": [shelf["id"]]})
+
+        shelves = service.list_shelves()
+        row = next(row for row in shelves if row["id"] == shelf["id"])
+        assert row["covers"] == []
+
+
+@pytest.mark.anyio
+async def test_an_empty_shelf_returns_an_empty_covers_list(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        service = LibraryService(app.state.engine)
+        shelf = service.create_shelf("Empty")
+
+        shelves = service.list_shelves()
+        row = next(row for row in shelves if row["id"] == shelf["id"])
+        assert row["covers"] == []
