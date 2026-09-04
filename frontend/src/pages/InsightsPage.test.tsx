@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes, useSearchParams } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -42,7 +42,24 @@ const bookType = {
   chooses_covers: false,
 };
 
-const itemTypes = [bookType];
+/** The same key, named differently by its own domain: `Authors` against `Artists`. */
+const albumType = {
+  ...bookType,
+  id: "album",
+  label: "Album",
+  fields: [
+    {
+      name: "creators",
+      label: "Artists",
+      type: "text",
+      multiplicity: "many",
+      groupable: true,
+    },
+  ],
+  entry_panel_label: "Your listening data",
+};
+
+const itemTypes = [bookType, albumType];
 
 function row(
   label: string,
@@ -92,19 +109,43 @@ function defaultRows() {
   ];
 }
 
-/** Every screen request, with the ranking swappable per test. */
-function stubApi(insight: ReturnType<typeof ranking> = ranking()) {
+type Rows = ReturnType<typeof defaultRows>;
+
+/**
+ * A ranking per key. The page asks for all of a domain's keys at once now, and
+ * four cards of identical rows would make every assertion ambiguous.
+ */
+const defaultRankings: Record<string, Rows> = {
+  creators: defaultRows(),
+  publisher: [
+    row("Alfaguara", 4, 3, 8.0),
+    row("Anagrama", 2, 2, 9.0),
+    row("Gollancz", 1, 0, null),
+  ],
+  year: [row("1963", 2, 2, 9.5), row("1974", 1, 1, 10)],
+  decade: [row("1960s", 4, 3, 9.1), row("1970s", 3, 2, 8.2)],
+};
+
+/** Every screen request, with the rankings swappable per key. */
+function stubApi(rankings: Record<string, Rows> = defaultRankings) {
   const calls: string[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
     calls.push(url);
     if (url === "/api/item-types")
       return new Response(JSON.stringify(itemTypes));
-    if (url.startsWith("/api/insights"))
-      return new Response(JSON.stringify(insight));
+    if (url.startsWith("/api/insights")) {
+      const key = new URL(url, "http://library.test").searchParams.get("key");
+      return new Response(JSON.stringify(ranking(rankings[key ?? ""] ?? [])));
+    }
     return new Response("[]");
   });
   return calls;
+}
+
+/** One card, by the name its own domain gives the key. */
+function card(name: string) {
+  return within(screen.getByRole("region", { name: new RegExp(`^${name}`) }));
 }
 
 /** Renders where an insights row's link lands, so a click's URL is observable. */
@@ -132,11 +173,39 @@ function renderPage() {
 afterEach(() => vi.restoreAllMocks());
 
 describe("InsightsPage", () => {
-  it("ranks the first domain by its first groupable key on load", async () => {
+  it("answers on arrival, with a card for every key the domain declares", async () => {
+    // Sprint 065 asked one question per visit: a popover, a refetch, and no way
+    // to see two answers beside each other.
     stubApi();
     renderPage();
-    expect(await screen.findByText("Julio Cortázar")).toBeVisible();
-    expect(screen.getByText("7")).toBeVisible();
+    await screen.findByText("Julio Cortázar");
+
+    expect(
+      screen
+        .getAllByRole("region")
+        .map(
+          (node) =>
+            node.getAttribute("aria-label") ??
+            within(node).getByRole("heading").textContent,
+        ),
+    ).toEqual(["Authors", "Publisher", "Year", "Decade"]);
+  });
+
+  it("titles a card the way the domain itself names that key", async () => {
+    // <th>{key}</th> printed the raw field name, lowercased, for every domain
+    // alike. The same field is Authors for books and Artists for albums.
+    stubApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Julio Cortázar");
+    expect(screen.getByRole("heading", { name: "Authors" })).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: "Album" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Artists" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Authors" })).toBeNull();
   });
 
   it("paints a mean score with the band the ramp gives it", async () => {
@@ -147,12 +216,13 @@ describe("InsightsPage", () => {
     stubApi();
     renderPage();
 
+    await screen.findByText("Julio Cortázar");
+
     // 8.8 is nearly a 9 and reads as one; 7.7 is an 8; 3.0 is a 3.
-    expect((await screen.findByText("8.8")).className).toContain(
-      "bg-score-top",
-    );
-    expect(screen.getByText("7.7").className).toContain("bg-score-high");
-    expect(screen.getByText("3.0").className).toContain("bg-score-low");
+    const authors = card("Authors");
+    expect(authors.getByText("8.8").className).toContain("bg-score-top");
+    expect(authors.getByText("7.7").className).toContain("bg-score-high");
+    expect(authors.getByText("3.0").className).toContain("bg-score-low");
   });
 
   it("sizes each row's bar to its share of the ranking's leader", async () => {
@@ -163,7 +233,9 @@ describe("InsightsPage", () => {
     renderPage();
     await screen.findByText("Julio Cortázar");
 
-    const bars = document.querySelectorAll<HTMLElement>("[data-magnitude]");
+    const bars = screen
+      .getByRole("region", { name: /^Authors/ })
+      .querySelectorAll<HTMLElement>("[data-magnitude]");
     expect([...bars].map((bar) => bar.dataset.magnitude)).toEqual([
       "1",
       "0.714",
@@ -185,7 +257,7 @@ describe("InsightsPage", () => {
     await screen.findByText("Julio Cortázar");
 
     // Sorted by how many: the leader is first, and its score is on the row.
-    expect(rowOrder()).toEqual([
+    expect(rowOrder("Authors")).toEqual([
       "Julio Cortázar",
       "Ursula K. Le Guin",
       "Italo Calvino",
@@ -193,22 +265,22 @@ describe("InsightsPage", () => {
       "Mariana Enríquez",
       "Samanta Schweblin",
     ]);
-    expect(screen.getByText("8.8")).toBeVisible();
+    expect(card("Authors").getByText("8.8")).toBeVisible();
 
     await user.click(screen.getByRole("button", { name: "Best rated" }));
 
     // Sorted by score: the counts are still on every row.
-    expect(rowOrder().slice(0, 4)).toEqual([
+    expect(rowOrder("Authors").slice(0, 4)).toEqual([
       "Ursula K. Le Guin",
       "Julio Cortázar",
       "Italo Calvino",
       "Mariana Enríquez",
     ]);
-    expect(screen.getByText("5")).toBeVisible();
+    expect(card("Authors").getByText("5")).toBeVisible();
 
-    // And the order costs no second request: one ranking answers both.
+    // And the order costs no second request: one ranking per key answers both.
     expect(calls.filter((url) => url.startsWith("/api/insights"))).toHaveLength(
-      1,
+      4,
     );
   });
 
@@ -223,17 +295,21 @@ describe("InsightsPage", () => {
 
     await user.click(screen.getByRole("button", { name: "Best rated" }));
 
-    expect(screen.getByText(/2 not rated enough to place/)).toBeVisible();
-    expect(rowOrder().slice(4)).toEqual(["Gene Wolfe", "Samanta Schweblin"]);
+    const authors = card("Authors");
+    expect(authors.getByText(/2 not rated enough to place/)).toBeVisible();
+    expect(rowOrder("Authors").slice(4)).toEqual([
+      "Gene Wolfe",
+      "Samanta Schweblin",
+    ]);
   });
 
   it("says plainly when nothing is rated enough to sort by score", async () => {
-    stubApi(
-      ranking([
+    stubApi({
+      creators: [
         row("Gene Wolfe", 2, 1, 5.0),
         row("Kazuo Ishiguro", 1, 0, null),
-      ]),
-    );
+      ],
+    });
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("Gene Wolfe");
@@ -241,7 +317,7 @@ describe("InsightsPage", () => {
     await user.click(screen.getByRole("button", { name: "Best rated" }));
 
     expect(
-      await screen.findByText(/Nothing is rated enough to sort by score yet/),
+      card("Authors").getByText(/Nothing is rated enough to sort by score/),
     ).toBeVisible();
   });
 
@@ -266,9 +342,11 @@ describe("InsightsPage", () => {
   });
 });
 
-/** The ranking's labels, in the order they are drawn. */
-function rowOrder(): string[] {
-  return [...document.querySelectorAll("[data-row-label]")].map(
-    (node) => node.textContent ?? "",
-  );
+/** One card's row labels, in the order they are drawn. */
+function rowOrder(name: string): string[] {
+  return [
+    ...screen
+      .getByRole("region", { name: new RegExp(`^${name}`) })
+      .querySelectorAll("[data-row-label]"),
+  ].map((node) => node.textContent ?? "");
 }

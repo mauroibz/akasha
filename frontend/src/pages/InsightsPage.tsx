@@ -4,9 +4,8 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
-import { InsightsKeyPicker } from "@/features/library/InsightsKeyPicker";
-import { InsightsRanking } from "@/features/library/InsightsRanking";
-import { orderRows, type InsightSort } from "@/features/library/insights";
+import { InsightsCard } from "@/features/library/InsightsCard";
+import { type InsightSort } from "@/features/library/insights";
 import { useInsights } from "@/features/library/useInsights";
 import { useItemTypes } from "@/features/library/useItemTypes";
 
@@ -17,6 +16,11 @@ import { useItemTypes } from "@/features/library/useItemTypes";
  * the cross-domain creator identity that would need, and this feature exists to keep
  * it that way. A ranking row links into the filtered library, not to a new entity
  * screen of its own.
+ *
+ * Redrawn in Sprint 066 (DEC-132). It was a query builder — four controls above one
+ * table, one question per visit, and the only interaction navigated away. It answers
+ * on arrival now: one card per key, both numbers on every row, and the accent
+ * spent on encoding a quantity rather than on colouring every label alike.
  */
 export function InsightsPage() {
   const navigate = useNavigate();
@@ -29,13 +33,12 @@ export function InsightsPage() {
   const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
 
   const [type, setType] = useState("");
-  const [key, setKey] = useState("");
   const [sort, setSort] = useState<InsightSort>("count");
   const [minRated, setMinRated] = useState(2);
   const [includeSuppressed, setIncludeSuppressed] = useState(false);
 
-  // The registry loads after this component mounts, so the first domain and its
-  // first groupable key are chosen once it arrives rather than assumed up front.
+  // The registry loads after this component mounts, so the first domain is chosen
+  // once it arrives rather than assumed up front.
   useEffect(() => {
     if (type || domains.length === 0) return;
     setType(domains[0].id);
@@ -47,200 +50,176 @@ export function InsightsPage() {
     [selectedDomain],
   );
 
-  useEffect(() => {
-    if (!selectedDomain) return;
-    if (keyOptions.some((option) => option.name === key)) return;
-    setKey(keyOptions[0]?.name ?? "");
-  }, [selectedDomain, keyOptions, key]);
+  const rankings = useInsights({
+    type,
+    keys: keyOptions.map((option) => option.name),
+    includeSuppressed,
+  });
 
-  const insights = useInsights({ type, key, includeSuppressed });
-
-  // One response, read in the order the reader asked for. `unplaced` is what the
-  // score order cannot rank -- kept and shown below a divider rather than dropped.
-  const ranking = useMemo(
-    () => orderRows(insights.data?.rows ?? [], sort, minRated),
-    [insights.data, sort, minRated],
-  );
-  const nothingPlaceable =
-    sort === "score" &&
-    ranking.placed.length === 0 &&
-    ranking.unplaced.length > 0;
+  const cards = keyOptions
+    .map((option, index) => ({ option, query: rankings[index] }))
+    .filter((card) => card.query?.data);
+  const pending = rankings.some((query) => query.isPending);
+  const failed =
+    rankings.length > 0 && rankings.every((query) => query.isError);
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-5 py-8">
-      <Button variant="ghost" className="px-0" onClick={() => navigate("/")}>
-        ← Library
-      </Button>
-      <h1
-        ref={headingRef}
-        tabIndex={-1}
-        className="mt-6 text-4xl font-semibold focus:outline-none"
-      >
-        Insights
-      </h1>
-      <p className="mt-2 text-muted-foreground">
-        A ranking from what your library already declares — one domain at a
-        time.
-      </p>
-
-      <section
-        aria-label="Ranking controls"
-        className="mt-6 flex flex-wrap items-center gap-3"
-      >
-        {domains.length > 1 && (
-          <div
-            role="radiogroup"
-            aria-label="Choose a domain"
-            className="inline-flex shrink-0 rounded-full bg-surface p-1"
+    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <h1
+            ref={headingRef}
+            tabIndex={-1}
+            className="text-4xl font-semibold focus:outline-none"
           >
-            {domains.map((choice) => (
-              <button
-                key={choice.id}
-                type="button"
-                role="radio"
-                aria-checked={type === choice.id}
-                className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
-                  type === choice.id
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                } focus-ring`}
-                onClick={() => setType(choice.id)}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-        )}
-
-        <InsightsKeyPicker options={keyOptions} value={key} onChange={setKey} />
-
-        {/* A sort order, not a choice of which numbers arrive: every row carries
-            both under either one. */}
-        <div
-          className="flex rounded-full bg-surface p-1"
-          role="group"
-          aria-label="Sort by"
-        >
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={sort === "count"}
-            className="rounded-full aria-pressed:bg-surface-raised"
-            onClick={() => setSort("count")}
-          >
-            Most collected
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            aria-pressed={sort === "score"}
-            className="rounded-full aria-pressed:bg-surface-raised"
-            onClick={() => setSort("score")}
-          >
-            Best rated
-          </Button>
+            Insights
+          </h1>
+          <p className="mt-2 text-muted-foreground">
+            What your library already declares, ranked — one domain at a time.
+          </p>
         </div>
 
-        {sort === "score" && (
-          <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            Placed from
-            <Input
-              type="number"
-              min={1}
-              aria-label="Ratings needed to place in the score order"
-              value={minRated}
-              onChange={(event) =>
-                setMinRated(Math.max(1, Number(event.target.value) || 1))
-              }
-              className="h-9 w-16 rounded-full text-center"
-            />
-            ratings up
-          </label>
-        )}
-      </section>
+        {/* A group, not a region: the landmark belongs to the rankings, and a
+            toolbar of two toggles is not a significant content area. */}
+        <div
+          role="group"
+          aria-label="Ranking controls"
+          className="flex flex-wrap items-center gap-3"
+        >
+          {domains.length > 1 && (
+            <div
+              role="radiogroup"
+              aria-label="Choose a domain"
+              className="inline-flex shrink-0 rounded-full bg-surface p-1"
+            >
+              {domains.map((choice) => (
+                <button
+                  key={choice.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={type === choice.id}
+                  className={`min-h-11 rounded-full px-5 py-2 text-sm font-medium transition-colors ${
+                    type === choice.id
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  } focus-ring`}
+                  onClick={() => setType(choice.id)}
+                >
+                  {choice.label}
+                </button>
+              ))}
+            </div>
+          )}
 
-      {insights.isPending && (
+          {/* A sort order, not a choice of which numbers arrive: every row carries
+              both under either one. */}
+          <div
+            className="flex rounded-full bg-surface p-1"
+            role="group"
+            aria-label="Sort by"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-pressed={sort === "count"}
+              className="rounded-full aria-pressed:bg-surface-raised"
+              onClick={() => setSort("count")}
+            >
+              Most collected
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              aria-pressed={sort === "score"}
+              className="rounded-full aria-pressed:bg-surface-raised"
+              onClick={() => setSort("score")}
+            >
+              Best rated
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <ScoreLegend />
+
+      {pending && cards.length === 0 && (
         <p role="status" className="mt-8 text-muted-foreground">
           Ranking…
         </p>
       )}
-      {insights.isError && (
+      {failed && (
         <p role="alert" className="mt-8 text-destructive">
           Insights could not be loaded
         </p>
       )}
 
-      {insights.data && insights.data.rows.length === 0 && (
-        <p className="mt-8 text-muted-foreground">
-          Nothing to rank yet for this key.
-        </p>
-      )}
-
-      {nothingPlaceable && (
-        <p className="mt-8 text-muted-foreground">
-          Nothing is rated enough to sort by score yet — try lowering the
-          threshold, or sort by how many you hold.
-        </p>
-      )}
-
-      {insights.data && insights.data.rows.length > 0 && (
-        <div className="mt-8">
-          <InsightsRanking
-            rows={ranking.placed}
-            unplaced={ranking.unplaced}
-            onOpen={(row) =>
-              navigate(
-                `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
-                  key,
-                )}&value=${encodeURIComponent(row.key)}`,
-              )
-            }
-          />
+      {cards.length > 0 && (
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          {cards.map(({ option, query }) => (
+            <InsightsCard
+              key={option.name}
+              title={option.label}
+              insight={query.data!}
+              sort={sort}
+              minRated={minRated}
+              showSuppressed={includeSuppressed}
+              onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
+              onOpen={(row) =>
+                navigate(
+                  `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
+                    option.name,
+                  )}&value=${encodeURIComponent(row.key)}`,
+                )
+              }
+            />
+          ))}
         </div>
       )}
 
-      {insights.data && insights.data.suppressed.length > 0 && (
-        <p className="mt-4 text-sm text-muted-foreground">
-          {includeSuppressed ? (
-            <>
-              Showing{" "}
-              {insights.data.suppressed.map((row) => row.label).join(", ")}.{" "}
-              <button
-                type="button"
-                className="underline focus-ring"
-                onClick={() => setIncludeSuppressed(false)}
-              >
-                Hide
-              </button>
-            </>
-          ) : (
-            <>
-              {insights.data.suppressed.length === 1
-                ? "1 value is"
-                : `${insights.data.suppressed.length} values are`}{" "}
-              suppressed from this ranking.{" "}
-              <button
-                type="button"
-                className="underline focus-ring"
-                onClick={() => setIncludeSuppressed(true)}
-              >
-                Show
-              </button>
-            </>
-          )}
-        </p>
+      {sort === "score" && cards.length > 0 && (
+        <label className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+          A value is placed in the score order from
+          <Input
+            type="number"
+            min={1}
+            aria-label="Ratings needed to place in the score order"
+            value={minRated}
+            onChange={(event) =>
+              setMinRated(Math.max(1, Number(event.target.value) || 1))
+            }
+            className="h-9 w-16 rounded-full text-center"
+          />
+          ratings up.
+        </label>
       )}
-
-      {insights.data &&
-        (key === "year" || key === "decade") &&
-        insights.data.null_count > 0 && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            {insights.data.null_count}{" "}
-            {insights.data.null_count === 1 ? "entry has" : "entries have"} no
-            year and {insights.data.null_count === 1 ? "is" : "are"} not shown
-            here.
-          </p>
-        )}
     </main>
+  );
+}
+
+/** The ramp, explained once, because every card leans on it. */
+function ScoreLegend() {
+  const bands: Array<[string, string]> = [
+    ["bg-score-low", "1–3"],
+    ["bg-score-mid", "4–6"],
+    ["bg-score-high", "7–8"],
+    ["bg-score-top", "9–10"],
+  ];
+  return (
+    <p className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <span>
+        Bar length is how many you hold; the chip is how you rate them.
+      </span>
+      <span className="flex items-center gap-2">
+        {bands.map(([background, range]) => (
+          <span key={range} className="flex items-center gap-1">
+            <span
+              aria-hidden="true"
+              className={`inline-block h-2 w-3.5 rounded-sm ${background}`}
+            />
+            {range}
+          </span>
+        ))}
+      </span>
+    </p>
   );
 }
