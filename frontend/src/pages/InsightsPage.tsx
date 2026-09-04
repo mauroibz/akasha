@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { domainsFrom, insightKeyOptions } from "@/features/library/labels";
 import { InsightsKeyPicker } from "@/features/library/InsightsKeyPicker";
 import { InsightsRanking } from "@/features/library/InsightsRanking";
+import { orderRows, type InsightSort } from "@/features/library/insights";
 import { useInsights } from "@/features/library/useInsights";
 import { useItemTypes } from "@/features/library/useItemTypes";
 
@@ -29,7 +30,7 @@ export function InsightsPage() {
 
   const [type, setType] = useState("");
   const [key, setKey] = useState("");
-  const [metric, setMetric] = useState<"count" | "score">("count");
+  const [sort, setSort] = useState<InsightSort>("count");
   const [minRated, setMinRated] = useState(2);
   const [includeSuppressed, setIncludeSuppressed] = useState(false);
 
@@ -52,13 +53,18 @@ export function InsightsPage() {
     setKey(keyOptions[0]?.name ?? "");
   }, [selectedDomain, keyOptions, key]);
 
-  const insights = useInsights({
-    type,
-    key,
-    metric,
-    minRated,
-    includeSuppressed,
-  });
+  const insights = useInsights({ type, key, includeSuppressed });
+
+  // One response, read in the order the reader asked for. `unplaced` is what the
+  // score order cannot rank -- kept and shown below a divider rather than dropped.
+  const ranking = useMemo(
+    () => orderRows(insights.data?.rows ?? [], sort, minRated),
+    [insights.data, sort, minRated],
+  );
+  const nothingPlaceable =
+    sort === "score" &&
+    ranking.placed.length === 0 &&
+    ranking.unplaced.length > 0;
 
   return (
     <main className="mx-auto min-h-screen max-w-3xl px-5 py-8">
@@ -108,41 +114,47 @@ export function InsightsPage() {
 
         <InsightsKeyPicker options={keyOptions} value={key} onChange={setKey} />
 
-        <div className="flex rounded-full bg-surface p-1" aria-label="Rank by">
+        {/* A sort order, not a choice of which numbers arrive: every row carries
+            both under either one. */}
+        <div
+          className="flex rounded-full bg-surface p-1"
+          role="group"
+          aria-label="Sort by"
+        >
           <Button
             variant="ghost"
             size="sm"
-            aria-label="Rank by count"
-            aria-pressed={metric === "count"}
+            aria-pressed={sort === "count"}
             className="rounded-full aria-pressed:bg-surface-raised"
-            onClick={() => setMetric("count")}
+            onClick={() => setSort("count")}
           >
-            Count
+            Most collected
           </Button>
           <Button
             variant="ghost"
             size="sm"
-            aria-label="Rank by score"
-            aria-pressed={metric === "score"}
+            aria-pressed={sort === "score"}
             className="rounded-full aria-pressed:bg-surface-raised"
-            onClick={() => setMetric("score")}
+            onClick={() => setSort("score")}
           >
-            Score
+            Best rated
           </Button>
         </div>
 
-        {metric === "score" && (
+        {sort === "score" && (
           <label className="flex items-center gap-2 text-sm text-muted-foreground">
-            Minimum rated
+            Placed from
             <Input
               type="number"
               min={1}
+              aria-label="Ratings needed to place in the score order"
               value={minRated}
               onChange={(event) =>
                 setMinRated(Math.max(1, Number(event.target.value) || 1))
               }
               className="h-9 w-16 rounded-full text-center"
             />
+            ratings up
           </label>
         )}
       </section>
@@ -158,26 +170,24 @@ export function InsightsPage() {
         </p>
       )}
 
-      {insights.data &&
-        insights.data.rows.length === 0 &&
-        !insights.data.no_rated_groups && (
-          <p className="mt-8 text-muted-foreground">
-            Nothing to rank yet for this key.
-          </p>
-        )}
-
-      {insights.data?.no_rated_groups && (
+      {insights.data && insights.data.rows.length === 0 && (
         <p className="mt-8 text-muted-foreground">
-          Nothing is rated enough to rank by score yet — try lowering the
-          minimum, or switch to Count.
+          Nothing to rank yet for this key.
+        </p>
+      )}
+
+      {nothingPlaceable && (
+        <p className="mt-8 text-muted-foreground">
+          Nothing is rated enough to sort by score yet — try lowering the
+          threshold, or sort by how many you hold.
         </p>
       )}
 
       {insights.data && insights.data.rows.length > 0 && (
         <div className="mt-8">
           <InsightsRanking
-            rows={insights.data.rows}
-            showScore={metric === "score"}
+            rows={ranking.placed}
+            unplaced={ranking.unplaced}
             onOpen={(row) =>
               navigate(
                 `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(

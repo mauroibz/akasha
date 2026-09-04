@@ -281,6 +281,7 @@ export async function getInsights(params: {
   metric: "count" | "score";
   minRated?: number;
   includeSuppressed?: boolean;
+  limit?: number;
   after?: string;
 }): Promise<Insight> {
   const query = new URLSearchParams({
@@ -288,6 +289,7 @@ export async function getInsights(params: {
     key: params.key,
     metric: params.metric,
   });
+  if (params.limit) query.set("limit", String(params.limit));
   if (params.minRated) query.set("min_rated", String(params.minRated));
   if (params.includeSuppressed) query.set("include_suppressed", "true");
   if (params.after) query.set("after", params.after);
