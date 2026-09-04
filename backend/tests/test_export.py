@@ -17,10 +17,20 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from book_tracker.application.export import export_csv, export_json
+from book_tracker.application.export import export_json, stream_export_view
 from book_tracker.config import Settings
+from book_tracker.domain.registry import DOMAINS, REGISTERED_EXPORTS, find_export_view
+from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
+from book_tracker.domains.book.goodreads import GOODREADS_COLUMNS as GOODREADS_EXPORT_COLUMNS
+from book_tracker.domains.book.goodreads import parse_goodreads
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
+
+
+def _export_csv(engine):
+    """`export_csv`'s pre-sprint call shape, now the `goodreads` view through the walk."""
+    return stream_export_view(engine, GOODREADS_EXPORT, "book")
+
 
 DERIVED_COLUMNS = (
     "creator",
@@ -340,7 +350,7 @@ def test_export_memory_is_flat_against_library_size(tmp_path: Path, exporter: st
     dominated by a fixed ~1 MB of SQLAlchemy statement compilation that does not
     grow with the corpus, so a small library failed a bound the large one passed.
     """
-    generate = export_json if exporter == "json" else export_csv
+    generate = export_json if exporter == "json" else _export_csv
 
     small_app = create_app(settings(tmp_path / "small"))
     with TestClient(small_app):
@@ -434,9 +444,7 @@ async def test_the_json_export_carries_progress_and_the_goodreads_csv_does_not(
     so there is nothing to write there and inventing a column would grow one domain's
     export a field that domain does not have.
     """
-    from book_tracker.application.export import GOODREADS_COLUMNS
-
-    assert "progress" not in {column.lower() for column in GOODREADS_COLUMNS}
+    assert "progress" not in {column.lower() for column in GOODREADS_EXPORT_COLUMNS}
 
 
 @pytest.mark.anyio

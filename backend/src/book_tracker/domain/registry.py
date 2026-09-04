@@ -13,6 +13,7 @@ Nothing in this module knows what a book or an album *is*. That lives in
 from collections.abc import Sequence
 from enum import StrEnum
 
+from book_tracker.domain.exports import ExportView, make_table_view
 from book_tracker.domain.importers import Importer
 from book_tracker.domain.spec import Domain
 from book_tracker.domains.album import DOMAIN as ALBUM
@@ -21,6 +22,7 @@ from book_tracker.domains.anime import DOMAIN as ANIME
 from book_tracker.domains.anime.myanimelist import IMPORTER as MYANIMELIST_IMPORTER
 from book_tracker.domains.book import DOMAIN as BOOK
 from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
+from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.movie.imdb import IMPORTER as IMDB_IMPORTER
@@ -57,6 +59,33 @@ IMPORTERS_BY_DOMAIN: dict[str, tuple[Importer, ...]] = {
 }
 #: Keyed by name, so a connector indexed under two domains is still published once.
 IMPORTERS: dict[str, Importer] = {importer.name: importer for importer in REGISTERED_IMPORTERS}
+
+# The export registration point (Sprint 068), the same derived shape as importers
+# above. A `table` view is generic per domain rather than a single shared instance:
+# its columns and count are domain-shaped (`make_table_view` builds one from that
+# domain's own `Domain` object), the way a `table`-named view for books is a
+# different file from a `table`-named view for albums even though a screen renders
+# both the same way. `EXPORTS_BY_DOMAIN` is therefore the authority for dispatch —
+# `name` is unique *within* one domain's tuple, not across the whole registry.
+REGISTERED_EXPORTS: tuple[ExportView, ...] = (
+    GOODREADS_EXPORT,
+    *(make_table_view(domain) for domain in DOMAINS.values()),
+)
+EXPORTS_BY_DOMAIN: dict[str, tuple[ExportView, ...]] = {
+    item_type: tuple(view for view in REGISTERED_EXPORTS if item_type in view.item_types)
+    for item_type in DOMAINS
+}
+
+
+def find_export_view(item_type: str, name: str) -> ExportView | None:
+    """Resolve `GET /api/export/{view}?type=<domain>` to a declared view, or `None`.
+
+    `None` rather than a raised error: the route decides what a miss means (a 404
+    with the standard envelope), the way `IMPORTERS.get` leaves that choice to
+    `api/imports.py` today.
+    """
+    return next((view for view in EXPORTS_BY_DOMAIN.get(item_type, ()) if view.name == name), None)
+
 
 # Every route, importer and repository that predates the second domain works on books;
 # naming that here keeps `"book"` out of those call sites as a literal.

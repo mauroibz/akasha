@@ -994,6 +994,75 @@
         "title": "ErrorResponse",
         "type": "object"
       },
+      "ExportViewResponse": {
+        "description": "One declared view, shaped like `ImporterResponse` (DEC-080's pattern, pointed\nthe other way): a screen renders this without knowing which view it is holding.",
+        "properties": {
+          "carries": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Carries",
+            "type": "array"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "guide": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Guide",
+            "type": "array"
+          },
+          "help_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Help Url"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "item_types": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Item Types",
+            "type": "array"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "lossless": {
+            "title": "Lossless",
+            "type": "boolean"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "label",
+          "item_types",
+          "media_type",
+          "lossless",
+          "guide",
+          "carries",
+          "count"
+        ],
+        "title": "ExportViewResponse",
+        "type": "object"
+      },
       "FacetsResponse": {
         "properties": {
           "format_counts": {
@@ -3244,6 +3313,73 @@
           }
         },
         "summary": "Export"
+      }
+    },
+    "/api/export/{view}": {
+      "get": {
+        "operationId": "export_view_route_api_export__view__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "view",
+            "required": true,
+            "schema": {
+              "title": "View",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemTypeName"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Export View Route"
+      }
+    },
+    "/api/exports": {
+      "get": {
+        "operationId": "available_exports_api_exports_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/ExportViewResponse"
+                  },
+                  "title": "Response Available Exports Api Exports Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Available Exports"
       }
     },
     "/api/health/live": {

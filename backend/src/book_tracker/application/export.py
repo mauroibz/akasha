@@ -13,9 +13,10 @@ are omitted deliberately and a test asserts their absence.
 **The entity shape, not a book shape.** An item is `type`, identifiers, sources
 and an opaque `metadata` object, exactly as the row stores it. `metadata` is
 passed through untransformed: the moment this module knows that `creators` is a
-field, the format needs a v2 for the second domain (DEC-052 seam 3). The
-Goodreads CSV beside it is allowed to be book-shaped because it is one domain's
-export view rather than the export.
+field, the format needs a v2 for the second domain (DEC-052 seam 3). A registered
+`ExportView` (`domain/exports.py`) is allowed to be domain-shaped, because it is
+one domain's export view rather than the export — `iter_export_rows` below is the
+shared walk behind every one of them, and this module's own JSON path never uses it.
 
 **Flat memory, whatever the library size.** The deployment target is a ZimaBoard.
 Rows stream in bounded batches and each one is serialized and yielded on its own,
@@ -24,8 +25,6 @@ fetched one query per batch rather than one per item, which keeps that promise
 without an N+1.
 """
 
-import csv
-import io
 import json
 from collections.abc import Iterator, Sequence
 from datetime import UTC, datetime
@@ -34,7 +33,7 @@ from typing import Any
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.registry import DEFAULT_DOMAIN
+from book_tracker.domain.exports import ExportRow, ExportView
 from book_tracker.infrastructure.models import (
     AttachmentRow,
     EntryFormatRow,
@@ -292,136 +291,96 @@ def export_json(engine: Engine, *, now: datetime | None = None) -> Iterator[str]
         yield "}"
 
 
-#: Product spec 5.1, in Goodreads' own order. This view is allowed to be
-#: book-shaped: it is one domain's export view, not the export (DEC-052 seam 3).
-GOODREADS_COLUMNS = (
-    "Book Id",
-    "Title",
-    "Author",
-    "Additional Authors",
-    "ISBN",
-    "ISBN13",
-    "My Rating",
-    "Publisher",
-    "Number of Pages",
-    "Year Published",
-    "Original Publication Year",
-    "Date Read",
-    "Date Added",
-    "Bookshelves",
-    "Exclusive Shelf",
-    "My Review",
-    "Read Count",
-)
+def _entry_batches_for_type(session: Session, item_type: str) -> Iterator[list[Any]]:
+    """`_batches`, joined and filtered to one domain's entries.
 
-#: The inverse of the import's suggestion map (product spec 5.1). Goodreads has no
-#: wishlist or dropped concept, so those statuses -- and `unsorted` -- have no
-#: Goodreads spelling and are written verbatim rather than flattened into a
-#: neighbouring shelf, which would silently move a row.
-_EXCLUSIVE_SHELF = {"read": "read", "reading": "currently-reading", "to_read": "to-read"}
-
-#: Leading characters a spreadsheet treats as the start of a formula rather than
-#: as text. Excel's DDE behaviour makes this a real hazard in a file whose whole
-#: purpose is to be opened in a spreadsheet, and notes are free text.
-_FORMULA_PREFIXES = ("=", "+", "-", "@", "\t", "\r")
-
-
-def _safe_cell(value: object) -> str:
-    """Render a cell that a spreadsheet will read as text.
-
-    Neutralizing changes the bytes, which is why it happens *here* and not in the
-    JSON: the JSON export is the lossless artifact and carries the value exactly
-    as typed, while the CSV is the convenience view and is made safe to open.
+    A registered export view's rows are always one domain at a time — `type` is a
+    required parameter of `GET /api/export/{view}` because a view's columns are
+    themselves domain-shaped (the `table` view's header, the Goodreads writer's
+    presence at all). Filtering here, at the query, keeps the walk from fetching a
+    row only to discard it in Python.
     """
-    text_value = "" if value is None else str(value)
-    if text_value.startswith(_FORMULA_PREFIXES):
-        return "'" + text_value
-    return text_value
+    key = EntryRow.id
+    last: int | None = None
+    while True:
+        statement = (
+            select(*_ENTRY_COLUMNS)
+            .join(ItemRow, ItemRow.id == EntryRow.item_id)
+            .where(ItemRow.type == item_type)
+            .order_by(key)
+            .limit(BATCH)
+        )
+        if last is not None:
+            statement = statement.where(key > last)
+        rows = session.execute(statement).all()
+        if not rows:
+            return
+        yield list(rows)
+        if len(rows) < BATCH:
+            return
+        last = rows[-1][0]
 
 
-def _goodreads_date(value: str | None) -> str:
-    """ISO `2026-01-05` to Goodreads' `2026/01/05`; timestamps lose their time."""
-    if not value:
-        return ""
-    return value[:10].replace("-", "/")
+def iter_export_rows(session: Session, item_type: str) -> Iterator[ExportRow]:
+    """The shared walk behind every registered `ExportView` (proposal §2.1).
+
+    One domain's entries, joined to their item, identifiers, shelves and formats,
+    the same batched-then-discarded shape `export_csv` used before this sprint. A
+    view built on this never opens a session and never writes SQL — it receives one
+    `ExportRow` at a time and decides only how to spell it.
+    """
+    for batch in _entry_batches_for_type(session, item_type):
+        item_ids = [entry.item_id for entry in batch]
+        entry_ids = [entry.id for entry in batch]
+        items = {
+            item.id: item
+            for item in session.execute(
+                select(*_ITEM_COLUMNS).where(ItemRow.id.in_(item_ids))
+            ).all()
+        }
+        identifiers: dict[int, dict[str, str]] = {}
+        for row in session.execute(
+            select(
+                ItemIdentifierRow.item_id,
+                ItemIdentifierRow.kind,
+                ItemIdentifierRow.normalized_value,
+            ).where(ItemIdentifierRow.item_id.in_(item_ids))
+        ).all():
+            identifiers.setdefault(row.item_id, {})[row.kind] = row.normalized_value
+        shelves = _shelves_for(session, entry_ids)
+        formats = _formats_for(session, entry_ids)
+        for entry in batch:
+            item = items.get(entry.item_id)
+            if item is None:  # pragma: no cover - the foreign key guarantees this
+                continue
+            yield ExportRow(
+                item_id=item.id,
+                item_type=item.type,
+                title=item.title,
+                subtitle=item.subtitle,
+                year=item.year,
+                metadata=json.loads(item.metadata_json or "{}"),
+                identifiers=identifiers.get(item.id, {}),
+                status=entry.status,
+                score=entry.score,
+                notes=entry.notes,
+                date_added=entry.date_added,
+                date_started=entry.date_started,
+                date_finished=entry.date_finished,
+                reread_count=entry.reread_count or 0,
+                progress=entry.progress,
+                shelves=tuple(shelves.get(entry.id, [])),
+                formats=tuple(formats.get(entry.id, [])),
+            )
 
 
-def _row(entry: Any, item: Any, identifiers: dict[str, str], shelves: list[str]) -> dict[str, Any]:
-    metadata = json.loads(item.metadata_json or "{}")
-    authors = metadata.get("creators")
-    authors = [str(name) for name in authors] if isinstance(authors, list) else []
-    # Goodreads rates 1-5 and the importer doubled it (product spec 5.1). Halving
-    # rounds a hand-set odd score up rather than down; the exact 1-10 value is in
-    # the JSON export, which is the lossless one. `0` is Goodreads for unrated.
-    rating = (entry.score + 1) // 2 if entry.score else 0
-    return {
-        "Book Id": item.id,
-        "Title": item.title,
-        "Author": authors[0] if authors else "",
-        "Additional Authors": ", ".join(authors[1:]),
-        "ISBN": identifiers.get("isbn10", ""),
-        "ISBN13": identifiers.get("isbn", identifiers.get("isbn13", "")),
-        "My Rating": rating,
-        "Publisher": metadata.get("publisher") or "",
-        "Number of Pages": metadata.get("page_count") or "",
-        "Year Published": item.year if item.year is not None else "",
-        "Original Publication Year": metadata.get("original_year") or "",
-        "Date Read": _goodreads_date(entry.date_finished),
-        "Date Added": _goodreads_date(entry.date_added),
-        "Bookshelves": ", ".join(shelves),
-        "Exclusive Shelf": _EXCLUSIVE_SHELF.get(entry.status, entry.status),
-        "My Review": entry.notes or "",
-        # We store rereads; Goodreads counts total reads, and the importer took
-        # `Read Count - 1`. This is that inverse.
-        "Read Count": (entry.reread_count or 0) + 1,
-    }
+def stream_export_view(engine: Engine, view: ExportView, item_type: str) -> Iterator[str]:
+    """Stream one registered view for one domain — `GET /api/export/{view}`'s walk.
 
-
-def export_csv(engine: Engine) -> Iterator[str]:
-    """Yield the Goodreads-shaped CSV a row at a time, for books alone."""
-    buffer = io.StringIO()
-    writer = csv.DictWriter(buffer, fieldnames=list(GOODREADS_COLUMNS), lineterminator="\r\n")
-
-    def flush() -> str:
-        value = buffer.getvalue()
-        buffer.seek(0)
-        buffer.truncate(0)
-        return value
-
-    writer.writeheader()
-    yield flush()
-
+    The session is opened here and stays open across the view's own generator: both
+    are lazy, so nothing runs until the `StreamingResponse` above this pulls a chunk,
+    and the session lives exactly as long as the walk it backs (the same pattern
+    `export_json` and the pre-sprint `export_csv` both used).
+    """
     with Session(engine) as session:
-        for batch in _batches(session, _ENTRY_COLUMNS):
-            item_ids = [entry.item_id for entry in batch]
-            items = {
-                item.id: item
-                for item in session.execute(
-                    select(*_ITEM_COLUMNS).where(ItemRow.id.in_(item_ids))
-                ).all()
-            }
-            identifiers: dict[int, dict[str, str]] = {}
-            for row in session.execute(
-                select(
-                    ItemIdentifierRow.item_id,
-                    ItemIdentifierRow.kind,
-                    ItemIdentifierRow.normalized_value,
-                ).where(ItemIdentifierRow.item_id.in_(item_ids))
-            ).all():
-                identifiers.setdefault(row.item_id, {})[row.kind] = row.normalized_value
-            shelves = _shelves_for(session, [entry.id for entry in batch])
-            for entry in batch:
-                item = items.get(entry.item_id)
-                if item is None:  # pragma: no cover - the foreign key guarantees this
-                    continue
-                # One domain's export view, not the export. A Goodreads CSV describes
-                # books: an album emitted into it would arrive somewhere else as a book
-                # with no author, no ISBN and a page count. The JSON beside it is the
-                # lossless artifact and carries every type (DEC-052 seam 3).
-                if item.type != DEFAULT_DOMAIN.item_type:
-                    continue
-                row_values = _row(
-                    entry, item, identifiers.get(item.id, {}), shelves.get(entry.id, [])
-                )
-                writer.writerow({key: _safe_cell(value) for key, value in row_values.items()})
-                yield flush()
+        yield from view.write(iter_export_rows(session, item_type))
