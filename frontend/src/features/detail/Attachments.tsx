@@ -90,9 +90,10 @@ export function Attachments({ itemId }: { itemId: number }) {
   return (
     <div data-testid="attachments">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wider text-primary">
-          Files
-        </h2>
+        {/* A panel heading is a panel heading on every screen now; amber
+            marks quantity and active state, not "this is a heading"
+            (deliverable 2). */}
+        <h2 className="text-sm font-semibold">Files</h2>
         <Button
           type="button"
           className="rounded-full px-5"

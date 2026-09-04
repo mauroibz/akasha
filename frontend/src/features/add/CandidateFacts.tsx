@@ -90,9 +90,10 @@ export function CandidateFacts({
       className="rounded-xl border border-border p-4"
       data-candidate-facts=""
     >
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-primary">
-        What we know
-      </h3>
+      {/* A panel heading is a panel heading on every screen now; amber
+          marks quantity and active state, not "this is a heading"
+          (deliverable 2). */}
+      <h3 className="text-xs font-semibold text-foreground">What we know</h3>
       <dl className="mt-3 grid gap-x-6 gap-y-2 sm:grid-cols-2">
         {rows.map(([label, value]) => (
           <div key={label} className="min-w-0">
