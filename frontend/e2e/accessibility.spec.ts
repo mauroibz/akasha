@@ -530,6 +530,7 @@ async function stubInsightsScreen(page: Page) {
                 rated_count: rated,
                 mean_score: mean,
                 score_spread: 1,
+                covers: [],
               }))
             : [
                 {
@@ -539,6 +540,7 @@ async function stubInsightsScreen(page: Page) {
                   rated_count: 4,
                   mean_score: 8,
                   score_spread: 1,
+                  covers: [],
                 },
               ],
         next_cursor: null,
@@ -548,6 +550,8 @@ async function stubInsightsScreen(page: Page) {
             : [],
         no_rated_groups: false,
         null_count: 0,
+        total_entries: 20,
+        rated_entries: 15,
       },
     });
   });
@@ -630,7 +634,7 @@ test("insights has no serious accessibility violations, in either order", async 
 }) => {
   await stubInsightsScreen(page);
   await page.goto("/insights");
-  await expect(page.getByText("Julio Cortázar")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Authors" })).toBeVisible();
   await expectNoSeriousViolations(page, "insights (most collected)");
 
   await page.getByRole("button", { name: "Best rated" }).click();

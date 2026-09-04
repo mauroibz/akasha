@@ -134,7 +134,10 @@ def seed(engine: Engine, count: int) -> None:
                 "subtitle": None,
                 # One year in eleven is unknown.
                 "year": None if index % 11 == 0 else 1900 + (index % 126),
-                "cover_path": None,
+                # A real library's covers are near-universal (Sprint 067's
+                # insights covers query joins on this); one in thirteen missing
+                # exercises the empty case without making it the common one.
+                "cover_path": None if index % 13 == 0 else f"covers/{index}.jpg",
                 "identifiers": "{}",
                 "metadata": json.dumps(metadata),
                 "created_at": now,

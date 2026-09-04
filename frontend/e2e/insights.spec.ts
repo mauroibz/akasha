@@ -92,11 +92,14 @@ async function stubInsights(page: import("@playwright/test").Page) {
           rated_count: rated,
           mean_score: mean,
           score_spread: mean === null ? null : 1,
+          covers: [],
         })),
         next_cursor: null,
         suppressed: [],
         no_rated_groups: false,
         null_count: key === "year" || key === "decade" ? 4 : 0,
+        total_entries: 60,
+        rated_entries: 47,
       },
     });
   });
@@ -151,7 +154,7 @@ test("the page fits a phone, and nothing makes the body scroll sideways", async 
   await page.setViewportSize({ width: 390, height: 844 });
   await stubInsights(page);
   await page.goto("/insights");
-  await page.getByText("Julio Cortázar").waitFor();
+  await page.getByRole("heading", { name: "Authors" }).waitFor();
 
   // The row labels are the widest thing on the page and they truncate rather
   // than push the layout out.
