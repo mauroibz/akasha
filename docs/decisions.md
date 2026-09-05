@@ -5428,3 +5428,30 @@ both changes, against 1 of 3 before the second.
   `070`. Sprint 071 ("What the numbers say") depends on this sprint's primitives, which are now
   built. The `sourceStrip` overflow above is carried forward in `docs/agent/HANDOFF.md`'s
   known-degraded list until a sprint that touches `ImportPage.tsx`'s connector strip picks it up.
+
+## DEC-138 — DEC-137's `sourceStrip` overflow is fixed inside Sprint 071, at the owner's direction
+
+- **Date:** 2026-09-05
+- **Status:** accepted
+- **Cross-references:** DEC-137 (found the defect, left it unfixed and out of scope), DEC-134 (the
+  identical structural fix — scroll within the box instead of pushing the document sideways —
+  already applied to the domain strip).
+- **Context:** DEC-137 recorded `ImportPage.tsx`'s `sourceStrip` (the "Choose an import source"
+  `TabsList`) overflowing a 390px viewport by about 205px against the real backend's seven
+  registered importers, named it a different control from DEC-134's domain radiogroup, and left it
+  for "whichever future sprint next touches `ImportPage.tsx`'s connector strip, or a dedicated one
+  if none does soon." The owner asked for it explicitly, alongside Sprint 071, rather than waiting
+  for a sprint that happened to touch the file.
+- **Decision:** Fixed inside Sprint 071 as an owner-authorized addition, not treated as a deviation
+  needing a scope renegotiation — the fix is presentation-only, touches no acceptance criterion
+  Sprint 071 already owns, and is small next to the sprint it rides with. `sourceStrip` gets
+  DEC-134's own structural answer: `overflow-x-auto`/`min-w-0`/`max-w-full` on the strip, `shrink-0`
+  on every trigger, and — since every other control in the redesigned app keeps one — a 44px target
+  each trigger did not have before. Verified at 390px against seven importers named the way the
+  walkthrough found them (Goodreads, Calibre, MyAnimeList, Letterboxd, IMDb, Trakt, Spotify):
+  `frontend/e2e/import.spec.ts`'s new "the import source strip fits a phone with seven connectors"
+  test asserts no body overflow, the strip itself scrolling (`scrollWidth > clientWidth`), and every
+  trigger at or above 44px.
+- **Consequences:** `docs/agent/HANDOFF.md`'s known-degraded list drops this line. No sprint file
+  changes: Sprint 071's own file did not need to declare this addition in advance for the owner to
+  authorize it in session, and its Outcome records the fix and this decision together.

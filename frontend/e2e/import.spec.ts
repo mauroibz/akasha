@@ -833,3 +833,74 @@ test.describe("the export tab (Sprint 069)", () => {
     expect(short).toEqual([]);
   });
 });
+
+test("the import source strip fits a phone with seven connectors, and scrolls within itself (DEC-137)", async ({
+  page,
+}) => {
+  // DEC-137: found by Sprint 070's own walkthrough against the real backend's
+  // seven registered importers (Goodreads, Calibre, MyAnimeList, Letterboxd,
+  // IMDb, Trakt, Spotify) — a bare TabsList overflowed a 390px viewport by
+  // about 205px. Out of that sprint's scope; fixed here at the owner's
+  // direction, the same structural fix DEC-134 applied to the domain strip.
+  const sevenImporters = [
+    "goodreads",
+    "calibre",
+    "myanimelist",
+    "letterboxd",
+    "imdb",
+    "trakt",
+    "spotify",
+  ].map((id) => ({
+    id,
+    label: id[0].toUpperCase() + id.slice(1),
+    item_types: ["book"],
+    attachment_max_bytes: 25 * 1024 * 1024,
+    input: {
+      kind: "upload",
+      label: `${id} CSV`,
+      field: "file",
+      accept: ".csv,text/csv",
+      placeholder: null,
+      help: null,
+      guide: [],
+      empty_state: "Drop a file here, or choose one.",
+      help_url: null,
+      browsable: false,
+      incremental: false,
+      accepts_files: false,
+      max_bytes: null,
+      max_files: null,
+      alternates: [],
+    },
+  }));
+  await page.route("**/api/importers", (route) =>
+    route.fulfill({ json: sevenImporters }),
+  );
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/import");
+
+  const strip = page.getByRole("tablist", { name: "Import source" });
+  await expect(strip.getByRole("tab")).toHaveCount(7);
+
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow, "horizontal page overflow").toBeLessThanOrEqual(0);
+
+  const stripBox = await strip.evaluate((node) => ({
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth,
+    boundingWidth: node.getBoundingClientRect().width,
+  }));
+  expect(stripBox.scrollWidth).toBeGreaterThan(stripBox.clientWidth);
+  expect(stripBox.boundingWidth).toBeLessThanOrEqual(390);
+
+  const heights = await strip
+    .getByRole("tab")
+    .evaluateAll((nodes) =>
+      nodes.map((node) => node.getBoundingClientRect().height),
+    );
+  for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
+});

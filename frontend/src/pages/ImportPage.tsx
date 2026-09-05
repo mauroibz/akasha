@@ -525,9 +525,22 @@ export function ImportPage() {
   );
 
   const sourceStrip = (
-    <TabsList aria-label="Import source">
+    // Scrolls within its own box below its breakpoint instead of pushing the
+    // document sideways — DomainStrip's own fix for the same class of defect
+    // (DEC-134), applied here to a seven-importer TabsList that overflowed a
+    // 390px viewport by about 205px (DEC-137, found by Sprint 070's own
+    // walkthrough, out of that sprint's scope, fixed here at the owner's
+    // direction).
+    <TabsList
+      aria-label="Import source"
+      className="flex h-auto min-w-0 max-w-full gap-1 overflow-x-auto"
+    >
       {importers.map((importer) => (
-        <TabsTrigger key={importer.id} value={importer.id}>
+        <TabsTrigger
+          key={importer.id}
+          value={importer.id}
+          className="min-h-11 shrink-0"
+        >
           {importer.label}
         </TabsTrigger>
       ))}
