@@ -171,6 +171,7 @@ async function expectNoSeriousViolations(page: Page, screen: string) {
 test("library in grid view has no serious accessibility violations", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await seedLibrary(page);
   await stubShelves(page);
   await page.goto("/");
@@ -183,6 +184,7 @@ test("library in grid view has no serious accessibility violations", async ({
 test("library in table view has no serious accessibility violations", async ({
   page,
 }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
   await seedLibrary(page);
   await stubShelves(page);
   await page.goto("/");
@@ -190,8 +192,57 @@ test("library in table view has no serious accessibility violations", async ({
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Table view" }).click();
-  await expect(page.getByRole("feed", { name: "Library" })).toBeVisible();
+  const feed = page.getByRole("feed", { name: "Library" });
+  await expect(feed).toBeVisible();
+  const row = feed.locator("[data-entry-id]").first();
+  const status = row.getByRole("combobox", { name: /^Status for / });
+  const score = row.getByRole("button", { name: /^Score for / });
+  expect((await status.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect((await score.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(
+    overflow,
+    "table density horizontal body overflow",
+  ).toBeLessThanOrEqual(0);
   await expectNoSeriousViolations(page, "library (table)");
+});
+
+test("wall-card score and status controls are visible at rest and keyboard reachable", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedLibrary(page);
+  await stubShelves(page);
+  await page.goto("/");
+  await page.mouse.move(0, 0);
+  const card = page.locator("[data-entry-id]").first();
+  await expect(card).toBeVisible();
+  const status = card.getByRole("combobox", { name: /^Status for / });
+  const score = card.getByRole("button", { name: /^Score for / });
+  await expect(status).toBeVisible();
+  await expect(score).toBeVisible();
+  const statusBox = (await status.boundingBox())!;
+  const scoreBox = (await score.boundingBox())!;
+  expect(statusBox.height).toBeGreaterThanOrEqual(44);
+  expect(scoreBox.width).toBeGreaterThanOrEqual(40);
+  expect(scoreBox.height).toBeGreaterThanOrEqual(40);
+  expect(
+    Number.parseFloat(
+      await score.evaluate((node) => getComputedStyle(node).fontSize),
+    ),
+  ).toBeGreaterThanOrEqual(18);
+
+  await card.focus();
+  await page.keyboard.press("Tab");
+  await expect(card.getByRole("button", { name: /^Open / })).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(status).toBeFocused();
+  await page.keyboard.press("Tab");
+  await expect(score).toBeFocused();
 });
 
 test("the library with web results on it has no serious accessibility violations", async ({

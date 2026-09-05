@@ -103,7 +103,7 @@ export function ScorePicker({
             : "border-dashed border-background/80"
           : "border-border",
         scoreChipClass(shown),
-        compact && "h-9 min-h-0 shrink-0 px-2 text-sm",
+        compact && "h-11 min-h-11 shrink-0 px-2 text-sm",
         // The wall card's chip is the full touch target the sprint asks for
         // (AC4): 44px tall with a numeral large enough to read from the room.
         // Listed after the compact clause so it wins on both chips it applies

@@ -70,6 +70,15 @@ test("the format of a copy is readable from the library row", async ({
 
   const row = page.getByRole("article").filter({ hasText: "Discovery" });
   await expect(row.locator("[data-card-formats]")).toContainText("Vinyl");
+
+  await page.getByRole("button", { name: "Table view" }).click();
+  await expect(row.getByRole("heading", { name: "Discovery" })).toBeVisible();
+  await expect(row.getByText("Daft Punk")).toBeVisible();
+  await expect(row.getByText("2001")).toBeVisible();
+  await expect(row.locator("[data-card-formats]")).toContainText("Vinyl");
+  const cover = (await row.locator("[data-card-cover]").boundingBox())!;
+  expect(cover.width).toBe(32);
+  expect(cover.height).toBe(48);
 });
 
 test("the status filter offers the chosen domain's vocabulary, and only that domain's", async ({
@@ -83,13 +92,18 @@ test("the status filter offers the chosen domain's vocabulary, and only that dom
   await library(page, [album()]);
   await page.goto("/");
 
-  const status = page.getByRole("combobox", { name: "Filter by status" });
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  let status = page.getByRole("combobox", { name: "Filter by status" });
   await status.click();
   await expect(page.getByRole("option", { name: /^Read \d/ })).toBeVisible();
   await expect(page.getByRole("option", { name: /^Owned/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
   await page.getByRole("radio", { name: "Album" }).click();
+  if (!(await status.isVisible())) {
+    await page.getByRole("button", { name: /^Filters/ }).click();
+    status = page.getByRole("combobox", { name: "Filter by status" });
+  }
   await status.click();
   await expect(page.getByRole("option", { name: /^Owned/ })).toBeVisible();
   await expect(page.getByRole("option", { name: /^Read \d/ })).toHaveCount(0);
@@ -104,6 +118,7 @@ test("filtering to owned asks the server for that status", async ({ page }) => {
   await page.goto("/");
 
   await page.getByRole("radio", { name: "Album" }).click();
+  await page.getByRole("button", { name: /^Filters/ }).click();
   await page.getByRole("combobox", { name: "Filter by status" }).click();
   await page.getByRole("option", { name: /^Owned/ }).click();
 

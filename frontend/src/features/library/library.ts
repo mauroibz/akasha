@@ -126,7 +126,11 @@ export const gridLayout = {
 } as const;
 
 export const gridRowHeight = gridLayout.cardHeight + gridLayout.gap;
-export const tableRowHeight = 84;
+// Sprint 072 D7: the list density is a genuinely tighter second density now —
+// one ~56px band holding the 32×48 cover, title, creator, year, formats, status
+// pill and score chip, about 16 rows under a 900px viewport against the 9 the
+// old 84px row managed.
+export const tableRowHeight = 52;
 
 /** Columns that fit `containerWidth` without any card dropping below its minimum. */
 export function gridColumnCount(containerWidth: number): number {

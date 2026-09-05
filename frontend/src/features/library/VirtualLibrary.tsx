@@ -69,9 +69,8 @@ function EntryControls({
         onValueChange={(status) => onStatus(entry, status)}
         label={`Status for ${entry.item.title}`}
         statuses={statusesFor(entry.item.type, itemTypes.data)}
-        // The wall-card pill must be a 44px target (AC4); the row keeps its
-        // hurdle-era 36px, which DEC-109 deliberately accepts in the dense view.
-        className={onCover ? "h-11 w-auto" : "h-9 w-auto"}
+        // Both densities keep the sprint's 44px target at 390px (AC4/AC10).
+        className="h-11 w-auto"
       />
       <ScorePicker
         value={entry.score}
@@ -101,20 +100,15 @@ function EntryMetadata({
   // and everything in it takes the full measure of the card. The title gets
   // two lines at text-sm leading-5 (40px) merged into the textHeight budget;
   // the creator and the year/format lines each fit inside one line.
-  return (
-    <div
-      className={
-        grid ? "grid min-w-0 content-start px-2.5 pt-2" : "min-w-0 flex-1"
-      }
-      data-card-meta=""
-    >
-      <h2
-        className="overflow-hidden text-sm font-semibold leading-5 [-webkit-line-clamp:2] [display:-webkit-box] [-webkit-box-orient:vertical]"
-        title={entry.item.title}
-      >
-        {entry.item.title}
-      </h2>
-      {grid ? (
+  if (grid)
+    return (
+      <div className="grid min-w-0 content-start px-2.5 pt-2" data-card-meta="">
+        <h2
+          className="overflow-hidden text-sm font-semibold leading-5 [-webkit-line-clamp:2] [display:-webkit-box] [-webkit-box-orient:vertical]"
+          title={entry.item.title}
+        >
+          {entry.item.title}
+        </h2>
         <>
           <p
             className="mt-0.5 overflow-hidden text-xs leading-4 text-muted-foreground truncate"
@@ -140,30 +134,32 @@ function EntryMetadata({
           </p>
           <FormatBadges entry={entry} />
         </>
-      ) : (
-        <>
-          <p className="truncate text-sm text-muted-foreground">
-            {entry.item.creator ?? "Unknown creator"}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            <span className="sr-only">Edition year: </span>
-            {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
-            {entry.item.year === null || entry.item.year === undefined ? (
-              <span className="sr-only">unknown</span>
-            ) : null}
-            {entry.item.metadata.original_year &&
-            entry.item.metadata.original_year !== entry.item.year ? (
-              <>
-                {" · "}
-                <span className="sr-only">originally published </span>
-                <span aria-hidden="true">orig. </span>
-                {entry.item.metadata.original_year}
-              </>
-            ) : null}
-          </p>
-          <FormatBadges entry={entry} />
-        </>
-      )}
+      </div>
+    );
+
+  // List density is one horizontal reading line, not the wall metadata stacked
+  // into a shorter box. Lower-priority columns progressively hide when the
+  // viewport cannot hold them; desktop keeps the complete title / creator /
+  // year / formats sequence while the card controls retain 44px targets.
+  return (
+    <div className="flex min-w-0 flex-1 items-center gap-3" data-card-meta="">
+      <h2
+        className="min-w-0 flex-[2] truncate text-sm font-semibold"
+        title={entry.item.title}
+      >
+        {entry.item.title}
+      </h2>
+      <p className="hidden min-w-0 flex-[1.5] truncate text-xs text-muted-foreground sm:block">
+        {entry.item.creator ?? "Unknown creator"}
+      </p>
+      <p className="hidden shrink-0 text-xs text-muted-foreground md:block">
+        <span className="sr-only">Edition year: </span>
+        {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
+        {entry.item.year === null || entry.item.year === undefined ? (
+          <span className="sr-only">unknown</span>
+        ) : null}
+      </p>
+      <FormatBadges entry={entry} dense />
     </div>
   );
 }
@@ -175,13 +171,23 @@ function EntryMetadata({
  * on the detail page, one click per record, which is not an answer to "sort by
  * owned and see where I own it" (DEC-059).
  */
-function FormatBadges({ entry }: { entry: LibraryEntry }) {
+function FormatBadges({
+  entry,
+  dense = false,
+}: {
+  entry: LibraryEntry;
+  dense?: boolean;
+}) {
   const itemTypes = useItemTypes();
   if (!entry.formats?.length) return null;
   const labels = formatLabels(itemTypes.data);
   return (
     <span
-      className="mt-1 inline-flex flex-wrap items-center gap-1 align-[3px] empty:hidden"
+      className={
+        dense
+          ? "hidden shrink-0 flex-nowrap items-center gap-1 empty:hidden lg:inline-flex"
+          : "mt-1 inline-flex flex-wrap items-center gap-1 align-[3px] empty:hidden"
+      }
       data-card-formats=""
     >
       <span className="sr-only">Formats: </span>
@@ -235,7 +241,10 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
     estimateSize: () => rowHeight,
     // A grid row mounts `columns` cards, so it uses a smaller overscan to keep
     // the mounted-DOM budget comparable to the table.
-    overscan: isGrid ? 2 : 4,
+    // The 52px list density shows fourteen rows at 900px. Two rows of overscan
+    // on either side keep scrolling smooth while preserving DEC-023's strict
+    // <20 mounted-row budget (four would mount 23 rows at depth).
+    overscan: 2,
     getItemKey: (index) => props.entries[index * columns]?.id ?? index,
     scrollMargin,
     initialRect: { width: 1000, height: 640 },
@@ -305,7 +314,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
             ? // Sprint 072: no padding on the wall card — the cover is the
               // card's skin edge-to-edge, and the text block carries its own.
               `relative h-full overflow-hidden rounded-2xl bg-surface/60 ${focusRing} ${ring}`
-            : `flex h-full w-full items-center gap-4 border-b border-border px-4 ${focusRing} ${ring}`
+            : `flex h-full min-h-0 w-full items-center gap-4 border-b border-border px-4 ${focusRing} ${ring}`
         }
         data-entry-id={entry.id}
         data-provisional={entry.score_provisional ? "true" : "false"}
@@ -409,7 +418,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 <CoverImage
                   src={entry.item.cover_url}
                   alt={`Cover of ${entry.item.title}`}
-                  className="h-14 w-10"
+                  className="h-12 w-8"
                 />
               </div>
               <EntryMetadata entry={entry} grid={false} />

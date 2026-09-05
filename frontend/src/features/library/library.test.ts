@@ -15,6 +15,7 @@ import {
   readLibraryFiltersPreference,
   readViewPreference,
   rememberLibraryFilters,
+  tableRowHeight,
 } from "./library";
 
 const entry = (id: number) => ({ id }) as LibraryEntry;
@@ -77,6 +78,11 @@ test("the grid card is cover-first and its row height is one band (DEC-023)", ()
     gridLayout.coverHeight + gridLayout.textHeight,
   );
   expect(gridRowHeight).toBe(gridLayout.cardHeight + gridLayout.gap);
+});
+
+test("the second density is a genuinely dense fixed-height row", () => {
+  expect(tableRowHeight).toBe(52);
+  expect(Math.floor(900 / tableRowHeight)).toBeGreaterThanOrEqual(16);
 });
 
 test("global shortcuts stay disabled while a control owns the keystroke", () => {

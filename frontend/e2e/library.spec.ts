@@ -77,10 +77,85 @@ async function libraryBox(page: Page): Promise<Box> {
 }
 
 const viewports = [
-  { name: "mobile", width: 375, height: 812 },
+  { name: "mobile", width: 390, height: 844 },
   { name: "tablet", width: 768, height: 1024 },
   { name: "desktop", width: 1440, height: 900 },
 ];
+
+async function openFilters(page: Page) {
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  await expect(
+    page.getByRole("combobox", { name: "Sort library" }),
+  ).toBeVisible();
+}
+
+test("the wall starts near the top and gives at least seventy percent of each card to its cover", async ({
+  page,
+}) => {
+  await seedLibrary(page, 100);
+  for (const viewport of viewports) {
+    await page.setViewportSize({
+      width: viewport.width,
+      height: viewport.height,
+    });
+    await page.goto("/");
+    const card = page.locator("[data-entry-id]").first();
+    await expect(card).toBeVisible();
+    const cardBox = (await card.boundingBox())!;
+    const coverBox = (await card.locator("[data-card-cover]").boundingBox())!;
+    const documentTop = cardBox.y + (await page.evaluate(() => window.scrollY));
+    if (viewport.width === 390)
+      expect(documentTop, "first cover at 390px").toBeLessThanOrEqual(300);
+    if (viewport.width === 1440)
+      expect(documentTop, "first cover at 1440px").toBeLessThanOrEqual(200);
+    expect(
+      (coverBox.width * coverBox.height) / (cardBox.width * cardBox.height),
+      `${viewport.name} cover/card area`,
+    ).toBeGreaterThanOrEqual(0.7);
+  }
+});
+
+test("the wall reaches one, five, and six columns at its acceptance widths", async ({
+  page,
+}) => {
+  await seedLibrary(page, 100);
+  for (const viewport of [
+    { width: 390, height: 844, minimum: 1, exact: 1 },
+    { width: 1440, height: 900, minimum: 5 },
+    { width: 2560, height: 1400, minimum: 6 },
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto("/");
+    const feed = page.getByRole("feed", { name: "Library" });
+    await expect(feed).toBeVisible();
+    const columns = Number(await feed.getAttribute("data-columns"));
+    if (viewport.exact) expect(columns).toBe(viewport.exact);
+    expect(columns).toBeGreaterThanOrEqual(viewport.minimum);
+  }
+});
+
+test("list density shows at least fourteen rows in a 900px viewport", async ({
+  page,
+}) => {
+  await seedLibrary(page, 100);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto("/");
+  await page.getByRole("button", { name: "Table view" }).click();
+  const rowMeasurement = await page
+    .locator("[data-entry-id]")
+    .evaluateAll((rows) => ({
+      visible: rows.filter((row) => {
+        const box = row.getBoundingClientRect();
+        return box.bottom > 0 && box.top < window.innerHeight;
+      }).length,
+      firstTop: rows[0]?.getBoundingClientRect().top ?? 0,
+      rowHeight: rows[0]?.getBoundingClientRect().height ?? 0,
+    }));
+  console.log(
+    `table 900px: visible rows=${rowMeasurement.visible} first top=${rowMeasurement.firstTop} row height=${rowMeasurement.rowHeight}`,
+  );
+  expect(rowMeasurement.visible).toBeGreaterThanOrEqual(14);
+});
 
 test("the deterministic 10,000-entry library mounts only overscanned rows", async ({
   page,
@@ -262,9 +337,7 @@ test("a settled search with nothing local collapses the controls, and Clear rest
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("combobox", { name: "Sort library" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Filters/ })).toBeVisible();
 
   await page.getByRole("searchbox").fill("nothing owned matches this");
   await expect(
@@ -275,9 +348,7 @@ test("a settled search with nothing local collapses the controls, and Clear rest
 
   // Sort, shelf and format applied to rows that are not on screen — gone with
   // them, not sitting above an empty list and a results region below it.
-  await expect(
-    page.getByRole("combobox", { name: "Sort library" }),
-  ).toBeHidden();
+  await expect(page.getByRole("button", { name: /^Filters/ })).toBeHidden();
 
   await results.getByRole("button", { name: "Clear" }).click();
   await expect(results).toBeHidden();
@@ -285,9 +356,7 @@ test("a settled search with nothing local collapses the controls, and Clear rest
   await expect(
     page.getByRole("heading", { name: "Seeded book 0003" }),
   ).toBeVisible();
-  await expect(
-    page.getByRole("combobox", { name: "Sort library" }),
-  ).toBeVisible();
+  await expect(page.getByRole("button", { name: /^Filters/ })).toBeVisible();
 });
 
 test("the edition year line is readable at every width, not clipped", async ({
@@ -331,6 +400,7 @@ test("changing sort crossfades the container and animates no row", async ({
   await page
     .locator("[data-library-container]")
     .evaluate((element) => element.setAttribute("data-probe", "before"));
+  await openFilters(page);
 
   const samples = await sampleAnimations(page, async () => {
     await chooseOption(
@@ -360,6 +430,7 @@ test("the mounted-DOM budget holds through a crossfade", async ({ page }) => {
   await seedLibrary(page);
   await page.goto("/");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  await openFilters(page);
   await page.evaluate(() => {
     const peak = { cards: 0, rows: 0, containers: 0 };
     const tick = () => {
@@ -413,6 +484,7 @@ test("animated surfaces really do animate without the preference", async ({
   await seedLibrary(page);
   await page.goto("/");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  await openFilters(page);
   await expectAnimated(page, animatedSurfaces.card, "card");
   await expectAnimated(page, animatedSurfaces.cover, "cover");
   await expectAnimated(page, animatedSurfaces.scoreTrigger, "score trigger");
