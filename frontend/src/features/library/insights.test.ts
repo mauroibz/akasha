@@ -7,6 +7,7 @@ import {
   orderKeys,
   orderRows,
   quietSummary,
+  weightClass,
 } from "@/features/library/insights";
 import type { InsightRow } from "@/api/library";
 
@@ -175,6 +176,22 @@ describe("magnitude", () => {
 
   it("survives an empty ranking rather than dividing by zero", () => {
     expect(magnitude(0, 0)).toBe(0);
+  });
+});
+
+describe("weightClass", () => {
+  it("gives the leading share the heaviest class and a small one the quietest", () => {
+    expect(weightClass(30, 30)).toBe("text-base font-semibold tabular-nums");
+    expect(weightClass(12, 30)).toBe("text-sm font-medium tabular-nums");
+    expect(weightClass(1, 30)).toBe(
+      "text-sm text-muted-foreground tabular-nums",
+    );
+  });
+
+  it("survives a zero ceiling rather than dividing by zero", () => {
+    expect(weightClass(0, 0)).toBe(
+      "text-sm text-muted-foreground tabular-nums",
+    );
   });
 });
 

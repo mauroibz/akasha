@@ -1,4 +1,5 @@
 import type { EntryStatus, StatusSpec } from "@/api/library";
+import { weightClass } from "@/features/library/insights";
 import { Button } from "@/components/ui/button";
 import {
   Command,
@@ -41,6 +42,14 @@ export function StatusFilter({
 }) {
   if (!statuses.length) return null;
   const chosen = statuses.filter((status) => value.includes(status.value));
+  // Every status reads against the same ceiling — the busiest status among the
+  // ones shown here — so a facet's share of the whole is legible at a glance
+  // (deliverable 5), the same rule the shelves list and the import summary
+  // apply to their own counts.
+  const max = Math.max(
+    ...statuses.map((status) => counts[status.value] ?? 0),
+    1,
+  );
   const label =
     chosen.length === 0
       ? "All statuses"
@@ -84,7 +93,9 @@ export function StatusFilter({
                       {on ? "✓" : ""}
                     </span>
                     <span className="flex-1">{status.label}</span>
-                    <span className="ml-2 text-xs text-muted-foreground">
+                    <span
+                      className={`ml-2 ${weightClass(counts[status.value] ?? 0, max)}`}
+                    >
                       {counts[status.value] ?? 0}
                     </span>
                   </CommandItem>

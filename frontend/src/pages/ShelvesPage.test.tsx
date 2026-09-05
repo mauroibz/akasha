@@ -180,6 +180,31 @@ describe("ShelvesPage", () => {
     }
   });
 
+  it("gives a shelf's count visible weight against the largest shelf", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/shelves")
+        return new Response(
+          JSON.stringify([
+            { id: 1, name: "Big", slug: "big", entry_count: 30, covers: [] },
+            {
+              id: 2,
+              name: "Small",
+              slug: "small",
+              entry_count: 1,
+              covers: [],
+            },
+          ]),
+        );
+      return new Response("[]");
+    });
+    renderPage();
+    const bigCount = await screen.findByText("30 items");
+    const smallCount = await screen.findByText("1 item");
+    expect(bigCount.className).toContain("font-semibold");
+    expect(smallCount.className).toContain("text-muted-foreground");
+    expect(bigCount.className).not.toEqual(smallCount.className);
+  });
+
   it("shows up to three covers, the shared placeholder, or nothing for an empty shelf", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/shelves")

@@ -366,6 +366,38 @@ describe("ImportPage", () => {
     ).toHaveLength(1);
   });
 
+  it("gives the preview summary's counts visible weight against each other (deliverable 5)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/importers")
+        return new Response(JSON.stringify(importers));
+      if (String(input).endsWith("preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "batch-weight",
+            fingerprint: "weight",
+            state: "previewed",
+            summary: { total: 10, ready: 9, errors: 1, ambiguous: 0 },
+            records: [],
+          }),
+          { status: 201 },
+        );
+      return new Response("[]");
+    });
+    renderImportPage();
+    await userEvent.upload(
+      await screen.findByLabelText("Goodreads CSV"),
+      new File(["Book Id\n"], "goodreads.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      screen.getByRole("button", { name: /preview import/i }),
+    );
+    const summary = await screen.findByRole("status");
+    const ready = within(summary).getByText(/9 ready/);
+    const errors = within(summary).getByText(/1 have errors/);
+    expect(ready.className).toContain("font-semibold");
+    expect(errors.className).toContain("text-muted-foreground");
+  });
+
   it("requires an explicit choice for ambiguous rows", async () => {
     vi.spyOn(globalThis, "fetch")
       .mockResolvedValueOnce(new Response(JSON.stringify(importers)))

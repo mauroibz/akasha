@@ -33,6 +33,24 @@ export function magnitude(count: number, max: number): number {
   return Number((count / Math.max(max, 1)).toFixed(3));
 }
 
+/**
+ * The text-weight class for a count that is one member of a set describing a
+ * whole (Sprint 071 deliverable 5) — shelf sizes, status facets, the import
+ * preview's `N ready · N need a choice · N have errors`. Built on `magnitude`,
+ * the same share-of-the-largest arithmetic the ranking bar already uses,
+ * rather than a second formula for the same question.
+ *
+ * Three buckets, not a continuous inline style: a set of counts is read at a
+ * glance, not measured, and a discrete class is what a test can assert
+ * against without reading computed pixel sizes.
+ */
+export function weightClass(count: number, max: number): string {
+  const share = magnitude(count, max);
+  if (share >= 0.66) return "text-base font-semibold tabular-nums";
+  if (share >= 0.33) return "text-sm font-medium tabular-nums";
+  return "text-sm text-muted-foreground tabular-nums";
+}
+
 /** Ties break on the normalized key, which is the order the server itself used. */
 const byKey = (a: InsightRow, b: InsightRow) => a.key.localeCompare(b.key);
 

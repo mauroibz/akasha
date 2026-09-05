@@ -19,7 +19,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { CoverStack } from "@/features/library/InsightsRanking";
-import { magnitude } from "@/features/library/insights";
+import { magnitude, weightClass } from "@/features/library/insights";
 import { cn } from "@/lib/utils";
 import {
   createShelf,
@@ -229,7 +229,13 @@ export function ShelvesPage() {
                         className="focus-ring relative min-w-0 flex-1 rounded-md"
                       >
                         <p className="truncate font-semibold">{shelf.name}</p>
-                        <p className="text-sm text-muted-foreground">
+                        <p
+                          className={
+                            shelf.entry_count === 0
+                              ? "text-sm text-muted-foreground"
+                              : weightClass(shelf.entry_count, max)
+                          }
+                        >
                           {shelf.entry_count === 0
                             ? "Empty"
                             : `${shelf.entry_count} ${

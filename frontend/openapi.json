@@ -2479,6 +2479,13 @@
       },
       "ShelfResponse": {
         "properties": {
+          "covers": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Covers",
+            "type": "array"
+          },
           "entry_count": {
             "default": 0,
             "title": "Entry Count",

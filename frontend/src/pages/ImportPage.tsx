@@ -39,6 +39,7 @@ import {
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
 import { describeRowError } from "@/features/import/errors";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { weightClass } from "@/features/library/insights";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { ExportPanel } from "@/features/export/ExportPanel";
 import { ExportPicker } from "@/features/import/ExportPicker";
@@ -703,9 +704,47 @@ export function ImportPage() {
                 >
                   Preview: {preview.summary.total} rows
                 </h2>
-                <p className="mt-2" role="status">
-                  {preview.summary.ready} ready · {preview.summary.ambiguous}{" "}
-                  need a choice · {preview.summary.errors} have errors
+                <p
+                  className="mt-2 flex flex-wrap items-baseline gap-x-1"
+                  role="status"
+                >
+                  {/* Three counts describing one whole — the same rule the
+                      shelves list and the status facets apply to theirs
+                      (deliverable 5) — so the number that dominates the batch
+                      reads as dominant, not identical in weight to the two
+                      that don't. */}
+                  {(() => {
+                    const max = Math.max(
+                      preview.summary.ready,
+                      preview.summary.ambiguous,
+                      preview.summary.errors,
+                      1,
+                    );
+                    return (
+                      <>
+                        <span
+                          className={weightClass(preview.summary.ready, max)}
+                        >
+                          {preview.summary.ready} ready
+                        </span>
+                        <span>·</span>
+                        <span
+                          className={weightClass(
+                            preview.summary.ambiguous,
+                            max,
+                          )}
+                        >
+                          {preview.summary.ambiguous} need a choice
+                        </span>
+                        <span>·</span>
+                        <span
+                          className={weightClass(preview.summary.errors, max)}
+                        >
+                          {preview.summary.errors} have errors
+                        </span>
+                      </>
+                    );
+                  })()}
                 </p>
                 {/* What the import left behind, on its own line and never counted
                 as an error. The two are kept apart because they are different
