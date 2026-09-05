@@ -449,6 +449,66 @@ test("Enter opens a focused row to detail", async () => {
   });
 });
 
+test("a wall card presents cover, title, creator and the year line in that order", async () => {
+  // Sprint 072 required test. The card is a cover over a text block; the DOM
+  // order is the design. Assertions are document-position checks, not
+  // pixel-measurements — the pinned geometry lives in library.test.ts and
+  // the e2e containment rules, and this test keeps the anatomy honest.
+  const fetchMock = vi.fn(
+    async () => new Response(JSON.stringify(populated), { status: 200 }),
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  const article = await screen.findByRole("article", { name: "Rayuela" });
+  // The cover region, whether or not artwork has arrived: the placeholder is
+  // a labelled block, not an img, so the asserted piece is the region.
+  const cover = article.querySelector("[data-card-cover]");
+  const title = article.querySelector("h2");
+  const paragraphs = article.querySelectorAll("p");
+  const creator = paragraphs[0];
+  const year = paragraphs[1];
+  expect(cover, "the card has a cover").toBeTruthy();
+  expect(title, "the card has a title").toBeTruthy();
+  expect(creator, "the card has a creator line").toBeTruthy();
+  expect(year, "the card has a year line").toBeTruthy();
+  const sequence = [cover!, title!, creator!, year!];
+  for (let i = 1; i < sequence.length; i += 1)
+    // DOCUMENT_POSITION_FOLLOWING — each piece comes after the one before.
+    expect(sequence[i - 1].compareDocumentPosition(sequence[i]) & 4).toBe(4);
+  expect(title).toHaveTextContent("Rayuela");
+  expect(creator).toHaveTextContent("Cortázar, Julio");
+  expect(year).toHaveTextContent("1963");
+});
+
+test("the wall card's score chip is the picker trigger and carries its ramp class", async () => {
+  // Sprint 072 required test. The chip is the trigger — pressing it opens
+  // the ramp panel — and its colour is the DEC-026 ramp for its band, so a
+  // score reads at a glance from across the room.
+  const fetchMock = vi.fn(
+    async (request: string | URL | Request, init?: RequestInit) => {
+      if (init?.method === "PATCH") {
+        return new Response(JSON.stringify(populated.items[0]), {
+          status: 200,
+        });
+      }
+      return new Response(JSON.stringify(populated), { status: 200 });
+    },
+  );
+  vi.stubGlobal("fetch", fetchMock);
+  renderPage();
+  await screen.findByRole("article", { name: "Rayuela" });
+  const user = userEvent.setup();
+  const chip = screen.getByRole("button", { name: /^Score for Rayuela/ });
+  expect(chip).toHaveTextContent("9");
+  // Score 9 sits in the top band of the ramp.
+  expect(chip.className).toContain("bg-score-top");
+  // The chip is the trigger: opening it surfaces the ramp itself.
+  await user.click(chip);
+  expect(
+    await screen.findByRole("button", { name: "Score 7" }),
+  ).toBeVisible();
+});
+
 /**
  * Three domains, one of which this build has never heard of.
  *

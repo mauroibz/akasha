@@ -37,27 +37,41 @@ function EntryControls({
   entry,
   onScore,
   onStatus,
-  stretch,
+  onCover,
 }: Pick<VirtualLibraryProps, "onScore" | "onStatus"> & {
   entry: LibraryEntry;
-  stretch?: boolean;
+  /** Sprint 072 wall cards: controls ride the cover's bottom scrim (DEC-139). */
+  onCover?: boolean;
 }) {
   // One cached request for the whole session, shared with every other row.
   const itemTypes = useItemTypes();
   return (
     <div
-      className="flex h-11 shrink-0 items-center gap-2"
       data-card-controls=""
       onClick={(e) => e.stopPropagation()}
+      className={
+        onCover
+          ? // Both controls always in the DOM and visible at rest (AC4 is not
+            // a hover contract). The opaque backing is the Sprint 071 lesson:
+            // colours on artwork blend into it — the translucent buttons need
+            // solid ground behind them, not a tint over the poster.
+            //
+            // `relative` is load-bearing: the score panel anchors to this
+            // container (not to its own chip, which sits off-centre) so
+            // the panel opens centred above the card — contained at every
+            // width (AC9), within DEC-023 without changing the card box.
+            "relative flex h-[52px] items-center justify-center gap-2 rounded-full bg-surface p-1 shadow-lg"
+          : "flex h-11 shrink-0 items-center gap-2"
+      }
     >
       <StatusSelect
         value={entry.status}
         onValueChange={(status) => onStatus(entry, status)}
         label={`Status for ${entry.item.title}`}
         statuses={statusesFor(entry.item.type, itemTypes.data)}
-        // In a card the select absorbs the free width so it can never push the
-        // score control past the card edge.
-        className={stretch ? "h-9 min-w-0 flex-1" : "h-9 w-auto"}
+        // The wall-card pill must be a 44px target (AC4); the row keeps its
+        // hurdle-era 36px, which DEC-109 deliberately accepts in the dense view.
+        className={onCover ? "h-11 w-auto" : "h-9 w-auto"}
       />
       <ScorePicker
         value={entry.score}
@@ -66,7 +80,11 @@ function EntryControls({
           if (score !== null) onScore(entry, score);
         }}
         label={`Score for ${entry.item.title}`}
+        // Compact so the panel stays a contained overlay (DEC-023); onCover
+        // grows the chip to 44px with the larger numeral and centres the panel
+        // above it (AC4, AC9).
         compact
+        onCover={onCover}
       />
     </div>
   );
@@ -79,46 +97,73 @@ function EntryMetadata({
   entry: LibraryEntry;
   grid: boolean;
 }) {
+  // Nothing gets pinned width in Sprint 072 — the card is a measureless cover,
+  // and everything in it takes the full measure of the card. The title gets
+  // two lines at text-sm leading-5 (40px) merged into the textHeight budget;
+  // the creator and the year/format lines each fit inside one line.
   return (
-    <div className="min-w-0 flex-1" data-card-meta="">
+    <div
+      className={
+        grid ? "grid min-w-0 content-start px-2.5 pt-2" : "min-w-0 flex-1"
+      }
+      data-card-meta=""
+    >
       <h2
-        className={`font-semibold leading-snug ${grid ? "line-clamp-3" : "truncate"}`}
+        className="overflow-hidden text-sm font-semibold leading-5 [-webkit-line-clamp:2] [display:-webkit-box] [-webkit-box-orient:vertical]"
+        title={entry.item.title}
       >
         {entry.item.title}
       </h2>
-      <p
-        className={`text-sm text-muted-foreground ${grid ? "mt-1 line-clamp-2" : "truncate"}`}
-      >
-        {entry.item.creator ?? "Unknown creator"}
-      </p>
-      {/* A grid card is 260px wide and gives its metadata column 88px once the
-          fixed cover and the padding are subtracted, so "Edition year: 2015 ·
-          Original: 1963" could only ever render as "Edition year: 201…". The
-          card box is pinned (DEC-023) and the cover cannot shrink, so the text
-          shortens and wraps instead: the label survives for screen readers,
-          where it costs no pixels, and the years are what a reader needs. */}
-      {/* No opacity modifier: the caption does not fade in, so axe samples the
-          settled colour rather than a frame mid-transition (Sprint 055). */}
-      <p className={`text-xs text-muted-foreground ${grid ? "mt-1" : ""}`}>
-        <span className="sr-only">Edition year: </span>
-        {/* A bare "unknown" under an author reads as a broken field. With a
-            year present the number speaks for itself; without one it needs the
-            noun, and "Year unknown" still fits the 88px column. */}
-        {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
-        {entry.item.year === null || entry.item.year === undefined ? (
-          <span className="sr-only">unknown</span>
-        ) : null}
-        {entry.item.metadata.original_year &&
-        entry.item.metadata.original_year !== entry.item.year ? (
-          <>
-            {" · "}
-            <span className="sr-only">originally published </span>
-            <span aria-hidden="true">orig. </span>
-            {entry.item.metadata.original_year}
-          </>
-        ) : null}
-      </p>
-      <FormatBadges entry={entry} />
+      {grid ? (
+        <>
+          <p
+            className="mt-0.5 overflow-hidden text-xs leading-4 text-muted-foreground truncate"
+            title={entry.item.creator ?? undefined}
+          >
+            {entry.item.creator ?? "Unknown creator"}
+          </p>
+          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
+            <span className="sr-only">Edition year: </span>
+            {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
+            {entry.item.year === null || entry.item.year === undefined ? (
+              <span className="sr-only">unknown</span>
+            ) : null}
+            {entry.item.metadata.original_year &&
+            entry.item.metadata.original_year !== entry.item.year ? (
+              <>
+                {" · "}
+                <span className="sr-only">originally published </span>
+                <span aria-hidden="true">orig. </span>
+                {entry.item.metadata.original_year}
+              </>
+            ) : null}
+          </p>
+          <FormatBadges entry={entry} />
+        </>
+      ) : (
+        <>
+          <p className="truncate text-sm text-muted-foreground">
+            {entry.item.creator ?? "Unknown creator"}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <span className="sr-only">Edition year: </span>
+            {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
+            {entry.item.year === null || entry.item.year === undefined ? (
+              <span className="sr-only">unknown</span>
+            ) : null}
+            {entry.item.metadata.original_year &&
+            entry.item.metadata.original_year !== entry.item.year ? (
+              <>
+                {" · "}
+                <span className="sr-only">originally published </span>
+                <span aria-hidden="true">orig. </span>
+                {entry.item.metadata.original_year}
+              </>
+            ) : null}
+          </p>
+          <FormatBadges entry={entry} />
+        </>
+      )}
     </div>
   );
 }
@@ -135,7 +180,10 @@ function FormatBadges({ entry }: { entry: LibraryEntry }) {
   if (!entry.formats?.length) return null;
   const labels = formatLabels(itemTypes.data);
   return (
-    <p className="mt-1 flex flex-wrap gap-1" data-card-formats="">
+    <span
+      className="mt-1 inline-flex flex-wrap items-center gap-1 align-[3px] empty:hidden"
+      data-card-formats=""
+    >
       <span className="sr-only">Formats: </span>
       {entry.formats.map((format) => (
         <span
@@ -145,7 +193,7 @@ function FormatBadges({ entry }: { entry: LibraryEntry }) {
           {labels[format] ?? format}
         </span>
       ))}
-    </p>
+    </span>
   );
 }
 
@@ -254,7 +302,9 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
         aria-label={entry.item.title}
         className={
           isGrid
-            ? `flex h-full flex-col gap-3 overflow-hidden rounded-2xl bg-surface/60 p-4 ${focusRing} ${ring}`
+            ? // Sprint 072: no padding on the wall card — the cover is the
+              // card's skin edge-to-edge, and the text block carries its own.
+              `relative h-full overflow-hidden rounded-2xl bg-surface/60 ${focusRing} ${ring}`
             : `flex h-full w-full items-center gap-4 border-b border-border px-4 ${focusRing} ${ring}`
         }
         data-entry-id={entry.id}
@@ -263,11 +313,26 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
         data-rollback={isRolledBack ? "true" : "false"}
         key={entry.id}
         onFocus={() => props.onFocusEntry(entry.id)}
+        onClick={(e) => {
+          if (!isGrid) return;
+          // The text block's own button opens the card; this handler is the
+          // net for clicks on the card shell itself. Interactive children
+          // keep their clicks — EntryControls stops propagation and this
+          // guard returns before a button's click could double-navigate.
+          if ((e.target as HTMLElement).closest("button, [role='combobox']"))
+            return;
+          void navigate(`/books/${entry.id}`);
+        }}
         onKeyDown={(e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            void navigate(`/books/${entry.id}`);
-          }
+          if (e.key !== "Enter") return;
+          // Enter on a control is the control's own action — the chip opens,
+          // the pill opens, the Open button opens the page. Only a bare Enter
+          // on the card itself (the row crack, reached from `j`/`k`) is the
+          // open-shortcut; without this guard one key press is both.
+          if ((e.target as HTMLElement).closest("button, [role='combobox']"))
+            return;
+          e.preventDefault();
+          void navigate(`/books/${entry.id}`);
         }}
         // Both views are the same list of entries at two densities, so both
         // are a feed of articles. Table mode used to claim `role="row"` inside
@@ -278,29 +343,84 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
         aria-setsize={props.total}
         tabIndex={0}
       >
-        <button
-          type="button"
-          className={`flex min-w-0 flex-1 gap-4 overflow-hidden text-left focus-visible:outline-none ${
-            isGrid ? "items-start" : "items-center"
-          }`}
-          aria-label={`Open ${entry.item.title}`}
-          onClick={() => void navigate(`/books/${entry.id}`)}
-        >
-          <div className="shrink-0" data-card-cover="">
-            <CoverImage
-              src={entry.item.cover_url}
-              alt={`Cover of ${entry.item.title}`}
-              className={isGrid ? "h-48 w-32 rounded-xl" : "h-14 w-10"}
+        {isGrid ? (
+          <>
+            {/* Sprint 072 wall card. The cover is the card's skin — edge to
+                edge, pinned, cropped — so its wrapper opts out of hit-testing
+                entirely: its job is pixels, not clicks. */}
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0"
+              style={{ height: gridLayout.coverHeight }}
+              data-card-cover=""
+            >
+              <CoverImage
+                src={entry.item.cover_url}
+                alt={`Cover of ${entry.item.title}`}
+                className="absolute inset-0 h-full w-full rounded-none"
+              />
+              {/* The scrim: artwork reads as art because the black gradient
+                  sits above it, and it keeps the score chip and status pill
+                  legible over any poster, light or dark (DEC-139 risk item). */}
+              <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+            </div>
+            {/* The text block is the card's open control — a named button exactly
+                like the table row's, whose topmost target is the title text
+                itself, so a reader who clicks the title hits the title (the
+                editorial suite's heading click opens the detail; AC11 leaves
+                that suite untouched) and a screen reader gets a real door.
+                There is deliberately NO full-card overlay: one above the
+                whole surface would intercept exactly that click. */}
+            <button
+              type="button"
+              aria-label={`Open ${entry.item.title}`}
+              className="absolute inset-x-0 bottom-0 z-[1] block overflow-hidden rounded-b-2xl bg-surface text-left focus-visible:outline-none"
+              style={{ height: gridLayout.textHeight }}
+              onClick={() => void navigate(`/books/${entry.id}`)}
+            >
+              <EntryMetadata entry={entry} grid />
+            </button>
+            {/* The controls ride the bottom of the cover — the pile sits a
+                few pixels up from the poster's edge, on the scrim's opaque
+                backing rather than tinted into the artwork itself. z-10 keeps
+                it above the text block's button: its 52px footprint sits in
+                the cover region, and clicks there must hit the chip, not the
+                card. */}
+            <div
+              className="absolute inset-x-0 z-10 flex justify-center p-1.5"
+              style={{ top: gridLayout.coverHeight - 58 }}
+            >
+              <EntryControls
+                entry={entry}
+                onScore={props.onScore}
+                onStatus={props.onStatus}
+                onCover
+              />
+            </div>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden text-left focus-visible:outline-none"
+              aria-label={`Open ${entry.item.title}`}
+              onClick={() => void navigate(`/books/${entry.id}`)}
+            >
+              <div className="shrink-0" data-card-cover="">
+                <CoverImage
+                  src={entry.item.cover_url}
+                  alt={`Cover of ${entry.item.title}`}
+                  className="h-14 w-10"
+                />
+              </div>
+              <EntryMetadata entry={entry} grid={false} />
+            </button>
+            <EntryControls
+              entry={entry}
+              onScore={props.onScore}
+              onStatus={props.onStatus}
             />
-          </div>
-          <EntryMetadata entry={entry} grid={isGrid} />
-        </button>
-        <EntryControls
-          entry={entry}
-          onScore={props.onScore}
-          onStatus={props.onStatus}
-          stretch={isGrid}
-        />
+          </>
+        )}
       </article>
     );
   };

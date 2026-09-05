@@ -16,6 +16,14 @@ interface ScorePickerProps {
   onChange: (score: number | null) => void;
   label?: string;
   compact?: boolean;
+  /**
+   * Wall-card mode (Sprint 072): the chip keeps the compact overlay — the
+   * panel must stay geometrically inside its card (DEC-023) — but grows to the
+   * full 44px target with a ~18px numeral, and the panel opens centred above
+   * the chip instead of right-aligned, because the chip no longer sits at the
+   * card edge but on the cover's bottom scrim.
+   */
+  onCover?: boolean;
 }
 
 /**
@@ -31,6 +39,7 @@ export function ScorePicker({
   onChange,
   label = "Score",
   compact,
+  onCover,
 }: ScorePickerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [editing, setEditing] = useState(false);
@@ -95,6 +104,11 @@ export function ScorePicker({
           : "border-border",
         scoreChipClass(shown),
         compact && "h-9 min-h-0 shrink-0 px-2 text-sm",
+        // The wall card's chip is the full touch target the sprint asks for
+        // (AC4): 44px tall with a numeral large enough to read from the room.
+        // Listed after the compact clause so it wins on both chips it applies
+        // to — the wall card is compact (overlay) *and* on the cover.
+        onCover && "h-11 min-h-11 min-w-11 px-2.5 text-lg",
       )}
       aria-expanded={editing}
       // The dashed border and the dot say "provisional" to someone who already
@@ -145,6 +159,9 @@ export function ScorePicker({
             type="button"
             className={cn(
               "w-8 rounded-md text-sm font-medium transition-colors focus-ring",
+              // Wall cards can be 190px: five full-width segments would make
+              // the panel wider than the card, so they step down half a size.
+              onCover && "w-7",
               compact ? "h-9" : "h-11",
               n === shown
                 ? scoreFillClass[scoreBand(n)]
@@ -187,7 +204,17 @@ export function ScorePicker({
   // layout box and cannot push neighbouring content around.
   if (compact)
     return (
-      <div className="relative shrink-0" ref={containerRef}>
+      // The wrapper is the panel's positioning context on a library row —
+      // right-anchored above the chip. On a wall card it is *not* positioned:
+      // the grid card's `data-card-controls` container is, so the panel opens
+      // centred above the *card*, not above the chip. Centring over the chip
+      // pushes the panel past the card edge — the chip sits off-centre because
+      // the status beside it is wider — and re-testing the containment
+      // per-view afterwards becomes the fix here.
+      <div
+        className={cn("shrink-0", !onCover && "relative")}
+        ref={containerRef}
+      >
         {trigger}
         {editing && (
           // Enter only, and scaling up from 0.96 towards its resting box: the
@@ -195,14 +222,27 @@ export function ScorePicker({
           // No exit -- the panel vanishing is the confirmation that the commit
           // landed, and an exiting node inside a recyclable virtual row is a
           // lifecycle hazard for no visible gain.
-          <m.div
-            className="absolute bottom-full right-0 z-20 mb-2 w-max rounded-xl border border-border bg-popover p-2 shadow-2xl"
-            style={{ transformOrigin: "bottom right" }}
-            initial={presets.panel.initial}
-            animate={presets.panel.animate}
+          //
+          // The positioning wrapper owns the placement (right-anchored on a
+          // row, centred above the chip on a wall card) so motion's inline
+          // scale transform on the panel itself can't knock it off-centre.
+          <div
+            className={cn(
+              "absolute bottom-full z-20 mb-2",
+              onCover ? "left-1/2 -translate-x-1/2" : "right-0",
+            )}
           >
-            {panel}
-          </m.div>
+            <m.div
+              className="w-max rounded-xl border border-border bg-popover p-2 shadow-2xl"
+              style={{
+                transformOrigin: onCover ? "bottom center" : "bottom right",
+              }}
+              initial={presets.panel.initial}
+              animate={presets.panel.animate}
+            >
+              {panel}
+            </m.div>
+          </div>
         )}
       </div>
     );

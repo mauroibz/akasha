@@ -91,7 +91,9 @@ export const defaultLibraryFilters: LibraryFilters = {
 };
 
 const coverHeight = 300;
-const textHeight = 72;
+// Sprint 072 (DEC-139): below the pinned cover, the text band is everything
+// — two-line title, creator, and one quiet line for year/formats.
+const textHeight = 112;
 
 /**
  * Fixed geometry of the virtualized library wall. Card height is constant so the
