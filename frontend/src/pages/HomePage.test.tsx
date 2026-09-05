@@ -1450,3 +1450,93 @@ test("a library reached from a ranking says which filter it is under, and drops 
     expect(last).not.toContain("key=creators");
   });
 });
+
+/* ------------------------------------------------------------------ *
+ * Sprint 071 deliverable 4 — the active-filters row.
+ * ------------------------------------------------------------------ */
+
+test("the active-filters row shows one chip per set filter, including the insights breadcrumb, and dismissing one leaves the others", async () => {
+  const requests: string[] = [];
+  vi.stubGlobal(
+    "fetch",
+    vi.fn((request: string | URL | Request) => {
+      const url = String(request);
+      requests.push(url);
+      if (url.startsWith("/api/item-types"))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              {
+                id: "book",
+                label: "Book",
+                fields: [
+                  {
+                    name: "creators",
+                    label: "Authors",
+                    type: "text",
+                    multiplicity: "many",
+                    groupable: true,
+                  },
+                ],
+                statuses: [
+                  { value: "read", label: "Read", choosable: true, hotkey: "r" },
+                ],
+                default_status: "to_read",
+                entry_fields: [],
+                entry_field_labels: {},
+                progress: null,
+                formats: [{ value: "digital", label: "Digital" }],
+                entry_panel_label: "Your reading data",
+                chooses_covers: false,
+              },
+            ]),
+          ),
+        );
+      if (url.startsWith("/api/shelves"))
+        return Promise.resolve(
+          new Response(
+            JSON.stringify([
+              { id: 1, name: "Favorites", slug: "favorites", entry_count: 5 },
+            ]),
+          ),
+        );
+      return Promise.resolve(new Response(JSON.stringify(populated)));
+    }),
+  );
+  const user = userEvent.setup();
+  renderPage(
+    "/?type=book&shelf=favorites&format=digital&status=read&q=leon" +
+      "&key=creators&value=julio+cortazar&label=Julio+Cort%C3%A1zar",
+  );
+
+  const row = await screen.findByRole("region", { name: "Active filters" });
+  await within(row).findByRole("button", { name: /Shelf · Favorites/ });
+  within(row).getByRole("button", { name: /Format · Digital/ });
+  within(row).getByRole("button", { name: /Status · Read/ });
+  within(row).getByRole("button", { name: /Search · .*leon/ });
+  within(row).getByRole("button", {
+    name: /Insights · Authors · Julio Cortázar/,
+  });
+
+  // Dismissing one filter's chip clears exactly that filter (AC4).
+  await user.click(within(row).getByRole("button", { name: /Format · Digital/ }));
+
+  expect(
+    within(row).queryByRole("button", { name: /Format · Digital/ }),
+  ).toBeNull();
+  // The others are untouched: still chips, and still in the next request.
+  within(row).getByRole("button", { name: /Shelf · Favorites/ });
+  within(row).getByRole("button", { name: /Status · Read/ });
+  within(row).getByRole("button", { name: /Search · .*leon/ });
+  within(row).getByRole("button", {
+    name: /Insights · Authors · Julio Cortázar/,
+  });
+  await waitFor(() => {
+    const last = requests[requests.length - 1];
+    expect(last).not.toContain("format=digital");
+    expect(last).toContain("shelf=favorites");
+    expect(last).toContain("status=read");
+    expect(last).toContain("q=leon");
+    expect(last).toContain("key=creators");
+  });
+});

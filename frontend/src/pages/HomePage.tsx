@@ -42,6 +42,7 @@ import {
   insightKeyOptions,
   labelFor,
   sortLabels,
+  statusLabelFor,
 } from "@/features/library/labels";
 import { AddForm } from "@/features/add/AddForm";
 import { ResultsGrid } from "@/features/add/ResultsGrid";
@@ -292,6 +293,17 @@ export function HomePage() {
     return Array.from(seen.values());
   }, [shownDomains]);
   const firstPage = library.data?.pages[0];
+  // Whether the local library came up empty for the current query, so web
+  // results have replaced it. Requires `library.isSuccess` rather than reading
+  // `firstPage` alone: between a query changing and its new page landing,
+  // `firstPage` is `undefined` (TanStack Query clears data on a queryKey
+  // change with no `placeholderData`), and `undefined === 0` is `false` — a
+  // transient window where this would otherwise read as "still a hit" and
+  // flash the controls (and, since Sprint 071, the active-filters row —
+  // including a query chip whose own label repeats the query text a reader
+  // just typed, which a test can mistake for the real search result).
+  const libraryMissedQuery =
+    Boolean(filters.query) && library.isSuccess && firstPage?.items.length === 0;
 
   const mutation = useMutation({
     mutationFn: ({
@@ -631,7 +643,7 @@ export function HomePage() {
           shelf, format and view apply to rows that are not on screen, and a reader
           who searched the web because their own library came up empty gets those
           results sooner without a row of now-meaningless controls above them. */}
-      {!(filters.query && firstPage?.items.length === 0) && (
+      {!libraryMissedQuery && (
         <section
           aria-label="Library controls"
           className="mt-3 flex flex-wrap items-center gap-3"
@@ -726,19 +738,6 @@ export function HomePage() {
               onChange={(statuses) => updateFilters({ statuses })}
             />
           ))}
-          {filters.key && filters.value && (
-            <InsightFilterChip
-              keyLabel={insightKeyLabel(
-                filters.key,
-                filters.types[0],
-                itemTypes.data,
-              )}
-              value={filters.valueLabel || filters.value}
-              onClear={() =>
-                updateFilters({ key: "", value: "", valueLabel: "" })
-              }
-            />
-          )}
           <SegmentedControl
             ariaLabel="Library view"
             value={view}
@@ -750,6 +749,78 @@ export function HomePage() {
           />
         </section>
       )}
+      {/* Which filter it is, whichever filter it is (deliverable 4). The
+          selects above keep their own state; this is what makes a library
+          narrowed by four different controls legible at a glance instead of
+          requiring all four to be reopened to find out. The insights
+          breadcrumb used to be a chip of its own beside the selects — it is
+          one of these now, not a second idiom (AC5). */}
+      {!libraryMissedQuery &&
+        (filters.shelves.length > 0 ||
+          filters.formats.length > 0 ||
+          filters.statuses.length > 0 ||
+          filters.query.trim().length > 0 ||
+          (filters.key !== "" && filters.value !== "")) && (
+          <section
+            aria-label="Active filters"
+            className="mt-3 flex flex-wrap items-center gap-2"
+          >
+            {filters.shelves.map((slug) => (
+              <FilterChip
+                key={`shelf-${slug}`}
+                label={`Shelf · ${shelves.find((shelf) => shelf.slug === slug)?.name ?? slug}`}
+                onClear={() =>
+                  updateFilters({
+                    shelves: filters.shelves.filter((s) => s !== slug),
+                  })
+                }
+              />
+            ))}
+            {filters.formats.map((format) => (
+              <FilterChip
+                key={`format-${format}`}
+                label={`Format · ${
+                  formatChoices.find((choice) => choice.value === format)
+                    ?.label ?? format
+                }`}
+                onClear={() =>
+                  updateFilters({
+                    formats: filters.formats.filter((f) => f !== format),
+                  })
+                }
+              />
+            ))}
+            {filters.statuses.map((status) => (
+              <FilterChip
+                key={`status-${status}`}
+                label={`Status · ${statusLabelFor(selectedDomain, itemTypes.data, status)}`}
+                onClear={() =>
+                  updateFilters({
+                    statuses: filters.statuses.filter((s) => s !== status),
+                  })
+                }
+              />
+            ))}
+            {filters.query.trim() && (
+              <FilterChip
+                label={`Search · “${filters.query.trim()}”`}
+                onClear={() => clearSearch({ refocus: false })}
+              />
+            )}
+            {filters.key && filters.value && (
+              <FilterChip
+                label={`Insights · ${insightKeyLabel(
+                  filters.key,
+                  filters.types[0],
+                  itemTypes.data,
+                )} · ${filters.valueLabel || filters.value}`}
+                onClear={() =>
+                  updateFilters({ key: "", value: "", valueLabel: "" })
+                }
+              />
+            )}
+          </section>
+        )}
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole
@@ -935,30 +1006,23 @@ export function HomePage() {
 }
 
 /**
- * What a `key`/`value` filter is, and how to drop it.
+ * One dismissable chip naming one set filter (deliverable 4).
  *
- * Sprint 065 linked here from an insights ranking and left the params applying
- * invisibly: a library filtered to one author looked like a library that had lost
- * most of its books, with nothing on screen saying why or how to undo it.
+ * Sprint 065 built this shape for the insights `key`/`value` breadcrumb alone —
+ * linked here from a ranking and left applying invisibly, so a library filtered to
+ * one author looked like a library that had lost most of its books, with nothing on
+ * screen saying why or how to undo it. Generalized now to whichever filter it is:
+ * shelf, format, status, the search query, or that same insights breadcrumb, which
+ * is one of these chips rather than a second idiom of its own (AC5).
  */
-function InsightFilterChip({
-  keyLabel,
-  value,
-  onClear,
-}: {
-  keyLabel: string;
-  value: string;
-  onClear: () => void;
-}) {
+function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
   return (
     <button
       type="button"
       onClick={onClear}
       className="flex min-h-11 items-center gap-2 rounded-full bg-primary/15 px-4 text-sm font-medium text-primary hover:bg-primary/25 focus-ring"
     >
-      <span>
-        Insights · {keyLabel} · {value}
-      </span>
+      <span>{label}</span>
       <span aria-hidden="true">✕</span>
       <span className="sr-only">Clear this filter</span>
     </button>
