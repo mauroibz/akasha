@@ -441,7 +441,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
       // report was that the primary surface was a window inside the page, and the
       // fixed height was the whole of it. `overflow-x-hidden` stays, because a
       // wide card must not push the document sideways.
-      className="library-scroll mt-5 overflow-x-hidden rounded-2xl bg-surface/40"
+      className="library-scroll mt-4 overflow-x-hidden rounded-2xl bg-surface/40"
       role="feed"
       aria-label="Library"
       aria-busy={props.isFetchingNextPage}

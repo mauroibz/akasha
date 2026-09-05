@@ -93,6 +93,13 @@ test("the wall starts near the top and gives at least seventy percent of each ca
   page,
 }) => {
   await seedLibrary(page, 100);
+  await stubItemTypes(page, [
+    bookItemType,
+    albumItemType,
+    animeItemType,
+    movieItemType,
+    seriesItemType,
+  ]);
   for (const viewport of viewports) {
     await page.setViewportSize({
       width: viewport.width,
@@ -119,6 +126,13 @@ test("the wall reaches one, five, and six columns at its acceptance widths", asy
   page,
 }) => {
   await seedLibrary(page, 100);
+  await stubItemTypes(page, [
+    bookItemType,
+    albumItemType,
+    animeItemType,
+    movieItemType,
+    seriesItemType,
+  ]);
   for (const viewport of [
     { width: 390, height: 844, minimum: 1, exact: 1 },
     { width: 1440, height: 900, minimum: 5 },

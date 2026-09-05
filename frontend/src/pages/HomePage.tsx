@@ -690,34 +690,7 @@ export function HomePage() {
               { value: "table", label: "Table", ariaLabel: "Table view" },
             ]}
           />
-          <div className="ml-auto flex items-center gap-3">
-            <Button
-              variant="outline"
-              className="min-h-11 rounded-full px-4 aria-pressed:border-primary aria-pressed:text-primary"
-              aria-pressed={filters.statuses.includes("unsorted")}
-              onClick={() => void navigate("/import?tab=triage")}
-            >
-              Inbox {inboxCount}
-            </Button>
-            <Button
-              className="min-h-11 rounded-full px-4"
-              aria-label="Add to library"
-              onClick={() => searchRef.current?.focus()}
-            >
-              Add
-            </Button>
-          </div>
-        </div>
-        {/* The row's filter state: one Filters control plus the chips. Gone
-            exactly when the library has nothing for the current query — the
-            controls applied to rows that are not on screen — and the total
-            with it. The region name is where a set filter gets stated: the
-            chips inside are the only statement of it (deliverable 5). */}
-        {!libraryMissedQuery && (
-          <section
-            aria-label="Active filters"
-            className="mt-2 flex flex-wrap items-center gap-2"
-          >
+          {!libraryMissedQuery && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button
@@ -801,10 +774,6 @@ export function HomePage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value={allFormats}>All formats</SelectItem>
-                      {/* One entry per distinct format, not one per domain that declares it:
-                `digital` belongs to books and records both, and listing it twice
-                gave two options with the same value and the same count. The filter
-                itself spans domains, so a flat list is what it actually does. */}
                       {formatChoices.map((format) => (
                         <SelectItem key={format.value} value={format.value}>
                           {format.label}{" "}
@@ -813,11 +782,6 @@ export function HomePage() {
                       ))}
                     </SelectContent>
                   </Select>
-                  {/* The fourth filter, in the row of filters.
-            It was a row of chips of its own -- one whole row of chrome above the
-            library for the vocabulary the tab already names. `shownDomains` is at
-            most one domain, and empty only until the registry answers, so this
-            renders exactly when there is a vocabulary to render. */}
                   {shownDomains.map((type) => (
                     <StatusFilter
                       key={type.id}
@@ -832,6 +796,33 @@ export function HomePage() {
                 </div>
               </PopoverContent>
             </Popover>
+          )}
+          <div className="ml-auto flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="min-h-11 rounded-full px-4 aria-pressed:border-primary aria-pressed:text-primary"
+              aria-pressed={filters.statuses.includes("unsorted")}
+              onClick={() => void navigate("/import?tab=triage")}
+            >
+              Inbox {inboxCount}
+            </Button>
+            <Button
+              className="min-h-11 rounded-full px-4"
+              aria-label="Add to library"
+              onClick={() => searchRef.current?.focus()}
+            >
+              Add
+            </Button>
+          </div>
+        </div>
+        {/* A second row exists only when there is state to spell out. The
+            Filters trigger itself stays in the command row above; these chips
+            are the only place a set filter is stated (deliverable 5). */}
+        {!libraryMissedQuery && activeFilterCount > 0 && (
+          <section
+            aria-label="Active filters"
+            className="mt-2 flex flex-wrap items-center gap-2"
+          >
             {filters.shelves.map((slug) => (
               <FilterChip
                 key={`shelf-${slug}`}

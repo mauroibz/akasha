@@ -1633,11 +1633,11 @@ test("the active-filters row shows one chip per set filter, including the insigh
   );
 
   const row = await screen.findByRole("region", { name: "Active filters" });
-  expect(within(row).getByRole("button", { name: "Filters 5" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Filters 5" })).toBeVisible();
   expect(
     within(row).queryByRole("combobox", { name: "Sort library" }),
   ).toBeNull();
-  await user.click(within(row).getByRole("button", { name: "Filters 5" }));
+  await user.click(screen.getByRole("button", { name: "Filters 5" }));
   expect(screen.getByRole("combobox", { name: "Sort library" })).toBeVisible();
   await within(row).findByRole("button", { name: /Shelf · Favorites/ });
   within(row).getByRole("button", { name: /Format · Digital/ });
@@ -1655,7 +1655,7 @@ test("the active-filters row shows one chip per set filter, including the insigh
   expect(
     within(row).queryByRole("button", { name: /Format · Digital/ }),
   ).toBeNull();
-  expect(within(row).getByRole("button", { name: "Filters 4" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Filters 4" })).toBeVisible();
   // The others are untouched: still chips, and still in the next request.
   within(row).getByRole("button", { name: /Shelf · Favorites/ });
   within(row).getByRole("button", { name: /Status · Read/ });
