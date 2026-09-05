@@ -4456,3 +4456,145 @@ so 050 adds an adapter, not a declaration.
   Decide first, with the owner, whether it continues on branch
   `ui-readability-proposal` or whether these plans merge to `main` — neither
   has been authorized, and nothing is pushed.
+## 2026-09-05 — Sprint 072 (in progress) — wall built, command bar half-built
+
+State: `state.json` has `project_status: "in_progress"`, active sprint 072.
+This entry is the resume point for whoever
+picks up the command-bar work — the tree is intentionally dirty on two files,
+and neither has been committed yet.
+
+Done and committed:
+- `edc1fe3` [MOD] Repin the grid and container to Sprint 072 geometry —
+  deliverable 1 complete: `max-w-[1600px]` container, `cardMinWidth` 190 /
+  `coverHeight` 300 / `textHeight` 112 / max 6 columns, container pinned at
+  190 in `library.test.ts`, the state flip folded in.
+- `565e6aa` [MOD] Give the card its cover back — deliverables 2–4 complete
+  and verified at that commit: vertical cover-first card, `ScorePicker` chip
+  and status controls riding the cover scrim on an opaque `bg-surface`
+  backing, `data-card-cover/meta/controls` preserved, the full-card overlay
+  `Open X` button removed in favor of the text-block button (keeps
+  `editorial.spec.ts` heading clicks working and satisfies the requirement
+  table's `at line 839` pointer to it), and the two required wall-card
+  component tests in `HomePage.test.tsx`.
+- At the wall commit: unit suite green, Playwright 115 passed at that commit,
+  `make check` and `make test` green. The keyboard-guard URL assertion was
+  stabilized (pre-existing search-debounce race), and AC5's e2e test was
+  rewritten per suite expectations.
+
+In flight, uncommitted (deliverables 5–6):
+- `frontend/src/pages/HomePage.tsx` (+164/−121): the four rows of chrome are
+  collapsing into one sticky command bar — h1 `Akasha`, the library total,
+  `DomainStrip`, the search field, one **Filters** popover holding the four
+  collapsed controls (sort / shelf / format / status), the `Library view`
+  segmented toggle, and the `Inbox N` + `Add` buttons. The Active-filters
+  region with its chips sits in `section aria-label="Active filters"`.
+- **The file is mid-write: esbuild reports `Unexpected closing "div" tag
+  does not match opening "section" tag` at `HomePage.tsx:865:12`** — the
+  `section` opened at line 698 must be closed with `</section>`, not
+  `</div>`. **Until that is fixed, 0 unit tests can run in
+  `HomePage.test.tsx`.** Do not commit anything while the parse error is
+  live.
+- `frontend/src/features/library/library.ts`: `tableRowHeight` 84 → 56 with
+  the D7 comment. Nothing else moves (the pins derive from the constant),
+  but this has not been committed or re-verified.
+- Verified helper arithmetic for D6: `libraryWhole` sums
+  `facets.status_counts_by_type[selectedDomain]`, falling back to
+  `firstPage.total`, then `entries.length`; `filterActive` covers
+  statuses/shelves/formats/query; the total renders `N` unfiltered and
+  `N of M` filtered. Motion total (`ariaLabel="Total display"`), web block,
+  and sticky SSR guards untouched.
+
+Known-and-left, in the order they are likely to bite:
+1. **The esbuild tag mismatch at `HomePage.tsx:865`** — described above; the
+   immediate blocker.
+2. **Eight unit tests in `HomePage.test.tsx` address collapsed controls
+   directly** by role — `Sort library` (lines 283/287), `Filter by shelf`
+   (line 389), and the narrowing trio at 1344/1353/1359/1366. They must be
+   taught to open the **Filters** popover first; count those additions
+   toward the requirement table's `named for change` allowance.
+3. **One replaced attribute that needs its tests re-pointed:** the old
+   `Search and add` / `Library controls` names are gone, replaced by the
+   `Active filters` section and the popover's comboboxes. The new tests
+   required by the table — the sticky bar at the end of a 200-item library,
+   and the unfiltered vs `N of M` total (1344-style) — do not yet exist.
+4. **Behavior note:** the Add button now renders visible text `Add` with
+   `aria-label="Add to library"` and focuses the search input — same click
+   behavior as before, but confirm nothing asserts the visible text
+   `Add to library`.
+5. **The `typing in search library` race** — green isolated, raced once
+   under parallel load (debounced URL sync). Likely pre-existing; re-check
+   on the full run.
+
+Verified and how (this session): `git status` and the geometry for `commit
+565e6aa`, the esbuild signature above, the 8-test role-name scan, and the
+`git diff` of the two dirty files.
+
+Deviations to record honestly at close:
+- `textHeight` is 112, not the plan's 96 — deliberate (the two-line title +
+  metadata needs it); name it in Outcome.
+- The `≥44px` chip target vs the plan's "borderless overlay top-left"
+  phrasing — containment and reachability beat chrome.
+
+State: active, local commits only, nothing pushed. The old `stash@{0}`
+remains untouched (never pop it). **No walkthrough backend was launched this
+session; the D8 10k run and DEC-025 walkthrough are still owed.**
+
+Next, in order:
+1. Fix the closing tag at `HomePage.tsx:865` — the only unconditional step.
+2. Teach the 8 unit tests the **Filters** popover, add the two required new
+   tests, get `vitest` green.
+3. Run `make format`, `make check`, `make test`; then full Playwright (the
+   sort/filter comboboxes appear throughout the remaining specs too).
+4. Land a D5+D6 commit once green, then a small D7 commit.
+5. Seed a throwaway backend (never the owner's `127.0.0.1:8000`) for the D8
+   10k-entry measurement and the DEC-025 walkthrough, and record the numbers.
+6. Close: reconcile the docs (the 112px and chip deviations), fill the
+   sprint Outcome, update `decisions.md`, mark `completed`, stub the next
+   sprint at `ready`, write the final `[DOCS]` commit and the owner report.
+
+## 2026-09-05 — Sprint 072 (in progress) — implementation complete; exhaustive gate deferred
+
+The owner asked to defer the remaining testing because they had to leave. Sprint 072 therefore
+remains `in_progress`; no completion or active-sprint pointer is claimed.
+
+Done and committed this session:
+
+- `060792a` [MOD] Put one bar above the library and state its size — repaired the inherited parse
+  error, collapsed sort/shelf/format/status into Filters, retained individually removable chips,
+  and rendered the response total. Validation found that summing status facets produces a false
+  denominator under shelf/query/format filters, so the unfiltered denominator now comes from a
+  cheap one-row companion query for the selected domain.
+- `3bacbc3` [MOD] Make the second library density honestly dense — 52px horizontal rows, 32×48
+  covers, 44px status/score targets and overscan 2. At 10,000 deterministic entries the grid
+  mounted 6 rows / 30 cards and the table 19 rows / 19 cards, both inside DEC-023.
+- `e3aeacb` [FIX] Keep the real command bar above the fold — the Filters trigger moved into the
+  command row and the otherwise-empty chip row stopped rendering. The acceptance test was
+  strengthened to include the real five-domain registry instead of a one-domain convenience stub.
+
+Verified:
+
+- Focused Vitest: `HomePage.test.tsx` 50/50; the broader focused library/HomePage/ScorePicker run
+  was 76/76.
+- Focused Playwright: wall fold/area/columns, control geometry and keyboard access, table density,
+  and the deterministic 10,000-entry DOM budget passed. A 43-test affected run had one transient
+  degraded-provider axe sample fail during a fade; the isolated test then passed. The exhaustive
+  run remains owed.
+- Realistic walkthrough against a fresh throwaway backend (never the owner's port 8000), with 20
+  API-created books, 19 generated covers and one missing cover: wall top 293px at 390×844 and
+  144px at 1440×900 and 2560×1400; columns 1/6/6; cover area 72.8%; no horizontal body overflow;
+  dense table 15 visible rows. Score/status persisted, filtering showed the correct `3 of 20`,
+  navigation returned to the wall, and no console/page errors occurred. The 3:1 poster was
+  strongly centre-cropped to a 0.69:1 frame, as specified; the opaque backing kept controls
+  readable over the near-white cover.
+- `make check` passed after implementation froze.
+- `make test` was started and collected all 1,356 backend tests, but its final result was not
+  captured before the owner's deadline; rerun it rather than treating this as evidence.
+
+Observed outside Sprint 072 scope: immediately after changing a status, the filter option retained
+its old facet label (`To read 4`) until refresh even though the filtered response and visible total
+were correctly `3 of 20`. Record or schedule this cache-invalidation defect; it does not alter this
+sprint's delivered total contract.
+
+Next: rerun `make test`, run `python scripts/validate_project.py` distinctly and the full
+`npx playwright test`. If green, reconcile Outcome/DEC/ROADMAP, mark 072 completed, make 073 ready,
+run documentation closure checks and create `[DOCS] Close sprint 072 and hand off`.
