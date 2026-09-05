@@ -349,6 +349,17 @@ def insights_scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[
     )
 
 
+def shelves_scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[[], object]]]:
+    """Sprint 071 deliverable 6: `list_shelves` repeats DEC-134's lateral top-3 join,
+    keyed by shelf instead of ranking value, over the seed's 13 shelves rather than a
+    ranking's larger key set — measured rather than assumed, same as DEC-134 was.
+    """
+    yield (
+        "shelves list (13 shelves, covers)",
+        lambda: service.list_shelves(),
+    )
+
+
 def insight_query_plan(engine: Engine) -> list[str]:
     """The `json_each` explosion's own plan — new code with nothing else to mirror it."""
     statement = (
@@ -592,7 +603,11 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
             drainer = QueueDrainer(engine, condition) if condition else None
             context: Any = drainer if drainer else _NullContext()
             with context:
-                for name, callable_ in (*scenarios(service), *insights_scenarios(service)):
+                for name, callable_ in (
+                    *scenarios(service),
+                    *insights_scenarios(service),
+                    *shelves_scenarios(service),
+                ):
                     p50, p95, worst = measure(callable_, iterations)
                     flag = "" if p95 < FIRST_PAGE_BUDGET_MS else "  OVER BUDGET"
                     if flag:
