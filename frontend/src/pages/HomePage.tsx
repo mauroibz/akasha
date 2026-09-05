@@ -23,7 +23,11 @@ import {
 import { getShelves } from "@/api/shelves";
 import { AkashaMark } from "@/components/AkashaMark";
 import { DomainStrip } from "@/components/DomainStrip";
-import { PageHeader } from "@/components/PageHeader";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { useMotionPresets } from "@/lib/motion";
 import { Button } from "@/components/ui/button";
@@ -57,6 +61,7 @@ import {
 import type { SearchCandidate } from "@/api/add";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import {
+  defaultLibraryFilters,
   domainPreferenceKey,
   isEditableTarget,
   libraryMotionKey,
@@ -272,6 +277,32 @@ export function HomePage() {
   // One domain at a time is the whole point of the strip, so the filter carries at
   // most one value even though the API accepts a repeated parameter.
   const selectedDomain = filters.types[0] ?? "";
+  const filterActive =
+    filters.statuses.length > 0 ||
+    filters.shelves.length > 0 ||
+    filters.formats.length > 0 ||
+    filters.query.trim().length > 0 ||
+    (filters.key !== "" && filters.value !== "");
+  // Facets clear only their own dimension: under a shelf, query, format, or
+  // insights filter their sum is the filtered total again, not the size of the
+  // domain. Fetch the domain's unfiltered first page when the readout needs an
+  // "N of M" denominator. `limit=1` keeps this count-only companion request
+  // cheap; its response total is the authority.
+  const wholeLibrary = useQuery({
+    queryKey: ["library-whole", selectedDomain],
+    queryFn: ({ signal }) =>
+      getLibraryPage(
+        {
+          ...defaultLibraryFilters,
+          types: selectedDomain ? [selectedDomain] : [],
+        },
+        undefined,
+        signal,
+        1,
+      ),
+    enabled: domainReady && filterActive,
+    retry: false,
+  });
   // The domain the chips and the format list describe. Always exactly one once the
   // registry has loaded, which is what lets one control mean both "these rows" and
   // "these providers" (DEC-065). It is a list only because the registry may not have
@@ -469,6 +500,21 @@ export function HomePage() {
 
   const inboxCount = firstPage?.facets.status_counts.unsorted ?? 0;
   const domainLabel = labelFor(selectedDomain, domains);
+  // Sprint 072 D6: the library states its size at the fold — `firstPage.total`,
+  // the number the response already carried and spent on `aria-setsize` alone
+  // (finding 5, DEC-139). The per-domain facet sums across every status of the
+  // chosen domain because the server clears the status dimension for it — so
+  // "18 of 342" reads from one response with no second fetch. The insight
+  // breadcrumb is a server filter but never narrows the ranking, so the total
+  // stays read as the whole while its chip is set.
+  const activeFilterCount =
+    filters.statuses.length +
+    filters.shelves.length +
+    filters.formats.length +
+    (filters.query.trim() ? 1 : 0) +
+    (filters.key !== "" && filters.value !== "" ? 1 : 0);
+  const libraryWhole = wholeLibrary.data?.total;
+  const shownDomain = domains.find((type) => type.id === selectedDomain);
   const web = useWebSearch(selectedDomain);
 
   /**
@@ -547,199 +593,94 @@ export function HomePage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-7 sm:px-8">
-      {/* The horizontal lockup: mark at 48px, then the wide-tracked eyebrow
-          over the tight-tracked wordmark. Mirrors
-          docs/brand/source/lockup-horizontal.svg. */}
-      <PageHeader
-        icon={
-          <AkashaMark
-            size={48}
-            className="shrink-0 text-foreground"
-            aria-hidden="true"
-          />
-        }
-        eyebrow="Personal library"
-        title="Akasha"
-        actions={
-          <>
-            <Button
-              variant="outline"
-              className="rounded-full aria-pressed:border-primary aria-pressed:text-primary"
-              aria-pressed={filters.statuses.includes("unsorted")}
-              onClick={() => void navigate("/import?tab=triage")}
-            >
-              Inbox {inboxCount}
-            </Button>
-            <Button
-              className="rounded-full px-5"
-              onClick={() => searchRef.current?.focus()}
-            >
-              Add to library
-            </Button>
-          </>
-        }
-      />
-      {/* One bar, one row: which domain, the query, and the override.
-          The domain strip sits inside it rather than under the filters, because it
-          now picks two things at once — the rows shown and the providers a search
-          would reach — and a control that means both belongs beside the thing it
-          means them about. */}
-      <section
-        aria-label="Search and add"
-        className="mt-6 flex flex-wrap items-center gap-3"
-      >
-        {domains.length > 1 && (
-          <DomainStrip
-            domains={domains}
-            value={selectedDomain}
-            onChange={chooseDomain}
-          />
-        )}
-        <label className="relative min-w-60 flex-1">
-          <span className="sr-only">
-            Search your library, or add something new
-          </span>
-          <Input
-            ref={searchRef}
-            type="search"
-            value={search}
-            onChange={(event) => {
-              lastTypedAt.current = Date.now();
-              setSearch(event.target.value);
-            }}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") {
-                event.preventDefault();
-                searchTheWeb();
-              }
-            }}
-            placeholder="Title, creator, ISBN or link  /"
-            // The trailing padding is the button's room: without it a long query
-            // runs underneath it. `appearance-none` removes WebKit's own tiny
-            // cancel glyph, which would otherwise sit beside this one saying the
-            // same thing in a style nothing else here uses -- and which Firefox
-            // does not render at all, so it could never have been the control.
-            className="h-11 rounded-full bg-surface pr-12 [&::-webkit-search-cancel-button]:appearance-none"
-          />
-          {search && (
-            <button
-              type="button"
-              aria-label="Clear search"
-              onClick={() => clearSearch({ refocus: true })}
-              className="focus-ring absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
-            >
-              <span aria-hidden="true" className="text-lg leading-none">
-                ×
-              </span>
-            </button>
-          )}
-        </label>
-        <Button
-          className="h-11 shrink-0 rounded-full px-6"
-          onClick={searchTheWeb}
-        >
-          Search
-        </Button>
-      </section>
-      {/* Hidden exactly when the library has nothing for the current query: sort,
-          shelf, format and view apply to rows that are not on screen, and a reader
-          who searched the web because their own library came up empty gets those
-          results sooner without a row of now-meaningless controls above them. */}
-      {!libraryMissedQuery && (
-        <section
-          aria-label="Library controls"
-          className="mt-3 flex flex-wrap items-center gap-3"
-        >
-          <Select
-            value={`${filters.sort}:${filters.order}`}
-            onValueChange={(value) => {
-              const [sort, order] = value.split(":") as [
-                SortKey,
-                "asc" | "desc",
-              ];
-              updateFilters({ sort, order });
-            }}
-          >
-            <SelectTrigger
-              aria-label="Sort library"
-              className="h-11 w-auto gap-2 rounded-full bg-surface"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(sortLabels).flatMap(([key, label]) => [
-                <SelectItem key={`${key}:desc`} value={`${key}:desc`}>
-                  {label} ↓
-                </SelectItem>,
-                <SelectItem key={`${key}:asc`} value={`${key}:asc`}>
-                  {label} ↑
-                </SelectItem>,
-              ])}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.shelves[0] ?? allShelves}
-            onValueChange={(value) =>
-              updateFilters({ shelves: value === allShelves ? [] : [value] })
-            }
-          >
-            <SelectTrigger
-              aria-label="Filter by shelf"
-              className="h-11 w-auto gap-2 rounded-full bg-surface"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={allShelves}>All shelves</SelectItem>
-              {shelves.map((shelf) => (
-                <SelectItem key={shelf.id} value={shelf.slug}>
-                  {shelf.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select
-            value={filters.formats[0] ?? allFormats}
-            onValueChange={(value) =>
-              updateFilters({
-                formats: value === allFormats ? [] : [value as EntryFormat],
-              })
-            }
-          >
-            <SelectTrigger
-              aria-label="Filter by format"
-              className="h-11 w-auto gap-2 rounded-full bg-surface"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={allFormats}>All formats</SelectItem>
-              {/* One entry per distinct format, not one per domain that declares it:
-                `digital` belongs to books and records both, and listing it twice
-                gave two options with the same value and the same count. The filter
-                itself spans domains, so a flat list is what it actually does. */}
-              {formatChoices.map((format) => (
-                <SelectItem key={format.value} value={format.value}>
-                  {format.label}{" "}
-                  {firstPage?.facets.format_counts[format.value] ?? 0}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {/* The fourth filter, in the row of filters.
-            It was a row of chips of its own -- one whole row of chrome above the
-            library for the vocabulary the tab already names. `shownDomains` is at
-            most one domain, and empty only until the registry answers, so this
-            renders exactly when there is a vocabulary to render. */}
-          {shownDomains.map((type) => (
-            <StatusFilter
-              key={type.id}
-              statuses={type.statuses}
-              counts={firstPage?.facets.status_counts_by_type?.[type.id] ?? {}}
-              value={filters.statuses}
-              onChange={(statuses) => updateFilters({ statuses })}
+      {/* Sprint 072 (DEC-139, deliverable 5): one sticky command bar. The
+          brand lockup, the domain strip, search, the density toggle, the
+          inbox and the add path share one row; sort, shelf, format and
+          status collapse into a single Filters control that carries a count
+          of what is set, and the chips beside it stay the only place a set
+          filter is spelled out. `sticky top-0` keeps the bar at the fold —
+          the risk-note's rule: its height never changes on scroll, so the
+          virtualizer's `scrollMargin` measurement stays valid. */}
+      <div className="sticky top-0 z-40 -mx-5 -mt-7 border-b border-border/70 bg-background/95 px-5 pb-1.5 pt-2 backdrop-blur sm:-mx-8 sm:px-8">
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
+          <h1 className="flex items-center gap-2.5 text-xl font-semibold tracking-tight">
+            <AkashaMark
+              size={24}
+              className="shrink-0 text-foreground"
+              aria-hidden="true"
             />
-          ))}
+            Akasha
+          </h1>
+          {/* The registry declares no unit name, so the visual total is a bare number
+              and the screen-reader span supplies the noun from the declared label
+              (D6's very small deviation from the proposal's "342 books", noted in
+              the Outcome). */}
+          {!libraryMissedQuery && firstPage && (
+            <p className="text-3xl font-semibold leading-none tabular-nums">
+              {filterActive
+                ? libraryWhole === undefined
+                  ? firstPage.total
+                  : `${firstPage.total} of ${libraryWhole}`
+                : firstPage.total}
+              <span className="sr-only">
+                {filterActive
+                  ? ` ${shownDomain ? shownDomain.label.toLowerCase() : "library"} entries match${libraryWhole === undefined ? "" : ` out of ${libraryWhole}`}`
+                  : ` ${shownDomain ? shownDomain.label.toLowerCase() : "library"} entries in the library`}
+              </span>
+            </p>
+          )}
+          {domains.length > 1 && (
+            <DomainStrip
+              domains={domains}
+              value={selectedDomain}
+              onChange={chooseDomain}
+            />
+          )}
+          <label className="relative min-w-60 flex-1">
+            <span className="sr-only">
+              Search your library, or add something new
+            </span>
+            <Input
+              ref={searchRef}
+              type="search"
+              value={search}
+              onChange={(event) => {
+                lastTypedAt.current = Date.now();
+                setSearch(event.target.value);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  searchTheWeb();
+                }
+              }}
+              placeholder="Title, creator, ISBN or link  /"
+              // The trailing padding is the button's room: without it a long query
+              // runs underneath it. `appearance-none` removes WebKit's own tiny
+              // cancel glyph, which would otherwise sit beside this one saying the
+              // same thing in a style nothing else here uses -- and which Firefox
+              // does not render at all, so it could never have been the control.
+              className="h-11 rounded-full bg-surface pr-12 [&::-webkit-search-cancel-button]:appearance-none"
+            />
+            {search && (
+              <button
+                type="button"
+                aria-label="Clear search"
+                onClick={() => clearSearch({ refocus: true })}
+                className="focus-ring absolute right-1 top-1/2 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full text-muted-foreground transition-colors hover:text-foreground"
+              >
+                <span aria-hidden="true" className="text-lg leading-none">
+                  ×
+                </span>
+              </button>
+            )}
+          </label>
+          <Button
+            className="h-11 shrink-0 rounded-full px-6"
+            onClick={searchTheWeb}
+          >
+            Search
+          </Button>
           <SegmentedControl
             ariaLabel="Library view"
             value={view}
@@ -749,24 +690,148 @@ export function HomePage() {
               { value: "table", label: "Table", ariaLabel: "Table view" },
             ]}
           />
-        </section>
-      )}
-      {/* Which filter it is, whichever filter it is (deliverable 4). The
-          selects above keep their own state; this is what makes a library
-          narrowed by four different controls legible at a glance instead of
-          requiring all four to be reopened to find out. The insights
-          breadcrumb used to be a chip of its own beside the selects — it is
-          one of these now, not a second idiom (AC5). */}
-      {!libraryMissedQuery &&
-        (filters.shelves.length > 0 ||
-          filters.formats.length > 0 ||
-          filters.statuses.length > 0 ||
-          filters.query.trim().length > 0 ||
-          (filters.key !== "" && filters.value !== "")) && (
+          <div className="ml-auto flex items-center gap-3">
+            <Button
+              variant="outline"
+              className="min-h-11 rounded-full px-4 aria-pressed:border-primary aria-pressed:text-primary"
+              aria-pressed={filters.statuses.includes("unsorted")}
+              onClick={() => void navigate("/import?tab=triage")}
+            >
+              Inbox {inboxCount}
+            </Button>
+            <Button
+              className="min-h-11 rounded-full px-4"
+              aria-label="Add to library"
+              onClick={() => searchRef.current?.focus()}
+            >
+              Add
+            </Button>
+          </div>
+        </div>
+        {/* The row's filter state: one Filters control plus the chips. Gone
+            exactly when the library has nothing for the current query — the
+            controls applied to rows that are not on screen — and the total
+            with it. The region name is where a set filter gets stated: the
+            chips inside are the only statement of it (deliverable 5). */}
+        {!libraryMissedQuery && (
           <section
             aria-label="Active filters"
-            className="mt-3 flex flex-wrap items-center gap-2"
+            className="mt-2 flex flex-wrap items-center gap-2"
           >
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="h-11 rounded-full bg-surface font-normal"
+                >
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="ml-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="w-[min(92vw,720px)] p-3">
+                <div className="flex flex-wrap items-center gap-3">
+                  <Select
+                    value={`${filters.sort}:${filters.order}`}
+                    onValueChange={(value) => {
+                      const [sort, order] = value.split(":") as [
+                        SortKey,
+                        "asc" | "desc",
+                      ];
+                      updateFilters({ sort, order });
+                    }}
+                  >
+                    <SelectTrigger
+                      aria-label="Sort library"
+                      className="h-11 w-auto gap-2 rounded-full bg-surface"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(sortLabels).flatMap(([key, label]) => [
+                        <SelectItem key={`${key}:desc`} value={`${key}:desc`}>
+                          {label} ↓
+                        </SelectItem>,
+                        <SelectItem key={`${key}:asc`} value={`${key}:asc`}>
+                          {label} ↑
+                        </SelectItem>,
+                      ])}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filters.shelves[0] ?? allShelves}
+                    onValueChange={(value) =>
+                      updateFilters({
+                        shelves: value === allShelves ? [] : [value],
+                      })
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label="Filter by shelf"
+                      className="h-11 w-auto gap-2 rounded-full bg-surface"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={allShelves}>All shelves</SelectItem>
+                      {shelves.map((shelf) => (
+                        <SelectItem key={shelf.id} value={shelf.slug}>
+                          {shelf.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={filters.formats[0] ?? allFormats}
+                    onValueChange={(value) =>
+                      updateFilters({
+                        formats:
+                          value === allFormats ? [] : [value as EntryFormat],
+                      })
+                    }
+                  >
+                    <SelectTrigger
+                      aria-label="Filter by format"
+                      className="h-11 w-auto gap-2 rounded-full bg-surface"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={allFormats}>All formats</SelectItem>
+                      {/* One entry per distinct format, not one per domain that declares it:
+                `digital` belongs to books and records both, and listing it twice
+                gave two options with the same value and the same count. The filter
+                itself spans domains, so a flat list is what it actually does. */}
+                      {formatChoices.map((format) => (
+                        <SelectItem key={format.value} value={format.value}>
+                          {format.label}{" "}
+                          {firstPage?.facets.format_counts[format.value] ?? 0}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  {/* The fourth filter, in the row of filters.
+            It was a row of chips of its own -- one whole row of chrome above the
+            library for the vocabulary the tab already names. `shownDomains` is at
+            most one domain, and empty only until the registry answers, so this
+            renders exactly when there is a vocabulary to render. */}
+                  {shownDomains.map((type) => (
+                    <StatusFilter
+                      key={type.id}
+                      statuses={type.statuses}
+                      counts={
+                        firstPage?.facets.status_counts_by_type?.[type.id] ?? {}
+                      }
+                      value={filters.statuses}
+                      onChange={(statuses) => updateFilters({ statuses })}
+                    />
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
             {filters.shelves.map((slug) => (
               <FilterChip
                 key={`shelf-${slug}`}
@@ -823,6 +888,8 @@ export function HomePage() {
             )}
           </section>
         )}
+      </div>
+
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole

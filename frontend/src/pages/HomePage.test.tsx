@@ -28,6 +28,11 @@ function renderPage(initialEntry = "/", client = makeClient()) {
   );
 }
 
+async function openFilters(user: ReturnType<typeof userEvent.setup>) {
+  await user.click(screen.getByRole("button", { name: /^Filters/ }));
+  await screen.findByRole("combobox", { name: "Sort library" });
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
   localStorage.clear();
@@ -171,6 +176,8 @@ test("abandons the in-flight page when the sort changes again", async () => {
 
   const user = userEvent.setup();
   const chooseSort = async (name: string) => {
+    if (!screen.queryByRole("combobox", { name: /sort library/i }))
+      await openFilters(user);
     await user.click(screen.getByRole("combobox", { name: /sort library/i }));
     await user.click(await screen.findByRole("option", { name }));
   };
@@ -270,22 +277,23 @@ test("the rollback restores the query key it snapshotted, not the one on screen"
   const client = makeClient();
   renderPage("/", client);
   const user = userEvent.setup();
-  await user.click(
-    await screen.findByRole("button", { name: /score for rayuela: 9/i }),
-  );
-  await user.click(screen.getByRole("button", { name: "Score 4" }));
+  const row = await screen.findByRole("article", { name: "Rayuela" });
+  act(() => row.focus());
+  await user.keyboard("4");
   await waitFor(() =>
     expect(
       screen.getByRole("button", { name: /score for rayuela: 4/i }),
     ).toBeVisible(),
   );
 
+  await openFilters(user);
   await user.click(screen.getByRole("combobox", { name: "Sort library" }));
   await user.click(screen.getByRole("option", { name: /Score ↓/ }));
   await waitFor(() =>
-    expect(
-      screen.getByRole("combobox", { name: "Sort library" }),
-    ).toHaveTextContent(/Score/),
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringMatching(/sort=score.*order=desc/),
+      expect.anything(),
+    ),
   );
 
   const writes = vi.spyOn(client, "setQueryData");
@@ -386,8 +394,9 @@ test("the shelf filter lists every shelf, not only those on loaded pages", async
 
   // Radix renders the trigger as button[role="combobox"] and portals the
   // listbox to document.body, so the options only exist once it is opened.
-  const filter = screen.getByRole("combobox", { name: "Filter by shelf" });
   const user = userEvent.setup();
+  await openFilters(user);
+  const filter = screen.getByRole("combobox", { name: "Filter by shelf" });
   await user.click(filter);
   const listbox = await screen.findByRole("listbox");
   expect(
@@ -504,9 +513,44 @@ test("the wall card's score chip is the picker trigger and carries its ramp clas
   expect(chip.className).toContain("bg-score-top");
   // The chip is the trigger: opening it surfaces the ramp itself.
   await user.click(chip);
-  expect(
-    await screen.findByRole("button", { name: "Score 7" }),
-  ).toBeVisible();
+  expect(await screen.findByRole("button", { name: "Score 7" })).toBeVisible();
+});
+
+test("the library states its whole size and the filtered response total", async () => {
+  const response = (total: number) => ({
+    ...populated,
+    total,
+    facets: {
+      ...populated.facets,
+      // Facets retain shelf/query/format filters on the real API, so this
+      // deliberately cannot be misused as the whole-library count.
+      status_counts_by_type: { book: { read: total } },
+    },
+  });
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (request: string | URL | Request) => {
+      const url = String(request);
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(threeDomains));
+      if (url.startsWith("/api/shelves"))
+        return new Response(
+          JSON.stringify([
+            { id: 1, name: "Favorites", slug: "favorites", entry_count: 18 },
+          ]),
+        );
+      if (url.includes("shelf=favorites"))
+        return new Response(JSON.stringify(response(18)));
+      return new Response(JSON.stringify(response(342)));
+    }),
+  );
+
+  const unfiltered = renderPage("/?type=book");
+  expect(await screen.findByText("342", { exact: false })).toBeVisible();
+  unfiltered.unmount();
+
+  renderPage("/?type=book&shelf=favorites");
+  expect(await screen.findByText("18 of 342", { exact: false })).toBeVisible();
 });
 
 /**
@@ -714,6 +758,7 @@ test("with a domain chosen, only that domain's statuses and formats render", asy
   const user = userEvent.setup();
 
   // The record's vocabulary, without the domain heading the tab already carries.
+  await openFilters(user);
   await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
   expect(await screen.findByRole("option", { name: /^Owned/ })).toBeVisible();
   expect(screen.queryByRole("option", { name: /^Read / })).toBeNull();
@@ -1350,21 +1395,20 @@ test("a missed local search collapses the library controls, and Clear brings the
   await screen.findByText("Rayuela");
   const user = userEvent.setup();
 
-  expect(screen.getByRole("combobox", { name: "Sort library" })).toBeVisible();
+  expect(screen.getByRole("button", { name: /^Filters/ })).toBeVisible();
+  expect(screen.queryByRole("combobox", { name: "Sort library" })).toBeNull();
 
   await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
   await screen.findByText(/nothing in your library matches/i);
   await screen.findByText("From the web");
 
-  expect(screen.queryByRole("combobox", { name: "Sort library" })).toBeNull();
+  expect(screen.queryByRole("button", { name: /^Filters/ })).toBeNull();
 
   await user.click(screen.getByRole("button", { name: "Clear" }));
 
   expect(screen.queryByText("From the web")).toBeNull();
   expect(await screen.findByRole("searchbox")).toHaveValue("");
-  expect(
-    await screen.findByRole("combobox", { name: "Sort library" }),
-  ).toBeVisible();
+  expect(await screen.findByRole("button", { name: /^Filters/ })).toBeVisible();
 });
 
 test("the status filter is one control beside the others, and it holds more than one status", async () => {
@@ -1373,8 +1417,7 @@ test("the status filter is one control beside the others, and it holds more than
   await screen.findByText("Rayuela");
   const user = userEvent.setup();
 
-  // A row of chips was a third row of chrome above the library. It is the fourth
-  // control now, beside sort, shelf and format.
+  await openFilters(user);
   await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
   await user.click(await screen.findByRole("option", { name: /^Read \d/ }));
   await waitFor(() =>
@@ -1399,12 +1442,15 @@ test("the status filter offers the chosen domain's vocabulary and only that doma
   await screen.findByText("Rayuela");
   const user = userEvent.setup();
 
+  await openFilters(user);
   await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
   expect(await screen.findByRole("option", { name: /^Read \d/ })).toBeVisible();
   expect(screen.queryByRole("option", { name: /^Owned/ })).toBeNull();
   await user.keyboard("{Escape}");
 
   await user.click(screen.getByRole("radio", { name: "Record" }));
+  if (!screen.queryByRole("combobox", { name: "Filter by status" }))
+    await openFilters(user);
   await user.click(screen.getByRole("combobox", { name: "Filter by status" }));
   expect(await screen.findByRole("option", { name: /^Owned/ })).toBeVisible();
   expect(screen.queryByRole("option", { name: /^Read \d/ })).toBeNull();
@@ -1587,6 +1633,12 @@ test("the active-filters row shows one chip per set filter, including the insigh
   );
 
   const row = await screen.findByRole("region", { name: "Active filters" });
+  expect(within(row).getByRole("button", { name: "Filters 5" })).toBeVisible();
+  expect(
+    within(row).queryByRole("combobox", { name: "Sort library" }),
+  ).toBeNull();
+  await user.click(within(row).getByRole("button", { name: "Filters 5" }));
+  expect(screen.getByRole("combobox", { name: "Sort library" })).toBeVisible();
   await within(row).findByRole("button", { name: /Shelf · Favorites/ });
   within(row).getByRole("button", { name: /Format · Digital/ });
   within(row).getByRole("button", { name: /Status · Read/ });
@@ -1603,6 +1655,7 @@ test("the active-filters row shows one chip per set filter, including the insigh
   expect(
     within(row).queryByRole("button", { name: /Format · Digital/ }),
   ).toBeNull();
+  expect(within(row).getByRole("button", { name: "Filters 4" })).toBeVisible();
   // The others are untouched: still chips, and still in the next request.
   within(row).getByRole("button", { name: /Shelf · Favorites/ });
   within(row).getByRole("button", { name: /Status · Read/ });
