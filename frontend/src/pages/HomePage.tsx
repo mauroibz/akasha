@@ -546,7 +546,7 @@ export function HomePage() {
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
+    <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-7 sm:px-8">
       {/* The horizontal lockup: mark at 48px, then the wide-tracked eyebrow
           over the tight-tracked wordmark. Mirrors
           docs/brand/source/lockup-horizontal.svg. */}

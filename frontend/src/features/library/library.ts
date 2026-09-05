@@ -90,17 +90,37 @@ export const defaultLibraryFilters: LibraryFilters = {
   valueLabel: "",
 };
 
+const coverHeight = 300;
+const textHeight = 72;
+
 /**
- * Fixed geometry of the virtualized library grid. Card height is constant so the
+ * Fixed geometry of the virtualized library wall. Card height is constant so the
  * virtualizer keeps cheap fixed-size rows (technical spec §8) while the column
  * count adapts to the measured container width.
+ *
+ * Sprint 072 moved DEC-023's numbers and kept its rule (DEC-139): the card is
+ * vertical now — a cover pinned at coverHeight across the full card width, then
+ * a text block of textHeight beneath it. The pin is what keeps the virtualizer
+ * cheap: a poster crops (`object-cover`) rather than the row resizing.
  */
 export const gridLayout = {
   gap: 20,
+  /** The grid wrapper's horizontal padding; the column count subtracts it, so it
+   * is part of the contract between this block and VirtualLibrary's row. */
   paddingX: 32,
-  cardMinWidth: 260,
-  cardHeight: 280,
-  maxColumns: 4,
+  /** The narrowest card the wall will show; below this the wall has one fewer
+   * column instead of narrower cards. Chosen so 1440px mounts at least five
+   * columns and a phone mounts one wide cover (AC3). */
+  cardMinWidth: 190,
+  /** Pinned cover height, cropped at the full card width (DEC-139). */
+  coverHeight,
+  /** Text block below the cover: a two-line title at the full card measure, the
+   * creator, and one quiet line for year and formats. */
+  textHeight,
+  cardHeight: coverHeight + textHeight,
+  /** A ceiling, not a target. The page container caps the wall at 1600px
+   * (DEC-139), so it never mounts more than this many columns of DOM. */
+  maxColumns: 6,
 } as const;
 
 export const gridRowHeight = gridLayout.cardHeight + gridLayout.gap;
@@ -119,6 +139,19 @@ export function gridColumnCount(containerWidth: number): number {
       ),
     ),
   );
+}
+
+/**
+ * The container width HomePage's main row hands the wall at a given viewport
+ * width — the same `px-5` / `sm:px-8` paddings, the `max-w-[1600px]` ceiling
+ * and the 640px `sm:` breakpoint. Kept here so the wall's column contract
+ * (1 / ≥5 / ≥6 columns at 390 / 1440 / 2560, AC3) is asserted against the same
+ * constants VirtualLibrary measures, instead of drifting from them.
+ */
+export function containerWidthFor(viewportWidth: number): number {
+  if (!Number.isFinite(viewportWidth) || viewportWidth <= 0) return 0;
+  if (viewportWidth < 640) return Math.max(320, viewportWidth) - 40;
+  return Math.min(viewportWidth, 1600) - 64;
 }
 
 /**

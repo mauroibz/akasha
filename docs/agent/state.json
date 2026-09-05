@@ -1,10 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 39,
-  "project_status": "ready",
+  "project_status": "in_progress",
+  "started_at": "2026-09-05T19:10:00-03:00",
   "active_sprint": "072",
   "active_sprint_file": "docs/sprints/072-a-wall-of-covers.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "071",
   "completed_sprints": [
     "001",
@@ -79,6 +80,5 @@
     "070",
     "071"
   ],
-  "started_at": "",
-  "updated_at": "2026-09-05T18:20:00-03:00"
+  "updated_at": "2026-09-05T19:10:00-03:00"
 }

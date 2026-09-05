@@ -2,9 +2,11 @@ import { describe, expect, it, test } from "vitest";
 
 import type { LibraryEntry, LibraryFilters } from "@/api/library";
 import {
+  containerWidthFor,
   defaultLibraryFilters,
   gridColumnCount,
   gridLayout,
+  gridRowHeight,
   hasRememberedFilters,
   isEditableTarget,
   libraryFiltersPreferenceKey,
@@ -36,23 +38,45 @@ test("defaults to grid and restores only valid persisted preferences", () => {
 });
 
 test("grid columns follow the measured width and never starve a card", () => {
-  // Container widths observed in Chromium at the supported viewports.
-  expect(gridColumnCount(320)).toBe(1);
-  expect(gridColumnCount(689)).toBe(2);
-  expect(gridColumnCount(1201)).toBe(4);
+  // Sprint 072's wall geometry (DEC-139): a ~190px minimum card, a pinned
+  // 300px cover and a text block under it. Assertion widths are the container
+  // the page actually presents to the wall — main's side padding comes out of
+  // the viewport — which is what `containerWidthFor` derives and what
+  // VirtualLibrary measures at runtime. The three viewports below are the
+  // acceptance trio (AC3): one column on a phone, five+ at 1440, six+ at 2560.
+  expect(gridColumnCount(containerWidthFor(390))).toBe(1);
+  expect(gridColumnCount(containerWidthFor(1440))).toBeGreaterThanOrEqual(5);
+  expect(gridColumnCount(containerWidthFor(2560))).toBeGreaterThanOrEqual(6);
+  // Pin the exact answers so a constant change gets reviewed, not discovered:
+  // 1440 presents 1376px (main - px-8). 2560 clamps to the 1600px container,
+  // so it presents 1536px — and DEC-139's six-column cap holds there.
+  expect(gridColumnCount(1376)).toBe(6);
+  expect(gridColumnCount(1536)).toBe(gridLayout.maxColumns);
+  expect(gridLayout.maxColumns).toBe(6);
   // Degenerate widths (unmeasured container, server render) stay single-column.
   expect(gridColumnCount(0)).toBe(1);
   expect(gridColumnCount(-100)).toBe(1);
   expect(gridColumnCount(Number.NaN)).toBe(1);
+  // An absurd window still mounts a finite wall.
   expect(gridColumnCount(10_000)).toBe(gridLayout.maxColumns);
   // Every column keeps at least the minimum card width.
-  for (const width of [320, 500, 689, 900, 1201, 1600]) {
+  for (const width of [320, 500, 689, 900, 1201, 1408, 1600, 1848, 2400]) {
     const columns = gridColumnCount(width);
     const cardWidth =
       (width - gridLayout.paddingX - (columns - 1) * gridLayout.gap) / columns;
     if (columns > 1)
       expect(cardWidth).toBeGreaterThanOrEqual(gridLayout.cardMinWidth);
   }
+});
+
+test("the grid card is cover-first and its row height is one band (DEC-023)", () => {
+  expect(gridLayout.cardMinWidth).toBe(190);
+  expect(gridLayout.coverHeight).toBe(300);
+  // Card = pinned cover + text block; the row band adds the gap.
+  expect(gridLayout.cardHeight).toBe(
+    gridLayout.coverHeight + gridLayout.textHeight,
+  );
+  expect(gridRowHeight).toBe(gridLayout.cardHeight + gridLayout.gap);
 });
 
 test("global shortcuts stay disabled while a control owns the keystroke", () => {

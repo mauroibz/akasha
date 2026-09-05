@@ -1,6 +1,6 @@
 # Sprint 072 — A wall of covers
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 071
 **Roadmap revision:** 39
 
