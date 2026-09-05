@@ -2,7 +2,10 @@
 
 **Plan revision:** 38
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [071 — What the numbers say](071-what-the-numbers-say.md); see `docs/agent/state.json`.
+**Active sprint:** none. Every planned v1 sprint (001–071) is complete; `docs/agent/state.json`
+reads `project_status: "complete"`. See [071 — What the numbers say](071-what-the-numbers-say.md)'s
+own Outcome for the closing sprint's detail and `docs/agent/HANDOFF.md` for what remains owed to the
+owner outside the numbered plan.
 
 ## Shape of the plan
 
@@ -1531,7 +1534,14 @@ library's five filters saying it is set.
   describe a whole. `ShelfResponse.covers` is the only backend change in the line, and it is the
   same lateral top-3 join DEC-134 already benchmarked.
 
-`FINAL_SPRINT` in `scripts/validate_project.py` moves from 69 to 71 with this revision (DEC-136).
+  [Closed 2026-09-05. All 6 deliverables, all 8 acceptance criteria — see the sprint's own Outcome.
+  DEC-137's `sourceStrip` overflow, left unfixed by 070, was folded in and fixed here at the owner's
+  explicit direction (DEC-138) rather than waiting for a sprint that happens to touch the file. This
+  is `FINAL_SPRINT` — every planned v1 sprint is now complete; `docs/agent/state.json` reads
+  `project_status: "complete"`.]
+
+`FINAL_SPRINT` in `scripts/validate_project.py` moved from 69 to 71 with DEC-136's revision; Sprint
+071's own closure above is the last planned sprint reaching it.
 
 ## Not scheduled
 

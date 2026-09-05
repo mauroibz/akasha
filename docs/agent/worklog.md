@@ -4321,3 +4321,75 @@ so 050 adds an adapter, not a declaration.
 - **Next:** Sprint 071 — shelves as an openable ranking with covers and
   magnitude bars, an active-filters row on the library, weighted counts. Its
   own file names what it needs from this sprint's primitives.
+
+## 2026-09-05 — Sprint 071 (complete) — final sprint; project_status → complete
+
+- **Resumed interrupted work.** A prior session in this same worktree had
+  already committed `ca6709d` (`ShelfResponse.covers`) and `ac2f299` (the
+  shelf-row ranking) and left `HomePage.tsx`/`insights.test.ts` uncommitted
+  mid-deliverable-4, with two stray `console.log` debug lines in
+  `HomePage.test.tsx`'s "choosing a web result" test — evidence of an
+  in-progress investigation, not committed. Removed the debug lines (the test
+  passed either way in isolation) and continued from the uncommitted diff
+  rather than redoing it, per the interrupted-work recovery procedure.
+- **Done: all 6 deliverables, all 8 acceptance criteria**, plus the DEC-137
+  mobile fix added at the owner's explicit request ("work on the last sprint,
+  add the mobile ui fix"), recorded as DEC-138. Full detail and commit IDs are
+  in `docs/sprints/071-what-the-numbers-say.md`'s own Outcome — not repeated
+  here.
+- **Two regressions found and fixed during this session's own verification,
+  both introduced by this sprint's own commits, neither pre-existing:**
+  - The active-filters row's query chip collided with an existing test
+    helper's unscoped role/name lookup (`/Dune Messiah/` matched both the chip
+    and the real result card), breaking nine `HomePage.test.tsx` tests that
+    all route through `openConfirmDialog`. Scoped the lookup to the "From the
+    web" region.
+  - The shelves-ranking magnitude bar, at full width on a near-full shelf,
+    dropped the Delete button's text contrast below axe's serious threshold
+    (caught by `accessibility.spec.ts`'s "shelves has no serious violations",
+    fixture shelf `entry_count: 4` against a max of 4). Gave the button group
+    its own opaque `bg-surface`.
+  - Both caught by this sprint's own required gates before closure, not left
+    for a later session.
+- **Verified:** `make check` green; `make test` — backend 1,356 (unchanged,
+  confirmed by `git diff --stat`: only `ca6709d` touched `backend/src`, and it
+  already carried its own tests), frontend 274 (was 266 at Sprint 070's
+  close). `npx playwright test --project=chromium`: 111 passed / 2 skipped on
+  the clean run; one run in four hit `library.spec.ts`'s pre-existing
+  debounce-timing flake this same file's Sprint 070 entry already named, green
+  standalone and on the other three full runs. `scripts/benchmark_library.py`
+  before/after for `list_shelves`: p95 12.3ms idle, 13.8ms contended — well
+  inside the 500ms budget.
+  - **Observed, out of scope, not fixed:** the pre-existing `insights`
+    ranking scenarios in that same benchmark exceed the 500ms budget under
+    the contended condition on this workstation (p95 552.9–1009.4ms,
+    DEC-131 territory). No line of insights ranking code is in this sprint's
+    diff. Left for whoever next touches that query.
+- **Walkthrough (DEC-025), done.** `scripts/walkthrough.py` on an ephemeral
+  port, seeded through the real HTTP API (`httpx` + a small Pillow-generated
+  JPEG per cover) rather than a script committed to the repo: three shelves
+  of visibly different sizes (5/2/0 entries), one with two real covers, one
+  with one, one empty. A real Chromium (driven ad hoc via `@playwright/test`'s
+  `chromium.launch()`, not a tracked spec) visited `/shelves` at 1280px and
+  390px, followed a shelf into the library, narrowed it further with a status
+  filter, dropped the shelf chip, and visited `/` and `/import` at 390px.
+  Zero console errors across every visit, zero horizontal body overflow, the
+  import source strip measured scrolling within itself
+  (`scrollWidth` 475 vs `clientWidth` 350) rather than pushing the page
+  sideways. Screenshots inspected and matched the acceptance criteria:
+  proportional bars, real covers, the empty shelf showing neither bar nor
+  covers, bolder text on the fuller shelf. Owner's real `:8000` instance
+  confirmed unaffected before and after (`curl` health check); throwaway
+  backend, dev server (scratch port 4321) and seeded data directory all torn
+  down at close — nothing from this walkthrough is tracked or committed.
+- **Deviations:** DEC-138 (the DEC-137 fix folded into this sprint at the
+  owner's direction). No other material deviation from the sprint file.
+- **State:** `project_status` → `complete`, `active_sprint` /
+  `active_sprint_file` / `active_sprint_status` → `null`,
+  `last_completed_sprint` → `071`, `completed_sprints` gains `071`. Per
+  `docs/agent/WORKFLOW.md`'s "Final sprint" rule — this is `FINAL_SPRINT` in
+  `scripts/validate_project.py`.
+- **Next:** no numbered sprint remains. `docs/agent/HANDOFF.md` carries what
+  is still owed to the owner outside the numbered plan (Sprint 065's DEC-025
+  walkthrough against the owner's real library, cutting release tags, and
+  DEC-133's open product question).

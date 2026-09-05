@@ -1,6 +1,6 @@
 # Sprint 071 — What the numbers say
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 070
 **Roadmap revision:** 38
 
@@ -148,4 +148,104 @@ the library says what it is showing.
 
 ## Outcome
 
-_Not started._
+**Done: all 6 deliverables, all 8 acceptance criteria**, plus the DEC-137 mobile fix
+added to this sprint's scope at the owner's explicit direction (DEC-138).
+
+- **Deliverable 1 (`ShelfResponse.covers`).** `LibraryService._shelf_covers` repeats
+  DEC-134's lateral top-3 join, keyed by shelf id rather than ranking value: highest
+  scored first, then most recently added, then by entry id. Empty for an uncovered or
+  empty shelf. `ca6709d`.
+- **Deliverables 2–3 (a shelf row is a ranking row).** `ShelvesPage.tsx`: a magnitude
+  bar (share of the largest shelf), up to three covers via `CoverStack` (now exported
+  from `InsightsRanking.tsx`), the count, and the name linking into `/?shelf=slug`.
+  *Rename*/*Delete* unchanged. `magnitude` and `CoverStack` reused, not re-derived
+  (AC1–3). `ac2f299`.
+- **Deliverable 4 (active-filters row).** `FilterChip` in `HomePage.tsx`, generalized
+  from the insights-only `InsightFilterChip`: one dismissable chip per set filter
+  (shelf, format, status, query, insights key), clearing through the same
+  `paramsFromFilters` path the selects already used. The insights breadcrumb is one of
+  these chips now, not a second idiom (AC4–5). `a616baf`.
+  - **Found while wiring it up: an existing test helper collided with the new chip.**
+    `openConfirmDialog`'s unscoped `/Dune Messiah/` role/name lookup could match the
+    active-filters query chip ("Search · "Dune Messiah"") as well as the actual web
+    result card of the same title, and — since the chip renders first — did, breaking
+    nine tests that all route through that helper. Scoped the lookup to the "From the
+    web" region. `e5636f8`.
+- **Deliverable 5 (counts carry weight).** `weightClass` (`features/library/insights.ts`):
+  the same `magnitude` arithmetic as the ranking bar, bucketed into three text weights
+  (`text-base font-semibold`, `text-sm font-medium`, `text-sm text-muted-foreground`,
+  all `tabular-nums`) rather than a continuous style — a discrete class a test can
+  assert against, and a set of counts read at a glance rather than measured. Applied to
+  shelf sizes (`ShelvesPage.tsx`), the status-facet counts in the library's status
+  popover (`StatusFilter.tsx`, weighed against the busiest status shown), and the
+  import preview's ready/needs-a-choice/errors summary (`ImportPage.tsx`). `4be458d`.
+  - **Found while verifying it: the magnitude bar can undercut a button's contrast.**
+    A shelf holding the largest share draws its bar the full row width; the
+    Rename/Delete button group had no backing of its own, so the destructive button's
+    text rendered against the bar's tint blended into the surface — axe flagged it
+    below the contrast threshold on a near-full shelf (the accessibility fixture's
+    "Pending" shelf, `entry_count: 4` against a max of 4). Gave the button group its
+    own opaque `bg-surface`. `84532f8`.
+- **Deliverable 6 (measured, not assumed).** `shelves_scenarios` added to
+  `scripts/benchmark_library.py`, alongside the existing library and insights
+  scenarios: `list_shelves` against the seeded 13-shelf library. `78ababb`.
+  - **Idle:** p50 12.2ms, p95 12.3ms, max 12.4ms.
+  - **Contended (200 jobs queued):** p50 13.3ms, p95 13.8ms, max 13.9ms.
+  - Both well inside the 500ms budget — the covers join adds no measurable cost at
+    this shelf count (AC6). Not surprising enough to need its own decision entry.
+  - **Observed, out of this sprint's scope, not fixed:** the pre-existing `insights`
+    scenarios (`creators/count`, `creators/score`, `publisher/count`) exceed the same
+    500ms budget under the contended condition on this workstation (552.9ms, 585.7ms,
+    1009.4ms p95) — DEC-131 territory, no line of insights ranking code touched by
+    this sprint's diff. Recorded for whoever next touches that query; not a Sprint 071
+    regression.
+- **DEC-137's mobile fix, added at the owner's direction (DEC-138).** `sourceStrip` in
+  `ImportPage.tsx` gets DEC-134's own structural answer: `overflow-x-auto`/`min-w-0`/
+  `max-w-full` on the strip, `shrink-0` on every trigger, and a 44px target each did
+  not have before. `3733b1f`.
+
+**Verified:**
+- `make check` green (ruff format/lint, prettier, eslint, mypy, tsc, openapi
+  check/regenerate, `api:check`, `validate_project.py`).
+- `make test`: backend **1,356** passed (unchanged — this sprint's only backend
+  change, the covers join, already had its own tests in `ca6709d`); frontend **274**
+  passed (was 266 at Sprint 070's close).
+- `npx playwright test --project=chromium`: **111 passed, 2 skipped** on the clean
+  run; one run in four hit `library.spec.ts`'s pre-existing "keyboard guards and
+  reduced motion" debounce-timing flake (green standalone and on the other three
+  full runs) — the same flake class Sprint 070's own Outcome named in this exact
+  file, not a new one.
+- `python scripts/benchmark_library.py` before/after for the shelves path: see
+  deliverable 6 above.
+- **Walkthrough (DEC-025), done.** `scripts/walkthrough.py` on an ephemeral port,
+  seeded through the real HTTP API: three shelves ("Currently reading" 5 items one
+  cover, "Favorites" 2 items two covers, "To explore" empty), seven books, one
+  unsorted. A real Chromium visited `/shelves` at 1280px and 390px, followed
+  "Currently reading" into the library, narrowed it further with a status filter,
+  dropped the shelf chip and confirmed the status chip and the wider result set both
+  held, then visited `/` and `/import` at 390px — zero console errors across every
+  visit, zero horizontal body overflow, the import source strip measured scrolling
+  within itself (`scrollWidth` 475 against a 350px `clientWidth`) rather than pushing
+  the page sideways. Screenshots inspected: proportional bars, real covers on
+  covered shelves, the shared placeholder implied by the empty shelf showing neither
+  bar nor covers, weighted counts visibly bolder on the fuller shelf. Owner's own
+  `:8000` instance confirmed unaffected before and after; throwaway backend, dev
+  server and seeded data directory torn down at close.
+
+**Deviations:**
+- The DEC-137 mobile fix was not in this sprint's original file — added in-session at
+  the owner's explicit request ("work on the last sprint, add the mobile ui fix"),
+  recorded as DEC-138 rather than a silent scope change.
+- Two defects were found and fixed during this sprint's own verification rather than
+  being pre-existing and named in "Current implementation baseline": the test-helper
+  selector collision (deliverable 4) and the magnitude-bar contrast regression
+  (deliverable 5), both introduced by this sprint's own commits and both closed before
+  the gate that would have needed them named as known-degraded instead.
+- The insights-ranking contended-budget overage is observed but not this sprint's to
+  fix (see deliverable 6 above); carried into the handoff rather than silently dropped.
+
+**Final sprint.** This is `FINAL_SPRINT` (`scripts/validate_project.py`). Per
+`docs/agent/WORKFLOW.md`'s "Final sprint" rule: `project_status` moves to `complete`,
+`active_sprint`/`active_sprint_file`/`active_sprint_status` move to `null`, and
+`completed_sprints` gains `071`. There is no Sprint 072 to hand off to; see
+`docs/agent/HANDOFF.md` for what remains owed to the owner beyond the numbered plan.

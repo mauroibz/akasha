@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 38,
-  "project_status": "in_progress",
-  "active_sprint": "071",
-  "active_sprint_file": "docs/sprints/071-what-the-numbers-say.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "070",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "071",
   "completed_sprints": [
     "001",
     "002",
@@ -76,8 +76,9 @@
     "067",
     "068",
     "069",
-    "070"
+    "070",
+    "071"
   ],
   "started_at": "2026-09-04T21:30:00-03:00",
-  "updated_at": "2026-09-04T21:30:00-03:00"
+  "updated_at": "2026-09-05T13:50:00-03:00"
 }
