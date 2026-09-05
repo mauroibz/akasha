@@ -46,8 +46,10 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # DEC-132's accepted insights redesign to 67, and DEC-135's accepted export line to 70, and
 # DEC-136 to 71 — withdrawing the export line's own Sprint 070 (ecosystem-specific
 # exporters, built and found to exceed scope) and renumbering the accepted UI-cohesion
-# sprints down to 70 and 71 to close the gap, rather than leaving one).
-FINAL_SPRINT = 71
+# sprints down to 70 and 71 to close the gap, rather than leaving one, and DEC-139's accepted
+# readability line to 74 — the library, insights and shelves redrawn, which extends the plan
+# after Sprint 071 had closed it).
+FINAL_SPRINT = 74
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

@@ -1540,11 +1540,59 @@ library's five filters saying it is set.
   is `FINAL_SPRINT` — every planned v1 sprint is now complete; `docs/agent/state.json` reads
   `project_status: "complete"`.]
 
-`FINAL_SPRINT` in `scripts/validate_project.py` moved from 69 to 71 with DEC-136's revision; Sprint
-071's own closure above is the last planned sprint reaching it.
+`FINAL_SPRINT` in `scripts/validate_project.py` moved from 69 to 71 with DEC-136's revision; it
+moves again to 74 with DEC-139 below, which extends the plan after Sprint 071 closed it.
+
+### Covers first — the library, insights and shelves redrawn for reading
+
+**Owner feedback, 2026-09-05, accepted as DEC-139 and scheduled as Sprints 072–074.**
+
+> *"I feel like there is a lot of wasted space everywhere. We could have a bit more fun with the
+> layout, covers and the main number should be larger, things could be better arranged so they are
+> easier to parse and read. Same for the insights page, the two columns read as bland. Finally,
+> the shelves tab is too bland — can you propose some extra functionality to it?"*
+
+**[`../readability-proposal.md`](../readability-proposal.md)** measured the three screens on the
+owner's own running instance rather than describing them: 338px of chrome above the first cover at
+1440×900 and 509px at 390×844; a card giving 31% of its area to the cover and 105px of width to a
+title; a score at 14px beside a 150px status select; four columns at 2560px with 54% of the window
+as margin; a `total` fetched on every response and spent only on `aria-setsize`; two insights cards
+holding one fact at two grains, above a footnote hiding the library's most concentrated facts; and
+a shelves tab whose whole vocabulary is create, rename and delete. Nineteen findings, each traced
+to a line, plus the two the owner's own reading added — a shelf may hold any domain and no screen
+says which, so a mixed shelf's count would disagree with the screen it links to.
+
+- **[072 — A wall of covers](072-a-wall-of-covers.md)** — the cover-first card (cover at ~81% of
+  the card, title at the full card measure, the score as a 44px chip in the corner), one sticky
+  command bar in place of four rows of chrome, the match count made visible, six columns on a wide
+  screen, and a second density that is actually dense. `gridLayout` moves; DEC-023's rule does
+  not. Frontend only.
+- **[073 — Insights with a shape](073-insights-with-a-shape.md)** — the leading key becomes a hero
+  carrying its own superlatives, Decade and Year become one card at two grains, decades are drawn
+  in time order, the score distribution is drawn at all, and the long tail becomes a card instead
+  of a footnote. One read-only endpoint (per-score counts) is the only backend change.
+- **[074 — A shelf is a place](074-a-shelf-is-a-place.md)** — the index becomes a board whose
+  cards are drawn as shelves (covers stood up in a scrolling rail on a rule), each saying which
+  domains it holds, with a domain filter, sort and search; every shelf gets a page that shows the
+  set whole across domains (DEC-139 §2); and a shelf can be pinned into the library bar. One
+  grouped count on the shelves response is the only backend change.
 
 ## Not scheduled
 
+- **Saved views ("smart shelves").** A library filter set, named and kept — *Unrated 2024
+  additions*, *Vinyl I do not own yet* — appearing beside the shelves and opening the library
+  filtered. `readability-proposal.md` §3.3.5 and §5.3 row E; **accepted in principle by DEC-139 and
+  deliberately not scheduled**, because it needs a `saved_views` table and a migration where
+  Sprints 072–074 need neither. It becomes Sprint 075 the day the owner asks; the design question
+  it carries is that a saved view must still parse after a filter is added or renamed, which means
+  storing the query it was created from and ignoring unknown keys on read, never on write.
+- **The rest of the shelf menu**, costed in `readability-proposal.md` §5.3 and deferred there:
+  bulk shelving from the library (row F, ~1 sprint, Triage's selection model already exists),
+  manual order and "up next" queues (row G), shelf goals (row H, needs a product call about
+  targets), merging shelves (row I), and auto-shelving rules (row J, a different product — saved
+  views are the honest 80% of it).
+- **A cover-only third library density.** `readability-proposal.md` §3.1 offers it as optional and
+  §5.1 rejects it as a default: a phone has no hover and a cover is not a label.
 - **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
   owner during the revision-8 re-plan. It remains the gate on any exposure beyond LAN: no public
   DNS, port-forwarding, tunnel, or internet-reachable proxy until it exists.

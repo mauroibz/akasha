@@ -5455,3 +5455,64 @@ both changes, against 1 of 3 before the second.
 - **Consequences:** `docs/agent/HANDOFF.md`'s known-degraded list drops this line. No sprint file
   changes: Sprint 071's own file did not need to declare this addition in advance for the owner to
   authorize it in session, and its Outcome records the fix and this decision together.
+
+## DEC-139 — The readability proposal is accepted; the plan extends to Sprint 074
+
+- **Date:** 2026-09-05
+- **Status:** accepted by the owner
+- **Accepts:** [`readability-proposal.md`](readability-proposal.md), including the second draft's
+  shelves revision, in full.
+- **Cross-references:** DEC-023 (the virtualization contract whose numbers move here), DEC-026 (the
+  tokens and the ramp, unchanged), DEC-065 (the library names one domain — reaffirmed, and read as
+  binding on the library rather than on every list), DEC-131 (the insights query budget), DEC-132
+  (the insights rules Sprints 066/067 established, two of which constrain Sprint 073), DEC-136 and
+  DEC-137 (the shared primitives these sprints rearrange rather than replace).
+- **Context:** Sprint 071 closed the last planned v1 sprint and the owner used the result:
+  *"there is a lot of wasted space everywhere … covers and the main number should be larger …
+  the insights page, the two columns read as bland … the shelves tab is too bland, can you propose
+  some extra functionality to it?"* The proposal measured the three screens on the owner's own
+  running instance rather than describing them — 338px of chrome above the first cover at
+  1440×900 and 509px at 390×844; a card giving 31% of its area to the cover and 105px of width to
+  a title; a score at 14px beside a 150px status select; four columns at 2560 with 54% of the
+  window as margin; a `total` fetched on every response and spent only on `aria-setsize`; two
+  insights cards holding one fact at two grains; and a shelves screen that can create, rename and
+  delete. Nineteen findings, each traced to a line.
+- **Decision.** The proposal is accepted as written and scheduled as three sprints:
+  **072 — A wall of covers** (frontend only), **073 — Insights with a shape** (one read-only
+  endpoint), **074 — A shelf is a place** (one grouped count on the shelves response). Four
+  decisions inside it are what this record exists to fix:
+
+  1. **DEC-023's numbers move; its rule does not.** The card becomes cover-first — a pinned cover
+     height with the width flexing, so the poster crops rather than the row resizing — and
+     `gridLayout` stays the single place the geometry lives. Fixed-size virtualization, the
+     derived column count, and the score picker's in-card overlay are all preserved, and the two
+     mounted-DOM bounds are re-measured rather than assumed to survive a row-height change.
+  2. **A shelf page spans domains.** DEC-065 removed "All" from the *library* so one control could
+     pick both the rows and the providers a search would reach; `/triage` and the export already
+     span domains under it. A shelf is a set the owner assembled by hand, and the proposal argued
+     its page is the second screen where "everything in this set" is the question. The owner
+     accepted the proposal including that recommendation, so Sprint 074 builds it: the shelf page
+     shows every domain the shelf holds, with a strip offering only those. The library is
+     unchanged and still names exactly one domain.
+  3. **Findings 18 and 19 are answered on the screen where they start.** `shelves` has no type
+     column and `entry_shelves` joins an entry of any domain, so a shelf may mix them, and nothing
+     on any screen says which it holds — a mixed shelf's card would count 14 and open a library
+     showing 9. Sprint 074 adds members-by-type to the shelves response, a chip per domain and a
+     domain filter, and makes "the count equals what the click shows" an acceptance criterion.
+  4. **Saved views are accepted in principle and not scheduled.** The proposal's optional Sprint
+     075 (naming and keeping a library filter set) needs a table and a migration; it stays in the
+     roadmap's "Not scheduled" section and becomes Sprint 075 the day the owner asks, rather than
+     being carried as a planned sprint nobody has committed to. Bulk shelving, manual queues,
+     shelf goals, merging and auto-shelving rules stay deferred with their costs recorded in the
+     proposal's §5.3.
+
+- **Consequences.** `FINAL_SPRINT` in `scripts/validate_project.py` moves from 71 to 74 and the
+  project leaves `complete`: `docs/agent/state.json` goes to `project_status: "ready"` with 072
+  active at plan revision 39. `docs/README.md` moves the proposal from open to accepted. The
+  acceptance criterion that holds all three sprints honest is Sprint 070's: the existing component
+  and e2e suites pass unchanged except where a test asserts one of the nineteen findings, and each
+  such test is named in the sprint that changes it. Two are known in advance —
+  `library.spec.ts`'s "grid cards keep cover, metadata and controls separated" (the controls now
+  sit on the cover by design) and `library.test.ts`'s column-count expectations (which read the
+  constants, so they move with them). No new colour, no second accent, no new typeface, no
+  charting library, no new dependency, and no light theme.

@@ -1,57 +1,53 @@
-# Handoff — every planned v1 sprint is complete
+# Handoff — the plan is extended; Sprint 072 is ready to start
 
-`docs/agent/state.json` reads `project_status: "complete"`, `active_sprint: null`,
-`active_sprint_file: null`, `active_sprint_status: null`, `last_completed_sprint: "071"`.
-Plan revision 38; `FINAL_SPRINT` in `scripts/validate_project.py` is 71, and Sprint 071
-("What the numbers say") reached it. **There is no active sprint file to read and no
-next sprint to start.** A session picking this up should read "Still owed to the owner"
-below before inventing new work — the numbered plan is done, but this is not the same
-as "nothing left to do."
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "072"`,
+`active_sprint_file: "docs/sprints/072-a-wall-of-covers.md"`, `active_sprint_status:
+"ready"`, `last_completed_sprint: "071"`. Plan revision 39; `FINAL_SPRINT` in
+`scripts/validate_project.py` is now **74**.
+
+**Nothing has been implemented for this line.** The three new sprint files are plans, and
+`started_at` is empty. A session picking this up starts at `AGENTS.md` §1 and executes
+Sprint 072.
 
 ## What just happened
 
-Sprint 071 shipped in full, plus one addition folded in at the owner's explicit
-request. `docs/sprints/071-what-the-numbers-say.md`'s own Outcome has the complete
-account; the summary:
+No product code changed. The owner asked for another look at the library UI, the insights
+page and the shelves tab; the three screens were **measured** on the owner's own running
+instance (`ghcr.io/mauroibz/akasha:1.5.7` on `127.0.0.1:8000`, read-only through its HTTP
+API) with Playwright at 1440×900, 2560×1400 and 390×844, and the result is
+[`../readability-proposal.md`](../readability-proposal.md) — nineteen findings, each traced
+to a line, with alternatives, non-goals and risks. The owner accepted it (**DEC-139**) and
+asked for the plans to be committed.
 
-- **Shelves became an openable ranking**: `ShelfResponse.covers` (the only backend
-  change — DEC-134's own lateral top-3 join, keyed by shelf), a magnitude bar, up to
-  three covers, and the name linking into `/?shelf=slug`.
-- **The library gained an active-filters row**: one dismissable chip per set filter
-  (shelf, format, status, query, insights key), generalized from the insights-only
-  `InsightFilterChip`.
-- **Counts that describe a whole carry visible weight**: shelf sizes, the status
-  popover's facet counts, and the import preview's ready/needs-a-choice/errors summary,
-  all through one `weightClass` helper built on the same `magnitude` arithmetic the
-  ranking bar already used.
-- **DEC-137's mobile fix, added in-session at the owner's direction** (the request was
-  "work on the last sprint, add the mobile ui fix"): `/import`'s connector-choice strip,
-  found overflowing a 390px viewport by Sprint 070's own walkthrough and left unfixed
-  there, got DEC-134's own structural answer. Recorded as **DEC-138**, cross-referencing
-  DEC-137 rather than rewriting it.
-- **Two regressions were found and fixed inside this same session**, both introduced by
-  this sprint's own commits and both closed before the gate that would otherwise have
-  carried them forward as known-degraded: a test-helper selector collision the
-  active-filters chip exposed, and a magnitude-bar contrast regression on a near-full
-  shelf's Delete button. Full detail in the sprint's own Outcome and in
-  `docs/agent/worklog.md`'s 2026-09-05 entry.
-- **One pre-existing condition was observed, not fixed**: the `insights` ranking
-  scenarios in `scripts/benchmark_library.py` exceed their 500ms budget under the
-  contended condition on this workstation. DEC-131 territory, no line of insights
-  ranking code touched by this sprint's diff — recorded here and in the worklog rather
-  than silently noticed and dropped.
+- **`docs/readability-proposal.md`** — the proposal, revised once on the owner's reading of
+  the first draft (the shelf card wastes its width on three overlapping faces; are shelves
+  multi-domain?). That revision added findings 18 and 19 and rewrote §3.3.
+- **`docs/decisions.md` DEC-139** — the acceptance, and the four decisions inside it:
+  DEC-023's numbers move while its rule stands; a shelf page spans domains; findings 18/19
+  are answered on the shelves screen; saved views are accepted in principle and left
+  unscheduled.
+- **Sprints 072, 073, 074** — new files, `ROADMAP.md` extended, `FINAL_SPRINT` 71 → 74,
+  `state.json` at revision 39 pointing at 072.
+- **A visual mockup was published as an artifact for the owner** (before/after for all
+  three screens, drawn with their real covers). It is not in the repository and nothing
+  depends on it; the proposal is the record.
 
-## Final sprint: what "complete" means here
+## Sprint 072 in one paragraph
 
-`docs/agent/WORKFLOW.md`'s final-sprint rule has been applied: `project_status`,
-`active_sprint`, `active_sprint_file` and `active_sprint_status` are set as above, and
-`completed_sprints` runs `001` through `071` with no gaps. **This does not mean the
-product is finished** — it means every sprint the roadmap had planned is delivered. New
-work (a bug the owner reports, a feature they ask for, a proposal like
-`ui-cohesion-proposal.md` was) gets its own new sprint file, numbered 072 onward, the
-same way DEC-135/DEC-136 extended the plan twice already when the owner asked for more
-after a prior "final" sprint closed. Do not invent a 072 speculatively; wait for the
-owner's direction the way both of those extensions did.
+The library card becomes cover-first: the cover takes the full card width at a pinned
+height, the title gets the whole card measure instead of 105px, and the score becomes a
+44px chip in the ramp on the corner of the poster. Four rows of chrome collapse into one
+sticky command bar, the match count (fetched on every response, today spent only on
+`aria-setsize`) becomes visible, wide screens gain columns, and the second density becomes
+genuinely dense. **Frontend only.** `gridLayout` is the single place the geometry lives;
+DEC-023's contract — fixed-size virtualization, derived column count, the score picker's
+overlay contained inside its card — is preserved, and its two mounted-DOM bounds are
+re-measured because both row heights change.
+
+Two tests are known in advance to need changing, and both are named in the sprint:
+`library.spec.ts`'s "grid cards keep cover, metadata and controls separated" (controls now
+sit on the cover deliberately) and `library.test.ts`'s column expectations (which read the
+constants and move with them). Everything else must pass unchanged.
 
 ## Known-degraded, deliberately not fixed (carried forward, still true)
 
@@ -60,49 +56,42 @@ owner's direction the way both of those extensions did.
 - `languages` mixes vocabularies across movie/series sources.
 - The book domain declares `Creators` where `Authors` would read better.
 - The `insights` ranking scenarios (`creators/count`, `creators/score`,
-  `publisher/count`) in `scripts/benchmark_library.py` exceed the 500ms first-page
-  budget under the contended (200-jobs-queued) condition on this workstation — p95
-  552.9–1009.4ms, measured 2026-09-05. DEC-131 governs this query's budget; no sprint
-  since has touched the query itself. Whoever picks this up next should re-measure
-  before assuming it is still true, since it depends on host load as much as on code.
-- DEC-134's domain-radiogroup overflow and DEC-137's import-strip overflow are both
-  **paid** now (Sprints 070 and 071 respectively). Kept out of this list on purpose —
-  removed rather than marked resolved, so a stale memory of either does not resurface
-  as a re-opened item.
+  `publisher/count`) in `scripts/benchmark_library.py` exceeded the 500ms first-page budget
+  under the contended condition on this workstation — p95 552.9–1009.4ms, measured
+  2026-09-05, before this session. Sprint 073 touches this path and must re-measure rather
+  than inherit the number or blame its own diff for it.
+- `scripts/validate_project.py` currently fails on this workstation for a reason unrelated
+  to the repository: a leftover agent worktree at
+  `.claude/worktrees/agent-ae82b747e32836664/` is git-excluded but still walked by the
+  text-hygiene check, so its provider fixtures report "no trailing newline". Deleting that
+  directory clears it. Run the validator from a clean checkout before believing a failure.
 
 ## Still owed to the owner
 
 - **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
-  outstanding, needs the owner's own container. Every walkthrough run since (Sprints
-  070 and 071 both) used a throwaway seeded backend per their own instructions; neither
-  satisfies this one.
-- Cutting the `v1.6.0` and/or `v1.7.0` (or later) release tag(s) — never done this
-  session or any recorded prior one.
-- **DEC-133's open product question** (album ranking ordering `Label` ahead of
-  `Artists`) — still the owner's call.
+  outstanding; needs the owner's own container.
+- Cutting the `v1.6.0` and/or `v1.7.0` release tag(s).
+- **DEC-133's open product question** (album ranking ordering `Label` ahead of `Artists`).
 
 ## Branch and authorization
 
-On **`main`**, committed directly, inside this session's worktree
-(`.claude/worktrees/agent-ae82b747e32836664`, branch
-`worktree-agent-ae82b747e32836664`) — **nothing pushed**. Eight commits landed for
-Sprint 071 (`ca6709d` through `3733b1f`; see the sprint's own Outcome for the full list
-and what each one did) plus this closing documentation commit. Authorization does not
-carry forward: a session picking this up should not push, merge, tag, or take any
-remote action without being asked to, regardless of what any prior session was told.
+On **`ui-readability-proposal`**, branched from `main` at `1914ffe`, three commits, nothing
+pushed and nothing merged. `main` is untouched. Whoever implements Sprint 072 should decide
+with the owner whether to continue on this branch or merge the plans to `main` first —
+neither has been authorized. Authorization does not carry forward: do not push, merge, tag
+or take any remote action without being asked.
 
 ## Version
 
-Unchanged at `1.7.0`. Neither Sprint 070 nor 071 bumped it. A version bump — and
-cutting the tag(s) named above — is still owed and belongs to whoever the owner asks
-to do it, not to whoever happens to close a sprint.
+Unchanged at `1.7.0`.
 
 ## Private data and operational constraints
 
-Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has
-no auth and stays LAN-only; Calibre is opened read-only. **The owner's own instance runs
-on this host at `127.0.0.1:8000`.** Sprint 071's own walkthrough used a throwaway
-seeded backend (`scripts/walkthrough.py`, ephemeral port) and a throwaway Vite dev
-server (scratch port 4321), both already torn down — the owner's own instance was
-confirmed reachable and healthy both before and after (`curl .../api/health/ready`),
-and was never pointed at. Any future walkthrough needs the same discipline.
+Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has no
+auth and stays LAN-only; Calibre is opened read-only. **The owner's own instance runs on
+this host at `127.0.0.1:8000`** — this session read from it (`/api/entries`, `/api/shelves`,
+`/api/insights`, cover images) to measure the screens and to draw the mockup with real
+data, and wrote nothing to it. A second backend was run briefly on port 8010 against a
+**copy** of `data/` in the scratchpad and has been stopped; the Vite dev server used for
+the screenshots is stopped too. Any future walkthrough uses a throwaway seeded backend, not
+the owner's instance.

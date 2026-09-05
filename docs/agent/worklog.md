@@ -4393,3 +4393,66 @@ so 050 adds an adapter, not a declaration.
   is still owed to the owner outside the numbered plan (Sprint 065's DEC-025
   walkthrough against the owner's real library, cutting release tags, and
   DEC-133's open product question).
+
+## 2026-09-05 — Planning session (no sprint) — the readability line, DEC-139, Sprints 072–074
+
+- **Asked for:** another look at the main library UI ("a lot of wasted space
+  everywhere … covers and the main number should be larger"), the insights page
+  ("the two columns read as bland"), and extra functionality for the shelves
+  tab. On a branch, as a proposal.
+- **Done:** measured the three screens rather than describing them.
+  Playwright against the owner's own running instance
+  (`ghcr.io/mauroibz/akasha:1.5.7` on `127.0.0.1:8000`, read-only through its
+  HTTP API) at 1440×900, 2560×1400 and 390×844: first card top `y=338` at
+  desktop and `y=509` on a phone; card 281×280 with a 128×192 cover, so a
+  105px title column; 4 columns at 2560 with `x=688` of margin each side;
+  `total` fetched and spent only on `aria-setsize`; two insights cards
+  (`Decade`, `Year`) holding one fact at two grains with the superlative strip
+  repeating the first row below it; eleven shelf rows at ~90px each in a 768px
+  column. Nineteen findings, each traced to a line, in
+  `docs/readability-proposal.md`, with alternatives per screen, non-goals and
+  risks.
+- **Revised once, on the owner's reading of the first draft.** Two questions:
+  the shelf card wastes its horizontal space on three overlapping faces, and
+  are shelves multi-domain? Checked: `shelves` has no type column and
+  `entry_shelves` joins an entry of any domain, and the shelf picker is offered
+  on every domain's detail page and in `AddForm` — so a shelf may mix domains,
+  nothing on any screen says which it holds, and a mixed shelf opened through
+  `/?shelf=slug` would show part of itself, because the library always names
+  exactly one domain (DEC-065). Verified against the real library that all
+  eleven shelves are books-only today (240 of its 264 entries are albums and
+  anime, none shelved), so this is latent rather than live. Added as findings
+  18 and 19; §3.3 rewritten around a cover rail per card, a chip per domain, a
+  domain filter, and a shelf page that shows the set whole.
+- **Accepted by the owner** ("love it. commit the plans so we can start work on
+  the sprints") and recorded as **DEC-139**, which fixes four things: DEC-023's
+  numbers move while its rule stands; a shelf page spans domains (with
+  `/triage` and the export as the standing precedent under DEC-065); findings
+  18/19 are answered on the shelves screen; saved views are accepted in
+  principle and deliberately left unscheduled, since they need a table and a
+  migration where 072–074 need neither.
+- **Committed:** `docs/readability-proposal.md`, DEC-139,
+  `docs/sprints/072-a-wall-of-covers.md`,
+  `073-insights-with-a-shape.md`, `074-a-shelf-is-a-place.md`, `ROADMAP.md`
+  extended, `FINAL_SPRINT` 71 → 74, `docs/README.md` moved the proposal from
+  open to accepted, `state.json` to plan revision 39 with 072 `ready`, and this
+  handoff.
+- **Verified:** `python scripts/validate_project.py`. **No product code
+  changed, so no `make check`, `make test` or Playwright run is owed** — the
+  diff is documentation, planning state and one constant in the validator
+  itself (`docs/agent/TESTING.md`'s documentation/state-only classification).
+  The validator additionally reports 49 "no trailing newline" errors from
+  `.claude/worktrees/agent-ae82b747e32836664/` — a leftover agent worktree that
+  git excludes but the text-hygiene walk still visits; pre-existing on `main`,
+  unrelated to this diff, and recorded in `HANDOFF.md` rather than silently
+  worked around.
+- **A visual mockup was published as an artifact for the owner** — before/after
+  for all three screens, drawn with their real covers and real numbers. Not in
+  the repository; the proposal is the record.
+- **Deviations:** none. This was not a sprint; no acceptance criteria applied.
+- **State:** `project_status` `complete` → `ready`, `active_sprint` `072`,
+  plan revision 38 → 39, `started_at` cleared.
+- **Next:** execute Sprint 072 (`docs/sprints/072-a-wall-of-covers.md`).
+  Decide first, with the owner, whether it continues on branch
+  `ui-readability-proposal` or whether these plans merge to `main` — neither
+  has been authorized, and nothing is pushed.
