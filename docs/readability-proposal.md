@@ -47,11 +47,17 @@ Every number below was measured on 2026-09-05 against the owner's own running in
 | 15 | **The two destructive-ish buttons are the loudest thing on every row**, repeated eleven times, while the shelf itself — what is on it — is one word and one number. | — | `ShelvesPage.tsx:251-271` |
 | 16 | **A shelf has no page.** The name links into `/?shelf=slug`, which is the library with a chip on it. There is nowhere that a shelf is a thing with a shape: how far through it you are, what it is made of, how you rate it. | — | `ShelvesPage.tsx:227-245` |
 | 17 | **Nothing else is possible on this screen.** Create, rename, delete. No sort, no search, no pinning, no bulk shelving, no saved filters — while the library already has a filter language that would make all of them cheap. | — | whole page |
+| 18 | **A shelf can hold any domain, and nothing on any screen says which it holds.** `shelves` has no type column and `entry_shelves` joins an entry of any domain, so a shelf may mix books, albums and anime — and the shelf picker is offered on every domain's detail page and in `AddForm`. The owner's eleven shelves are books only, while 240 of the 264 entries in that library are albums and anime and none of them is on a shelf. | 11/11 shelves books-only; 159 albums, 81 anime unshelved | `models.py:121-134`, `DetailPage.tsx:408`, `AddForm.tsx:392` |
+| 19 | **Opening a mixed shelf would show part of it, silently.** The row links to `/?shelf=slug`, and the library always names exactly one domain (DEC-065). A shelf whose card counts 14 would open a library showing 9, with nothing on screen accounting for the other five — the count and the click disagree. | — | `ShelvesPage.tsx:228`, `HomePage.tsx:255-271` |
 
 Two smaller ones, recorded so they are not rediscovered: the shelf index is sorted by name only, which
 puts an 11-entry shelf below a 1-entry one; and the running 1.5.7 instance shows the "no cover"
 placeholder on every shelf row because `covers` predates it — main already fixes that (Sprint 071),
 so §3.3 builds on faces that are there.
+
+Findings 18 and 19 are the ones with a behavioural edge to them. Nothing is broken today only because
+every shelf happens to hold one domain; the moment one does not, a count on the shelves screen stops
+agreeing with the screen it links to.
 
 **None of these is a defect in behaviour.** Every screen works and every suite passes. What they add
 up to is a product that stores pictures and shows text.
@@ -139,27 +145,47 @@ rather than here.)
    row into the filtered library (finding 12).
 7. Page width matches the library's, so the two screens stop being different documents.
 
-### 3.3 Shelves: a shelf becomes a place, and the tab gains a job
+### 3.3 Shelves: a shelf is drawn as a shelf, and it says what it holds
 
 Section 5 costs the full menu of candidate features. What this proposal recommends:
 
-1. **`/shelves/:slug` — the shelf page.** A hero of up to twelve covers, the count at the same
-   `text-3xl` the library uses, a status breakdown bar (*4 read · 1 reading · 6 unsorted*), the
-   mean score chip, the format mix — then the shelf's own entries in the library's grid. Rename and
-   delete live here, which takes them off every row of the index (finding 15). **No backend change:**
-   `GET /api/entries?shelf=slug` already returns `total` and returns `facets.status_counts`
-   narrowed by shelf (`library.py:892`).
-2. **The index becomes a board, not a list.** Shelf tiles at three columns: cover stack, name, count
-   with its magnitude bar, and a status sliver. Eleven shelves fit one screen instead of 990px of
-   rows.
-3. **Sort and search the index** — by size, by recently added to, by name — which is finding 14's
+1. **The index becomes a board, and each card is a shelf.** Not three overlapping thumbnails in a
+   corner: the shelf's covers stood up side by side at one height, in their own widths, on a rule —
+   which is what fills the card's width instead of leaving it empty (the owner's note on the first
+   draft). More members than fit scroll horizontally, `scroll-snap-type: x proximity`, with the
+   right edge faded so it reads as continuing. The row holds nothing focusable and is
+   `aria-hidden`; the card is one link carrying the name and the count, so a keyboard reader is
+   never parked inside a scroller. Under the covers: the name, the count with its magnitude bar,
+   and a chip per domain (§3.3.2). Eleven shelves fit one screen instead of 990px of rows.
+2. **A shelf says which domains it holds, and the index can filter by one.** A chip per domain with
+   that domain's own label and count — *11 books*, or *9 books · 5 albums* — and a domain strip over
+   the board that shows only the shelves holding it, each card then counting only those members.
+   This is findings 18 and 19 answered on the screen where they start. It is the **one backend
+   addition** in Sprint 074: the shelves response carries members grouped by item type, which is the
+   same `GROUP BY` shape the facets block already builds.
+3. **`/shelves/:slug` — the shelf page, showing the shelf whole.** A mosaic of up to twelve covers,
+   the count at the same `text-3xl` the library uses, a status breakdown bar (*4 read · 1 reading ·
+   6 unsorted*), the mean score chip, the format mix — then the shelf's own entries in the library's
+   grid. Rename and delete live here, off every row of the index (finding 15).
+
+   **It spans domains, deliberately.** DEC-065 removed "All" from the *library*, so that one control
+   picks both the rows and the providers a search would reach; `/triage` and the export already span
+   domains under that same decision. A shelf is a set the owner assembled by hand, and its page is
+   the one place "everything in this set" is the question — so the page shows all of it, with a strip
+   offering only the domains that shelf actually holds. This is a product call rather than a
+   deduction, and Sprint 074 should not start until it is made: the alternative is one domain at a
+   time here too, which keeps the rule uniform and makes finding 19 permanent.
+
+   **No backend change for the rest of it:** `GET /api/entries?shelf=slug` already returns `total`
+   and `facets.status_counts` narrowed by shelf (`library.py:892`).
+4. **Sort and search the index** — by size, by recently added to, by name — which is finding 14's
    other half.
-4. **Saved views ("smart shelves").** The library's filter set, named and kept: *Unrated 2024
+5. **Saved views ("smart shelves").** The library's filter set, named and kept: *Unrated 2024
    additions*, *Vinyl I do not own yet*. They appear on the shelves screen in their own group, open
    the library with those filters applied, and are the one genuinely new capability here — the
    filter language exists, the URL already encodes a whole view, and nothing today can keep one.
    Costs a table and a migration (§4).
-5. **Pin a shelf.** A pinned shelf becomes a one-press chip in the library's command bar.
+6. **Pin a shelf.** A pinned shelf becomes a one-press chip in the library's command bar.
    `localStorage`, no backend, no migration.
 
 ---
@@ -173,7 +199,7 @@ everything needing no new data first, everything needing some second.
 |---|---|---|
 | **072 — A wall of covers** | §3.1 entire: grid geometry, the vertical card, the score corner, the collapsed command bar, the visible count, the dense list, wide-screen columns. | **None.** |
 | **073 — Insights with a shape** | §3.2 entire: hero panel, the Decade/Year merge, the chronology strip, the asymmetric grid, the long-tail card, and the score distribution band. | One read-only addition: per-score counts for a domain (a `GROUP BY score` over the same `_filtered_entries` the facets block already builds). |
-| **074 — A shelf is a place** | §3.3 items 1–3 and 5: the shelf page, the board index, sort/search, pinning. | **None** (facets already narrow by shelf). |
+| **074 — A shelf is a place** | §3.3 items 1–4 and 6: the board index with a cover shelf per card, domain chips and a domain filter, the shelf page whole across domains, sort/search, pinning. | One grouped count — members per item type — on the shelves response. Everything else is already there: facets narrow by shelf. |
 | **075 — Saved views** *(optional)* | §3.3 item 4. | A `saved_views` table (name, slug, query string, created_at), CRUD routes, one migration. |
 
 Sprint 072 is the one that must not be trimmed into 073: it is a geometry change to a virtualized
@@ -181,7 +207,7 @@ list, and DEC-023's contract, the mounted-card bound, the `library.spec.ts` layo
 the 390px viewport check all have to move together or not at all.
 
 **The acceptance criterion that holds them honest** is the one Sprint 070 used: the existing
-component and e2e suites pass unchanged, except where a test asserts one of the seventeen findings
+component and e2e suites pass unchanged, except where a test asserts one of the nineteen findings
 above — `library.test.ts` asserts `gridColumnCount` against `gridLayout`, so it moves with the
 constants by construction, and any test that hard-codes 4 columns or a 128px cover is named in the
 sprint that changes it.
@@ -215,8 +241,9 @@ Costed so the shape of the work is a choice rather than this document's opinion.
 
 | # | Feature | Value | Cost | In? |
 |---|---|---|---|---|
-| A | Shelf page (`/shelves/:slug`) with composition and its own grid | High — a shelf becomes somewhere you go | ~⅓ sprint, no backend | **Yes (074)** |
-| B | Board index with cover stacks, magnitude and status slivers | High — the tab stops being a settings list | ~¼ sprint | **Yes (074)** |
+| A | Shelf page (`/shelves/:slug`) with composition and its own grid, spanning domains | High — a shelf becomes somewhere you go, and a mixed one is visible whole | ~⅓ sprint, no backend | **Yes (074)** |
+| B | Board index, each card drawn as a shelf: covers in a scrolling row on a rule | High — the tab stops being a settings list, and the card width does work | ~¼ sprint | **Yes (074)** |
+| B2 | Domain chips per shelf, and a domain filter over the board | High — findings 18 and 19; today a shelf never says what it holds | small + one grouped count | **Yes (074)** |
 | C | Sort and search the index | Medium | small | **Yes (074)** |
 | D | Pin shelves into the library command bar | Medium — one press to a shelf | small, `localStorage` | **Yes (074)** |
 | E | Saved views / smart shelves | High — the one new capability | ~⅔ sprint + migration | **Yes (075, optional)** |
@@ -259,6 +286,16 @@ Costed so the shape of the work is a choice rather than this document's opinion.
 - **Screenshots are the only real evidence for this work.** The walkthrough gate (DEC-025) is the
   actual verification: every screen at 390px and at 1440 and 2560, against the owner's real library,
   reported in the worklog.
+- **A horizontal scroller inside a vertical page is a touch hazard.** A shelf card's cover row must
+  not steal a vertical swipe on a phone, and it must never become a keyboard trap. Mitigation: the
+  row is `aria-hidden`, holds no focusable child, uses `scroll-snap-type: x proximity` rather than
+  `mandatory`, and the card itself remains the single link — so the whole feature degrades to "a
+  wide picture that happens to scroll" for anyone not dragging it.
+- **The cross-domain shelf page is a product decision, not a deduction.** §3.3.3 reads DEC-065 as
+  binding on the library rather than on every list — `/triage` and the export are the precedent —
+  but the owner's call is what settles it, and Sprint 074 should not begin without it. Choosing the
+  uniform rule instead is a defensible answer; it just makes finding 19 permanent, and then the
+  shelf card's count must be stated per domain rather than as one number.
 - **Saved views (075) introduce the first stored query string in the product.** A view saved today
   must still parse after a filter is added or renamed; the mitigation is that a view stores the URL
   query it was created from and unknown keys are ignored on read, never on write.

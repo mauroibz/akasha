@@ -45,7 +45,7 @@ Written to be accepted, rejected or cut down. Nothing in one is built.
 
 | Document | What it proposes |
 |---|---|
-| [`readability-proposal.md`](readability-proposal.md) | Written 2026-09-05 at the owner's request, after Sprint 071 closed the last planned v1 sprint: seventeen measured findings about wasted space and small covers on the library, insights and shelves screens, the redraw that answers them, a costed menu of new shelf functionality, and three sprints (plus one optional) to build it. |
+| [`readability-proposal.md`](readability-proposal.md) | Written 2026-09-05 at the owner's request, after Sprint 071 closed the last planned v1 sprint: nineteen measured findings about wasted space and small covers on the library, insights and shelves screens — including that a shelf may hold any domain and no screen says which — the redraw that answers them, a costed menu of new shelf functionality, and three sprints (plus one optional) to build it. |
 
 ## Historical
 
