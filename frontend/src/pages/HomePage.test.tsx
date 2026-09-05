@@ -791,7 +791,13 @@ function stubBar(options: BarStub = {}) {
 /** Type a miss, wait for the one search it costs, and open the confirm dialog. */
 async function openConfirmDialog(user: ReturnType<typeof userEvent.setup>) {
   await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
-  const result = await screen.findByRole(
+  // Scoped to the web-results region: since Sprint 071 an active-filters chip
+  // also names the query ("Search · “Dune Messiah”"), and its accessible name
+  // matches the same regex an unscoped query would use.
+  const webResults = await screen.findByRole("region", {
+    name: /from the web/i,
+  });
+  const result = await within(webResults).findByRole(
     "button",
     { name: /Dune Messiah/ },
     { timeout: 3000 },
@@ -917,7 +923,13 @@ test("choosing a web result opens the confirm form over the library", async () =
   const user = userEvent.setup();
 
   await user.type(await screen.findByRole("searchbox"), "Dune Messiah");
-  const result = await screen.findByRole(
+  // Scoped to the web-results region: since Sprint 071 an active-filters chip
+  // also names the query ("Search · “Dune Messiah”"), and its accessible name
+  // matches the same regex an unscoped query would use.
+  const webResults = await screen.findByRole("region", {
+    name: /from the web/i,
+  });
+  const result = await within(webResults).findByRole(
     "button",
     { name: /Dune Messiah/ },
     { timeout: 3000 },
@@ -1479,7 +1491,12 @@ test("the active-filters row shows one chip per set filter, including the insigh
                   },
                 ],
                 statuses: [
-                  { value: "read", label: "Read", choosable: true, hotkey: "r" },
+                  {
+                    value: "read",
+                    label: "Read",
+                    choosable: true,
+                    hotkey: "r",
+                  },
                 ],
                 default_status: "to_read",
                 entry_fields: [],
@@ -1519,7 +1536,9 @@ test("the active-filters row shows one chip per set filter, including the insigh
   });
 
   // Dismissing one filter's chip clears exactly that filter (AC4).
-  await user.click(within(row).getByRole("button", { name: /Format · Digital/ }));
+  await user.click(
+    within(row).getByRole("button", { name: /Format · Digital/ }),
+  );
 
   expect(
     within(row).queryByRole("button", { name: /Format · Digital/ }),

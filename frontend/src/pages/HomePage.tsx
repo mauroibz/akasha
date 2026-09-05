@@ -303,7 +303,9 @@ export function HomePage() {
   // including a query chip whose own label repeats the query text a reader
   // just typed, which a test can mistake for the real search result).
   const libraryMissedQuery =
-    Boolean(filters.query) && library.isSuccess && firstPage?.items.length === 0;
+    Boolean(filters.query) &&
+    library.isSuccess &&
+    firstPage?.items.length === 0;
 
   const mutation = useMutation({
     mutationFn: ({
@@ -1015,7 +1017,13 @@ export function HomePage() {
  * shelf, format, status, the search query, or that same insights breadcrumb, which
  * is one of these chips rather than a second idiom of its own (AC5).
  */
-function FilterChip({ label, onClear }: { label: string; onClear: () => void }) {
+function FilterChip({
+  label,
+  onClear,
+}: {
+  label: string;
+  onClear: () => void;
+}) {
   return (
     <button
       type="button"
