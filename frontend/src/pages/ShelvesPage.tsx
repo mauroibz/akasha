@@ -243,7 +243,12 @@ export function ShelvesPage() {
                               }`}
                         </p>
                       </Link>
-                      <div className="relative flex shrink-0 gap-2">
+                      {/* Its own opaque backing: at a high share the magnitude
+                          bar can extend the full row width, and the
+                          destructive button's text otherwise renders against
+                          that tint blended into the surface — enough to drop
+                          below axe's contrast threshold on a near-full shelf. */}
+                      <div className="relative flex shrink-0 gap-2 rounded-full bg-surface">
                         <Button
                           variant="outline"
                           className="rounded-full text-sm"
