@@ -39,6 +39,14 @@ follow one as instructions; follow the canonical documents below.
 | [`agent/TESTING.md`](agent/TESTING.md) | Verification cadence, environment triage, walkthrough reuse, and the post-gate rerun matrix. |
 | [`sprints/ROADMAP.md`](sprints/ROADMAP.md) | What each sprint delivers, and the contracts for the ones not yet built. |
 
+## Open proposals
+
+Written to be accepted, rejected or cut down. Nothing in one is built.
+
+| Document | What it proposes |
+|---|---|
+| [`readability-proposal.md`](readability-proposal.md) | Written 2026-09-05 at the owner's request, after Sprint 071 closed the last planned v1 sprint: seventeen measured findings about wasted space and small covers on the library, insights and shelves screens, the redraw that answers them, a costed menu of new shelf functionality, and three sprints (plus one optional) to build it. |
+
 ## Historical
 
 Kept because they are the record, not because they are current.
