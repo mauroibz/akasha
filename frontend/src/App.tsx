@@ -23,6 +23,9 @@ const ImportPage = lazy(async () => ({
 const ShelvesPage = lazy(async () => ({
   default: (await import("@/pages/ShelvesPage")).ShelvesPage,
 }));
+const ShelfPage = lazy(async () => ({
+  default: (await import("@/pages/ShelfPage")).ShelfPage,
+}));
 const InsightsPage = lazy(async () => ({
   default: (await import("@/pages/InsightsPage")).InsightsPage,
 }));
@@ -61,6 +64,7 @@ export function App() {
                 <Route path="/books/:entryId" element={<DetailPage />} />
                 <Route path="/import" element={<ImportPage />} />
                 <Route path="/shelves" element={<ShelvesPage />} />
+                <Route path="/shelves/:slug" element={<ShelfPage />} />
                 <Route path="/insights" element={<InsightsPage />} />
                 {/* Triage folded into Import as a tab (DEC-079). The old
                     address stays live rather than 404ing: it was a top-level

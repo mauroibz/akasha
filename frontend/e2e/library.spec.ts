@@ -1040,3 +1040,118 @@ test("the library fits a phone with five domains, and the domain strip scrolls w
     );
   for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
 });
+
+// --------------------------------------------------------------------------------------
+// Sprint 074: the shelves board and the shelf page.
+// --------------------------------------------------------------------------------------
+
+async function stubShelvesBoard(page: Page) {
+  await stubItemTypes(page, [bookItemType, albumItemType]);
+  await page.route("**/api/shelves", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          name: "A shelf with a lot on it",
+          slug: "a-shelf-with-a-lot-on-it",
+          entry_count: 10,
+          covers: Array.from({ length: 10 }, () => pixelCover),
+          members_by_type: { book: 7, album: 3 },
+        },
+      ],
+    }),
+  );
+}
+
+test("the shelves board holds at 390px, and the rail scrolls without the body scrolling", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubShelvesBoard(page);
+  await page.goto("/shelves");
+  await expect(page.getByText("A shelf with a lot on it")).toBeVisible();
+
+  const bodyOverflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(bodyOverflow, "body horizontal overflow").toBeLessThanOrEqual(0);
+
+  const rail = page.locator("[data-shelf-rail]");
+  const railBox = await rail.first().evaluate((node) => ({
+    scrollWidth: node.scrollWidth,
+    clientWidth: node.clientWidth,
+  }));
+  expect(railBox.scrollWidth).toBeGreaterThan(railBox.clientWidth);
+
+  // The card is one link; the rail underneath it holds nothing focusable.
+  const card = page.getByRole("link", { name: /A shelf with a lot on it/ });
+  await expect(card).toBeVisible();
+  const focusableInRail = await rail
+    .first()
+    .locator("a, button, input, select, textarea, [tabindex]")
+    .count();
+  expect(focusableInRail).toBe(0);
+
+  const createButton = page.getByRole("button", { name: "Create shelf" });
+  expect((await createButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+});
+
+test("a shelf page holds at 390px across the two domains it holds", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubItemTypes(page, [bookItemType, albumItemType]);
+  await page.route("**/api/shelves", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          name: "Mixed",
+          slug: "mixed",
+          entry_count: 2,
+          covers: [],
+          members_by_type: { book: 1, album: 1 },
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [
+          {
+            ...entry(1),
+            item: { ...entry(1).item, type: "book", title: "A Book" },
+          },
+          {
+            ...entry(2),
+            item: { ...entry(2).item, type: "album", title: "An Album" },
+          },
+        ],
+        next_cursor: null,
+        total: 2,
+        facets: {
+          status_counts: { read: 1, owned: 1 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.goto("/shelves/mixed");
+  await expect(page.getByRole("heading", { name: "Mixed" })).toBeVisible();
+  await expect(page.getByText("A Book")).toBeVisible();
+  await expect(page.getByText("An Album")).toBeVisible();
+
+  const strip = page.getByRole("radiogroup", { name: "Choose a domain" });
+  await expect(strip.getByRole("radio")).toHaveCount(3); // Everything, Book, Album
+
+  const overflow = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflow, "body horizontal overflow").toBeLessThanOrEqual(0);
+});

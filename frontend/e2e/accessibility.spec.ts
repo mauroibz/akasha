@@ -2,7 +2,14 @@ import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
-import { seedLibrary, stubExports, stubImporters, stubItemTypes } from "./seed";
+import {
+  albumItemType,
+  bookItemType,
+  seedLibrary,
+  stubExports,
+  stubImporters,
+  stubItemTypes,
+} from "./seed";
 
 /**
  * Automated WCAG 2.1 A/AA checks on every screen a user can reach.
@@ -565,6 +572,71 @@ test("shelves has no serious accessibility violations", async ({ page }) => {
   await page.goto("/shelves");
   await expect(page.getByRole("heading", { name: /shelves/i })).toBeVisible();
   await expectNoSeriousViolations(page, "shelves");
+});
+
+test("the shelves board with a rail and domain chips has no serious accessibility violations", async ({
+  page,
+}) => {
+  await stubItemTypes(page, [bookItemType, albumItemType]);
+  await page.route("**/api/shelves", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          name: "Mixed",
+          slug: "mixed",
+          entry_count: 4,
+          covers: [
+            "/api/items/1/cover?v=1",
+            "/api/items/2/cover?v=1",
+            "/api/items/3/cover?v=1",
+          ],
+          members_by_type: { book: 3, album: 1 },
+        },
+      ],
+    }),
+  );
+  await page.goto("/shelves");
+  await expect(page.getByText("Mixed")).toBeVisible();
+  await expectNoSeriousViolations(page, "shelves (board)");
+});
+
+test("the shelf page has no serious accessibility violations", async ({
+  page,
+}) => {
+  await stubItemTypes(page, [bookItemType, albumItemType]);
+  await page.route("**/api/shelves", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          name: "Mixed",
+          slug: "mixed",
+          entry_count: 1,
+          covers: [],
+          members_by_type: { book: 1 },
+        },
+      ],
+    }),
+  );
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [detailEntry],
+        next_cursor: null,
+        total: 1,
+        facets: {
+          status_counts: { reading: 1 },
+          status_counts_by_type: {},
+          format_counts: { physical: 1 },
+        },
+      },
+    }),
+  );
+  await page.goto("/shelves/mixed");
+  await expect(page.getByRole("heading", { name: "Mixed" })).toBeVisible();
+  await expect(page.getByText("Rayuela")).toBeVisible();
+  await expectNoSeriousViolations(page, "shelf page");
 });
 
 /**

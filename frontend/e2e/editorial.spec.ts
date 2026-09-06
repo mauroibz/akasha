@@ -220,6 +220,21 @@ test("shelf management creates, renames, and deletes shelves", async ({
     }
   });
 
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: [],
+        next_cursor: null,
+        total: 0,
+        facets: {
+          status_counts: {},
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+
   await page.goto("/shelves");
   await expect(page.getByText("Favorites")).toBeVisible();
   await expect(page.getByText("5 items")).toBeVisible();
@@ -227,22 +242,31 @@ test("shelf management creates, renames, and deletes shelves", async ({
   // Create a new shelf
   await page.getByPlaceholder(/new shelf name/i).fill("Sci-fi");
   await page.getByRole("button", { name: /create shelf/i }).click();
-  // Anchored on the list row: the confirmation toast repeats the shelf name.
+  await expect(page.getByRole("link", { name: /Sci-fi/ })).toBeVisible();
+
+  // Rename and delete moved to the shelf's own page (Sprint 074 deliverable 5,
+  // finding 15): reach them from the board card, not from the index row.
+  await page.getByRole("link", { name: /Sci-fi/ }).click();
+  await expect(page.getByRole("heading", { name: "Sci-fi" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Rename" }).click();
+  await page.getByLabel(/new name for sci-fi/i).fill("Space Opera");
+  await page.getByRole("button", { name: "Save" }).click();
   await expect(
-    page.getByRole("button", { name: /rename sci-fi/i }),
+    page.getByRole("heading", { name: "Space Opera" }),
   ).toBeVisible();
 
   // Delete with confirmation
-  await page.getByRole("button", { name: /delete sci-fi/i }).click();
+  await page.getByRole("button", { name: "Delete" }).click();
   await expect(
-    page.getByRole("alertdialog", { name: /delete .sci-fi./i }),
+    page.getByRole("alertdialog", { name: /delete .space opera./i }),
   ).toBeVisible();
   await expect(page.getByText(/retain/i)).toBeVisible();
   await page.getByRole("button", { name: /delete shelf/i }).click();
-  // Wait for the shelf to disappear
-  await expect(
-    page.getByRole("button", { name: /rename sci-fi/i }),
-  ).toHaveCount(0, { timeout: 5000 });
+
+  // Back on the board, the shelf is gone.
+  await expect(page).toHaveURL("/shelves");
+  await expect(page.getByText("Space Opera")).toHaveCount(0);
 });
 
 test("unknown route shows a useful 404", async ({ page }) => {

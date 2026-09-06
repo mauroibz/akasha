@@ -166,6 +166,10 @@ for (const size of widths) {
     });
 
     test("renaming a shelf confirms on the toast surface", async ({ page }) => {
+      // Rename moved to the shelf's own page (Sprint 074 deliverable 5,
+      // finding 15) -- reached directly here, since this test is about the
+      // toast the action produces, not about navigating the board to find it.
+      await stubItemTypes(page);
       let renamed = false;
       await page.route("**/api/shelves/1", (route) => {
         renamed = true;
@@ -180,8 +184,22 @@ for (const size of widths) {
             : [{ id: 1, name: "Favorites", slug: "favorites", entry_count: 5 }],
         }),
       );
-      await page.goto("/shelves");
-      await page.getByRole("button", { name: /rename favorites/i }).click();
+      await page.route("**/api/entries?**", (route) =>
+        route.fulfill({
+          json: {
+            items: [],
+            next_cursor: null,
+            total: 0,
+            facets: {
+              status_counts: {},
+              status_counts_by_type: {},
+              format_counts: {},
+            },
+          },
+        }),
+      );
+      await page.goto("/shelves/favorites");
+      await page.getByRole("button", { name: "Rename" }).click();
       await page
         .getByRole("textbox", { name: /new name for favorites/i })
         .fill("Best");
