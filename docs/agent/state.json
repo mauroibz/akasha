@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 39,
-  "project_status": "ready",
+  "project_status": "complete",
   "started_at": "",
-  "active_sprint": "074",
-  "active_sprint_file": "docs/sprints/074-a-shelf-is-a-place.md",
-  "active_sprint_status": "ready",
-  "last_completed_sprint": "073",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "074",
   "completed_sprints": [
     "001",
     "002",
@@ -80,7 +80,8 @@
     "070",
     "071",
     "072",
-    "073"
+    "073",
+    "074"
   ],
-  "updated_at": "2026-09-06T12:25:00-03:00"
+  "updated_at": "2026-09-06T15:20:00-03:00"
 }

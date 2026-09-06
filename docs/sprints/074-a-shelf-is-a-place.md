@@ -1,6 +1,6 @@
 # Sprint 074 — A shelf is a place
 
-**Status:** ready
+**Status:** completed
 **Depends on:** 073
 **Roadmap revision:** 39
 
@@ -178,4 +178,139 @@ Measured 2026-09-05:
 
 ## Outcome
 
-_Not started._
+Delivered as planned. This is the final planned sprint (`FINAL_SPRINT` 74); the project moves to
+`complete` on closing it.
+
+### Backend (deliverable 1, the only backend change)
+
+- `LibraryService._shelf_members_by_type()` — a `GROUP BY (shelf_id, item type)` over
+  `entry_shelves`/`entries`/`items`, the same shape the facets block already builds for the whole
+  library, keyed by shelf instead. Wired into `list_shelves()`; `ShelfResponse` gained
+  `members_by_type: dict[str, int]`, defaulting to `{}` so an empty shelf returns an empty
+  grouping rather than a missing key (AC1's backend half).
+- Also exposed `ShelfRow.updated_at` on `ShelfResponse` — not new computation, an existing column
+  made visible — as the nearest available signal for "sort by recently added to" (deliverable 4).
+  Named as a deliberate approximation, both in the code and here: `entry_shelves` carries no
+  timestamp of its own, so this is the shelf's own created/renamed time, not literally the last
+  member's addition. Adding a true one needs a new column and a migration, which deliverable 1
+  did not ask for.
+- Tests: `test_library_queries.py` (a mixed shelf's grouping, an empty shelf's `{}`),
+  `test_library_api.py` (the grouping over HTTP, a mixed shelf's `entry_count` agreeing with the
+  sum of `members_by_type`).
+
+### Frontend
+
+1. **The board** (`ShelvesPage.tsx`, rewritten). A responsive grid of `ShelfCard`s replaces the
+   `max-w-3xl` row list (finding 14). Each card: a `ShelfRail` (deliverable 2) — covers stood up
+   at one height in their own widths on a rule, scrolling with `scroll-snap-type: x proximity`,
+   `aria-hidden` and holding no focusable child (AC2) — the shared "No cover" placeholder when
+   members exist but none carry art, and neither when the shelf is empty (AC1); a magnitude bar
+   against the largest shelf shown; one chip per domain held, from `members_by_type` and the
+   domain registry's own labels (AC3).
+2. **`ShelfRail` is its own component, not a generalization of `CoverStack`** (decision surfaced
+   by the required-context note). `CoverStack` (`InsightsRanking.tsx`) is a fixed-size,
+   up-to-three overlapping stack built for a different question ("a hint of what's in this
+   group," beside a ranking row's text). A shelf's rail is unbounded, naturally sized per cover,
+   and the card's whole visual weight — bending `CoverStack` to also do that would have made
+   neither shape honest. Recorded here rather than only in the code, since the sprint's own
+   required-context section asked for the decision to be named.
+3. **Domain filter, sort, search** (deliverable 3-4). A `DomainStrip` limited to domains at least
+   one shelf actually holds (offering a domain with zero matches would be a filter that always
+   empties the board); choosing one re-counts every card to that domain's members via
+   `members_by_type` (AC4). Sort by size (default, ties broken by name), name, or "recently
+   added" (the `updated_at` approximation above). A plain client-side search over shelf names —
+   the list is small enough that no backend change earns its keep here.
+4. **`/shelves/:slug`** (`ShelfPage.tsx`, new route). Shows the shelf's own entries **across every
+   domain it holds by default** (AC6) — `types: []` on the same `getLibraryPage` the library
+   itself calls, which already means "every domain" (DEC-065's own contract, unchanged). A
+   `DomainStrip` offering "Everything" plus only the domains this shelf holds narrows it. The
+   count at `text-3xl` (the library's own scale), a status breakdown bar and a format-mix line
+   both read `facets.status_counts`/`format_counts` off the same response — already narrowed by
+   shelf, no new backend query, per deliverable 5's "no backend change for the rest of it." The
+   mean score chip is computed from currently-loaded entries only (a client-side approximation
+   for a shelf larger than one page — no server aggregate exists for it, and none was in scope).
+   Rename and delete moved here from the index (finding 15), keeping their existing confirmation.
+   The entries themselves render through the same `VirtualLibrary` grid the library uses.
+5. **Pinning** (deliverable 6). `readPinnedShelf`/`writePinnedShelf` (`library.ts`), the same
+   shape and `localStorage` pattern as the remembered domain. A "Pin to library" toggle on the
+   shelf page; a chip in the library's command bar (📌 name, applies the shelf filter in one
+   press, plus a separate un-pin control — never nested inside the same button, which would be
+   invalid, ambiguous markup) reads it back. Its absence is not an error (AC9).
+6. **The count and the click agree** (deliverable 7 / AC7), verified directly in the walkthrough
+   below rather than assumed: a card's own number and the total the shelf's own page shows for
+   the same shelf were read from the same `entry_count`/`total` fields, both ultimately backed by
+   the one `entry_shelves` join.
+
+### Acceptance criteria
+
+1. Rail / placeholder / "Empty" — held (`ShelvesPage.test.tsx`).
+2. Rail has no focusable child, is `aria-hidden`, the card is the one link — held
+   (`ShelvesPage.test.tsx`, `library.spec.ts`'s board test counts focusable elements inside the
+   rail directly).
+3. Chips sum to the total, one chip for a single-domain shelf — held (`ShelvesPage.test.tsx`);
+   structurally guaranteed by the backend `GROUP BY`, not just asserted.
+4. Domain filter narrows and re-counts — held (`ShelvesPage.test.tsx`).
+5. Sort by size/name, active control and shown order agree — held (`ShelvesPage.test.tsx`); the
+   "recently added" order is asserted as an order, not as a claim about timing accuracy it cannot
+   make (see the `updated_at` approximation above).
+6. `/shelves/:slug` spans every domain by default; the strip offers only those present — held
+   (`ShelfPage.test.tsx`, `library.spec.ts`, `accessibility.spec.ts`).
+7. Card count equals the page's own count — held (`ShelfPage.test.tsx`'s mixed-shelf test; the
+   walkthrough's live "4" on both the board card and the shelf page for the same real shelf).
+8. Rename/delete from the shelf page, existing confirmation, entries retained on delete — held
+   (`ShelfPage.test.tsx`).
+9. Pin/unpin, one-press apply, survives reload, absence is not an error — held
+   (`HomePage.test.tsx`'s pin test, `library.test.ts`'s `readPinnedShelf`/`writePinnedShelf` tests).
+10. 390px, no horizontal body scroll (the rail's own scroll is not body scroll), 44px targets,
+    zero serious axe violations on both screens — held (`library.spec.ts`'s two 390px tests,
+    `accessibility.spec.ts`'s two new axe tests).
+11. `GET /api/shelves` stays inside budget with the grouped count added — held. Measured at 5,000
+    entries / 100 contended jobs: `shelves list (13 shelves, covers)` p95 9.4ms idle → 11.6ms
+    contended (was 7.6-8.1ms before this sprint's own query addition, per Sprint 072's own
+    measurement) — a small, expected increase from one more `GROUP BY`, nowhere near the 500ms
+    budget. `VERDICT: every scenario is within budget.`
+12. Existing suites pass unchanged except where a test asserts findings 14-19 — held. Three specs
+    needed updating, all because rename/delete moved off the index (finding 15) exactly as
+    deliverable 5 specifies, not because of an unrelated regression:
+    - `editorial.spec.ts`'s "shelf management creates, renames, and deletes shelves" now opens
+      the created shelf's own page before renaming/deleting it.
+    - `feedback.spec.ts`'s "renaming a shelf confirms on the toast surface" (both viewport
+      variants) navigates directly to the shelf page rather than clicking a "Rename" button that
+      no longer exists on the index row.
+    - Neither test's *assertion* changed (a toast still confirms; a confirmed delete still
+      retains entries) — only how each reaches the control that used to live on the index.
+
+### Verification
+
+- `make check`, backend `pytest -q` (1364 passed), frontend `vitest run` (305 passed) — green.
+- `python scripts/export_openapi.py` regenerated for `members_by_type`/`updated_at`;
+  `npm run api:check` — green.
+- `npx playwright test` — 128 passed, 2 skipped, 0 failed on the clean run.
+- `python scripts/benchmark_library.py --entries 5000 --jobs 100` before and after — numbers
+  above; every scenario within budget.
+- Walkthrough (DEC-025): a throwaway backend (`scripts/walkthrough.py`), seeded via the real API.
+  Built a shelf holding two domains (2 books, 2 albums) — the case the owner's own library never
+  has and the whole reason findings 18/19 exist — plus an 8-book shelf, an empty shelf, and a
+  shelf with one covered and one uncovered member. Confirmed live: the two-domain shelf's board
+  card and its own page both read `4`; filtering that page to Book showed exactly 2 entries;
+  clearing the filter restored all 4; pinning it and returning to the library surfaced the chip,
+  and one click applied the shelf as a filter, narrowing "2 of 10" for the currently-selected
+  domain; no horizontal overflow at 390px on either the board or the shelf page; zero console or
+  page errors throughout. Real cover art came from OpenLibrary for one entry (rate-limited by the
+  provider after a handful of requests, consistent with `docs/sprints/062-providers-under-strain.md`'s
+  own findings about this provider under a burst of calls) — the single-cover case was verified
+  live; a full ten-cover rail's scrolling behaviour was verified instead by `library.spec.ts`'s
+  own e2e test (real overflow measurement, not merely rendered) rather than by a live rail this
+  session could not fill with real art in the time available. Recorded rather than glossed over,
+  per the walkthrough gate's own rule.
+
+### Deviations, named rather than left for a reader to notice
+
+- `textHeight`-style honesty: `updated_at` answers "recently added to" with the shelf's own
+  timestamp, not a true last-member-addition time. See deliverable 1 above and DEC-144.
+- The shelf page's mean score chip is a client-side mean over loaded entries, not a server
+  aggregate — accurate for any shelf that fits on one page (all of this sprint's test shelves do),
+  approximate beyond it. No acceptance criterion graded it and no backend addition was owed here
+  beyond deliverable 1, so it was not built as one.
+- `ShelfRail` was built as a new component rather than a generalized `CoverStack`, per the
+  required-context section's own instruction to decide and say which.

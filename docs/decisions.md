@@ -5734,3 +5734,58 @@ both changes, against 1 of 3 before the second.
   `ScoreDistributionCard`, which also spans twelve columns, stretches its ten score bars the same
   way the chronology strip did. It was outside both of the owner's reports and is left alone,
   named here so the next session that touches Insights can decide about it deliberately.
+
+## DEC-144 — Sprint 074 closes: the plan is complete again
+
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Cross-references:** DEC-139 (accepted the proposal Sprint 074 finishes), DEC-065 (the shelf
+  page's cross-domain span, the second screen under that precedent alongside `/triage` and the
+  export), DEC-134 (the covers join this sprint's members-by-type grouping copies the shape of).
+- **Context:** [`074-a-shelf-is-a-place.md`](sprints/074-a-shelf-is-a-place.md) redrew the shelves
+  index as a board of cover-rail cards with a domain filter, sort and search; gave every shelf its
+  own page spanning every domain it holds; moved rename and delete there off the index; and added
+  pinning a shelf into the library's command bar. One backend addition: members grouped by item
+  type on the shelves response.
+- **Decision:** accepted as built, with two points worth recording rather than letting the sprint
+  Outcome carry alone.
+  - **`ShelfRail` is a new component, not a generalized `CoverStack`.** The required-context
+    section asked for this decision to be made and named. `CoverStack` is a fixed-size,
+    up-to-three overlapping stack built for a different question; a shelf's rail is unbounded,
+    naturally sized, and the card's own visual weight. Bending one shape to serve both would have
+    made neither honest — the same reasoning DEC-141 already applied to the hero/hero-summary
+    split.
+  - **"Recently added to" reads the shelf's own `updated_at`, not a true last-member-addition
+    time.** `entry_shelves` carries no timestamp of its own; adding one is a new column and a
+    migration, which deliverable 1 named as the sprint's *only* backend change. The chosen
+    approximation is named in the code, the Outcome, and here, rather than left for a future
+    session to discover by reading the query.
+  - **Rename and delete moving off the index broke three existing e2e assertions**
+    (`editorial.spec.ts`, `feedback.spec.ts` twice) — exactly finding 15's own fix, not a
+    regression. Each was updated to reach the control on the shelf's own page; no assertion's
+    *meaning* changed (a toast still confirms, a delete still retains entries), only the path to
+    reach it.
+- **This is the final planned sprint.** `FINAL_SPRINT` in `scripts/validate_project.py` is 74, and
+  DEC-139 is the last extension of the plan on record. `docs/agent/state.json` moves to
+  `project_status: "complete"`, `active_sprint`/`active_sprint_file`/`active_sprint_status` to
+  `null`, `last_completed_sprint` to `074`, per `docs/agent/WORKFLOW.md`'s final-sprint rule.
+  `docs/sprints/ROADMAP.md`'s own banner is updated to say so. Nothing is tagged, published,
+  deployed or pushed — none of that was asked for, and the rule stands regardless.
+- **Verified:** `make check`; backend `pytest -q` (1364 passed); frontend `vitest run` (305
+  passed); the full Playwright suite (128 passed, 2 skipped, 0 failed on the clean run).
+  `python scripts/benchmark_library.py --entries 5000 --jobs 100` measured the shelves-list
+  scenario before and after the grouped-count addition (9.4ms → 11.6ms p95 contended, both far
+  inside the 500ms budget). A DEC-025 walkthrough against a throwaway seeded backend built a
+  two-domain shelf (books and albums together — the case the owner's own library has never had)
+  and confirmed live: the board card's count and the shelf page's own count agreed (AC7);
+  filtering the shelf page to one domain and clearing it both worked; pinning the shelf and
+  applying it from the library bar took one press; no horizontal overflow at 390px on either
+  screen. Real cover art for the rail came from a live provider for one entry before the provider
+  rate-limited further requests (consistent with `062-providers-under-strain.md`'s own findings);
+  the ten-cover scrolling case is proven instead by `library.spec.ts`'s own e2e measurement,
+  recorded honestly rather than presented as something this session's live walkthrough covered.
+- **Consequences:** the project has no active sprint. `docs/agent/HANDOFF.md` is rewritten as a
+  release-state handoff: what v1 plus the three readability sprints delivered, what remains
+  known-degraded, and what is still owed to the owner outside the numbered plan (the DEC-025
+  walkthrough against the owner's own real library, the two release tags, DEC-133's open product
+  question). A new numbered sprint begins only when the owner asks for one.

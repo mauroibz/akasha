@@ -4835,3 +4835,76 @@ reports; recorded in DEC-143 so the next Insights sprint decides about it on pur
 State unchanged: still `074` `ready`, not started. Nothing is owed ahead of it.
 
 Next: Sprint 074 ("A shelf is a place") at `AGENTS.md` §1.
+
+## 2026-09-06 — Sprint 074 implemented and closed: the plan is complete
+
+Full TDD implementation in one session, the final planned sprint (`FINAL_SPRINT` 74).
+
+Backend: `LibraryService._shelf_members_by_type()` (a `GROUP BY (shelf_id, item type)`, the
+facets block's own shape, keyed by shelf) wired into `list_shelves()`; `ShelfResponse` gained
+`members_by_type` (empty `{}` for an empty shelf, not a missing key) and `updated_at` (exposing an
+existing column, named as the nearest available signal for "recently added to" since
+`entry_shelves` carries no timestamp of its own). Tests first: `test_library_queries.py` (a mixed
+shelf's grouping, an empty shelf's `{}`), `test_library_api.py` (the schema over HTTP, a mixed
+shelf's `entry_count` agreeing with the sum of `members_by_type`). Both green immediately.
+
+Frontend, new: `ShelfRail.tsx` (the cover rail — deliberately not a generalized `CoverStack`, a
+decision the sprint's own required-context section asked to be made and named), `ShelfCard.tsx`
+(the board card: rail, magnitude bar, one chip per domain), `ShelfPage.tsx` (the new
+`/shelves/:slug` route — count, status breakdown, format mix, a client-mean score chip, a
+domain strip defaulting to "Everything," the entries rendered through the same `VirtualLibrary`
+the library uses, rename/delete moved here from the index with their existing confirmation, a
+pin/unpin toggle). Rewritten: `ShelvesPage.tsx` (the board: domain filter limited to domains at
+least one shelf holds, sort by size/name/recently-added, a client-side name search).
+`library.ts` gained `readPinnedShelf`/`writePinnedShelf`, the same shape as the remembered domain.
+`HomePage.tsx` gained the pinned-shelf chip in the command bar — deliberately two adjacent
+buttons (apply / unpin), not one button with a nested interactive child, which is invalid markup
+and would have broken the accessibility tree.
+
+Found and fixed during implementation, not left for the gate to catch: `ShelfRail`'s image `key`
+was a bare cover URL, which warned React (and would have failed the console-error-gated e2e
+suite) the moment a test built a rail from repeated placeholder URLs — real URLs are always
+unique in production, but nothing in the component should have assumed it. Fixed to `${src}-${index}`.
+
+Full unit run: backend 1364, frontend 305 (up from 291 — 14 net new: `library.test.ts`'s pinned-
+shelf suite, `ShelvesPage.test.tsx` and `ShelfPage.test.tsx` largely rewritten around the new
+board/page split, one `HomePage.test.tsx` pin test). `make check` green throughout.
+
+Full Playwright surfaced three real failures on the first run, all in `editorial.spec.ts` and
+`feedback.spec.ts` (twice) — rename/delete no longer reachable from the index row, exactly
+finding 15's own fix, not a regression. Each updated to reach the shelf's own page first; no
+assertion's meaning changed. New e2e coverage: `library.spec.ts` (the board's rail scrolling
+without body scroll, no focusable child in the rail, a shelf page across two domains, both at
+390px), `accessibility.spec.ts` (the board with a rail and chips, the shelf page — zero serious
+violations on both, first try).
+
+`scripts/benchmark_library.py --entries 5000 --jobs 100`: `shelves list (13 shelves, covers)` p95
+9.4ms idle / 11.6ms contended (was 7.6-8.1ms before this sprint's own query addition) — a small,
+expected cost for one more `GROUP BY`, nowhere near the 500ms budget. `VERDICT: every scenario is
+within budget.`
+
+Walkthrough (DEC-025): a throwaway seeded backend (`scripts/walkthrough.py`), built via the real
+API: a two-domain shelf (2 books, 2 albums — the case the owner's own library has never had), an
+8-book shelf, an empty shelf, and a shelf with one covered and one uncovered member. Confirmed
+live: the two-domain shelf's board card and its own page both read `4` (AC7); filtering that page
+to Book showed exactly 2, clearing restored 4; pinning it and returning to the library surfaced
+the chip and one click applied it, narrowing "2 of 10" for the selected domain; zero horizontal
+overflow at 390px on either screen; zero console/page errors. A live OpenLibrary search supplied
+one real cover before the provider rate-limited further requests (matches
+`062-providers-under-strain.md`'s own findings about bursts against it) — the single-cover case
+was verified live; the ten-cover scrolling case is proven by `library.spec.ts`'s own e2e
+measurement instead, named honestly rather than folded into what the live walkthrough covered.
+
+Reconciled: Sprint 074's own Outcome (every deliverable, every acceptance criterion, the three
+e2e tests changed and why, the benchmark numbers, the walkthrough), DEC-144 (the sprint's closure
+and the two decisions worth naming beyond the Outcome), `docs/sprints/ROADMAP.md`'s top banner
+(stale since revision 38, now correctly says 001-074 complete at revision 39).
+
+**This was the final planned sprint.** `docs/agent/state.json` moves to `project_status:
+"complete"`, `active_sprint`/`active_sprint_file`/`active_sprint_status` to `null`,
+`last_completed_sprint` to `074`, per `WORKFLOW.md`'s final-sprint rule. `docs/agent/HANDOFF.md`
+is rewritten as a release-state handoff rather than a pointer to a next sprint. Nothing tagged,
+published, deployed or pushed — not asked for.
+
+Next: nothing numbered. A new sprint begins only when the owner asks for one; `HANDOFF.md` lists
+what remains owed outside the plan.

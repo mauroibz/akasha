@@ -1,11 +1,13 @@
 # Implementation Roadmap
 
-**Plan revision:** 38
+**Plan revision:** 39
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none. Every planned v1 sprint (001–071) is complete; `docs/agent/state.json`
-reads `project_status: "complete"`. See [071 — What the numbers say](071-what-the-numbers-say.md)'s
-own Outcome for the closing sprint's detail and `docs/agent/HANDOFF.md` for what remains owed to the
-owner outside the numbered plan.
+**Active sprint:** none. Every planned sprint (001–074) is complete; `docs/agent/state.json` reads
+`project_status: "complete"`. Sprint 071 closed the original v1 plan; the owner's 2026-09-05
+readability feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section
+below. See [074 — A shelf is a place](074-a-shelf-is-a-place.md)'s own Outcome for the closing
+sprint's detail and `docs/agent/HANDOFF.md` for what remains owed to the owner outside the
+numbered plan.
 
 ## Shape of the plan
 
