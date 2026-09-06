@@ -4654,3 +4654,74 @@ Next: Sprint 073 ("Insights with a shape") — the leading key becomes a hero wi
 superlatives, Decade/Year become one card at two grains in time order, the score distribution is
 drawn, and the long tail becomes a card instead of a footnote. One read-only endpoint (per-score
 counts) is the only backend change.
+
+## 2026-09-06 — Sprint 073 implemented and closed in one session
+
+Full TDD implementation, immediately following Sprint 072's closure in the same session.
+
+Backend: `LibraryService.score_distribution()` (a `GROUP BY score` over `_filtered_entries`,
+the same shape `rank()` and the facets block already use) and `GET /api/insights/scores`, typed
+`type: ItemTypeName` so an unknown domain 422s the same way `/api/insights` does. Tests written
+first: `test_library_queries.py` (counts, unrated tail, each of the four filters plus type
+narrowing it independently) and `test_insights_api.py` (schema, 422 on unknown type, 422 on an
+invalid status filter). Both green on first implementation.
+
+Frontend, in deliverable order: the hero (`InsightsCard`'s new `hero` prop, reusing
+`SuperlativeStrip` instead of a page-level section), the Decade/Year rollup
+(`labels.ts`'s `InsightKeyOption.grain`, `insights.ts`'s `resolveAnsweredKeys`,
+`ChronologyCard.tsx`), the chronology strip (`insights.ts`'s `chronologyBuckets`,
+`ChronologyStrip.tsx`), the score distribution (`ScoreDistributionCard.tsx`,
+`useScoreDistribution.ts`), the asymmetric grid (`insights.ts`'s `insightGridSpan`), the long
+tail as a card (`LongTailCard.tsx`). `insights.test.ts` grew from 25 to 28 tests for the new pure
+functions; `InsightsPage.test.tsx` grew from 14 to 19, four of the original fourteen updated for
+duplicate-text assertions the hero legitimately introduces (the same fact drawn twice — promoted
+and in the ordinary list — switched to `getAllByText`) and one for the merged card / long-tail
+card replacing the old footnote. Full unit run: backend 1361, frontend 291, both green.
+`make check` green throughout.
+
+Full Playwright run surfaced nothing new the first time (124 passed) after two existing insights
+fixtures (`insights.spec.ts`, `accessibility.spec.ts`) were taught to stub the new
+`/api/insights/scores` route (registered after the broader `/api/insights` route so Playwright's
+most-recently-registered-wins rule matches it) and a pre-existing decade-row fixture bug was
+fixed (`key` must be the plain decade number `chronologyBuckets` parses, not the `"…s"` label).
+`insights.spec.ts`'s phone-fit test now also exercises the grain toggle and re-checks 390px
+overflow after it, per the sprint's own required-tests table.
+
+`scripts/benchmark_library.py --entries 5000 --jobs 100`: the new `insights scores` scenario
+measured p50 2.7ms / p95 2.8ms / max 2.9ms contended — negligible. Existing insights scenarios
+re-measured alongside it, no regression (`creators/count` p95 299.2ms, `publisher/count` p95
+372.7ms). `VERDICT: every scenario is within budget.`
+
+**Walkthrough found two real defects, fixed in-session (DEC-141):**
+
+1. A throwaway seeded backend (`scripts/walkthrough.py`, 20 books via the real API, 12 creators,
+   seven decades 1951-2019, full 1-10 score range plus two unrated) put *Decade* in the lead
+   rather than Creators — every fixture and unit test built during implementation happened to
+   keep a metadata field leading, so `ChronologyCard` had no hero mode at all, and the hero
+   rendered with zero superlatives. This is exactly the class of defect DEC-025's walkthrough
+   gate exists to catch. Fixed: `ChronologyCard` gained the same `hero` prop `InsightsCard` has.
+2. At 390px, the three superlative tiles in one row truncated "2000s" to "2..." and wrapped
+   titles mid-word. Fixed: `SuperlativeStrip` stacks one tile per row below `sm`, and switched
+   its tile background to `bg-surface-raised` for contrast against the card.
+
+Re-verified both fixes with a second walkthrough render (screenshots) and the full unit/e2e
+suites rerun clean afterward: `make check`, backend 1361 + frontend 291, Playwright 124
+passed/0 failed (one interim run's "degraded provider notice" axe failure reproduced as the
+known pre-existing parallel-load timing sample on an unrelated file — 2/2 green in isolation both
+times it was checked, not a regression, not weakened).
+
+Reconciled: Sprint 073's Outcome (delivered work, all 10 acceptance criteria, every test named
+that changed with what it was asserting, the two walkthrough-found-and-fixed defects, benchmark
+numbers), DEC-141 (the rollup-declaration decision and the hero-generalization fix), state.json
+(`073` completed, `074` active and `ready`), Sprint 074's file (`planned` → `ready`). No
+known-degraded item added — both walkthrough findings were fixed before closure.
+
+Next: Sprint 074 ("A shelf is a place") — the shelves index becomes a board of cover-rail cards,
+a domain filter, a shelf page spanning every domain it holds, sort/search, pinning a shelf into
+the library's command bar. One backend addition: members-per-item-type on the shelves response.
+**Before starting 074's own implementation**, the owner has asked for a follow-up pass on Sprint
+072's library card: the covers don't match the accepted mockup closely enough, there is still
+wasted space, and the total/status readout reads centered and hard to parse at a glance. That
+work is out-of-band from the sprint sequence (072 is closed) and will be recorded as its own
+decision when done, the same way DEC-138 recorded an owner-directed fix to an already-closed
+sprint's finding.

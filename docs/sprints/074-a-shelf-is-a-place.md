@@ -1,6 +1,6 @@
 # Sprint 074 — A shelf is a place
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 073
 **Roadmap revision:** 39
 

@@ -5561,3 +5561,44 @@ both changes, against 1 of 3 before the second.
   primitives it already shared. The stale facet-label defect above is carried forward in
   `docs/agent/HANDOFF.md`'s known-degraded list until a sprint that touches the status facet query
   picks it up.
+
+## DEC-141 — Sprint 073 closes: the rollup declared in `labels.ts`, the hero taught to a second card type mid-walkthrough
+
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Cross-references:** DEC-139 (accepted the proposal this sprint builds the second third of),
+  DEC-131 (the insights query budget this sprint's one new endpoint is measured against), DEC-132
+  (the leading-key-alone rule for superlatives, unchanged), DEC-134 (the covers join the hero's
+  promoted row reuses).
+- **Context:** [`073-insights-with-a-shape.md`](sprints/073-insights-with-a-shape.md) redrew
+  Insights around one hero panel, a Decade/Year card with a grain toggle, a client-derived
+  chronology strip, a new score-distribution band, an asymmetric grid, and the long tail as
+  clickable cards instead of a footnote. One backend addition: `GET /api/insights/scores`.
+- **Decision:** accepted as built, with two points worth recording rather than letting the sprint
+  Outcome carry alone.
+  - **The rollup declaration lives on `InsightKeyOption` in `labels.ts`, not on the domain's field
+    spec.** The sprint's own risk section named the domain's field spec as "the obvious
+    candidate" and asked for a decision rather than a hard-coded pair. `year`/`decade` are not
+    `FieldSpec`s at all — they read `items.year` directly, declared client-side in
+    `builtinInsightKeys` since Sprint 065 — so extending the *backend* domain contract for a
+    purely client-side presentation grouping would have added a schema concept with no
+    consumer but this one page. `InsightKeyOption.grain` is general in the sense the sprint
+    asked for (any future key naming another as its finer grain joins the same way,
+    `resolveAnsweredKeys` does not know it is Decade/Year specifically) without asking the
+    backend to model a UI-only fact.
+  - **The hero's promoted row belongs to whichever card leads, not to a specific card shape.**
+    Every fixture and unit test built during implementation had a metadata field (Authors) in
+    the lead, so `ChronologyCard` was built without a hero mode and the gap was invisible until
+    the DEC-025 walkthrough ran against a real library, where Decade's own concentration (seven
+    decades, a clear leader) beat every metadata field's. The hero rendered with no superlatives
+    at all in that run — exactly the class of defect the walkthrough gate exists to catch,
+    because no fixture had ever put a rollup key in the lead. Fixed in the same session:
+    `ChronologyCard` gained the identical `hero` prop `InsightsCard` has, computed from the
+    decade ranking's own rows regardless of which grain is currently displayed. A second,
+    smaller finding from the same walkthrough — three superlative tiles squeezed into one row
+    truncated at 390px — was fixed alongside it (`SuperlativeStrip` stacks below `sm`).
+- **Consequences:** `docs/agent/state.json` advances `last_completed_sprint` to `073` and
+  `active_sprint` to `074` (`ready`, not started); `completed_sprints` gains `073`. Sprint 074
+  ("A shelf is a place") depends on nothing this sprint changed. No known-degraded item is added
+  to `docs/agent/HANDOFF.md` by this sprint — the hero and truncation gaps above were fixed before
+  closure, not deferred.

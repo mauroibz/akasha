@@ -3,10 +3,10 @@
   "plan_revision": 39,
   "project_status": "ready",
   "started_at": "",
-  "active_sprint": "073",
-  "active_sprint_file": "docs/sprints/073-insights-with-a-shape.md",
+  "active_sprint": "074",
+  "active_sprint_file": "docs/sprints/074-a-shelf-is-a-place.md",
   "active_sprint_status": "ready",
-  "last_completed_sprint": "072",
+  "last_completed_sprint": "073",
   "completed_sprints": [
     "001",
     "002",
@@ -79,7 +79,8 @@
     "069",
     "070",
     "071",
-    "072"
+    "072",
+    "073"
   ],
-  "updated_at": "2026-09-06T11:35:00-03:00"
+  "updated_at": "2026-09-06T12:25:00-03:00"
 }
