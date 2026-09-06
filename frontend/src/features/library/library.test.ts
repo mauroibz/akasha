@@ -12,10 +12,13 @@ import {
   libraryFiltersPreferenceKey,
   libraryMotionKey,
   mergeUniqueEntries,
+  pinnedShelfKey,
   readLibraryFiltersPreference,
+  readPinnedShelf,
   readViewPreference,
   rememberLibraryFilters,
   tableRowHeight,
+  writePinnedShelf,
 } from "./library";
 
 const entry = (id: number) => ({ id }) as LibraryEntry;
@@ -218,5 +221,34 @@ describe("the remembered library filters (Sprint 067)", () => {
         query: "",
       }),
     ).toBe(true);
+  });
+});
+
+describe("the pinned shelf (Sprint 074 deliverable 6)", () => {
+  it("is null until something pins one", () => {
+    localStorage.clear();
+    expect(readPinnedShelf()).toBeNull();
+  });
+
+  it("round-trips the slug and name that were pinned", () => {
+    localStorage.clear();
+    writePinnedShelf({ slug: "favorites", name: "Favorites" });
+    expect(readPinnedShelf()).toEqual({ slug: "favorites", name: "Favorites" });
+  });
+
+  it("unpins by writing null, and that removes the stored value entirely", () => {
+    localStorage.clear();
+    writePinnedShelf({ slug: "favorites", name: "Favorites" });
+    writePinnedShelf(null);
+    expect(readPinnedShelf()).toBeNull();
+    expect(localStorage.getItem(pinnedShelfKey)).toBeNull();
+  });
+
+  it("treats an unparsable or wrongly-shaped stored value as absent, not an error", () => {
+    localStorage.clear();
+    localStorage.setItem(pinnedShelfKey, "{not json");
+    expect(readPinnedShelf()).toBeNull();
+    localStorage.setItem(pinnedShelfKey, JSON.stringify({ slug: "only-slug" }));
+    expect(readPinnedShelf()).toBeNull();
   });
 });

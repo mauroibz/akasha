@@ -77,6 +77,42 @@ export function hasRememberedFilters(
   );
 }
 
+/** A shelf pinned into the library's command bar (Sprint 074 deliverable 6). */
+export const pinnedShelfKey = "akasha.library.pinnedShelf";
+
+export interface PinnedShelf {
+  slug: string;
+  /** Stored alongside the slug so the chip has a name to show without a
+   * second fetch, the same reason the remembered domain does not. */
+  name: string;
+}
+
+/** The pinned shelf, or `null` if none was ever pinned or the stored value
+ * cannot be parsed (a private window, a cleared store, a shape from an
+ * older version) -- its absence is not an error (AC9). */
+export function readPinnedShelf(): PinnedShelf | null {
+  const raw = localStorage.getItem(pinnedShelfKey);
+  if (!raw) return null;
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== "object" || parsed === null) return null;
+    const candidate = parsed as Partial<PinnedShelf>;
+    if (
+      typeof candidate.slug !== "string" ||
+      typeof candidate.name !== "string"
+    )
+      return null;
+    return { slug: candidate.slug, name: candidate.name };
+  } catch {
+    return null;
+  }
+}
+
+export function writePinnedShelf(shelf: PinnedShelf | null): void {
+  if (shelf) localStorage.setItem(pinnedShelfKey, JSON.stringify(shelf));
+  else localStorage.removeItem(pinnedShelfKey);
+}
+
 export const defaultLibraryFilters: LibraryFilters = {
   statuses: [],
   shelves: [],

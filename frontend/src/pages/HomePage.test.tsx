@@ -668,6 +668,42 @@ test("nothing remembered lands on the first declared domain, and there is no way
   expect(libraryUrls.every((url) => url.includes("type="))).toBe(true);
 });
 
+test("a pinned shelf reaches the library bar and applies in one press", async () => {
+  // Sprint 074 deliverable 6: pinning happens on the shelf's own page: this
+  // test only proves the library bar honours what `localStorage` already
+  // carries, the same shape the remembered domain uses.
+  localStorage.setItem(
+    "akasha.library.pinnedShelf",
+    JSON.stringify({ slug: "favorites", name: "Favorites" }),
+  );
+  const fetchMock = stubRegistry();
+  const user = userEvent.setup();
+  renderPage();
+  await screen.findByText("Rayuela");
+
+  const chip = screen.getByRole("button", { name: "📌 Favorites" });
+  expect(chip).toBeVisible();
+
+  await user.click(chip);
+
+  await waitFor(() => {
+    expect(
+      requestedUrls(fetchMock).some(
+        (url) =>
+          url.startsWith("/api/entries?") && url.includes("shelf=favorites"),
+      ),
+    ).toBe(true);
+  });
+  expect(chip).toHaveAttribute("aria-pressed", "true");
+
+  await user.click(screen.getByRole("button", { name: "Unpin Favorites" }));
+
+  expect(
+    screen.queryByRole("button", { name: "📌 Favorites" }),
+  ).not.toBeInTheDocument();
+  expect(localStorage.getItem("akasha.library.pinnedShelf")).toBeNull();
+});
+
 test("a stored empty preference resolves to the first declared domain", async () => {
   // Sprint 027 stored "" as the way of saying "All". That filter no longer
   // exists, and `readDomainPreference` also returns "" for a first-ever visit,

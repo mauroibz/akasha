@@ -67,10 +67,13 @@ import {
   libraryMotionKey,
   mergeUniqueEntries,
   readDomainPreference,
+  readPinnedShelf,
   readViewPreference,
   rememberLibraryFilters,
   viewPreferenceKey,
+  writePinnedShelf,
   type LibraryView,
+  type PinnedShelf,
 } from "@/features/library/library";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
@@ -123,6 +126,12 @@ export function HomePage() {
   useEffect(() => rememberLibraryFilters(filters), [filters]);
   const [search, setSearch] = useState(filters.query);
   const [view, setView] = useState<LibraryView>(readViewPreference);
+  // A shelf pinned from its own page (Sprint 074 deliverable 6) -- read once,
+  // the same shape as the remembered domain, so a pin made elsewhere shows up
+  // on the next visit without a second store between the two pages.
+  const [pinnedShelf, setPinnedShelf] = useState<PinnedShelf | null>(
+    readPinnedShelf,
+  );
   const [focusedId, setFocusedId] = useState<number | null>(null);
   const [highlightId, setHighlightId] = useState<number | null>(null);
   const [rollbackId, setRollbackId] = useState<number | null>(null);
@@ -798,6 +807,35 @@ export function HomePage() {
             </Popover>
           )}
           <div className="ml-auto flex items-center gap-3">
+            {pinnedShelf && (
+              <div className="flex min-h-11 items-center rounded-full border border-border">
+                <button
+                  type="button"
+                  className="flex min-h-11 items-center gap-2 rounded-l-full px-4 text-sm font-medium aria-pressed:text-primary"
+                  aria-pressed={filters.shelves.includes(pinnedShelf.slug)}
+                  onClick={() =>
+                    updateFilters({
+                      shelves: filters.shelves.includes(pinnedShelf.slug)
+                        ? filters.shelves.filter((s) => s !== pinnedShelf.slug)
+                        : [pinnedShelf.slug],
+                    })
+                  }
+                >
+                  📌 {pinnedShelf.name}
+                </button>
+                <button
+                  type="button"
+                  aria-label={`Unpin ${pinnedShelf.name}`}
+                  className="min-h-11 min-w-11 rounded-r-full px-3 text-muted-foreground hover:text-foreground focus-ring"
+                  onClick={() => {
+                    writePinnedShelf(null);
+                    setPinnedShelf(null);
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <Button
               variant="outline"
               className="min-h-11 rounded-full px-4 aria-pressed:border-primary aria-pressed:text-primary"
