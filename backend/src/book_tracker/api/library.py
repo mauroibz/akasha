@@ -248,6 +248,16 @@ class InsightResponse(BaseModel):
     rated_entries: int
 
 
+class ScoreDistributionResponse(BaseModel):
+    type: str
+    #: Index `i` is the count of entries scored `i + 1` (Sprint 073). A list rather
+    #: than a dict keyed by score, since JSON object keys are strings and "ten bars
+    #: in the ramp, in order" is what the client draws either way.
+    counts: list[int] = Field(min_length=10, max_length=10)
+    rated_count: int
+    unrated_count: int
+
+
 class AffectedResponse(BaseModel):
     affected: int
 
@@ -479,6 +489,31 @@ async def get_insights(
             formats=[item.value for item in format or []],
             limit=limit,
             after=after,
+        )
+    )
+
+
+@router.get(
+    "/insights/scores",
+    response_model=ScoreDistributionResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+async def get_score_distribution(
+    library: Library,
+    type: ItemTypeName,
+    status: Annotated[list[EntryStatus] | None, Query()] = None,
+    shelf: Annotated[list[str] | None, Query()] = None,
+    format: Annotated[list[EntryFormat] | None, Query()] = None,
+    q: str | None = None,
+) -> ScoreDistributionResponse:
+    """Per-score counts for one domain (Sprint 073 deliverable 4)."""
+    return ScoreDistributionResponse.model_validate(
+        library.score_distribution(
+            item_type=type.value,
+            statuses=[item.value for item in status] if status is not None else None,
+            shelves=shelf or [],
+            q=q,
+            formats=[item.value for item in format or []],
         )
     )
 

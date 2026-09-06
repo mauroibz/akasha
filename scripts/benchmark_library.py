@@ -347,6 +347,10 @@ def insights_scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[
         "insights     decade/count",
         lambda: service.rank(item_type="book", key="decade", metric="count", limit=50),
     )
+    yield (
+        "insights     scores (Sprint 073)",
+        lambda: service.score_distribution(item_type="book"),
+    )
 
 
 def shelves_scenarios(service: LibraryService) -> Iterator[tuple[str, Callable[[], object]]]:

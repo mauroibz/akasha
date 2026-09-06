@@ -1347,6 +1347,40 @@ class LibraryService:
             "covers": list(covers),
         }
 
+    def score_distribution(
+        self,
+        *,
+        item_type: str,
+        statuses: Sequence[str] | None = None,
+        shelves: Sequence[str] = (),
+        q: str | None = None,
+        formats: Sequence[str] = (),
+    ) -> dict[str, Any]:
+        """Per-score counts for one domain (Sprint 073), the one backend addition.
+
+        A `GROUP BY score` over the same `_filtered_entries` set `rank()` ranks and
+        the facets block already narrows by status — no new filtering logic, just a
+        different column grouped. `item_type` validity is enforced the same way
+        `rank()`'s is: the route's `ItemTypeName` type rejects an unknown domain
+        with a 422 before this ever runs, so nothing is re-checked here.
+        """
+        with Session(self.engine) as session:
+            base = self._filtered_entries(statuses, shelves, q, formats, [item_type]).subquery()
+            rows = session.execute(select(base.c.score, func.count()).group_by(base.c.score)).all()
+            counts = [0] * 10
+            unrated_count = 0
+            for score, count in rows:
+                if score is None:
+                    unrated_count = count
+                else:
+                    counts[score - 1] = count
+            return {
+                "type": item_type,
+                "counts": counts,
+                "rated_count": sum(counts),
+                "unrated_count": unrated_count,
+            }
+
     def _selection(
         self,
         session: Session,

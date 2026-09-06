@@ -2337,6 +2337,39 @@
         "title": "RefreshBody",
         "type": "object"
       },
+      "ScoreDistributionResponse": {
+        "properties": {
+          "counts": {
+            "items": {
+              "type": "integer"
+            },
+            "maxItems": 10,
+            "minItems": 10,
+            "title": "Counts",
+            "type": "array"
+          },
+          "rated_count": {
+            "title": "Rated Count",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "unrated_count": {
+            "title": "Unrated Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "counts",
+          "rated_count",
+          "unrated_count"
+        ],
+        "title": "ScoreDistributionResponse",
+        "type": "object"
+      },
       "SearchCandidateResponse": {
         "properties": {
           "cover_url": {
@@ -3980,6 +4013,118 @@
           }
         },
         "summary": "Get Insights"
+      }
+    },
+    "/api/insights/scores": {
+      "get": {
+        "description": "Per-score counts for one domain (Sprint 073 deliverable 4).",
+        "operationId": "get_score_distribution_api_insights_scores_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemTypeName"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shelf",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shelf"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryFormat"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScoreDistributionResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Score Distribution"
       }
     },
     "/api/item-types": {

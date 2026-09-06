@@ -328,6 +328,34 @@ export async function getInsights(params: {
   return (await response.json()) as Insight;
 }
 
+/** Per-score counts for one domain (Sprint 073), the score distribution band. */
+export interface ScoreDistribution {
+  type: string;
+  /** Index `i` is the count of entries scored `i + 1`. Always length 10. */
+  counts: number[];
+  rated_count: number;
+  unrated_count: number;
+}
+
+export async function getScoreDistribution(params: {
+  type: string;
+  statuses?: EntryStatus[];
+  shelves?: string[];
+  formats?: EntryFormat[];
+  q?: string;
+}): Promise<ScoreDistribution> {
+  const query = new URLSearchParams({ type: params.type });
+  params.statuses?.forEach((status) => query.append("status", status));
+  params.shelves?.forEach((shelf) => query.append("shelf", shelf));
+  params.formats?.forEach((format) => query.append("format", format));
+  if (params.q?.trim()) query.set("q", params.q.trim());
+  const response = await fetch(`/api/insights/scores?${query.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok) throw new Error("Insights could not be loaded");
+  return (await response.json()) as ScoreDistribution;
+}
+
 export async function patchEntry(
   entryId: number,
   changes: Partial<

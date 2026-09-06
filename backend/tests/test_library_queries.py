@@ -165,3 +165,86 @@ async def test_an_empty_shelf_returns_an_empty_covers_list(tmp_path: Path) -> No
         shelves = service.list_shelves()
         row = next(row for row in shelves if row["id"] == shelf["id"])
         assert row["covers"] == []
+
+
+# --------------------------------------------------------------------------------------
+# Sprint 073 deliverable 4: `score_distribution` — the one backend addition, a
+# `GROUP BY score` over the same filtered set `rank()` ranks.
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_score_distribution_counts_by_score_and_the_unrated_tail(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        service = LibraryService(app.state.engine)
+        eight_a = repository.create_or_get_entry(title="A", creators=["X"])
+        eight_b = repository.create_or_get_entry(title="B", creators=["X"])
+        three = repository.create_or_get_entry(title="C", creators=["X"])
+        unrated = repository.create_or_get_entry(title="D", creators=["X"])
+        service.update_entry(eight_a.entry_id, {"status": "read", "score": 8})
+        service.update_entry(eight_b.entry_id, {"status": "read", "score": 8})
+        service.update_entry(three.entry_id, {"status": "read", "score": 3})
+        service.update_entry(unrated.entry_id, {"status": "read"})
+
+        distribution = service.score_distribution(item_type="book")
+
+        assert len(distribution["counts"]) == 10
+        assert distribution["counts"][7] == 2  # index 7 == score 8
+        assert distribution["counts"][2] == 1  # index 2 == score 3
+        assert sum(distribution["counts"]) == 3
+        assert distribution["rated_count"] == 3
+        assert distribution["unrated_count"] == 1
+        assert distribution["type"] == "book"
+
+
+@pytest.mark.anyio
+async def test_score_distribution_honours_type_and_the_four_filters(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        service = LibraryService(app.state.engine)
+
+        book = repository.create_or_get_entry(
+            title="Rayuela", creators=["Julio Cortázar"], item_type="book"
+        )
+        album = repository.create_or_get_entry(
+            title="Discovery", creators=["Daft Punk"], item_type="album"
+        )
+        service.update_entry(book.entry_id, {"status": "read", "score": 9})
+        service.update_entry(album.entry_id, {"status": "owned", "score": 5})
+
+        # type: an album's score never reaches a book's distribution.
+        book_only = service.score_distribution(item_type="book")
+        assert book_only["counts"][8] == 1
+        assert sum(book_only["counts"]) == 1
+
+        # status
+        by_status = service.score_distribution(item_type="book", statuses=["reading"])
+        assert sum(by_status["counts"]) == 0
+
+        # shelf
+        shelf = service.create_shelf("Favorites")
+        by_shelf_absent = service.score_distribution(item_type="book", shelves=[shelf["slug"]])
+        assert sum(by_shelf_absent["counts"]) == 0
+        service.update_entry(book.entry_id, {"shelf_ids": [shelf["id"]]})
+        by_shelf_present = service.score_distribution(item_type="book", shelves=[shelf["slug"]])
+        assert sum(by_shelf_present["counts"]) == 1
+
+        # format
+        service.update_entry(book.entry_id, {"formats": ["physical"]})
+        by_format_absent = service.score_distribution(item_type="book", formats=["digital"])
+        assert sum(by_format_absent["counts"]) == 0
+        by_format_present = service.score_distribution(item_type="book", formats=["physical"])
+        assert sum(by_format_present["counts"]) == 1
+
+        # q
+        no_match = service.score_distribution(item_type="book", q="nonexistent")
+        assert sum(no_match["counts"]) == 0
+        match = service.score_distribution(item_type="book", q="rayuela")
+        assert sum(match["counts"]) == 1

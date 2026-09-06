@@ -275,3 +275,57 @@ async def test_an_invalid_status_filter_is_refused_as_entries_refuses_it(tmp_pat
         entries = await client.get("/api/entries", params={"status": "not-a-real-status"})
 
     assert insights.status_code == entries.status_code == 422
+
+
+# --------------------------------------------------------------------------------------
+# Sprint 073 deliverable 4: `GET /api/insights/scores` over HTTP.
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_score_distribution_schema_over_http(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        repository = DomainRepository(app.state.engine)
+        entry = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET status='read', score=9 WHERE id=:id"),
+                {"id": entry.entry_id},
+            )
+        response = await client.get("/api/insights/scores", params={"type": "book"})
+    assert response.status_code == 200
+    assert response.json() == {
+        "type": "book",
+        "counts": [0, 0, 0, 0, 0, 0, 0, 0, 1, 0],
+        "rated_count": 1,
+        "unrated_count": 0,
+    }
+
+
+@pytest.mark.anyio
+async def test_score_distribution_unknown_domain_type_is_a_422(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get("/api/insights/scores", params={"type": "boardgame"})
+    assert response.status_code == 422
+
+
+@pytest.mark.anyio
+async def test_score_distribution_invalid_status_filter_is_a_422(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get(
+            "/api/insights/scores",
+            params={"type": "book", "status": "not-a-real-status"},
+        )
+    assert response.status_code == 422
