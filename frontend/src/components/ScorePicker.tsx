@@ -108,7 +108,13 @@ export function ScorePicker({
         // (AC4): 44px tall with a numeral large enough to read from the room.
         // Listed after the compact clause so it wins on both chips it applies
         // to — the wall card is compact (overlay) *and* on the cover.
-        onCover && "h-11 min-h-11 min-w-11 px-2.5 text-lg",
+        onCover && "h-11 min-h-11 min-w-11 px-2.5 text-lg shadow-lg",
+        // An unscored chip has no ramp fill to sit on -- `scoreChipClass`
+        // gives it none at all, which reads fine on the app's own dark
+        // ground but disappears into a busy poster. On the cover it gets
+        // the same opaque backing the status pill needs for the same
+        // reason.
+        onCover && shown === null && "bg-surface",
       )}
       aria-expanded={editing}
       // The dashed border and the dot say "provisional" to someone who already

@@ -52,15 +52,18 @@ function EntryControls({
       className={
         onCover
           ? // Both controls always in the DOM and visible at rest (AC4 is not
-            // a hover contract). The opaque backing is the Sprint 071 lesson:
-            // colours on artwork blend into it — the translucent buttons need
-            // solid ground behind them, not a tint over the poster.
+            // a hover contract). Each carries its own opaque backing now
+            // (the Sprint 071 lesson: colours on artwork blend into it) --
+            // status at one edge of the cover, score at the other, rather
+            // than the two of them shrink-wrapped into one pill and
+            // centred, which read as small and left most of the cover's
+            // width unused (owner feedback after Sprint 072 shipped).
             //
             // `relative` is load-bearing: the score panel anchors to this
             // container (not to its own chip, which sits off-centre) so
             // the panel opens centred above the card — contained at every
             // width (AC9), within DEC-023 without changing the card box.
-            "relative flex h-[52px] items-center justify-center gap-2 rounded-full bg-surface p-1 shadow-lg"
+            "relative flex w-full items-end justify-between gap-2"
           : "flex h-11 shrink-0 items-center gap-2"
       }
     >
@@ -70,7 +73,15 @@ function EntryControls({
         label={`Status for ${entry.item.title}`}
         statuses={statusesFor(entry.item.type, itemTypes.data)}
         // Both densities keep the sprint's 44px target at 390px (AC4/AC10).
-        className="h-11 w-auto"
+        // On the cover, the trigger needs its own opaque ground -- the
+        // shared component defaults to a transparent one, which blended
+        // into artwork once the wrapping pill that used to backstop it
+        // was removed.
+        className={
+          onCover
+            ? "h-11 w-auto rounded-full border-border bg-surface shadow-lg"
+            : "h-11 w-auto"
+        }
       />
       <ScorePicker
         value={entry.score}
@@ -388,15 +399,16 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
             >
               <EntryMetadata entry={entry} grid />
             </button>
-            {/* The controls ride the bottom of the cover — the pile sits a
-                few pixels up from the poster's edge, on the scrim's opaque
-                backing rather than tinted into the artwork itself. z-10 keeps
-                it above the text block's button: its 52px footprint sits in
-                the cover region, and clicks there must hit the chip, not the
-                card. */}
+            {/* The controls ride the bottom of the cover, one at each edge
+                (EntryControls' own `justify-between`) rather than centred
+                as one pill — the full cover width is there to use, and a
+                pill hugging its own content in the middle wasted most of
+                it. z-10 keeps this above the text block's button: its
+                footprint sits in the cover region, and clicks there must
+                hit a control, not the card. */}
             <div
-              className="absolute inset-x-0 z-10 flex justify-center p-1.5"
-              style={{ top: gridLayout.coverHeight - 58 }}
+              className="absolute inset-x-0 z-10 px-2"
+              style={{ bottom: gridLayout.textHeight + 8 }}
             >
               <EntryControls
                 entry={entry}

@@ -1,16 +1,9 @@
-# Handoff — Sprint 073 closed; a library-card follow-up is owed before Sprint 074 starts
+# Handoff — Sprint 074 ready to start
 
 `docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "074"`,
 `active_sprint_file: "docs/sprints/074-a-shelf-is-a-place.md"`, `active_sprint_status: "ready"`,
-`last_completed_sprint: "073"`. Plan revision 39, unchanged.
-
-**Before Sprint 074's own implementation starts**, the owner asked for a follow-up pass on
-Sprint 072's library card: the covers do not match the accepted mockup closely enough, there is
-still wasted space, and the total/status readout reads centered and hard to parse at a glance.
-This is out-of-band from the sprint sequence — 072 is closed — and should land as its own small
-commit with a decision record, the same way DEC-138 recorded an owner-directed fix to an
-already-closed sprint's finding, before a session moves on to Sprint 074's actual deliverables.
-A session picking this up should do that pass first, then start Sprint 074 at `AGENTS.md` §1.
+`last_completed_sprint: "073"`. Plan revision 39, unchanged. A session picking this up starts at
+`AGENTS.md` §1 and executes Sprint 074 — nothing is owed ahead of it.
 
 ## What just happened
 
@@ -22,20 +15,21 @@ into one card with a client-side grain toggle (`labels.ts`'s new `InsightKeyOpti
 chronology strip (time-ordered decades, zero-count gaps kept), the score distribution band, an
 asymmetric 12-column grid, and the long tail drawn as clickable cards instead of a footnote.
 Full detail — every acceptance criterion, every test changed and why, the benchmark numbers — is
-in the sprint's own Outcome and DEC-141.
+in the sprint's own Outcome and DEC-141. Its own DEC-025 walkthrough found and fixed two real
+defects (a chronology-led hero rendering with no superlatives; truncated superlative tiles at
+390px) before closing — neither carried forward as known-degraded.
 
-**The DEC-025 walkthrough found two real defects, both fixed before closure:**
-
-1. In a real seeded library, *Decade* led rather than a metadata field — every fixture built
-   during implementation happened to keep a metadata field in the lead, so `ChronologyCard` had
-   no hero mode, and the hero rendered with zero superlatives when it was the leading key. Fixed:
-   `ChronologyCard` gained the same `hero` prop `InsightsCard` has.
-2. Three superlative tiles squeezed into one row at 390px truncated their labels. Fixed:
-   `SuperlativeStrip` stacks one tile per row below `sm`.
-
-Neither is carried forward as known-degraded — both were fixed in-session, and the fixes were
-re-verified with a second walkthrough render plus a full clean re-run of `make check`, `make
-test`, and `npx playwright test`.
+**Then, with both 072 and 073 closed**, the owner compared the shipped library card against the
+accepted design proposal's own mockup and reported wasted space and a centered, hard-to-read
+score/status readout. Reading the mockup's markup confirmed a specific bug: the wall card wrapped
+the status pill and score chip in one shared, centred pill instead of drawing them at opposite
+edges of the cover the way the mockup does. Fixed and recorded as **DEC-142**, landed as its own
+commit outside the sprint sequence (the same pattern DEC-138 used for a prior closed-sprint fix):
+`VirtualLibrary.tsx`'s `EntryControls` onCover branch now spans the cover's full width with
+`justify-between`, each control carrying its own opaque backing rather than sharing one. Verified
+with the full gate (`make check`, backend 1361, frontend 291, Playwright 124/0 failed) and a
+before/after screenshot walkthrough. DEC-023's score-picker containment contract is unchanged and
+was re-verified, not assumed.
 
 ## Known-degraded, deliberately not fixed (carried forward, still true)
 
@@ -55,8 +49,6 @@ test`, and `npx playwright test`.
 
 ## Still owed to the owner
 
-- **The library-card follow-up above** — the owner's own words: covers don't match the accepted
-  mockup, still-wasted space, a centered total/status readout that is hard to parse at a glance.
 - **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
   outstanding; needs the owner's own container.
 - Cutting the `v1.6.0` and/or `v1.7.0` release tag(s).
@@ -75,9 +67,9 @@ Unchanged at `1.7.0`.
 ## Private data and operational constraints
 
 Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has no auth and
-stays LAN-only; Calibre is opened read-only. This session's Sprint 073 walkthrough ran a
-throwaway backend (`scripts/walkthrough.py`) seeded via its own API with invented book data, torn
-down afterward — the owner's own instance was never touched.
+stays LAN-only; Calibre is opened read-only. This session's Sprint 073 walkthrough and the
+library-card fix's screenshot walkthrough both ran against throwaway/mocked fixtures — the
+owner's own instance was never touched.
 
 ## Sprint 074 in one paragraph
 

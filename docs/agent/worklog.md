@@ -4725,3 +4725,36 @@ wasted space, and the total/status readout reads centered and hard to parse at a
 work is out-of-band from the sprint sequence (072 is closed) and will be recorded as its own
 decision when done, the same way DEC-138 recorded an owner-directed fix to an already-closed
 sprint's finding.
+
+## 2026-09-06 — Library-card follow-up (DEC-142): the score/status pill stops being centred
+
+Read the owner's own accepted mockup artifact (the readability proposal's, not summarized from
+memory) and confirmed a specific bug: it draws the status pill and score chip at opposite corners
+of the cover (`justify-content: space-between`, each with its own opaque backing), while
+`VirtualLibrary.tsx`'s `EntryControls` onCover branch wrapped both in one `bg-surface rounded-full`
+pill inside a `justify-center` container, itself inside a second `justify-center` wrapper —
+double-centred, shrink-wrapped to its content, wasting most of the cover's width on both sides.
+
+Fixed: the onCover branch is now `w-full justify-between` (status at one edge, score at the
+other); `StatusSelect` gets an opaque `bg-surface` override for this case since its shared
+component defaults to `bg-transparent`; `ScorePicker`'s unscored state gets the same treatment
+since `scoreChipClass(null)` carries no fill. First attempt at the positioning wrapper used a bare
+`bottom-2`, which resolves against the whole card box (cover + text block), not the cover alone —
+`library.spec.ts`'s "grid cards keep controls on the cover and off the metadata" test caught the
+controls landing on top of the metadata text immediately. Fixed to `bottom: textHeight + 8`,
+anchored from the text block's own top edge; the test passed at all three widths after.
+
+Verified: `make check`; backend 1361 (untouched, frontend-only diff, run anyway); frontend 291;
+full Playwright 124 passed / 0 failed on the clean run (one interim run's "degraded provider
+notice" reproduced as the same known unrelated-file parallel-load flake already on record in
+DEC-140/141 — 2/2 green in isolation, not a regression). `library.spec.ts`'s score-picker
+containment test (DEC-023) passes unchanged, confirmed rather than assumed: the overlay panel
+anchors to the same `relative` container, which spans the full card width in both the old and new
+layout, so its centering math is unaffected by the edge-vs-centre change in its children.
+Before/after screenshots taken against seeded fixtures at 1440×900 and 390×844, discarded after
+review (not tracked; not needed once the fix was verified structurally). Recorded as DEC-142.
+
+State unchanged: still `074` `ready`, not started. This was the one thing owed ahead of it;
+nothing is now.
+
+Next: Sprint 074 ("A shelf is a place") at `AGENTS.md` §1.

@@ -5602,3 +5602,50 @@ both changes, against 1 of 3 before the second.
   ("A shelf is a place") depends on nothing this sprint changed. No known-degraded item is added
   to `docs/agent/HANDOFF.md` by this sprint — the hero and truncation gaps above were fixed before
   closure, not deferred.
+
+## DEC-142 — Sprint 072's wall card: the score and status stop being one centred pill, at the owner's direction
+
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Cross-references:** DEC-139 (accepted the wall card this fixes; its fixed-coverHeight
+  virtualization contract is unchanged here), DEC-023 (the score picker's in-card overlay
+  containment, re-verified rather than assumed), DEC-138 (the precedent for an owner-directed fix
+  to an already-closed sprint's finding, done outside the sprint sequence).
+- **Context:** after Sprint 072 and 073 both closed, the owner compared the shipped library card
+  against the accepted design proposal's own mockup and reported: *"the Main library page covers
+  do not look exactly as proposed in the original artifact... there is still a lot of wasted space
+  and the number and status are centered thus look ugly and are hard to read at a glance."*
+  Reading the mockup's own markup confirmed a specific, fixable divergence: it draws the score
+  chip and the status pill at opposite corners of the cover (`justify-content: space-between`,
+  each carrying its own opaque backing), while the shipped card wrapped both controls in one
+  `bg-surface rounded-full` pill centred under a `justify-center` on *two* nested containers —
+  the pill shrank to its content and sat in the middle of the cover, leaving most of its width
+  empty on both sides and making both controls read smaller and more cramped than the mockup drew
+  them.
+- **Decision:** fixed as reported, not treated as a new deviation needing a scope renegotiation —
+  the fix is presentation-only inside the wall card `EntryControls` already built for Sprint 072,
+  touches no acceptance criterion any sprint currently owns, and the mockup itself was the
+  original spec `docs/readability-proposal.md` was drawn from. `VirtualLibrary.tsx`'s onCover
+  branch now spans the cover's full width with `justify-between` (status at one edge, score at
+  the other) instead of a shared centred pill; each control gained its own opaque backing since
+  the shared pill's `bg-surface` no longer sits behind either one (`StatusSelect`'s own
+  `bg-transparent` default would otherwise blend into artwork, and `ScorePicker`'s unscored state
+  has no ramp fill to sit on). The positioning wrapper anchors from the text block's own top edge
+  (`bottom: textHeight + 8`) rather than a fixed pixel offset from the card's top, which is what
+  the first attempt at this fix got wrong: an unqualified `bottom-2` resolves against the whole
+  card box, not the cover alone, and put the controls on top of the metadata text until
+  `library.spec.ts`'s containment test caught it. DEC-023's contract is unchanged — the score
+  picker's overlay panel still anchors to the same `relative` container, which still spans the
+  card's full width in both the old and new layout, so its centering and containment hold exactly
+  as measured before (`library.spec.ts`'s "expanded score picker stays inside its card" test
+  passes unchanged, per that test's own requirement).
+- **Verified:** `make check`; full unit suites (backend 1361, frontend 291); the full Playwright
+  suite (124 passed, 0 failed on the clean run; one interim run's "degraded provider notice" axe
+  failure reproduced as the same known unrelated-file parallel-load timing sample recorded in
+  DEC-140/DEC-141, not a regression). A screenshot walkthrough against seeded fixtures at 1440×900
+  and 390×844 confirms the corrected layout: the status pill and score chip sit at opposite edges
+  of the cover, each legibly sized, with no more wasted centre gap.
+- **Consequences:** none to sprint sequencing — this lands as its own commit outside the active
+  sprint (074, not yet started), the same way DEC-138 recorded Sprint 071's fix to a Sprint
+  070-closed finding. No `docs/agent/HANDOFF.md` known-degraded entry is needed; the report is
+  resolved by this decision.
