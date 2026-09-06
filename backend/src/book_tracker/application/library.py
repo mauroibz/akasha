@@ -240,7 +240,17 @@ class LibraryService:
 
     @staticmethod
     def _shelf_dict(shelf: ShelfRow) -> dict[str, Any]:
-        return {"id": shelf.id, "name": shelf.name, "slug": shelf.slug}
+        return {
+            "id": shelf.id,
+            "name": shelf.name,
+            "slug": shelf.slug,
+            # Exposing an already-stored column, not a new computation (Sprint
+            # 074's "sort by recently added to" reads this) -- `entry_shelves`
+            # carries no timestamp of its own, so this is the shelf's own
+            # created/renamed time, not the last member's addition. The
+            # nearest honest signal without a new column and a migration.
+            "updated_at": shelf.updated_at,
+        }
 
     def _entry_dict(self, session: Session, entry: EntryRow) -> dict[str, Any]:
         item = self._item(session, entry.item_id)
@@ -586,14 +596,43 @@ class LibraryService:
                 .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
             ).all()
             covers_by_shelf = self._shelf_covers(session, [row[0].id for row in rows])
+            members_by_shelf = self._shelf_members_by_type(session, [row[0].id for row in rows])
             return [
                 {
                     **self._shelf_dict(row[0]),
                     "entry_count": row[1],
                     "covers": covers_by_shelf.get(row[0].id, []),
+                    "members_by_type": members_by_shelf.get(row[0].id, {}),
                 }
                 for row in rows
             ]
+
+    @staticmethod
+    def _shelf_members_by_type(
+        session: Session, shelf_ids: Sequence[int]
+    ) -> dict[int, dict[str, int]]:
+        """Which domains a shelf holds, and how many of each (Sprint 074 deliverable 1).
+
+        `shelves` has no type column of its own — a shelf can hold any domain, and
+        nothing before this said which. The same `GROUP BY` shape the facets block
+        already builds for the whole library (`:875-950`), keyed by shelf instead of
+        by the whole result set. A shelf absent from the result (no members at all)
+        is simply absent from the returned mapping; the caller supplies `{}` for it.
+        """
+        if not shelf_ids:
+            return {}
+        rows = session.execute(
+            select(EntryShelfRow.shelf_id, ItemRow.type, func.count())
+            .select_from(EntryShelfRow)
+            .join(EntryRow, EntryRow.id == EntryShelfRow.entry_id)
+            .join(ItemRow, ItemRow.id == EntryRow.item_id)
+            .where(EntryShelfRow.shelf_id.in_(shelf_ids))
+            .group_by(EntryShelfRow.shelf_id, ItemRow.type)
+        ).all()
+        members: dict[int, dict[str, int]] = {}
+        for shelf_id, item_type, count in rows:
+            members.setdefault(shelf_id, {})[item_type] = count
+        return members
 
     @staticmethod
     def _shelf_covers(session: Session, shelf_ids: Sequence[int]) -> dict[int, list[str]]:

@@ -70,11 +70,19 @@ class ShelfResponse(BaseModel):
     id: int
     name: str
     slug: str
+    #: The shelf's own created/renamed time (Sprint 074) -- `entry_shelves` has
+    #: no timestamp of its own, so this is the nearest available signal for
+    #: "recently added to", not literally the last member's addition.
+    updated_at: str
     entry_count: int = 0
     #: Up to three cover URLs from the shelf's own members (Sprint 071), the same
     #: lateral top-3 join `InsightRowResponse.covers` already does (DEC-134). Empty
     #: when no member carries a cover, or when the shelf is empty.
     covers: list[str] = Field(default_factory=list)
+    #: Members grouped by item type (Sprint 074 deliverable 1) — the same `GROUP BY`
+    #: shape the facets block already builds for the whole library, keyed by shelf
+    #: instead. An empty shelf returns `{}` here, not a missing key.
+    members_by_type: dict[str, int] = Field(default_factory=dict)
 
 
 class SourceResponse(BaseModel):

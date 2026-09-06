@@ -248,3 +248,45 @@ async def test_score_distribution_honours_type_and_the_four_filters(
         assert sum(no_match["counts"]) == 0
         match = service.score_distribution(item_type="book", q="rayuela")
         assert sum(match["counts"]) == 1
+
+
+# --------------------------------------------------------------------------------------
+# Sprint 074 deliverable 1: `list_shelves` gains members grouped by item type -- the
+# one backend addition, a `GROUP BY` shaped like the facets block's own.
+# --------------------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_list_shelves_groups_members_by_item_type(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        service = LibraryService(app.state.engine)
+        shelf = service.create_shelf("Mixed")
+
+        book_a = repository.create_or_get_entry(title="Rayuela", creators=["Cortázar"])
+        book_b = repository.create_or_get_entry(title="Bestiario", creators=["Cortázar"])
+        album = repository.create_or_get_entry(
+            title="Discovery", creators=["Daft Punk"], item_type="album"
+        )
+        for entry in (book_a, book_b, album):
+            service.update_entry(entry.entry_id, {"shelf_ids": [shelf["id"]]})
+
+        shelves = service.list_shelves()
+        row = next(row for row in shelves if row["id"] == shelf["id"])
+        assert row["members_by_type"] == {"book": 2, "album": 1}
+        assert row["entry_count"] == 3
+
+
+@pytest.mark.anyio
+async def test_an_empty_shelf_returns_an_empty_grouping_not_a_missing_key(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        service = LibraryService(app.state.engine)
+        shelf = service.create_shelf("Empty")
+
+        shelves = service.list_shelves()
+        row = next(row for row in shelves if row["id"] == shelf["id"])
+        assert row["members_by_type"] == {}

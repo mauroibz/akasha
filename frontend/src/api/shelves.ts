@@ -2,10 +2,19 @@ import type { Shelf } from "./library";
 
 export interface ShelfWithCount extends Shelf {
   entry_count: number;
+  //: The shelf's own created/renamed time (Sprint 074) -- the nearest signal
+  //: for "recently added to" without a new `entry_shelves` timestamp column.
+  //: Optional for the same reason `covers` is: shelf-shaped values built
+  //: elsewhere (`AddForm`, `ShelfPicker`) never carry it.
+  updated_at?: string;
   //: Up to three cover URLs from the shelf's own members (Sprint 071).
   //: Optional: `AddForm` and `ShelfPicker` build shelf-shaped values of their
   //: own that never carry it, and `GET /api/shelves` always does.
   covers?: string[];
+  //: Members grouped by item type (Sprint 074), keyed by domain id. Optional
+  //: for the same reason `covers` is: `AddForm` and `ShelfPicker` build
+  //: shelf-shaped values that never carry it.
+  members_by_type?: Record<string, number>;
 }
 
 async function jsonOrThrow<T>(

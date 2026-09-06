@@ -164,6 +164,36 @@ async def test_get_shelves_carries_covers_in_its_schema(tmp_path: Path) -> None:
     assert row["covers"][0].startswith(f"/api/items/{created.item_id}/cover?v=")
 
 
+@pytest.mark.anyio
+async def test_get_shelves_carries_members_by_type_in_its_schema(tmp_path: Path) -> None:
+    """Sprint 074 deliverable 1: a mixed shelf's domains, over real HTTP."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        repository = DomainRepository(app.state.engine)
+        book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        album = repository.create_or_get_entry(
+            title="Discovery", creators=("Daft Punk",), item_type="album"
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            shelf = await client.post("/api/shelves", json={"name": "Mixed"})
+            shelf_id = shelf.json()["id"]
+            await client.patch(
+                f"/api/entries/{book.entry_id}",
+                json={"status": "read", "shelf_ids": [shelf_id]},
+            )
+            await client.patch(
+                f"/api/entries/{album.entry_id}",
+                json={"status": "owned", "shelf_ids": [shelf_id]},
+            )
+            shelves = await client.get("/api/shelves")
+    assert shelves.status_code == 200
+    row = shelves.json()[0]
+    assert row["members_by_type"] == {"book": 1, "album": 1}
+    assert row["entry_count"] == 2
+
+
 # --------------------------------------------------------------------------------------
 # Per-domain statuses and formats (seam 5b, DEC-057 and DEC-059)
 # --------------------------------------------------------------------------------------

@@ -2528,6 +2528,13 @@
             "title": "Id",
             "type": "integer"
           },
+          "members_by_type": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Members By Type",
+            "type": "object"
+          },
           "name": {
             "title": "Name",
             "type": "string"
@@ -2535,12 +2542,17 @@
           "slug": {
             "title": "Slug",
             "type": "string"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
           }
         },
         "required": [
           "id",
           "name",
-          "slug"
+          "slug",
+          "updated_at"
         ],
         "title": "ShelfResponse",
         "type": "object"
