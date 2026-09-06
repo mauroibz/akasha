@@ -99,11 +99,20 @@ test("the status filter offers the chosen domain's vocabulary, and only that dom
   await expect(page.getByRole("option", { name: /^Owned/ })).toHaveCount(0);
   await page.keyboard.press("Escape");
 
+  // The domain radio sits outside the popover, so Radix treats the click as
+  // an outside interaction and closes Filters -- reliably, but not
+  // synchronously with the click: `status` can still report visible for one
+  // more tick while its exit animation runs, which raced this reopen guard
+  // when it read `status.isVisible()` instead of the trigger's own state and
+  // clicked a node that was already on its way out of the DOM. The trigger's
+  // `data-state` is the one signal that settles deterministically.
   await page.getByRole("radio", { name: "Album" }).click();
-  if (!(await status.isVisible())) {
-    await page.getByRole("button", { name: /^Filters/ }).click();
-    status = page.getByRole("combobox", { name: "Filter by status" });
-  }
+  await expect(page.getByRole("button", { name: /^Filters/ })).toHaveAttribute(
+    "data-state",
+    "closed",
+  );
+  await page.getByRole("button", { name: /^Filters/ }).click();
+  status = page.getByRole("combobox", { name: "Filter by status" });
   await status.click();
   await expect(page.getByRole("option", { name: /^Owned/ })).toBeVisible();
   await expect(page.getByRole("option", { name: /^Read \d/ })).toHaveCount(0);

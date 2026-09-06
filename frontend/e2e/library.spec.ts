@@ -511,6 +511,7 @@ test("reduced motion reaches the animations no stylesheet can touch", async ({
   await seedLibrary(page);
   await page.goto("/");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+  await openFilters(page);
 
   // The `*` block in index.css cannot help here. Motion drives the Web
   // Animations API and inline styles, which no stylesheet overrides -- which is

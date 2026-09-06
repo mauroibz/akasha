@@ -195,6 +195,13 @@ test("library in table view has no serious accessibility violations", async ({
   const feed = page.getByRole("feed", { name: "Library" });
   await expect(feed).toBeVisible();
   const row = feed.locator("[data-entry-id]").first();
+  // The row's controls pop in at mount, so a bounding box read mid-pop
+  // reports a transiently smaller height (measured as low as 42.5px against
+  // the 44px target) even though the settled chip is exactly 44px. Wait for
+  // the row's own animations to finish rather than looser numbers.
+  await expect
+    .poll(() => page.evaluate(() => document.getAnimations().length))
+    .toBe(0);
   const status = row.getByRole("combobox", { name: /^Status for / });
   const score = row.getByRole("button", { name: /^Score for / });
   expect((await status.boundingBox())!.height).toBeGreaterThanOrEqual(44);
