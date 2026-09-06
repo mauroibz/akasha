@@ -92,8 +92,15 @@ export const defaultLibraryFilters: LibraryFilters = {
 
 const coverHeight = 300;
 // Sprint 072 (DEC-139): below the pinned cover, the text band is everything
-// — two-line title, creator, and one quiet line for year/formats.
-const textHeight = 112;
+// — two-line title, creator, and one quiet line carrying year *and* formats.
+//
+// The number is the content's own height, not a budget with slack in it:
+// 8 top padding + a two-line title at leading-5 (40) + the creator line
+// (2 + 16) + the year/formats line (2 + 16) + 8 bottom padding = 92. It was
+// 112 while the formats sat on a fourth line of their own, so every card
+// without formats — nearly all of them — carried 20px of nothing, painted a
+// lighter grey than the page (owner feedback after Sprints 072/073 shipped).
+const textHeight = 92;
 
 /**
  * Fixed geometry of the virtualized library wall. Card height is constant so the
@@ -117,7 +124,8 @@ export const gridLayout = {
   /** Pinned cover height, cropped at the full card width (DEC-139). */
   coverHeight,
   /** Text block below the cover: a two-line title at the full card measure, the
-   * creator, and one quiet line for year and formats. */
+   * creator, and one quiet line carrying year and formats together. Sized to
+   * that content exactly, so the block has no dead band under it. */
   textHeight,
   cardHeight: coverHeight + textHeight,
   /** A ceiling, not a target. The page container caps the wall at 1600px

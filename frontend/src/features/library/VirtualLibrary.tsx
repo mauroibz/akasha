@@ -108,12 +108,18 @@ function EntryMetadata({
   grid: boolean;
 }) {
   // Nothing gets pinned width in Sprint 072 — the card is a measureless cover,
-  // and everything in it takes the full measure of the card. The title gets
-  // two lines at text-sm leading-5 (40px) merged into the textHeight budget;
-  // the creator and the year/format lines each fit inside one line.
+  // and everything in it takes the full measure of the card. Three lines, and
+  // the block is exactly as tall as they are: a two-line title at leading-5,
+  // the creator, then year and formats sharing one quiet line. The formats had
+  // a fourth line of their own, which meant `textHeight` had to budget for a
+  // line almost no card draws, and every card without one ended in a band of
+  // empty surface.
   if (grid)
     return (
-      <div className="grid min-w-0 content-start px-2.5 pt-2" data-card-meta="">
+      <div
+        className="grid min-w-0 content-start px-2.5 pb-2 pt-2"
+        data-card-meta=""
+      >
         <h2
           className="overflow-hidden text-sm font-semibold leading-5 [-webkit-line-clamp:2] [display:-webkit-box] [-webkit-box-orient:vertical]"
           title={entry.item.title}
@@ -127,23 +133,30 @@ function EntryMetadata({
           >
             {entry.item.creator ?? "Unknown creator"}
           </p>
-          <p className="mt-0.5 text-xs leading-4 text-muted-foreground">
-            <span className="sr-only">Edition year: </span>
-            {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
-            {entry.item.year === null || entry.item.year === undefined ? (
-              <span className="sr-only">unknown</span>
-            ) : null}
-            {entry.item.metadata.original_year &&
-            entry.item.metadata.original_year !== entry.item.year ? (
-              <>
-                {" · "}
-                <span className="sr-only">originally published </span>
-                <span aria-hidden="true">orig. </span>
-                {entry.item.metadata.original_year}
-              </>
-            ) : null}
+          {/* One flex line, so a badge cannot lift the line box the way an
+              inline-block on a 16px baseline does — the year keeps its own
+              measure and the badges take what is left of it. Still the last
+              `p` of the block, which is what `library.spec.ts` measures the
+              year line's clipping on. */}
+          <p className="mt-0.5 flex items-center gap-1.5 text-xs leading-4 text-muted-foreground">
+            <span className="shrink-0">
+              <span className="sr-only">Edition year: </span>
+              {entry.item.year ?? <span aria-hidden="true">Year unknown</span>}
+              {entry.item.year === null || entry.item.year === undefined ? (
+                <span className="sr-only">unknown</span>
+              ) : null}
+              {entry.item.metadata.original_year &&
+              entry.item.metadata.original_year !== entry.item.year ? (
+                <>
+                  {" · "}
+                  <span className="sr-only">originally published </span>
+                  <span aria-hidden="true">orig. </span>
+                  {entry.item.metadata.original_year}
+                </>
+              ) : null}
+            </span>
+            <FormatBadges entry={entry} />
           </p>
-          <FormatBadges entry={entry} />
         </>
       </div>
     );
@@ -197,7 +210,11 @@ function FormatBadges({
       className={
         dense
           ? "hidden shrink-0 flex-nowrap items-center gap-1 empty:hidden lg:inline-flex"
-          : "mt-1 inline-flex flex-wrap items-center gap-1 align-[3px] empty:hidden"
+          : // On the wall card this shares the year's line. Wrapping inside a
+            // one-line box, rather than clipping mid-badge: a badge that does
+            // not fit drops out of sight whole instead of being sliced down
+            // the middle, and the block keeps the fixed height DEC-023 pins.
+            "flex h-4 min-w-0 flex-wrap items-center gap-1 overflow-hidden empty:hidden"
       }
       data-card-formats=""
     >
@@ -205,7 +222,12 @@ function FormatBadges({
       {entry.formats.map((format) => (
         <span
           key={format}
-          className="rounded-full bg-surface-raised px-2 py-0.5 text-[11px] leading-4 text-muted-foreground"
+          className={
+            dense
+              ? "rounded-full bg-surface-raised px-2 py-0.5 text-[11px] leading-4 text-muted-foreground"
+              : // 16px tall, so the year line stays one 16px line.
+                "shrink-0 rounded-full bg-surface-raised px-1.5 text-[11px] leading-4 text-muted-foreground"
+          }
         >
           {labels[format] ?? format}
         </span>
@@ -324,7 +346,10 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
           isGrid
             ? // Sprint 072: no padding on the wall card — the cover is the
               // card's skin edge-to-edge, and the text block carries its own.
-              `relative h-full overflow-hidden rounded-2xl bg-surface/60 ${focusRing} ${ring}`
+              // No fill either: the cover already draws the card's boundary,
+              // and a lighter ground under it only added a second edge — the
+              // caption reads as the cover's own, on the wall's ground.
+              `relative h-full overflow-hidden rounded-2xl ${focusRing} ${ring}`
             : `flex h-full min-h-0 w-full items-center gap-4 border-b border-border px-4 ${focusRing} ${ring}`
         }
         data-entry-id={entry.id}
@@ -389,11 +414,16 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 editorial suite's heading click opens the detail; AC11 leaves
                 that suite untouched) and a screen reader gets a real door.
                 There is deliberately NO full-card overlay: one above the
-                whole surface would intercept exactly that click. */}
+                whole surface would intercept exactly that click.
+                It carries no fill at rest — the block was painted `bg-surface`,
+                a step lighter than the page it sat on, so a caption of three
+                short lines read as a pale card stuck under the poster. The
+                fill is the hover/focus affordance now, which is the one moment
+                a button has to say it is one. */}
             <button
               type="button"
               aria-label={`Open ${entry.item.title}`}
-              className="absolute inset-x-0 bottom-0 z-[1] block overflow-hidden rounded-b-2xl bg-surface text-left focus-visible:outline-none"
+              className="absolute inset-x-0 bottom-0 z-[1] block overflow-hidden rounded-b-2xl text-left transition-colors hover:bg-surface focus-visible:bg-surface focus-visible:outline-none"
               style={{ height: gridLayout.textHeight }}
               onClick={() => void navigate(`/books/${entry.id}`)}
             >
