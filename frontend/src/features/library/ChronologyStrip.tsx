@@ -12,6 +12,13 @@ import { cn } from "@/lib/utils";
  * An empty decade is kept as a zero-height gap: skipping it would say the
  * decade does not exist, when it says only that this library holds nothing
  * from it.
+ *
+ * The bars are capped in width and the chart starts at the card's own left
+ * edge, in line with its heading. `flex-1` alone stretched eight decades
+ * across the hero's full twelve columns — 164px per bar against a 128px chart
+ * height, so the bars read as slabs and the gaps between them competed with
+ * the heights that actually carry the data. A chart of eight buckets does not
+ * owe the hero its whole width; the leftover is margin.
  */
 export function ChronologyStrip({
   buckets,
@@ -33,7 +40,7 @@ export function ChronologyStrip({
         return (
           <li
             key={bucket.decade}
-            className="flex h-full flex-1 flex-col items-center justify-end gap-1"
+            className="flex h-full max-w-[4.5rem] flex-1 flex-col items-center justify-end gap-1"
           >
             {bucket.count > 0 ? (
               <Link

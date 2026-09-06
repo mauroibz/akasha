@@ -1,7 +1,6 @@
 import { useId, useState } from "react";
 
 import type { Insight, InsightRow } from "@/api/library";
-import { CoverImage } from "@/components/CoverImage";
 import { Panel } from "@/components/Panel";
 import { InsightsRanking } from "@/features/library/InsightsRanking";
 import {
@@ -10,9 +9,7 @@ import {
   type InsightSort,
 } from "@/features/library/insights";
 import { insightDepth } from "@/features/library/useInsights";
-import { SuperlativeStrip } from "@/features/library/SuperlativeStrip";
-import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
-import { cn } from "@/lib/utils";
+import { HeroSummary } from "@/features/library/HeroSummary";
 
 /** How many rows a card shows before it has to be asked for the rest. */
 const preview = 6;
@@ -83,36 +80,9 @@ export function InsightsCard({
         </>
       }
     >
-      {top && (
-        <div className="flex items-center gap-4 px-4 pb-4">
-          <CoverImage
-            src={top.covers[0]}
-            alt=""
-            className="h-24 w-16 shrink-0 object-cover"
-            placeholderClassName="h-24 w-16 shrink-0 [&_svg]:h-8 [&_svg]:w-8"
-          />
-          <div className="min-w-0">
-            <p className="truncate text-xl font-semibold">{top.label}</p>
-            <p className="text-sm text-muted-foreground">
-              {top.count} {top.count === 1 ? "entry" : "entries"}
-            </p>
-            {top.mean_score !== null && (
-              <span
-                className={cn(
-                  "mt-1 inline-block",
-                  scoreChipShape,
-                  meanScoreChipClass(top.mean_score),
-                )}
-              >
-                {top.mean_score.toFixed(1)}
-              </span>
-            )}
-          </div>
-        </div>
-      )}
-
-      {superlatives.length > 0 && (
-        <SuperlativeStrip
+      {hero && (
+        <HeroSummary
+          top={top}
           superlatives={superlatives}
           totalEntries={insight.total_entries}
           ratedEntries={insight.rated_entries}
