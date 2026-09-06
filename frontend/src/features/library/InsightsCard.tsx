@@ -1,10 +1,18 @@
 import { useId, useState } from "react";
 
 import type { Insight, InsightRow } from "@/api/library";
+import { CoverImage } from "@/components/CoverImage";
 import { Panel } from "@/components/Panel";
 import { InsightsRanking } from "@/features/library/InsightsRanking";
-import { orderRows, type InsightSort } from "@/features/library/insights";
+import {
+  computeSuperlatives,
+  orderRows,
+  type InsightSort,
+} from "@/features/library/insights";
 import { insightDepth } from "@/features/library/useInsights";
+import { SuperlativeStrip } from "@/features/library/SuperlativeStrip";
+import { meanScoreChipClass, scoreChipShape } from "@/lib/score";
+import { cn } from "@/lib/utils";
 
 /** How many rows a card shows before it has to be asked for the rest. */
 const preview = 6;
@@ -19,6 +27,12 @@ const preview = 6;
  * The title is the label the *domain* declares — `Artists` for albums, `Authors`
  * for books. The shipped table printed the raw field name, lowercased, for every
  * domain alike.
+ *
+ * `hero` (Sprint 073 deliverable 1) promotes this into the leading key's hero
+ * panel: its own top row (by whichever order is active) drawn large above the
+ * ordinary list, and the three superlatives folded in beneath it — the fix for
+ * finding 9, where a page-level strip repeated the very card it sat above. Their
+ * only home is here now (AC3).
  */
 export function InsightsCard({
   title,
@@ -30,6 +44,7 @@ export function InsightsCard({
   showSuppressed,
   onToggleSuppressed,
   hrefFor,
+  hero = false,
 }: {
   title: string;
   type: string;
@@ -40,6 +55,8 @@ export function InsightsCard({
   showSuppressed: boolean;
   onToggleSuppressed: () => void;
   hrefFor: (row: InsightRow) => string;
+  /** Promote this card into the page's hero (deliverable 1). */
+  hero?: boolean;
 }) {
   const [showAll, setShowAll] = useState(false);
   const headingId = useId();
@@ -48,11 +65,14 @@ export function InsightsCard({
   const shown = showAll ? placed : placed.slice(0, preview);
   const hidden = placed.length - shown.length;
   const deep = insight.rows.filter((row) => row.count > 1).length;
+  const top = hero ? placed[0] : undefined;
+  const superlatives = hero ? computeSuperlatives(insight.rows, minRated) : [];
 
   return (
     <Panel
       aria-labelledby={headingId}
       data-insight-card=""
+      data-insight-hero={hero ? "" : undefined}
       className="flex flex-col"
       bodyClassName=""
       heading={title}
@@ -63,6 +83,42 @@ export function InsightsCard({
         </>
       }
     >
+      {top && (
+        <div className="flex items-center gap-4 px-4 pb-4">
+          <CoverImage
+            src={top.covers[0]}
+            alt=""
+            className="h-24 w-16 shrink-0 object-cover"
+            placeholderClassName="h-24 w-16 shrink-0 [&_svg]:h-8 [&_svg]:w-8"
+          />
+          <div className="min-w-0">
+            <p className="truncate text-xl font-semibold">{top.label}</p>
+            <p className="text-sm text-muted-foreground">
+              {top.count} {top.count === 1 ? "entry" : "entries"}
+            </p>
+            {top.mean_score !== null && (
+              <span
+                className={cn(
+                  "mt-1 inline-block",
+                  scoreChipShape,
+                  meanScoreChipClass(top.mean_score),
+                )}
+              >
+                {top.mean_score.toFixed(1)}
+              </span>
+            )}
+          </div>
+        </div>
+      )}
+
+      {superlatives.length > 0 && (
+        <SuperlativeStrip
+          superlatives={superlatives}
+          totalEntries={insight.total_entries}
+          ratedEntries={insight.rated_entries}
+        />
+      )}
+
       {placed.length === 0 && unplaced.length === 0 && (
         <p className="px-4 pb-4 text-sm text-muted-foreground">
           Nothing to rank here yet.
@@ -112,7 +168,7 @@ export function InsightsCard({
  * information in the least likely place to be read, and detached from the ranking
  * they describe once there is more than one.
  */
-function CardNotes({
+export function CardNotes({
   insight,
   showSuppressed,
   onToggleSuppressed,

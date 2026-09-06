@@ -250,15 +250,25 @@ export const sortLabels: Record<SortKey, string> = {
 export interface InsightKeyOption {
   name: string;
   label: string;
+  /**
+   * Present when this key's values are a coarsening of another key's (Sprint 073
+   * deliverable 2) — a declared rollup rather than a hard-coded Decade/Year pair,
+   * so the next domain that has one joins the same way. `name` names this option's
+   * own (coarser) fetch key; `grain` names the finer one sharing its card. Ordered
+   * coarse first, since that is the default grain a merged card opens on.
+   */
+  grain?: { name: string; label: string };
 }
 
 /**
  * `year` and `decade` are not `FieldSpec`s — they read `items.year`, not metadata —
- * so they are built here rather than invented as fake fields (Sprint 065).
+ * so they are built here rather than invented as fake fields (Sprint 065). One
+ * option now, not two (Sprint 073): Decade and Year are one fact at two grains,
+ * and `insightFetchKeys` is what turns this back into the two requests the page
+ * still needs to make.
  */
 const builtinInsightKeys: InsightKeyOption[] = [
-  { name: "year", label: "Year" },
-  { name: "decade", label: "Decade" },
+  { name: "decade", label: "Decade", grain: { name: "year", label: "Year" } },
 ];
 
 export function insightKeyOptions(fields: FieldSpec[]): InsightKeyOption[] {
@@ -269,4 +279,11 @@ export function insightKeyOptions(fields: FieldSpec[]): InsightKeyOption[] {
   // answer, and `year`/`decade` are declared on every domain regardless, so leading
   // with them would default every domain's first load to the same generic question.
   return [...groupable, ...builtinInsightKeys];
+}
+
+/** Every key actually fetched behind a set of options — a grain group fetches both. */
+export function insightFetchKeys(options: InsightKeyOption[]): string[] {
+  return options.flatMap((option) =>
+    option.grain ? [option.name, option.grain.name] : [option.name],
+  );
 }

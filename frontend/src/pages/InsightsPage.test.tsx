@@ -25,6 +25,13 @@ const bookType = {
       groupable: true,
     },
     {
+      name: "language",
+      label: "Language",
+      type: "text",
+      multiplicity: "one",
+      groupable: true,
+    },
+    {
       name: "description",
       label: "Description",
       type: "long_text",
@@ -119,6 +126,29 @@ function defaultRows() {
   ];
 }
 
+/**
+ * A decade row, in the server's real shape: `key` is the plain decade start
+ * (`"1960"`), `label` is `"1960s"` — distinct from `row()`'s
+ * `key = label.toLowerCase()`, which would give a decade row the label text
+ * itself as its key and break `chronologyBuckets`' `Number(row.key)`.
+ */
+function decadeRow(
+  decade: number,
+  count: number,
+  rated: number,
+  mean: number | null,
+) {
+  return {
+    key: String(decade),
+    label: `${decade}s`,
+    count,
+    rated_count: rated,
+    mean_score: mean,
+    score_spread: null,
+    covers: [],
+  };
+}
+
 type Rows = ReturnType<typeof defaultRows>;
 
 /**
@@ -133,13 +163,15 @@ const defaultRankings: Record<string, Rows> = {
     row("Anagrama", 2, 2, 9.0),
     row("Gollancz", 1, 0, null),
   ],
-  // Two values: a fact, not a ranking. Earns a line, not a card.
+  // The fine grain of the merged Decade/Year card, not a card of its own.
   year: [row("1963", 2, 2, 9.5), row("1974", 1, 1, 10)],
   decade: [
-    row("1960s", 4, 3, 9.1),
-    row("1970s", 3, 2, 8.2),
-    row("2000s", 2, 1, 6.0),
+    decadeRow(1960, 4, 3, 9.1),
+    decadeRow(1970, 3, 2, 8.2),
+    decadeRow(2000, 2, 1, 6.0),
   ],
+  // Two values, each appearing once: a fact, not a ranking. A long-tail card.
+  language: [row("Spanish", 1, 0, null), row("English", 1, 0, null)],
 };
 
 /** The entries behind a ranking row, as `/api/entries` returns them. */
@@ -185,14 +217,29 @@ function entriesPage() {
   };
 }
 
+/** A plausible score distribution, for the domain-wide band (Sprint 073). */
+function distribution(counts = [0, 0, 1, 0, 0, 1, 0, 2, 1, 0]) {
+  return {
+    type: "book",
+    counts,
+    rated_count: counts.reduce((sum, count) => sum + count, 0),
+    unrated_count: 1,
+  };
+}
+
 /** Every screen request, with the rankings swappable per key. */
-function stubApi(rankings: Record<string, Rows> = defaultRankings) {
+function stubApi(
+  rankings: Record<string, Rows> = defaultRankings,
+  scoreDistribution = distribution(),
+) {
   const calls: string[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
     const url = String(input);
     calls.push(url);
     if (url === "/api/item-types")
       return new Response(JSON.stringify(itemTypes));
+    if (url.startsWith("/api/insights/scores"))
+      return new Response(JSON.stringify(scoreDistribution));
     if (url.startsWith("/api/insights")) {
       const key = new URL(url, "http://library.test").searchParams.get("key");
       return new Response(JSON.stringify(ranking(rankings[key ?? ""] ?? [])));
@@ -242,14 +289,24 @@ describe("InsightsPage", () => {
     // way to see two answers beside each other -- and opened on whichever key
     // the domain happened to declare first. Cards are ordered by how far each
     // ranking's leader stands above its own middle, and a key with nothing to
-    // rank gets a line rather than a two-row table.
+    // rank gets a card of its own long-tail values instead of a footnote line
+    // (Sprint 073 deliverable 6).
     stubApi();
     renderPage();
     await screen.findByRole("heading", { name: "Authors" });
 
-    expect(cardTitles()).toEqual(["Authors", "Publisher", "Decade"]);
-    expect(screen.getByText("Nothing much to rank yet")).toBeVisible();
-    expect(screen.getByText(/1963 2, 1974 1/)).toBeVisible();
+    expect(cardTitles()).toEqual([
+      "Authors",
+      "Publisher",
+      "Decade",
+      "Language",
+    ]);
+    expect(screen.queryByText("Nothing much to rank yet")).toBeNull();
+    expect(screen.getByText("2 values, each appearing once")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Spanish 1" })).toBeVisible();
+    // Year is a grain of Decade's card now (deliverable 2), not a card of its
+    // own -- so it never earns its own heading, whether it would have carded
+    // on its own concentration or not.
     expect(screen.queryByRole("heading", { name: "Year" })).toBeNull();
   });
 
@@ -280,9 +337,13 @@ describe("InsightsPage", () => {
 
     await screen.findByRole("heading", { name: "Authors" });
 
-    // 8.8 is nearly a 9 and reads as one; 7.7 is an 8; 3.0 is a 3.
+    // 8.8 is nearly a 9 and reads as one; 7.7 is an 8; 3.0 is a 3. Cortázar's
+    // mean appears twice now -- once promoted in the hero (Sprint 073
+    // deliverable 1), once still on his own row in the list below -- so every
+    // instance is checked rather than just the one `getByText` used to find.
     const authors = card("Authors");
-    expect(authors.getByText("8.8").className).toContain("bg-score-top");
+    for (const chip of authors.getAllByText("8.8"))
+      expect(chip.className).toContain("bg-score-top");
     expect(authors.getByText("7.7").className).toContain("bg-score-high");
     expect(authors.getByText("3.0").className).toContain("bg-score-low");
   });
@@ -327,7 +388,9 @@ describe("InsightsPage", () => {
       "Mariana Enríquez",
       "Samanta Schweblin",
     ]);
-    expect(card("Authors").getByText("8.8")).toBeVisible();
+    // Cortázar is the hero's promoted top row now (Sprint 073), so his mean
+    // is drawn twice: once above the list, once still on his own row in it.
+    expect(card("Authors").getAllByText("8.8").length).toBeGreaterThan(0);
 
     await user.click(screen.getByRole("button", { name: "Best rated" }));
 
@@ -338,11 +401,13 @@ describe("InsightsPage", () => {
       "Italo Calvino",
       "Mariana Enríquez",
     ]);
-    expect(card("Authors").getByText("5")).toBeVisible();
+    expect(card("Authors").getAllByText("5").length).toBeGreaterThan(0);
 
-    // And the order costs no second request: one ranking per key answers both.
+    // And the order costs no second request: one ranking per fetch key
+    // answers both (creators, publisher, language, decade, year), plus the
+    // one score-distribution request the page also makes.
     expect(calls.filter((url) => url.startsWith("/api/insights"))).toHaveLength(
-      4,
+      6,
     );
   });
 
@@ -453,6 +518,37 @@ describe("InsightsPage", () => {
     expect(screen.getByText("Steadiest")).toBeVisible();
   });
 
+  it("promotes the leading key into a hero, superlatives folded inside it", async () => {
+    // Sprint 073 deliverable 1: the leading key's card carries its own top
+    // row (cover, label, count, mean) large above its list, and the three
+    // superlatives that used to sit in a page-level strip above every card
+    // (finding 9's repetition) live inside this one card now -- and only
+    // this one (AC3).
+    stubApi();
+    renderPage();
+    await screen.findByRole("heading", { name: "Authors" });
+
+    const hero = screen
+      .getByRole("heading", { name: "Authors" })
+      .closest("[data-insight-hero]");
+    expect(hero).not.toBeNull();
+    const heroRegion = within(hero as HTMLElement);
+    // The promoted top row: Cortázar is the count leader, and also names
+    // "Holds the most" among the superlatives below -- the same fact drawn
+    // twice inside one card rather than repeated across two page sections
+    // (finding 9).
+    expect(heroRegion.getAllByText("Julio Cortázar").length).toBeGreaterThan(0);
+    expect(heroRegion.getAllByText("8.8").length).toBeGreaterThan(0);
+    // The superlatives are inside the hero...
+    expect(heroRegion.getByText("Holds the most")).toBeVisible();
+    // ...and appear nowhere else on the page.
+    expect(screen.getAllByText("Holds the most")).toHaveLength(1);
+    expect(screen.getAllByText("Highest rated")).toHaveLength(1);
+    expect(screen.getAllByText("Steadiest")).toHaveLength(1);
+    // No other card is a hero.
+    expect(document.querySelectorAll("[data-insight-hero]")).toHaveLength(1);
+  });
+
   it("leaves out a superlative with no honest answer", async () => {
     // Nothing meets min_rated=2, so neither a highest-rated nor a steadiest
     // row exists to name -- only "most collected" survives.
@@ -479,8 +575,10 @@ describe("InsightsPage", () => {
     await screen.findByRole("heading", { name: "Authors" });
 
     const authors = card("Authors");
-    expect(authors.getByText("7")).toBeVisible();
-    expect(authors.getByText("8.8")).toBeVisible();
+    // Cortázar is the hero's promoted top row (Sprint 073), so his numbers
+    // are drawn twice -- once above the list, once still on his own row.
+    expect(authors.getAllByText("7").length).toBeGreaterThan(0);
+    expect(authors.getAllByText("8.8").length).toBeGreaterThan(0);
     // jsdom never fires the cover's `load` event, so if this is visible the
     // row rendered its numbers without waiting for it.
     const authorsRegion = screen.getByRole("region", { name: /^Authors/ });
@@ -543,6 +641,76 @@ describe("InsightsPage", () => {
     );
 
     expect(await screen.findByText(/no filters set right now/)).toBeVisible();
+  });
+
+  it("switches Decade and Year in one card, costing no second request", async () => {
+    // Sprint 073 deliverable 2: Decade and Year are one card with a grain
+    // toggle now, not two cards repeating one fact (finding 8). Both grains
+    // are already on the page (AC1), so switching is client-side only.
+    const calls = stubApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Decade" });
+
+    const decadeCard = screen
+      .getByRole("heading", { name: "Decade" })
+      .closest("[data-chronology-card]") as HTMLElement;
+    expect(
+      within(decadeCard).getByRole("link", { name: /1960s/ }),
+    ).toBeVisible();
+    expect(within(decadeCard).queryByText("1963")).toBeNull();
+
+    await user.click(within(decadeCard).getByRole("button", { name: "Year" }));
+
+    expect(within(decadeCard).getByText("1963")).toBeVisible();
+    expect(within(decadeCard).queryByText(/1960s/)).toBeNull();
+    expect(calls.filter((url) => url.startsWith("/api/insights"))).toHaveLength(
+      6,
+    );
+  });
+
+  it("draws the score distribution, sums to the rated count, and states the unrated tail", async () => {
+    // Sprint 073 deliverable 4: the one new number, ten bars in the ramp,
+    // with the unrated tail stated in words rather than drawn as an eleventh
+    // bar (it is not a score).
+    stubApi(defaultRankings, distribution([0, 0, 1, 0, 0, 1, 0, 2, 1, 0]));
+    renderPage();
+    await screen.findByRole("heading", { name: "How you rate" });
+
+    const bars = document.querySelectorAll<HTMLElement>("[data-score-bar]");
+    expect(bars).toHaveLength(10);
+    const counts = [...bars].map((bar) => bar.dataset.count);
+    expect(counts).toEqual(["0", "0", "1", "0", "0", "1", "0", "2", "1", "0"]);
+    expect(screen.getByText("5 rated")).toBeVisible();
+    expect(screen.getByText("1 entry is unrated.")).toBeVisible();
+  });
+
+  it("states a stated zero rather than an empty box when nothing is rated", async () => {
+    stubApi(defaultRankings, distribution([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
+    renderPage();
+    await screen.findByRole("heading", { name: "How you rate" });
+
+    expect(screen.getByText("0 rated")).toBeVisible();
+    expect(document.querySelectorAll("[data-score-bar]")).toHaveLength(10);
+  });
+
+  it("opens a long-tail value in the filtered library, arriving with its chip", async () => {
+    // Sprint 073 deliverable 6: "16 subjects appear once" is a clickable tag
+    // row into the filtered library now, not a grey sentence (finding 12).
+    stubApi();
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByRole("heading", { name: "Language" });
+
+    await user.click(screen.getByRole("link", { name: "Spanish 1" }));
+
+    await waitFor(() => {
+      const text = screen.getByText(/Library:/).textContent ?? "";
+      expect(text).toContain("type=book");
+      expect(text).toContain("key=language");
+      expect(text).toContain("value=spanish");
+      expect(text).toContain("label=Spanish");
+    });
   });
 });
 

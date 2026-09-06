@@ -7,14 +7,18 @@ import { Input } from "@/components/ui/input";
 import {
   domainsFrom,
   formatLabels,
+  insightFetchKeys,
   insightKeyOptions,
   statusLabelFor,
 } from "@/features/library/labels";
+import { ChronologyCard } from "@/features/library/ChronologyCard";
 import { InsightsCard } from "@/features/library/InsightsCard";
+import { LongTailCard } from "@/features/library/LongTailCard";
+import { ScoreDistributionCard } from "@/features/library/ScoreDistributionCard";
 import {
-  computeSuperlatives,
+  insightGridSpan,
   orderKeys,
-  quietSummary,
+  resolveAnsweredKeys,
   type InsightSort,
 } from "@/features/library/insights";
 import {
@@ -22,10 +26,10 @@ import {
   readLibraryFiltersPreference,
   type RememberedLibraryFilters,
 } from "@/features/library/library";
-import { SuperlativeStrip } from "@/features/library/SuperlativeStrip";
 import { useInsights } from "@/features/library/useInsights";
+import { useScoreDistribution } from "@/features/library/useScoreDistribution";
 import { getShelves } from "@/api/shelves";
-import type { ItemType, Insight } from "@/api/library";
+import type { ItemType, InsightRow } from "@/api/library";
 import { useItemTypes } from "@/features/library/useItemTypes";
 
 /**
@@ -78,10 +82,24 @@ export function InsightsPage() {
   );
 
   const activeFilters = withinFilters ? remembered : undefined;
+  // A grain group (Decade+Year) fetches both of its keys; `resolveAnsweredKeys`
+  // is what turns the flat response array back into one answered entry per
+  // *option* (Sprint 073 deliverable 2), not one per request.
+  const fetchKeys = useMemo(() => insightFetchKeys(keyOptions), [keyOptions]);
   const rankings = useInsights({
     type,
-    keys: keyOptions.map((option) => option.name),
+    keys: fetchKeys,
     includeSuppressed,
+    statuses: activeFilters?.statuses,
+    shelves: activeFilters?.shelves,
+    formats: activeFilters?.formats,
+    q: activeFilters?.query,
+  });
+  const insightByKey = new Map(
+    fetchKeys.map((key, index) => [key, rankings[index]?.data]),
+  );
+  const distribution = useScoreDistribution({
+    type,
     statuses: activeFilters?.statuses,
     shelves: activeFilters?.shelves,
     formats: activeFilters?.formats,
@@ -90,30 +108,70 @@ export function InsightsPage() {
 
   // Which keys are worth a card, and in what order, is a judgement about this
   // library rather than the order a domain happens to declare its fields
-  // (DEC-132). The rest are stated in a line rather than hidden. Not memoized:
-  // it is a sort of at most a handful of keys, and a dependency array over an
-  // array rebuilt every render would only pretend otherwise.
-  type Answered = { option: (typeof keyOptions)[number]; insight: Insight };
-  const answered = keyOptions
-    .map((option, index) => ({ option, insight: rankings[index]?.data }))
-    .filter((entry): entry is Answered => Boolean(entry.insight));
+  // (DEC-132). The rest are stated in a line rather than hidden.
+  const answered = resolveAnsweredKeys(keyOptions, insightByKey);
   const { carded, quiet } = orderKeys(answered, (entry) => entry.insight.rows);
-
-  // Above the fold, and drawn from the leading key alone (proposal §2.7):
-  // pooling every key's rows found "most collected" answering with a subject
-  // tag like `Fiction`, true and useless. The leading key is already the
-  // library's own most concentrated answer to "collect what".
-  const leading = carded[0]?.insight;
-  const superlatives = leading
-    ? computeSuperlatives(leading.rows, minRated)
-    : [];
 
   const pending = rankings.some((query) => query.isPending);
   const failed =
     rankings.length > 0 && rankings.every((query) => query.isError);
 
+  // Every card's link into the filtered library — `key` is explicit rather than
+  // read off `option.name` so a grain card (Sprint 073) can link either of its
+  // two grains from the one function.
+  const linkTo = (key: string, row: Pick<InsightRow, "key" | "label">) =>
+    `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
+      key,
+    )}&value=${encodeURIComponent(row.key)}&label=${encodeURIComponent(
+      row.label,
+    )}`;
+
+  const [heroEntry, ...restEntries] = carded;
+
+  const renderRankedCard = (
+    entry: (typeof carded)[number],
+    cardOptions: { hero?: boolean } = {},
+  ) => {
+    const { option, insight, grainInsight } = entry;
+    if (option.grain) {
+      return (
+        <ChronologyCard
+          title={option.label}
+          type={type}
+          decadeKey={option.name}
+          yearKey={option.grain.name}
+          yearLabel={option.grain.label}
+          decadeInsight={insight}
+          yearInsight={grainInsight}
+          sort={sort}
+          minRated={minRated}
+          showSuppressed={includeSuppressed}
+          onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
+          hero={cardOptions.hero}
+          hrefFor={linkTo}
+        />
+      );
+    }
+    return (
+      <InsightsCard
+        title={option.label}
+        type={type}
+        insightKey={option.name}
+        insight={insight}
+        sort={sort}
+        minRated={minRated}
+        showSuppressed={includeSuppressed}
+        onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
+        hero={cardOptions.hero}
+        // `label` is display only, so the library can name the filter rather
+        // than echo the normalized value that groups it.
+        hrefFor={(row) => linkTo(option.name, row)}
+      />
+    );
+  };
+
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+    <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1
@@ -179,14 +237,6 @@ export function InsightsPage() {
         )}
       </div>
 
-      {leading && (
-        <SuperlativeStrip
-          superlatives={superlatives}
-          totalEntries={leading.total_entries}
-          ratedEntries={leading.rated_entries}
-        />
-      )}
-
       {pending && carded.length === 0 && (
         <p role="status" className="mt-8 text-muted-foreground">
           Ranking…
@@ -198,53 +248,54 @@ export function InsightsPage() {
         </p>
       )}
 
-      {carded.length > 0 && (
-        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-          {carded.map(({ option, insight }) => (
-            <InsightsCard
-              key={option.name}
-              title={option.label}
-              type={type}
-              insightKey={option.name}
-              insight={insight}
-              sort={sort}
-              minRated={minRated}
-              showSuppressed={includeSuppressed}
-              onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
-              // `label` is display only, so the library can name the filter
-              // rather than echo the normalized value that groups it.
-              hrefFor={(row) =>
-                `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
-                  option.name,
-                )}&value=${encodeURIComponent(
-                  row.key,
-                )}&label=${encodeURIComponent(row.label)}`
+      {(carded.length > 0 || quiet.length > 0 || distribution.data) && (
+        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-12">
+          {/* The hero (deliverable 1) always spans the grid, so the leading
+              key never competes for width with the cards its own lead earned
+              it (AC6). Its superlatives live inside it now (AC3) — this is
+              the only card the page draws them on. */}
+          {heroEntry && (
+            <div className="xl:col-span-12">
+              {renderRankedCard(heroEntry, { hero: true })}
+            </div>
+          )}
+
+          {/* One new number (deliverable 4), domain-wide rather than per key,
+              so it sits with the hero rather than competing with a ranking
+              for a rank tier it does not have. */}
+          {distribution.data && (
+            <div className="xl:col-span-12">
+              <ScoreDistributionCard distribution={distribution.data} />
+            </div>
+          )}
+
+          {/* 8/4, then 4/4/4, by `orderKeys`' own rank (deliverable 5) — a
+              fifteen-value ranking is not drawn the same size as a
+              three-value one, and the pattern repeats past five cards
+              because the proposal is silent past five. */}
+          {restEntries.map((entry, index) => (
+            <div
+              key={entry.option.name}
+              className={
+                insightGridSpan(index) === 8 ? "xl:col-span-8" : "xl:col-span-4"
               }
-            />
+            >
+              {renderRankedCard(entry)}
+            </div>
+          ))}
+
+          {/* The long tail, as cards instead of a grey footnote (deliverable
+              6, finding 12) — each value opens the library filtered to it. */}
+          {quiet.map(({ option, insight }) => (
+            <div key={option.name} className="xl:col-span-4">
+              <LongTailCard
+                title={option.label}
+                insight={insight}
+                hrefFor={(row) => linkTo(option.name, row)}
+              />
+            </div>
           ))}
         </div>
-      )}
-
-      {quiet.length > 0 && (
-        <section
-          aria-labelledby="quiet-keys"
-          className="mt-4 rounded-xl border border-border px-4 py-3"
-        >
-          <h2
-            id="quiet-keys"
-            className="text-xs font-semibold text-muted-foreground"
-          >
-            Nothing much to rank yet
-          </h2>
-          <ul className="mt-1.5 flex flex-wrap gap-x-6 gap-y-1 text-xs text-muted-foreground">
-            {quiet.map(({ option, insight }) => (
-              <li key={option.name}>
-                <span className="text-foreground">{option.label}</span> —{" "}
-                {quietSummary(insight.rows)}
-              </li>
-            ))}
-          </ul>
-        </section>
       )}
 
       {sort === "score" && carded.length > 0 && (

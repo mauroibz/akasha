@@ -95,7 +95,9 @@ async function stubInsights(
         metric: "count",
         min_rated: 2,
         rows: (rankings[key] ?? []).map(([label, count, rated, mean]) => ({
-          key: label.toLowerCase(),
+          // A decade's real key is its plain start year ("1960"), not its
+          // label ("1960s") -- `chronologyBuckets` reads it as a number.
+          key: key === "decade" ? label.replace(/s$/, "") : label.toLowerCase(),
           label,
           count,
           rated_count: rated,
@@ -112,6 +114,18 @@ async function stubInsights(
       },
     });
   });
+  // Registered after the broader route above, so Playwright's
+  // most-recently-registered-wins rule gives this the more specific match.
+  await page.route("**/api/insights/scores**", (route) =>
+    route.fulfill({
+      json: {
+        type: "book",
+        counts: [0, 0, 2, 1, 3, 5, 8, 12, 9, 6],
+        rated_count: 46,
+        unrated_count: 14,
+      },
+    }),
+  );
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({
       json: {
@@ -220,6 +234,22 @@ test("the page fits a phone, and nothing makes the body scroll sideways — five
       .filter((row) => row.height > 0 && row.height < 44),
   );
   expect(short).toEqual([]);
+
+  // The Decade/Year grain toggle (Sprint 073 deliverable 2) is one of the
+  // controls just checked for a 44px target; exercising it here proves it
+  // also holds the 390px body-overflow contract once its content swaps.
+  const decadeCard = page
+    .getByRole("heading", { name: "Decade" })
+    .locator("xpath=ancestor::*[@data-chronology-card]");
+  await decadeCard.getByRole("button", { name: "Year" }).click();
+  await expect(decadeCard.getByText("1963")).toBeVisible();
+
+  const overflowAfterToggle = await page.evaluate(
+    () =>
+      document.documentElement.scrollWidth -
+      document.documentElement.clientWidth,
+  );
+  expect(overflowAfterToggle).toBeLessThanOrEqual(0);
 });
 
 test("a row opens in place, and the library says what it was opened into", async ({

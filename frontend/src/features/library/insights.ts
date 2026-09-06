@@ -1,4 +1,5 @@
-import type { InsightRow } from "@/api/library";
+import type { Insight, InsightRow } from "@/api/library";
+import type { InsightKeyOption } from "@/features/library/labels";
 
 /**
  * The two orders a ranking can be read in (Sprint 066).
@@ -186,6 +187,87 @@ export function computeSuperlatives(
   }
 
   return superlatives;
+}
+
+/** One decade's place in a chronology strip (Sprint 073 deliverable 3). */
+export interface ChronologyBucket {
+  /** The decade's start year, e.g. `2000`. */
+  decade: number;
+  label: string;
+  count: number;
+  meanScore: number | null;
+}
+
+/**
+ * A decade ranking's rows, filled out into every decade between the earliest and
+ * latest one the library actually holds — in ascending time order, with an empty
+ * decade kept as a zero-count bucket rather than skipped (deliverable 3, "an empty
+ * decade is data").
+ *
+ * Derived entirely from the `decade` ranking already on the page: `rank()` only
+ * returns decades with at least one entry (`GROUP BY`), so the gaps are filled in
+ * here rather than asked of the server, which is the whole reason this deliverable
+ * costs no backend change.
+ */
+export function chronologyBuckets(rows: InsightRow[]): ChronologyBucket[] {
+  if (rows.length === 0) return [];
+  const byDecade = new Map(rows.map((row) => [Number(row.key), row]));
+  const decades = [...byDecade.keys()];
+  const earliest = Math.min(...decades);
+  const latest = Math.max(...decades);
+  const buckets: ChronologyBucket[] = [];
+  for (let decade = earliest; decade <= latest; decade += 10) {
+    const row = byDecade.get(decade);
+    buckets.push({
+      decade,
+      label: row?.label ?? `${decade}s`,
+      count: row?.count ?? 0,
+      meanScore: row?.mean_score ?? null,
+    });
+  }
+  return buckets;
+}
+
+/** One key option, paired with the ranking(s) that have actually arrived. */
+export interface AnsweredInsightKey {
+  option: InsightKeyOption;
+  insight: Insight;
+  /** Present only when `option.grain` is declared and its own ranking has arrived. */
+  grainInsight?: Insight;
+}
+
+/**
+ * Pairs each key option with its ranking(s), dropping any still pending — and,
+ * for a rollup declaration (deliverable 2), pairing the coarse and fine grain
+ * into *one* answered key rather than two. `orderKeys` and everything downstream
+ * sees Decade+Year as a single entry, the way any other key is one.
+ */
+export function resolveAnsweredKeys(
+  options: InsightKeyOption[],
+  insightByKey: ReadonlyMap<string, Insight | undefined>,
+): AnsweredInsightKey[] {
+  const answered: AnsweredInsightKey[] = [];
+  for (const option of options) {
+    const insight = insightByKey.get(option.name);
+    if (!insight) continue;
+    const grainInsight = option.grain
+      ? insightByKey.get(option.grain.name)
+      : undefined;
+    answered.push({ option, insight, grainInsight });
+  }
+  return answered;
+}
+
+/**
+ * How much of the 12-column grid a ranked card earns, by its rank among the cards
+ * below the hero (deliverable 5): the first is worth two of the next three, so a
+ * ranking with fifteen values is not drawn the same size as one with three. Past
+ * the first row the pattern repeats — the proposal specifies 8/4 then 4/4/4 and is
+ * silent past five cards, and repeating 4s is the same "not the same size as the
+ * hero" statement for however many keys a domain happens to declare.
+ */
+export function insightGridSpan(rankIndex: number): 8 | 4 {
+  return rankIndex === 0 ? 8 : 4;
 }
 
 /**

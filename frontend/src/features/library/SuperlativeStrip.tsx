@@ -60,31 +60,36 @@ export function SuperlativeStrip({
   if (superlatives.length === 0) return null;
 
   return (
-    <div className="mt-6 flex flex-wrap gap-3">
-      {superlatives.map((superlative) => (
-        <div
-          key={superlative.kind}
-          className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-border bg-surface px-4 py-3"
-        >
-          <CoverImage
-            src={superlative.row.covers[0]}
-            alt=""
-            className="h-12 w-9 shrink-0 object-cover"
-            placeholderClassName="h-12 w-9 shrink-0 [&_svg]:h-5 [&_svg]:w-5"
-          />
-          <div className="min-w-0">
-            <p className="text-xs text-muted-foreground">
-              {titles[superlative.kind]}
-            </p>
-            <p className="truncate text-sm font-medium">
-              {superlative.row.label}
-            </p>
-            {stat(superlative)}
+    <div className="flex flex-col gap-3 px-4 pb-4">
+      {/* One per row below `sm`: three tiles squeezed into 390px truncated
+          both the label ("2000s" to "2...") and wrapped the title
+          mid-word — a phone gets the room a tile actually needs instead. */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+        {superlatives.map((superlative) => (
+          <div
+            key={superlative.kind}
+            className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3 sm:flex-1"
+          >
+            <CoverImage
+              src={superlative.row.covers[0]}
+              alt=""
+              className="h-12 w-9 shrink-0 object-cover"
+              placeholderClassName="h-12 w-9 shrink-0 [&_svg]:h-5 [&_svg]:w-5"
+            />
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">
+                {titles[superlative.kind]}
+              </p>
+              <p className="truncate text-sm font-medium">
+                {superlative.row.label}
+              </p>
+              {stat(superlative)}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
       {ratedEntries > 0 && (
-        <p className="w-full text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {ratedEntries} of your {totalEntries} are rated.
         </p>
       )}

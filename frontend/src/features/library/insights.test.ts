@@ -1,15 +1,18 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  chronologyBuckets,
   computeSuperlatives,
+  insightGridSpan,
   keyLead,
   magnitude,
   orderKeys,
   orderRows,
   quietSummary,
+  resolveAnsweredKeys,
   weightClass,
 } from "@/features/library/insights";
-import type { InsightRow } from "@/api/library";
+import type { Insight, InsightRow } from "@/api/library";
 
 function row(
   key: string,
@@ -239,5 +242,103 @@ describe("computeSuperlatives", () => {
 
   it("answers nothing for an empty ranking", () => {
     expect(computeSuperlatives([], 2)).toEqual([]);
+  });
+});
+
+describe("chronologyBuckets", () => {
+  function decadeRow(decade: string, count: number, mean: number | null) {
+    return row(decade, count, count, mean);
+  }
+
+  it("fills a gap between decades that hold entries as a zero-count bucket", () => {
+    const rows = [decadeRow("2000", 6, 8.1), decadeRow("1960", 3, 7.0)];
+    expect(chronologyBuckets(rows)).toEqual([
+      { decade: 1960, label: "1960", count: 3, meanScore: 7.0 },
+      { decade: 1970, label: "1970s", count: 0, meanScore: null },
+      { decade: 1980, label: "1980s", count: 0, meanScore: null },
+      { decade: 1990, label: "1990s", count: 0, meanScore: null },
+      { decade: 2000, label: "2000", count: 6, meanScore: 8.1 },
+    ]);
+  });
+
+  it("returns nothing for an empty ranking", () => {
+    expect(chronologyBuckets([])).toEqual([]);
+  });
+
+  it("returns exactly one bucket when every entry shares a decade", () => {
+    expect(chronologyBuckets([decadeRow("2010", 4, 6.5)])).toEqual([
+      { decade: 2010, label: "2010", count: 4, meanScore: 6.5 },
+    ]);
+  });
+});
+
+function insight(rows: InsightRow[]): Insight {
+  return {
+    type: "book",
+    key: "decade",
+    metric: "count",
+    min_rated: 2,
+    rows,
+    next_cursor: null,
+    suppressed: [],
+    no_rated_groups: false,
+    null_count: 0,
+    total_entries: rows.reduce((sum, row) => sum + row.count, 0),
+    rated_entries: 0,
+  };
+}
+
+describe("resolveAnsweredKeys", () => {
+  it("resolves a rollup key and its fine grain to one answered entry", () => {
+    const decade = insight([row("2000", 6, 0, null)]);
+    const year = insight([row("2001", 6, 0, null)]);
+    const options = [
+      {
+        name: "decade",
+        label: "Decade",
+        grain: { name: "year", label: "Year" },
+      },
+    ];
+    const byKey = new Map([
+      ["decade", decade],
+      ["year", year],
+    ]);
+
+    const answered = resolveAnsweredKeys(options, byKey);
+
+    expect(answered).toHaveLength(1);
+    expect(answered[0].insight).toBe(decade);
+    expect(answered[0].grainInsight).toBe(year);
+  });
+
+  it("drops a key whose ranking has not arrived yet", () => {
+    const options = [{ name: "creators", label: "Authors" }];
+    expect(resolveAnsweredKeys(options, new Map())).toEqual([]);
+  });
+
+  it("leaves grainInsight undefined when the fine grain has not arrived yet", () => {
+    const decade = insight([row("2000", 6, 0, null)]);
+    const options = [
+      {
+        name: "decade",
+        label: "Decade",
+        grain: { name: "year", label: "Year" },
+      },
+    ];
+    const answered = resolveAnsweredKeys(
+      options,
+      new Map([["decade", decade]]),
+    );
+    expect(answered).toHaveLength(1);
+    expect(answered[0].grainInsight).toBeUndefined();
+  });
+});
+
+describe("insightGridSpan", () => {
+  it("gives the first card after the hero two of the next three's width", () => {
+    expect(insightGridSpan(0)).toBe(8);
+    expect(insightGridSpan(1)).toBe(4);
+    expect(insightGridSpan(2)).toBe(4);
+    expect(insightGridSpan(3)).toBe(4);
   });
 });

@@ -664,6 +664,18 @@ async function stubInsightsScreen(page: Page) {
       },
     }),
   );
+  // Registered after the broader `**/api/insights**` route above, so
+  // Playwright's most-recently-registered-wins rule gives this the match.
+  await page.route("**/api/insights/scores**", (route) =>
+    route.fulfill({
+      json: {
+        type: "book",
+        counts: [0, 0, 1, 0, 1, 2, 3, 4, 3, 1],
+        rated_count: 15,
+        unrated_count: 5,
+      },
+    }),
+  );
 }
 
 const insightsBookType = {
