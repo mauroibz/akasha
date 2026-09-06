@@ -4908,3 +4908,25 @@ published, deployed or pushed — not asked for.
 
 Next: nothing numbered. A new sprint begins only when the owner asks for one; `HANDOFF.md` lists
 what remains owed outside the plan.
+
+## 2026-09-06 — v1.8.0 released: merged to main, pushed, tagged
+
+The owner asked directly: "commit, merge to main, push and tag a new version." Version bumped
+1.7.0 -> 1.8.0 across `backend/pyproject.toml`, `main.py`'s FastAPI version, `backend/uv.lock`
+(via `uv lock`), and `frontend/package.json`; `frontend/openapi.json` regenerated (version field
+only -- every schema change from Sprints 073/074 was already committed incrementally during their
+own sessions). `docs/operations/release-notes-v1.8.md` written following the v1.6/v1.7 release
+notes' own shape (what's new, what it deliberately does not do, known-unfixed, an explicit
+"nothing migrates" versioning note since none of Sprints 072-074 touched a migration).
+`docs/README.md`'s release-notes index line gained the new file. `make check` green after the
+bump.
+
+`ui-readability-proposal` (23 commits ahead of `main`, `main` with none of its own past the branch
+point) was merged into `main` as a fast-forward, pushed, and tagged `v1.8.0` -- all three actions
+the owner asked for directly, in the same message. `docs/agent/HANDOFF.md` updated to describe
+`main` as current rather than `ui-readability-proposal` as a pending branch, and its "still owed"
+list corrected: it had been asking to cut `v1.6.0`/`v1.7.0` tags that a `git tag -l` check showed
+were already cut, a stale bullet from before this session -- removed rather than carried forward
+again.
+
+State unchanged otherwise: `project_status: "complete"`, no active sprint.

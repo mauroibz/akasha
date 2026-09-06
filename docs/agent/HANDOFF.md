@@ -76,7 +76,6 @@ have the decisions worth reading independent of the code.
 - **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
   outstanding; needs the owner's own container. Every walkthrough since has run against a
   throwaway seeded backend instead.
-- Cutting the `v1.6.0` and/or `v1.7.0` release tag(s).
 - **DEC-133's open product question** (album ranking ordering `Label` ahead of `Artists`).
 - **Saved views ("smart shelves")** — accepted in principle by DEC-139, needs a `saved_views`
   table and a migration, deliberately left unscheduled. Becomes a sprint the day the owner asks;
@@ -88,13 +87,16 @@ have the decisions worth reading independent of the code.
 
 ## Branch and authorization
 
-On **`ui-readability-proposal`**, branched from `main` at `1914ffe`. Nothing pushed, nothing
-merged; `main` is untouched. Authorization does not carry forward: do not push, merge, tag, open a
-PR, or take any remote action without being asked — including now that the plan reads complete.
+`ui-readability-proposal` (branched from `main` at `1914ffe`) was merged into `main`
+(fast-forward — `main` had no commits of its own past that point), pushed, and tagged `v1.8.0` at
+the owner's explicit request ("commit, merge to main, push and tag a new version"). `main` is now
+current with all of Sprints 072-074 and both layout fixes. Authorization does not carry forward to
+future sessions: do not push, merge, tag, open a PR, or take any remote action again without being
+asked, even though this session did.
 
 ## Version
 
-Unchanged at `1.7.0`.
+`1.8.0`, tagged. `docs/operations/release-notes-v1.8.md` has the release notes.
 
 ## Private data and operational constraints
 
