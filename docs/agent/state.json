@@ -1,12 +1,12 @@
 {
   "schema_version": 1,
   "plan_revision": 39,
-  "project_status": "in_progress",
-  "started_at": "2026-09-05T19:10:00-03:00",
-  "active_sprint": "072",
-  "active_sprint_file": "docs/sprints/072-a-wall-of-covers.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "071",
+  "project_status": "ready",
+  "started_at": "",
+  "active_sprint": "073",
+  "active_sprint_file": "docs/sprints/073-insights-with-a-shape.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "072",
   "completed_sprints": [
     "001",
     "002",
@@ -78,7 +78,8 @@
     "068",
     "069",
     "070",
-    "071"
+    "071",
+    "072"
   ],
-  "updated_at": "2026-09-05T19:10:00-03:00"
+  "updated_at": "2026-09-06T11:35:00-03:00"
 }

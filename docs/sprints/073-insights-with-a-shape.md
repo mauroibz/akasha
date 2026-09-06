@@ -1,6 +1,6 @@
 # Sprint 073 — Insights with a shape
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 072
 **Roadmap revision:** 39
 

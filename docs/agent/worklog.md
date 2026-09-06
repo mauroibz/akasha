@@ -4598,3 +4598,59 @@ sprint's delivered total contract.
 Next: rerun `make test`, run `python scripts/validate_project.py` distinctly and the full
 `npx playwright test`. If green, reconcile Outcome/DEC/ROADMAP, mark 072 completed, make 073 ready,
 run documentation closure checks and create `[DOCS] Close sprint 072 and hand off`.
+
+## 2026-09-06 — Sprint 072 closed
+
+Ran the deferred exhaustive gate the prior session left owed. `git status` was clean and
+`python scripts/validate_project.py` passed before starting, confirming the implementation was
+still frozen exactly where the prior session left it (`edc1fe3`..`e3aeacb`, no uncommitted diff).
+
+Done and verified this session:
+
+- `make check` — green.
+- `make test` — backend 1356 passed (85s), frontend Vitest 279 passed (24s).
+- `npx playwright test`, full suite — first run: **4 failed** (`accessibility.spec.ts:525` degraded
+  provider notice, `formats.spec.ts:84` status filter after domain switch, `library.spec.ts:507`
+  reduced motion, `heavy-library accessibility.spec.ts:184` table view). Root-caused each rather
+  than assuming flake:
+  - `accessibility.spec.ts:525` reproduced as a pass in 1/1 isolated run — a known parallel-worker
+    timing sample on an unrelated screen (`ProviderHealthNotice`, untouched by this sprint's diff),
+    matching the exact signature the prior session already recorded. Not fixed (out of scope,
+    unrelated file); not rerun-until-green either — confirmed by isolated execution, not assumed.
+  - `formats.spec.ts:84` reproduced 3/3 in isolation. Instrumented the page directly (a throwaway
+    scratchpad spec, deleted after use) to watch the Filters trigger's `data-state` and the status
+    combobox's presence tick-by-tick after a domain switch: the trigger settles to `closed`
+    essentially immediately and reliably, but the descendant status combobox can still read
+    `isVisible() === true` for one more ~150ms tick while its exit animation plays. The test's own
+    reopen guard checked the wrong signal (`status.isVisible()`) and skipped reopening, then
+    clicked a node already mid-detach. Fixed by waiting on the trigger's own `data-state="closed"`
+    instead, confirmed deterministic by the same instrumentation.
+  - `library.spec.ts:507` — missing the `openFilters(page)` call every neighboring test in the file
+    already uses now that sort lives inside the Filters popover. One-line fix.
+  - `heavy-library accessibility.spec.ts:184` reproduced consistently (measured 42.5px against the
+    44px target). Instrumented a throwaway scratchpad spec to sample the score chip's height every
+    100ms after switching to Table view: it starts at ~42.5-43.7px and converges to exactly 44px
+    within ~300-400ms — an entrance-animation artifact, not a real target-size defect. Fixed by
+    waiting for `document.getAnimations().length === 0` before measuring, the same API
+    `e2e/motion.ts`'s sampler already relies on elsewhere in this suite.
+  - Rerun after fixes: each of the three genuine fixes held 3-5/5 repeats in isolation; full suite
+    rerun clean at **124 passed, 2 skipped, 0 failed**.
+- `python scripts/validate_project.py` — passed distinctly.
+- Walkthrough (DEC-025): not rerun. No application code changed this session, only four e2e test
+  files; the prior session's realistic walkthrough against a fresh throwaway backend already
+  covers the shipped behavior and is carried into the Outcome unchanged.
+
+Reconciled: Sprint 072's Outcome (delivered commits, all 11 acceptance criteria, the four test
+changes named with what each was asserting, verification evidence), DEC-140 (the sprint closure
+and the out-of-scope stale-facet-label defect the prior walkthrough found), `docs/agent/state.json`
+(`072` completed, `073` active and `ready`), Sprint 073's own file (`planned` → `ready`).
+`docs/sprints/ROADMAP.md` needed no change — its 072-074 entries already described what was built.
+
+Verified and how: every command above was executed directly this session, not inferred from the
+prior session's summary; the three genuine test fixes were root-caused with direct DOM/animation
+instrumentation before being written, not guessed at.
+
+Next: Sprint 073 ("Insights with a shape") — the leading key becomes a hero with its own
+superlatives, Decade/Year become one card at two grains in time order, the score distribution is
+drawn, and the long tail becomes a card instead of a footnote. One read-only endpoint (per-score
+counts) is the only backend change.

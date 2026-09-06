@@ -1,43 +1,82 @@
-# Handoff — Sprint 072 implementation complete; exhaustive gate deferred
+# Handoff — Sprint 072 closed; Sprint 073 ready
 
-Branch `ui-readability-proposal`, local only, nothing pushed. Sprint 072 remains `in_progress` by
-the owner's explicit request to defer the remaining tests. The only tracked worktree changes are
-this handoff and the appended worklog entries; application and test changes are committed.
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "073"`,
+`active_sprint_file: "docs/sprints/073-insights-with-a-shape.md"`, `active_sprint_status: "ready"`,
+`last_completed_sprint: "072"`. Plan revision 39, unchanged. A session picking this up starts at
+`AGENTS.md` §1 and executes Sprint 073.
 
-## Delivered commits
+## What just happened
 
-- `edc1fe3` — grid/container geometry and in-progress state.
-- `565e6aa` — vertical cover-first card, readable cover controls and metadata.
-- `060792a` — one command bar, Filters popover/chips, and correct `N` / `N of M` total.
-- `3bacbc3` — genuinely dense 52px list and bounded overscan.
-- `e3aeacb` — five-domain command bar stays above the measured fold.
+Sprint 072 ("A wall of covers") was implemented in a prior session (commits `edc1fe3`..`e3aeacb`)
+which then deferred the exhaustive verification gate at the owner's request. This session ran that
+gate: `make check`, `make test` (backend 1356, frontend 279, both green), and the full
+`npx playwright test`. The first full Playwright run surfaced four failures, all inside this
+sprint's own new e2e coverage and none in application code; each was root-caused with direct
+instrumentation rather than assumed transient, three were genuine test bugs and fixed, and one
+(a `ProviderHealthNotice` axe sample, unrelated file) reproduced as green in isolation — a known
+parallel-worker timing sample already on record from the implementation session. Full details,
+including exactly what each fix does and why, are in the sprint's own Outcome section and DEC-140.
+The closing commit for this reconciliation is `[DOCS] Close sprint 072 and hand off`.
 
-## Evidence already captured
+Sprint 072 delivered: the library card is cover-first (cover ≥70% of card area), the score is a
+44px chip on the cover's scrim, one sticky command bar replaces four rows of chrome behind a single
+**Filters** popover, the response total is visible (plain `N`, or `N of M` filtered), six columns at
+2560px, and the second (list) density is genuinely dense (~52px rows, ≥14 visible in 900px).
+DEC-023's virtualization contract (fixed-size rows, derived columns, the score picker's in-card
+overlay) is unchanged; its two mounted-DOM bounds were re-measured for the new row heights and hold.
 
-- `make check` passes.
-- Focused Vitest passes (HomePage 50/50; broader affected set 76/76).
-- Focused Playwright acceptance checks pass. Deterministic 10,000-entry measurements are grid
-  6 rows / 30 cards and table 19 rows / 19 cards.
-- Fresh 20-entry realistic walkthrough passes: first card y=293/144/144 at 390/1440/2560;
-  columns 1/6/6; cover area 72.8%; table 15 visible rows; no body overflow or browser errors;
-  score/status/filter/navigation persisted. The wide poster centre-crops strongly; the light-cover
-  controls remain readable on their opaque backing. The owner's `127.0.0.1:8000` was not mutated.
+## Known-degraded, deliberately not fixed (carried forward, still true)
 
-## Exact remaining work
+- `/api/health/providers` reports configuration, not reachability.
+- Kitsu's latency tail occasionally exceeds its budget.
+- `languages` mixes vocabularies across movie/series sources.
+- The book domain declares `Creators` where `Authors` would read better.
+- The `insights` ranking scenarios (`creators/count`, `creators/score`, `publisher/count`) in
+  `scripts/benchmark_library.py` have exceeded the 500ms first-page budget under contended
+  conditions on this workstation in past measurements (DEC-133). Sprint 073 touches this exact
+  path and must re-measure rather than inherit an old number or blame its own diff for one it
+  didn't cause.
+- **New this session:** immediately after an inline status change on a library entry, the Filters
+  popover's status option kept its stale facet label (e.g. `To read 4`) until reload, even though
+  the filtered response and the visible total were correctly `3 of 20`. A cache-invalidation gap in
+  the facet-counts read (Sprint 072's Outcome and DEC-140 have the full context). Not this sprint's
+  diff, not fixed here — pick it up in whichever sprint next touches the status facet query, or a
+  dedicated one if none does soon.
+- If `scripts/validate_project.py` ever fails for a reason unrelated to real doc/state
+  inconsistency, check first for a leftover agent worktree under `.claude/worktrees/` — a prior
+  instance of this was git-excluded but still walked by the text-hygiene check. Deleting it clears
+  a false failure. Run from a clean checkout before believing a failure.
 
-1. Rerun `make test`; the interrupted capture is not a pass.
-2. Run the full `npx playwright test`. If the degraded-provider axe timing sample recurs, settle
-   the crossfade before axe rather than weakening accessibility assertions.
-3. Run `python scripts/validate_project.py` distinctly (it already passed inside `make check`).
-4. Reconcile and close: Sprint 072 Outcome (including every changed test and the 112px text block
-   deviation), any material DEC append, ROADMAP review, status/state transition to Sprint 073
-   `ready`, final worklog/HANDOFF, closure validator plus `git diff --check`, and the final
-   `[DOCS] Close sprint 072 and hand off` commit.
+## Still owed to the owner
 
-Observed outside scope: after an inline status mutation, the filter facet label stayed stale until
-refresh (`To read 4`) while the filtered response and total were correctly `3 of 20`. Do not hide
-this in Sprint 072's Outcome; record/schedule it as a cache invalidation defect.
+- **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
+  outstanding; needs the owner's own container.
+- Cutting the `v1.6.0` and/or `v1.7.0` release tag(s).
+- **DEC-133's open product question** (album ranking ordering `Label` ahead of `Artists`).
 
-After 072 closes, Sprint 073 redesigns Insights (hero, chronology, score distribution and long-tail
-cards). Sprint 074 then turns Shelves into a visual board with cross-domain shelf pages and pinning;
-074 is the current final planned sprint. Saved views are accepted in principle but unscheduled.
+## Branch and authorization
+
+On **`ui-readability-proposal`**, branched from `main` at `1914ffe`. Nothing pushed, nothing
+merged; `main` is untouched. Authorization does not carry forward: do not push, merge, tag or take
+any remote action without being asked.
+
+## Version
+
+Unchanged at `1.7.0`.
+
+## Private data and operational constraints
+
+Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has no auth and
+stays LAN-only; Calibre is opened read-only. This session ran the frontend's own test suites and
+Playwright against its dev/preview servers only — no backend container was launched, and the
+owner's own instance was not touched.
+
+## Sprint 073 in one paragraph
+
+Insights stops saying one thing twice in one idiom: the leading key becomes a hero carrying its own
+superlatives, Decade and Year become one card at two grains drawn in time order, the score
+distribution is drawn (today it isn't drawn at all), and the keys that were a grey footnote become
+cards sized by how much they have to say. One read-only endpoint (per-score counts) is the only
+backend change. Sprint 074 ("A shelf is a place") follows: the shelves index becomes a board, every
+shelf gets a cross-domain page, and a shelf can be pinned into the library bar — the current final
+planned sprint. Saved views are accepted in principle and left unscheduled.

@@ -5516,3 +5516,48 @@ both changes, against 1 of 3 before the second.
   sit on the cover by design) and `library.test.ts`'s column-count expectations (which read the
   constants, so they move with them). No new colour, no second accent, no new typeface, no
   charting library, no new dependency, and no light theme.
+
+## DEC-140 — Sprint 072 closes: the wall of covers built, a deferred gate resolved, one out-of-scope defect found
+
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Cross-references:** DEC-139 (accepted the proposal this sprint builds the first third of),
+  DEC-023 (the virtualization contract whose numbers move here), DEC-137/DEC-138 (the precedent for
+  recording a walkthrough-found, out-of-scope defect rather than silently fixing or hiding it).
+- **Context:** [`072-a-wall-of-covers.md`](sprints/072-a-wall-of-covers.md) redrew the library as a
+  cover-first wall — a pinned cover height, the score as a corner chip on the cover's scrim, one
+  sticky command bar replacing four rows of chrome, the response total made visible, six columns at
+  2560px, and a genuinely dense second density — with DEC-023's virtualization contract preserved
+  and its two mounted-DOM bounds re-measured for the new row heights. Implementation and the
+  application-code commits closed in the prior session; the owner asked to defer the exhaustive
+  gate (`make test`, the full `npx playwright test`, `validate_project.py` run distinctly) because
+  they had to leave, and `docs/agent/HANDOFF.md`/the worklog recorded exactly that as the resume
+  point. This session ran the deferred gate.
+- **Decision:** accepted as built, with two points worth recording rather than letting the sprint
+  Outcome carry alone.
+  - **The deferred gate surfaced four e2e failures, all in this sprint's own new coverage, none in
+    application code.** Each was root-caused rather than assumed transient or rerun-until-green:
+    one test was missing the `openFilters` call every neighbor in its file now needs; one measured
+    a score chip's height mid-entrance-animation (settles to the correct 44px within ~300ms); and
+    one had a real race — after a domain switch, it reopened the Filters popover only if a
+    descendant control read as not-visible, but that control can still read visible for one more
+    tick while Radix's own close animation runs, so the guard skipped reopening and then clicked a
+    node already leaving the DOM (reproduced 3/3 in isolation before the fix, via direct
+    instrumentation of the popover's own `data-state`, which was shown to settle deterministically
+    where the descendant's visibility did not). All three test files are named with their fixes in
+    the sprint Outcome. No test was weakened, skipped, or marked flaky to reach green; the full
+    suite (124 passed, 2 skipped) was rerun clean after the fixes, on top of `make check` and
+    `make test` (1356 backend, 279 frontend).
+  - **One new out-of-scope defect, found by the prior session's walkthrough, not fixed here.**
+    Immediately after an inline status change, the Filters popover's status option kept its stale
+    facet label (e.g. `To read 4`) until reload, while the filtered response and the visible total
+    were correctly `3 of 20`. A cache-invalidation gap in the facet-counts read, not in the total
+    AC7 owns, and this sprint's diff touches no line of that path. Recorded rather than fixed, per
+    the walkthrough gate's own rule that a defect noticed and left unrecorded is the failure mode
+    the gate exists to prevent — the same rule DEC-137 applied to the import source strip.
+- **Consequences:** `docs/agent/state.json` advances `active_sprint` to `073`, `active_sprint_status`
+  and `project_status` to `ready`; `last_completed_sprint` becomes `072`; `completed_sprints` gains
+  `072`. Sprint 073 ("Insights with a shape") depends on nothing this sprint changed beyond the
+  primitives it already shared. The stale facet-label defect above is carried forward in
+  `docs/agent/HANDOFF.md`'s known-degraded list until a sprint that touches the status facet query
+  picks it up.

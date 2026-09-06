@@ -1,6 +1,6 @@
 # Sprint 072 — A wall of covers
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 071
 **Roadmap revision:** 39
 
@@ -175,4 +175,112 @@ Measured 2026-09-05 against the owner's running instance through Playwright:
 
 ## Outcome
 
-_Not started._
+Delivered as planned, frontend only. Commits, in order:
+
+1. `edc1fe3` [MOD] Repin the grid and container to Sprint 072 geometry — `gridLayout`:
+   `cardMinWidth` 190, `coverHeight` 300, `textHeight` 112 (96 was the plan's placeholder; the
+   two-line title plus creator and year/format line measured wider, named here as the deviation
+   deliverable 1 owed), `cardHeight = coverHeight + textHeight`, `maxColumns` 6, container
+   `max-w-[1600px]`.
+2. `565e6aa` [MOD] Give the card its cover back, and its score where the eye lands — the vertical
+   cover-first card, the `ScorePicker`/`StatusSelect` pair riding an opaque scrim on the cover
+   (deliverables 2–4).
+3. `060792a` [MOD] Put one bar above the library and state its size — the sticky command bar,
+   sort/shelf/format/status collapsed into one **Filters** popover, the chips as the sole record
+   of active state, and `firstPage.total` / "N of M" (deliverables 5–6). The plan assumed summing
+   `facets.status_counts_by_type[domain]` gave the unfiltered denominator; validation showed that
+   sum is filtered by whatever shelf/query/format is also set, so it silently produced the wrong
+   `M` under those filters. Fixed with a `limit=1` companion query (`wholeLibrary`,
+   `frontend/src/pages/HomePage.tsx:290-303`) that reads the true per-domain total from its own
+   response, fetched only when a filter is active.
+4. `3bacbc3` [MOD] Make the second library density honestly dense — `tableRowHeight` 52 (net; the
+   sprint file's own baseline table row was already 84px, called out at variance in the plan
+   itself), 32×48 covers, 44px status/score targets, overscan reduced to 2 (deliverable 7).
+5. `e3aeacb` [FIX] Keep the real command bar above the fold — moved the Filters trigger into the
+   command row itself (it had drifted into the second, conditionally-empty row) and stopped that
+   row from rendering when no chip is set, which is what the 1440×900/390×844 fold measurements
+   below depend on.
+6. This session (no separate commit list beyond the closing one below): three e2e tests fixed, all
+   named under "Tests changed" below, and this Outcome/DEC/state/worklog/HANDOFF reconciliation.
+
+### Acceptance criteria
+
+1. First card top ≤200px at 1440×900, ≤300px at 390×844 — held (`library.spec.ts` "the wall
+   starts near the top…").
+2. Cover ≥70% of card area at 390/768/1440 — held (measured 72.8% in the realistic walkthrough,
+   asserted in `library.spec.ts`).
+3. Columns 1/≥5/≥6 at 390/1440/2560, no overlap on reflow — held
+   (`library.spec.ts` "the wall reaches one, five, and six columns…").
+4. Score chip ≥40×40 with ≥18px numeral; status target ≥44px; both visible at rest and keyboard
+   reachable — held (`accessibility.spec.ts` "wall-card score and status controls…").
+5. Controls may overlap the cover, never the metadata, never escape the card, no card overlaps
+   another — held; `library.spec.ts`'s containment test was **rewritten** to this rule, as
+   anticipated by the sprint file (see Tests changed).
+6. DEC-023's mounted-DOM bounds hold at 10,000 entries in both densities — held. Freshly measured
+   this session: grid 7 rows / 35 cards, table 19 rows / 19 cards, grid+web-results 35 cards,
+   crossfade peak 4 rows / 20 cards / 1 container — all inside <20 rows / <48 cards. (These are
+   viewport-dependent counts, not fixed constants; the worklog's earlier 6/30 sample from the same
+   suite is the same bound read at a different column count, not a regression.)
+7. The library shows its total, and both numbers filtered, equal to the response's `total` — held,
+   via the companion query described above.
+8. List density ≥14 rows in a 900px viewport — held, measured 15 visible rows.
+9. The expanded score picker stays inside its card at every width, test **unchanged** — held.
+10. `/` holds at 390px, no horizontal scroll, 44px targets, zero serious axe violations in both
+    densities — held.
+11. Every other suite passes unchanged except the tests named below.
+
+### Tests changed (AC5/AC11)
+
+- `frontend/e2e/library.spec.ts` — "grid cards keep cover, metadata and controls separated"
+  rewritten to "grid cards keep controls on the cover and off the metadata", per AC5 above.
+  Anticipated by the sprint file.
+- `frontend/src/features/library/library.test.ts` — column-count expectations moved with the new
+  `gridLayout` constants. Anticipated by the sprint file.
+- `frontend/e2e/library.spec.ts` "reduced motion reaches the animations no stylesheet can touch" —
+  was missing the `openFilters(page)` call every neighboring test in the file uses now that sort
+  lives inside the Filters popover; added. Pre-existing since the D5 commit, only surfaced when
+  this session ran the deferred exhaustive gate.
+- `frontend/e2e/formats.spec.ts` "the status filter offers the chosen domain's vocabulary…" — after
+  switching domains, the test reopened the Filters popover only `if (!(await status.isVisible()))`.
+  The domain radio sits outside the popover, so Radix closes Filters on that click, but the status
+  combobox can still read `isVisible() === true` for one more tick while its exit animation runs —
+  a real race, reproduced 3/3 in isolation before the fix. Rewritten to wait for the Filters
+  trigger's own `data-state="closed"` (which settles deterministically, confirmed by direct
+  instrumentation) before unconditionally reopening it.
+- `frontend/e2e/accessibility.spec.ts` "library in table view has no serious accessibility
+  violations" — measured the score chip's height immediately after switching to Table view, which
+  can land mid-entrance-animation (observed as low as 42.5px against the 44px target, settling to
+  exactly 44px within ~300ms). Added a wait for `document.getAnimations().length === 0` before
+  measuring, the same signal `e2e/motion.ts`'s sampler already trusts elsewhere in this suite.
+
+None of the four fixes above touched application code — all four were latent test races or
+omissions in this sprint's own new coverage, found only because the exhaustive gate that surfaces
+them had been deferred past the implementation session. Each reproduced reliably in isolation
+before its fix and passed 3-5/5 repeats after.
+
+### Verification
+
+- `make check` — green.
+- `make test` — backend 1356 passed, frontend (Vitest) 279 passed.
+- `npx playwright test` (full suite, both `chromium` and the serial `heavy-library` project) — 124
+  passed, 2 skipped, 0 failed, after the four test fixes above. A first exhaustive run surfaced
+  those four failures; each was root-caused (not assumed transient) before being fixed, and the
+  full suite was rerun clean afterward.
+- `python scripts/validate_project.py` — passed, both standalone and inside `make check`.
+- Walkthrough (DEC-025): carried from the prior session's realistic run against a fresh throwaway
+  backend (20 API-created books, 19 generated covers, one missing) — never the owner's own
+  instance. Wall top 293px/144px/144px at 390/1440/2560; columns 1/6/6; cover area 72.8%; dense
+  table 15 visible rows; no horizontal body overflow or console errors; score/status persisted;
+  filtering showed the correct `3 of 20`. The 3:1 poster centre-cropped strongly to the pinned
+  frame, as specified; the opaque backing kept controls readable over a near-white cover. Not
+  rerun this session because no application code changed after that walkthrough — only e2e test
+  files were touched to close the deferred gate.
+
+### Known, out-of-scope defect recorded by the walkthrough (not fixed here)
+
+Immediately after an inline status change, the Filters popover's status option kept its stale
+facet label (e.g. `To read 4`) until a reload, even though the filtered response and the visible
+total were correctly `3 of 20`. This is a cache-invalidation gap in the facet counts, not in the
+total this sprint's AC7 owns, and touches no file this sprint's diff reaches. Carried forward in
+`docs/agent/HANDOFF.md`'s known-degraded list for whichever sprint next touches the status facet
+query, or a dedicated one if none does soon.
