@@ -4758,3 +4758,80 @@ State unchanged: still `074` `ready`, not started. This was the one thing owed a
 nothing is now.
 
 Next: Sprint 074 ("A shelf is a place") at `AGENTS.md` §1.
+
+## 2026-09-06 — Second library/insights follow-up (DEC-143): a tighter caption, a hero that uses its width
+
+Two more owner-directed layout fixes against the accepted mockup, out-of-band from the sprint
+sequence exactly as DEC-142 was. Sprint 074 was not started and is not touched.
+
+**Library card.** Reproduced and measured before changing anything: the text block was pinned at
+`textHeight = 112`, its content measured 64px on an ordinary card (no formats, one-line title),
+and the 48px remainder was painted `bg-surface` against a `bg-background` page — the "pale gray
+card" in the owner's words. The 112 existed because `FormatBadges` took a fourth line, so the
+constant had to budget for a line almost no card draws. Moved year and formats onto one line (what
+the proposal drew), recomputed `textHeight` honestly as 8 + 40 + 18 + 18 + 8 = 92, and dropped the
+`bg-surface` fill from both the text button and the card shell — the fill is the button's
+hover/focus state now. Card 412 → 392px, cover 73% → 76% of its area.
+
+Judgement calls, and why, against what the brief floated:
+- **Formats inline rather than on their own line** — the brief left this open. Inline is what
+  makes the height identical with and without formats, which is the whole point of the fix; a
+  fourth line would have put the slack straight back.
+- **They went *inside* the year `<p>`, not into a sibling of it.** `library.spec.ts`'s year-line
+  clipping test selects `[data-card-meta] p:last-of-type`. Wrapping the year in a new div would
+  have made the *creator* paragraph last-of-type, and that one is `truncate`d, so the test would
+  have started asserting truncation is absent on a line designed to truncate. Restructuring
+  around the test rather than editing it.
+- **The `<p>` is a flex row and the badges are 16px tall.** An inline-block badge on a 16px
+  baseline lifts the line box; a flex row with `items-center` does not, so the block's height
+  stays predictable. Badges that do not fit wrap out of an `h-4 overflow-hidden` box — a badge
+  disappears whole rather than being sliced down the middle, which is what a plain `flex-nowrap`
+  clip looked like in the first render.
+- **No fill at all rather than a near-background fill.** Tried reasoning about a fill close to
+  `bg-background`; removing it is simpler and strictly quieter, and the feed's own `bg-surface/40`
+  is already what fills the gutters between cards, so the caption now sits on the same ground the
+  gaps do — no seam at any card edge.
+- **92, not the proposal's 372px card (72px text).** 72 cannot hold a two-line title, and the
+  two-line clamp is finding 2's whole answer. Recorded rather than silently split the difference.
+
+**Insights.** The hero's promoted block stopped at ~200px in a 1400px row with the superlatives
+stacked below it; the chronology bars were 164px wide against a 128px chart height. Promoted block
+and tiles now share one row (wrapping only when the width runs out — 390px unchanged), and the
+duplicate promoted block in `InsightsCard`/`ChronologyCard` became one `HeroSummary` component
+with `SuperlativeStrip` folded into it and deleted. That deduplication is the reason for the
+choice: DEC-141's own finding was that one card had a hero mode and the other did not, and two
+byte-identical copies is how that happens again. Bars cap at 72px; the chart is left-aligned at
+the card's own edge.
+
+Judgement calls here:
+- **Left-aligned, not centred.** Centred was tried and screenshotted first: a 632px chart floating
+  in a 1368px card, out of line with the heading above it and the stats line below it. Left-aligned
+  puts the chart on the card's own left edge with everything else.
+- **The promoted block is capped (`max-w-sm`) rather than free or `shrink-0`.** Free, it takes a
+  share of the width it has nothing to do with; `shrink-0` overflows on a long author name. Capped,
+  it stops growing and hands the rest to the tiles.
+- **Considered and rejected: a two-column hero** (promoted + superlatives left, chronology strip
+  right) which would have filled the hero's width completely. It squeezes three tiles into ~500px,
+  which is the truncation DEC-141 had just fixed at 390px, and it is a redesign rather than a fix.
+  Noted in case a future sprint wants it deliberately.
+
+Verified, in the order asked: `make check`; backend `pytest -q` 1361 passed (frontend-only diff,
+run anyway); frontend `vitest run` 291 passed; full `npm run test:e2e` **124 passed, 2 skipped, 0
+failed** — run twice, once after a late `FormatBadges` class change. The "degraded provider notice"
+axe flake recorded in DEC-140/141/142 did not reproduce on either run, so no isolation rerun was
+needed. The three `library.spec.ts` geometry tests this fix is measured by all pass unchanged
+(controls off the metadata at 390/768/1440; cover ≥70% of card area at all three; first card top
+≤200px at 1440×900 and ≤300px at 390×844), and the 10,000-entry budget still mounts 7 rows / 35
+cards. Before/after screenshots taken with throwaway specs under `e2e/scratchpad/` (git-ignored,
+excluded from the normal run) at 1440×900 and 390×844 for the library and at 1440×900 for both
+hero variants — a decade-led chronology hero and a metadata-field-led one, so both hero shapes
+were checked rather than only the one the checked-in fixture happens to draw. Specs deleted after
+review; nothing from `e2e/scratchpad/` was committed.
+
+Observed and deliberately not fixed: `ScoreDistributionCard` also spans twelve columns and
+stretches its ten score bars the way the chronology strip did. Outside both of the owner's
+reports; recorded in DEC-143 so the next Insights sprint decides about it on purpose.
+
+State unchanged: still `074` `ready`, not started. Nothing is owed ahead of it.
+
+Next: Sprint 074 ("A shelf is a place") at `AGENTS.md` §1.

@@ -19,17 +19,27 @@ in the sprint's own Outcome and DEC-141. Its own DEC-025 walkthrough found and f
 defects (a chronology-led hero rendering with no superlatives; truncated superlative tiles at
 390px) before closing — neither carried forward as known-degraded.
 
-**Then, with both 072 and 073 closed**, the owner compared the shipped library card against the
-accepted design proposal's own mockup and reported wasted space and a centered, hard-to-read
-score/status readout. Reading the mockup's markup confirmed a specific bug: the wall card wrapped
-the status pill and score chip in one shared, centred pill instead of drawing them at opposite
-edges of the cover the way the mockup does. Fixed and recorded as **DEC-142**, landed as its own
-commit outside the sprint sequence (the same pattern DEC-138 used for a prior closed-sprint fix):
-`VirtualLibrary.tsx`'s `EntryControls` onCover branch now spans the cover's full width with
-`justify-between`, each control carrying its own opaque backing rather than sharing one. Verified
-with the full gate (`make check`, backend 1361, frontend 291, Playwright 124/0 failed) and a
-before/after screenshot walkthrough. DEC-023's score-picker containment contract is unchanged and
-was re-verified, not assumed.
+**Then, with both 072 and 073 closed**, the owner inspected the running app against the accepted
+design proposal's own mockup and reported three layout faults, fixed in two out-of-band passes
+(the pattern DEC-138 established: an owner-directed fix to a closed sprint's finding lands as its
+own commit, outside the sprint sequence).
+
+- **DEC-142** — the wall card wrapped the status pill and score chip in one shared, centred pill
+  instead of drawing them at opposite edges of the cover the way the mockup does.
+  `VirtualLibrary.tsx`'s `EntryControls` onCover branch now spans the cover's full width with
+  `justify-between`, each control carrying its own opaque backing. DEC-023's score-picker
+  containment contract is unchanged and was re-verified, not assumed.
+- **DEC-143** — *"the text under each cover has too much wasted vertical space, and the pale gray
+  card adds noise to it"*, plus an Insights hero and chronology strip that wasted the width they
+  were given. The card's year and formats share one line, so `textHeight` could be recomputed as
+  the content's actual height (112 → 92, still one constant in `library.ts` under DEC-023), and
+  the caption's `bg-surface` fill became its hover/focus state. On Insights the hero's promoted
+  block and its three superlative tiles share one row, the duplicate promoted block in
+  `InsightsCard`/`ChronologyCard` became one `HeroSummary` (`SuperlativeStrip` folded in and
+  deleted), and the chronology bars cap at 72px instead of stretching to 164px each.
+
+Both were verified with the full gate (`make check`, backend 1361, frontend 291, Playwright
+124 passed / 0 failed) and before/after screenshot walkthroughs against seeded fixtures.
 
 ## Known-degraded, deliberately not fixed (carried forward, still true)
 
@@ -67,9 +77,9 @@ Unchanged at `1.7.0`.
 ## Private data and operational constraints
 
 Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has no auth and
-stays LAN-only; Calibre is opened read-only. This session's Sprint 073 walkthrough and the
-library-card fix's screenshot walkthrough both ran against throwaway/mocked fixtures — the
-owner's own instance was never touched.
+stays LAN-only; Calibre is opened read-only. Sprint 073's walkthrough and both layout fixes'
+screenshot walkthroughs ran against throwaway/mocked fixtures — the owner's own instance was never
+touched.
 
 ## Sprint 074 in one paragraph
 

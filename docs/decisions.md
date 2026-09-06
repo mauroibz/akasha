@@ -5649,3 +5649,88 @@ both changes, against 1 of 3 before the second.
   sprint (074, not yet started), the same way DEC-138 recorded Sprint 071's fix to a Sprint
   070-closed finding. No `docs/agent/HANDOFF.md` known-degraded entry is needed; the report is
   resolved by this decision.
+
+## DEC-143 — Sprint 072/073 layout follow-up: the wall card's caption tightens, the insights hero uses its width
+
+- **Date:** 2026-09-06
+- **Status:** accepted
+- **Cross-references:** DEC-139 (accepted the proposal both screens are drawn from; its §3.1
+  geometry table is what the card's new height is measured against), DEC-142 (the immediately
+  preceding owner-directed fix to the same card, same out-of-band pattern), DEC-023 (the
+  fixed-row virtualization contract the card's one constant lives under), DEC-132 (the
+  leading-key-alone rule for superlatives, unchanged here), DEC-141 (taught `ChronologyCard` the
+  hero mode this entry deduplicates).
+- **Context:** with Sprints 072 and 073 both closed and DEC-142 landed, the owner inspected the
+  running app against the accepted mockup again and reported two more layout faults. On the
+  library: *"the text under each cover has too much wasted vertical space, and the pale gray card
+  adds noise to it."* On Insights: the hero panel and the chronology strip waste the horizontal
+  space they were given. Both were reproduced and measured before being changed, at 1440×900 and
+  390×844 against seeded fixtures.
+  - The card's text block was pinned at `textHeight = 112` because the format badges took a
+    fourth line of their own, so the height had to budget for a line that almost no card draws.
+    A card with formats and a two-line title measured 108px of content; the ordinary card — no
+    formats, a one-line title — measured 64px, leaving 48px of nothing. That nothing was painted
+    `bg-surface` (`hsl(240 5.9% 10%)`) against a `bg-background` page (`hsl(240 10% 3.9%)`), so
+    it read as a second, paler card under the poster rather than as the poster's caption. The
+    proposal's own geometry table had asked for a 372px card; the sprint shipped 412.
+  - The Insights hero spans all twelve columns by design (Sprint 073 deliverable 5). Its
+    promoted block — a 64×96 thumbnail beside a label, a count and a mean chip — sat in a plain
+    left-aligned flex row and stopped at roughly 200px, with `SuperlativeStrip` in a second row
+    below it. Measured at a 1400px hero: about 1200px of the first row empty while the three
+    tiles queued underneath. The chronology strip's `<li>`s were `flex-1` with no cap, so eight
+    decades drew at **164px per bar** against a 128px chart height — the bars were wider than
+    the chart was tall, and the width differences between them read as loudly as the heights
+    that actually carry the data.
+- **Decision:** fixed as reported, as two commits outside the sprint sequence — the same
+  out-of-band pattern DEC-142 and DEC-138 used. Neither fix touches an acceptance criterion any
+  sprint currently owns, and Sprint 074 has not started.
+  - **The card's caption is sized to its content and carries no fill at rest.** Year and formats
+    share one line, which is what the proposal drew (§3.1: *"year and formats as one quiet
+    line"*) and what makes the block's height the same with or without formats: 8 top padding +
+    a two-line title at `leading-5` (40) + the creator line (2 + 16) + the year/formats line
+    (2 + 16) + 8 bottom padding. `textHeight` is that number, 92, and it stays a single constant
+    in `library.ts` — `cardHeight`, `gridRowHeight` and the score/status row's
+    `bottom: textHeight + 8` anchor all follow it, as DEC-023 requires. The card is 392px and the
+    cover is 76% of its area, against 73% before; the proposal's 372px was not reachable without
+    giving up the two-line title clamp, which is the whole of finding 2. The `bg-surface` fill is
+    gone from both the text button and the card shell: the cover already draws the card's
+    boundary, and a lighter ground under it only added a second edge. The fill is the button's
+    hover and focus state now, which is the moment it has to say it is a button. A format badge
+    that does not fit the line wraps out of a one-line box rather than being clipped down its
+    middle.
+  - **The hero's promoted block and its superlatives share one row, in one component.** They
+    wrap onto separate lines only when the width genuinely runs out, so 390px is unchanged (one
+    tile per row, as DEC-141 fixed it). The promoted block is capped at `max-w-sm`: past that a
+    thumbnail and three short lines only get further apart, and the width is worth more to the
+    tiles beside them. `InsightsCard` and `ChronologyCard` held byte-identical copies of that
+    promoted block — the exact shape of duplication that lets one hero be fixed and the other
+    left behind, which is how DEC-141's chronology-hero gap arose in the first place. Both call
+    one `HeroSummary` now, which owns the promoted row, the tiles and the rated-count line
+    together; `SuperlativeStrip.tsx` is folded into it and deleted. No behaviour moves:
+    superlatives are still computed from the leading key alone (DEC-132), still appear exactly
+    once, and still drop to fewer than three when the library cannot honestly support them.
+  - **The chronology bars are capped at 72px and the chart starts at the card's left edge.** A
+    chart of eight buckets does not owe the hero its whole width; the leftover is margin, and
+    left-aligning it puts the chart in line with the card's heading and its stats line rather
+    than floating it. Centring was tried first and read as a chart adrift in the card. AC2 is
+    untouched: buckets are still in ascending time order, a zero-count decade is still drawn as
+    a gap rather than skipped, and the fill still comes from the bucket's own mean-score band.
+    At 390px the cap never binds and the bars fill the width exactly as before.
+- **Verified:** `make check`; backend 1361 (frontend-only diff, run anyway); frontend 291; the
+  full Playwright suite 124 passed / 2 skipped / **0 failed**, twice — the "degraded provider
+  notice" axe sample recorded as a known parallel-load flake in DEC-140/141/142 did not reproduce
+  on either run. `library.spec.ts`'s three geometry tests are the ones this fix is measured by
+  and all pass unchanged: controls never overlap the metadata at 390/768/1440, the cover holds
+  ≥70% of the card's area at all three, and the first card's document top is ≤200px at 1440×900
+  and ≤300px at 390×844. The 10,000-entry DOM budget still mounts 7 rows / 35 cards against
+  DEC-023's <20 / <48. No test was weakened, deleted or edited to reach green — the year line's
+  clipping assertion still measures the same last `<p>` of the block, which is why the formats
+  moved *inside* that paragraph rather than into a sibling of it. Before/after screenshots at
+  1440×900 and 390×844 for the library, and at 1440×900 for both hero variants (a decade-led
+  chronology hero and a metadata-field-led one), taken against seeded fixtures with throwaway
+  specs that were deleted afterwards.
+- **Consequences:** none to sprint sequencing — Sprint 074 stays `ready` and not started, and
+  `docs/agent/state.json` is unchanged. One observation recorded rather than fixed:
+  `ScoreDistributionCard`, which also spans twelve columns, stretches its ten score bars the same
+  way the chronology strip did. It was outside both of the owner's reports and is left alone,
+  named here so the next session that touches Insights can decide about it deliberately.
