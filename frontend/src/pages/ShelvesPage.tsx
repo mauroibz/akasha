@@ -1,44 +1,38 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { PageHeader } from "@/components/PageHeader";
-import { CoverImage } from "@/components/CoverImage";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { DomainStrip } from "@/components/DomainStrip";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { buttonVariants } from "@/components/ui/button-variants";
-import { CoverStack } from "@/features/library/InsightsRanking";
-import { magnitude, weightClass } from "@/features/library/insights";
-import { cn } from "@/lib/utils";
-import {
-  createShelf,
-  deleteShelf,
-  getShelves,
-  renameShelf,
-  type ShelfWithCount,
-} from "@/api/shelves";
+import { ShelfCard } from "@/features/shelves/ShelfCard";
+import { domainsFrom } from "@/features/library/labels";
+import { useItemTypes } from "@/features/library/useItemTypes";
+import { createShelf, getShelves, type ShelfWithCount } from "@/api/shelves";
+
+type ShelfSort = "size" | "name" | "recent";
+
+const allDomains = "";
+
+/** Every shelf's chosen count, honouring the domain filter (deliverable 3). */
+function countFor(shelf: ShelfWithCount, domainFilter: string): number {
+  if (!domainFilter) return shelf.entry_count;
+  return shelf.members_by_type?.[domainFilter] ?? 0;
+}
 
 export function ShelvesPage() {
   const cache = useQueryClient();
   const [newName, setNewName] = useState("");
   const [error, setError] = useState("");
-  const [renamingId, setRenamingId] = useState<number | null>(null);
-  const [renameValue, setRenameValue] = useState("");
-  const [deletingShelf, setDeletingShelf] = useState<ShelfWithCount | null>(
-    null,
-  );
+  const [domainFilter, setDomainFilter] = useState(allDomains);
+  const [sort, setSort] = useState<ShelfSort>("size");
+  const [query, setQuery] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
+
+  const itemTypes = useItemTypes();
+  const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
 
   const shelves = useQuery({
     queryKey: ["shelves"],
@@ -61,32 +55,47 @@ export function ShelvesPage() {
     onError: (e: Error) => setError(e.message),
   });
 
-  const rename = useMutation({
-    mutationFn: ({ id, name }: { id: number; name: string }) =>
-      renameShelf(id, name),
-    onSuccess: (_data, { name }) => {
-      setRenamingId(null);
-      setError("");
-      toast.success(`Shelf renamed to "${name}"`);
-      void cache.invalidateQueries({ queryKey: ["shelves"] });
-    },
-    onError: (e: Error) => setError(e.message),
-  });
+  // Only domains at least one shelf actually holds -- offering "Album" on a
+  // library with no album shelves would be a filter that always empties the
+  // board (deliverable 3).
+  const domainsInUse = useMemo(() => {
+    const ids = new Set<string>();
+    for (const shelf of shelves.data ?? [])
+      for (const id of Object.keys(shelf.members_by_type ?? {})) ids.add(id);
+    return domains.filter((domain) => ids.has(domain.id));
+  }, [shelves.data, domains]);
 
-  const remove = useMutation({
-    mutationFn: (id: number) => deleteShelf(id),
-    onSuccess: () => {
-      setDeletingShelf(null);
-      toast.success("Shelf deleted", {
-        description: "Your entries are retained.",
-      });
-      void cache.invalidateQueries({ queryKey: ["shelves"] });
-    },
-    onError: (e: Error) => setError(e.message),
-  });
+  const board = useMemo(() => {
+    let rows = shelves.data ?? [];
+    if (domainFilter)
+      rows = rows.filter((shelf) => countFor(shelf, domainFilter) > 0);
+    const typed = query.trim().toLowerCase();
+    if (typed)
+      rows = rows.filter((shelf) => shelf.name.toLowerCase().includes(typed));
+    const sorted = [...rows];
+    if (sort === "name") {
+      sorted.sort((a, b) => a.name.localeCompare(b.name));
+    } else if (sort === "recent") {
+      sorted.sort((a, b) =>
+        (b.updated_at ?? "").localeCompare(a.updated_at ?? ""),
+      );
+    } else {
+      sorted.sort(
+        (a, b) =>
+          countFor(b, domainFilter) - countFor(a, domainFilter) ||
+          a.name.localeCompare(b.name),
+      );
+    }
+    return sorted;
+  }, [shelves.data, domainFilter, query, sort]);
+
+  const max = Math.max(
+    ...board.map((shelf) => countFor(shelf, domainFilter)),
+    1,
+  );
 
   return (
-    <main className="mx-auto min-h-screen max-w-3xl px-5 py-8">
+    <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
       <PageHeader
         back
         headingRef={headingRef}
@@ -94,10 +103,9 @@ export function ShelvesPage() {
         lede="Organize your library with custom shelves. Deleting a shelf removes the tag from what is on it, but never deletes anything itself."
       />
 
-      {/* Create shelf */}
-      <section className="mt-6 flex gap-2">
+      <section className="mt-6 flex flex-wrap items-center gap-3">
         <Input
-          className="h-11 flex-1"
+          className="h-11 min-w-[200px] flex-1"
           aria-label="New shelf name"
           placeholder="New shelf name"
           value={newName}
@@ -110,7 +118,7 @@ export function ShelvesPage() {
           }}
         />
         <Button
-          className="rounded-full px-5"
+          className="h-11 rounded-full px-5"
           disabled={!newName.trim() || create.isPending}
           onClick={() => create.mutate(newName.trim())}
         >
@@ -124,7 +132,38 @@ export function ShelvesPage() {
         </p>
       )}
 
-      {/* Shelf list */}
+      {shelves.data && shelves.data.length > 0 && (
+        <section className="mt-6 flex flex-wrap items-center gap-3">
+          {domainsInUse.length > 1 && (
+            <DomainStrip
+              domains={[{ id: allDomains, label: "All" }, ...domainsInUse]}
+              value={domainFilter}
+              onChange={setDomainFilter}
+            />
+          )}
+          <SegmentedControl
+            ariaLabel="Sort shelves"
+            value={sort}
+            onChange={setSort}
+            options={[
+              { value: "size", label: "Largest" },
+              { value: "recent", label: "Recently added" },
+              { value: "name", label: "Name" },
+            ]}
+          />
+          <label className="relative min-w-40 flex-1">
+            <span className="sr-only">Search shelves by name</span>
+            <Input
+              className="h-11"
+              type="search"
+              placeholder="Search shelves"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </label>
+        </section>
+      )}
+
       {shelves.isPending && (
         <p role="status" className="mt-8 text-muted-foreground">
           Loading shelves…
@@ -140,176 +179,25 @@ export function ShelvesPage() {
           No shelves yet. Create one above.
         </p>
       )}
-      {shelves.data && shelves.data.length > 0 && (
-        <ul className="mt-6 space-y-3">
-          {(() => {
-            // Every row's bar reads against the same leader, so proportion is
-            // seen rather than computed (deliverable 2, the insights ranking's
-            // own rule). A single shelf's own count is never its own ceiling.
-            const max = Math.max(
-              ...shelves.data.map((row) => row.entry_count),
-              1,
-            );
-            return shelves.data.map((shelf) => {
-              const share = magnitude(shelf.entry_count, max);
-              const covers = shelf.covers ?? [];
-              return (
-                <li
-                  key={shelf.id}
-                  className="relative flex items-center gap-3 overflow-hidden rounded-xl border border-border bg-surface px-5 py-4"
-                >
-                  {renamingId === shelf.id ? (
-                    <div className="relative flex flex-1 items-center gap-2">
-                      <Input
-                        className="h-11 flex-1"
-                        aria-label={`New name for ${shelf.name}`}
-                        value={renameValue}
-                        autoFocus
-                        onChange={(e) => setRenameValue(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === "Enter" && renameValue.trim()) {
-                            e.preventDefault();
-                            rename.mutate({
-                              id: shelf.id,
-                              name: renameValue.trim(),
-                            });
-                          }
-                          if (e.key === "Escape") setRenamingId(null);
-                        }}
-                      />
-                      <Button
-                        className="rounded-full"
-                        onClick={() =>
-                          rename.mutate({
-                            id: shelf.id,
-                            name: renameValue.trim(),
-                          })
-                        }
-                      >
-                        Save
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        className="rounded-full"
-                        onClick={() => setRenamingId(null)}
-                      >
-                        Cancel
-                      </Button>
-                    </div>
-                  ) : (
-                    <>
-                      {/* The bar: this row's share of the largest shelf, decorative
-                        to assistive technology — the count beside it is the text
-                        a screen reader gets (AC2). */}
-                      <span
-                        aria-hidden="true"
-                        data-magnitude={String(share)}
-                        style={{
-                          width: `${Number((share * 100).toFixed(1))}%`,
-                        }}
-                        className="absolute inset-y-0 left-0 rounded-xl bg-primary/10"
-                      />
-                      {shelf.entry_count === 0 ? null : covers.length > 0 ? (
-                        <CoverStack covers={covers} />
-                      ) : (
-                        // Entries exist but none of them carry a cover: the
-                        // shared placeholder ("No cover", `CoverImage`'s own
-                        // label), not a gap where the covers would have been
-                        // (AC3). Left in the accessibility tree, unlike
-                        // `CoverStack`'s own faces — it says something the row's
-                        // count does not: this shelf has nothing to show.
-                        <CoverImage
-                          src={null}
-                          alt=""
-                          className="h-8 w-6 shrink-0 rounded-sm"
-                        />
-                      )}
-                      <Link
-                        to={`/?shelf=${encodeURIComponent(shelf.slug)}`}
-                        className="focus-ring relative min-w-0 flex-1 rounded-md"
-                      >
-                        <p className="truncate font-semibold">{shelf.name}</p>
-                        <p
-                          className={
-                            shelf.entry_count === 0
-                              ? "text-sm text-muted-foreground"
-                              : weightClass(shelf.entry_count, max)
-                          }
-                        >
-                          {shelf.entry_count === 0
-                            ? "Empty"
-                            : `${shelf.entry_count} ${
-                                shelf.entry_count === 1 ? "item" : "items"
-                              }`}
-                        </p>
-                      </Link>
-                      {/* Its own opaque backing: at a high share the magnitude
-                          bar can extend the full row width, and the
-                          destructive button's text otherwise renders against
-                          that tint blended into the surface — enough to drop
-                          below axe's contrast threshold on a near-full shelf. */}
-                      <div className="relative flex shrink-0 gap-2 rounded-full bg-surface">
-                        <Button
-                          variant="outline"
-                          className="rounded-full text-sm"
-                          aria-label={`Rename ${shelf.name}`}
-                          onClick={() => {
-                            setRenamingId(shelf.id);
-                            setRenameValue(shelf.name);
-                          }}
-                        >
-                          Rename
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="rounded-full border-destructive/60 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
-                          aria-label={`Delete ${shelf.name}`}
-                          onClick={() => setDeletingShelf(shelf)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </>
-                  )}
-                </li>
-              );
-            });
-          })()}
+      {shelves.data && shelves.data.length > 0 && board.length === 0 && (
+        <p className="mt-8 text-muted-foreground">
+          No shelf matches this filter.
+        </p>
+      )}
+      {board.length > 0 && (
+        <ul className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {board.map((shelf) => (
+            <li key={shelf.id}>
+              <ShelfCard
+                shelf={shelf}
+                max={max}
+                domains={domains}
+                domainFilter={domainFilter || undefined}
+              />
+            </li>
+          ))}
         </ul>
       )}
-
-      {/* Delete confirmation. Confirmation dialogs are limited to delete and
-          explicit provider refresh (product spec section 7). */}
-      <AlertDialog
-        open={deletingShelf !== null}
-        onOpenChange={(open) => {
-          if (!open) setDeletingShelf(null);
-        }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              Delete &ldquo;{deletingShelf?.name}&rdquo;?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              This shelf will be removed from everything on it. The entries
-              themselves are retained and remain in your library.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              className={cn(
-                buttonVariants({ variant: "destructive" }),
-                "rounded-full px-5",
-              )}
-              onClick={() => deletingShelf && remove.mutate(deletingShelf.id)}
-            >
-              Delete shelf
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </main>
   );
 }

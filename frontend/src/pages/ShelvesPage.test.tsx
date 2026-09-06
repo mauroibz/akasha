@@ -5,8 +5,20 @@ import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
-import { findToast } from "@/test/toast";
 import { ShelvesPage } from "./ShelvesPage";
+
+const bookType = {
+  id: "book",
+  label: "Book",
+  fields: [],
+  statuses: [],
+  default_status: "read",
+  entry_fields: [],
+  formats: [],
+  entry_panel_label: "Your reading data",
+};
+
+const albumType = { ...bookType, id: "album", label: "Album" };
 
 function renderPage() {
   const client = new QueryClient({
@@ -25,17 +37,38 @@ function renderPage() {
 afterEach(() => vi.restoreAllMocks());
 
 const shelves = [
-  { id: 1, name: "Favorites", slug: "favorites", entry_count: 5 },
-  { id: 2, name: "Sci-fi", slug: "sci-fi", entry_count: 3 },
+  {
+    id: 1,
+    name: "Favorites",
+    slug: "favorites",
+    entry_count: 5,
+    covers: [],
+    members_by_type: { book: 5 },
+  },
+  {
+    id: 2,
+    name: "Sci-fi",
+    slug: "sci-fi",
+    entry_count: 3,
+    covers: [],
+    members_by_type: { book: 3 },
+  },
 ];
 
+function stubApi(rows: unknown[] = shelves, types: unknown[] = [bookType]) {
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (url === "/api/item-types") return new Response(JSON.stringify(types));
+    if (url === "/api/shelves") return new Response(JSON.stringify(rows));
+    if (init?.method === "POST" && url === "/api/shelves")
+      return new Response(JSON.stringify({ id: 3, name: "New", slug: "new" }));
+    return new Response("[]");
+  });
+}
+
 describe("ShelvesPage", () => {
-  it("lists shelves with entry counts", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      if (String(input) === "/api/shelves")
-        return new Response(JSON.stringify(shelves));
-      return new Response("[]");
-    });
+  it("lists shelves as board cards with entry counts", async () => {
+    stubApi();
     renderPage();
     expect(await screen.findByText("Favorites")).toBeVisible();
     // A shelf spans domains and always did, so it counts items rather than
@@ -45,10 +78,12 @@ describe("ShelvesPage", () => {
     expect(screen.getByText("3 items")).toBeVisible();
   });
 
-  it("creates a shelf and refreshes the list", async () => {
+  it("creates a shelf and refreshes the board", async () => {
     let created = false;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify([bookType]));
       if (init?.method === "POST" && url === "/api/shelves") {
         created = true;
         return new Response(
@@ -77,95 +112,32 @@ describe("ShelvesPage", () => {
     await waitFor(() => expect(screen.getByText("New")).toBeVisible());
   });
 
-  it("renames a shelf", async () => {
-    let renamed = false;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const url = String(input);
-      if (init?.method === "PATCH" && url.includes("/api/shelves/1")) {
-        renamed = true;
-        return new Response(
-          JSON.stringify({ id: 1, name: "Best", slug: "best", entry_count: 5 }),
-        );
-      }
-      if (url === "/api/shelves")
-        return new Response(
-          JSON.stringify(
-            renamed
-              ? [
-                  { id: 1, name: "Best", slug: "best", entry_count: 5 },
-                  shelves[1],
-                ]
-              : shelves,
-          ),
-        );
-      return new Response("[]");
-    });
-    renderPage();
-    const user = userEvent.setup();
-    await screen.findByText("Favorites");
-    await user.click(screen.getByRole("button", { name: /rename favorites/i }));
-    const input = await screen.findByDisplayValue("Favorites");
-    await user.clear(input);
-    await user.type(input, "Best");
-    await user.click(screen.getByRole("button", { name: /save/i }));
-    await waitFor(() => expect(screen.getByText("Best")).toBeVisible());
-    expect(await findToast('Shelf renamed to "Best"')).toBeInTheDocument();
-  });
-
-  it("confirms deletion and states the entries are retained", async () => {
-    let deleted = false;
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      const url = String(input);
-      if (init?.method === "DELETE" && url.includes("/api/shelves/1")) {
-        deleted = true;
-        return new Response(null, { status: 204 });
-      }
-      if (url === "/api/shelves")
-        return new Response(
-          JSON.stringify(deleted ? shelves.slice(1) : shelves),
-        );
-      return new Response("[]");
-    });
-    renderPage();
-    const user = userEvent.setup();
-    await screen.findByText("Favorites");
-    await user.click(screen.getByRole("button", { name: /delete favorites/i }));
-    // Confirmation dialog states the entries are retained
-    expect(screen.getByText(/entries.*retained/i)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: /delete shelf/i }));
-    await waitFor(() => expect(deleted).toBe(true));
-    expect(screen.queryByText("Favorites")).not.toBeInTheDocument();
-    expect(await findToast("Shelf deleted")).toBeInTheDocument();
-  });
-
-  it("a shelf row links into the library filtered to that shelf", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      if (String(input) === "/api/shelves")
-        return new Response(JSON.stringify(shelves));
-      return new Response("[]");
-    });
+  it("a shelf card links into its own page", async () => {
+    stubApi();
     renderPage();
     const link = await screen.findByRole("link", { name: /Favorites/ });
-    expect(link).toHaveAttribute("href", "/?shelf=favorites");
+    expect(link).toHaveAttribute("href", "/shelves/favorites");
   });
 
-  it("renders bars proportional to shelf size, decorative to assistive technology", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      if (String(input) === "/api/shelves")
-        return new Response(
-          JSON.stringify([
-            { id: 1, name: "Big", slug: "big", entry_count: 30, covers: [] },
-            {
-              id: 2,
-              name: "Small",
-              slug: "small",
-              entry_count: 10,
-              covers: [],
-            },
-          ]),
-        );
-      return new Response("[]");
-    });
+  it("renders one magnitude bar per card, proportional to shelf size", async () => {
+    stubApi([
+      {
+        id: 1,
+        name: "Big",
+        slug: "big",
+        entry_count: 30,
+        covers: [],
+        members_by_type: { book: 30 },
+      },
+      {
+        id: 2,
+        name: "Small",
+        slug: "small",
+        entry_count: 10,
+        covers: [],
+        members_by_type: { book: 10 },
+      },
+    ]);
     renderPage();
     await screen.findByText("Big");
     const bars = document.querySelectorAll("[data-magnitude]");
@@ -181,22 +153,24 @@ describe("ShelvesPage", () => {
   });
 
   it("gives a shelf's count visible weight against the largest shelf", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      if (String(input) === "/api/shelves")
-        return new Response(
-          JSON.stringify([
-            { id: 1, name: "Big", slug: "big", entry_count: 30, covers: [] },
-            {
-              id: 2,
-              name: "Small",
-              slug: "small",
-              entry_count: 1,
-              covers: [],
-            },
-          ]),
-        );
-      return new Response("[]");
-    });
+    stubApi([
+      {
+        id: 1,
+        name: "Big",
+        slug: "big",
+        entry_count: 30,
+        covers: [],
+        members_by_type: { book: 30 },
+      },
+      {
+        id: 2,
+        name: "Small",
+        slug: "small",
+        entry_count: 1,
+        covers: [],
+        members_by_type: { book: 1 },
+      },
+    ]);
     renderPage();
     const bigCount = await screen.findByText("30 items");
     const smallCount = await screen.findByText("1 item");
@@ -205,63 +179,174 @@ describe("ShelvesPage", () => {
     expect(bigCount.className).not.toEqual(smallCount.className);
   });
 
-  it("shows up to three covers, the shared placeholder, or nothing for an empty shelf", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
-      if (String(input) === "/api/shelves")
-        return new Response(
-          JSON.stringify([
-            {
-              id: 1,
-              name: "Covered",
-              slug: "covered",
-              entry_count: 2,
-              covers: ["/api/items/1/cover?v=1", "/api/items/2/cover?v=1"],
-            },
-            {
-              id: 2,
-              name: "Coverless",
-              slug: "coverless",
-              entry_count: 3,
-              covers: [],
-            },
-            {
-              id: 3,
-              name: "Unstarted",
-              slug: "unstarted",
-              entry_count: 0,
-              covers: [],
-            },
-          ]),
-        );
-      return new Response("[]");
-    });
+  it("shows a rail of covers, the shared placeholder, or nothing for an empty shelf", async () => {
+    stubApi([
+      {
+        id: 1,
+        name: "Covered",
+        slug: "covered",
+        entry_count: 2,
+        covers: ["/api/items/1/cover?v=1", "/api/items/2/cover?v=1"],
+        members_by_type: { book: 2 },
+      },
+      {
+        id: 2,
+        name: "Coverless",
+        slug: "coverless",
+        entry_count: 3,
+        covers: [],
+        members_by_type: { book: 3 },
+      },
+      {
+        id: 3,
+        name: "Unstarted",
+        slug: "unstarted",
+        entry_count: 0,
+        covers: [],
+        members_by_type: {},
+      },
+    ]);
     renderPage();
-    const coveredRow = (await screen.findByText("Covered")).closest("li");
-    expect(coveredRow).not.toBeNull();
+    const coveredCard = (await screen.findByText("Covered")).closest("a");
+    expect(coveredCard).not.toBeNull();
     // Decorative like the ranking's own `CoverStack` (empty `alt`), so these
     // are real `<img>` elements rather than accessible-role ones.
-    expect((coveredRow as HTMLElement).querySelectorAll("img")).toHaveLength(2);
+    expect((coveredCard as HTMLElement).querySelectorAll("img")).toHaveLength(
+      2,
+    );
 
-    const coverlessRow = screen.getByText("Coverless").closest("li");
-    expect(coverlessRow).not.toBeNull();
+    const coverlessCard = screen.getByText("Coverless").closest("a");
+    expect(coverlessCard).not.toBeNull();
     expect(
-      within(coverlessRow as HTMLElement).getByRole("img", {
+      within(coverlessCard as HTMLElement).getByRole("img", {
         name: "No cover",
       }),
     ).toBeInTheDocument();
     expect(screen.getByText("3 items")).toBeVisible();
 
-    const emptyRow = screen.getByText("Unstarted").closest("li");
-    expect(emptyRow).not.toBeNull();
+    const emptyCard = screen.getByText("Unstarted").closest("a");
+    expect(emptyCard).not.toBeNull();
     expect(
-      within(emptyRow as HTMLElement).queryByRole("img"),
+      within(emptyCard as HTMLElement).queryByRole("img"),
     ).not.toBeInTheDocument();
-    expect(within(emptyRow as HTMLElement).getByText("Empty")).toBeVisible();
+    expect(within(emptyCard as HTMLElement).getByText("Empty")).toBeVisible();
+  });
+
+  it("shows one chip per domain a shelf holds, and they sum to its total", async () => {
+    stubApi(
+      [
+        {
+          id: 1,
+          name: "Mixed",
+          slug: "mixed",
+          entry_count: 8,
+          covers: [],
+          members_by_type: { book: 5, album: 3 },
+        },
+      ],
+      [bookType, albumType],
+    );
+    renderPage();
+    const card = (await screen.findByText("Mixed")).closest("a") as HTMLElement;
+    expect(within(card).getByText("Book 5")).toBeVisible();
+    expect(within(card).getByText("Album 3")).toBeVisible();
+  });
+
+  it("shows exactly one chip for a single-domain shelf", async () => {
+    stubApi();
+    renderPage();
+    const card = (await screen.findByText("Favorites")).closest(
+      "a",
+    ) as HTMLElement;
+    expect(card.querySelectorAll("li")).toHaveLength(1);
+  });
+
+  it("the domain filter narrows the board and re-counts the cards", async () => {
+    stubApi(
+      [
+        {
+          id: 1,
+          name: "Books only",
+          slug: "books-only",
+          entry_count: 5,
+          covers: [],
+          members_by_type: { book: 5 },
+        },
+        {
+          id: 2,
+          name: "Mixed",
+          slug: "mixed",
+          entry_count: 8,
+          covers: [],
+          members_by_type: { book: 5, album: 3 },
+        },
+      ],
+      [bookType, albumType],
+    );
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Books only");
+    expect(screen.getByText("Mixed")).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: "Album" }));
+
+    expect(screen.queryByText("Books only")).not.toBeInTheDocument();
+    expect(screen.getByText("Mixed")).toBeVisible();
+    // Recounted to the chosen domain's members only (deliverable 3).
+    const card = screen.getByText("Mixed").closest("a") as HTMLElement;
+    expect(within(card).getByText("3 items")).toBeVisible();
+
+    await user.click(screen.getByRole("radio", { name: "All" }));
+    expect(screen.getByText("Books only")).toBeVisible();
+  });
+
+  it("sorts by size (default), by name, and by recently added", async () => {
+    stubApi([
+      {
+        id: 1,
+        name: "Zeta",
+        slug: "zeta",
+        entry_count: 1,
+        covers: [],
+        members_by_type: { book: 1 },
+        updated_at: "2026-09-01T00:00:00Z",
+      },
+      {
+        id: 2,
+        name: "Alpha",
+        slug: "alpha",
+        entry_count: 9,
+        covers: [],
+        members_by_type: { book: 9 },
+        updated_at: "2026-09-05T00:00:00Z",
+      },
+    ]);
+    const user = userEvent.setup();
+    renderPage();
+    await screen.findByText("Zeta");
+
+    const names = () =>
+      [...document.querySelectorAll("[data-shelf-name]")].map(
+        (node) => node.textContent,
+      );
+
+    // Largest first by default.
+    expect(names()[0]).toBe("Alpha");
+
+    await user.click(screen.getByRole("button", { name: "Name" }));
+    expect(names()[0]).toBe("Alpha");
+    expect(names()[1]).toBe("Zeta");
+
+    await user.click(screen.getByRole("button", { name: "Recently added" }));
+    expect(names()[0]).toBe("Alpha");
   });
 
   it("surfaces duplicate slug errors", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
-      if (init?.method === "POST" && String(input) === "/api/shelves")
+      const url = String(input);
+      if (url === "/api/item-types")
+        return new Response(JSON.stringify([bookType]));
+      if (init?.method === "POST" && url === "/api/shelves")
         return new Response(
           JSON.stringify({
             error: {
@@ -271,8 +356,7 @@ describe("ShelvesPage", () => {
           }),
           { status: 409 },
         );
-      if (String(input) === "/api/shelves")
-        return new Response(JSON.stringify(shelves));
+      if (url === "/api/shelves") return new Response(JSON.stringify(shelves));
       return new Response("[]");
     });
     renderPage();
