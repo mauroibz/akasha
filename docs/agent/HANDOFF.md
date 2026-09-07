@@ -1,49 +1,58 @@
-# Handoff — the plan is complete
+# Handoff — the plan is reopened at Sprint 075
 
-`docs/agent/state.json` reads `project_status: "complete"`, `active_sprint: null`,
-`active_sprint_file: null`, `active_sprint_status: null`, `last_completed_sprint: "074"`.
-`completed_sprints` runs `001` through `074` — every planned sprint, including the three the
-owner's 2026-09-05 readability feedback added (DEC-139) after Sprint 071 closed the original v1
-plan. `FINAL_SPRINT` in `scripts/validate_project.py` is `74`; nothing raises it further without
-the owner asking for a new sprint. A session picking this up should not assume there is an active
-sprint to continue — check with the owner what, if anything, comes next, rather than inventing one.
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "075"`,
+`active_sprint_file: "docs/sprints/075-identity-in-the-schema.md"`, `active_sprint_status:
+"ready"`, `last_completed_sprint: "074"`, `plan_revision: 40`. `completed_sprints` runs `001`
+through `074`. `FINAL_SPRINT` in `scripts/validate_project.py` is `82`.
 
-## What the three readability sprints delivered
+**Read [`../auth-and-multiuser-proposal.md`](../auth-and-multiuser-proposal.md) and DEC-146 before
+Sprint 075's own file.** The proposal is the design and the sprint files are its schedule; a
+sprint file assumes you have read it.
 
-The owner's report — *"there is a lot of wasted space everywhere... covers and the main number
-should be larger... the insights page reads bland... the shelves tab is too bland"* — became
-`docs/readability-proposal.md`, accepted whole as DEC-139, and built as:
+## What is being built
 
-- **Sprint 072 — A wall of covers.** The library card is cover-first (cover ≥70% of card area,
-  pinned height, DEC-023's fixed-size virtualization unchanged), the score and status sit at
-  opposite edges of the cover, one sticky command bar replaces four rows of chrome behind a single
-  **Filters** popover, the response total is visible, six columns at wide widths, list density
-  genuinely dense. Frontend only.
-- **Sprint 073 — Insights with a shape.** A hero panel promotes the leading key with its own
-  superlatives folded in; Decade and Year are one card with a grain toggle; a chronology strip
-  draws decades in time order; a score-distribution band (the sprint's one backend addition,
-  `GET /api/insights/scores`) draws the 1-10 spread; an asymmetric grid sizes cards by rank; the
-  long tail is clickable cards instead of a footnote.
-- **Sprint 074 — A shelf is a place.** The shelves index is a board of cards, each with a
-  scrolling cover rail, a magnitude bar, and one chip per domain it holds (`members_by_type`, the
-  sprint's one backend addition). A domain filter, sort and search work the board. Every shelf
-  gets its own page (`/shelves/:slug`) showing the set whole across every domain it holds — a
-  deliberate, owner-accepted exception to the library's one-domain-at-a-time rule (DEC-065,
-  DEC-139 §2) — with rename and delete moved there off the index, and a shelf can be pinned into
-  the library's command bar.
+The owner asked on 2026-09-07 for authentication and multiuser: one install serving at least two
+independent libraries, a username and password, an admin with unrestricted access, minimum
+friction on mobile behind Tailscale, and a single-user deployment that still needs no
+authentication at all. Accepted whole as **DEC-146** and scheduled as Sprints 075–082, ending in
+`2.0.0`.
 
-Two owner-directed layout fixes landed between and after these, outside the sprint sequence, the
-same pattern DEC-138 established:
+Eight sprints: the schema (075), a user on every request (076), password and session (077), the
+login and setup screens (078), the second user and the isolation suite (079), admin view-as (080),
+friction — trusted header, long sessions, mobile (081), and the release (082). The roadmap's
+"Two people, one install" section summarizes each.
 
-- **DEC-142** — the wall card's score and status were one shared, centred pill instead of two
-  controls at the cover's opposite edges (the accepted mockup's own layout). Fixed.
-- **DEC-143** — the library caption had dead space under a visibly pale `bg-surface` fill, and the
-  Insights hero/chronology strip wasted the width they were given. Both fixed; the caption's
-  height is now the content's actual height, and the hero/chronology bars use their space.
+**The three facts that shape all of it:**
 
-Every sprint's own Outcome section (`docs/sprints/07{2,3,4}-*.md`) has full delivered-behaviour
-detail, every acceptance criterion, and every test that changed and why. DEC-140 through DEC-144
-have the decisions worth reading independent of the code.
+1. **Half the data-model work was already done.** `entries.user_id` and `shelves.user_id` have
+   existed since migration `0002`, with `uq_entries_user_item`, `uq_shelves_user_slug` and six
+   user-leading indexes. `LibraryService` takes a `user_id` and filters on it in ten places.
+   Product spec §9's instruction to build the list view as `render(entries WHERE user = X, …)` was
+   kept, and the query plans multiuser needs already exist and are already benchmarked.
+2. **`AKASHA_AUTH` defaults to `off`, and `off` is bit-for-bit v1.8.0.** 213 backend tests call
+   `create_app(`. Authentication on by default breaks every one of them. Every sprint owes the
+   criterion that the existing 1364 backend, 305 frontend and 130 e2e tests pass **unchanged**
+   with auth off; a sprint that has to edit the suite broadly has the boundary wrong.
+3. **Sprint 076 must not be merged into its neighbour.** It ships zero user-visible change across
+   24 call sites in 8 files, and it is what makes 077–081 small.
+
+## Known defect, already scheduled
+
+`backend/src/book_tracker/application/export.py:248` (`iter_entries`) walks every entry row with
+no `WHERE user_id`, and `export_json` calls it. Harmless with one user; a data leak the day Sprint
+079 lands. **Sprint 076 fixes it** — do not fix it earlier and do not leave it for 079 to discover
+as a failure.
+
+## Four defaults adopted, overridable before their sprint
+
+DEC-146 adopted the proposal's own recommendations rather than blocking eight sprints on four
+questions. Each is cheap to flip **before** its sprint and expensive after:
+
+1. Attachments stay shared, hanging off `items` (affects 075's schema and 079's criterion 8).
+2. An admin acting as another user can write, not only read (affects 080).
+3. The trusted-proxy header is built, off by default, refusing to start without a peer allowlist
+   (affects 081).
+4. Calibre stays deployment-wide; a per-user mount is not scheduled.
 
 ## Known-degraded, deliberately not fixed (carried forward, still true)
 
@@ -52,89 +61,66 @@ have the decisions worth reading independent of the code.
 - `languages` mixes vocabularies across movie/series sources.
 - The book domain declares `Creators` where `Authors` would read better.
 - Immediately after an inline status change on a library entry, the Filters popover's status
-  option keeps its stale facet label (e.g. `To read 4`) until reload, even though the filtered
-  response and the visible total are correctly `3 of 20`. A cache-invalidation gap in the
-  facet-counts read (Sprint 072's Outcome, DEC-140). Pick it up in whichever future sprint next
-  touches the status facet query, or a dedicated one if none does soon.
-- `ScoreDistributionCard` (Insights) spans twelve columns and stretches its ten score bars to
-  fill it, the same way the chronology strip did before DEC-143 capped that one. Out of scope for
-  both owner reports that drove DEC-143; recorded there for whenever Insights is next touched.
+  option keeps its stale facet label until reload, even though the filtered response and the
+  visible total are correct. A cache-invalidation gap in the facet-counts read (Sprint 072's
+  Outcome, DEC-140). Pick it up in whichever future sprint next touches the status facet query.
+- `ScoreDistributionCard` (Insights) spans twelve columns and stretches its ten score bars to fill
+  it, the same way the chronology strip did before DEC-143 capped that one.
 - The shelf page's mean score chip is a client-side mean over currently-loaded entries, not a
-  server aggregate — accurate for any shelf that fits on one page, approximate beyond it
-  (Sprint 074's Outcome).
-- "Sort by recently added to" on the shelves board reads a shelf's own `updated_at` (bumped on
-  creation and rename), not a true last-member-addition time — `entry_shelves` has no timestamp
-  column of its own. Adding one is a migration nobody has asked for yet (Sprint 074's Outcome,
-  DEC-144).
+  server aggregate — accurate for any shelf that fits on one page, approximate beyond it.
+- "Sort by recently added to" on the shelves board reads a shelf's own `updated_at`, not a true
+  last-member-addition time — `entry_shelves` has no timestamp column (DEC-144).
 - If `scripts/validate_project.py` ever fails for a reason unrelated to real doc/state
-  inconsistency, check first for a leftover agent worktree under `.claude/worktrees/` — a prior
-  instance of this was git-excluded but still walked by the text-hygiene check. Deleting it clears
-  a false failure. Run from a clean checkout before believing a failure.
+  inconsistency, check first for a leftover agent worktree under `.claude/worktrees/`. Deleting it
+  clears a false failure.
 
 ## Still owed to the owner
 
 - **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
-  outstanding; needs the owner's own container. Every walkthrough since has run against a
-  throwaway seeded backend instead.
+  outstanding; needs the owner's own container. **Sprint 081's tailnet walkthrough is the second
+  of this kind** and cannot be faked with a seeded container either. Plan for both.
 - **DEC-133's open product question** (album ranking ordering `Label` ahead of `Artists`).
-- **Saved views ("smart shelves")** — accepted in principle by DEC-139, needs a `saved_views`
-  table and a migration, deliberately left unscheduled. Becomes a sprint the day the owner asks;
-  `docs/sprints/ROADMAP.md`'s "Not scheduled" section has the design note it carries forward
-  (a saved view must still parse after a filter is added or renamed).
+- **Saved views ("smart shelves")** — accepted in principle by DEC-139, still unscheduled. It was
+  promised the number 075; that number is now the first authentication sprint, so it becomes a
+  sprint after 082.
 - The rest of the shelf menu costed in `readability-proposal.md` §5.3 and deferred there: bulk
-  shelving from the library, manual order/queues, shelf goals, merging shelves, auto-shelving
-  rules. None scheduled.
-
-## Branch and authorization
-
-`ui-readability-proposal` (branched from `main` at `1914ffe`) was merged into `main`
-(fast-forward — `main` had no commits of its own past that point), pushed, and tagged `v1.8.0` at
-the owner's explicit request ("commit, merge to main, push and tag a new version"). `main` is now
-current with all of Sprints 072-074 and both layout fixes. Authorization does not carry forward to
-future sessions: do not push, merge, tag, open a PR, or take any remote action again without being
-asked, even though this session did.
+  shelving from the library, manual order and queues, shelf goals, merging shelves, auto-shelving
+  rules.
+- **A cheap version-surface check.** Nothing in `make check` verifies that
+  `backend/pyproject.toml`, `frontend/package.json`, `main.py` and `frontend/openapi.json` agree;
+  only `make smoke-container` does, and it costs minutes (DEC-145). **Sprint 082 owes it** as
+  deliverable 7.
 
 ## Version and pipeline state
 
-`1.8.0`, tagged, and the four version surfaces agree (`backend/pyproject.toml`,
-`frontend/package.json`, `main.py`'s FastAPI `version=`, `frontend/openapi.json`).
-`docs/operations/release-notes-v1.8.md` has the release notes.
+`1.8.0`, tagged, with all four version surfaces in agreement. CI on `main` is **green** as of
+`11db2c5` — it had been red from the 1.6.0 bump until 2026-09-07, on three test defects and no
+product defect (DEC-145). GitHub Releases exist for v1.6.0, v1.7.0 and v1.8.0; the four v1.5.x
+patch tags deliberately have none.
 
-**CI on `main` was red from the 1.6.0 bump until 2026-09-07, and is repaired (DEC-145).** Three
-test defects, no product defect:
+Two lessons from that repair worth carrying:
 
-- `scripts/smoke_container.sh` AC4 compared the served OpenAPI version against the literal
-  `"1.5.1"`. It now reads `backend/pyproject.toml` and checks all four surfaces against it.
-- `the degraded provider notice has no serious accessibility violations` now seeds an empty
-  library. Axe was sampling a wall-card caption mid-render; the palette measures 7.47:1 and
-  18.34:1 at rest, so the sample was wrong, not the colours. The card was incidental to a check
-  about the provider notice. **A first attempt moved the check into the serial `heavy-library`
-  project instead and made things worse** — that project runs one worker, and a fourth axe pass
-  ahead of the crossfade DOM-budget probes broke both of them. Reverted. Treat the serial project
-  as a scarce resource, not a quarantine to grow.
-- `fetches a missing cover for a domain with no chooser` asserted on an `<img>` whose bytes were
-  never stubbed, racing the dev proxy that has no backend behind it in CI. Stubbed now.
+- **The serial `heavy-library` Playwright project is a scarce resource, not a quarantine to grow.**
+  Adding a fourth axe check to it broke the two crossfade DOM-budget probes it shares a worker
+  with. Sprints 078–081 add auth and isolation specs; keep them in the parallel project.
+- **The documented release procedure never published a GitHub Release**, which is why the page
+  stood seven tags behind. Sprint 082 deliverable 10 adds the step.
 
-Two gaps those repairs exposed, neither fixed:
+## Branch and authorization
 
-- **Nothing cheap checks that the version surfaces agree.** The only check is inside
-  `make smoke-container`, which costs minutes and is not part of `make check`.
-  `scripts/validate_project.py` is where it belongs, whenever someone next touches it.
-- **The release procedure never publishes a GitHub Release.**
-  `docs/operations/publishing-images.md` moves the tag and builds the image, and stops there. The
-  *Releases* page therefore still showed `v1.5.0` as the latest while seven tags stood past it.
+The authentication plan — the proposal, DEC-146, the eight sprint files, the roadmap, the state
+file and `FINAL_SPRINT` — is on **`auth-and-multiuser`**, branched from `main` at `11db2c5` at the
+owner's explicit request ("branch before committing the proposal"). `main` carries only the
+DEC-145 CI repairs and is pushed. The branch is **not** pushed and no pull request exists.
+
+Authorization does not carry forward. Do not push, merge, tag, open a PR, or take any remote
+action without being asked, even though this session pushed `main` and published three Releases
+when asked to.
 
 ## Private data and operational constraints
 
-Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has no auth and
-stays LAN-only; Calibre is opened read-only. Every walkthrough across Sprints 072-074 and both
-layout fixes ran against throwaway or mocked fixtures — the owner's own instance was never
-touched, and Sprint 065's walkthrough against it remains the one still owed.
-
-## If a session picks this up with nothing specific asked
-
-There is no active sprint and no numbered work queued. Do not start Sprint 075 or invent new
-scope on your own initiative — saved views is the only named-but-unscheduled candidate, and even
-that is "the day the owner asks," not before. A session with no specific instruction should read
-this file, confirm the state above against `docs/agent/state.json`, and ask the owner what they
-want next rather than guessing.
+Secrets, databases, uploaded imports and covers are never committed. **Calibre is opened
+read-only.** The exposure rule still stands in its v1 form until Sprint 082 rewrites it narrower:
+no public DNS, port-forwarding, tunnel or internet-reachable proxy while `AKASHA_AUTH` is `off`.
+Nothing in Sprints 075–082 puts Akasha on the internet — authentication is the precondition for
+that, not the same thing.

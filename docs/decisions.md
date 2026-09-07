@@ -5850,3 +5850,75 @@ both changes, against 1 of 3 before the second.
   the release procedure in `docs/operations/publishing-images.md` moves the tag and builds the
   image but never publishes a GitHub Release, which is why seven of them are missing — the
   backfill and the procedure change are recorded with the release work itself, not here.
+
+## DEC-146 — Authentication and multiuser accepted; the plan reopens through Sprint 082 and a 2.0.0
+
+- **Date:** 2026-09-07
+- **Status:** accepted
+- **Cross-references:** DEC-145 (the CI repair and the release-procedure gap this planning session
+  opened with), DEC-139 (the previous reopening of a closed plan, and the precedent for how one is
+  done), DEC-023 (fixed-size virtualization, untouched by any of this), DEC-039 (the startup
+  pre-migration backup that Sprint 075 leans on), DEC-114 (the serial Playwright project the
+  isolation and auth specs must not grow into).
+- **Context:** with v1.8.0 shipped and the numbered plan closed at Sprint 074, the owner asked for
+  *"proper auth and multiuser support… a single install serve at least two independent libraries
+  to two users… a basic user/password… any help in reducing user interaction and friction is
+  welcome… a single user setup without auth could still be available for easy deployments… easy
+  mobile access is a priority… plan it as as many sprints necessary to reach its own major release
+  (maybe 2.0?)."* [`auth-and-multiuser-proposal.md`](auth-and-multiuser-proposal.md) was written
+  against the code at `11db2c5` and is accepted whole.
+- **The finding that set the cost.** Half the data-model work was already done, and not by
+  accident: product spec §9 told the project to build the list view as
+  `render(entries WHERE user = X, filter, sort)` and it did. `entries.user_id` and
+  `shelves.user_id` have existed since migration `0002` with `uq_entries_user_item`,
+  `uq_shelves_user_slug` and six user-leading indexes; `LibraryService` takes a `user_id` and
+  filters on it in ten places. The query plans multiuser needs exist and have been benchmarked.
+  What is missing is a `users` table, sessions, `user_id` on the import ledger and jobs, and a
+  user *on the request* — the service is constructed 24 times across 8 files with no user
+  argument, so the default `1` wins every time.
+- **Decision:** eight sprints, 075–082, ending in `2.0.0`, as the proposal's §3 costs them. Four
+  points are worth recording independently of the sprint files.
+  - **`AKASHA_AUTH` defaults to `off` and `off` is bit-for-bit v1.8.0.** This is the whole
+    architectural bet and it is driven by a measurement, not by caution: 213 backend tests call
+    `create_app(`, and authentication on by default breaks every one, turning a refactor into a
+    rewrite of the verification gate. It also satisfies the owner's "easy deployments" requirement
+    for free.
+  - **Sprint 076 stays its own sprint.** It ships no user-visible change and touches 24 call sites
+    across 8 files, which is exactly the shape that gets folded into its neighbour and then goes
+    wrong. Keeping it alone with its own gate is why this plan is eight sprints rather than five;
+    the proposal's §5.5 costs the merged alternative and rejects it.
+  - **Password hashing is `hashlib.scrypt` from the standard library**, not `argon2-cffi`. Ten
+    runtime dependencies is the project's current count and a two-row `users` table on a household
+    LAN does not justify the first C extension added for a marginal algorithmic gain. The stored
+    parameters allow the cost to be raised later without invalidating a password.
+  - **A defect was found while planning and is fixed in Sprint 076, not deferred.**
+    `application/export.py:248` (`iter_entries`) walks every entry row in the database with no
+    `WHERE user_id`, and `export_json` calls it. It is harmless with one user and a data leak the
+    day Sprint 079 lands. It belongs to the sprint that owns scoping, not to the sprint that would
+    have discovered it as a failure.
+- **Four defaults adopted, in the shape of product spec §11.** The proposal's §7 asked the owner
+  four questions. Rather than block eight sprints on them, the proposal's own recommendations are
+  adopted as defaults and each remains cheap to override **before its sprint begins** and
+  expensive after.
+  1. **Attachments stay shared**, hanging off `items` as they do today. Privacy is not a concern
+     by the owner's own instruction, and one copy of a file is better organization than two.
+     Affects Sprint 075's schema and Sprint 079's criterion 8.
+  2. **An admin acting as another user can write**, not only read. "Unrestricted access" was the
+     instruction, and a read-only mode cannot fix the mistake it was opened to investigate.
+     Affects Sprint 080.
+  3. **The trusted-proxy header is built**, off by default, refusing to start without a peer
+     allowlist. It is the largest friction reduction available for a Tailscale deployment and the
+     one setting in the plan that can be misconfigured into a full bypass; every mitigation is a
+     mechanism rather than a sentence in a document. Affects Sprint 081.
+  4. **Calibre stays deployment-wide.** A second user's own Calibre library is a Compose change
+     and an importer argument, not a schema question, and nobody has asked for it. Not scheduled.
+- **What stays deferred after 2.0**, and is said so in the proposal's §4 and again in Sprint 082's
+  documentation: sharing and public read-only links, Calibre write-back, OPDS, passkeys, OIDC,
+  email of any kind, per-user settings, per-user provider budgets, and a native application. None
+  of the eight sprints puts Akasha on the internet — authentication is the precondition for that,
+  not the same thing, and the exposure rule becomes narrower rather than deleted.
+- **Consequences:** `docs/agent/state.json` reopens at `project_status: "ready"` with Sprint 075
+  active and `plan_revision` 40; `FINAL_SPRINT` in `scripts/validate_project.py` moves from 74 to
+  82; the roadmap gains a "Two people, one install" section and loses its "Not scheduled" entries
+  for auth and multiuser. Saved views, which DEC-139 promised would "become Sprint 075 the day the
+  owner asks", becomes a sprint after 082 instead — the number is taken.

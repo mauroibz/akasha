@@ -1,13 +1,13 @@
 # Implementation Roadmap
 
-**Plan revision:** 39
+**Plan revision:** 40
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none. Every planned sprint (001–074) is complete; `docs/agent/state.json` reads
-`project_status: "complete"`. Sprint 071 closed the original v1 plan; the owner's 2026-09-05
-readability feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section
-below. See [074 — A shelf is a place](074-a-shelf-is-a-place.md)'s own Outcome for the closing
-sprint's detail and `docs/agent/HANDOFF.md` for what remains owed to the owner outside the
-numbered plan.
+**Active sprint:** [075 — Identity in the schema](075-identity-in-the-schema.md). Sprints 001–074
+are complete — Sprint 071 closed the original v1 plan and the owner's 2026-09-05 readability
+feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section below.
+The owner's 2026-09-07 request for authentication and multiuser reopens the plan through 082 and
+a 2.0.0 release; see "Two people, one install" below, and
+[`../auth-and-multiuser-proposal.md`](../auth-and-multiuser-proposal.md) accepted as **DEC-146**.
 
 ## Shape of the plan
 
@@ -1579,13 +1579,63 @@ says which, so a mixed shelf's count would disagree with the screen it links to.
   set whole across domains (DEC-139 §2); and a shelf can be pinned into the library bar. One
   grouped count on the shelves response is the only backend change.
 
+## Two people, one install — authentication and multiuser
+
+Proposed in [`../auth-and-multiuser-proposal.md`](../auth-and-multiuser-proposal.md) on 2026-09-07
+at the owner's request and **accepted whole as DEC-146**: a single install serving at least two
+independent libraries, a username and password, an admin with unrestricted access, and a
+single-user deployment that still needs no authentication at all.
+
+The proposal's own finding is what sets the shape. Half the data-model work was already done:
+`entries` and `shelves` have carried `user_id` since migration `0002`, with `uq_entries_user_item`,
+`uq_shelves_user_slug` and six user-leading indexes, and `LibraryService` already takes a `user_id`
+and filters on it in ten places — product spec §9's instruction to *"build the view that way now"*
+was kept. What is missing is a users table, sessions, `user_id` on the import ledger and jobs, and
+a user **on the request**: the service is constructed 24 times across 8 files with no user
+argument, so the default `1` wins every time.
+
+`AKASHA_AUTH` defaults to `off`, which is bit-for-bit v1.8.0. That is not caution: 213 backend
+tests call `create_app(`, and authentication on by default breaks every one of them, turning a
+refactor into a rewrite of the gate. It also keeps the owner's "easy deployments" requirement free.
+
+- **[075 — Identity in the schema](075-identity-in-the-schema.md)** — `users` and `sessions`,
+  foreign keys behind the two `user_id` columns that already exist, `user_id` on
+  `import_batches`/`import_records`/`import_effects`/`jobs`, everything backfilled to one seeded
+  user. `AKASHA_AUTH` exists and accepts only `off`. A migration that changes nothing observable.
+- **[076 — The request has a user](076-the-request-has-a-user.md)** — one resolver, all 24
+  construction sites taking a user, the `user_id=1` defaults and the one bare literal deleted, and
+  the export scoped (`iter_entries` has never filtered by user — harmless with one user, a leak
+  the day 079 lands). Zero user-visible change, and the sprint that makes the rest small.
+- **[077 — A password and a session](077-a-password-and-a-session.md)** — stdlib scrypt, a
+  revocable server-side session, login/logout/me/setup, the 401 contract, the cookie policy that
+  works on both plain-HTTP LAN and HTTPS, and login rate limiting. No screens.
+- **[078 — The way in](078-the-way-in.md)** — the login and first-run setup screens, one place
+  that handles a 401 across the six API modules, return-to-where-you-were, and the five
+  password-manager attributes that decide whether a phone login is typed by hand.
+- **[079 — The second library](079-the-second-library.md)** — the admin creates the second user;
+  each library is the user's own; and an isolation suite enumerates every route from the router and
+  proves it, returning `404` rather than `403` so ids do not leak. The sprint the plan is for.
+- **[080 — The admin sees everything](080-the-admin-sees-everything.md)** — view-as, recorded on
+  the session and never in a cookie, with a banner that cannot be dismissed and an audit line per
+  request. One resolver branch, because 076 exists.
+- **[081 — Log in once](081-log-in-once.md)** — optional trusted-header authentication from
+  `tailscale serve` (off by default, refusing to start without a peer allowlist), sliding 400-day
+  sessions, see-and-revoke-your-sessions, and the mobile pass.
+- **[082 — Two point oh](082-two-point-oh.md)** — the exposure rule rewritten narrower rather
+  than deleted across nine files, both specs made canonical, a runbook section that is followed
+  rather than reviewed, the smoke test covering both modes, and `2.0.0`.
+
+Explicitly outside it, and still deferred after 2.0: sharing and public links, Calibre write-back,
+OPDS, passkeys, OIDC, email of any kind, and per-user settings. See the proposal's §4.
+
 ## Not scheduled
 
 - **Saved views ("smart shelves").** A library filter set, named and kept — *Unrated 2024
   additions*, *Vinyl I do not own yet* — appearing beside the shelves and opening the library
   filtered. `readability-proposal.md` §3.3.5 and §5.3 row E; **accepted in principle by DEC-139 and
   deliberately not scheduled**, because it needs a `saved_views` table and a migration where
-  Sprints 072–074 need neither. It becomes Sprint 075 the day the owner asks; the design question
+  Sprints 072–074 need neither. It becomes a sprint after 082 the day the owner asks — the number 075 it was
+  once promised is now the first authentication sprint; the design question
   it carries is that a saved view must still parse after a filter is added or renamed, which means
   storing the query it was created from and ignoring unknown keys on read, never on write.
 - **The rest of the shelf menu**, costed in `readability-proposal.md` §5.3 and deferred there:
@@ -1595,16 +1645,13 @@ says which, so a mixed shelf's count would disagree with the screen it links to.
   views are the honest 80% of it).
 - **A cover-only third library density.** `readability-proposal.md` §3.1 offers it as optional and
   §5.1 rejects it as a default: a phone has no hover and a cover is not a label.
-- **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
-  owner during the revision-8 re-plan. It remains the gate on any exposure beyond LAN: no public
-  DNS, port-forwarding, tunnel, or internet-reachable proxy until it exists.
-  **A proposal now exists** — [`../auth-and-multiuser-proposal.md`](../auth-and-multiuser-proposal.md),
-  written 2026-09-07 at the owner's request — which would schedule this and multiuser together as
-  Sprints 075–082 ending in 2.0.0. It is awaiting acceptance and nothing in it is built; until the
-  owner accepts it, this entry and the one below stand unchanged.
-- **Sharing, multiuser, Calibre write-back, OPDS.** Product spec section 9, unchanged. Multiuser is
-  covered by the proposal linked above; sharing, Calibre write-back and OPDS are explicitly outside
-  it (its section 4).
+- **Auth and multiuser are no longer here.** Both were v2 deferrals with no sprint number until
+  2026-09-07; they are now Sprints 075–082 above, accepted as DEC-146. The exposure rule they
+  gate stands until Sprint 082 rewrites it: no public DNS, port-forwarding, tunnel or
+  internet-reachable proxy while `AKASHA_AUTH` is `off`.
+- **Sharing, Calibre write-back, OPDS.** Product spec section 9, unchanged, and explicitly outside
+  the authentication plan (its section 4). Sharing becomes cheap once Sprint 077 lands and is
+  still a separate feature with its own product questions.
 - **The owner feedback above**, until it is scheduled.
 - **Wine and the remaining exploratory domains.** `docs/domain_metadata_roadmap_report.md` assesses
   them; none is scheduled. Wine's weakness is access economics rather than catalogue geography. That

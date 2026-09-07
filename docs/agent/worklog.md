@@ -4930,3 +4930,57 @@ were already cut, a stale bullet from before this session -- removed rather than
 again.
 
 State unchanged otherwise: `project_status: "complete"`, no active sprint.
+
+## 2026-09-07 — Release state repaired, and the authentication plan written
+
+**Done.** Two owner requests, in order.
+
+1. **"Make sure the repo has a current release."** The tags were current (`v1.8.0` on `HEAD`,
+   pushed, four version surfaces agreeing) but CI had been red on `main` since the 1.6.0 bump and
+   the GitHub Releases page still showed `v1.5.0` as latest, seven tags behind. Three test
+   defects, no product defect, all repaired and pushed (DEC-145): the container smoke test's AC4
+   compared the served OpenAPI version against the literal `"1.5.1"` and now reads
+   `backend/pyproject.toml` and checks all four surfaces; an a11y check was sampling a wall-card
+   caption mid-render and now seeds an empty library; a cover assertion raced the dev proxy and
+   now stubs the bytes. Releases published for v1.6.0, v1.7.0 and v1.8.0 at the owner's direction.
+2. **"Plan auth and multiuser as as many sprints as necessary to reach a 2.0."**
+   `docs/auth-and-multiuser-proposal.md` written against the code, accepted by the owner as
+   DEC-146, and scheduled as Sprints 075–082 on branch `auth-and-multiuser`.
+
+**Verified.** `make check`, `make test` (1364 backend, 305 frontend), the full Playwright suite as
+CI runs it (128 passed, 2 skipped), and `make smoke-container` end to end against a real built
+image — the gate that had been red. CI run `34142235640` on `main` is green on all three jobs, the
+first fully green run since 1.6.0.
+
+**Dead end worth recording.** The first repair for the a11y flake moved the check into the serial
+`heavy-library` Playwright project, reasoning that DEC-114 had already quarantined its three
+siblings there. That project runs one worker and `accessibility.spec.ts` sorts ahead of
+`library.spec.ts` in it, so a fourth CPU-heavy axe pass landed immediately before the two
+crossfade DOM-budget probes; both failed on the very next CI run, neither having failed before.
+Reverted and fixed properly by seeding no library — the check's subject is the provider notice and
+the wall card was incidental. **The serial project is a scarce resource, not a quarantine to
+grow.** Recorded in DEC-145 and the handoff.
+
+**Evidence behind the a11y diagnosis.** A throwaway Playwright probe dumped axe's own computed
+values for the three flagged nodes on that screen: `.leading-5` at 18.34:1, `.truncate` and
+`.gap-1.5 > .shrink-0` at 7.47:1, all against a resolved `#0f0f11`. A title at 18:1 cannot fail a
+4.5:1 threshold, which is what ruled out a palette defect rather than an inference from the
+screenshot. The probe was deleted.
+
+**The planning finding that set the plan's cost.** Half the multiuser data-model work was already
+done: `entries.user_id` and `shelves.user_id` since migration `0002`, both unique constraints
+already user-scoped, six user-leading indexes, and a `LibraryService` that takes a `user_id` and
+filters on it in ten places. What is missing is a users table, sessions, `user_id` on the import
+ledger and jobs, and a user on the request — the service is constructed 24 times across 8 files
+with no user argument. Also found while planning and scheduled into Sprint 076:
+`application/export.py:248` (`iter_entries`) has never filtered by user, which is harmless with
+one user and a leak the day Sprint 079 lands.
+
+**Deviations.** None from any sprint — no sprint was active. The four open product questions in
+the proposal's §7 were adopted as DEC-146 defaults in the shape of product spec §11 rather than
+blocking eight sprints; each is named in the handoff as cheap to flip before its sprint.
+
+**Next.** Sprint 075 — Identity in the schema. `users` and `sessions`, foreign keys behind the two
+`user_id` columns that already exist, `user_id` on the import ledger and jobs, everything
+backfilled to one seeded user, and `AKASHA_AUTH` accepting only `off`. A migration that changes
+nothing observable, whose acceptance criterion is that the entire existing suite passes unedited.
