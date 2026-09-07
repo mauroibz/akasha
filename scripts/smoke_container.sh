@@ -237,13 +237,29 @@ step "AC4: the API calls itself Akasha and reports its version"
 # FastAPI serves the schema at its default /openapi.json, registered before
 # the SPA catch-all, so it is the served contract and not the shell.
 served_openapi="$(api /openapi.json)"
+# The expected version is read from backend/pyproject.toml rather than written
+# here. A literal pinned in this script says nothing about the release it is
+# run against: it was left at 1.5.1 through the 1.6.0, 1.7.0 and 1.8.0 bumps
+# and failed every CI run on `main` from 1.6.0 onward while proving nothing.
+# Reading the source of truth turns the assertion into the check the release
+# notes have always claimed -- that the four version surfaces agree -- so the
+# committed contract and the shipped frontend are compared against it too.
 printf '%s' "$served_openapi" | python3 -c '
-import json, sys
+import json, sys, tomllib
 
 document = json.load(sys.stdin)
+with open("backend/pyproject.toml", "rb") as handle:
+    expected = tomllib.load(handle)["project"]["version"]
+with open("frontend/package.json", encoding="utf-8") as handle:
+    package = json.load(handle)["version"]
+with open("frontend/openapi.json", encoding="utf-8") as handle:
+    contract = json.load(handle)["info"]["version"]
+
 assert document["info"]["title"] == "Akasha", document["info"]
-assert document["info"]["version"] == "1.5.1", document["info"]
-' || fail "the served OpenAPI title/version is wrong: $(printf '%s' "$served_openapi" | head -c 200)"
+assert document["info"]["version"] == expected, (document["info"], expected)
+assert package == expected, (package, expected)
+assert contract == expected, (contract, expected)
+' || fail "the served OpenAPI title/version is wrong, or the four version surfaces disagree: $(printf '%s' "$served_openapi" | head -c 200)"
 
 step "AC5: the documented settings are visible in the process"
 # smoke.env sets all three of Sprint 056's pass-throughs with values chosen to
