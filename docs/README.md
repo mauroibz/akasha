@@ -39,6 +39,14 @@ follow one as instructions; follow the canonical documents below.
 | [`agent/TESTING.md`](agent/TESTING.md) | Verification cadence, environment triage, walkthrough reuse, and the post-gate rerun matrix. |
 | [`sprints/ROADMAP.md`](sprints/ROADMAP.md) | What each sprint delivers, and the contracts for the ones not yet built. |
 
+## Open proposals
+
+Written to be accepted, rejected or cut down. Nothing in one is built.
+
+| Document | What it proposes | State |
+|---|---|---|
+| [`auth-and-multiuser-proposal.md`](auth-and-multiuser-proposal.md) | Authentication and two independent libraries on one install, as Sprints 075–082 ending in 2.0.0. Measures what `user_id` already buys (it is on `entries` and `shelves` with the constraints and indexes to match), what is genuinely missing, and costs the alternatives for the mode switch, password hashing, sessions and login friction. | **Awaiting the owner.** Four open questions in its §7 |
+
 ## Historical
 
 Kept because they are the record, not because they are current.

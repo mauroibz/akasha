@@ -1598,7 +1598,13 @@ says which, so a mixed shelf's count would disagree with the screen it links to.
 - **Auth.** Product spec section 9 keeps this a v2 deferral with no sprint number, reaffirmed by the
   owner during the revision-8 re-plan. It remains the gate on any exposure beyond LAN: no public
   DNS, port-forwarding, tunnel, or internet-reachable proxy until it exists.
-- **Sharing, multiuser, Calibre write-back, OPDS.** Product spec section 9, unchanged.
+  **A proposal now exists** — [`../auth-and-multiuser-proposal.md`](../auth-and-multiuser-proposal.md),
+  written 2026-09-07 at the owner's request — which would schedule this and multiuser together as
+  Sprints 075–082 ending in 2.0.0. It is awaiting acceptance and nothing in it is built; until the
+  owner accepts it, this entry and the one below stand unchanged.
+- **Sharing, multiuser, Calibre write-back, OPDS.** Product spec section 9, unchanged. Multiuser is
+  covered by the proposal linked above; sharing, Calibre write-back and OPDS are explicitly outside
+  it (its section 4).
 - **The owner feedback above**, until it is scheduled.
 - **Wine and the remaining exploratory domains.** `docs/domain_metadata_roadmap_report.md` assesses
   them; none is scheduled. Wine's weakness is access economics rather than catalogue geography. That
