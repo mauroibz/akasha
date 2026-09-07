@@ -5821,7 +5821,18 @@ both changes, against 1 of 3 before the second.
     wrong, not the palette. This is precisely the flake DEC-114 quarantined for the three sibling
     checks on the same screen, and `playwright.config.ts` already predicted it moving. Sprint 072
     is why it moved here — rebuilding the card made this test's page the same page as the others.
-    The assertion is unchanged; only which project runs it is.
+
+    **Corrected the same day, after the repair's own CI run.** Moving it into the serial project
+    was the wrong fix and it cost more than it bought. That project runs one worker and
+    `accessibility.spec.ts` sorts ahead of `library.spec.ts` in it, so a fourth CPU-heavy axe pass
+    now ran immediately before the two crossfade DOM-budget probes — the most load-sensitive tests
+    in the suite by their own record. Both failed on the next run, one outright and one flaky,
+    neither having failed before. The project move is reverted. The check never needed a library:
+    its subject is the notice beside the web results, and the seeded entry only put a wall card on
+    the page for axe to sample. It seeds nothing now, so the card is gone, the notice is not, and
+    the test stays in the parallel project with the other 126. The lesson worth keeping is that
+    the serial project is a scarce resource, not a quarantine to grow: a test put there competes
+    with the DOM-budget probes it was meant to stop disturbing.
   - **A cover assertion was racing the dev proxy.** `fetches a missing cover for a domain with no
     chooser` asserted on an `<img>` whose `src` was never stubbed, so the request reached the dev
     server's proxy — behind which the e2e CI job runs no backend at all. The assertion reading the

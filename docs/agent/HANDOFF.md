@@ -105,9 +105,13 @@ test defects, no product defect:
 
 - `scripts/smoke_container.sh` AC4 compared the served OpenAPI version against the literal
   `"1.5.1"`. It now reads `backend/pyproject.toml` and checks all four surfaces against it.
-- `the degraded provider notice has no serious accessibility violations` joined the three sibling
-  library-wall axe checks in the serial `heavy-library` Playwright project. Axe was sampling the
-  wall-card caption mid-render; the palette measures 7.47:1 and 18.34:1 at rest.
+- `the degraded provider notice has no serious accessibility violations` now seeds an empty
+  library. Axe was sampling a wall-card caption mid-render; the palette measures 7.47:1 and
+  18.34:1 at rest, so the sample was wrong, not the colours. The card was incidental to a check
+  about the provider notice. **A first attempt moved the check into the serial `heavy-library`
+  project instead and made things worse** — that project runs one worker, and a fourth axe pass
+  ahead of the crossfade DOM-budget probes broke both of them. Reverted. Treat the serial project
+  as a scarce resource, not a quarantine to grow.
 - `fetches a missing cover for a domain with no chooser` asserted on an `<img>` whose bytes were
   never stubbed, racing the dev proxy that has no backend behind it in CI. Stubbed now.
 
