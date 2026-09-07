@@ -2,7 +2,7 @@ import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
 
 import { sampleAnimations } from "./motion";
-import { albumItemType, stubItemTypes } from "./seed";
+import { albumItemType, pixelCover, stubItemTypes } from "./seed";
 
 const candidate = (id: string, year: number) => ({
   source: "openlibrary",
@@ -254,6 +254,21 @@ test("fetches a missing cover for a domain with no chooser, and reports why one 
     formats: ["vinyl"],
   };
   let coverFetched = false;
+  // The installed cover's bytes, served here rather than left to reach the
+  // dev server's proxy. Nothing runs a backend behind that proxy in CI, so an
+  // unstubbed `<img src>` races: whichever happens first, the assertion below
+  // reading the element or the proxy erroring and `CoverImage` swapping the
+  // image for its "Cover failed to load" placeholder. It lost that race on the
+  // v1.8.0 push. A URL predicate rather than a glob, so it matches the path
+  // with or without a cache-busting query and never `/cover/fetch`.
+  await page.route(
+    (url) => url.pathname === "/api/items/3/cover",
+    (route) =>
+      route.fulfill({
+        contentType: "image/png",
+        body: Buffer.from(pixelCover.split(",")[1], "base64"),
+      }),
+  );
   await page.route("**/api/entries/7", (route) =>
     route.fulfill({
       json: coverFetched
