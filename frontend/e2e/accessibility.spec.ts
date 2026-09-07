@@ -544,7 +544,15 @@ test("the degraded provider notice has no serious accessibility violations", asy
   // The notice sits with the web results, which is where a degraded provider is
   // the reader's problem — a library page reaches no provider at all.
   await page.route("**/api/search**", (route) => route.fulfill({ json: [] }));
-  await seedLibrary(page, 1);
+  // An empty library on purpose. The subject here is the notice, and a seeded
+  // entry put a wall card on the page whose caption axe then sampled: on the
+  // v1.8.0 push it reported colour-contrast violations on `.leading-5`,
+  // `.truncate` and `.gap-1.5 > .shrink-0`, a different subset on each of three
+  // attempts. Those nodes measure 18.34:1, 7.47:1 and 7.47:1 at rest against a
+  // resolved `#0f0f11` -- a title at 18:1 cannot fail a 4.5:1 threshold, so the
+  // sample was wrong, not the palette. The three checks that do own the wall
+  // are serial for exactly this reason (DEC-114); this one never needed a card.
+  await seedLibrary(page, 0);
   await page.goto("/");
   await page.getByRole("searchbox").fill("rayuela");
   await page.getByRole("button", { name: "Search", exact: true }).click();

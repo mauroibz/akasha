@@ -23,18 +23,8 @@ const INCLUDE_SCRATCHPAD = process.env.AKASHA_INCLUDE_SCRATCHPAD === "1";
 //   the opacity modifier), but the assertions stay serial: a rendering-timing
 //   sample under load is exactly the flakiness this project exists to remove,
 //   and the failing test moved between them.
-//
-// It moved again on 2026-09-06: `the degraded provider notice…` is the fourth
-// axe check standing on the library wall (it seeds an entry, searches, and
-// renders the same card caption), and it was the one that failed CI on the
-// v1.8.0 push — reporting `.leading-5`, `.truncate` and `.gap-1.5 > .shrink-0`,
-// a different subset on each of its three attempts. Those are card-caption
-// nodes, and axe's own computed values for them at rest are 18.34:1, 7.47:1
-// and 7.47:1 against a resolved `#0f0f11`; a title at 18:1 cannot fail a 4.5:1
-// threshold, so the sample, not the palette, is what was wrong. Sprint 072
-// rebuilt the card and made this test's page the same page as the other three.
 const HEAVY_LIBRARY =
-  /the deterministic 10,000-entry library mounts only overscanned rows|the 10,000-entry library keeps its DOM budget with web results on the page|changing sort crossfades the container and animates no row|the mounted-DOM budget holds through a crossfade|library in (grid|table) view has no serious accessibility violations|the library with web results on it has no serious accessibility violations|the degraded provider notice has no serious accessibility violations/;
+  /the deterministic 10,000-entry library mounts only overscanned rows|the 10,000-entry library keeps its DOM budget with web results on the page|changing sort crossfades the container and animates no row|the mounted-DOM budget holds through a crossfade|library in (grid|table) view has no serious accessibility violations|the library with web results on it has no serious accessibility violations/;
 
 export default defineConfig({
   testDir: "./e2e",
