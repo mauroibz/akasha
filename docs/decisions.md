@@ -5789,3 +5789,53 @@ both changes, against 1 of 3 before the second.
   known-degraded, and what is still owed to the owner outside the numbered plan (the DEC-025
   walkthrough against the owner's own real library, the two release tags, DEC-133's open product
   question). A new numbered sprint begins only when the owner asks for one.
+
+## DEC-145 — `main` had been red since the 1.6.0 bump; three CI failures repaired before v1.8.0 is published
+
+- **Date:** 2026-09-07
+- **Status:** accepted
+- **Cross-references:** DEC-114 (the serial `heavy-library` project and its measurement), DEC-025
+  (why an unenforced check stops being true), DEC-139–144 (the sprints whose pushes carried the
+  failures unnoticed).
+- **Context:** the owner asked, before any new work, that the repository have a release current
+  with the development state. The tags were current — `v1.8.0` sits on `HEAD`, is pushed, and the
+  four version surfaces agree — but two other things were not. The GitHub *Releases* page still
+  showed `v1.5.0` as the latest, seven tags behind. And CI had been failing on `main` since the
+  1.6.0 bump: the `container` job on every push, and the `e2e` job on the v1.8.0 push. Nothing was
+  broken in the product; three separate test defects were.
+- **Decision:** repair all three before publishing anything, on the principle that a release
+  announced off a red pipeline is a claim nobody checked.
+  - **The smoke test's version assertion was a literal.** `scripts/smoke_container.sh` AC4
+    compared the served OpenAPI version against `"1.5.1"`, written when that was current and never
+    moved. From 1.6.0 onward it could only fail, and it failed on a served document that was
+    correct every time. It now reads the expected value from `backend/pyproject.toml` and compares
+    `frontend/package.json` and the committed `frontend/openapi.json` against it too — the
+    four-surfaces-agree check the release notes have asserted since v1.5 and which, it turns out,
+    nothing enforced. `make check` never looked at versions at all.
+  - **The fourth library-wall axe check joins the other three in the serial project.** `the
+    degraded provider notice has no serious accessibility violations` failed three times on the
+    v1.8.0 push, naming a different subset of `.leading-5`, `.truncate` and `.gap-1.5 > .shrink-0`
+    each attempt. Those are wall-card caption nodes. Axe's own computed values for them at rest,
+    measured with a throwaway probe against the same screen, are 18.34:1, 7.47:1 and 7.47:1
+    against a resolved `#0f0f11`: a title at 18:1 cannot fail a 4.5:1 threshold, so the sample was
+    wrong, not the palette. This is precisely the flake DEC-114 quarantined for the three sibling
+    checks on the same screen, and `playwright.config.ts` already predicted it moving. Sprint 072
+    is why it moved here — rebuilding the card made this test's page the same page as the others.
+    The assertion is unchanged; only which project runs it is.
+  - **A cover assertion was racing the dev proxy.** `fetches a missing cover for a domain with no
+    chooser` asserted on an `<img>` whose `src` was never stubbed, so the request reached the dev
+    server's proxy — behind which the e2e CI job runs no backend at all. The assertion reading the
+    element and the proxy failing (which makes `CoverImage` swap in its "Cover failed to load"
+    placeholder) were in a race the test lost on the v1.8.0 push. The bytes are stubbed now, so
+    the assertion is about the behaviour under test rather than about which unrelated event landed
+    first.
+- **Verified:** `make check`; backend `pytest` (1364 passed, 89% coverage); frontend `vitest`
+  (305 passed); the full Playwright suite as CI runs it (128 passed, 2 skipped, 0 failed);
+  `make smoke-container` end to end against a real built image, which is the gate that had been
+  red — it now passes, including the new four-surfaces comparison.
+- **Consequences:** two things follow. First, no gate anywhere checks that the version surfaces
+  agree except a container smoke test that costs minutes and is not part of `make check`; the
+  cheap check belongs in `scripts/validate_project.py` whenever someone next touches it. Second,
+  the release procedure in `docs/operations/publishing-images.md` moves the tag and builds the
+  image but never publishes a GitHub Release, which is why seven of them are missing — the
+  backfill and the procedure change are recorded with the release work itself, not here.

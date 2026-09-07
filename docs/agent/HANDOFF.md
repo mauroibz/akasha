@@ -94,9 +94,31 @@ current with all of Sprints 072-074 and both layout fixes. Authorization does no
 future sessions: do not push, merge, tag, open a PR, or take any remote action again without being
 asked, even though this session did.
 
-## Version
+## Version and pipeline state
 
-`1.8.0`, tagged. `docs/operations/release-notes-v1.8.md` has the release notes.
+`1.8.0`, tagged, and the four version surfaces agree (`backend/pyproject.toml`,
+`frontend/package.json`, `main.py`'s FastAPI `version=`, `frontend/openapi.json`).
+`docs/operations/release-notes-v1.8.md` has the release notes.
+
+**CI on `main` was red from the 1.6.0 bump until 2026-09-07, and is repaired (DEC-145).** Three
+test defects, no product defect:
+
+- `scripts/smoke_container.sh` AC4 compared the served OpenAPI version against the literal
+  `"1.5.1"`. It now reads `backend/pyproject.toml` and checks all four surfaces against it.
+- `the degraded provider notice has no serious accessibility violations` joined the three sibling
+  library-wall axe checks in the serial `heavy-library` Playwright project. Axe was sampling the
+  wall-card caption mid-render; the palette measures 7.47:1 and 18.34:1 at rest.
+- `fetches a missing cover for a domain with no chooser` asserted on an `<img>` whose bytes were
+  never stubbed, racing the dev proxy that has no backend behind it in CI. Stubbed now.
+
+Two gaps those repairs exposed, neither fixed:
+
+- **Nothing cheap checks that the version surfaces agree.** The only check is inside
+  `make smoke-container`, which costs minutes and is not part of `make check`.
+  `scripts/validate_project.py` is where it belongs, whenever someone next touches it.
+- **The release procedure never publishes a GitHub Release.**
+  `docs/operations/publishing-images.md` moves the tag and builds the image, and stops there. The
+  *Releases* page therefore still showed `v1.5.0` as the latest while seven tags stood past it.
 
 ## Private data and operational constraints
 
