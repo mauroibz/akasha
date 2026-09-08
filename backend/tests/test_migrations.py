@@ -124,6 +124,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0015_entry_progress",
         "0016_import_kind_is_the_registrys",
         "0017_users_and_sessions",
+        "0018_user_foreign_keys",
     ]
 
     upgrade(configured.database_url)
@@ -198,6 +199,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0015_entry_progress",
         "0016_import_kind_is_the_registrys",
         "0017_users_and_sessions",
+        "0018_user_foreign_keys",
     ]
 
 
@@ -1032,3 +1034,155 @@ def test_the_identity_revision_downgrades_back_to_the_previous_head(tmp_path: Pa
     assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
     assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
     connection.close()
+
+FK_REVISION = "0018_user_foreign_keys"
+
+
+def test_every_user_owned_row_now_points_at_a_real_user(tmp_path: Path) -> None:
+    """Sprint 075 AC1/AC3/AC4, exercised the way 0013/0015 did their rebuilds.
+
+    A populated `0016` library walks up two new revisions; every row that said
+    `user_id = 1` by convention now says it by foreign key, and every constraint
+    the previous head had survives the rebuild of `entries` — byte for byte in
+    name and columns, asserted against `sqlite_master` (AC4).
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+
+    command.upgrade(alembic_config(configured.database_url), FK_REVISION)
+
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == FK_REVISION
+    )
+
+    # AC4: the entries rebuild drops nothing and renames nothing. All five CHECKs,
+    # both timestamp-carrying columns, six indexes and the user-scoped unique —
+    # exactly the list the sprint's baseline names.
+    entries_ddl = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+    for surviving in (
+        "uq_entries_user_item",
+        "ck_entries_score",
+        "ck_entries_reread_count",
+        "ck_entries_score_provisional",
+        "ck_entries_progress",
+    ):
+        assert surviving in entries_ddl, f"the rebuild dropped {surviving}"
+    # The foreign key the revision exists to add...
+    entries_fks = {
+        (row[2], row[3], row[6]) for row in connection.execute("PRAGMA foreign_key_list(entries)")
+    }
+    assert entries_fks == {("items", "item_id", "RESTRICT"), ("users", "user_id", "RESTRICT")}
+    entries_indexes = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='entries'"
+        )
+    }
+    assert entries_indexes >= {
+        "ix_entries_status",
+        "ix_entries_score",
+        "ix_entries_date_added",
+        "ix_entries_user_status_date_id",
+        "ix_entries_user_status_score_id",
+        "ix_entries_user_finished_id",
+    }
+    # ...and a column order built to prove nothing moved: `progress` stays last.
+    assert [row[1] for row in connection.execute("PRAGMA table_info(entries)")] == [
+        "id",
+        "user_id",
+        "item_id",
+        "status",
+        "score",
+        "notes",
+        "date_added",
+        "date_started",
+        "date_finished",
+        "reread_count",
+        "score_provisional",
+        "suggested_status",
+        "created_at",
+        "updated_at",
+        "progress",
+    ]
+
+    shelves_ddl = connection.execute("SELECT sql FROM sqlite_master WHERE name='shelves'").fetchone()[0]
+    assert "uq_shelves_user_slug" in shelves_ddl
+    shelves_fks = {
+        (row[2], row[3], row[6]) for row in connection.execute("PRAGMA foreign_key_list(shelves)")
+    }
+    assert shelves_fks == {("users", "user_id", "RESTRICT")}
+
+    # AC1 continued: every row came through both rebuilds with its values intact,
+    # and the rebuild children — entry_shelves and entry_formats — survived a DROP
+    # TABLE that would have emptied them under PRAGMA foreign_keys.
+    rows = connection.execute(
+        "SELECT id, user_id, item_id, status, score, notes FROM entries ORDER BY id"
+    ).fetchall()
+    assert rows == [
+        (1, 1, 1, "read", 9, "hopscotch"),
+        (2, 1, 2, "owned", None, None),
+    ]
+    assert connection.execute(
+        "SELECT id, user_id, name, slug FROM shelves"
+    ).fetchall() == [(1, 1, "Argentina", "argentina")]
+    assert connection.execute("SELECT entry_id, shelf_id FROM entry_shelves").fetchall() == [(1, 1)]
+    assert connection.execute("SELECT entry_id, format FROM entry_formats").fetchall() == [
+        (1, "paperback")
+    ]
+
+    # AC3: the referential audit keeps returning empty on the upgraded schema.
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+    # And the new constraint bites through the connection the application uses
+    # (database.py enables the pragma): a row claiming a user nobody is refused.
+    import sqlalchemy as _sa
+
+    engine = _sa.create_engine(f"sqlite:///{database_path}")
+    with engine.connect() as verification:
+        verification.execute(_sa.text("PRAGMA foreign_keys=ON"))
+        with pytest.raises(_sa.exc.IntegrityError):
+            verification.execute(
+                _sa.text(
+                    "INSERT INTO entries (id, user_id, item_id, status, date_added,"
+                    " reread_count, score_provisional, created_at, updated_at)"
+                    " VALUES (3, 42, 1, 'read', 'now', 0, 0, 'now', 'now')"
+                )
+            )
+    engine.dispose()
+    connection.close()
+
+
+def test_the_foreign_key_revision_downgrades_without_the_keys(tmp_path: Path) -> None:
+    """Down from 0018 returns both tables to their FK-less 0016 shapes."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+    command.upgrade(alembic_config(configured.database_url), FK_REVISION)
+
+    # 0017's tables are a no-op for this downgrade: it rebuilds from their left.
+    command.downgrade(alembic_config(configured.database_url), "0017_users_and_sessions")
+
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == "0017_users_and_sessions"
+    )
+    for table in ("entries", "shelves"):
+        fk_targets = {
+            row[2] for row in connection.execute(f"PRAGMA foreign_key_list({table})")
+        }
+        assert "users" not in fk_targets
+    # Data survived the rebuild down just as it survived up.
+    assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
+    assert connection.execute("SELECT count(*) FROM entry_formats").fetchone()[0] == 1
+    connection.close()
+

@@ -4,6 +4,8 @@ import httpx
 import pytest
 from sqlalchemy import text
 
+from sqlalchemy.exc import IntegrityError
+
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.main import create_app
@@ -189,3 +191,81 @@ def test_compose_side_akasha_names_are_ignored_not_applied(
     assert (
         configured.model_dump() == Settings(user_agent_contact="test@example.invalid").model_dump()
     )
+
+
+@pytest.mark.anyio
+async def test_an_entry_cannot_reference_a_user_that_does_not_exist(tmp_path: Path) -> None:
+    """Sprint 075 AC7 surface: runtime connections enforce the `users` foreign key.
+
+    `database.py` enables `PRAGMA foreign_keys` and `alembic/env.py` deliberately
+    does not (DEC-092): enforcement is the app's, not the migration's. The seeded
+    user exists and can be referenced; a number with no row behind it cannot.
+    """
+    configured = settings(tmp_path)
+    app = create_app(configured)
+    async with app.router.lifespan_context(app):
+        with app.state.engine.begin() as database:
+            database.execute(
+                text(
+                    "INSERT INTO items (id, type, title, identifiers, metadata,"
+                    " created_at, updated_at)"
+                    " VALUES (1, 'book', 'Rayuela', '{}', '{}', 'now', 'now')"
+                )
+            )
+            database.execute(
+                text(
+                    "INSERT INTO entries (id, user_id, item_id, status, date_added,"
+                    " reread_count, score_provisional, created_at, updated_at)"
+                    " VALUES (1, 1, 1, 'read', 'now', 0, 0, 'now', 'now')"
+                )
+            )
+            with pytest.raises(IntegrityError):
+                database.execute(
+                    text(
+                        "INSERT INTO entries (id, user_id, item_id, status, date_added,"
+                        " reread_count, score_provisional, created_at, updated_at)"
+                        " VALUES (2, 42, 1, 'read', 'now', 0, 0, 'now', 'now')"
+                    )
+                )
+
+
+@pytest.mark.anyio
+async def test_a_user_with_entries_cannot_be_deleted(tmp_path: Path) -> None:
+    """`entries` and `shelves` RESTRICT their user: a library outlives the delete.
+
+    Deleting a user is not a route in Sprint 075 — Sprint 079 owns that product
+    decision — but the constraint states what deletion would do, and the answer for
+    someone's library is 'refuse' rather than 'cascade'. The entry and the shelf
+    keep the user alive exactly because they are typed with RESTRICT.
+    """
+    configured = settings(tmp_path)
+    app = create_app(configured)
+    async with app.router.lifespan_context(app):
+        with app.state.engine.begin() as database:
+            database.execute(
+                text(
+                    "INSERT INTO items (id, type, title, identifiers, metadata,"
+                    " created_at, updated_at)"
+                    " VALUES (1, 'book', 'Rayuela', '{}', '{}', 'now', 'now')"
+                )
+            )
+            database.execute(
+                text(
+                    "INSERT INTO entries (id, user_id, item_id, status, date_added,"
+                    " reread_count, score_provisional, created_at, updated_at)"
+                    " VALUES (1, 1, 1, 'read', 'now', 0, 0, 'now', 'now')"
+                )
+            )
+            database.execute(
+                text(
+                    "INSERT INTO shelves (id, user_id, name, slug, created_at, updated_at)"
+                    " VALUES (1, 1, 'Argentina', 'argentina', 'now', 'now')"
+                )
+            )
+            with pytest.raises(IntegrityError):
+                database.execute(text("DELETE FROM users WHERE id = 1"))
+        # The refusal left everything where it was.
+        with app.state.engine.begin() as database:
+            assert database.execute(text("SELECT count(*) FROM users")).scalar_one() == 1
+            assert database.execute(text("SELECT count(*) FROM entries")).scalar_one() == 1
+            assert database.execute(text("SELECT count(*) FROM shelves")).scalar_one() == 1
