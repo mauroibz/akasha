@@ -5049,3 +5049,24 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   or dies, never the column default. If the owner speaks before Sprint 076 starts:
   DEC-147 offers a cheap path to re-migrate 0017 if the seeded username isn't
   wanted as `owner`.
+
+## 2026-09-08 — Post-closure, owner-directed: seeded username renamed owner -> admin
+
+- Done, owner-directed, immediately after Sprint 075 closed: change the seeded
+  username from `owner` to `admin` as the default. DEC-147 had priced exactly
+  this: while the migration stays in place -- one literal and one assertion.
+- Verified: grep confirmed the name exists in exactly one place of code
+  (`_SEED_USERNAME` in `0017_users_and_sessions.py`); the AC5 test had only
+  asserted normalization, so renamed to a new assertion (`== "admin"`),
+  confirmed RED against the old seed, turned GREEN on the flip; entire backend
+  suite 1382 passed; `make check` green (format, lint, mypy, tsc, OpenAPI
+  1.8.9, validator). No frontend, e2e, container, spec, e2e reference
+  changed; the technical spec didn't name the seed at all.
+- Docs moved with it: DEC-147 gained a revision note (cheap path spent,
+  walkthrough observation annotated), Sprint 075's `Outcome` deliverables
+  line and deviation note now say `admin`, the walkthrough audit bullet
+  keeps the `owner` it actually observed and points at DEC-147, HANDOFF
+  updated to `admin`. No worklog history was renamed; it is history.
+- No state flip: Sprint 075 remains closed; this is an owner-directed post-
+  closure operation, not a new sprint.
+- Next: unchanged -- Sprint 076 on `ready`, `docs/sprints/076-...`.

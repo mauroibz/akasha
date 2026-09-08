@@ -14,8 +14,9 @@ inside it.
 - Migration head is `0019_ownership_on_the_import_ledger`, three revisions added
   (`0017` `users` + `sessions`, `0018` `entries`/`shelves` foreign keys via rebuild,
   `0019` ownership on the import ledger and `jobs`).
-- Exactly one user exists: id 1, username `owner`, admin, credentials NULL
-  (DEC-147 — re-migrate 0017 cheaply before Sprint 078 if the owner dislikes the name).
+- Exactly one user exists: id 1, username `admin`, admin, credentials NULL
+  (seeded as `owner` on close day and renamed to `admin` the same day, taking
+  the in-place re-migration DEC-147 priced; see its revision note).
 - Every `user_id` column that existed keeps `NOT NULL` + `server_default "1"` —
   that default is still what the unchanged code paths write with, and it is now a real
   reference. `jobs.user_id` alone is nullable (nobody's enrichment work); Sprint 076's

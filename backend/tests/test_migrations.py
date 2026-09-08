@@ -874,6 +874,10 @@ def test_users_and_sessions_are_created_from_the_previous_head(tmp_path: Path) -
     assert (user_id, is_admin, password_hash, password_salt) == (1, 1, None, None)
     # Stored normalized: the column's value is its own stripped-casefold form.
     assert username == username.strip().casefold()
+    # The seed's name is `admin` (the owner directed it on close day, taking the
+    # cheap re-migration DEC-147 offered: Sprint 077's setup screen still chooses
+    # the real credentials).
+    assert username == "admin"
 
     # `users` shape (proposal §2.2). `display_name` is optional and typed — the
     # normalized `username` is the identity. Credentials are nullable on purpose:

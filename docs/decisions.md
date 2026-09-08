@@ -5972,3 +5972,14 @@ both changes, against 1 of 3 before the second.
   walkthrough on a seeded `0016` copy of the fixture database showed the pre-migration backup, the
   chain, a commit-undo round trip, and `/openapi.json` still saying 1.8.0 — the sprint's "nothing
   changed" claim, tested by walking a real library through a real container.
+**Revision (2026-09-08, close day).** The owner took this entry's cheap path: the seeded
+username is `admin`, not `owner`. Migration `0017`'s `_SEED_USERNAME` literal — the only place
+the name exists in code — was changed and the AC test that asserts the seeded row's shape now
+asserts the value `admin` (previously it asserted only normalization). No other surface named
+it. The walkthrough's sqlite audit observed `owner` (it ran minutes before the rename) and is
+recorded as such in Sprint 075's Outcome with the rename noted beside it. This is the bullet's
+cheap-path condition executed (before Sprint 078 starts), so the fix stayed in place: one
+literal and one assertion, no data migration. Post-change evidence: 1382 backend tests pass
+(same count — the rename added one assertion to an existing test), `make check` green,
+validator green. The cheap path is now spent: a rename after Sprint 077's setup screen is the
+data migration the bullet priced.

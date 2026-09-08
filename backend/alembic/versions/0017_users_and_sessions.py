@@ -53,8 +53,10 @@ depends_on = None
 
 #: Placeholder identity for the seeded first user. Sprint 077's setup screen is
 #: where the owner chooses the real one; until then the migration needs *some*
-#: normalized-by-construction value in the one identity column it has.
-_SEED_USERNAME = "owner"
+#: normalized-by-construction value in the one identity column it has. `owner`
+#: landed with the sprint and the owner renamed it to `admin` on close day,
+#: taking the in-place revision DEC-147 priced (still cheap before Sprint 078).
+_SEED_USERNAME = "admin"
 
 
 def upgrade() -> None:

@@ -172,7 +172,7 @@ Completed 2026-09-08. Three migrations, one settings field, nothing else.
   `uq_users_username`) and `sessions` (opaque text id, `user_id` CASCADE to users,
   unique `token_hash`, `created_at`/`last_seen_at`/`expires_at`, nullable
   `user_agent`, and the expiry-sweep index). Seeds exactly one row: `id = 1`,
-  username `owner`, `is_admin = 1`, credentials NULL.
+  username `admin`, `is_admin = 1`, credentials NULL.
 - `0018_user_foreign_keys` — table rebuilds of `entries` and `shelves` (the shape
   of `0013`/`0015`, five rebuilds in project history now) attaching
   `REFERENCES users(id) ON DELETE RESTRICT` to the `user_id` that has existed
@@ -247,7 +247,9 @@ Completed 2026-09-08. Three migrations, one settings field, nothing else.
   DEC-146's four adopted defaults. Chose `owner`: normalized-form, and Sprint
   077's setup screen is where the real one is chosen. This is a data choice made
   once, and the decision is recorded in DEC-147 along with its cheap re-migration
-  if the owner prefers before Sprints 078/079.
+  if the owner prefers before Sprints 078/079. **Taken on close day:** the owner
+  renamed the seed to `admin`, and migration `0017` was revised in place under
+  DEC-147's cheap path (see DEC-147's revision note).
 - **`alembic` CLI without a `--url` is not wired**: the project's
   `alembic.ini` ships no `sqlalchemy.url` and instead the app injects it
   (`migrations.py`). Verification's "`uv run alembic upgrade head`" line was run
@@ -261,7 +263,7 @@ Completed 2026-09-08. Three migrations, one settings field, nothing else.
   deadline to fix `application/export.py:248` (`iter_entries` walks all entries
   with no `user_id` filter — a data leak the day Sprint 079 creates a second
   user; recorded in DEC-146).
-- 077 — first writer of `sessions`; the setup screen where the seeded `owner`
+- 077 — first writer of `sessions`; the setup screen where the seeded `admin`
   gets its real credentials.
 
 **Container walkthrough (DEC-025)**
@@ -277,7 +279,8 @@ named volume and the container started against it. Observed:
   three sprint revisions), then ran `0016→0017→0018→0019` and reported the app
   at 1.8.0.
 - `sqlite` audit inside the container: head `0019`, exactly one
-  `users` row (id 1, `owner`, admin), every `entries.user_id` = 1,
+  `users` row (id 1, `owner` as the walkthrough observed — renamed to `admin`
+  the same day, see DEC-147), every `entries.user_id` = 1,
   `PRAGMA foreign_key_check` empty.
 - A Goodreads preview (fixture CSV, 1 valid row + 1 row error), commit
   (created 1 item / 1 entry, batch state `committed`, every ledger row
