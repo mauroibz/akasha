@@ -56,9 +56,7 @@ def _user_id_column(with_user_fk: bool) -> sa.Column:
     referent moves.
     """
     referencing = [sa.ForeignKey("users.id", ondelete="RESTRICT")] if with_user_fk else []
-    return sa.Column(
-        "user_id", sa.Integer(), *referencing, nullable=False, server_default="1"
-    )
+    return sa.Column("user_id", sa.Integer(), *referencing, nullable=False, server_default="1")
 
 
 def _entries_table(with_user_fk: bool) -> sa.Table:

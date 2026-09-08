@@ -3,7 +3,6 @@ from pathlib import Path
 import httpx
 import pytest
 from sqlalchemy import text
-
 from sqlalchemy.exc import IntegrityError
 
 from book_tracker.config import Settings

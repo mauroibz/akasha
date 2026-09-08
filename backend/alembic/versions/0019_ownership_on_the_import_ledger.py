@@ -189,11 +189,17 @@ def _owned_user_column(table: str) -> sa.Column:
 
 
 def upgrade() -> None:
-    with op.batch_alter_table("import_batches", copy_from=_import_batches(), recreate="always") as batch:
+    with op.batch_alter_table(
+        "import_batches", copy_from=_import_batches(), recreate="always"
+    ) as batch:
         batch.add_column(_owned_user_column("import_batches"))
-    with op.batch_alter_table("import_records", copy_from=_import_records(), recreate="always") as batch:
+    with op.batch_alter_table(
+        "import_records", copy_from=_import_records(), recreate="always"
+    ) as batch:
         batch.add_column(_owned_user_column("import_records"))
-    with op.batch_alter_table("import_effects", copy_from=_import_effects(), recreate="always") as batch:
+    with op.batch_alter_table(
+        "import_effects", copy_from=_import_effects(), recreate="always"
+    ) as batch:
         batch.add_column(_owned_user_column("import_effects"))
 
     # No default on `jobs.user_id` on purpose (docstring): nobody's work must not

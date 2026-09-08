@@ -952,9 +952,10 @@ def test_users_and_sessions_are_created_from_the_previous_head(tmp_path: Path) -
     assert connection.execute("SELECT effect_type, entity_id FROM import_effects").fetchall() == [
         ("insert", "1")
     ]
-    assert {
-        row[0]: row[1] for row in connection.execute("SELECT id, batch_id FROM jobs")
-    } == {"job-batched": "batch-1", "job-shared": None}
+    assert {row[0]: row[1] for row in connection.execute("SELECT id, batch_id FROM jobs")} == {
+        "job-batched": "batch-1",
+        "job-shared": None,
+    }
 
     # Nobody's work is owned yet: user attribution lands one revision at a time.
     for table in ("import_batches", "import_records", "import_effects", "jobs"):
@@ -1037,6 +1038,7 @@ def test_the_identity_revision_downgrades_back_to_the_previous_head(tmp_path: Pa
     assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
     connection.close()
 
+
 FK_REVISION = "0018_user_foreign_keys"
 
 
@@ -1059,14 +1061,15 @@ def test_every_user_owned_row_now_points_at_a_real_user(tmp_path: Path) -> None:
 
     connection = sqlite3.connect(database_path)
     assert (
-        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
-        == FK_REVISION
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == FK_REVISION
     )
 
     # AC4: the entries rebuild drops nothing and renames nothing. All five CHECKs,
     # both timestamp-carrying columns, six indexes and the user-scoped unique —
     # exactly the list the sprint's baseline names.
-    entries_ddl = connection.execute("SELECT sql FROM sqlite_master WHERE name='entries'").fetchone()[0]
+    entries_ddl = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='entries'"
+    ).fetchone()[0]
     for surviving in (
         "uq_entries_user_item",
         "ck_entries_score",
@@ -1084,10 +1087,7 @@ def test_every_user_owned_row_now_points_at_a_real_user(tmp_path: Path) -> None:
     # exact column list. Names alone would pass a rebuild that silently reordered
     # or dropped an indexed column, which is the failure mode AC4 exists to catch.
     entry_index_columns = {
-        name: tuple(
-            info_row[2]
-            for info_row in connection.execute(f"PRAGMA index_info('{name}')")
-        )
+        name: tuple(info_row[2] for info_row in connection.execute(f"PRAGMA index_info('{name}')"))
         for name in (
             "ix_entries_status",
             "ix_entries_score",
@@ -1124,7 +1124,9 @@ def test_every_user_owned_row_now_points_at_a_real_user(tmp_path: Path) -> None:
         "progress",
     ]
 
-    shelves_ddl = connection.execute("SELECT sql FROM sqlite_master WHERE name='shelves'").fetchone()[0]
+    shelves_ddl = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='shelves'"
+    ).fetchone()[0]
     assert "uq_shelves_user_slug" in shelves_ddl
     shelves_fks = {
         (row[2], row[3], row[6]) for row in connection.execute("PRAGMA foreign_key_list(shelves)")
@@ -1141,9 +1143,9 @@ def test_every_user_owned_row_now_points_at_a_real_user(tmp_path: Path) -> None:
         (1, 1, 1, "read", 9, "hopscotch"),
         (2, 1, 2, "owned", None, None),
     ]
-    assert connection.execute(
-        "SELECT id, user_id, name, slug FROM shelves"
-    ).fetchall() == [(1, 1, "Argentina", "argentina")]
+    assert connection.execute("SELECT id, user_id, name, slug FROM shelves").fetchall() == [
+        (1, 1, "Argentina", "argentina")
+    ]
     assert connection.execute("SELECT entry_id, shelf_id FROM entry_shelves").fetchall() == [(1, 1)]
     assert connection.execute("SELECT entry_id, format FROM entry_formats").fetchall() == [
         (1, "paperback")
@@ -1190,14 +1192,13 @@ def test_the_foreign_key_revision_downgrades_without_the_keys(tmp_path: Path) ->
         == "0017_users_and_sessions"
     )
     for table in ("entries", "shelves"):
-        fk_targets = {
-            row[2] for row in connection.execute(f"PRAGMA foreign_key_list({table})")
-        }
+        fk_targets = {row[2] for row in connection.execute(f"PRAGMA foreign_key_list({table})")}
         assert "users" not in fk_targets
     # Data survived the rebuild down just as it survived up.
     assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
     assert connection.execute("SELECT count(*) FROM entry_formats").fetchone()[0] == 1
     connection.close()
+
 
 LEDGER_REVISION = "0019_ownership_on_the_import_ledger"
 
@@ -1249,7 +1250,9 @@ def test_the_import_ledger_and_job_queue_belong_to_the_seeded_user(tmp_path: Pat
         ("import_records", ("uq_import_record_row",)),
         ("jobs", ("ck_jobs_state", "ck_jobs_attempts")),
     ):
-        ddl = connection.execute(f"SELECT sql FROM sqlite_master WHERE name='{table}'").fetchone()[0]
+        ddl = connection.execute(f"SELECT sql FROM sqlite_master WHERE name='{table}'").fetchone()[
+            0
+        ]
         for name in surviving:
             assert name in ddl, f"{table} lost {name}"
     # …and the three independent indexes survive with their exact column lists.
@@ -1270,7 +1273,8 @@ def test_the_import_ledger_and_job_queue_belong_to_the_seeded_user(tmp_path: Pat
     # ...and the new reference (AC3's audit + a runtime enforcement check).
     for table in ("import_batches", "import_records", "import_effects", "jobs"):
         fks = {
-            (row[2], row[3], row[6]) for row in connection.execute(f"PRAGMA foreign_key_list({table})")
+            (row[2], row[3], row[6])
+            for row in connection.execute(f"PRAGMA foreign_key_list({table})")
         }
         assert ("users", "user_id", "RESTRICT") in fks
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
@@ -1328,7 +1332,9 @@ def test_a_job_written_by_enrichment_claims_no_user(tmp_path: Path) -> None:
     repository = JobRepository(engine)
     job_id = repository.enqueue(None, "enrich_item", {"item_id": 1})
     connection = sqlite3.connect(configured.data_dir / "books.db")
-    assert connection.execute("SELECT user_id FROM jobs WHERE id = ?", (job_id,)).fetchone()[0] is None
+    assert (
+        connection.execute("SELECT user_id FROM jobs WHERE id = ?", (job_id,)).fetchone()[0] is None
+    )
     connection.close()
     engine.dispose()
 
@@ -1387,9 +1393,7 @@ async def test_a_full_downgrade_returns_0016_and_the_application_still_starts(
     assert configured.database_url is not None
     assert pending_revisions(configured.database_url) == []
     connection = sqlite3.connect(database_path)
-    assert (
-        connection.execute("SELECT count(*) FROM users").fetchone()[0] == 1
-    )
+    assert connection.execute("SELECT count(*) FROM users").fetchone()[0] == 1
     connection.close()
 
 
@@ -1477,4 +1481,3 @@ def test_the_ownership_revision_downgrades_without_user_columns(tmp_path: Path) 
     assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     connection.close()
-
