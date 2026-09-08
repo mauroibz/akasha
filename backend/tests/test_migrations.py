@@ -125,6 +125,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0016_import_kind_is_the_registrys",
         "0017_users_and_sessions",
         "0018_user_foreign_keys",
+        "0019_ownership_on_the_import_ledger",
     ]
 
     upgrade(configured.database_url)
@@ -200,6 +201,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0016_import_kind_is_the_registrys",
         "0017_users_and_sessions",
         "0018_user_foreign_keys",
+        "0019_ownership_on_the_import_ledger",
     ]
 
 
@@ -1184,5 +1186,166 @@ def test_the_foreign_key_revision_downgrades_without_the_keys(tmp_path: Path) ->
     # Data survived the rebuild down just as it survived up.
     assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
     assert connection.execute("SELECT count(*) FROM entry_formats").fetchone()[0] == 1
+    connection.close()
+
+LEDGER_REVISION = "0019_ownership_on_the_import_ledger"
+
+
+def test_the_import_ledger_and_job_queue_belong_to_the_seeded_user(tmp_path: Path) -> None:
+    """Sprint 075 AC1/AC4/AC6: `0016` -> head with all six tables populated.
+
+    The three import-ledger tables gain a NOT NULL user defaulted and backfilled to
+    1 — an import and its undo ledger are someone's work, and everyone here is the
+    seeded user. `jobs` is the deliberate asymmetry (sprint risks section, proposal
+    §1 line 54): an enrichment job acts on a shared item and belongs to nobody, so
+    the column is nullable with no default, and the migration tells the two apart
+    the only way a `0016` row can be told — by `batch_id`. A job the import pipeline
+    chained to a batch is user 1's; a standalone enrichment job stays nobody's.
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+
+    command.upgrade(alembic_config(configured.database_url), LEDGER_REVISION)
+
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == LEDGER_REVISION
+    )
+
+    # AC1: the ledger's user_id is 1 on every row, taken by reference now.
+    assert connection.execute("SELECT DISTINCT user_id FROM import_batches").fetchall() == [(1,)]
+    assert connection.execute("SELECT DISTINCT user_id FROM import_records").fetchall() == [(1,)]
+    assert connection.execute("SELECT DISTINCT user_id FROM import_effects").fetchall() == [(1,)]
+
+    # AC6: the queue splits by import origin. The batch-chained enrichment is user
+    # 1's work; the standalone enrichment belongs to nobody.
+    assert {row[0]: row[1] for row in connection.execute("SELECT id, user_id FROM jobs")} == {
+        "job-batched": 1,
+        "job-shared": None,
+    }
+
+    # AC4 for the ledger: every constraint and index from the baseline's list
+    # survives the upgrade, asserted from sqlite_master. The uq_*/ck_* constraints
+    # live in the table body; ix_* are separate objects and are asserted via the
+    # index query below, once each.
+    for table, surviving in (
+        ("import_batches", ("uq_import_batch_input",)),
+        ("import_records", ("uq_import_record_row",)),
+        ("jobs", ("ck_jobs_state", "ck_jobs_attempts")),
+    ):
+        ddl = connection.execute(f"SELECT sql FROM sqlite_master WHERE name='{table}'").fetchone()[0]
+        for name in surviving:
+            assert name in ddl, f"{table} lost {name}"
+    index_names = {
+        row[0]
+        for row in connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND"
+            " tbl_name IN ('import_records','import_effects','jobs')"
+        )
+    }
+    assert index_names >= {
+        "ix_import_records_batch_action",
+        "ix_import_effects_batch_effect",
+        "ix_jobs_claim",
+    }
+
+    # ...and the new reference (AC3's audit + a runtime enforcement check).
+    for table in ("import_batches", "import_records", "import_effects", "jobs"):
+        fks = {
+            (row[2], row[3], row[6]) for row in connection.execute(f"PRAGMA foreign_key_list({table})")
+        }
+        assert ("users", "user_id", "RESTRICT") in fks
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+    # The application's connection (database.py enables the pragma) refuses a batch
+    # claimed by a user nobody is. The default still writes user 1 — AC8 depends on
+    # INSERTs that name no user still landing.
+    import sqlalchemy as _sa
+
+    engine = _sa.create_engine(f"sqlite:///{database_path}")
+    with engine.connect() as verification:
+        verification.execute(_sa.text("PRAGMA foreign_keys=ON"))
+        with pytest.raises(_sa.exc.IntegrityError):
+            verification.execute(
+                _sa.text(
+                    "INSERT INTO import_batches (id, kind, fingerprint, state, user_id,"
+                    " created_at, updated_at)"
+                    " VALUES ('b-42', 'calibre', 'fp-42', 'previewed', 42, 'now', 'now')"
+                )
+            )
+        # A batch naming nobody falls to the column's default: user 1.
+        verification.execute(
+            _sa.text(
+                "INSERT INTO import_batches (id, kind, fingerprint, state, created_at,"
+                " updated_at) VALUES ('b-default', 'calibre', 'fp-d', 'previewed', 'now',"
+                " 'now')"
+            )
+        )
+        assert (
+            verification.execute(
+                _sa.text("SELECT user_id FROM import_batches WHERE id = 'b-default'")
+            ).scalar_one()
+            == 1
+        )
+    engine.dispose()
+    connection.close()
+
+
+def test_a_job_written_by_enrichment_claims_no_user(tmp_path: Path) -> None:
+    """AC6 at runtime: JobRepository.enqueue produces a shared, userless job.
+
+    The queue's only writer today is enrichment. Its jobs act on shared items, so
+    the schema must record them as nobody's — a NULL user_id is the claim the
+    Sprint 076 resolver fills in, and a batch-chained job claiming an owner is the
+    opposite kind of row, told apart by batch_id at migration time.
+    """
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+
+    from book_tracker.database import create_engine
+    from book_tracker.infrastructure.jobs import JobRepository
+
+    engine = create_engine(configured)
+    repository = JobRepository(engine)
+    job_id = repository.enqueue(None, "enrich_item", {"item_id": 1})
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    assert connection.execute("SELECT user_id FROM jobs WHERE id = ?", (job_id,)).fetchone()[0] is None
+    connection.close()
+    engine.dispose()
+
+
+def test_the_ownership_revision_downgrades_without_user_columns(tmp_path: Path) -> None:
+    """Down from `0019` strips user_id from all four tables, rows intact."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+    command.upgrade(alembic_config(configured.database_url), LEDGER_REVISION)
+
+    command.downgrade(alembic_config(configured.database_url), FK_REVISION)
+
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0] == FK_REVISION
+    )
+    for table in ("import_batches", "import_records", "import_effects", "jobs"):
+        assert "user_id" not in {
+            row[1] for row in connection.execute(f"PRAGMA table_info({table})")
+        }
+    # Rows ride through the four rebuilds; the rebuild children of the ledger keep
+    # their CASCADEs, which is what the seed asserts indirectly by still existing.
+    assert connection.execute("SELECT count(*) FROM import_batches").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_records").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_effects").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     connection.close()
 
