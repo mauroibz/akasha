@@ -6036,3 +6036,19 @@ data migration the bullet priced.
   guard (any divergence still fails the gate), the shape of WORKFLOW's final-sprint rule, and
   DEC-090's general rule (tests read what exists) — only the "except the one list" exception,
   coined by DEC-147, is retired.
+
+**Revision (2026-09-08, same day).** Building `references/plan-insertion-worked-example.md`'s
+DEC-111 shape on top of this entry surfaced a hole: a mid-plan insertion renumbers every sprint
+at and after the insertion point, and the displaced file must drop `ready -> planned` in the same
+atomic call that activates the inserted sprint. The transition table as shipped allowed no edge
+out of `ready` except `in_progress`/`blocked`, so the commit ritual for an insertion revision
+still required a hand-edit. Added `ready -> planned` to `TRANSITIONS`; it can only compose into a
+legal derived state when the same call promotes another file to the single active slot (the
+derived-state check still refuses zero or two active files on its own). Proven on a scratch repo:
+renamed 076..082 up by one, created the inserted file at `planned`, then one call
+`--sprint 077 planned --sprint 076 ready --plan-revision 41` produced exactly one `ready` file,
+agreement with state.json, and the correct successor/activeness invariants; the standalone
+`ready -> planned` demotion (no activation in the same call) was refused as "project cannot be
+complete: sprint files are still open". The full insertion ritual (git mv, internal references,
+ROADMAP, FINAL_SPRINT, DEC entry) still carries the DEC-111 documented items — the script owns
+only the file-Status flip and state regeneration.

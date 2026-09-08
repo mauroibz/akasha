@@ -54,7 +54,11 @@ SPRINTS_DIR = ROOT / "docs/sprints"
 # is no edge out of `completed` (WORKFLOW's no completed -> in_progress rule).
 TRANSITIONS: dict[str, frozenset[str]] = {
     "planned": frozenset({"ready"}),
-    "ready": frozenset({"in_progress", "blocked"}),
+    # ready -> planned is legal only for the renumbering step of a mid-plan
+    # insertion revision (DEC-111 shape): the displaced sprint's file drops
+    # out of the active claim in the same atomic call that activates the new
+    # one, and the derived-state check still requires exactly one active file.
+    "ready": frozenset({"in_progress", "blocked", "planned"}),
     "in_progress": frozenset({"completed", "blocked"}),
     "blocked": frozenset({"in_progress", "completed"}),
     "completed": frozenset(),

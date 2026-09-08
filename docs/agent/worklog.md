@@ -5115,3 +5115,11 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Next: Sprint 076 stays `ready`; the next claim uses
   `python scripts/sync_sprint_state.py --sprint 076 in_progress` as its first
   state step.
+
+- Supplement (same session, same day): while building the insertion case for the
+  seeds-methodology skill update, the transition table shipped in `cc97cac` was found to
+  lack `ready -> planned` — the demotion the displaced sprint file needs during a DEC-111
+  mid-plan insertion renumber. Added it (commit below), recorded as a DEC-148 revision
+  note, and proven on a scratch repo: the swap `--sprint 077 planned --sprint 076 ready
+  --plan-revision 41` lands one `ready` file with agreement in one atomic call, while the
+  standalone demotion is still refused.
