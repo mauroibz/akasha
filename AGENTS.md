@@ -27,7 +27,13 @@ If state is inconsistent, repair documentation-only inconsistencies when the int
 
 ## 2. Execute one sprint
 
-1. Change both `project_status` and `active_sprint_status` in `docs/agent/state.json` to `in_progress`, set `started_at` if it is empty, and change the active sprint file's `Status` to `in_progress`. Commit these state changes only with the first meaningful implementation slice; do not make a bookkeeping-only commit.
+1. Run `python scripts/sync_sprint_state.py --sprint NNN in_progress` — it flips the active sprint
+   file's `Status` to `in_progress` and regenerates `docs/agent/state.json` from the sprint files
+   (DEC-148: state.json is this script's output; never hand-edit it; the validator still checks
+   both artifacts agree as an independent guard). It refuses illegal transitions and, when the
+   sprint is not the sequential successor or leaves two sprints active, it reverts everything and
+   writes nothing. Commit these state changes only with the first meaningful implementation
+   slice; do not make a bookkeeping-only commit.
 2. Implement acceptance criteria in listed order using test-driven development:
    - add or change a test and observe the expected failure;
    - implement the smallest coherent behavior;
@@ -88,15 +94,21 @@ Document observed reality. Do not change the product spec merely to excuse an in
 
 Only after all acceptance criteria and verification pass:
 
-1. Mark the active sprint `completed` in its file.
-2. In `docs/agent/state.json`, append it to `completed_sprints` and set `last_completed_sprint`. If another sprint remains, select it and set both `project_status` and `active_sprint_status` to `ready`; if the final planned sprint just closed, follow `WORKFLOW.md`'s final-sprint rule and set the project complete with null active fields. Clear `started_at` and update `updated_at`.
-3. Append a `docs/agent/worklog.md` entry for this session (done, verified-and-how, deviations, next), then rewrite `docs/agent/HANDOFF.md` for the next agent as concise current reality, not a transcript.
-4. Classify every change made after the exhaustive gate using `docs/agent/TESTING.md`. For the
+1. Run `python scripts/sync_sprint_state.py --sprint NNN completed --sprint MMM ready` — this is
+   the single step that marks the active sprint `completed` in its file, activates the successor
+   `MMM` as `ready`, regenerates `docs/agent/state.json` from the sprint files, clears
+   `started_at`, and sets `updated_at`. If no successor is planned yet, run it with only the
+   closing flip; `WORKFLOW.md`'s final-sprint rule then governs the project-complete state. The
+   script refuses illegal transitions and reverts everything if the resulting state breaks an
+   invariant. Never hand-edit state.json; DEC-148 made the sprint files the single source of
+   truth for sprint state.
+2. Append a `docs/agent/worklog.md` entry for this session (done, verified-and-how, deviations, next), then rewrite `docs/agent/HANDOFF.md` for the next agent as concise current reality, not a transcript.
+3. Classify every change made after the exhaustive gate using `docs/agent/TESTING.md`. For the
    normal documentation/state-only closure, run `python scripts/validate_project.py` and
    `git diff --check`; run documentation formatting or link checks when applicable. If a post-gate
    change invalidated a product gate, rerun that gate before closing.
-5. Create the final documentation/state commit: `[DOCS] Close sprint NNN and hand off`.
-6. Confirm `git status --short` is empty, then write the completion report for the owner (Mauro, not a frontend developer): in plain language, the sprint that was completed, one line per acceptance criterion and how it was verified, any deviations, anything that needs the owner (accounts, keys, money, irreversible choices), and one sentence on what the next sprint delivers. Keep audit detail — commit hashes, full command output — in the sprint `Outcome` and worklog, not the report.
+4. Create the final documentation/state commit: `[DOCS] Close sprint NNN and hand off`.
+5. Confirm `git status --short` is empty, then write the completion report for the owner (Mauro, not a frontend developer): in plain language, the sprint that was completed, one line per acceptance criterion and how it was verified, any deviations, anything that needs the owner (accounts, keys, money, irreversible choices), and one sentence on what the next sprint delivers. Keep audit detail — commit hashes, full command output — in the sprint `Outcome` and worklog, not the report.
 
 The active sprint pointer must never advance before the implementation is tested and committed.
 

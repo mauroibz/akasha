@@ -5070,3 +5070,48 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - No state flip: Sprint 075 remains closed; this is an owner-directed post-
   closure operation, not a new sprint.
 - Next: unchanged -- Sprint 076 on `ready`, `docs/sprints/076-...`.
+
+## 2026-09-08 — Post-closure, owner-directed: feedback 1 + 2 (DEC-148)
+
+- Done, owner-directed, between sprints (075 closed, 076 ready, unclaimed —
+  so protocol infrastructure, not sprint scope). Two structural fixes from the
+  Sprint-075 review:
+  - **Feedback 2 — head-pinned test lists retired.** `migrations.py` gained
+    `revision_chain_from_files()` (AST-parses `revision`/`down_revision` from
+    every `alembic/versions/0NNN_*.py`, chains from `None`);
+    `test_migrations.py` gained `revisions_above()` deriving the pending list
+    from that chain, `test_pending_revisions_reports_what_is_outstanding` and
+    `test_an_unwritable_backup_directory_stops_the_upgrade` now assert against
+    the derived list (with an explicit guard that no literal `0017`/`0018`/
+    `0019` survives), and two new tests lock the chain itself: equality with
+    Alembic's own `ScriptDirectory` walk order, and the revision numbers
+    forming `0001..NNNN` exactly. DEC-090's "except the one list" exception is
+    retired by DEC-148.
+  - **Feedback 1 — state.json is now generated.** New
+    `scripts/sync_sprint_state.py`: flips sprint-file `Status`
+    (`--sprint NNN <status>`, repeatable so the close pair is one atomic
+    call), regenerates `docs/agent/state.json` from all sprint files, refuses
+    illegal transitions/impossible result states and reverts on refusal,
+    reuses `FINAL_SPRINT`/status vocabulary from `validate_project.py`.
+    AGENTS.md §2.1 + §5.2 and WORKFLOW.md (state model, blocked handoff,
+    final sprint) now prescribe the script; validator's agreement check stays
+    as the independent guard. `started_at` is set on in_progress-if-empty and
+    cleared on close, owned by the implementing sprint.
+  - Docs reconciled: DEC-148 recorded; Sprint-075 outcome bullet and HANDOFF's
+    head-pinned note annotated (history preserved, retirement added);
+    docs/README.md's state.json row updated.
+- Verified: `uv run pytest tests/test_migrations.py` 34 passed incl. both new
+  chain tests and the two derived tests. One bug found and fixed on the first
+  run (committed in the same commit): the chain glob had three digit classes
+  but migration filenames use four digits, so the chain came back empty and
+  the new tests failed; after the fix everything was green. Scratch-repo proof
+  of the sync script: ready->in_progress, in_progress->completed + 077 ready,
+  validator green on the result; illegal ready->completed rejected, and on
+  failure no file is written (sprint file vs state.json compared before/after).
+  `make check` green on the real repo. `python scripts/validate_project.py`
+  green. Full backend suite 1384 passed (1382 + the two new chain tests).
+- Deviations: none from the reading order/treatise — owner-directed protocol
+  refinements between sprints are the documented exception path (DEC-148).
+- Next: Sprint 076 stays `ready`; the next claim uses
+  `python scripts/sync_sprint_state.py --sprint 076 in_progress` as its first
+  state step.

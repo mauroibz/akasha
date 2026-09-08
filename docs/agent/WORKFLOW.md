@@ -4,7 +4,12 @@ This document expands the mandatory protocol in `/AGENTS.md`. It is designed for
 
 ## State model
 
-`docs/agent/state.json` is the only machine-readable sprint pointer.
+`docs/agent/state.json` is the machine-readable sprint pointer. It is a **generated artifact**
+(DEC-148): `python scripts/sync_sprint_state.py` derives it from the `Status` fields of the sprint
+files, which are the single source of truth. Never hand-edit state.json; edit sprint files (via the
+script's `--sprint NNN <status>` flips) and let the script regenerate.
+`scripts/validate_project.py` independently checks the two agree, as a guard, not a license to edit
+both by hand.
 
 Allowed project statuses:
 
@@ -125,7 +130,7 @@ Visual behavior requires browser/Playwright execution. Container behavior requir
 When blocked:
 
 1. preserve all useful green work in commits;
-2. set state and sprint to `blocked`;
+2. run `python scripts/sync_sprint_state.py --sprint NNN blocked` to set both the sprint file and state.json consistently;
 3. append a `docs/agent/worklog.md` entry and write `HANDOFF.md` with exact blocker, reproduction command/output summary, attempted approaches, safe next action, and dirty files if any;
 4. run all checks that remain meaningful;
 5. commit documentation/state if the worktree can be left coherent;
@@ -166,6 +171,8 @@ If tests and docs disagree, actual test output proves current behavior, while hi
 ## Final sprint
 
 After the final planned sprint passes — the last numbered sprint in the current roadmap, matching
-`FINAL_SPRINT` in `scripts/validate_project.py` — set project state to `complete`, set
-`active_sprint`, `active_sprint_file`, and `active_sprint_status` to `null`, preserve the completed
-list, and write a release-state handoff. Do not tag, publish, deploy, or push unless the user asks.
+`FINAL_SPRINT` in `scripts/validate_project.py` — run
+`python scripts/sync_sprint_state.py --sprint NNN completed` with no successor flip; the script sets
+project state to `complete` and `active_sprint`, `active_sprint_file`, and `active_sprint_status` to
+`null`, and preserves the completed list. Write a release-state handoff. Do not tag, publish, deploy,
+or push unless the user asks.
