@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "ready",
-  "started_at": "",
+  "project_status": "in_progress",
+  "started_at": "2026-09-08",
   "active_sprint": "075",
   "active_sprint_file": "docs/sprints/075-identity-in-the-schema.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "074",
   "completed_sprints": [
     "001",

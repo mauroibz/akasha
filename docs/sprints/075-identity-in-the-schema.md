@@ -1,6 +1,6 @@
 # Sprint 075 — Identity in the schema
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 074
 **Roadmap revision:** 40
 

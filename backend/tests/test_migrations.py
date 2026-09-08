@@ -123,6 +123,7 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
         "0014_status_is_the_domains",
         "0015_entry_progress",
         "0016_import_kind_is_the_registrys",
+        "0017_users_and_sessions",
     ]
 
     upgrade(configured.database_url)
@@ -196,6 +197,7 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         "0014_status_is_the_domains",
         "0015_entry_progress",
         "0016_import_kind_is_the_registrys",
+        "0017_users_and_sessions",
     ]
 
 
@@ -759,4 +761,274 @@ def test_the_connector_name_is_the_registrys_and_its_batches_keep_their_records(
             (NOW, NOW),
         )
     connection.commit()
+    connection.close()
+
+
+IDENTITY_SEED_REVISION = "0016_import_kind_is_the_registrys"
+
+
+def seed_identity_library(database_path: Path) -> None:
+    """A `0016` library holding every kind of row Sprint 075's migrations walk.
+
+    One entry written with an explicit ``user_id`` and one relying on the column's
+    ``server_default``: both already mean user 1, and the migrations must keep saying
+    so. A shelf with an entry on it and a format on that entry covers the two rebuild
+    children; a committed batch with one record and one effect covers the import
+    ledger; two job rows split the queue the way the schema is about to need it split
+    — one enrichment job chained to the batch, one with no batch at all.
+    """
+    connection = sqlite3.connect(database_path)
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (1, 'book', 'Rayuela', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO items (id, type, title, identifiers, metadata, created_at, updated_at)"
+        " VALUES (2, 'album', 'Kind of Blue', '{}', '{}', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO entries (id, user_id, item_id, status, score, notes, date_added,"
+        " reread_count, score_provisional, created_at, updated_at)"
+        " VALUES (1, 1, 1, 'read', 9, 'hopscotch', ?, 0, 0, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO entries (id, item_id, status, date_added, reread_count,"
+        " score_provisional, created_at, updated_at)"
+        " VALUES (2, 2, 'owned', ?, 0, 0, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO shelves (id, user_id, name, slug, created_at, updated_at)"
+        " VALUES (1, 1, 'Argentina', 'argentina', ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute("INSERT INTO entry_shelves (entry_id, shelf_id) VALUES (1, 1)")
+    connection.execute("INSERT INTO entry_formats (entry_id, format) VALUES (1, 'paperback')")
+    connection.execute(
+        "INSERT INTO import_batches (id, kind, fingerprint, state, committed_at,"
+        " created_at, updated_at)"
+        " VALUES ('batch-1', 'goodreads', 'fp-1', 'committed', ?, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO import_records (id, batch_id, row_number, created_at, updated_at)"
+        " VALUES (1, 'batch-1', 1, ?, ?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO import_effects (effect_id, batch_id, record_id, effect_type,"
+        " entity_type, entity_id)"
+        " VALUES (1, 'batch-1', 1, 'insert', 'entry', '1')"
+    )
+    connection.execute(
+        "INSERT INTO jobs (id, batch_id, kind, state, payload, available_at,"
+        " created_at, updated_at)"
+        " VALUES ('job-batched', 'batch-1', 'enrich_item', 'queued', '{}', ?, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO jobs (id, batch_id, kind, state, payload, available_at,"
+        " created_at, updated_at)"
+        " VALUES ('job-shared', NULL, 'enrich_item', 'queued', '{}', ?, ?, ?)",
+        (NOW, NOW, NOW),
+    )
+    connection.commit()
+    connection.close()
+
+
+def test_users_and_sessions_are_created_from_the_previous_head(tmp_path: Path) -> None:
+    """Sprint 075 AC1/AC3/AC5 for the identity revision.
+
+    The upgrade is a data operation here — the seeded first user arrives — so the test
+    seeds every table the sprint walks and proves each one comes through untouched
+    while ``users`` and ``sessions`` appear with the shapes the proposal's §2.2 fixes.
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+
+    command.upgrade(alembic_config(configured.database_url), "0017_users_and_sessions")
+
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == "0017_users_and_sessions"
+    )
+
+    # The seeded first user: exactly one row, admin, no credentials (AC5).
+    rows = connection.execute(
+        "SELECT id, username, display_name, password_hash, password_salt, is_admin FROM users"
+    ).fetchall()
+    assert len(rows) == 1
+    user_id, username, display_name, password_hash, password_salt, is_admin = rows[0]
+    assert (user_id, is_admin, password_hash, password_salt) == (1, 1, None, None)
+    # Stored normalized: the column's value is its own stripped-casefold form.
+    assert username == username.strip().casefold()
+
+    # `users` shape (proposal §2.2). `display_name` is optional and typed — the
+    # normalized `username` is the identity. Credentials are nullable on purpose:
+    # the seeded user gets its password from the Sprint 077 setup screen.
+    user_columns = {
+        row[1]: (row[2].upper(), row[3], row[5])
+        for row in connection.execute("PRAGMA table_info(users)")
+    }
+    assert user_columns == {
+        "id": ("INTEGER", 1, 1),
+        "username": ("TEXT", 1, 0),
+        "display_name": ("TEXT", 0, 0),
+        "password_hash": ("TEXT", 0, 0),
+        "password_salt": ("TEXT", 0, 0),
+        "is_admin": ("INTEGER", 1, 0),
+        "created_at": ("TEXT", 1, 0),
+        "updated_at": ("TEXT", 1, 0),
+    }
+    # It is the table everything points at; it points at nothing itself.
+    assert connection.execute("PRAGMA foreign_key_list(users)").fetchall() == []
+    # `PRAGMA index_list` shows a UNIQUE constraint declared in the table body as an
+    # unnamed autoindex, so the named constraint is asserted where it actually lives:
+    # the table's own DDL (the same channel the 0016 tests below use).
+    users_ddl = connection.execute("SELECT sql FROM sqlite_master WHERE name='users'").fetchone()[0]
+    assert "CONSTRAINT uq_users_username UNIQUE (username)" in users_ddl
+
+    # `sessions` shape: server-side and therefore revocable. The token exists only as
+    # its hash — unique — with the expiry sweep's (user_id, expires_at) index beside it.
+    session_columns = {
+        row[1]: (row[2].upper(), row[3])
+        for row in connection.execute("PRAGMA table_info(sessions)")
+    }
+    assert session_columns == {
+        "id": ("TEXT", 1),
+        "user_id": ("INTEGER", 1),
+        "token_hash": ("TEXT", 1),
+        "created_at": ("TEXT", 1),
+        "last_seen_at": ("TEXT", 1),
+        "expires_at": ("TEXT", 1),
+        "user_agent": ("TEXT", 0),
+    }
+    session_fks = {
+        (row[2], row[3], row[6]) for row in connection.execute("PRAGMA foreign_key_list(sessions)")
+    }
+    assert session_fks == {("users", "user_id", "CASCADE")}
+    sessions_ddl = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='sessions'"
+    ).fetchone()[0]
+    assert "CONSTRAINT uq_sessions_token_hash UNIQUE (token_hash)" in sessions_ddl
+    sessions_indexes = {
+        row[1]: bool(row[2]) for row in connection.execute("PRAGMA index_list(sessions)")
+    }
+    assert sessions_indexes.get("ix_sessions_user_expires") is False
+
+    # AC1: nothing the library already had may move. Rows and values exactly as 0016
+    # left them — including the tables the next revision will rebuild.
+    entries = {
+        row[0]: row[1:]
+        for row in connection.execute(
+            "SELECT id, user_id, item_id, status, score, notes FROM entries"
+        )
+    }
+    # The second entry was written with no user_id: its column default already meant 1.
+    assert entries == {1: (1, 1, "read", 9, "hopscotch"), 2: (1, 2, "owned", None, None)}
+    assert connection.execute("SELECT name FROM shelves").fetchall() == [("Argentina",)]
+    assert connection.execute("SELECT entry_id, shelf_id FROM entry_shelves").fetchall() == [(1, 1)]
+    assert connection.execute("SELECT entry_id, format FROM entry_formats").fetchall() == [
+        (1, "paperback")
+    ]
+    assert connection.execute("SELECT id, kind, state FROM import_batches").fetchall() == [
+        ("batch-1", "goodreads", "committed")
+    ]
+    assert connection.execute("SELECT batch_id, row_number FROM import_records").fetchall() == [
+        ("batch-1", 1)
+    ]
+    assert connection.execute("SELECT effect_type, entity_id FROM import_effects").fetchall() == [
+        ("insert", "1")
+    ]
+    assert {
+        row[0]: row[1] for row in connection.execute("SELECT id, batch_id FROM jobs")
+    } == {"job-batched": "batch-1", "job-shared": None}
+
+    # Nobody's work is owned yet: user attribution lands one revision at a time.
+    for table in ("import_batches", "import_records", "import_effects", "jobs"):
+        assert "user_id" not in {
+            row[1] for row in connection.execute(f"PRAGMA table_info({table})")
+        }
+    # AC3: the whole schema passes its own referential audit.
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    connection.close()
+
+
+def test_users_refuses_a_second_user_with_the_same_username(tmp_path: Path) -> None:
+    """`uq_users_username` bites: one identity per stored normalized form."""
+    configured = database_at(tmp_path / "data", "0017_users_and_sessions")
+    connection = sqlite3.connect(configured.data_dir / "books.db")
+    connection.execute(
+        "INSERT INTO users (id, username, is_admin, created_at, updated_at)"
+        " VALUES (2, 'second', 0, ?, ?)",
+        (NOW, NOW),
+    )
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO users (id, username, is_admin, created_at, updated_at)"
+            " VALUES (3, 'second', 0, ?, ?)",
+            (NOW, NOW),
+        )
+    connection.close()
+
+
+def test_sessions_cascade_when_their_user_is_deleted(tmp_path: Path) -> None:
+    """ON DELETE CASCADE: revoking a user revokes its sessions.
+
+    No route deletes a user in Sprint 075 — Sprint 079 owns that product decision — but
+    the constraint has to state what deletion would do, and for a credential table the
+    answer is 'never orphan a session' rather than 'refuse'.
+    """
+    configured = database_at(tmp_path / "data", "0017_users_and_sessions")
+    database_path = configured.data_dir / "books.db"
+    connection = sqlite3.connect(database_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        "INSERT INTO sessions (id, user_id, token_hash, created_at, last_seen_at,"
+        " expires_at, user_agent)"
+        " VALUES ('s1', 1, 'hash-1', ?, ?, ?, NULL)",
+        (NOW, NOW, NOW),
+    )
+    connection.commit()
+    assert connection.execute("SELECT count(*) FROM sessions").fetchone()[0] == 1
+
+    connection.execute("DELETE FROM users WHERE id = 1")
+    connection.commit()
+
+    assert connection.execute("SELECT count(*) FROM sessions").fetchone()[0] == 0
+    connection.close()
+
+
+def test_the_identity_revision_downgrades_back_to_the_previous_head(tmp_path: Path) -> None:
+    """Down from `0017` removes both tables and leaves the 0016 library untouched."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+    command.upgrade(alembic_config(configured.database_url), "0017_users_and_sessions")
+
+    command.downgrade(alembic_config(configured.database_url), IDENTITY_SEED_REVISION)
+
+    connection = sqlite3.connect(database_path)
+    tables = {
+        row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    assert "users" not in tables and "sessions" not in tables
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == IDENTITY_SEED_REVISION
+    )
+    # The library was never this revision's to lose.
+    assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
+    assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
     connection.close()
