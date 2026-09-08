@@ -237,6 +237,10 @@ Completed 2026-09-08. Three migrations, one settings field, nothing else.
   all other 1364 provided the proof AC8 asks for, and every new behavior test
   lands in a described file (test_migrations, test_foundation, test_backup) or a
   new `test_settings.py` (sprint test table line 8).
+  **Post-closure annotation (2026-09-08, DEC-148):** the head-pinning this bullet
+  describes was retired — both tests now derive the pending list from
+  `revision_chain_from_files()` (`migrations.py`), so future migrations no longer
+  need to touch them. The history above is preserved as-is.
 - **Deliverable 5 is self-contradictory** ("`NOT NULL`, defaulted and backfilled"
   then "`jobs` additionally gains **nullable** `user_id`"). Resolved in favor of
   the sprint's risks section and the proposal's line 54: `jobs.user_id` is

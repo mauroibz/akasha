@@ -42,10 +42,13 @@ inside it.
    files, edit the tests only where a satisfying "no literal" guard requires, keep the
    migration table out of scope — no schema line in this sprint.
 
-Two head-pinned migration tests (`test_pending_revisions_reports_what_is_outstanding`,
-`test_an_unwritable_backup_directory_stops_the_upgrade`) enumerate revisions above head —
-any future migration that lands must update those two lists, as `0016` did and `0017`–
-`0019` did (commits `2cab02e`, `10deb80`, `408b5c6`).
+Two migration tests used to be pinned to head — they enumerated every revision
+after the pinned fixture as literal lists, so each migration had to update them
+(0016 did, 0017–0019 did: commits `2cab02e`, `10deb80`, `408b5c6`). That
+obligation was retired post-closure on 2026-09-08 (DEC-148): both tests now derive
+the pending list via `revision_chain_from_files()` in `migrations.py`, and two new
+tests cross-check that chain against Alembic's own graph and verify the numeric
+sequencing. No per-sprint migration-list edits are needed anymore.
 
 ## Verified gates at close
 

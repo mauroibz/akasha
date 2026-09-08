@@ -12,12 +12,18 @@ from pathlib import Path
 
 import httpx
 import pytest
+from alembic.script import ScriptDirectory
 
 from book_tracker.application.library import LibraryService
 from book_tracker.backup import read_manifest, restore_backup, verify_backup
 from book_tracker.config import Settings
 from book_tracker.main import _back_up_before_migrating, create_app
-from book_tracker.migrations import alembic_config, pending_revisions, upgrade
+from book_tracker.migrations import (
+    alembic_config,
+    pending_revisions,
+    revision_chain_from_files,
+    upgrade,
+)
 
 PRE_PROJECTION = "0006_job_error_code"
 NOW = "2026-08-13T00:00:00+00:00"
@@ -48,6 +54,19 @@ def database_at(data_dir: Path, revision: str) -> Settings:
     assert configured.database_url is not None
     upgrade(configured.database_url, revision=revision)
     return configured
+
+
+def revisions_above(revision: str) -> list[str]:
+    """Every shipped revision after ``revision``, oldest first.
+
+    Derived from Alembic's own version files (DEC-148), so moving head touches no
+    pinned list here: the fixture revision stays pinned, the production chain is
+    whatever the files declare, exactly as Alembic itself reads it.
+    """
+    chain = revision_chain_from_files()
+    if revision not in chain:
+        raise AssertionError(f"pinned fixture revision {revision!r} is no longer shipped")
+    return chain[chain.index(revision) + 1 :]
 
 
 def assert_no_frozen_application_vocabulary(connection: sqlite3.Connection) -> None:
@@ -110,26 +129,37 @@ def test_pending_revisions_reports_what_is_outstanding(tmp_path: Path) -> None:
     configured = database_at(tmp_path / "data", PRE_PROJECTION)
     assert configured.database_url is not None
 
-    pending = pending_revisions(configured.database_url)
+    expected = revisions_above(PRE_PROJECTION)
+    assert len(expected) > 0, "the pinned fixture revision must still be below head"
 
-    assert pending == [
-        "0007_normalized_sort_projection",
-        "0008_plain_text_descriptions",
-        "0009_provider_usage",
-        "0010_attachments",
-        "0011_creator_sort_names",
-        "0012_creators",
-        "0013_entry_formats",
-        "0014_status_is_the_domains",
-        "0015_entry_progress",
-        "0016_import_kind_is_the_registrys",
-        "0017_users_and_sessions",
-        "0018_user_foreign_keys",
-        "0019_ownership_on_the_import_ledger",
-    ]
+    assert pending_revisions(configured.database_url) == expected
 
     upgrade(configured.database_url)
     assert pending_revisions(configured.database_url) == []
+
+
+def test_the_revision_chain_read_from_files_is_alembics_own_graph(tmp_path: Path) -> None:
+    """DEC-148: the file-derived chain must be exactly the graph Alembic itself reads.
+
+    Asserts equality against the running migration engine rather than a frozen copy, so
+    the two cannot drift again the moment a new revision lands.
+    """
+    fake_url = f"sqlite:///{tmp_path / 'books.db'}"
+    script = ScriptDirectory.from_config(alembic_config(fake_url))
+    head = script.get_current_head()
+    alembic_chain = [rev.revision for rev in script.iterate_revisions(head, None)][::-1]
+
+    assert revision_chain_from_files() == alembic_chain
+
+
+def test_revision_numbers_are_unique_and_in_order() -> None:
+    """The shipped chain is exactly the numeric line 0001..NNNN of its version files."""
+    numbers = [int(revision.split("_", 1)[0]) for revision in revision_chain_from_files()]
+
+    assert numbers == list(range(1, len(numbers) + 1)), (
+        "migration numbers must be the gapless line 0001 onward "
+        f"(found {numbers[0]:04d}..{numbers[-1]:04d}, {len(numbers)} revisions)"
+    )
 
 
 @pytest.mark.anyio
@@ -186,23 +216,12 @@ async def test_an_unwritable_backup_directory_stops_the_upgrade(tmp_path: Path) 
         async with app.router.lifespan_context(app):
             pass
 
-    # Refusing to migrate is the whole point: the pre-0007 rows must still be there.
+    # Refusing to migrate is the whole point: the pre-0007 rows must still be there,
+    # and everything the files say must still be outstanding.
     assert configured.database_url is not None
-    assert pending_revisions(configured.database_url) == [
-        "0007_normalized_sort_projection",
-        "0008_plain_text_descriptions",
-        "0009_provider_usage",
-        "0010_attachments",
-        "0011_creator_sort_names",
-        "0012_creators",
-        "0013_entry_formats",
-        "0014_status_is_the_domains",
-        "0015_entry_progress",
-        "0016_import_kind_is_the_registrys",
-        "0017_users_and_sessions",
-        "0018_user_foreign_keys",
-        "0019_ownership_on_the_import_ledger",
-    ]
+    expected = revisions_above(PRE_PROJECTION)
+    assert len(expected) > 0, "the pinned fixture revision must still be below head"
+    assert pending_revisions(configured.database_url) == expected
 
 
 @pytest.mark.anyio

@@ -5983,3 +5983,56 @@ literal and one assertion, no data migration. Post-change evidence: 1382 backend
 (same count — the rename added one assertion to an existing test), `make check` green,
 validator green. The cheap path is now spent: a rename after Sprint 077's setup screen is the
 data migration the bullet priced.
+
+---
+
+## DEC-148 — state.json is a generated artifact, and the head-pinned test lists are gone
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Cross-references:** DEC-090 (the rule "a test that enumerates what exists today is a test
+  the next change breaks"; DEC-147 cites it with the "except the one list that is definitionally
+  the head" exception — this retires that exception), DEC-147 (the close-day seed rename —
+  owner-directed post-closure operations run through the same discipline),
+  `scripts/sync_sprint_state.py`, `scripts/validate_project.py`.
+- **Context:** Owner-directed methodology feedback after Sprint 075, applied between sprints
+  (075 closed, 076 `ready`, not yet claimed — so everything here is protocol infrastructure
+  rather than sprint scope). Two mechanical footguns from the 075 run get structural fixes here.
+  - *Charge 1: "Which sprint is active / what status does it have" was being stored in two
+    places.* The `Status` line of the sprint file, and `docs/agent/state.json`. The
+    validator *detected* mismatches ("the two must agree"), but each status transition was a
+    two-artifact manual edit, and both halves of the protocol describing that manual edit
+    (AGENTS.md §2.1, §5.2; WORKFLOW.md blocked + final sprint) kept every transition and every
+    close and every block paying the same two-edits tax.
+  - *Charge 2: DEC-090's exception clause made migrations carry a test-edit duty.* Two
+    tests that enumerate everything above head, relative to the 0006 database,
+    were mechanically head-dependent — 0016 had, and 0017 through 0019 each had, updated those
+    literal lists. The accommodation was documented, but the accommodation baked in mechanical
+    labor demanded of every migration.
+- **Decision.**
+  - **The sprint file is the sole source of truth, and state.json is generated from it.**
+    The new `scripts/sync_sprint_state.py`, when given `--sprint NNN <status>`,
+    (1) flips the `Status` of the sprint file (repeated `--sprint` arguments atomically
+    execute the entire close pair), (2) regenerates state.json from the sprint file,
+    (3) refuses illegal transitions and impossible result states (two actives, zero actives,
+    non-sequential successor), and on refusal writes nothing and reverts everything,
+    (4) imports `FINAL_SPRINT` and the status vocabulary from
+    `scripts/validate_project.py`, so the two cannot drift. AGENTS.md §2.1 and §5.2, and
+    WORKFLOW.md's state model, blocked, and final-sprint sections now prescribe the
+    script-based form. The validator's agreement check remains as an independent guard.
+    `started_at` remains under the jurisdiction of the implementing sprint: it is set at the
+    in_progress flip if empty, cleared at the close flip, and never overwritten.
+  - **The pending list is a computation, not an enumeration.** `migrations.py` reads the chain
+    from the version files themselves (`revision_chain_from_files()` parses each file's
+    `revision`/`down_revision` assignment and orders them) and `pending_revisions` is derived
+    from it; the two tests adopt the chain computed after `PRE_PROJECTION` as the expected
+    value. Two new tests fix the chain itself: one compares it against Alembic's own
+    `ScriptDirectory` walk order, and the other verifies that the revision numbers form a
+    gapless consecutive line from `0001..NNNN`. The "except the one list that is definitionally the
+    head" exception DEC-147 coined is retired; future migrations move the tests forward for free.
+- **Consequences.** The close ritual becomes one command; the obligation to edit the test list
+  per migration vanishes. The protocol changes are owner-directed and recorded here rather than
+  in a sprint file for that reason. Unchanged: the validator remains an independent agreement
+  guard (any divergence still fails the gate), the shape of WORKFLOW's final-sprint rule, and
+  DEC-090's general rule (tests read what exists) — only the "except the one list" exception,
+  coined by DEC-147, is retired.
