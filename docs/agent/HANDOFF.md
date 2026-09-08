@@ -9,7 +9,8 @@ through `075`. `FINAL_SPRINT` in `scripts/validate_project.py` is `82`.
 Sprint 076's own file.** The proposal is the design; DEC-147 is what Sprint 075 actually decided
 inside it.
 
-## What Sprint 075 left in the schema (2026-09-08, commits `2cab02e`→`01b717a`)
+## What Sprint 075 left in the schema (2026-09-08, commits `2cab02e`→`01b717a`,
+## seed rename `bd6ae67`)
 
 - Migration head is `0019_ownership_on_the_import_ledger`, three revisions added
   (`0017` `users` + `sessions`, `0018` `entries`/`shelves` foreign keys via rebuild,
@@ -35,7 +36,8 @@ inside it.
    entry row with no `WHERE user_id`. Harmless today (exactly one user); a data leak the
    day Sprint 079 creates a second. Fix in 076, alongside the scoping.
 3. **The gate is the proof that nothing user-visible moved:** the whole existing suite
-   (1382 backend, 305 frontend, 130 e2e — 075 left it green) plus a guard test asserting
+   (1382 backend, 305 frontend, e2e 128 passed / 2 config-skipped, exit 0 — 075 left
+   it clean) plus a guard test asserting
    no `user_id` literal survives outside the resolver, per DEC-146. Edit the listed
    files, edit the tests only where a satisfying "no literal" guard requires, keep the
    migration table out of scope — no schema line in this sprint.
@@ -55,3 +57,11 @@ backup written, all three migrations run, a Goodreads preview→commit→undo ro
 with every owned row at `user_id = 1`, the library rendering in Chromium, and
 `/openapi.json` unchanged at 1.8.0. Full audit trail in Sprint 075's `Outcome`
 section and the 2026-09-08 worklog entry.
+
+**Running environment on handoff:** the owner's standing dev stack
+(`akasha-akasha-1` from `compose.yaml`/`compose.build.yaml`) has been up since
+before Sprint 075 started and still runs the pre-identity image at 8000 — do not
+stop it or assume it serves this branch's code; Sprint 076 is backend-only and
+needs no container, and any walkthrough in 077+ should build its own throwaway
+stack (the 075 walkthrough stack and volumes were torn down at close; residue
+checked clean).
