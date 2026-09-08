@@ -5922,3 +5922,53 @@ both changes, against 1 of 3 before the second.
   82; the roadmap gains a "Two people, one install" section and loses its "Not scheduled" entries
   for auth and multiuser. Saved views, which DEC-139 promised would "become Sprint 075 the day the
   owner asks", becomes a sprint after 082 instead — the number is taken.
+
+## DEC-147 — Identity's choices made once: three revisions, a nullable job owner, and a seeded username
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Cross-references:** DEC-146 (the plan this executes), DEC-092 (the migration-connection
+  exception to the foreign-key pragma that every rebuild since has leaned on), DEC-039 (the
+  pre-migration backup that proved itself again this sprint), DEC-090 (tests read what exists,
+  never enumerate a moving head — except the one list that is definitionally the head).
+- **Context:** Sprint 075 was planned as one migration per deliverable and kept that shape:
+  `0017_users_and_sessions`, `0018_user_foreign_keys`, `0019_ownership_on_the_import_ledger`,
+  plus the `AKASHA_AUTH` setting. Three decisions inside that work were the sprint's to make and
+  are recorded here because they are either data-irreversible after Sprint 079 or the kind of
+  asymmetry a reviewer should meet documented.
+- **Decision.**
+  - **`jobs.user_id` is nullable, with no default.** The proposal's §1 named the column's job as
+    telling an importer's enrichment pass from a background backfill belonging to nobody; the
+    sprint's deliverable 5 contradicted itself halfway through ("NOT NULL, defaulted", then
+    "nullable"). The risks section and the proposal both resolve toward nullable, so that is what
+    landed. A shared item's enrichment claiming a user would be the actual lie; `NULL` is the
+    truthful value for nobody's work. `0019` attributes a `0016` database's existing jobs by
+    `batch_id` — the one fact a `0016` row carries about its origin — so batch-chained jobs
+    become user 1's and standalone ones stay `NULL`. Sprint 076's resolver writes the field going
+    forward.
+  - **The seeded user is named `owner`.** The migration has to pick *something* for the one
+    identity column, and no name was specified anywhere in DEC-146's four adopted defaults.
+    `owner` is casefold-and-strip-normalized already, unambiguous on screen, and Sprint 077's
+    setup screen is where the owner chooses the real one. It is cheap to re-migrate before a
+    second user exists (the decision the sprint's risks section prices) and a data migration
+    after, so if the owner dislikes `owner` before Sprint 078 starts, say so and 0017 is revised
+    in place.
+  - **The `server_default "1"` stays on every `user_id`.** The rebuilds of 0018 keep it and 0019
+    reintroduces it on the ledger tables. It is what lets the unchanged `INSERT` paths of this
+    build keep meaning user 1 — now by reference instead of convention — which is the whole of
+    AC8 ("no behaviour change"). Sprint 076 removes the 24-literal default from code, not the
+    column default from the schema; 079's second user and 077's setup screen decide who else it
+    may mean.
+  - **Two head-pinned tests move with each migration.** `test_pending_revisions_reports_what_is_outstanding`
+    and `test_an_unwritable_backup_directory_stops_the_upgrade` enumerate the revisions above a
+    0006 database, which is definitionally everything above head. AC8's "no edit to any of them"
+    cannot hold for a sprint that moves head, and the project's own precedent — `5b55e53`
+    updated the same two lists when `0016` landed — establishes the reading. No other of the
+    1364 was touched; every behaviour claim landed in the sprint table's files or a new one.
+- **Consequences.** The schema can now name a person without any route able to be touched by one:
+  that is 076. `sessions` sits empty until 077 writes its first hash. The `iter_entries` export
+  defect recorded in DEC-146 is a 076 job — it is harmless while exactly one user exists and there
+  is exactly one. `make smoke-container` passed unchanged on the three-revision image, and the
+  walkthrough on a seeded `0016` copy of the fixture database showed the pre-migration backup, the
+  chain, a commit-undo round trip, and `/openapi.json` still saying 1.8.0 — the sprint's "nothing
+  changed" claim, tested by walking a real library through a real container.

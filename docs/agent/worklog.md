@@ -4984,3 +4984,68 @@ blocking eight sprints; each is named in the handoff as cheap to flip before its
 `user_id` columns that already exist, `user_id` on the import ledger and jobs, everything
 backfilled to one seeded user, and `AKASHA_AUTH` accepting only `off`. A migration that changes
 nothing observable, whose acceptance criterion is that the entire existing suite passes unedited.
+
+
+## 2026-09-08 — Sprint 075 implemented and closed in one session
+
+- Done: `users` + `sessions` (0017), `RESTRICT` FKs onto `entries`/`shelves` via
+  rebuild (0018), `user_id` on `import_batches`/`import_records`/`import_effects`
+  (NOT NULL, default 1) and a deliberately nullable `user_id` on `jobs` attributed
+  by `batch_id` (0019), `AKASHA_AUTH` in `Settings` refusing all but `off` and
+  naming Sprint 077, `.env.example` documented. Six commits: `2cab02e`, `10deb80`,
+  `408b5c6`, `8cbe029`, `01b717a`, `bf77ca6`.
+- Verified, 9/9 acceptance criteria:
+  1. AC1 — upgrade walk from a seeded 0016 library, all six tables populated and
+     every row's `user_id = 1` (`test_users_and_sessions_are_created_from_the_previous_head`,
+     `test_every_user_owned_row_now_points_at_a_real_user`,
+     `test_the_import_ledger_and_job_queue_belong_to_the_seeded_user`);
+  2. AC2 — `test_a_full_downgrade_returns_0016_and_the_application_still_starts`:
+     three-step downgrade, `users`/`sessions` gone, ledger columns gone, rows back,
+     app starts against the downgraded database and re-migrates;
+  3. AC3 — `PRAGMA foreign_key_check` empty asserted after upgrade (`test_migrations.py`
+     and the container audit);
+  4. AC4 — every named constraint and index asserted against `sqlite_master` including
+     the exact column list (`PRAGMA index_info`) of all nine surviving indexes;
+  5. AC5 — exactly one `users` row, `id=1`, `is_admin=1`, credentials NULL, `username`
+     its own normalized form;
+  6. AC6 — `test_a_job_written_by_enrichment_claims_no_user` proves
+     `JobRepository.enqueue` lands `user_id` NULL through the runtime engine, and the
+     ledger test proves the `batch_id`-attributed row carries 1;
+  7. AC7 — `test_settings.py`: `off`, unset, `on` (refuses naming Sprint 077), and
+     `banana`;
+  8. AC8 — `make test` (backend 1382 = baseline 1364 + 18 new; frontend 305), the e2e
+     suite passes unchanged (`npx playwright test`: 128 pass, 2 config-skipped, exit 0);
+     two head-list tests needed a line each (the precedent is the very migration they
+     pin to, and that very thing — `5b55e53` — changed the same two lists);
+  9. AC9 — `test_the_pre_migration_backup_is_taken_and_restores_a_working_0016_database`:
+     the startup backup fires on a 0016 database with all three revisions pending,
+     records revision `0016_import_kind_is_the_registrys` in the manifest, and restores
+     as a working 0016 library.
+  Verification ladder: `make check` green (ruff format + lint, mypy, tsc,
+  OpenAPI-check, validate_project); a migration drill on the real fixture `books.db`
+  (0016) in `tests/fixtures/backup-v1` ran the app-equivalent
+  `migrations.upgrade`/downgrade/re-upgrade dance on a file-based, non-in-memory
+  database; `make smoke-container` end-to-end (exit 0); DEC-025 walkthrough on a
+  container against a throwaway volume seeded from the fixture 0016 — startup wrote
+  the pre-migration backup and ran all three migrations, the sqlite audit had one
+  seeded admin and zero rows, Goodreads preview→commit→undo round-trip with
+  every `import_batches`/`records`/`effects` row `user_id = 1` and enrichment `jobs`
+  NULL, the library rendered the committed *Rayuela* card in a real Chromium,
+  `/openapi.json` unchanged at `Akasha / 1.8.0`.
+- Deviations: documented in DEC-147 — (a) two head-pinned tests updated with the head
+  (AC8's "no edits" cannot coexist with moving the head; the project's own precedent
+  is the very migration they pin); (b) `jobs.user_id` nullable (deliverable 5
+  self-contradicts; the risks section of the proposal resolves it); (c) the seed's
+  username `owner` (nothing specified it, Sprint 077's setup screen is where the real
+  one is chosen); (d) the verification section's `uv run alembic upgrade head` ran
+  as the app's migration API against the same file-based fixture database
+  (the repo's `alembic.ini` ships no `sqlalchemy.url`; it's injected by
+  `migrations.py`).
+- Blocked / unresolved: none.
+- Next: Sprint 076 is `ready`. Claim it: thread a user through the 24 construction
+  sites in 8 files, delete the `user_id=1` literals, fix
+  `application/export.py:248` (`iter_entries`, a leak the day Sprint 079 lands), and
+  keep every `server_default` in the schema — the literal in code, 076, is what moves
+  or dies, never the column default. If the owner speaks before Sprint 076 starts:
+  DEC-147 offers a cheap path to re-migrate 0017 if the seeded username isn't
+  wanted as `owner`.

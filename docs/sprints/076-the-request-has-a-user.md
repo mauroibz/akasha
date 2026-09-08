@@ -1,6 +1,6 @@
 # Sprint 076 — The request has a user
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 075
 **Roadmap revision:** 40
 

@@ -1,6 +1,6 @@
 # Sprint 075 — Identity in the schema
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 074
 **Roadmap revision:** 40
 
@@ -163,5 +163,131 @@ Read at `11db2c5`, 2026-09-07:
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-09-08. Three migrations, one settings field, nothing else.
+
+**Delivered behavior**
+
+- `0017_users_and_sessions` — `users` (primary key, normalized unique `username`,
+  optional `display_name`, nullable credentials, integer `is_admin`, timestamps,
+  `uq_users_username`) and `sessions` (opaque text id, `user_id` CASCADE to users,
+  unique `token_hash`, `created_at`/`last_seen_at`/`expires_at`, nullable
+  `user_agent`, and the expiry-sweep index). Seeds exactly one row: `id = 1`,
+  username `owner`, `is_admin = 1`, credentials NULL.
+- `0018_user_foreign_keys` — table rebuilds of `entries` and `shelves` (the shape
+  of `0013`/`0015`, five rebuilds in project history now) attaching
+  `REFERENCES users(id) ON DELETE RESTRICT` to the `user_id` that has existed
+  since `0002` with a `server_default` of `1`. Every CHECK, unique and index
+  carried through the snapshots; the default survives.
+- `0019_ownership_on_the_import_ledger` — `import_batches`, `import_records`,
+  `import_effects` gain `user_id` NOT NULL, defaulted and backfilled to 1, with a
+  RESTRICT foreign key; `jobs` gains the deliberately nullable `user_id`, and the
+  migration attributes a `0016` database's rows by `batch_id` (batch-chained to 1,
+  batchless to `NULL`).
+- `Settings.auth` (`AKASHA_AUTH`) — one legal value, `off`; anything else refuses
+  at startup naming Sprint 077, `banana` as a plain validation error. Documented
+  in `.env.example`.
+- Pre-migration backup fires on a pending-revision 0016 database and restores as
+  a working 0016 library; a full-step downgrade chain then a re-upgrade work on a
+  real file-backed database — the 0016-stamped `books.db` from
+  `backend/tests/fixtures/backup-v1` copied out and walked the whole way.
+
+**Verification (commands and results)**
+
+- `make check` — green end-to-end (ruff format+lint, mypy, tsc, OpenAPI-check,
+  `scripts/validate_project.py`).
+- `make test` — backend **1382 passed** (pre-Sprint baseline 1364 + 18 new),
+  frontend **305 passed** unchanged.
+- Focused suite: `uv run pytest tests/test_migrations.py tests/test_foundation.py
+  tests/test_backup.py tests/test_settings.py` — 71 passed.
+- AC-mapping tests: `test_users_and_sessions_are_created_from_the_previous_head`
+  (AC1/3/5), `test_every_user_owned_row_now_points_at_a_real_user` (AC1/4: both
+  rebuilds, all constraints/indexes assert against the exact column list of
+  `sqlite_master`), `test_the_import_ledger_and_job_queue_belong_to_the_seeded_user`
+  (AC1/4/6), `test_a_job_written_by_enrichment_claims_no_user` (AC6 runtime:
+  `JobRepository.enqueue` writes `user_id` NULL), `test_settings.py`
+  (AC7, 4 tests), `test_a_full_downgrade_returns_0016_and_the_application_still_starts`
+  (AC2), `test_the_pre_migration_backup_is_taken_and_restores_a_working_0016_database`
+  (AC9), `test_a_backup_taken_at_the_identity_head_restores_the_owned_rows`
+  (backup layer), and the two RESTRICT tests in `test_foundation.py` (`INSERT`
+  refused by a nonexistent user, `DELETE` refused by a user with entries).
+- Acceptance drill on a real 0016 fixture database: `pending_revisions` reports
+  exactly the 3 sprint revisions; `upgrade` lands on 0019 with one admin user and
+  no rows of `PRAGMA foreign_key_check`; `downgrade` to 0016 removes `users`,
+  `sessions` and the four tables' columns and every row back; re-`upgrade` to head
+  succeeds.
+
+**Commits**
+
+- `2cab02e` `[ADD] Give the schema a users table and a session store`
+- `10deb80` `[MOD] Point every user-owned row at a real user`
+- `408b5c6` `[ADD] Tell the import ledger and the job queue whose work they are`
+- `8cbe029` `[ADD] Declare AKASHA_AUTH, and refuse every value but off`
+- `01b717a` `[CHORE] Format and import-order the Sprint 075 surface`
+- `bf77ca6` `[TEST] Prove the three identity revisions end where the sprint says they do`
+
+**Deviations and decisions**
+
+- **Two pre-existing tests pinned to the head migration were updated**
+  (`test_pending_revisions_reports_what_is_outstanding` and
+  `test_an_unwritable_backup_directory_stops_the_upgrade` in
+  `test_migrations.py`, lines 115–126 and 188–199): the pending-revision
+  list is mechanically dependent on head, and AC8's "no edits" cannot hold for a
+  sprint that moves head. The project's own precedent (commit `5b55e53`, Sprint
+  041's migration 0016) did exactly the same thing. No other test was touched;
+  all other 1364 provided the proof AC8 asks for, and every new behavior test
+  lands in a described file (test_migrations, test_foundation, test_backup) or a
+  new `test_settings.py` (sprint test table line 8).
+- **Deliverable 5 is self-contradictory** ("`NOT NULL`, defaulted and backfilled"
+  then "`jobs` additionally gains **nullable** `user_id`"). Resolved in favor of
+  the sprint's risks section and the proposal's line 54: `jobs.user_id` is
+  nullable with no default, that's the point; the migration attributes 0016 rows
+  by `batch_id` so the two job kinds can be told apart, and Sprint 076's resolver
+  owns filling it in going forward. Recorded as the asymmetry in DEC-147.
+- **Seeded-username choice.** No name is specified in the deliverables or in
+  DEC-146's four adopted defaults. Chose `owner`: normalized-form, and Sprint
+  077's setup screen is where the real one is chosen. This is a data choice made
+  once, and the decision is recorded in DEC-147 along with its cheap re-migration
+  if the owner prefers before Sprints 078/079.
+- **`alembic` CLI without a `--url` is not wired**: the project's
+  `alembic.ini` ships no `sqlalchemy.url` and instead the app injects it
+  (`migrations.py`). Verification's "`uv run alembic upgrade head`" line was run
+  as the equivalent `migrations.upgrade`/`alembic.command.upgrade` entry
+  against the same file-backed fixture database — same code path, same revision
+  chain. Not a code-change decision; a documentation of how the drill ran.
+
+**Impact on future sprints**
+
+- 076 — the resolver threads a user through every construction site, and is the
+  deadline to fix `application/export.py:248` (`iter_entries` walks all entries
+  with no `user_id` filter — a data leak the day Sprint 079 creates a second
+  user; recorded in DEC-146).
+- 077 — first writer of `sessions`; the setup screen where the seeded `owner`
+  gets its real credentials.
+
+**Container walkthrough (DEC-025)**
+
+The image was rebuilt at this sprint's head (`make smoke-container` passed end to
+end — port default, single runtime, log bounds, env passthrough, Calibre
+read-only, backup/restore, volume drill, SIGTERM — exit 0), and then a separate
+walkthrough stack was booted against a real `0016` database: the fixture
+`books.db` from `backend/tests/fixtures/backup-v1` was copied into a throwaway
+named volume and the container started against it. Observed:
+
+- Startup wrote the pre-migration backup (`pre-migration-…`, pending list the
+  three sprint revisions), then ran `0016→0017→0018→0019` and reported the app
+  at 1.8.0.
+- `sqlite` audit inside the container: head `0019`, exactly one
+  `users` row (id 1, `owner`, admin), every `entries.user_id` = 1,
+  `PRAGMA foreign_key_check` empty.
+- A Goodreads preview (fixture CSV, 1 valid row + 1 row error), commit
+  (created 1 item / 1 entry, batch state `committed`, every ledger row
+  `user_id = 1`, enrichment `jobs.user_id` NULL), the library rendering the
+  committed entry in a real Chromium (render check: title "Akasha",
+  "1 book entries", *Rayuela* card visible in the grid view, score 9,
+  `Inbox 0`), then `DELETE /api/import/batches/{id}` to UNDO (6 reverts,
+  batch `undone`, entries back to the seeded row only, fk-check still clean).
+- `/openapi.json` reports `Akasha / 1.8.0` — unchanged version, the sprint's
+  claim was tested against a real running container.
+
+The stack was thrown down and both volumes removed after the walkthrough; no
+residual processes or ports.

@@ -140,14 +140,33 @@ A valid ISBN-10 is converted to canonical ISBN-13 before storage, so conversion-
 
 A merged search candidate can retain both Open Library and Google Books identities. The primary source selects explicit refresh; manual-only items have none.
 
-Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps.
+`users`
+
+- `id` integer primary key, seeded with exactly one row (id 1, admin, null credentials) by migration `0017` — the designated owner of every row that said `user_id = 1` by convention until then (DEC-146)
+- `username` required text, unique, stored normalized (stripped and casefolded); `display_name` an optional typed form kept alongside when it differs
+- `password_hash` and `password_salt` required-nullable text: the seeded user has no credential until the Sprint 077 setup screen gives it one, and a `NOT NULL` column would have had to invent one
+- `is_admin` required integer (SQLite has no boolean type; flags throughout the schema are spelled this way)
+- `created_at`, `updated_at` required
+- `ON DELETE` behavior for everything pointing at this table is stated per table below, not defaulted
+
+`sessions`
+
+- `id` opaque text primary key, chosen by the code that creates the row
+- `user_id` foreign key to users with cascade delete — a revocation mechanism that refused to be revoked along with its user would be a worse one
+- `token_hash` required unique text: the server stores only the hash of the session token, never the token itself
+- `created_at`, `last_seen_at`, `expires_at` required; `user_agent` nullable
+- indexed on `token_hash` (via the unique constraint, the per-request login check) and on `(user_id, expires_at)` (the expiry sweep)
+- created by migration `0017`, first written in Sprint 077
+
+Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps; `sessions` keeps `last_seen_at` and `expires_at` in `updated_at`'s place.
 
 `entries`
 
-- product-spec fields plus foreign key `item_id` with restrict-on-delete
+- product-spec fields plus foreign key `item_id` with restrict-on-delete and foreign key `user_id` to `users` with restrict-on-delete (migration `0018`, DEC-146): a user with a library cannot be deleted out from under it, and Sprint 079 owns what deletion ends up meaning
+- `user_id` is `NOT NULL` with a `server_default` of `1`: while no request carries a user (until Sprint 076 threads one through), it is how an `INSERT` keeps meaning the seeded first user, now by reference instead of convention
 - checks for score, nonnegative `reread_count`, nonnegative `progress`, and boolean `score_provisional`. **There is no CHECK on `status`** (migration `0014`, DEC-067 row 1): the vocabulary is the domain's, and a constraint listing the union of every domain's values could neither express "`owned` is not a book status" nor admit a domain added later without a migration on this table. `validate_status`, keyed on the item's own domain, is the authority and is strictly stronger
 - unique `(user_id, item_id)`
-- indexes supporting status/score/date list paths
+- indexes supporting status/score/date list paths, all user-leading
 
 `entry_formats`
 
@@ -158,7 +177,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 
 `shelves` and `entry_shelves`
 
-- as in product spec, with normalized unique slug per user
+- as in product spec, with normalized unique slug per user, and `user_id` a foreign key to `users` with restrict-on-delete (migration `0018`), defaulted to the seeded user like `entries`
 - shelf rename updates name and slug transactionally and rejects collisions
 - deleting a shelf cascades join rows, never entries
 
@@ -170,6 +189,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - preview summary JSON, counters JSON, error JSON
 - `created_at`, `committed_at`, `undo_expires_at`
 - unique `(kind, fingerprint)` for committed input identity where practical
+- `user_id` foreign key to `users`, `NOT NULL` and defaulted to the seeded user (migration `0019`, DEC-146): an import is someone's work, and its undo ledger must follow the same user — two users importing concurrently would otherwise share one undo history
 
 `import_records`
 
@@ -177,6 +197,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - normalized payload JSON, matched item/entry IDs, match kind, planned action
 - conflicts JSON, validation errors JSON, and explicit ambiguity resolution
 - unique `(batch_id, row_number)`
+- `user_id` as on `import_batches` (migration `0019`)
 
 Preview persists these normalized records, so commit applies exactly the reviewed plan rather than reparsing an upload or rereading a Calibre database that may have changed.
 
@@ -185,6 +206,7 @@ Preview persists these normalized records, so commit applies exactly the reviewe
 - `effect_id` integer primary key and `batch_id`, `record_id`, effect/entity types, entity ID
 - before-values and after-values JSON
 - monotonic `effect_id` provides deterministic reverse-order undo
+- `user_id` as on `import_batches` (migration `0019`)
 
 This ledger makes undo safe: reverse only effects recorded for the batch; delete entities only when the batch created them and they remain unmodified/unreferenced; revert a filled field only if its current value still equals the recorded imported value. Late jobs from an undone batch are ignored.
 
@@ -193,6 +215,7 @@ This ledger makes undo safe: reverse only effects recorded for the batch; delete
 - `id` UUID, nullable `batch_id`, `kind`, `state` (`queued`, `running`, `succeeded`, `failed`, `cancelled`)
 - payload/progress/error JSON, attempts, `available_at`, heartbeat/lease timestamps
 - `created_at`, `updated_at`, `finished_at`
+- `user_id` foreign key to `users`, and **nullable by design** (migration `0019`): an enrichment job acts on a shared cached item and belongs to nobody, while a job chained to an import batch belongs to whoever ran it. The column is how the two are told apart; migration `0019` attributes a `0016` database's rows by `batch_id` (chained to the seeded user, batchless stays `NULL`), and enforcement of the ledger's ownership moves to the resolver in Sprint 076
 
 Jobs survive restart. Handlers are idempotent. The lifespan runner claims one queued job in a short transaction, processes network/file work outside that transaction, and persists progress. On startup, expired `running` jobs return to `queued` with incremented attempts. Cap retries and expose terminal failure.
 

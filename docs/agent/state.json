@@ -1,12 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "in_progress",
-  "started_at": "2026-09-08",
-  "active_sprint": "075",
-  "active_sprint_file": "docs/sprints/075-identity-in-the-schema.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "074",
+  "project_status": "ready",
+  "active_sprint": "076",
+  "active_sprint_file": "docs/sprints/076-the-request-has-a-user.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "075",
   "completed_sprints": [
     "001",
     "002",
@@ -81,7 +80,9 @@
     "071",
     "072",
     "073",
-    "074"
+    "074",
+    "075"
   ],
-  "updated_at": "2026-09-07T14:05:00-03:00"
+  "updated_at": "2026-09-08T18:00:00-03:00",
+  "started_at": ""
 }
