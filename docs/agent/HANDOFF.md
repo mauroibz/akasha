@@ -36,8 +36,8 @@ inside it.
    entry row with no `WHERE user_id`. Harmless today (exactly one user); a data leak the
    day Sprint 079 creates a second. Fix in 076, alongside the scoping.
 3. **The gate is the proof that nothing user-visible moved:** the whole existing suite
-   (1382 backend, 305 frontend, e2e 128 passed / 2 config-skipped, exit 0 — 075 left
-   it clean) plus a guard test asserting
+   (1384 backend — 1382 at 075's close plus DEC-148's two migration-chain tests —
+   305 frontend, e2e 128 passed / 2 config-skipped, exit 0) plus a guard test asserting
    no `user_id` literal survives outside the resolver, per DEC-146. Edit the listed
    files, edit the tests only where a satisfying "no literal" guard requires, keep the
    migration table out of scope — no schema line in this sprint.
@@ -52,7 +52,8 @@ sequencing. No per-sprint migration-list edits are needed anymore.
 
 ## Verified gates at close
 
-`make check` green; `make test` — backend 1382, frontend 305; Playwright e2e 128 passed,
+`make check` green; `make test` at 075's close — backend 1382, frontend 305 (backend has since
+grown to 1384 with DEC-148's two chain tests, verified green); Playwright e2e 128 passed,
 2 config-skipped, exit 0; `make smoke-container` end-to-end; an Alembic upgrade/downgrade
 drill on the real `backend/tests/fixtures/backup-v1` fixture sqlite; and a DEC-025
 walkthrough on a container against a seeded-0016 throwaway volume — pre-migration
