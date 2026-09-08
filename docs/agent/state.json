@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "076",
   "active_sprint_file": "docs/sprints/076-the-request-has-a-user.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "075",
   "completed_sprints": [
     "001",
@@ -83,6 +83,6 @@
     "074",
     "075"
   ],
-  "updated_at": "2026-09-08T18:00:00-03:00",
-  "started_at": ""
+  "started_at": "2026-09-08T19:45:07-03:00",
+  "updated_at": "2026-09-08T19:45:07-03:00"
 }
