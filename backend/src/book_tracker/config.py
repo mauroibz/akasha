@@ -44,7 +44,27 @@ class Settings(BaseSettings):
     # mode this guards against is running out entirely, not running low.
     min_free_bytes: int = 500 * 1024 * 1024
     sqlite_busy_timeout_ms: int = 5_000
+    # Sprint 075 (DEC-146): v1 has no authentication, and this is the schema's name
+    # for that absence. `off` is bit-for-bit the v1.8.0 shape; anything else is
+    # refused at startup. Nothing reads the field yet — refusal is this sprint's
+    # whole deliverable, and Sprint 077 is the first thing that makes it mean
+    # anything besides 'off'.
+    auth: str = "off"
     static_dir: Path | None = None
+
+    @model_validator(mode="after")
+    def refuse_authentication_not_yet_delivered(self) -> "Settings":
+        """`AKASHA_AUTH` has one legal value in v1 ('off'). Sprint 077 adds the
+        other, and refusing minimizes misconfiguration — a deployment that thinks
+        it turned authentication on but did not is strictly worse than a
+        deployment that knows it is wide open."""
+        if self.auth != "off":
+            raise ValueError(
+                "AKASHA_AUTH only accepts 'off' in v1 — the login this value"
+                " was set for is a Sprint 077 delivery and this build does not"
+                " have it"
+            )
+        return self
 
     @model_validator(mode="after")
     def derive_database_url(self) -> "Settings":
