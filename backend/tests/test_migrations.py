@@ -14,7 +14,7 @@ import httpx
 import pytest
 
 from book_tracker.application.library import LibraryService
-from book_tracker.backup import read_manifest, verify_backup
+from book_tracker.backup import read_manifest, restore_backup, verify_backup
 from book_tracker.config import Settings
 from book_tracker.main import _back_up_before_migrating, create_app
 from book_tracker.migrations import alembic_config, pending_revisions, upgrade
@@ -1080,19 +1080,30 @@ def test_every_user_owned_row_now_points_at_a_real_user(tmp_path: Path) -> None:
         (row[2], row[3], row[6]) for row in connection.execute("PRAGMA foreign_key_list(entries)")
     }
     assert entries_fks == {("items", "item_id", "RESTRICT"), ("users", "user_id", "RESTRICT")}
-    entries_indexes = {
-        row[0]
-        for row in connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='entries'"
+    # AC4 in names and columns: every entry index back from the rebuild with its
+    # exact column list. Names alone would pass a rebuild that silently reordered
+    # or dropped an indexed column, which is the failure mode AC4 exists to catch.
+    entry_index_columns = {
+        name: tuple(
+            info_row[2]
+            for info_row in connection.execute(f"PRAGMA index_info('{name}')")
+        )
+        for name in (
+            "ix_entries_status",
+            "ix_entries_score",
+            "ix_entries_date_added",
+            "ix_entries_user_status_date_id",
+            "ix_entries_user_status_score_id",
+            "ix_entries_user_finished_id",
         )
     }
-    assert entries_indexes >= {
-        "ix_entries_status",
-        "ix_entries_score",
-        "ix_entries_date_added",
-        "ix_entries_user_status_date_id",
-        "ix_entries_user_status_score_id",
-        "ix_entries_user_finished_id",
+    assert entry_index_columns == {
+        "ix_entries_status": ("user_id", "status"),
+        "ix_entries_score": ("user_id", "score"),
+        "ix_entries_date_added": ("user_id", "date_added"),
+        "ix_entries_user_status_date_id": ("user_id", "status", "date_added", "id"),
+        "ix_entries_user_status_score_id": ("user_id", "status", "score", "id"),
+        "ix_entries_user_finished_id": ("user_id", "date_finished", "id"),
     }
     # ...and a column order built to prove nothing moved: `progress` stays last.
     assert [row[1] for row in connection.execute("PRAGMA table_info(entries)")] == [
@@ -1241,17 +1252,19 @@ def test_the_import_ledger_and_job_queue_belong_to_the_seeded_user(tmp_path: Pat
         ddl = connection.execute(f"SELECT sql FROM sqlite_master WHERE name='{table}'").fetchone()[0]
         for name in surviving:
             assert name in ddl, f"{table} lost {name}"
-    index_names = {
-        row[0]
-        for row in connection.execute(
-            "SELECT name FROM sqlite_master WHERE type='index' AND"
-            " tbl_name IN ('import_records','import_effects','jobs')"
+    # …and the three independent indexes survive with their exact column lists.
+    ledger_index_columns = {
+        name: tuple(info_row[2] for info_row in connection.execute(f"PRAGMA index_info('{name}')"))
+        for name in (
+            "ix_import_records_batch_action",
+            "ix_import_effects_batch_effect",
+            "ix_jobs_claim",
         )
     }
-    assert index_names >= {
-        "ix_import_records_batch_action",
-        "ix_import_effects_batch_effect",
-        "ix_jobs_claim",
+    assert ledger_index_columns == {
+        "ix_import_records_batch_action": ("batch_id", "planned_action", "row_number"),
+        "ix_import_effects_batch_effect": ("batch_id", "effect_id"),
+        "ix_jobs_claim": ("state", "available_at"),
     }
 
     # ...and the new reference (AC3's audit + a runtime enforcement check).
@@ -1318,6 +1331,122 @@ def test_a_job_written_by_enrichment_claims_no_user(tmp_path: Path) -> None:
     assert connection.execute("SELECT user_id FROM jobs WHERE id = ?", (job_id,)).fetchone()[0] is None
     connection.close()
     engine.dispose()
+
+
+@pytest.mark.anyio
+async def test_a_full_downgrade_returns_0016_and_the_application_still_starts(
+    tmp_path: Path,
+) -> None:
+    """AC2: `alembic downgrade` from the new head restores the `0016` schema.
+
+    The three revisions of the sprint all invert, rows follow the copy back, and
+    the application still services it — its startup takes the pre-migration
+    backup, reruns the chain upward and refers to being ready. A downgrade that
+    corrosed any of that is one the restart: unless-stopped loop would find on a
+    real server.
+    """
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    assert configured.database_url is not None
+    upgrade(configured.database_url)
+
+    command.downgrade(alembic_config(configured.database_url), IDENTITY_SEED_REVISION)
+
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == IDENTITY_SEED_REVISION
+    )
+    tables = {
+        row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    # Both identity revisions' additions are gone — not schema ghosts left behind.
+    assert "users" not in tables and "sessions" not in tables
+    # entries and shelves have carried user_id since 0002 — only the FK goes with
+    # the downgrade. The import ledger and jobs gained theirs in 0019, so those are
+    # the ones that must not leave a ghost column behind.
+    for table in ("import_batches", "import_records", "import_effects", "jobs"):
+        assert "user_id" not in {
+            row[1] for row in connection.execute(f"PRAGMA table_info({table})")
+        }
+    # The library that never read anyone's data comes back with everything.
+    assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
+    assert connection.execute("SELECT count(*) FROM entry_formats").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_records").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
+    connection.close()
+
+    # And the application serves it: backup, upgrade, ready.
+    app = create_app(configured)
+    async with app.router.lifespan_context(app):
+        pass
+
+    assert configured.database_url is not None
+    assert pending_revisions(configured.database_url) == []
+    connection = sqlite3.connect(database_path)
+    assert (
+        connection.execute("SELECT count(*) FROM users").fetchone()[0] == 1
+    )
+    connection.close()
+
+
+@pytest.mark.anyio
+async def test_the_pre_migration_backup_is_taken_and_restores_a_working_0016_database(
+    tmp_path: Path,
+) -> None:
+    """AC9: the DEC-039 guard fires at 0016, and its copy is a rollback point.
+
+    A database holding all six tables of the sprint gets backed up by app startup,
+    migrated without error, and the preserved copy restores as a working `0016`
+    library — same schema, same rows, no identity tables. That copy is the answer
+    to the owner's question "how is this reversible?".
+    """
+    configured = database_at(tmp_path / "data", IDENTITY_SEED_REVISION)
+    database_path = configured.data_dir / "books.db"
+    seed_identity_library(database_path)
+    app = create_app(configured)
+
+    async with app.router.lifespan_context(app):
+        pass
+
+    assert configured.backup_dir is not None
+    backups = sorted(configured.backup_dir.glob("pre-migration-*"))
+    assert len(backups) == 1
+    manifest = verify_backup(backups[0])
+    # The copy predates the upgrade or it isn't a rollback point.
+    assert manifest["alembic_revision"] == IDENTITY_SEED_REVISION
+    assert manifest["label"] == "pre-migration"
+
+    restored_dir = tmp_path / "restored"
+    restore_backup(backups[0], into=restored_dir)
+
+    connection = sqlite3.connect(restored_dir / "books.db")
+    assert (
+        connection.execute("SELECT version_num FROM alembic_version").fetchone()[0]
+        == IDENTITY_SEED_REVISION
+    )
+    tables = {
+        row[0] for row in connection.execute("SELECT name FROM sqlite_master WHERE type='table'")
+    }
+    assert "users" not in tables and "sessions" not in tables
+    # Every row of the 0016 library rides in the backup.
+    assert connection.execute("SELECT count(*) FROM entries").fetchone()[0] == 2
+    assert connection.execute("SELECT count(*) FROM shelves").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM entry_formats").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_batches").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_records").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM import_effects").fetchone()[0] == 1
+    assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
+    # A restored 0016 — byte-for-byte, referentially clean.
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    connection.close()
+
+    # The live database is on the chain and nothing is pending.
+    assert configured.database_url is not None
+    assert pending_revisions(configured.database_url) == []
 
 
 def test_the_ownership_revision_downgrades_without_user_columns(tmp_path: Path) -> None:

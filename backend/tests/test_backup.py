@@ -672,3 +672,36 @@ def test_restoring_a_version_one_backup_still_works(tmp_path: Path) -> None:
     assert (restored / "books.db").is_file()
     assert (restored / "covers" / "1.jpg").is_file()
     assert (restored / "imports" / "batch-1" / "audit.json").is_file()
+
+
+def test_a_backup_taken_at_the_identity_head_restores_the_owned_rows(tmp_path: Path) -> None:
+    """Sprint 075: the backup crosses the three identity revisions transparently.
+
+    A backup taken on the sprint's head carries the seeded user and every
+    user_id back through a restore; the restored database still audits clean and
+    still says it is at head. This is the row on Sprint 075's test table that
+    lives in this file — backup-then-restore across the new revision.
+    """
+    data_dir = populated_data_dir(tmp_path)
+    result = create_backup(
+        database_path=data_dir / "books.db",
+        data_dir=data_dir,
+        dest=tmp_path / "backups",
+        now=datetime.fromisoformat(NOW),
+    )
+    assert result.manifest["alembic_revision"] == current_head()
+
+    restore_backup(result.path, into=tmp_path / "restored")
+
+    database = sqlite3.connect(tmp_path / "restored" / "books.db")
+    (user_id, is_admin, password_hash) = database.execute(
+        "SELECT id, is_admin, password_hash FROM users"
+    ).fetchone()
+    assert (user_id, is_admin, password_hash) == (1, 1, None)
+    # Every user-owned row rides along owned by that one user.
+    assert database.execute("SELECT DISTINCT user_id FROM entries").fetchall() == [(1,)]
+    assert database.execute("SELECT DISTINCT user_id FROM shelves").fetchall() == [(1,)]
+    sessions = database.execute("PRAGMA table_info(sessions)").fetchall()
+    assert any(row[1] == "token_hash" for row in sessions)
+    assert database.execute("PRAGMA foreign_key_check").fetchall() == []
+    database.close()
