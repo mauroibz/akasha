@@ -23,8 +23,10 @@ function returnDestination(state: unknown): string {
 
 export function LoginPage({
   onAuthenticated,
+  onNavigate,
 }: {
   onAuthenticated: (user: AuthUser) => void;
+  onNavigate?: (destination: string) => void;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -44,8 +46,13 @@ export function LoginPage({
     setMessage("");
     try {
       const user = await login(username, password);
+      const destination = returnDestination(location.state);
       onAuthenticated(user);
-      void navigate(returnDestination(location.state), { replace: true });
+      if (onNavigate) {
+        onNavigate(destination);
+      } else {
+        void navigate(destination, { replace: true });
+      }
     } catch (error) {
       setPassword("");
       setMessage(

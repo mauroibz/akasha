@@ -5,6 +5,15 @@ export interface AuthUser {
   is_admin: boolean;
 }
 
+export interface AuthState {
+  auth: "off" | "on";
+  authenticated: boolean;
+  setup_required: boolean;
+  user: AuthUser | null;
+}
+
+export const AUTH_STATE_QUERY_KEY = ["auth", "me"] as const;
+
 export class AuthRequestError extends Error {
   constructor(
     public readonly code: string,
@@ -34,4 +43,25 @@ export function login(username: string, password: string): Promise<AuthUser> {
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ username, password }),
   }).then(authJson<AuthUser>);
+}
+
+/**
+ * Probe the deployment once before mounting a private route.
+ *
+ * Auth routes deliberately return 404 in the default off mode, so that response
+ * is the mode signal rather than an authentication failure.
+ */
+export async function getAuthState(): Promise<AuthState> {
+  const response = await fetch("/api/auth/me", {
+    headers: { Accept: "application/json" },
+  });
+  if (response.status === 404) {
+    return {
+      auth: "off",
+      authenticated: false,
+      setup_required: false,
+      user: null,
+    };
+  }
+  return authJson<AuthState>(response);
 }
