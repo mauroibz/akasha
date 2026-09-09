@@ -46,8 +46,16 @@ router = APIRouter(prefix="/api")
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
+def library_for(request: Request, user: CurrentUser) -> LibraryService:
+    return LibraryService(
+        request.app.state.engine,
+        user.effective_user_id,
+        item_access_requires_entry=getattr(request.app.state, "auth", "off") == "on",
+    )
+
+
 async def service(request: Request, user: CurrentUser) -> LibraryService:
-    return LibraryService(request.app.state.engine, user.effective_user_id)
+    return library_for(request, user)
 
 
 Library = Annotated[LibraryService, Depends(service)]
@@ -680,7 +688,7 @@ async def list_item_types() -> list[ItemTypeResponse]:
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
 async def get_cover(item_id: int, request: Request, user: CurrentUser) -> Response:
-    item = LibraryService(request.app.state.engine, user.effective_user_id).get_item(item_id)
+    item = library_for(request, user).get_item(item_id)
     if not item["cover_url"]:
         raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
     target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
@@ -718,7 +726,7 @@ async def list_cover_candidates(
     Only ever reached because a chooser was opened. Nothing here runs while a library
     page renders, which is the invariant that keeps cached pages provider-free.
     """
-    library = LibraryService(request.app.state.engine, user.effective_user_id)
+    library = library_for(request, user)
     item = library.get_item(item_id)
     domain = DOMAINS.get(str(item["type"]))
     if domain is not None and not domain.chooses_covers:
@@ -790,7 +798,7 @@ async def replace_cover(
     are obtained: same validation, same atomic install, same recovery of the previous
     cover if anything fails.
     """
-    library = LibraryService(request.app.state.engine, user.effective_user_id)
+    library = library_for(request, user)
     library.get_item(item_id)
     ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
     chosen: str | None = None
@@ -878,7 +886,7 @@ async def add_attachment(
     name is stored in the database and the blob is addressed by its own hash, so
     there is no code path where this string reaches the filesystem (DEC-048).
     """
-    library = LibraryService(request.app.state.engine, user.effective_user_id)
+    library = library_for(request, user)
     # Before a single chunk is read: an upload to an item that is not here should
     # cost nothing, not 25 MiB of transfer followed by a 404.
     library.ensure_item(item_id)
@@ -934,9 +942,7 @@ async def download_attachment(
     inline could script the application against its own API. The three headers
     below are what stop that, and none of them is optional (DEC-048).
     """
-    row = LibraryService(request.app.state.engine, user.effective_user_id).get_attachment(
-        item_id, attachment_id
-    )
+    row = library_for(request, user).get_attachment(item_id, attachment_id)
     try:
         target = blob_path(request.app.state.data_dir, row["sha256"])
     except AttachmentError as error:
@@ -1021,7 +1027,7 @@ async def rename_attachment(
 async def delete_attachment(
     item_id: int, attachment_id: int, request: Request, user: CurrentUser
 ) -> Response:
-    LibraryService(request.app.state.engine, user.effective_user_id).delete_attachment(
+    library_for(request, user).delete_attachment(
         item_id, attachment_id, data_dir=request.app.state.data_dir
     )
     return Response(status_code=204)
@@ -1036,7 +1042,7 @@ async def delete_attachment(
 async def refresh_item(
     item_id: int, body: RefreshBody, request: Request, user: CurrentUser
 ) -> ItemResponse:
-    library = LibraryService(request.app.state.engine, user.effective_user_id)
+    library = library_for(request, user)
     provider, source_id = _primary_provider(request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     metadata = dict(payload.metadata)
@@ -1135,7 +1141,7 @@ async def fetch_cover(item_id: int, request: Request, user: CurrentUser) -> Item
     is destructive, so unlike refresh it needs no confirmation and no
     `overwrite` flag.
     """
-    library = LibraryService(request.app.state.engine, user.effective_user_id)
+    library = library_for(request, user)
     provider, source_id = _primary_provider(request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     if not await _install_cover_from_payload(request, payload, item_id, user):

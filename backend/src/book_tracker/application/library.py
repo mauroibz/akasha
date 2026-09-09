@@ -132,9 +132,12 @@ class LibraryError(Exception):
 
 
 class LibraryService:
-    def __init__(self, engine: Engine, user_id: int) -> None:
+    def __init__(
+        self, engine: Engine, user_id: int, *, item_access_requires_entry: bool = False
+    ) -> None:
         self.engine = engine
         self.user_id = user_id
+        self.item_access_requires_entry = item_access_requires_entry
 
     @contextmanager
     def _write(self) -> Iterator[Session]:
@@ -163,11 +166,12 @@ class LibraryService:
         # Items are a shared metadata cache, but a request reaches one only
         # through its own entry. Sharing the row avoids duplicate metadata and
         # files; it does not make another person's catalogue enumerable by id.
-        item = session.scalar(
-            select(ItemRow)
-            .join(EntryRow, EntryRow.item_id == ItemRow.id)
-            .where(ItemRow.id == item_id, EntryRow.user_id == self.user_id)
-        )
+        query = select(ItemRow).where(ItemRow.id == item_id)
+        if self.item_access_requires_entry:
+            query = query.join(EntryRow, EntryRow.item_id == ItemRow.id).where(
+                EntryRow.user_id == self.user_id
+            )
+        item = session.scalar(query)
         if item is None:
             raise LibraryError("item_not_found", "Item was not found", status_code=404)
         return item
