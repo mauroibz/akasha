@@ -3,6 +3,7 @@ from pathlib import Path
 
 from sqlalchemy import text
 
+import book_tracker.application.sessions as sessions_module
 from book_tracker.application.sessions import SESSION_LIFETIME, SessionStore
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
@@ -48,3 +49,28 @@ def test_session_create_lookup_refresh_expire_and_delete(tmp_path: Path) -> None
     assert store.delete(replacement.token) == 1
     assert store.lookup(replacement.token, now=started) is None
 
+    first = store.create(1, now=started)
+    second = store.create(1, now=started)
+    assert store.delete_all(1) == 2
+    assert store.lookup(first.token, now=started) is None
+    assert store.lookup(second.token, now=started) is None
+
+
+def test_missing_and_expired_lookup_pay_the_same_digest_comparison(
+    tmp_path: Path, monkeypatch
+) -> None:  # type: ignore[no-untyped-def]
+    engine = engine_at(tmp_path)
+    store = SessionStore(engine)
+    started = datetime(2024, 1, 1, tzinfo=UTC)
+    expired = store.create(1, now=started)
+    compared: list[tuple[int, int]] = []
+    original = sessions_module.secrets.compare_digest
+
+    def recording_compare(left: str, right: str) -> bool:
+        compared.append((len(left), len(right)))
+        return original(left, right)
+
+    monkeypatch.setattr(sessions_module.secrets, "compare_digest", recording_compare)
+    assert store.lookup("unknown", now=datetime.now(UTC)) is None
+    assert store.lookup(expired.token, now=datetime.now(UTC)) is None
+    assert compared == [(64, 64), (64, 64)]

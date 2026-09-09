@@ -2,23 +2,39 @@ import asyncio
 import contextlib
 import logging
 import sqlite3
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
+from book_tracker.api.auth import (
+    LoginRateLimiter,
+    bootstrap_admin,
+    has_credentialed_user,
+    unauthenticated,
+)
+from book_tracker.api.auth import (
+    router as auth_router,
+)
+from book_tracker.api.auth import (
+    setup_required as setup_required_response,
+)
 from book_tracker.api.export import router as export_router
+from book_tracker.api.identity import AuthenticationRequired, Principal
 from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
+from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.library import LibraryError
+from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 from book_tracker.backup import BackupError, create_backup, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
@@ -140,6 +156,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _back_up_before_migrating(configured)
             upgrade(configured.database_url)
         app.state.engine = create_engine(configured)
+        app.state.auth = configured.auth
+        app.state.cookie_secure = configured.cookie_secure
+        app.state.trusted_proxy_peers = configured.trusted_proxy_peers
+        app.state.login_limiter = LoginRateLimiter(
+            configured.login_max_failures, configured.login_window_seconds
+        )
+        if (
+            configured.auth == "on"
+            and configured.admin_username is not None
+            and configured.admin_password is not None
+        ):
+            bootstrap_admin(app.state.engine, configured.admin_username, configured.admin_password)
         provider_client = create_provider_client()
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
@@ -278,6 +306,51 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             app.state.engine.dispose()
 
     app = FastAPI(title="Akasha", version="1.8.0", lifespan=lifespan)
+    # Available before lifespan for route inspection; requests still run only
+    # after lifespan has installed the engine and session store dependencies.
+    app.state.auth = configured.auth
+    app.state.cookie_secure = configured.cookie_secure
+    app.state.trusted_proxy_peers = configured.trusted_proxy_peers
+
+    @app.exception_handler(AuthenticationRequired)
+    async def authentication_required(
+        _request: Request, _error: AuthenticationRequired
+    ) -> JSONResponse:
+        return unauthenticated()
+
+    @app.middleware("http")
+    async def authentication_boundary(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        if configured.auth == "off":
+            if request.url.path.startswith("/api/auth/"):
+                return JSONResponse(status_code=404, content={"detail": "Not Found"})
+            return await call_next(request)
+        if not request.url.path.startswith("/api/"):
+            return await call_next(request)
+        path = request.url.path
+        if path.startswith("/api/health/"):
+            return await call_next(request)
+
+        needs_setup = not has_credentialed_user(request.app.state.engine)
+        if needs_setup:
+            if path not in {"/api/auth/me", "/api/auth/setup"}:
+                return setup_required_response()
+            return await call_next(request)
+
+        if path.startswith("/api/auth/"):
+            return await call_next(request)
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+        if identity is None:
+            return unauthenticated()
+        request.state.principal = Principal(
+            user_id=identity.user_id,
+            username=identity.username,
+            is_admin=identity.is_admin,
+            acting_as=None,
+        )
+        return await call_next(request)
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:
@@ -396,12 +469,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
         return ProviderHealth(providers=rows, degraded=not all(row.available for row in rows))
 
-    app.include_router(library_router)
-    app.include_router(providers_router)
-    app.include_router(imports_router)
-    app.include_router(catalog_router)
-    app.include_router(enrichment_router)
-    app.include_router(export_router)
+    auth_responses: dict[int | str, dict[str, Any]] = {
+        401: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    }
+    app.include_router(auth_router)
+    app.include_router(library_router, responses=auth_responses)
+    app.include_router(providers_router, responses=auth_responses)
+    app.include_router(imports_router, responses=auth_responses)
+    app.include_router(catalog_router, responses=auth_responses)
+    app.include_router(enrichment_router, responses=auth_responses)
+    app.include_router(export_router, responses=auth_responses)
 
     @app.api_route(
         "/api/{path:path}",

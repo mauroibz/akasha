@@ -19,4 +19,3 @@ def test_stored_parameters_keep_an_old_hash_valid_after_the_default_changes() ->
 
     assert "n=8192" in old.digest
     assert verify_password("library secret", old.digest, old.salt)
-

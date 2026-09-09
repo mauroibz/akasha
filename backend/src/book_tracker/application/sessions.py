@@ -10,6 +10,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Engine, text
 
 SESSION_LIFETIME = timedelta(days=400)
+SESSION_COOKIE_NAME = "akasha_session"
 _MISSING_TOKEN_HASH = "0" * 64
 
 
@@ -84,15 +85,19 @@ class SessionStore:
         current = now or utc_now()
         digest = token_hash(token)
         with self.engine.connect() as connection:
-            row = connection.execute(
-                text(
-                    "SELECT sessions.id, sessions.token_hash, sessions.expires_at, "
-                    "users.id AS user_id, users.username, users.display_name, users.is_admin "
-                    "FROM sessions JOIN users ON users.id = sessions.user_id "
-                    "WHERE sessions.token_hash = :token_hash"
-                ),
-                {"token_hash": digest},
-            ).mappings().one_or_none()
+            row = (
+                connection.execute(
+                    text(
+                        "SELECT sessions.id, sessions.token_hash, sessions.expires_at, "
+                        "users.id AS user_id, users.username, users.display_name, users.is_admin "
+                        "FROM sessions JOIN users ON users.id = sessions.user_id "
+                        "WHERE sessions.token_hash = :token_hash"
+                    ),
+                    {"token_hash": digest},
+                )
+                .mappings()
+                .one_or_none()
+            )
 
         # Both a miss and an expired hit pay the same constant-time comparison.
         candidate = str(row["token_hash"]) if row is not None else _MISSING_TOKEN_HASH
@@ -121,6 +126,14 @@ class SessionStore:
             )
         return int(result.rowcount)
 
+    def delete_all(self, user_id: int) -> int:
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                text("DELETE FROM sessions WHERE user_id = :user_id"),
+                {"user_id": user_id},
+            )
+        return int(result.rowcount)
+
     def expire(self, *, now: datetime | None = None) -> int:
         with self.engine.begin() as connection:
             result = connection.execute(
@@ -128,4 +141,3 @@ class SessionStore:
                 {"now": timestamp(now or utc_now())},
             )
         return int(result.rowcount)
-

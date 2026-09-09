@@ -103,6 +103,8 @@ def test_redaction_removes_notes_payloads_and_keys(capsys: pytest.CaptureFixture
     logging.getLogger("test").warning(
         "import row failed",
         extra={
+            "password": "this must never appear",
+            "cookie": "akasha_session=private",
             "notes": "I hated the ending and here is why",
             "review": "two stars",
             "payload": {"volumeInfo": {"title": "Rayuela"}},
@@ -120,7 +122,7 @@ def test_redaction_removes_notes_payloads_and_keys(capsys: pytest.CaptureFixture
     assert record["level"] == "warning"
     assert "timestamp" in record
 
-    for field in ("notes", "review", "payload", "api_key"):
+    for field in ("password", "cookie", "notes", "review", "payload", "api_key"):
         assert record[field] == REDACTION, field
     assert "I hated the ending" not in json.dumps(record)
     assert "super-secret-google-key" not in json.dumps(record)

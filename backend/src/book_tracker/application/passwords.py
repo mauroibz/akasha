@@ -24,6 +24,9 @@ class PasswordHash:
     salt: str
 
 
+DEFAULT_SCRYPT_PARAMETERS = ScryptParameters()
+
+
 def _encode(value: bytes) -> str:
     return base64.urlsafe_b64encode(value).decode("ascii").rstrip("=")
 
@@ -33,7 +36,7 @@ def _decode(value: str) -> bytes:
 
 
 def hash_password(
-    password: str, *, parameters: ScryptParameters = ScryptParameters()
+    password: str, *, parameters: ScryptParameters = DEFAULT_SCRYPT_PARAMETERS
 ) -> PasswordHash:
     """Hash one password with a fresh salt and a self-describing digest."""
     salt = secrets.token_bytes(16)
@@ -76,4 +79,3 @@ def verify_password(password: str, encoded_digest: str, encoded_salt: str) -> bo
         return secrets.compare_digest(actual, _decode(expected))
     except (ValueError, TypeError):
         return False
-

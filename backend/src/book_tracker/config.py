@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -44,26 +45,22 @@ class Settings(BaseSettings):
     # mode this guards against is running out entirely, not running low.
     min_free_bytes: int = 500 * 1024 * 1024
     sqlite_busy_timeout_ms: int = 5_000
-    # Sprint 075 (DEC-146): v1 has no authentication, and this is the schema's name
-    # for that absence. `off` is bit-for-bit the v1.8.0 shape; anything else is
-    # refused at startup. Nothing reads the field yet — refusal is this sprint's
-    # whole deliverable, and Sprint 077 is the first thing that makes it mean
-    # anything besides 'off'.
-    auth: str = "off"
+    # Authentication is opt-in so every existing install remains unchanged.
+    auth: Literal["off", "on"] = "off"
+    cookie_secure: bool | None = None
+    # Shared with Sprint 081's trusted identity header: a forwarded scheme is
+    # authoritative only when the immediate peer is explicitly trusted.
+    trusted_proxy_peers: list[str] = Field(default_factory=list)
+    login_max_failures: int = Field(default=5, ge=1)
+    login_window_seconds: int = Field(default=300, ge=1)
+    admin_username: str | None = None
+    admin_password: SecretStr | None = None
     static_dir: Path | None = None
 
     @model_validator(mode="after")
-    def refuse_authentication_not_yet_delivered(self) -> "Settings":
-        """`AKASHA_AUTH` has one legal value in v1 ('off'). Sprint 077 adds the
-        other, and refusing minimizes misconfiguration — a deployment that thinks
-        it turned authentication on but did not is strictly worse than a
-        deployment that knows it is wide open."""
-        if self.auth != "off":
-            raise ValueError(
-                "AKASHA_AUTH only accepts 'off' in v1 — the login this value"
-                " was set for is a Sprint 077 delivery and this build does not"
-                " have it"
-            )
+    def validate_admin_bootstrap(self) -> "Settings":
+        if (self.admin_username is None) != (self.admin_password is None):
+            raise ValueError("AKASHA_ADMIN_USERNAME and AKASHA_ADMIN_PASSWORD must be set together")
         return self
 
     @model_validator(mode="after")

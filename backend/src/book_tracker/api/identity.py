@@ -1,24 +1,11 @@
-"""Who a request belongs to.
-
-Sprint 076 (DEC-146): v1 has no authentication, but every ledger row written
-since Sprint 075 has an owner column that Sprint 075 filled with the seeded
-user by server default. Past that sprint the code kept deciding "this row
-belongs to user 1" in two dozen places the request never reached — a
-single-user assumption smuggled through constructor defaults. This module is
-the only one allowed to make that decision: a FastAPI dependency that names
-the request's owner and carries that name as a value to every service.
-
-`Settings.auth` accepts exactly one value in v1 (`off`; anything else is
-refused at startup), so the answer is always the seeded user. Sprint 077
-replaces the body with a session lookup and Sprint 080 fills `acting_as`;
-neither changes the signature, and callers keep using `effective_user_id` so
-they never learn the difference.
-"""
+"""The one boundary that decides who a request belongs to."""
 
 from dataclasses import dataclass
 from typing import Annotated
 
 from fastapi import Depends, Request
+
+from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 
 __all__ = ["Principal", "current_user", "CurrentUser"]
 
@@ -46,21 +33,30 @@ class Principal:
 async def current_user(request: Request) -> Principal:
     """The one place that decides who a request belongs to.
 
-    `app.state.auth` mirrors `Settings.auth`, whose validator admits exactly one
-    value in v1 (`off`), so this branch is a constant — the dependency exists
-    so Sprint 077 can replace the constant with a session lookup in exactly one
-    file instead of discovering another hardcoded user somewhere it cannot see.
+    Auth-off preserves the seeded implicit user. Auth-on reads only the opaque
+    cookie and the server-side session it names; every downstream caller keeps
+    receiving the same value type Sprint 076 introduced.
     """
     auth = getattr(request.app.state, "auth", "off")
-    if auth != "off":
-        raise RuntimeError(
-            "AKASHA_AUTH must be 'off' in this build — a different value should "
-            "have been refused at startup before reaching here"
-        )
-    # The seeded user, written by Sprint 075's migration and renamed `admin` at
-    # DEC-147's cheap path. Sprint 077 turns this line into a session lookup;
-    # the dependency's return type is the part that is permanent.
-    return Principal(user_id=1, username="admin", is_admin=True, acting_as=None)
+    if auth == "off":
+        return Principal(user_id=1, username="admin", is_admin=True, acting_as=None)
+    principal = getattr(request.state, "principal", None)
+    if isinstance(principal, Principal):
+        return principal
+    token = request.cookies.get(SESSION_COOKIE_NAME)
+    identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+    if identity is None:
+        raise AuthenticationRequired
+    return Principal(
+        user_id=identity.user_id,
+        username=identity.username,
+        is_admin=identity.is_admin,
+        acting_as=None,
+    )
+
+
+class AuthenticationRequired(Exception):
+    """Raised only if a protected dependency is reached without middleware state."""
 
 
 CurrentUser = Annotated[Principal, Depends(current_user)]
