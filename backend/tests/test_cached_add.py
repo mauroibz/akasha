@@ -377,7 +377,7 @@ async def test_secondary_source_is_attached_only_when_canonical_isbn_agrees(tmp_
                     ],
                 },
             )
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         agreed = repository.match(sources=[SourceIdentity("googlebooks", "agree", False)])
         rejected = repository.match(sources=[SourceIdentity("googlebooks", "disagree", False)])
     assert response.status_code == 201
@@ -447,7 +447,7 @@ async def test_cover_failure_is_nonfatal_and_success_sets_only_valid_local_path(
 async def test_contradictory_exact_identities_do_not_attach(tmp_path: Path) -> None:
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         repository.create_or_get_entry(
             title="ISBN item", identifiers=[normalize_identifier("isbn", "9788437604572")]
         )
@@ -573,7 +573,7 @@ async def test_add_service_allowlists_entry_values_and_still_allows_clearing(
 ) -> None:
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        service = AddService(app.state.engine, {"openlibrary": Provider()})
+        service = AddService(app.state.engine, {"openlibrary": Provider()}, user_id=1)
         cleared = await service.add(
             manual=None,
             source="openlibrary",

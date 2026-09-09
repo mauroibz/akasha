@@ -28,7 +28,7 @@ def anyio_backend() -> str:
 async def test_a_groupable_key_ranks_over_http(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         entry = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -90,7 +90,7 @@ async def test_a_key_the_domain_does_not_declare_groupable_is_a_422_naming_the_d
 async def test_a_zero_score_domain_reports_no_rated_groups_over_http(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         entry = repository.create_or_get_entry(title="Unrated", creators=("Nobody Rated",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -137,7 +137,7 @@ async def test_the_built_in_year_and_decade_keys_rank_over_http(tmp_path: Path) 
     """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         for title, year in (("Rayuela", 1963), ("Bestiario", 1951), ("Final del juego", 1956)):
             entry = repository.create_or_get_entry(title=title, creators=("Julio Cortázar",))
             with app.state.engine.begin() as connection:
@@ -178,7 +178,7 @@ async def test_a_year_ranking_row_filters_the_library_to_its_members(tmp_path: P
     """The key a year row hands back is the value `/api/entries` expects (AC8)."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         for title, year in (("Rayuela", 1963), ("Bestiario", 1951)):
             entry = repository.create_or_get_entry(title=title, creators=("Julio Cortázar",))
             with app.state.engine.begin() as connection:
@@ -213,7 +213,7 @@ async def test_a_status_filter_narrows_a_ranking_and_agrees_with_entries(tmp_pat
     for the same filters plus `key`/`value`."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         read = repository.create_or_get_entry(title="Read one", creators=("Cortázar",))
         wishlisted = repository.create_or_get_entry(title="Wishlisted one", creators=("Cortázar",))
         with app.state.engine.begin() as connection:
@@ -289,7 +289,7 @@ async def test_score_distribution_schema_over_http(tmp_path: Path) -> None:
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         entry = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(

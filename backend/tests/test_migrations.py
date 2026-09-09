@@ -290,7 +290,7 @@ async def test_accented_sorting_and_search_survive_the_projection_backfill(
     app = create_app(configured)
 
     async with app.router.lifespan_context(app):
-        service = LibraryService(app.state.engine)
+        service = LibraryService(app.state.engine, 1)
         by_title = service.list_entries(sort="title", order="asc")
         unaccented_query = service.list_entries(q="avila")
         author_query = service.list_entries(q="sabato")

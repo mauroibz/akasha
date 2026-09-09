@@ -84,7 +84,7 @@ def test_one_factory_constructs_every_entry_row() -> None:
 
 
 def test_exact_item_and_entry_deduplicate(engine: Engine) -> None:
-    repository = DomainRepository(engine)
+    repository = DomainRepository(engine, 1)
     identity = normalize_identifier("isbn", "0-306-40615-2")
     first = repository.create_or_get_entry(title="First", identifiers=(identity,))
     second = repository.create_or_get_entry(title="Ignored", identifiers=(identity,))
@@ -95,7 +95,7 @@ def test_exact_item_and_entry_deduplicate(engine: Engine) -> None:
 
 def test_concurrent_equivalent_isbns_create_one_item(engine: Engine) -> None:
     def create(value: str) -> int:
-        result = DomainRepository(engine).create_or_get_entry(
+        result = DomainRepository(engine, 1).create_or_get_entry(
             title="Physics", identifiers=(normalize_identifier("isbn", value),)
         )
         return result.item_id
@@ -108,7 +108,7 @@ def test_concurrent_equivalent_isbns_create_one_item(engine: Engine) -> None:
 
 
 def test_split_exact_identities_conflict_without_mutation(engine: Engine) -> None:
-    repository = DomainRepository(engine)
+    repository = DomainRepository(engine, 1)
     one = normalize_identifier("calibre_uuid", "one")
     two = normalize_identifier("calibre_uuid", "two")
     repository.create_or_get_entry(title="One", identifiers=(one,))
@@ -122,7 +122,7 @@ def test_split_exact_identities_conflict_without_mutation(engine: Engine) -> Non
 
 
 def test_title_author_is_only_an_ambiguity_suggestion(engine: Engine) -> None:
-    repository = DomainRepository(engine)
+    repository = DomainRepository(engine, 1)
     repository.create_or_get_entry(title="Cien años de soledad", creators=("García Márquez",))
     decision = repository.match(title="Cien anos de soledad!", first_author="Garcia Marquez")
     assert decision.kind is MatchKind.AMBIGUOUS
@@ -130,7 +130,7 @@ def test_title_author_is_only_an_ambiguity_suggestion(engine: Engine) -> None:
 
 
 def test_fill_empty_and_identifier_union_require_exact_agreement(engine: Engine) -> None:
-    repository = DomainRepository(engine)
+    repository = DomainRepository(engine, 1)
     isbn = normalize_identifier("isbn", "9780306406157")
     calibre = normalize_identifier("calibre_uuid", "abc")
     created = repository.create_or_get_entry(
@@ -149,7 +149,7 @@ def test_fill_empty_and_identifier_union_require_exact_agreement(engine: Engine)
 
 
 def test_shelf_lifecycle_scopes_slug_and_only_cascades_joins(engine: Engine) -> None:
-    repository = DomainRepository(engine)
+    repository = DomainRepository(engine, 1)
     entry = repository.create_or_get_entry(title="Book")
     shelf = repository.create_shelf("Sci Fi")
     repository.attach_shelf(entry.entry_id, shelf)

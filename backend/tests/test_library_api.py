@@ -25,11 +25,11 @@ async def test_patch_service_refuses_an_unknown_entry_value_naming_the_domain(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        created = DomainRepository(app.state.engine).create_or_get_entry(
+        created = DomainRepository(app.state.engine, 1).create_or_get_entry(
             title="Unknown value", creators=("Nobody",)
         )
         with pytest.raises(LibraryError) as refused:
-            LibraryService(app.state.engine).update_entry(
+            LibraryService(app.state.engine, 1).update_entry(
                 created.entry_id, {"future_domain_value": "would otherwise be ignored"}
             )
 
@@ -42,7 +42,7 @@ async def test_patch_service_refuses_an_unknown_entry_value_naming_the_domain(
 async def test_entry_item_and_shelf_lifecycle(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -110,7 +110,7 @@ def test_openapi_describes_static_routes_and_response_contracts(tmp_path: Path) 
 async def test_shelf_entry_counts_and_deletion_retains_entries(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
@@ -145,7 +145,7 @@ async def test_get_shelves_carries_covers_in_its_schema(tmp_path: Path) -> None:
     """Sprint 071 deliverable 1: `GET /api/shelves` carries `covers`, over real HTTP."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         repository.set_cover_path(created.item_id, f"{created.item_id}.jpg")
         async with httpx.AsyncClient(
@@ -169,7 +169,7 @@ async def test_get_shelves_carries_members_by_type_in_its_schema(tmp_path: Path)
     """Sprint 074 deliverable 1: a mixed shelf's domains, over real HTTP."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         album = repository.create_or_get_entry(
             title="Discovery", creators=("Daft Punk",), item_type="album"
@@ -201,7 +201,7 @@ async def test_get_shelves_carries_members_by_type_in_its_schema(tmp_path: Path)
 
 async def _one_of_each(app: object) -> tuple[int, int]:
     """A book entry and an album entry, returned as (book_entry_id, album_entry_id)."""
-    repository = DomainRepository(app.state.engine)  # type: ignore[attr-defined]
+    repository = DomainRepository(app.state.engine, 1)  # type: ignore[attr-defined]
     book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
     album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
     with app.state.engine.begin() as connection:  # type: ignore[attr-defined]
@@ -451,7 +451,7 @@ async def test_the_facets_under_a_domain_filter(tmp_path: Path) -> None:
 
 async def _an_anime(app: object) -> int:
     """One anime entry, whose domain is the only one declaring progress."""
-    repository = DomainRepository(app.state.engine)  # type: ignore[attr-defined]
+    repository = DomainRepository(app.state.engine, 1)  # type: ignore[attr-defined]
     anime = repository.create_or_get_entry(title="Black Clover", creators=("Studio Pierrot",))
     with app.state.engine.begin() as connection:  # type: ignore[attr-defined]
         connection.execute(

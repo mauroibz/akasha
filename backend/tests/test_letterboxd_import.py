@@ -528,7 +528,7 @@ def library(tmp_path: Path) -> Any:
                 )
         return item_id
 
-    return DomainRepository(engine), add
+    return DomainRepository(engine, 1), add
 
 
 def decide(matcher: Any, record: Any) -> Any:

@@ -140,12 +140,14 @@ class ImportService:
         source_root: Path,
         importer: Importer,
         *,
+        user_id: int,
         attachment_max_bytes: int = 25 * 1024 * 1024,
     ) -> None:
         self.engine = engine
         self.data_dir = data_dir
         self.source_root = source_root
         self.importer = importer
+        self.user_id = user_id
         #: The same per-file ceiling the manual `/batches/{id}/files` route enforces
         #: (DEC-083), applied here to a reader-staged attachment too: a source that
         #: already had the bytes on disk does not get a bigger allowance than one that
@@ -155,8 +157,8 @@ class ImportService:
         #: one domain any more (DEC-106): each record resolves its own, and the first
         #: entry is what a record naming no type of its own becomes.
         self.domains = {item_type: DOMAINS[item_type] for item_type in importer.item_types}
-        self.library = DomainRepository(engine)
-        self.imports = ImportRepository(engine)
+        self.library = DomainRepository(engine, user_id)
+        self.imports = ImportRepository(engine, user_id)
 
     def _domain_for(self, record: NormalizedImportRecord) -> Domain:
         """The domain this row targets, refusing one the connector never declared.
@@ -435,7 +437,7 @@ class ImportService:
         and **retains** — the safe direction. The other order would let undo delete a
         file it never put there.
         """
-        attachment = LibraryService(self.engine).record_attachment(
+        attachment = LibraryService(self.engine, self.user_id).record_attachment(
             item_id, filename=filename, sha256=sha256, byte_size=byte_size
         )
         with Session(self.engine) as session:
@@ -456,6 +458,7 @@ class ImportService:
                 session.add(
                     ImportEffectRow(
                         batch_id=batch_id,
+                        user_id=self.user_id,
                         record_id=record_id,
                         effect_type="create",
                         entity_type="attachment",

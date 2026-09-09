@@ -34,8 +34,8 @@ class _Fixture:
 
     def __init__(self, app: object) -> None:
         self.app = app
-        self.repository = DomainRepository(app.state.engine)  # type: ignore[attr-defined]
-        self.service = LibraryService(app.state.engine)  # type: ignore[attr-defined]
+        self.repository = DomainRepository(app.state.engine, 1)  # type: ignore[attr-defined]
+        self.service = LibraryService(app.state.engine, 1)  # type: ignore[attr-defined]
 
     def set_score(self, entry_id: int, score: int | None) -> None:
         with self.app.state.engine.begin() as connection:  # type: ignore[attr-defined]

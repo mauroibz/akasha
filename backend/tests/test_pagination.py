@@ -39,7 +39,7 @@ async def test_list_filters_facets_and_default_excludes_unsorted(tmp_path: Path)
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
     app = create_app(configured)
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         first = repository.create_or_get_entry(title="Álgebra", creators=("Ada",))
         second = repository.create_or_get_entry(title="Biology", creators=("Bob",))
         third = repository.create_or_get_entry(title="Chemistry", creators=("Cara",))
@@ -77,7 +77,7 @@ async def test_keyset_score_is_null_last_and_stable_after_deleted_boundary(
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
     app = create_app(configured)
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         entries = [repository.create_or_get_entry(title=f"Book {index}") for index in range(5)]
         with app.state.engine.begin() as connection:
             for result, score in zip(entries, [8, 8, 3, None, None], strict=True):
@@ -150,7 +150,7 @@ async def test_every_sort_pages_without_duplicates_and_keeps_nulls_last(
 ) -> None:
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         entries = [
             repository.create_or_get_entry(title="Same", creators=("Zed",)),
             repository.create_or_get_entry(title="same", creators=("Zed",)),
@@ -201,7 +201,7 @@ async def test_a_mixed_library_pages_across_the_type_boundary(tmp_path: Path, so
     """
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         seeded = [
             ("book", "Rayuela", "Julio Cortázar", 1963),
             ("album", "Kind of Blue", "Miles Davis", 1959),
@@ -289,7 +289,7 @@ async def test_author_sort_orders_by_the_creator_sort_name(tmp_path: Path) -> No
     """
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         for title, author in [
             ("Cien años de soledad", "Gabriel García Márquez"),
             ("La invención de Morel", "Adolfo Bioy Casares"),
@@ -325,7 +325,7 @@ async def test_a_cursor_cut_under_one_domain_is_refused_under_another(tmp_path: 
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
     app = create_app(configured)
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         for index in range(4):
             repository.create_or_get_entry(title=f"Book {index}")
         album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))

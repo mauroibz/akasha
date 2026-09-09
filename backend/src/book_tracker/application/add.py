@@ -38,11 +38,12 @@ class AddService:
         engine: Engine,
         providers: Mapping[str, Provider],
         *,
+        user_id: int,
         cover_client: httpx.AsyncClient | None = None,
         data_dir: Path | None = None,
     ) -> None:
-        self.repository = DomainRepository(engine)
-        self.library = LibraryService(engine)
+        self.repository = DomainRepository(engine, user_id)
+        self.library = LibraryService(engine, user_id)
         self.providers = providers
         self.cover_client = cover_client
         self.data_dir = data_dir

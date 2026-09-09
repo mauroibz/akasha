@@ -578,7 +578,7 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
         started = time.perf_counter()
         seed(engine, count)
         seconds = time.perf_counter() - started
-        service = LibraryService(engine)
+        service = LibraryService(engine, 1)
         total = service.list_entries(limit=1)["total"]
 
         print(f"akasha library benchmark — {count} entries seeded in {seconds:.1f}s")

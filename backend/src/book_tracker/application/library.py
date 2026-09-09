@@ -132,7 +132,7 @@ class LibraryError(Exception):
 
 
 class LibraryService:
-    def __init__(self, engine: Engine, user_id: int = 1) -> None:
+    def __init__(self, engine: Engine, user_id: int) -> None:
         self.engine = engine
         self.user_id = user_id
 

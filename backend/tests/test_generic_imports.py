@@ -252,6 +252,7 @@ async def test_normalized_records_are_validated_against_the_target_domain(
             app.state.data_dir,
             app.state.calibre_dir,
             importer,  # type: ignore[arg-type]
+            user_id=1,
         )
         with pytest.raises(LibraryError) as caught:
             service.preview(ImportSource(data=b"fixture", filename="fixture"))
@@ -1111,7 +1112,7 @@ def test_the_inventory_answers_in_a_bounded_number_of_queries(tmp_path: Path) ->
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
     assert configured.database_url is not None
     upgrade(configured.database_url)
-    repository = DomainRepository(create_engine(configured))
+    repository = DomainRepository(create_engine(configured), 1)
     engine = repository.engine
 
     statements: list[str] = []
@@ -1163,7 +1164,9 @@ async def test_the_import_path_refuses_a_progress_the_domain_does_not_record(
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
         # Goodreads targets books, and a book records no progress at all.
-        service = ImportService(app.state.engine, tmp_path, tmp_path, IMPORTERS["goodreads"])
+        service = ImportService(
+            app.state.engine, tmp_path, tmp_path, IMPORTERS["goodreads"], user_id=1
+        )
         with pytest.raises(LibraryError) as refused:
             service._validate(record(3))
         assert service._validate(record(None)) == {"progress": None}
@@ -1250,3 +1253,114 @@ async def test_a_declared_upload_cap_is_honoured_in_both_directions(
     # not exist (deliverable 5's other half: "offers the alternate only when declared").
     assert "mounted path" not in body["action"]
     assert "Export a smaller file" in body["action"]
+
+
+@pytest.mark.anyio
+async def test_a_committed_import_stamps_its_owner_on_the_ledger(tmp_path: Path) -> None:
+    """AC4 first half: an import committed through the API records `user_id` on
+    its batch, records and effects. The columns existed defaulted since Sprint
+    075; this proves the code path writes them deliberately."""
+    calibre_root = tmp_path / "calibre"
+    _calibre_library(calibre_root)
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=calibre_root,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        preview = await client.post("/api/import/calibre/preview", json={"library_path": "library"})
+        assert preview.status_code == 201
+        batch_id = preview.json()["batch_id"]
+        commit = await client.post("/api/import/calibre/commit", json={"batch_id": batch_id})
+        assert commit.status_code == 200
+        with app.state.engine.connect() as connection:
+            owners = {
+                "batch": connection.execute(
+                    text("SELECT DISTINCT user_id FROM import_batches WHERE id=:id"),
+                    {"id": batch_id},
+                ).all(),
+                "records": connection.execute(
+                    text("SELECT DISTINCT user_id FROM import_records WHERE batch_id=:id"),
+                    {"id": batch_id},
+                ).all(),
+                "effects": connection.execute(
+                    text("SELECT DISTINCT user_id FROM import_effects WHERE batch_id=:id"),
+                    {"id": batch_id},
+                ).all(),
+            }
+    # The resolver answers the seeded user while auth is off, and every ledger
+    # table writing for this route names that user rather than riding the
+    # migration's server default.
+    for table, rows in owners.items():
+        assert rows, f"no {table} rows were stamped for the batch"
+        assert all(row[0] == 1 for row in rows), f"{table} wrote a different owner: {rows}"
+
+
+@pytest.mark.anyio
+async def test_undo_reverses_only_the_batch_that_belongs_to_the_caller(tmp_path: Path) -> None:
+    """AC4 second half: a batch is an owner's work in both directions — an import
+    landed under user 1 cannot be undone while requesting as another user, and
+    the owner still can."""
+    calibre_root = tmp_path / "calibre"
+    _calibre_library(calibre_root)
+    app = create_app(
+        Settings(
+            data_dir=tmp_path / "data",
+            calibre_dir=calibre_root,
+            user_agent_contact="test@example.invalid",
+        )
+    )
+    async with app.router.lifespan_context(app):
+        with app.state.engine.connect() as connection:
+            count = connection.execute(text("SELECT count(*) FROM entries")).scalar_one()
+            assert count == 0
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            preview = await client.post(
+                "/api/import/calibre/preview", json={"library_path": "library"}
+            )
+            assert preview.status_code == 201
+            batch_id = preview.json()["batch_id"]
+            commit = await client.post("/api/import/calibre/commit", json={"batch_id": batch_id})
+            assert commit.status_code == 200
+            assert commit.json()["created_entries"] >= 1
+
+            # Seed a second user directly — the route that creates one lands in
+            # Sprint 079, and this test only needs them to exist to ask the undo
+            # the question the route will ask Sprint 077.
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "INSERT INTO users (username, display_name, password_hash, "
+                        "password_salt, is_admin, created_at, updated_at) "
+                        "VALUES ('bruno', 'Bruno', NULL, NULL, 0, "
+                        "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+                    )
+                )
+                bruno = int(
+                    connection.execute(
+                        text("SELECT id FROM users WHERE username='bruno'")
+                    ).scalar_one()
+                )
+
+            from book_tracker.application.undo import UndoService
+
+            with pytest.raises(LookupError):
+                UndoService(app.state.engine, user_id=bruno).undo(batch_id)
+
+            result = UndoService(app.state.engine, user_id=1).undo(batch_id)
+
+    assert result["state"] == "undone"
+    # And the ledger says the same thing: the batch is undone, not deleted around
+    # the caller's check.
+    with app.state.engine.connect() as connection:
+        state = connection.execute(
+            text("SELECT state FROM import_batches WHERE id=:id"), {"id": batch_id}
+        ).scalar_one()
+    assert state == "undone"

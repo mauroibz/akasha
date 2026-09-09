@@ -856,7 +856,7 @@ def test_the_shared_service_applies_every_connectors_target_filter(
     configured = Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
     assert configured.database_url is not None
     upgrade(configured.database_url)
-    service = ImportService(create_engine(configured), tmp_path, tmp_path, importer)
+    service = ImportService(create_engine(configured), tmp_path, tmp_path, importer, user_id=1)
 
     assert service.chosen_targets(None) == importer.item_types
     for item_type in importer.item_types:
@@ -1570,7 +1570,7 @@ async def test_the_api_refuses_a_status_this_domain_does_not_declare(
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Conformance", creators=("Nobody",))
         with app.state.engine.begin() as connection:
             connection.execute(

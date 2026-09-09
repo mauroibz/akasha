@@ -9,6 +9,7 @@ from fastapi import APIRouter, Depends, File, Query, Request, Response, UploadFi
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field, model_validator
 
+from book_tracker.api.identity import CurrentUser
 from book_tracker.application.add import AddService
 from book_tracker.application.library import (
     LibraryError,
@@ -45,8 +46,8 @@ router = APIRouter(prefix="/api")
 UPLOAD_CHUNK_BYTES = 1024 * 1024
 
 
-async def service(request: Request) -> LibraryService:
-    return LibraryService(request.app.state.engine)
+async def service(request: Request, user: CurrentUser) -> LibraryService:
+    return LibraryService(request.app.state.engine, user.effective_user_id)
 
 
 Library = Annotated[LibraryService, Depends(service)]
@@ -533,11 +534,15 @@ async def get_score_distribution(
     responses={200: {"model": EntryCreateResponse}, **ERRORS},
 )
 async def create_entry(
-    body: EntryCreateBody, request: Request, response: Response
+    body: EntryCreateBody,
+    request: Request,
+    response: Response,
+    user: CurrentUser,
 ) -> EntryCreateResponse:
     add = AddService(
         request.app.state.engine,
         request.app.state.providers,
+        user_id=user.effective_user_id,
         cover_client=request.app.state.provider_client,
         data_dir=request.app.state.data_dir,
     )
@@ -674,8 +679,8 @@ async def list_item_types() -> list[ItemTypeResponse]:
 
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
-async def get_cover(item_id: int, request: Request) -> Response:
-    item = LibraryService(request.app.state.engine).get_item(item_id)
+async def get_cover(item_id: int, request: Request, user: CurrentUser) -> Response:
+    item = LibraryService(request.app.state.engine, user.effective_user_id).get_item(item_id)
     if not item["cover_url"]:
         raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
     target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
@@ -705,13 +710,15 @@ class CoverCandidates(BaseModel):
     response_model=CoverCandidates,
     responses=ERRORS,
 )
-async def list_cover_candidates(item_id: int, request: Request) -> CoverCandidates:
+async def list_cover_candidates(
+    item_id: int, request: Request, user: CurrentUser
+) -> CoverCandidates:
     """Other editions of this work, offered as covers to choose from.
 
     Only ever reached because a chooser was opened. Nothing here runs while a library
     page renders, which is the invariant that keeps cached pages provider-free.
     """
-    library = LibraryService(request.app.state.engine)
+    library = LibraryService(request.app.state.engine, user.effective_user_id)
     item = library.get_item(item_id)
     domain = DOMAINS.get(str(item["type"]))
     if domain is not None and not domain.chooses_covers:
@@ -774,6 +781,7 @@ class ChosenCover(BaseModel):
 async def replace_cover(
     item_id: int,
     request: Request,
+    user: CurrentUser,
     cover: Annotated[UploadFile | None, File()] = None,
 ) -> ItemResponse:
     """Replace a cover, either with an upload or with a candidate the owner picked.
@@ -782,7 +790,7 @@ async def replace_cover(
     are obtained: same validation, same atomic install, same recovery of the previous
     cover if anything fails.
     """
-    library = LibraryService(request.app.state.engine)
+    library = LibraryService(request.app.state.engine, user.effective_user_id)
     library.get_item(item_id)
     ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
     chosen: str | None = None
@@ -810,7 +818,9 @@ async def replace_cover(
             assert upload is not None
             prepared = prepare_uploaded_cover(upload[0], upload[1], request.app.state.data_dir)
         install_cover(prepared, request.app.state.data_dir, item_id)
-        DomainRepository(request.app.state.engine).set_cover_path(item_id, f"covers/{item_id}.jpg")
+        DomainRepository(request.app.state.engine, user.effective_user_id).set_cover_path(
+            item_id, f"covers/{item_id}.jpg"
+        )
     except CoverError as error:
         raise LibraryError("invalid_cover", str(error), status_code=422) from error
     except Exception:
@@ -859,6 +869,7 @@ async def add_attachment(
     item_id: int,
     request: Request,
     file: Annotated[UploadFile, File()],
+    user: CurrentUser,
 ) -> AttachmentResponse:
     """Take an opaque file and store it by the digest of its contents.
 
@@ -867,7 +878,7 @@ async def add_attachment(
     name is stored in the database and the blob is addressed by its own hash, so
     there is no code path where this string reaches the filesystem (DEC-048).
     """
-    library = LibraryService(request.app.state.engine)
+    library = LibraryService(request.app.state.engine, user.effective_user_id)
     # Before a single chunk is read: an upload to an item that is not here should
     # cost nothing, not 25 MiB of transfer followed by a 404.
     library.ensure_item(item_id)
@@ -912,7 +923,9 @@ async def add_attachment(
     responses=ERRORS,
     response_model=None,
 )
-async def download_attachment(item_id: int, attachment_id: int, request: Request) -> Response:
+async def download_attachment(
+    item_id: int, attachment_id: int, request: Request, user: CurrentUser
+) -> Response:
     """Serve an opaque blob in the only way that is safe from this origin.
 
     Everything the application served before this endpoint had been re-encoded to
@@ -921,7 +934,9 @@ async def download_attachment(item_id: int, attachment_id: int, request: Request
     inline could script the application against its own API. The three headers
     below are what stop that, and none of them is optional (DEC-048).
     """
-    row = LibraryService(request.app.state.engine).get_attachment(item_id, attachment_id)
+    row = LibraryService(request.app.state.engine, user.effective_user_id).get_attachment(
+        item_id, attachment_id
+    )
     try:
         target = blob_path(request.app.state.data_dir, row["sha256"])
     except AttachmentError as error:
@@ -1003,8 +1018,10 @@ async def rename_attachment(
     responses=ERRORS,
     response_model=None,
 )
-async def delete_attachment(item_id: int, attachment_id: int, request: Request) -> Response:
-    LibraryService(request.app.state.engine).delete_attachment(
+async def delete_attachment(
+    item_id: int, attachment_id: int, request: Request, user: CurrentUser
+) -> Response:
+    LibraryService(request.app.state.engine, user.effective_user_id).delete_attachment(
         item_id, attachment_id, data_dir=request.app.state.data_dir
     )
     return Response(status_code=204)
@@ -1016,8 +1033,10 @@ async def delete_attachment(item_id: int, attachment_id: int, request: Request) 
     response_model_exclude_none=True,
     responses=ERRORS,
 )
-async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> ItemResponse:
-    library = LibraryService(request.app.state.engine)
+async def refresh_item(
+    item_id: int, body: RefreshBody, request: Request, user: CurrentUser
+) -> ItemResponse:
+    library = LibraryService(request.app.state.engine, user.effective_user_id)
     provider, source_id = _primary_provider(request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     metadata = dict(payload.metadata)
@@ -1041,7 +1060,7 @@ async def refresh_item(item_id: int, body: RefreshBody, request: Request) -> Ite
             "metadata": metadata,
         },
     )
-    if await _install_cover_from_payload(request, payload, item_id):
+    if await _install_cover_from_payload(request, payload, item_id, user):
         refreshed = library.get_item(item_id)
     return ItemResponse.model_validate(refreshed)
 
@@ -1069,7 +1088,9 @@ async def _fetch_from_provider(provider: Any, source_id: str) -> Any:
         ) from error
 
 
-async def _install_cover_from_payload(request: Request, payload: Any, item_id: int) -> bool:
+async def _install_cover_from_payload(
+    request: Request, payload: Any, item_id: int, user: CurrentUser
+) -> bool:
     """Try each cover url the payload offers, in order; install the first that works.
 
     Returns whether one was installed, so a caller that only touched the cover
@@ -1090,7 +1111,9 @@ async def _install_cover_from_payload(request: Request, payload: Any, item_id: i
             install_cover(prepared, request.app.state.data_dir, item_id)
         except CoverError:
             continue
-        DomainRepository(request.app.state.engine).set_cover_path(item_id, f"covers/{item_id}.jpg")
+        DomainRepository(request.app.state.engine, user.effective_user_id).set_cover_path(
+            item_id, f"covers/{item_id}.jpg"
+        )
         return True
     return False
 
@@ -1101,7 +1124,7 @@ async def _install_cover_from_payload(request: Request, payload: Any, item_id: i
     response_model_exclude_none=True,
     responses=ERRORS,
 )
-async def fetch_cover(item_id: int, request: Request) -> ItemResponse:
+async def fetch_cover(item_id: int, request: Request, user: CurrentUser) -> ItemResponse:
     """Install a cover from the item's own primary provider, and nothing else.
 
     `Refresh from provider` already does this as a side effect, but only after
@@ -1112,10 +1135,10 @@ async def fetch_cover(item_id: int, request: Request) -> ItemResponse:
     is destructive, so unlike refresh it needs no confirmation and no
     `overwrite` flag.
     """
-    library = LibraryService(request.app.state.engine)
+    library = LibraryService(request.app.state.engine, user.effective_user_id)
     provider, source_id = _primary_provider(request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
-    if not await _install_cover_from_payload(request, payload, item_id):
+    if not await _install_cover_from_payload(request, payload, item_id, user):
         raise LibraryError(
             "cover_unavailable", "The provider has no cover for this item", status_code=422
         )

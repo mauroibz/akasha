@@ -50,8 +50,9 @@ class UndoService:
       and keeps its item alive (DEC-047, DEC-083).
     """
 
-    def __init__(self, engine: Engine, *, data_dir: Path | None = None) -> None:
+    def __init__(self, engine: Engine, *, user_id: int, data_dir: Path | None = None) -> None:
         self.engine = engine
+        self.user_id = user_id
         self.repo = JobRepository(engine)
         # Where the blobs live, when this undo is allowed to drop them. Without it the
         # rows still go and `reclaim` collects the files later (DEC-049) — correct, but
@@ -65,7 +66,7 @@ class UndoService:
 
         with Session(self.engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None:
+            if batch is None or batch.user_id != self.user_id:
                 raise LookupError(batch_id)
             if batch.state == "undone":
                 return {

@@ -90,8 +90,9 @@ class IdentityConflict(Exception):
 
 
 class DomainRepository:
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, user_id: int) -> None:
         self.engine = engine
+        self.user_id = user_id
 
     @contextmanager
     def _write(self) -> Iterator[Session]:
@@ -252,7 +253,6 @@ class DomainRepository:
         item_type: str = DEFAULT_DOMAIN.item_type,
         identifiers: Sequence[Identifier] = (),
         sources: Sequence[SourceIdentity] = (),
-        user_id: int = 1,
     ) -> EntryResult:
         with self._write() as session:
             exact = self._exact_ids(session, identifiers, sources)
@@ -300,14 +300,16 @@ class DomainRepository:
             else:
                 item_id = decision.item_id
             existing = session.scalar(
-                select(EntryRow).where(EntryRow.user_id == user_id, EntryRow.item_id == item_id)
+                select(EntryRow).where(
+                    EntryRow.user_id == self.user_id, EntryRow.item_id == item_id
+                )
             )
             if existing is not None:
                 return EntryResult(item_id, existing.id, True)
             # No progress: an entry nobody has touched has recorded nothing, which is
             # NULL and not zero.
             entry = _entry_row(
-                user_id=user_id,
+                user_id=self.user_id,
                 item_id=item_id,
                 status="unsorted",
                 now=now,
@@ -316,7 +318,7 @@ class DomainRepository:
             session.flush()
             return EntryResult(item_id, entry.id, False)
 
-    def near_entry_ids(self, title: str, first_author: str, user_id: int = 1) -> list[int]:
+    def near_entry_ids(self, title: str, first_author: str) -> list[int]:
         decision = self.match(title=title, first_author=first_author)
         if decision.kind is not MatchKind.AMBIGUOUS:
             return []
@@ -325,7 +327,7 @@ class DomainRepository:
                 session.scalars(
                     select(EntryRow.id)
                     .where(
-                        EntryRow.user_id == user_id,
+                        EntryRow.user_id == self.user_id,
                         EntryRow.item_id.in_(decision.candidates),
                     )
                     .order_by(EntryRow.id)
@@ -346,7 +348,6 @@ class DomainRepository:
         shelf_ids: Sequence[int] = (),
         creator_sort: str | None = None,
         item_type: str = DEFAULT_DOMAIN.item_type,
-        user_id: int = 1,
         #: The rest of the opinion, already validated against the item's own domain
         #: by the caller. Absent keys leave the column at its default.
         entry_values: Mapping[str, Any] | None = None,
@@ -404,7 +405,9 @@ class DomainRepository:
             else:
                 item_id = decision.item_id
             existing = session.scalar(
-                select(EntryRow).where(EntryRow.user_id == user_id, EntryRow.item_id == item_id)
+                select(EntryRow).where(
+                    EntryRow.user_id == self.user_id, EntryRow.item_id == item_id
+                )
             )
             if existing is not None:
                 return EntryResult(item_id, existing.id, True)
@@ -413,7 +416,7 @@ class DomainRepository:
                 found = set(
                     session.scalars(
                         select(ShelfRow.id).where(
-                            ShelfRow.user_id == user_id, ShelfRow.id.in_(shelves)
+                            ShelfRow.user_id == self.user_id, ShelfRow.id.in_(shelves)
                         )
                     )
                 )
@@ -421,7 +424,7 @@ class DomainRepository:
                     raise LookupError("shelf_not_found")
             values = dict(entry_values or {})
             entry = _entry_row(
-                user_id=user_id,
+                user_id=self.user_id,
                 item_id=item_id,
                 status=status,
                 now=now,
@@ -483,12 +486,12 @@ class DomainRepository:
             item.cover_path = cover_path
             item.updated_at = _now()
 
-    def create_shelf(self, name: str, user_id: int = 1) -> int:
+    def create_shelf(self, name: str) -> int:
         now = _now()
         try:
             with self._write() as session:
                 shelf = ShelfRow(
-                    user_id=user_id,
+                    user_id=self.user_id,
                     name=name.strip(),
                     slug=shelf_slug(name),
                     created_at=now,
@@ -543,8 +546,9 @@ def _count_unsorted(session: Session, user_id: int) -> int:
 
 
 class ImportRepository:
-    def __init__(self, engine: Engine) -> None:
+    def __init__(self, engine: Engine, user_id: int) -> None:
         self.engine = engine
+        self.user_id = user_id
 
     def get_batch_by_fingerprint(self, kind: str, fingerprint: str) -> str | None:
         with Session(self.engine) as session:
@@ -566,10 +570,11 @@ class ImportRepository:
         source_descriptor: Mapping[str, Any] | None = None,
     ) -> None:
         now = _now()
-        with DomainRepository(self.engine)._write() as session:
+        with DomainRepository(self.engine, self.user_id)._write() as session:
             session.add(
                 ImportBatchRow(
                     id=batch_id,
+                    user_id=self.user_id,
                     kind=kind,
                     fingerprint=fingerprint,
                     state="previewed",
@@ -593,6 +598,7 @@ class ImportRepository:
                 session.add(
                     ImportRecordRow(
                         batch_id=batch_id,
+                        user_id=self.user_id,
                         row_number=int(payload["row_number"]),
                         normalized_payload=json.dumps(payload, ensure_ascii=False),
                         matched_item_id=matched_item_id,
@@ -611,7 +617,6 @@ class ImportRepository:
         self,
         batch_id: str,
         choices: Mapping[int, Mapping[str, Any]],
-        user_id: int = 1,
         *,
         kind: str,
         domains: Mapping[str, Domain],
@@ -625,7 +630,7 @@ class ImportRepository:
         existed then was the only one it had.
         """
         default_domain = next(iter(domains.values()))
-        with DomainRepository(self.engine)._write() as session:
+        with DomainRepository(self.engine, self.user_id)._write() as session:
             batch = session.get(ImportBatchRow, batch_id)
             if batch is None or batch.kind != kind:
                 raise LookupError("import_batch_not_found")
@@ -634,7 +639,7 @@ class ImportRepository:
                     "batch_id": batch.id,
                     "state": batch.state,
                     **json.loads(batch.counters),
-                    "unsorted_entries": _count_unsorted(session, user_id),
+                    "unsorted_entries": _count_unsorted(session, self.user_id),
                 }
             if batch.state != "previewed":
                 raise ValueError("import_batch_not_committable")
@@ -711,6 +716,7 @@ class ImportRepository:
                     session.add(
                         ImportEffectRow(
                             batch_id=batch_id,
+                            user_id=self.user_id,
                             record_id=row.id,
                             effect_type="create",
                             entity_type="item",
@@ -769,6 +775,7 @@ class ImportRepository:
                         session.add(
                             ImportEffectRow(
                                 batch_id=batch_id,
+                                user_id=self.user_id,
                                 record_id=row.id,
                                 effect_type="fill_empty",
                                 entity_type="item",
@@ -799,6 +806,7 @@ class ImportRepository:
                             session.add(
                                 ImportEffectRow(
                                     batch_id=batch_id,
+                                    user_id=self.user_id,
                                     record_id=row.id,
                                     effect_type="create",
                                     entity_type="item_identifier",
@@ -811,7 +819,9 @@ class ImportRepository:
                             )
                 row.matched_item_id = item_id
                 existing = session.scalar(
-                    select(EntryRow).where(EntryRow.user_id == user_id, EntryRow.item_id == item_id)
+                    select(EntryRow).where(
+                        EntryRow.user_id == self.user_id, EntryRow.item_id == item_id
+                    )
                 )
                 if existing is not None:
                     row.matched_entry_id = existing.id
@@ -821,7 +831,7 @@ class ImportRepository:
                 # count through here; `.get` rather than `.get(..., 0)` because absent
                 # means not recorded.
                 entry = _entry_row(
-                    user_id=user_id,
+                    user_id=self.user_id,
                     item_id=item_id,
                     status="unsorted",
                     now=now,
@@ -842,6 +852,7 @@ class ImportRepository:
                 session.add(
                     ImportEffectRow(
                         batch_id=batch_id,
+                        user_id=self.user_id,
                         record_id=row.id,
                         effect_type="create",
                         entity_type="entry",
@@ -852,17 +863,24 @@ class ImportRepository:
                 )
                 for slug in payload.get("shelves", []):
                     shelf = session.scalar(
-                        select(ShelfRow).where(ShelfRow.user_id == user_id, ShelfRow.slug == slug)
+                        select(ShelfRow).where(
+                            ShelfRow.user_id == self.user_id, ShelfRow.slug == slug
+                        )
                     )
                     if shelf is None:
                         shelf = ShelfRow(
-                            user_id=user_id, name=slug, slug=slug, created_at=now, updated_at=now
+                            user_id=self.user_id,
+                            name=slug,
+                            slug=slug,
+                            created_at=now,
+                            updated_at=now,
                         )
                         session.add(shelf)
                         session.flush()
                         session.add(
                             ImportEffectRow(
                                 batch_id=batch_id,
+                                user_id=self.user_id,
                                 record_id=row.id,
                                 effect_type="create",
                                 entity_type="shelf",
@@ -876,6 +894,7 @@ class ImportRepository:
                     session.add(
                         ImportEffectRow(
                             batch_id=batch_id,
+                            user_id=self.user_id,
                             record_id=row.id,
                             effect_type="attach",
                             entity_type="entry_shelf",
@@ -903,5 +922,5 @@ class ImportRepository:
                 "batch_id": batch.id,
                 "state": "committed",
                 **counters,
-                "unsorted_entries": _count_unsorted(session, user_id),
+                "unsorted_entries": _count_unsorted(session, self.user_id),
             }
