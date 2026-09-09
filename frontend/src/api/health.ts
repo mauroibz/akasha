@@ -13,7 +13,7 @@ export interface ProviderHealth {
 
 /** Which metadata providers are configured. Search still works while degraded. */
 export async function getProviderHealth(): Promise<ProviderHealth> {
-  const response = await fetch("/api/health/providers", {
+  const response = await request("/api/health/providers", {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("Provider status is unavailable");
@@ -21,9 +21,10 @@ export async function getProviderHealth(): Promise<ProviderHealth> {
 }
 
 export async function getReadiness(): Promise<ReadyHealth> {
-  const response = await fetch("/api/health/ready", {
+  const response = await request("/api/health/ready", {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("Akasha is unavailable");
   return (await response.json()) as ReadyHealth;
 }
+import { request } from "./request";

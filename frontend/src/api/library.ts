@@ -126,7 +126,7 @@ export interface ItemType {
  * server declares instead of hardcoding one domain's vocabulary (DEC-052 seam 3).
  */
 export async function getItemTypes(): Promise<ItemType[]> {
-  const response = await fetch("/api/item-types", {
+  const response = await request("/api/item-types", {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("Item types could not be loaded");
@@ -248,7 +248,7 @@ export async function getLibraryPage(
   signal?: AbortSignal,
   limit?: number,
 ): Promise<LibraryPage> {
-  const response = await fetch(
+  const response = await request(
     `/api/entries?${libraryQueryString(filters, cursor, limit)}`,
     { headers: { Accept: "application/json" }, signal },
   );
@@ -321,7 +321,7 @@ export async function getInsights(params: {
   params.formats?.forEach((format) => query.append("format", format));
   if (params.q?.trim()) query.set("q", params.q.trim());
   if (params.after) query.set("after", params.after);
-  const response = await fetch(`/api/insights?${query.toString()}`, {
+  const response = await request(`/api/insights?${query.toString()}`, {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("Insights could not be loaded");
@@ -349,7 +349,7 @@ export async function getScoreDistribution(params: {
   params.shelves?.forEach((shelf) => query.append("shelf", shelf));
   params.formats?.forEach((format) => query.append("format", format));
   if (params.q?.trim()) query.set("q", params.q.trim());
-  const response = await fetch(`/api/insights/scores?${query.toString()}`, {
+  const response = await request(`/api/insights/scores?${query.toString()}`, {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("Insights could not be loaded");
@@ -371,7 +371,7 @@ export async function patchEntry(
     >
   > & { shelf_ids?: number[]; formats?: EntryFormat[] },
 ): Promise<LibraryEntry> {
-  const response = await fetch(`/api/entries/${entryId}`, {
+  const response = await request(`/api/entries/${entryId}`, {
     method: "PATCH",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(changes),
@@ -381,7 +381,7 @@ export async function patchEntry(
 }
 
 export async function getEntry(entryId: number): Promise<LibraryEntry> {
-  const response = await fetch(`/api/entries/${entryId}`, {
+  const response = await request(`/api/entries/${entryId}`, {
     headers: { Accept: "application/json" },
   });
   if (!response.ok) throw new Error("Detail could not be loaded");
@@ -399,7 +399,7 @@ export async function patchItem(
     metadata?: Record<string, unknown>;
   },
 ): Promise<LibraryEntry["item"]> {
-  const response = await fetch(`/api/items/${itemId}`, {
+  const response = await request(`/api/items/${itemId}`, {
     method: "PATCH",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(changes),
@@ -426,7 +426,7 @@ async function providerErrorMessage(
 export async function refreshItem(
   itemId: number,
 ): Promise<LibraryEntry["item"]> {
-  const response = await fetch(`/api/items/${itemId}/refresh`, {
+  const response = await request(`/api/items/${itemId}/refresh`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ overwrite: true }),
@@ -452,7 +452,7 @@ export async function refreshItem(
 export async function fetchProviderCover(
   itemId: number,
 ): Promise<LibraryEntry["item"]> {
-  const response = await fetch(`/api/items/${itemId}/cover/fetch`, {
+  const response = await request(`/api/items/${itemId}/cover/fetch`, {
     method: "POST",
     headers: { Accept: "application/json" },
   });
@@ -469,7 +469,7 @@ export async function replaceCover(
 ): Promise<LibraryEntry["item"]> {
   const body = new FormData();
   body.set("cover", cover);
-  const response = await fetch(`/api/items/${itemId}/cover`, {
+  const response = await request(`/api/items/${itemId}/cover`, {
     method: "POST",
     headers: { Accept: "application/json" },
     body,
@@ -497,7 +497,7 @@ export interface CoverCandidates {
 export async function fetchCoverCandidates(
   itemId: number,
 ): Promise<CoverCandidates> {
-  const response = await fetch(`/api/items/${itemId}/cover-candidates`);
+  const response = await request(`/api/items/${itemId}/cover-candidates`);
   if (!response.ok) throw new Error("Cover options could not be loaded");
   return response.json() as Promise<CoverCandidates>;
 }
@@ -506,7 +506,7 @@ export async function chooseCover(
   itemId: number,
   coverUrl: string,
 ): Promise<LibraryEntry["item"]> {
-  const response = await fetch(`/api/items/${itemId}/cover`, {
+  const response = await request(`/api/items/${itemId}/cover`, {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ cover_url: coverUrl }),
@@ -519,7 +519,7 @@ export async function chooseCover(
 }
 
 export async function deleteEntry(entryId: number): Promise<void> {
-  const response = await fetch(`/api/entries/${entryId}`, {
+  const response = await request(`/api/entries/${entryId}`, {
     method: "DELETE",
   });
   if (!response.ok) throw new Error("Entry could not be deleted");
@@ -547,7 +547,7 @@ export interface BulkBody {
 }
 
 export async function bulkUpdateEntries(body: BulkBody): Promise<number> {
-  const response = await fetch("/api/entries/bulk", {
+  const response = await request("/api/entries/bulk", {
     method: "PATCH",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -562,7 +562,7 @@ export async function acceptSuggestedStatuses(filter: {
   shelf?: string[];
   q?: string;
 }): Promise<number> {
-  const response = await fetch("/api/entries/accept-suggested", {
+  const response = await request("/api/entries/accept-suggested", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ filter }),
@@ -581,7 +581,7 @@ export interface Attachment {
 }
 
 export async function fetchAttachments(itemId: number): Promise<Attachment[]> {
-  const response = await fetch(`/api/items/${itemId}/attachments`);
+  const response = await request(`/api/items/${itemId}/attachments`);
   if (!response.ok) throw new Error("Files could not be loaded");
   const body = (await response.json()) as { attachments: Attachment[] };
   return body.attachments;
@@ -600,7 +600,7 @@ export async function uploadAttachment(
 ): Promise<Attachment> {
   const body = new FormData();
   body.set("file", file);
-  const response = await fetch(`/api/items/${itemId}/attachments`, {
+  const response = await request(`/api/items/${itemId}/attachments`, {
     method: "POST",
     headers: { Accept: "application/json" },
     body,
@@ -630,7 +630,7 @@ export async function renameAttachment(
   attachmentId: number,
   filename: string,
 ): Promise<Attachment> {
-  const response = await fetch(
+  const response = await request(
     `/api/items/${itemId}/attachments/${attachmentId}`,
     {
       method: "PATCH",
@@ -646,7 +646,7 @@ export async function deleteAttachment(
   itemId: number,
   attachmentId: number,
 ): Promise<void> {
-  const response = await fetch(
+  const response = await request(
     `/api/items/${itemId}/attachments/${attachmentId}`,
     { method: "DELETE" },
   );
@@ -657,3 +657,4 @@ export async function deleteAttachment(
 export function attachmentHref(itemId: number, attachmentId: number): string {
   return `/api/items/${itemId}/attachments/${attachmentId}`;
 }
+import { request } from "./request";

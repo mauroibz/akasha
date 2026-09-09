@@ -1,4 +1,5 @@
 import type { Shelf } from "./library";
+import { request } from "./request";
 
 export interface ShelfWithCount extends Shelf {
   entry_count: number;
@@ -31,13 +32,13 @@ async function jsonOrThrow<T>(
 }
 
 export function getShelves() {
-  return fetch("/api/shelves").then((r) =>
+  return request("/api/shelves").then((r) =>
     jsonOrThrow<ShelfWithCount[]>(r, "Shelves could not be loaded"),
   );
 }
 
 export function createShelf(name: string) {
-  return fetch("/api/shelves", {
+  return request("/api/shelves", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -45,7 +46,7 @@ export function createShelf(name: string) {
 }
 
 export function renameShelf(id: number, name: string) {
-  return fetch(`/api/shelves/${id}`, {
+  return request(`/api/shelves/${id}`, {
     method: "PATCH",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ name }),
@@ -53,7 +54,7 @@ export function renameShelf(id: number, name: string) {
 }
 
 export function deleteShelf(id: number) {
-  return fetch(`/api/shelves/${id}`, {
+  return request(`/api/shelves/${id}`, {
     method: "DELETE",
   }).then((r) => {
     if (!r.ok) throw new Error("Shelf could not be deleted");
