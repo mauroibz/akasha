@@ -55,6 +55,20 @@ export const test = base.extend<{
       await page.route("**/api/exports", (route) =>
         route.fulfill({ json: [] }),
       );
+      await page.route("**/api/entries?**", (route) =>
+        route.fulfill({
+          json: {
+            items: [],
+            next_cursor: null,
+            total: 0,
+            facets: {
+              status_counts: {},
+              status_counts_by_type: {},
+              format_counts: {},
+            },
+          },
+        }),
+      );
       await use();
     },
     { auto: true },
