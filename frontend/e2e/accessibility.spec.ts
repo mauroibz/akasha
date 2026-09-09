@@ -196,6 +196,56 @@ test("first-run setup has no serious accessibility violations", async ({
   await expectNoSeriousViolations(page, "setup");
 });
 
+test("people settings hold at 390px with no serious accessibility violations", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubAuth(page, "authenticated");
+  await page.route("**/api/users", (route) =>
+    route.fulfill({
+      json: [
+        {
+          id: 1,
+          username: "mauro",
+          display_name: "Mauro",
+          is_admin: true,
+          entry_count: 24,
+          shelf_count: 3,
+        },
+        {
+          id: 2,
+          username: "bruno",
+          display_name: "Bruno",
+          is_admin: false,
+          entry_count: 8,
+          shelf_count: 1,
+        },
+      ],
+    }),
+  );
+  await page.goto("/people");
+  await expect(
+    page.getByRole("heading", { name: "People", exact: true }).first(),
+  ).toBeVisible();
+  for (const control of [
+    page.getByLabel("Current password"),
+    page.getByLabel("New password"),
+    page.getByLabel("Username"),
+    page.getByLabel("Initial password"),
+    page.getByRole("button", { name: "Create person" }),
+  ]) {
+    expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  await expectNoSeriousViolations(page, "people settings");
+});
+
 test("library in grid view has no serious accessibility violations", async ({
   page,
 }) => {

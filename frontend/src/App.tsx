@@ -54,6 +54,9 @@ const LoginPage = lazy(async () => ({
 const SetupPage = lazy(async () => ({
   default: (await import("@/pages/SetupPage")).SetupPage,
 }));
+const PeoplePage = lazy(async () => ({
+  default: (await import("@/pages/PeoplePage")).PeoplePage,
+}));
 
 /**
  * Occupies the main region while a route chunk arrives.
@@ -120,6 +123,12 @@ function PrivateRoutes({
             <Route path="/shelves" element={<ShelvesPage />} />
             <Route path="/shelves/:slug" element={<ShelfPage />} />
             <Route path="/insights" element={<InsightsPage />} />
+            <Route
+              path="/people"
+              element={
+                user ? <PeoplePage user={user} /> : <Navigate to="/" replace />
+              }
+            />
             {/* Triage folded into Import as a tab (DEC-079). The old
                 address stays live rather than 404ing: it was a top-level
                 nav item for thirty sprints, so it is in bookmarks and in

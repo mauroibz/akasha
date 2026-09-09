@@ -12,6 +12,11 @@ export interface AuthState {
   user: AuthUser | null;
 }
 
+export interface ManagedUser extends AuthUser {
+  entry_count: number;
+  shelf_count: number;
+}
+
 export const AUTH_STATE_QUERY_KEY = ["auth", "me"] as const;
 
 export class AuthRequestError extends Error {
@@ -85,4 +90,62 @@ export async function getAuthState(): Promise<AuthState> {
     };
   }
   return authJson<AuthState>(response);
+}
+
+export function getUsers(): Promise<ManagedUser[]> {
+  return fetch("/api/users", { headers: { Accept: "application/json" } }).then(
+    authJson<ManagedUser[]>,
+  );
+}
+
+export function createUser(values: {
+  username: string;
+  display_name: string;
+  password: string;
+  is_admin: boolean;
+}): Promise<AuthUser> {
+  return fetch("/api/users", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(values),
+  }).then(authJson<AuthUser>);
+}
+
+export function updateUser(
+  id: number,
+  values: { display_name?: string; password?: string; is_admin?: boolean },
+): Promise<AuthUser> {
+  return fetch(`/api/users/${id}`, {
+    method: "PATCH",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(values),
+  }).then(authJson<AuthUser>);
+}
+
+export async function deleteUser(
+  id: number,
+  decision:
+    { action: "delete" } | { action: "transfer"; transfer_to_user_id: number },
+): Promise<void> {
+  const response = await fetch(`/api/users/${id}`, {
+    method: "DELETE",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(decision),
+  });
+  if (!response.ok) await authJson(response);
+}
+
+export async function changePassword(
+  currentPassword: string,
+  newPassword: string,
+): Promise<void> {
+  const response = await fetch("/api/auth/password", {
+    method: "PATCH",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      current_password: currentPassword,
+      new_password: newPassword,
+    }),
+  });
+  if (!response.ok) await authJson(response);
 }

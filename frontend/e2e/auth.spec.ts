@@ -2,7 +2,7 @@ import type { Locator } from "@playwright/test";
 
 import { expect, test } from "./console";
 import { stubAuth } from "./auth-fixture";
-import { entry, seedLibrary } from "./seed";
+import { bookItemType, entry, seedLibrary } from "./seed";
 
 const favorite = {
   id: 1,
@@ -155,4 +155,121 @@ test("a mid-session 401 closes an open dialog and asks for login", async ({
   await expect(page).toHaveURL(/\/login$/);
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.getByRole("status")).toContainText("Your session ended");
+});
+
+test("two people build two libraries without seeing each other's rows", async ({
+  page,
+}) => {
+  const admin = {
+    id: 1,
+    username: "admin",
+    display_name: "Mauro",
+    is_admin: true,
+  };
+  const bruno = {
+    id: 2,
+    username: "bruno",
+    display_name: "Bruno",
+    is_admin: false,
+  };
+  let current: typeof admin | typeof bruno | null = admin;
+  const people = [
+    { ...admin, entry_count: 1, shelf_count: 0 },
+    { ...bruno, entry_count: 0, shelf_count: 0 },
+  ];
+  const libraries = new Map<number, ReturnType<typeof entry>[]>([
+    [1, [entry(3)]],
+    [2, []],
+  ]);
+
+  await page.route("**/api/auth/me", (route) =>
+    route.fulfill({
+      json: {
+        auth: "on",
+        authenticated: Boolean(current),
+        setup_required: false,
+        user: current,
+      },
+    }),
+  );
+  await page.route("**/api/auth/session", async (route) => {
+    current = null;
+    await route.fulfill({ status: 204, body: "" });
+  });
+  await page.route("**/api/auth/login", async (route) => {
+    const body = route.request().postDataJSON() as {
+      username: string;
+      password: string;
+    };
+    current =
+      body.username === "bruno" && body.password === "bruno password"
+        ? bruno
+        : admin;
+    await route.fulfill({ json: current });
+  });
+  await page.route("**/api/users", async (route) => {
+    if (route.request().method() === "POST") {
+      await route.fulfill({ status: 201, json: bruno });
+      return;
+    }
+    await route.fulfill({ json: people });
+  });
+  await page.route("**/api/item-types", (route) =>
+    route.fulfill({ json: [bookItemType] }),
+  );
+  await page.route("**/api/entries**", async (route) => {
+    if (route.request().method() === "POST") {
+      const body = route.request().postDataJSON() as {
+        manual: { title: string };
+      };
+      const created = entry(20);
+      created.item.title = body.manual.title;
+      libraries.get(current!.id)!.push(created);
+      await route.fulfill({
+        status: 201,
+        json: { entry: created, already_exists: false, near_matches: [] },
+      });
+      return;
+    }
+    const items = libraries.get(current!.id)!;
+    await route.fulfill({
+      json: {
+        items,
+        next_cursor: null,
+        total: items.length,
+        facets: {
+          status_counts: { read: items.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    });
+  });
+
+  await page.goto("/");
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "Mauro" }).first().click();
+  await page.getByRole("button", { name: "People" }).click();
+  await page.getByLabel("Username").fill("bruno");
+  await page.getByLabel("Initial password").fill("bruno password");
+  await page.getByRole("button", { name: "Create person" }).click();
+  await page.getByRole("button", { name: "Mauro" }).first().click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  await page.getByLabel("Username").fill("bruno");
+  await page.getByLabel("Password").fill("bruno password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.goto("/");
+
+  await expect(
+    page.getByRole("heading", { name: "Your library is waiting" }),
+  ).toBeVisible();
+  await expect(page.getByText("Seeded book 0003")).toHaveCount(0);
+  await page.goto("/add");
+  await page.getByLabel("Title", { exact: true }).fill("Ficciones");
+  await page.getByRole("button", { name: "Add to library" }).click();
+  await expect(page.getByRole("heading", { name: "Ficciones" })).toBeVisible();
+  await expect(page.getByText("Seeded book 0003")).toHaveCount(0);
 });

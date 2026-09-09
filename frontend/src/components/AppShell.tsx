@@ -4,6 +4,7 @@ import {
   LibraryBig,
   LogOut,
   Plus,
+  Settings,
   Upload,
   UserRound,
 } from "lucide-react";
@@ -88,6 +89,14 @@ function AccountControl({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-44 p-2">
+        <Button
+          variant="ghost"
+          className="min-h-11 w-full justify-start gap-2"
+          onClick={() => void navigate("/people")}
+        >
+          <Settings className="h-4 w-4" aria-hidden="true" />
+          {user.is_admin ? "People" : "Settings"}
+        </Button>
         <Button
           variant="ghost"
           className="min-h-11 w-full justify-start gap-2"
