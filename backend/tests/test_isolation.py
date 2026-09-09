@@ -382,6 +382,32 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
             )
             assert second_preview.status_code == 201, second_preview.text
             assert second_preview.json()["batch_id"] != admin_preview.json()["batch_id"]
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        expires = (datetime.now(UTC) + timedelta(hours=1)).isoformat().replace("+00:00", "Z")
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE import_batches SET state='committed',committed_at=:now,"
+                    "undo_expires_at=:expires WHERE id IN (:admin,:second)"
+                ),
+                {
+                    "now": now,
+                    "expires": expires,
+                    "admin": admin_preview.json()["batch_id"],
+                    "second": second_preview.json()["batch_id"],
+                },
+            )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as admin:
+            await admin.post(
+                "/api/auth/login", json={"username": "admin", "password": ADMIN_PASSWORD}
+            )
+            assert (
+                await admin.delete(f"/api/import/batches/{second_preview.json()['batch_id']}")
+            ).status_code == 404
+            own_undo = await admin.delete(f"/api/import/batches/{admin_preview.json()['batch_id']}")
+            assert own_undo.status_code == 200, own_undo.text
         with app.state.engine.connect() as connection:
             assert connection.execute(
                 text(
@@ -390,3 +416,10 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
                 ),
                 {"fingerprint": admin_preview.json()["fingerprint"]},
             ).scalars().all() == [1, 2]
+            assert (
+                connection.execute(
+                    text("SELECT state FROM import_batches WHERE id=:batch"),
+                    {"batch": second_preview.json()["batch_id"]},
+                ).scalar_one()
+                == "committed"
+            )
