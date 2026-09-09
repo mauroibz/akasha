@@ -7,6 +7,7 @@ seeded user — and these tests pin that the constant names the migration's own
 row, not an invention.
 """
 
+import re
 from pathlib import Path
 
 import pytest
@@ -75,3 +76,26 @@ async def test_resolver_names_the_migrations_own_row(tmp_path: Path) -> None:
             ).one()
     assert row.username == "admin"
     assert bool(row.is_admin) is True
+
+
+def test_no_hardcoded_user_outside_the_resolver() -> None:
+    """Deliberately crude (the sprint's own word): grep every backend source
+    file for the three shapes a hardcoded user wears. `api/identity.py` is the
+    one file allowed to say `user_id=1`, because it is the one place allowed
+    to decide who a request belongs to. Anything else means the pattern came
+    back through a site the resolver never passes."""
+    src_root = Path(__file__).resolve().parent.parent / "src" / "book_tracker"
+    resolver_file = (src_root / "api" / "identity.py").resolve()
+    pattern = re.compile(r"\buser_id\b\s*(?::\s*int\s*)?=\s*1\b|\buser_id\b\s*==\s*1\b")
+
+    offenders: list[str] = []
+    for py in sorted(src_root.rglob("*.py")):
+        if py.resolve() == resolver_file:
+            continue
+        for lineno, line in enumerate(py.read_text(encoding="utf-8").splitlines(), 1):
+            if pattern.search(line):
+                offenders.append(f"{py.relative_to(src_root)}:{lineno}: {line.strip()}")
+
+    assert not offenders, "\n".join(
+        ["a hardcoded user reappeared outside api/identity.py:"] + offenders
+    )
