@@ -1,6 +1,6 @@
 # Sprint 078 — The way in
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 077
 **Roadmap revision:** 40
 

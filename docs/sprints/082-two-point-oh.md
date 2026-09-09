@@ -11,7 +11,8 @@
 
 Close the plan and ship it. Every document that says Akasha has no authentication is rewritten to
 say what is now true, the exposure rule becomes narrower rather than deleted, the container smoke
-test covers both modes, and the version surfaces read `2.0.0` together.
+test's existing both-mode coverage is reconfirmed against the release image, and the version
+surfaces read `2.0.0` together.
 
 ## Required context
 
@@ -30,8 +31,8 @@ test covers both modes, and the version surfaces read `2.0.0` together.
   - `docs/operations/publishing-images.md` — the release procedure.
   - `README.md`, `.env.example` line 1, `compose.yaml`'s warning comment, `SECURITY.md`.
   - `docs/sprints/ROADMAP.md` — the "Not scheduled" entries for auth and multiuser.
-- `scripts/smoke_container.sh` — AC4 and the version comparison DEC-145 rebuilt; the both-modes
-  coverage is added beside it.
+- `scripts/smoke_container.sh` — AC4 and the version comparison DEC-145 rebuilt; Sprint 077's
+  both-mode login/restart/logout coverage is the baseline to audit and rerun.
 - `scripts/validate_project.py` — `FINAL_SPRINT`, and the place DEC-145 said a cheap
   version-surface check belongs.
 
@@ -39,7 +40,8 @@ test covers both modes, and the version surfaces read `2.0.0` together.
 
 To be re-read at activation. Expected: everything in §2 of the proposal built and passing;
 `AKASHA_AUTH` defaulting to `off`; documentation across at least nine files still telling a reader
-there is no authentication and must never be exposed.
+there is no authentication and must never be exposed. Sprint 077 already extended the container
+smoke gate across auth off and auth on because that was required to prove its shipped boundary.
 
 ## Deliverables
 
@@ -62,9 +64,10 @@ there is no authentication and must never be exposed.
    operator at 1am, which is the standard the existing runbook already sets.
 5. **`.env.example` carries every new setting** with its default and, for the trusted-proxy
    header, the warning beside the setting rather than in a document.
-6. **The smoke test covers both modes.** `scripts/smoke_container.sh` runs its existing assertions
-   with `AKASHA_AUTH=off`, then repeats the core ones with `AKASHA_AUTH=on` — refused before
-   login, permitted after, refused after logout — proving the shipped image works both ways.
+6. **The existing both-mode smoke test is a release gate.** Audit Sprint 077's
+   `scripts/smoke_container.sh` coverage against the final user/session surface, extend it only
+   where the later sprints require it, and rerun: `AKASHA_AUTH=off`, refusal before auth-on login,
+   permission after login, survival across restart, and refusal after logout.
 7. **The cheap version check DEC-145 asked for.** `scripts/validate_project.py` compares
    `backend/pyproject.toml`, `frontend/package.json`, `main.py`'s FastAPI `version=` and
    `frontend/openapi.json` and fails when they disagree, so `make check` catches in one second
@@ -139,7 +142,7 @@ there is no authentication and must never be exposed.
 1. `[DOCS] Say what the exposure rule is now, everywhere it is written`
 2. `[DOCS] Describe auth and multiuser in both specs`
 3. `[DOCS] Teach the runbook how to turn auth on`
-4. `[BUILD] Smoke-test the image in both modes`
+4. `[BUILD] Reconfirm both-mode smoke coverage against the release image`
 5. `[BUILD] Fail make check when the version surfaces disagree`
 6. `[DOCS] Release notes for v2.0.0`
 

@@ -5154,3 +5154,38 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Next: Sprint 077 (A password and a session) is `ready` — claim it with
   `python scripts/sync_sprint_state.py --sprint 077 in_progress`; it turns `current_user`'s
   body into a session lookup and lifts `AKASHA_AUTH=on`.
+
+## 2026-09-09 — Sprint 077 closed: a password and a session (DEC-150)
+
+- Done: executed Sprint 077 end to end. Added parameter-carrying stdlib-scrypt credentials;
+  opaque revocable database sessions; login, logout, `me` and one-time setup routes;
+  request-boundary 401/409 enforcement; seeded-user claiming; scheme/trusted-peer-aware cookie
+  security; a per-username/per-peer in-process limiter; optional environment bootstrap; explicit
+  Compose and `.env.example` settings; technical-spec and OpenAPI contracts; and both-mode
+  container smoke coverage. Four implementation commits: `c6c539f`, `e833499`, `3d6bd98`,
+  `040dedb`.
+- Previous-sprint validation: migration/foundation/ownership/scoping tests passed 73 tests before
+  the known sandbox TestClient futex stall; the affected remainder was rerun outside the sandbox
+  with 146 passing. The final full suite independently revalidated Sprints 075 and 076.
+- Verified and how: focused auth/settings/security/password/session tests 34 passed; auth/library
+  regressions 59 passed; `make check` green (formatters, Ruff, ESLint, mypy on 71 files,
+  TypeScript, OpenAPI producer/consumer, validator); `make test` 1,421 backend and 305 frontend
+  tests passed; Playwright 128 passed / 2 config-skipped; OpenAPI export and consumer check green;
+  container smoke green in both modes, including auth-on login, restart persistence and logout.
+- DEC-025 walkthrough: a realistic pre-existing Rayuela row was refused with `setup_required`,
+  then immediately visible after setup claimed user id 1; logout returned it to 401; login plus a
+  container restart preserved access through the stored session. Cleanup used fixed, explicit
+  container/volume/file names only; read-only inventory afterwards found no walkthrough residue.
+- Password cost evidence: Ryzen 5 7600X native median/p95 24.1/29.3 ms (20 samples); container
+  constrained to 0.25 CPU median/p95/max 101.5/106.9/178.7 ms (40 samples). This is a conservative
+  small-server proxy, not an actual ZimaBoard measurement; DEC-150 records the limitation.
+- Deviations: the planned six commits became four coherent slices because auth routes, setup and
+  cookie enforcement shared one request boundary. Sprint 082's smoke deliverable now audits and
+  reruns the coverage Sprint 077 already had to introduce. A first manual walkthrough command was
+  interrupted; exact read-only inventory found no residue, and the successful rerun used no
+  recursive filesystem deletion. One OpenAPI consumer check was first invoked from the backend
+  directory and failed with npm's expected missing-package error; it passed immediately from
+  `frontend/`. No product scope was dropped.
+- Next: Sprint 078 (The way in) is `ready`. It adds the login/setup UI, shared frontend 401/409
+  handling, return-to-destination behavior and the shell account control against the contracts
+  completed here.

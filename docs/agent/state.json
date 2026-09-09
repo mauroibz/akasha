@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "in_progress",
-  "active_sprint": "077",
-  "active_sprint_file": "docs/sprints/077-a-password-and-a-session.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "076",
+  "project_status": "ready",
+  "active_sprint": "078",
+  "active_sprint_file": "docs/sprints/078-the-way-in.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "077",
   "completed_sprints": [
     "001",
     "002",
@@ -82,8 +82,9 @@
     "073",
     "074",
     "075",
-    "076"
+    "076",
+    "077"
   ],
-  "started_at": "2026-09-08T22:56:59-03:00",
-  "updated_at": "2026-09-08T22:56:59-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-08T23:58:31-03:00"
 }

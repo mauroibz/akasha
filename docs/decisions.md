@@ -6096,3 +6096,43 @@ only the file-Status flip and state regeneration.
   moves. Sprints 078–081 read `effective_user_id` and inherit impersonation for free. The guard
   test (`test_no_hardcoded_user_outside_the_resolver`) is now the standing witness that the
   single-user assumption never comes back through a constructor default.
+
+## DEC-150 — Sprint 077 puts authentication at the request boundary and claims the seeded user
+
+- **Date:** 2026-09-09
+- **Status:** accepted
+- **Cross-references:** DEC-025 (walkthroughs), DEC-146 (accepted auth plan), DEC-147 (identity
+  schema), DEC-149 (the `Principal` seam).
+- **Context:** Sprint 077 had to add authentication without making cached-page rendering consult
+  a provider, without breaking the existing unauthenticated deployment, and without reassigning
+  the rows Sprint 075 already attached to the seeded user. It also had to leave deliberate seams
+  for the UI, user administration, impersonation and trusted-header work that follows.
+- **Decision.**
+  - Authentication is enforced once in HTTP middleware. Health routes, the SPA shell, and the
+    setup probes have explicit exceptions; downstream routes continue to receive a `Principal`
+    and remain unaware of cookies. Auth routes stay in the generated OpenAPI contract but return
+    `404` at runtime while `AKASHA_AUTH=off`.
+  - First-run setup atomically adds credentials and the admin flag to seeded user id 1 rather
+    than inserting a replacement. Its existing entries and other owned rows therefore remain
+    attached through their original foreign keys.
+  - A session carries 256 bits from `secrets.token_urlsafe(32)` while SQLite stores only its
+    SHA-256 digest. It has a fixed 400-day expiry and records `last_seen_at` on lookup; sliding
+    expiry and batched refreshes remain Sprint 081's work.
+  - Cookie security follows the direct request scheme unless explicitly overridden.
+    `X-Forwarded-Proto` is accepted only when the immediate peer matches a configured IP address
+    or CIDR. That peer-matching helper is the one Sprint 081 must reuse for trusted identity
+    headers.
+  - The in-process fixed-window limiter tracks normalized username and immediate peer. A locked
+    username is rejected before another scrypt calculation, while a correct password for a
+    different username can still succeed. State intentionally resets with the process.
+  - Passwords use stdlib scrypt with parameters embedded in the stored digest: `n=16384`, `r=8`,
+    `p=1`, a 16-byte random salt and a 32-byte result. On the available Ryzen 5 7600X, 20 native
+    samples measured 24.1 ms median and 29.3 ms p95; a 40-sample container constrained to 0.25
+    CPU measured 101.5 ms median and 106.9 ms p95 (178.7 ms max). The constrained run is a
+    conservative small-server proxy, not a measurement on the owner's ZimaBoard. No password
+    dependency was added.
+- **Consequences.** Sprint 078 can build login and setup screens against stable `/api/auth/*`
+  responses without changing the gate. Sprint 079 creates users using the same password module;
+  Sprint 080 continues to consume `Principal.effective_user_id`; Sprint 081 owns session sliding
+  and extends the exact trusted-peer check; Sprint 082 reruns the both-mode container flow that
+  Sprint 077 introduced. The existing no-auth installation remains the default and unchanged.

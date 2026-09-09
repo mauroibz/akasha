@@ -1,6 +1,6 @@
 # Sprint 077 — A password and a session
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 076
 **Roadmap revision:** 40
 
@@ -176,5 +176,85 @@ nullable credentials on the seeded user; one resolver answers every request with
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-09-09.
+
+### Delivered
+
+1. `AKASHA_AUTH=off` remains the default and preserves the previous route behavior; the four
+   auth routes are present in the contract but return `404` at runtime in this mode.
+2. Login verifies a stdlib-scrypt digest, creates a database-backed session, and sets an opaque
+   cookie; wrong credentials return the shared `401 unauthenticated` body without a cookie.
+3. Missing, unknown, expired and orphaned session cookies all produce the same 401 response, and
+   session misses and expirations both perform a constant-time digest comparison.
+4. Logout deletes only the presented session, clears its cookie and makes that cookie unusable.
+5. Before credentials exist, middleware returns `409 setup_required` except for health, `me`,
+   setup and the SPA shell. Setup atomically turns seeded user id 1 into the admin, preserving all
+   rows it already owns, and logs that user in.
+6. A second setup attempt returns 409 and cannot add or overwrite credentials.
+7. Cookies are `HttpOnly`, `SameSite=Lax`, `Path=/`, and fixed at 400 days. `Secure` follows the
+   trusted request scheme, supports an explicit override in both directions, and ignores an
+   untrusted `X-Forwarded-Proto`.
+8. Password, token and cookie fields are redacted; captured-log, response, error and generated
+   OpenAPI assertions prove the submitted password is absent.
+9. A configurable in-process fixed-window limiter covers normalized username and peer, refuses
+   repeated failures, recovers after the window, and does not block a correct login for another
+   username.
+10. Anonymous GETs still receive the SPA shell, leaving Sprint 078 a place to render setup and
+    login screens.
+
+The environment bootstrap accepts the optional paired `AKASHA_ADMIN_USERNAME` and
+`AKASHA_ADMIN_PASSWORD`, creates credentials only when none exist, and is documented with the
+plaintext-file warning. Compose passes the auth settings explicitly. The OpenAPI producer and
+checked-in frontend contract now publish the auth routes and 401/409 response shapes. The
+container smoke script now exercises auth off plus anonymous refusal, login, persistence through
+restart, and logout in auth-on mode.
+
+### Verification
+
+- Predecessor validation: the Sprint 075/076 migration, identity, ownership and scoping suites
+  passed (73 tests before the repository-documented sandbox TestClient stall; the affected suite
+  was rerun outside the sandbox with 146 passing). The final full gate independently covered all
+  of them again.
+- TDD/focused: password and session tests first failed because their modules did not exist; the
+  final auth/settings/security/password/session selection passed 34 tests, and the auth/library
+  regression selection passed 59 tests.
+- `make check`: passed formatting, Ruff, ESLint, mypy across 71 source files, TypeScript, OpenAPI
+  producer/consumer checks and project validation.
+- `make test`: passed 1,421 backend tests (three known duplicate-zip warnings, 89% total coverage)
+  and 305 frontend tests in 27 files.
+- `npm run test:e2e`: 128 passed and two configuration-dependent tests skipped.
+- `make smoke-container`: passed the existing deployment checks and the new auth-on round trip,
+  including persistence across container restart.
+- `python scripts/export_openapi.py` and `npm run api:check`: passed; `frontend/openapi.json` is
+  current.
+- DEC-025 walkthrough: a realistic pre-existing Rayuela entry was gated before setup, became
+  visible to the claimed admin, was refused after logout, and remained visible to the same
+  session after a container restart. The throwaway container and volume were removed by exact
+  names and a read-only inventory confirmed no residue.
+- Scrypt timing: 20 native samples measured 24.1 ms median / 29.3 ms p95; 40 samples in a
+  container limited to 0.25 CPU measured 101.5 ms median / 106.9 ms p95 / 178.7 ms max.
+
+### Commits and decisions
+
+- `c6c539f` `[ADD] Hash a password with the standard library`
+- `e833499` `[ADD] Hold a login in a revocable session`
+- `3d6bd98` `[ADD] Let a request log in, log out, and say who it is`
+- `040dedb` `[MOD] Enforce the authentication boundary in deployment`
+- DEC-150 records the request-boundary gate, seeded-user claim, fixed session expiry, trusted-peer
+  seam, rate-limit scope and measured scrypt parameters.
+
+The planned six implementation checkpoints collapsed into four coherent commits because the
+route, setup and cookie behaviors shared one request boundary and were safest to gate together.
+No product scope was dropped. Actual ZimaBoard hardware was unavailable, so the constrained
+0.25-CPU container is recorded as a conservative proxy rather than misrepresented as target
+hardware evidence.
+
+### Future-sprint impact
+
+- Sprint 078 can consume the stable `me`, setup, login, logout and shared error contracts.
+- Sprint 079 must reuse the password module when an admin creates users.
+- Sprint 080 needs no resolver or service-signature change; it continues through
+  `Principal.effective_user_id`.
+- Sprint 081 owns sliding/batched session refresh and must reuse the trusted-peer helper.
+- Sprint 082 now audits and reruns the both-mode smoke path introduced here rather than creating
+  its first auth smoke coverage.

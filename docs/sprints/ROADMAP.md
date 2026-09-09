@@ -1623,7 +1623,8 @@ refactor into a rewrite of the gate. It also keeps the owner's "easy deployments
   sessions, see-and-revoke-your-sessions, and the mobile pass.
 - **[082 — Two point oh](082-two-point-oh.md)** — the exposure rule rewritten narrower rather
   than deleted across nine files, both specs made canonical, a runbook section that is followed
-  rather than reviewed, the smoke test covering both modes, and `2.0.0`.
+  rather than reviewed, Sprint 077's both-mode smoke gate reconfirmed against the release image,
+  and `2.0.0`.
 
 Explicitly outside it, and still deferred after 2.0: sharing and public links, Calibre write-back,
 OPDS, passkeys, OIDC, email of any kind, and per-user settings. See the proposal's §4.
