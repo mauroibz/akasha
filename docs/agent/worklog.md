@@ -5212,3 +5212,46 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - No dependencies, backend contracts, generated files, runtime data, external services, or owner
   environment were changed. The only dirty file at handoff is the intentional untracked RED test
   above; preserve it.
+
+## 2026-09-09 — Sprint 078 implementation complete; real-device gate remains
+
+- Done: completed the Sprint 078 implementation in five commits after the earlier two slices.
+  `59fed62` adds the cached authentication coordinator, outside-shell gating, safe router-state
+  return destination and centralized refusal transition; `969e55f` adds first-run setup and
+  existing-library claim; `c10a3e2` adds the responsive account control and sign-out;
+  `71dc706` preserves the first requested destination when concurrent refusals arrive; and
+  `afea4fb` adds auth-on browser flows plus login/setup accessibility coverage. The shared
+  auth-off e2e fixture keeps the pre-existing suite unaware of accounts. No password or session
+  token is stored in router state or browser storage.
+- TDD evidence: the inherited `App.test.tsx` failed because `AppContent` did not exist before the
+  coordinator was implemented; setup first failed with the page module missing; and the shell
+  account test first failed with no account control. Focused component/unit tests then passed,
+  including a second refusal after login is already visible so it cannot replace the original
+  destination.
+- Verified and how after the implementation froze: `make check` passed (formatters, Ruff, ESLint,
+  mypy on 71 files, TypeScript, OpenAPI producer/consumer and project validation); the exact
+  `make test` gate passed outside the filesystem sandbox with 1,421 backend and 318 frontend tests;
+  `npx playwright test` passed 134 with two configuration-dependent skips; and `npm run build`
+  passed. Login and setup remained separate lazy chunks; the entry chunk was 88.10 kB (26.25 kB
+  gzip), below DEC-037's 300 kB warning budget. A sandbox-only FastAPI TestClient futex stall and
+  Playwright loopback `EPERM` were environment failures; both exact commands passed when rerun
+  outside that sandbox.
+- Walkthrough evidence available here: built the current source into a disposable isolated
+  container, seeded a realistic pre-existing *Rayuela*, enabled authentication, and drove the
+  complete 390 px setup/sign-out/sign-in flow against the real static frontend and backend. The
+  claimed library was visible immediately. The same browser session survived an actual container
+  restart and still opened the library without another login. The exercised flow took four taps,
+  excluding typing. Its Playwright scratchpad passed 1 test in 9.7 seconds. The exact temporary
+  container, two named volumes and image were removed afterwards; read-only inventory showed no
+  residue, and the owner's standing development stack was never touched.
+- Blocker: Sprint 078 remains `in_progress`. This environment cannot truthfully verify acceptance
+  criterion 3 or the final walkthrough requirement: on a real phone over the owner's tailnet,
+  Chrome and Firefox must each offer to save and later fill the password, and the same session must
+  open the application the next morning without another login. Those observations require the
+  owner's device, browser password stores, tailnet and elapsed overnight time. No required product
+  check failed; the sprint must not close until this manual evidence is supplied.
+- Next: Mauro performs and reports that real-device walkthrough (including browser names, save/fill
+  observations, next-morning persistence and tap count). If it passes, update the Sprint 078
+  Outcome, run documentation-only closure checks, atomically complete 078 and ready 079, then
+  commit `[DOCS] Close sprint 078 and hand off`. If it exposes a defect, resume TDD without
+  advancing the sprint.

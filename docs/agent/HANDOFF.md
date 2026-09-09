@@ -1,89 +1,53 @@
-# Handoff — Sprint 078 in progress at the authentication-router RED
+# Handoff — Sprint 078 awaits its real-phone walkthrough
 
 `docs/agent/state.json` reads `project_status: "in_progress"`, `active_sprint: "078"`,
 `active_sprint_file: "docs/sprints/078-the-way-in.md"`, `active_sprint_status: "in_progress"`,
-`last_completed_sprint: "077"`, and `plan_revision: 40`. Completed sprints run 001–077;
-`FINAL_SPRINT` remains 82.
+`last_completed_sprint: "077"`, and `plan_revision: 40`. Keep it there: implementation and
+automated verification are complete, but the sprint's only non-automatable acceptance criterion
+has not been observed on the owner's device.
 
-Read Sprint 077's `Outcome` and DEC-150 before implementing 078. DEC-146 is the accepted plan;
-DEC-136/137, DEC-026, DEC-028 and DEC-037 govern the new screen work.
+## Delivered and committed
 
-## Completed Sprint 078 slices
+- `12d5f82`: shared typed refusal handling across all six frontend API modules.
+- `230464b`: standalone login form and password-manager HTML contract.
+- `59fed62`: cached `/me` coordinator, outside-shell auth routes, safe return destination and
+  mid-session refusal handling.
+- `969e55f`: first-run setup that claims and immediately reveals the existing library.
+- `c10a3e2`: desktop/mobile-header account control and sign-out with private-cache clearing.
+- `71dc706`: concurrent refusals cannot overwrite the first requested destination.
+- `afea4fb`: auth-on end-to-end flows, 390 px/keyboard/44 px coverage and login/setup axe checks.
 
-- `12d5f82 [ADD] Handle a refused request in one place`: `frontend/src/api/request.ts` recognizes
-  only 401 and `409 setup_required`, emits one typed browser event, and throws typed errors. All
-  calls in `add.ts`, `exports.ts`, `health.ts`, `imports.ts`, `library.ts` and `shelves.ts` use it;
-  ordinary/domain-specific responses and abort signals remain untouched. Focused API tests: 14
-  passed; TypeScript passed.
-- `230464b [ADD] A screen to sign in on`: `api/auth.ts` calls login without the global refusal
-  wrapper (a bad password belongs on the form), `AuthFrame.tsx` uses the existing mark/tokens/panel,
-  and `LoginPage.tsx` implements the password-manager contract, wrong-password focus recovery,
-  and safe internal return-to state. Focused login tests: 3 passed.
+Auth-off stays invisible through the default e2e fixture. Login and setup are lazy chunks outside
+`AppShell`. Passwords remain local form state; session credentials remain only in the HttpOnly
+cookie. No backend or OpenAPI contract changed. Review the final worklog entry for TDD detail and
+the complete verification evidence.
 
-## Exact RED resume point
+## Green gates
 
-The worktree has one intentional untracked file: `frontend/src/App.test.tsx`. Preserve it. Its three
-tests specify:
+- `make check`: passed.
+- `make test`: 1,421 backend and 318 frontend tests passed outside the filesystem sandbox. The
+  sandbox run showed its known FastAPI TestClient futex stall, not a test failure.
+- `npx playwright test`: 134 passed, 2 configuration-dependent skips outside the sandbox. The
+  sandbox cannot connect to its loopback webserver (`EPERM`).
+- `npm run build`: passed; entry chunk 88.10 kB / 26.25 kB gzip, with separate login/setup chunks.
+- Disposable-container walkthrough at 390 px: setup claimed a seeded *Rayuela*, sign-out/sign-in
+  worked, and the same browser session survived a real container restart. Four taps excluding
+  typing; scratchpad Playwright result 1 passed. All exact disposable container/image/volumes were
+  removed, and read-only inventory showed no residue.
 
-1. an anonymous auth-on request for `/shelves/favorites` sees login without `AppShell`;
-2. auth-off `/login` returns to the ordinary library with no account surface;
-3. a mid-session `AUTH_REQUIRED_EVENT` unmounts the shelf, shows the interruption sentence, and
-   returns to that shelf after successful login.
+## Exact blocker and next action
 
-`npm test -- --run src/App.test.tsx` is RED because current `App.tsx` has no exported
-`AppContent`; `npm run typecheck` reports that same missing export. Implement the cached
-`GET /api/auth/me` state in `api/auth.ts`, then restructure `App.tsx` so `App` supplies
-QueryClient/BrowserRouter and exported `AppContent` owns gating plus the single event listener.
-Clear private query/mutation cache at logout/refusal so browser back cannot reveal prior library
-data. Keep return destinations as validated local router state—never a query parameter.
+The required walkthrough must still be performed on a real phone over Mauro's tailnet. In Chrome
+and Firefox, confirm that the browser offers to save the password after successful login and to
+fill it on the next visit. Leave that signed-in session overnight, then confirm the application
+opens the next morning without another login. Record the browser names, save/fill observations,
+next-morning result and total tap count.
 
-## Sprint 077 authentication contract underneath it
+If all observations pass, no product gate needs rerunning unless code/tests/configuration change:
+update Sprint 078's Outcome, atomically mark 078 completed and 079 ready, append the closure
+worklog/handoff, run `python scripts/validate_project.py` and `git diff --check`, and commit
+`[DOCS] Close sprint 078 and hand off`. If the manual walkthrough finds a defect, resume TDD and
+rerun every invalidated gate. Do not advance the sprint based on the disposable-container proxy.
 
-- `AKASHA_AUTH=off` remains the default. Existing routes behave as before; `/api/auth/login`,
-  `/session`, `/me` and `/setup` return 404 at runtime, although all four stay in OpenAPI.
-- With auth on and no credentialed user, all application/API routes return the shared
-  `409 setup_required` body except health, `GET /api/auth/me`, `POST /api/auth/setup` and the SPA
-  shell. Setup updates seeded user id 1 in place, preserves its library, sets the cookie and
-  returns `{id, username, display_name, is_admin}`.
-- With credentials present, a non-auth API request without a valid `akasha_session` cookie returns
-  `401 unauthenticated`. `POST /api/auth/login` returns the same public user object and sets the
-  cookie; `DELETE /api/auth/session` returns 204 and clears it.
-- `GET /api/auth/me` is always safe before login in auth-on mode and returns
-  `{auth: "on", authenticated, setup_required, user}`. An anonymous response has `user: null`.
-- Error bodies keep the existing shape:
-  `{ "error": { "code": "...", "message": "...", "details": {} } }`.
-  Bad login is `unauthenticated`; repeated failures can be `login_rate_limited`; repeat setup is
-  `setup_already_completed`.
-- The cookie is HttpOnly, SameSite=Lax, Path=/, fixed at 400 days, and Secure only when the trusted
-  request scheme or explicit setting says so. The browser stores no session token elsewhere.
-- The SPA shell remains anonymous by design. FastAPI's OpenAPI/docs routes are API surfaces and
-  are gated, not mistaken for shell paths.
-
-## Remaining Sprint 078 work
-
-- Add the setup API/page after a focused RED: username, display name, new-password autocomplete,
-  claim-library sentence, and direct authenticated return to the requested address.
-- Add the cached session identity and header account control/sign-out. It belongs in the mobile
-  header, never as a sixth bottom-nav item.
-- Keep `/login` and `/setup` outside `AppShell`. Auth-off must remain invisible, and the default
-  e2e fixture must stub `/api/auth/me` as auth-off; opt the new auth spec into auth-on without
-  adding login steps to the existing suite.
-- Add `auth.spec.ts`, login/setup axe cases, 390px/44px/keyboard assertions and the real
-  phone/password-manager walkthrough. Then run `make check`, `make test`, full Playwright,
-  `npm run build`, and project validation once the implementation freezes.
-- The checked-in OpenAPI contract should not need to change.
-- `Principal.effective_user_id` remains the downstream identity seam. Do not push cookies,
-  session ids or auth-mode branches into services or domain repositories.
-- Session expiry is intentionally fixed even though lookup refreshes `last_seen_at`; Sprint 081
-  owns sliding/batched refresh. `peer_is_trusted` in `api/auth.py` is also Sprint 081's required
-  allowlist seam.
-
-## Baseline and environment
-
-Sprint 077 closed green at 1,421 backend tests, 305 frontend tests, Playwright 128 passed / two
-configuration skips, and a both-mode container smoke/walkthrough. This interrupted Sprint 078
-session ran only the focused evidence recorded above; exhaustive gates have not begun.
-
-The owner's standing dev stack (`akasha-akasha-1`) still runs its pre-sprint image on port 8000;
-do not stop it or treat it as this branch. No container, account, key, paid service, runtime data,
-or irreversible owner decision was created in this session.
+The owner's standing development stack (`akasha-akasha-1`) was never stopped or changed. No
+account, key, paid service, runtime data or irreversible owner decision was created.
