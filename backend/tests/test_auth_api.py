@@ -95,6 +95,7 @@ async def test_login_sets_cookie_and_wrong_password_does_not(tmp_path: Path) -> 
             assert wrong.status_code == 401
             assert wrong.json() == UNAUTHENTICATED
             assert COOKIE_NAME not in wrong.cookies
+            assert (await client.get("/openapi.json")).json() == UNAUTHENTICATED
 
             login = await client.post(
                 "/api/auth/login", json={"username": " MAURO ", "password": PASSWORD}
@@ -179,6 +180,7 @@ async def test_setup_gates_api_then_claims_the_existing_library(tmp_path: Path) 
                 ("post", "/api/auth/login"),
                 ("delete", "/api/auth/session"),
                 ("get", "/api/not-a-route"),
+                ("get", "/openapi.json"),
             ):
                 response = await getattr(client, method)(path)
                 assert response.status_code == 409, (method, path, response.text)

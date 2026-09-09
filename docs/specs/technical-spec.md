@@ -99,6 +99,13 @@ Environment variables:
 | `TZ` | no | `UTC` | display/default local timezone; stored dates remain ISO |
 | `LOG_LEVEL` | no | `INFO` | structured application log threshold |
 | `AKASHA_ATTACHMENT_MAX_BYTES` | no | `26214400` | per-file cap on attachments; bounds the worst file, not the total |
+| `AKASHA_AUTH` | no | `off` | `off` keeps the implicit seeded user; `on` requires a session for API access |
+| `AKASHA_COOKIE_SECURE` | no | derived | force the session cookie's `Secure` flag; otherwise it follows the trusted request scheme |
+| `AKASHA_TRUSTED_PROXY_PEERS` | no | `[]` | IP addresses/CIDRs allowed to supply `X-Forwarded-Proto`; JSON list |
+| `AKASHA_LOGIN_MAX_FAILURES` | no | `5` | failed logins admitted per username and peer within the fixed window |
+| `AKASHA_LOGIN_WINDOW_SECONDS` | no | `300` | in-process failed-login window; resets on process restart |
+| `AKASHA_ADMIN_USERNAME` | no | empty | paired with `AKASHA_ADMIN_PASSWORD` to bootstrap the first admin at startup |
+| `AKASHA_ADMIN_PASSWORD` | no | empty | optional first-admin secret; plaintext environment/file exposure is the operator's trade-off |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -144,7 +151,7 @@ A merged search candidate can retain both Open Library and Google Books identiti
 
 - `id` integer primary key, seeded with exactly one row (id 1, admin, null credentials) by migration `0017` — the designated owner of every row that said `user_id = 1` by convention until then (DEC-146)
 - `username` required text, unique, stored normalized (stripped and casefolded); `display_name` an optional typed form kept alongside when it differs
-- `password_hash` and `password_salt` required-nullable text: the seeded user has no credential until the Sprint 077 setup screen gives it one, and a `NOT NULL` column would have had to invent one
+- `password_hash` and `password_salt` required-nullable text: the seeded user has no credential until `POST /api/auth/setup` or the paired bootstrap environment variables give it one. The hash is stdlib scrypt with its `n`/`r`/`p`/`dklen` parameters encoded beside the digest and a fresh random salt per user; comparison is constant-time
 - `is_admin` required integer (SQLite has no boolean type; flags throughout the schema are spelled this way)
 - `created_at`, `updated_at` required
 - `ON DELETE` behavior for everything pointing at this table is stated per table below, not defaulted
@@ -156,7 +163,7 @@ A merged search candidate can retain both Open Library and Google Books identiti
 - `token_hash` required unique text: the server stores only the hash of the session token, never the token itself
 - `created_at`, `last_seen_at`, `expires_at` required; `user_agent` nullable
 - indexed on `token_hash` (via the unique constraint, the per-request login check) and on `(user_id, expires_at)` (the expiry sweep)
-- created by migration `0017`, first written in Sprint 077
+- created by migration `0017`, first written in Sprint 077. The browser holds a 32-byte URL-safe random token; only its SHA-256 reaches this table. Sessions expire 400 days after creation in this sprint; use refreshes `last_seen_at`, while Sprint 081 owns sliding the expiry and batching that write
 
 Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps; `sessions` keeps `last_seen_at` and `expires_at` in `updated_at`'s place.
 
@@ -598,6 +605,16 @@ Never expose tracebacks, host filesystem paths, provider keys, or raw SQL.
 
 The product-spec route list is authoritative, with these refinements:
 
+- Authentication adds `POST /api/auth/login`, `DELETE /api/auth/session`, `GET /api/auth/me`
+  and first-run-only `POST /api/auth/setup`. With `AKASHA_AUTH=off` all four answer 404 and every
+  older route is unchanged. With it `on`, health routes, auth routes and the SPA shell remain
+  reachable anonymously; every other API route answers the ordinary error envelope with
+  `401 unauthenticated`. Before any user has a credential that boundary answers
+  `409 setup_required` instead, except for health, `GET /api/auth/me`, setup and the shell.
+- The session cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and has a 400-day `Max-Age`.
+  `Secure` follows the request scheme unless `AKASHA_COOKIE_SECURE` forces it. A proxy's
+  `X-Forwarded-Proto` changes that scheme only when the immediate peer matches
+  `AKASHA_TRUSTED_PROXY_PEERS`; an arbitrary client header has no effect.
 - Define static routes such as `/entries/bulk` before `/entries/{entry_id}`.
 - Bulk mutation accepts either explicit `entry_ids` or a validated server-side filter plus `excluded_entry_ids`; never both. This supports select-all across unloaded virtual rows without sending thousands of IDs. Return affected count and apply in one transaction.
 - `GET /entries` accepts repeated `status`, `shelf`, `format`, `type`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. `type` selects domains and is validated against the registry; unlike `shelf` and `format`, repeating it *widens*, because a row has exactly one type. The response is `{items, next_cursor, total, facets}`. `facets.status_counts` is the whole-library total per status — what the inbox badge counts — `facets.status_counts_by_type` splits the same counts by item type, because a status two domains share is not one number on a screen that lists each domain's statuses separately, and `facets.format_counts` does the same for formats. Each facet clears its own dimension, so a count reads as "what you would get if you clicked this". **`type` is the exception and is not one dimension** (DEC-062): both status facets clear it, so the inbox badge keeps agreeing with the domain-agnostic triage surface and an unselected tab still has a count to show, while `format_counts` applies it, because that selector sits under the tab.
@@ -759,8 +776,15 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
 - **Serve attachments as downloads, never inline.** `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and a fixed `application/octet-stream`. Attachments are the only user-controlled content type the application serves — everything else is re-encoded to JPEG by the cover pipeline — and the SPA shares their origin, so an uploaded HTML or SVG rendered inline would run against the application's own API.
 - Enforce read-only Calibre mount in Compose and read-only SQLite URI/query mode in code.
 - Do not log notes, import row contents, API keys, or full provider payloads.
+- Never log passwords, session tokens or cookies. Passwords use scrypt with per-user salts;
+  sessions are opaque, server-side and revocable, and the database stores only token hashes.
+- Login failures are limited in-process by normalized username and immediate peer in one fixed
+  window. The limiter deliberately resets on restart; this is a single-container LAN control,
+  not a distributed security boundary.
 - No CORS by default in the single-origin deployment.
-- No auth means no public exposure. Documentation and Compose comments must state this prominently.
+- Auth-off means no public exposure. Authentication alone does not authorize an internet-facing
+  deployment; the published-port, HTTPS and proxy boundary remains LAN-only until Sprint 082
+  delivers and verifies the complete operational contract.
 
 ## 10. Testing and quality gates
 

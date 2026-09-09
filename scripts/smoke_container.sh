@@ -65,6 +65,7 @@ smoke_tag="smoke-$$"
 #                 copies, including its AKASHA_ENVIRONMENT=development
 #   no-contact.env  example.env minus USER_AGENT_CONTACT: must refuse to start
 printf 'AKASHA_ATTACHMENT_MAX_BYTES=1024\nAKASHA_SQLITE_BUSY_TIMEOUT_MS=12000\nTMDB_READ_TOKEN=token-for-smoke\n' > "$workdir/smoke.env"
+printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\n' > "$workdir/auth.env"
 : > "$workdir/bare.env"
 printf 'USER_AGENT_CONTACT=%s\nTZ=UTC\n' "$USER_AGENT_CONTACT" > "$workdir/defaults.env"
 cp .env.example "$workdir/example.env"
@@ -106,7 +107,7 @@ container_env() {
   docker compose exec -T akasha python -c '
 import json
 from os import environ
-print(json.dumps({name: environ.get(name) for name in sorted(environ) if name.startswith("AKASHA_") or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
+print(json.dumps({name: environ.get(name) for name in sorted(environ) if (name.startswith("AKASHA_") and "PASSWORD" not in name) or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
 '
 }
 
@@ -472,6 +473,59 @@ wait_healthy
 [ "$(docker inspect --format '{{.Config.Image}}' "$(docker compose ps -q akasha)")" = "$smoke_tag_image" ] \
   || fail "the running container did not come from the version tag"
 
+step "Sprint 077: authentication survives restart and logout revokes it"
+COMPOSE_ENV_FILES="$workdir/auth.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+refused_code="$(curl -sS --max-time 20 -o "$workdir/auth-refused.json" -w '%{http_code}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$refused_code" = "401" ] || fail "auth-on library was not refused before login: $refused_code $(cat "$workdir/auth-refused.json")"
+python3 - "$workdir/auth-refused.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    error = json.load(handle)["error"]
+assert error == {
+    "code": "unauthenticated",
+    "message": "Authentication is required",
+    "details": {},
+}, error
+PY
+login_headers="$workdir/login-headers.txt"
+login_body="$(curl -fsS --max-time 20 -D "$login_headers" -c "$workdir/cookies.txt" \
+  -H 'content-type: application/json' \
+  -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/login")"
+printf '%s' "$login_body" | python3 -c '
+import json, sys
+
+user = json.load(sys.stdin)
+assert user["username"] == "smoke-admin", user
+assert user["is_admin"] is True, user
+' || fail "login did not return the bootstrapped admin: $login_body"
+grep -qi 'Set-Cookie: akasha_session=' "$login_headers" \
+  || fail "login set no session cookie"
+if grep -qi 'Set-Cookie: .*; Secure' "$login_headers"; then
+  fail "plain HTTP login set a Secure cookie that the LAN client cannot return"
+fi
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
+  || fail "the authenticated cookie could not read the library"
+COMPOSE_ENV_FILES="$workdir/auth.env" docker compose down --timeout 10 >/dev/null
+COMPOSE_ENV_FILES="$workdir/auth.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
+  || fail "the database-backed session did not survive restart"
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" -c "$workdir/cookies.txt" \
+  -X DELETE "http://127.0.0.1:${AKASHA_PORT}/api/auth/session" >/dev/null \
+  || fail "logout failed"
+logout_code="$(curl -sS --max-time 20 -o "$workdir/logout-refused.json" -w '%{http_code}' \
+  -b "$workdir/cookies.txt" "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$logout_code" = "401" ] \
+  || fail "the logged-out client could still read the library: $logout_code"
+printf 'anonymous 401; login 200; restart kept session; logout restored 401\n'
+
 step "Signals: SIGTERM stops the container promptly and cleanly"
 container="$(docker compose ps -q akasha)"
 started="$(date +%s)"
@@ -508,4 +562,4 @@ printf 'container, API persistence across recreation, every emitted chunk served
 printf 'read-only Calibre, an in-container restore, a named-volume restore drill through\n'
 printf 'the documented host-side procedure, backups on their own host disk while /data\n'
 printf 'stayed a named volume, a version-tagged build starting without rebuilding, and\n'
-printf 'a graceful SIGTERM.\n'
+printf 'an auth-on login/restart/logout round-trip on plain HTTP, and a graceful SIGTERM.\n'

@@ -326,10 +326,19 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if request.url.path.startswith("/api/auth/"):
                 return JSONResponse(status_code=404, content={"detail": "Not Found"})
             return await call_next(request)
-        if not request.url.path.startswith("/api/"):
-            return await call_next(request)
         path = request.url.path
         if path.startswith("/api/health/"):
+            return await call_next(request)
+        # The shell and its emitted assets must load before Sprint 078 can draw
+        # a login screen. FastAPI's own contract/docs routes are not shell assets
+        # and remain behind the same boundary as the rest of the application.
+        is_spa_get = request.method == "GET" and path not in {
+            "/openapi.json",
+            "/docs",
+            "/docs/oauth2-redirect",
+            "/redoc",
+        }
+        if not path.startswith("/api/") and is_spa_get:
             return await call_next(request)
 
         needs_setup = not has_credentialed_user(request.app.state.engine)

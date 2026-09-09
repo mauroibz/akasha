@@ -14,6 +14,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, SecretStr, field_validator
 from sqlalchemy import Engine, text
 
+from book_tracker.api.library import ErrorResponse
 from book_tracker.application.passwords import hash_password, verify_password
 from book_tracker.application.sessions import (
     SESSION_COOKIE_NAME,
@@ -27,16 +28,6 @@ from book_tracker.infrastructure.offload import off_loop
 
 COOKIE_NAME = SESSION_COOKIE_NAME
 router = APIRouter(prefix="/api/auth", tags=["auth"])
-
-
-class ErrorDetail(BaseModel):
-    code: str
-    message: str
-    details: dict[str, Any]
-
-
-class ErrorResponse(BaseModel):
-    error: ErrorDetail
 
 
 class UserResponse(BaseModel):
@@ -188,12 +179,6 @@ class LoginRateLimiter:
         while bucket and bucket[0] <= now - self.window_seconds:
             bucket.popleft()
         return bucket
-
-    def limited(self, username: str, peer: str) -> bool:
-        return any(
-            len(self._bucket(key)) >= self.maximum
-            for key in (f"username:{username}", f"peer:{peer}")
-        )
 
     def username_limited(self, username: str) -> bool:
         return len(self._bucket(f"username:{username}")) >= self.maximum
