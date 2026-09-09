@@ -134,6 +134,18 @@ class SessionStore:
             )
         return int(result.rowcount)
 
+    def delete_other(self, user_id: int, current_token: str) -> int:
+        """Revoke a user's other sessions while preserving the request doing it."""
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                text(
+                    "DELETE FROM sessions WHERE user_id = :user_id "
+                    "AND token_hash != :current_token_hash"
+                ),
+                {"user_id": user_id, "current_token_hash": token_hash(current_token)},
+            )
+        return int(result.rowcount)
+
     def expire(self, *, now: datetime | None = None) -> int:
         with self.engine.begin() as connection:
             result = connection.execute(

@@ -5,9 +5,10 @@ from typing import Annotated
 
 from fastapi import Depends, Request
 
+from book_tracker.application.library import LibraryError
 from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 
-__all__ = ["Principal", "current_user", "CurrentUser"]
+__all__ = ["Principal", "current_user", "CurrentUser", "AdminUser"]
 
 
 @dataclass(frozen=True, slots=True)
@@ -61,3 +62,14 @@ class AuthenticationRequired(Exception):
 
 CurrentUser = Annotated[Principal, Depends(current_user)]
 """The dependency form for route handlers: `user: CurrentUser`."""
+
+
+async def require_admin(user: CurrentUser) -> Principal:
+    """Refuse account administration without revealing anything about a target."""
+    if not user.is_admin:
+        raise LibraryError("forbidden", "Administrator access is required", status_code=403)
+    return user
+
+
+AdminUser = Annotated[Principal, Depends(require_admin)]
+"""The dependency used only by user-management routes."""

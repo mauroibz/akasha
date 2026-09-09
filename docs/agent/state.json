@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "ready",
+  "project_status": "in_progress",
   "active_sprint": "079",
   "active_sprint_file": "docs/sprints/079-the-second-library.md",
-  "active_sprint_status": "ready",
+  "active_sprint_status": "in_progress",
   "last_completed_sprint": "078",
   "completed_sprints": [
     "001",
@@ -86,6 +86,6 @@
     "077",
     "078"
   ],
-  "started_at": "",
-  "updated_at": "2026-09-09T12:22:45-03:00"
+  "started_at": "2026-09-09T12:32:26-03:00",
+  "updated_at": "2026-09-09T12:32:26-03:00"
 }

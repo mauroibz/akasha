@@ -22,6 +22,7 @@ from book_tracker.api.auth import (
 from book_tracker.api.auth import (
     router as auth_router,
 )
+from book_tracker.api.auth import users_router
 from book_tracker.api.auth import (
     setup_required as setup_required_response,
 )
@@ -483,6 +484,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         409: {"model": ErrorResponse},
     }
     app.include_router(auth_router)
+    app.include_router(users_router, responses=auth_responses)
     app.include_router(library_router, responses=auth_responses)
     app.include_router(providers_router, responses=auth_responses)
     app.include_router(imports_router, responses=auth_responses)
