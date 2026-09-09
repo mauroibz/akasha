@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import {
   QueryClient,
   QueryClientProvider,
@@ -149,6 +149,7 @@ export function AppContent() {
   const location = useLocation();
   const navigate = useNavigate();
   const client = useQueryClient();
+  const authRedirecting = useRef(false);
   const [forcedLogin, setForcedLogin] = useState(false);
   const [resumeTo, setResumeTo] = useState<string | null>(null);
   const auth = useQuery({
@@ -160,6 +161,8 @@ export function AppContent() {
 
   useEffect(() => {
     function requireAuthentication(event: Event) {
+      if (authRedirecting.current) return;
+      authRedirecting.current = true;
       const detail = (event as CustomEvent<{ kind?: "login" | "setup" }>)
         .detail;
       const destination = currentDestination(
@@ -225,6 +228,7 @@ export function AppContent() {
         <SetupPage
           onAuthenticated={(user) => {
             client.setQueryData(AUTH_STATE_QUERY_KEY, authenticatedState(user));
+            authRedirecting.current = false;
           }}
           onNavigate={setResumeTo}
         />
@@ -246,6 +250,7 @@ export function AppContent() {
         <LoginPage
           onAuthenticated={(user) => {
             client.setQueryData(AUTH_STATE_QUERY_KEY, authenticatedState(user));
+            authRedirecting.current = false;
             setForcedLogin(false);
           }}
           onNavigate={setResumeTo}

@@ -190,6 +190,17 @@ describe("authentication routing", () => {
     expect(await screen.findByLabelText("Username")).toBeVisible();
     expect(screen.getByRole("status")).toHaveTextContent("Your session ended");
 
+    // Several queries can discover one expired cookie together. The first
+    // refusal owns the destination; a later one arriving after the login route
+    // mounted must not replace it with `/login`.
+    act(() => {
+      window.dispatchEvent(
+        new CustomEvent(AUTH_REQUIRED_EVENT, {
+          detail: { kind: "login" },
+        }),
+      );
+    });
+
     const user = userEvent.setup();
     await user.type(screen.getByLabelText("Username"), "mauro");
     await user.type(screen.getByLabelText("Password"), "right password");
