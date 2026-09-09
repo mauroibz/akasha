@@ -83,6 +83,16 @@ class EntryResult:
     already_exists: bool
 
 
+@dataclass(frozen=True)
+class CachedItem:
+    item_type: str
+    title: str
+    subtitle: str | None
+    year: int | None
+    metadata: Mapping[str, Any]
+    creator_sort: str | None
+
+
 class IdentityConflict(Exception):
     def __init__(self, decision: MatchDecision) -> None:
         self.decision = decision
@@ -135,6 +145,33 @@ class DomainRepository:
             if found is not None:
                 ids.add(found)
         return ids
+
+    def cached_item_for_source(self, source: str, source_id: str) -> CachedItem | None:
+        """Return a shared cached item only when this user does not own its entry."""
+        with Session(self.engine) as session:
+            item = session.scalar(
+                select(ItemRow)
+                .join(ItemSourceRow, ItemSourceRow.item_id == ItemRow.id)
+                .where(ItemSourceRow.source == source, ItemSourceRow.source_id == source_id)
+            )
+            if item is None:
+                return None
+            owned = session.scalar(
+                select(EntryRow.id).where(
+                    EntryRow.user_id == self.user_id, EntryRow.item_id == item.id
+                )
+            )
+            if owned is not None:
+                return None
+            metadata = json.loads(item.metadata_json)
+            return CachedItem(
+                item_type=item.type,
+                title=item.title,
+                subtitle=item.subtitle,
+                year=item.year,
+                metadata=metadata if isinstance(metadata, dict) else {},
+                creator_sort=item.creator_sort_override,
+            )
 
     def match(
         self,
@@ -554,7 +591,9 @@ class ImportRepository:
         with Session(self.engine) as session:
             return session.scalar(
                 select(ImportBatchRow.id).where(
-                    ImportBatchRow.kind == kind, ImportBatchRow.fingerprint == fingerprint
+                    ImportBatchRow.user_id == self.user_id,
+                    ImportBatchRow.kind == kind,
+                    ImportBatchRow.fingerprint == fingerprint,
                 )
             )
 
@@ -632,7 +671,7 @@ class ImportRepository:
         default_domain = next(iter(domains.values()))
         with DomainRepository(self.engine, self.user_id)._write() as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None or batch.kind != kind:
+            if batch is None or batch.user_id != self.user_id or batch.kind != kind:
                 raise LookupError("import_batch_not_found")
             if batch.state == "committed":
                 return {

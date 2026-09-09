@@ -186,28 +186,44 @@ class AddService:
             year = int(manual["year"]) if manual.get("year") is not None else None
         else:
             assert source is not None and source_id is not None
-            payload = await self._provider_payload(source, source_id, supplied_refs)
-            provider = self.providers.get(source)
-            provider_item_type = getattr(provider, "item_type", None)
-            if not isinstance(provider_item_type, str):
-                raise LibraryError(
-                    "unknown_item_type", "Provider has no registered domain", status_code=422
-                )
-            item_type = provider_item_type
-            cover_url = payload.cover_url
-            cover_fallback_urls = payload.cover_fallback_urls
-            title = payload.title
-            subtitle = payload.subtitle
-            creators = payload.creators
-            creator_sort = payload.creator_sort
-            year = payload.year
-            metadata = {**payload.metadata, "creators": list(creators)}
-            candidate_language = payload.language
-            identifiers = self._identifiers(payload.identifiers)
-            sources = [
-                SourceIdentity(ref.source, ref.source_id, ref.source == payload.source)
-                for ref in payload.source_refs
-            ]
+            cached = self.repository.cached_item_for_source(source, source_id)
+            if cached is not None:
+                item_type = cached.item_type
+                title = cached.title
+                subtitle = cached.subtitle
+                year = cached.year
+                metadata = dict(cached.metadata)
+                creator_values = metadata.get("creators", [])
+                creators = tuple(creator_values) if isinstance(creator_values, list) else ()
+                creator_sort = cached.creator_sort
+                candidate_language = None
+                identifiers = []
+                sources = [SourceIdentity(source, source_id, True)]
+                cover_url = None
+                cover_fallback_urls = ()
+            else:
+                payload = await self._provider_payload(source, source_id, supplied_refs)
+                provider = self.providers.get(source)
+                provider_item_type = getattr(provider, "item_type", None)
+                if not isinstance(provider_item_type, str):
+                    raise LibraryError(
+                        "unknown_item_type", "Provider has no registered domain", status_code=422
+                    )
+                item_type = provider_item_type
+                cover_url = payload.cover_url
+                cover_fallback_urls = payload.cover_fallback_urls
+                title = payload.title
+                subtitle = payload.subtitle
+                creators = payload.creators
+                creator_sort = payload.creator_sort
+                year = payload.year
+                metadata = {**payload.metadata, "creators": list(creators)}
+                candidate_language = payload.language
+                identifiers = self._identifiers(payload.identifiers)
+                sources = [
+                    SourceIdentity(ref.source, ref.source_id, ref.source == payload.source)
+                    for ref in payload.source_refs
+                ]
         domain = DOMAINS.get(item_type)
         if domain is None:
             raise LibraryError(

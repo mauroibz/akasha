@@ -72,13 +72,26 @@ async def test_auth_off_keeps_routes_absent_and_library_open(tmp_path: Path) -> 
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
         assert (await client.get("/api/entries")).status_code == 200
-        for method, path in (
-            ("post", "/api/auth/login"),
-            ("delete", "/api/auth/session"),
-            ("get", "/api/auth/me"),
-            ("post", "/api/auth/setup"),
+        for method, path, body in (
+            ("post", "/api/auth/login", {"username": "somebody", "password": PASSWORD}),
+            ("delete", "/api/auth/session", None),
+            ("get", "/api/auth/me", None),
+            (
+                "post",
+                "/api/auth/setup",
+                {"username": "somebody", "password": PASSWORD},
+            ),
+            (
+                "patch",
+                "/api/auth/password",
+                {"current_password": PASSWORD, "new_password": "another private password"},
+            ),
+            ("get", "/api/users", None),
+            ("post", "/api/users", {"username": "somebody", "password": PASSWORD}),
+            ("patch", "/api/users/1", {"display_name": "Somebody"}),
+            ("delete", "/api/users/1", {"action": "delete"}),
         ):
-            assert (await getattr(client, method)(path)).status_code == 404
+            assert (await client.request(method.upper(), path, json=body)).status_code == 404
 
 
 @pytest.mark.anyio

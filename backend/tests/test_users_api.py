@@ -11,6 +11,7 @@ from book_tracker.api.auth import COOKIE_NAME
 from book_tracker.application.passwords import hash_password
 from book_tracker.application.sessions import SessionStore
 from book_tracker.config import Settings
+from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.repositories import DomainRepository
 from book_tracker.main import create_app
 
@@ -63,6 +64,56 @@ async def create_second(client: httpx.AsyncClient, *, admin: bool = False) -> di
     )
     assert response.status_code == 201, response.text
     return response.json()
+
+
+def seed_import_ledger(app: object, user_id: int, entry_id: int, item_id: int) -> str:
+    now = datetime.now(UTC).isoformat()
+    batch_id = f"batch-{user_id}"
+    with app.state.engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO import_batches "
+                "(id,user_id,kind,fingerprint,state,source_descriptor,preview_summary,counters,"
+                "created_at,updated_at) VALUES "
+                "(:batch,:user,'goodreads',:fingerprint,'committed','{}','{}','{}',:now,:now)"
+            ),
+            {"batch": batch_id, "user": user_id, "fingerprint": f"fp-{user_id}", "now": now},
+        )
+        record_id = int(
+            connection.execute(
+                text(
+                    "INSERT INTO import_records "
+                    "(batch_id,user_id,row_number,normalized_payload,matched_item_id,matched_entry_id,"
+                    "conflicts,validation_errors,created_at,updated_at) VALUES "
+                    "(:batch,:user,1,'{}',:item,:entry,'{}','[]',:now,:now) RETURNING id"
+                ),
+                {
+                    "batch": batch_id,
+                    "user": user_id,
+                    "item": item_id,
+                    "entry": entry_id,
+                    "now": now,
+                },
+            ).scalar_one()
+        )
+        connection.execute(
+            text(
+                "INSERT INTO import_effects "
+                "(batch_id,user_id,record_id,effect_type,entity_type,entity_id,before_values,"
+                "after_values) VALUES "
+                "(:batch,:user,:record,'create','entry',:entry,'{}','{}')"
+            ),
+            {
+                "batch": batch_id,
+                "user": user_id,
+                "record": record_id,
+                "entry": str(entry_id),
+            },
+        )
+    JobRepository(app.state.engine).enqueue(
+        batch_id, "enrich_item", {"item_id": item_id}, user_id=user_id
+    )
+    return batch_id
 
 
 @pytest.mark.anyio
@@ -214,6 +265,7 @@ async def test_deleting_requires_a_decision_and_delete_leaves_shared_cache(tmp_p
                 title="Ficciones"
             )
             DomainRepository(app.state.engine, int(second["id"])).create_shelf("Private")
+            seed_import_ledger(app, int(second["id"]), owned.entry_id, owned.item_id)
             now = datetime.now(UTC).isoformat()
             with app.state.engine.begin() as connection:
                 connection.execute(
@@ -258,6 +310,14 @@ async def test_deleting_requires_a_decision_and_delete_leaves_shared_cache(tmp_p
                 ).scalar_one()
                 == 1
             )
+            for table in ("import_batches", "import_records", "import_effects", "jobs"):
+                assert (
+                    connection.execute(
+                        text(f"SELECT count(*) FROM {table} WHERE user_id=:user"),
+                        {"user": second["id"]},
+                    ).scalar_one()
+                    == 0
+                )
 
 
 @pytest.mark.anyio
@@ -270,10 +330,18 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
         ) as client:
             await login(client, "admin", ADMIN_PASSWORD)
             second = await create_second(client)
-            DomainRepository(app.state.engine, int(second["id"])).create_or_get_entry(
+            owned = DomainRepository(
+                app.state.engine, int(second["id"])
+            ).create_or_get_entry(
                 title="The second library"
             )
-            DomainRepository(app.state.engine, int(second["id"])).create_shelf("Moved")
+            shelf_id = DomainRepository(app.state.engine, int(second["id"])).create_shelf("Moved")
+            DomainRepository(app.state.engine, int(second["id"])).attach_shelf(
+                owned.entry_id, shelf_id
+            )
+            batch_id = seed_import_ledger(
+                app, int(second["id"]), owned.entry_id, owned.item_id
+            )
             transferred = await client.request(
                 "DELETE",
                 f"/api/users/{second['id']}",
@@ -293,3 +361,22 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
                 ).scalar_one()
                 == 1
             )
+            assert connection.execute(
+                text(
+                    "SELECT count(*) FROM entry_shelves "
+                    "WHERE entry_id=:entry AND shelf_id=:shelf"
+                ),
+                {"entry": owned.entry_id, "shelf": shelf_id},
+            ).scalar_one() == 1
+            assert connection.execute(
+                text("SELECT user_id FROM import_batches WHERE id=:batch"),
+                {"batch": batch_id},
+            ).scalar_one() == 1
+            for table in ("import_records", "import_effects", "jobs"):
+                assert (
+                    connection.execute(
+                        text(f"SELECT user_id FROM {table} WHERE batch_id=:batch"),
+                        {"batch": batch_id},
+                    ).scalar_one()
+                    == 1
+                )

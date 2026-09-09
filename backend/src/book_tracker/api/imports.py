@@ -769,12 +769,12 @@ async def commit(
 
 
 @router.get("/jobs/{job_id}", response_model=JobProgressResponse)
-async def get_job_progress(job_id: str, request: Request) -> JobProgressResponse:
+async def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
     from book_tracker.infrastructure.jobs import JobRepository
 
     repo = JobRepository(request.app.state.engine)
     job = repo.get_job(job_id)
-    if job is None:
+    if job is None or (job["user_id"] is not None and job["user_id"] != user.effective_user_id):
         raise LibraryError("job_not_found", "Job was not found", status_code=404)
     return JobProgressResponse.model_validate(job)
 

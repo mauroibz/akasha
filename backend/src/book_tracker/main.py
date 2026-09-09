@@ -18,11 +18,11 @@ from book_tracker.api.auth import (
     bootstrap_admin,
     has_credentialed_user,
     unauthenticated,
+    users_router,
 )
 from book_tracker.api.auth import (
     router as auth_router,
 )
-from book_tracker.api.auth import users_router
 from book_tracker.api.auth import (
     setup_required as setup_required_response,
 )

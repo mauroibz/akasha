@@ -589,7 +589,17 @@ def _transfer_conflict(connection: Any, user_id: int, target_id: int) -> str | N
         ),
         {"source": user_id, "target": target_id},
     ).first()
-    return "Both libraries contain the same shelf name" if duplicate_shelf else None
+    if duplicate_shelf:
+        return "Both libraries contain the same shelf name"
+    duplicate_import = connection.execute(
+        text(
+            "SELECT 1 FROM import_batches source JOIN import_batches target "
+            "ON target.kind=source.kind AND target.fingerprint=source.fingerprint "
+            "WHERE source.user_id=:source AND target.user_id=:target LIMIT 1"
+        ),
+        {"source": user_id, "target": target_id},
+    ).first()
+    return "Both libraries contain the same import" if duplicate_import else None
 
 
 @users_router.delete(

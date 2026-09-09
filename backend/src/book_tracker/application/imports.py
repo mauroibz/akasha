@@ -366,7 +366,7 @@ class ImportService:
     def get_preview(self, batch_id: str) -> dict[str, Any]:
         with Session(self.engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None or batch.kind != self.importer.name:
+            if batch is None or batch.user_id != self.user_id or batch.kind != self.importer.name:
                 raise LibraryError(
                     "import_batch_not_found", "Import preview was not found", status_code=404
                 )
@@ -396,7 +396,7 @@ class ImportService:
         moment = (now or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
         with Session(self.engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None or batch.kind != self.importer.name:
+            if batch is None or batch.user_id != self.user_id or batch.kind != self.importer.name:
                 raise LibraryError(
                     "import_batch_not_found", "Import batch was not found", status_code=404
                 )
@@ -444,12 +444,14 @@ class ImportService:
             record_id = session.scalar(
                 select(ImportRecordRow.id).where(
                     ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.user_id == self.user_id,
                     ImportRecordRow.matched_item_id == item_id,
                 )
             )
             existing = session.scalar(
                 select(ImportEffectRow.effect_id).where(
                     ImportEffectRow.batch_id == batch_id,
+                    ImportEffectRow.user_id == self.user_id,
                     ImportEffectRow.entity_type == "attachment",
                     ImportEffectRow.entity_id == str(attachment["id"]),
                 )

@@ -160,7 +160,14 @@ class LibraryService:
         return entry
 
     def _item(self, session: Session, item_id: int) -> ItemRow:
-        item = session.get(ItemRow, item_id)
+        # Items are a shared metadata cache, but a request reaches one only
+        # through its own entry. Sharing the row avoids duplicate metadata and
+        # files; it does not make another person's catalogue enumerable by id.
+        item = session.scalar(
+            select(ItemRow)
+            .join(EntryRow, EntryRow.item_id == ItemRow.id)
+            .where(ItemRow.id == item_id, EntryRow.user_id == self.user_id)
+        )
         if item is None:
             raise LibraryError("item_not_found", "Item was not found", status_code=404)
         return item
@@ -474,6 +481,7 @@ class LibraryService:
         if cleaned is None:
             raise LibraryError("invalid_attachment_name", "A file needs a name", status_code=422)
         with self._write() as session:
+            self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
                     AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
@@ -491,6 +499,7 @@ class LibraryService:
     def get_attachment(self, item_id: int, attachment_id: int) -> dict[str, Any]:
         """Scoped by item on purpose: an id alone must not reach another item's file."""
         with Session(self.engine) as session:
+            self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
                     AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
@@ -505,6 +514,7 @@ class LibraryService:
     def delete_attachment(self, item_id: int, attachment_id: int, *, data_dir: Path) -> None:
         """Drop the row, then the blob only if no other row still points at it."""
         with self._write() as session:
+            self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
                     AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
