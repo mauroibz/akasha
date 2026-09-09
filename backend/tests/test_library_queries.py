@@ -290,3 +290,52 @@ async def test_an_empty_shelf_returns_an_empty_grouping_not_a_missing_key(
         shelves = service.list_shelves()
         row = next(row for row in shelves if row["id"] == shelf["id"])
         assert row["members_by_type"] == {}
+
+
+@pytest.mark.anyio
+async def test_list_facets_and_insights_are_scoped_to_one_user(tmp_path: Path) -> None:
+    """Sprint 076 required test: two users seeded directly, and each surface —
+    the entry list, its facets and the insights ranking — carries only the
+    requesting user's rows. The route proves the same thing end-to-end in the
+    walkthrough; this pins it at the service the route delegates to."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        first = DomainRepository(app.state.engine, 1)
+        a = first.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET status='read' WHERE id=:id"), {"id": a.entry_id}
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO users (username, display_name, password_hash, password_salt,"
+                    " is_admin, created_at, updated_at) "
+                    "VALUES ('bruno', 'Bruno', NULL, NULL, 0,"
+                    " '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+                )
+            )
+            bruno = int(
+                connection.execute(text("SELECT id FROM users WHERE username='bruno'")).scalar_one()
+            )
+        second = DomainRepository(app.state.engine, bruno)
+        b = second.create_or_get_entry(title="Ficciones", creators=("Jorge Luis Borges",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET status='read' WHERE id=:id"), {"id": b.entry_id}
+            )
+
+        for user_id, want_title, want_creator in (
+            (1, "Rayuela", "julio cortazar"),
+            (bruno, "Ficciones", "jorge luis borges"),
+        ):
+            service = LibraryService(app.state.engine, user_id)
+            listed = service.list_entries(types=["book"])
+            titles = [item["item"]["title"] for item in listed["items"]]
+            assert titles == [want_title], titles
+            # Facets are the same walk's shadow: they count only this user's rows.
+            total = sum(listed["facets"]["status_counts"].values())
+            assert total == 1, listed["facets"]["status_counts"]
+            # Insights rank only what this user owns.
+            ranked = service.rank(item_type="book", key="creators", metric="count")
+            keys = {row["key"] for row in ranked["rows"]}
+            assert keys == {want_creator}, keys
