@@ -220,6 +220,10 @@ class EnrichmentHandler:
         payload = job["payload"]
         batch_id = job.get("batch_id")
         item_id = payload.get("item_id")
+        # Whose work this job is: the column Sprint 075 wrote, read back rather
+        # than assumed. `None` is legitimate (a batch-less backfill) and means
+        # " owns nothing " below — no entry note is guessed onto anybody.
+        owner = job.get("user_id")
 
         # Late-job guard: if the batch has been undone, cancel this job
         if batch_id is not None:
@@ -383,6 +387,7 @@ class EnrichmentHandler:
 
                     # Record import effect for undo coverage
                     if batch_id is not None:
+                        batch_row = session.get(ImportBatchRow, batch_id)
                         record_id = session.scalar(
                             select(ImportRecordRow.id)
                             .where(
@@ -392,10 +397,11 @@ class EnrichmentHandler:
                             .order_by(ImportRecordRow.id)
                             .limit(1)
                         )
-                        if record_id is not None:
+                        if record_id is not None and batch_row is not None:
                             session.add(
                                 ImportEffectRow(
                                     batch_id=batch_id,
+                                    user_id=batch_row.user_id,
                                     record_id=record_id,
                                     effect_type="fill_empty",
                                     entity_type="item",
@@ -418,15 +424,21 @@ class EnrichmentHandler:
         if needs_cover and await self._install_cover(item_id, payload_data):
             filled.append("cover")
 
-        if payload_data.match_note and self._write_match_note(item_id, payload_data.match_note):
+        if payload_data.match_note and self._write_match_note(
+            item_id, payload_data.match_note, owner
+        ):
             filled.append("notes")
 
         return {"state": "succeeded", "progress": {"filled": filled, "provider": source_name}}
 
-    def _write_match_note(self, item_id: int, note: str) -> bool:
+    def _write_match_note(self, item_id: int, note: str, owner: int | None) -> bool:
         """A note worth a person's attention when the resolved payload is weaker
         evidence than usual (Sprint 064). Never overwrites an owner's own note —
         the same rule every other fill in this handler already follows.
+
+        A job with no owner writes nothing: the note belongs on somebody's entry,
+        and guessing whose is exactly the assumption Sprint 076 deleted (before
+        this sprint it landed on the seeded user's entry whoever queued the job).
 
         Not independently undo-tracked: the entry this note lives on is itself a
         `create` effect of the import, so undoing the batch deletes the whole row,
@@ -435,12 +447,14 @@ class EnrichmentHandler:
         note would survive an undo — accepted rather than adding a second effect
         type for one edge case a fresh scan already treats as the owner's row.
         """
+        if owner is None:
+            return False
         with self.engine.connect() as connection:
             connection.exec_driver_sql("BEGIN IMMEDIATE")
             session = Session(bind=connection)
             try:
                 entry = session.execute(
-                    select(EntryRow).where(EntryRow.item_id == item_id, EntryRow.user_id == 1)
+                    select(EntryRow).where(EntryRow.item_id == item_id, EntryRow.user_id == owner)
                 ).scalar_one_or_none()
                 if entry is None or entry.notes:
                     connection.rollback()
@@ -503,11 +517,22 @@ def enqueue_enrichment_backfill(
     """
     if item_ids is not None and not item_ids:
         return 0
+    owner: int | None = None
+    if batch_id is not None:
+        # A chained job belongs to whoever ran the batch; a batch-less backfill
+        # belongs to nobody (Sprint 075 kept `jobs.user_id` nullable for exactly
+        # this row) and its handler treats "no owner" as "no entry note".
+        with Session(engine) as session:
+            batch = session.get(ImportBatchRow, batch_id)
+        owner = batch.user_id if batch is not None else None
     rows = _backfillable_items(engine, item_ids)
     repository = JobRepository(engine)
     for item_id, kind, value in rows:
         repository.enqueue(
-            batch_id, "enrich_item", {"item_id": item_id, "kind": kind, "value": value}
+            batch_id,
+            "enrich_item",
+            {"item_id": item_id, "kind": kind, "value": value},
+            user_id=owner,
         )
     return len(rows)
 
