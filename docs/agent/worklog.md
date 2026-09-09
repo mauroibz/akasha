@@ -5189,3 +5189,26 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Next: Sprint 078 (The way in) is `ready`. It adds the login/setup UI, shared frontend 401/409
   handling, return-to-destination behavior and the shell account control against the contracts
   completed here.
+
+## 2026-09-09 — Sprint 078 checkpoint: shared refusal handling and the login form
+
+- Stopped at the owner's request with Sprint 078 intentionally `in_progress`; no state advance.
+- Done and committed: `12d5f82` adds the thin shared `request()` wrapper, typed
+  `Unauthenticated`/`SetupRequired` failures, and routes every call in all six existing frontend
+  API modules through it. Its RED was a missing module; focused request/library/export tests then
+  passed 14 and TypeScript passed. `230464b` adds the auth API login call, standalone branded auth
+  frame, and login form with the real action/method/name/autocomplete/type contract, local-only
+  password state, return destination in router state, wrong-password clearing/focus, and the
+  interrupted-session sentence. Its RED was a missing page; all three focused tests pass.
+- In-progress RED, deliberately uncommitted: `frontend/src/App.test.tsx` contains three routing
+  tests for anonymous private-address gating, invisible auth-off redirects, and a mid-session
+  refusal returning to the requested shelf after login. `npm test -- --run src/App.test.tsx`
+  fails because `App.tsx` does not yet export/implement `AppContent`; `npm run typecheck` names the
+  same missing export. This is the next TDD step, not a product regression in committed code.
+- Next implementation: extend `api/auth.ts` with the one cached `/api/auth/me` probe, restructure
+  `App.tsx` into a testable coordinator inside the router, install the single auth-required event
+  listener, and route login outside `AppShell`. Then write setup RED/GREEN, add account/sign-out,
+  and proceed to auth e2e/accessibility/build/walkthrough gates.
+- No dependencies, backend contracts, generated files, runtime data, external services, or owner
+  environment were changed. The only dirty file at handoff is the intentional untracked RED test
+  above; preserve it.
