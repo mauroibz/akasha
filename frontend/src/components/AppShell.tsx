@@ -1,10 +1,26 @@
-import { Bookmark, ChartBar, LibraryBig, Plus, Upload } from "lucide-react";
+import {
+  Bookmark,
+  ChartBar,
+  LibraryBig,
+  LogOut,
+  Plus,
+  Upload,
+  UserRound,
+} from "lucide-react";
 import { LazyMotion, domAnimation } from "motion/react";
-import { type ReactNode } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { type ReactNode, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
+import { logout, type AuthUser } from "@/api/auth";
 import { AkashaMark } from "@/components/AkashaMark";
 import { DataCredit } from "@/components/DataCredit";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +49,68 @@ const navItems: readonly NavItem[] = [
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+function AccountControl({
+  user,
+  onSignedOut,
+}: {
+  user: AuthUser;
+  onSignedOut: () => void;
+}) {
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+  const name = user.display_name?.trim() || user.username;
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+      onSignedOut();
+      void navigate("/login", {
+        replace: true,
+        state: { returnTo: "/" },
+      });
+    } catch {
+      setSigningOut(false);
+      toast.error("You could not be signed out. Try again.");
+    }
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          className="min-h-11 max-w-48 gap-2 px-3 text-muted-foreground"
+          aria-label={name}
+        >
+          <UserRound className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{name}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-44 p-2">
+        <Button
+          variant="ghost"
+          className="min-h-11 w-full justify-start gap-2"
+          disabled={signingOut}
+          onClick={() => void signOut()}
+        >
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+          {signingOut ? "Signing out…" : "Sign out"}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+export function AppShell({
+  children,
+  user,
+  onSignedOut,
+}: {
+  children: ReactNode;
+  user?: AuthUser | null;
+  onSignedOut?: () => void;
+}) {
   const location = useLocation();
   return (
     // `domAnimation` deliberately omits Motion's projection features, so
@@ -80,7 +157,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span>{item.label}</span>
             </NavLink>
           ))}
+          {user && onSignedOut ? (
+            <div className="ml-auto">
+              <AccountControl user={user} onSignedOut={onSignedOut} />
+            </div>
+          ) : null}
         </nav>
+        {user && onSignedOut ? (
+          <header className="flex min-h-14 items-center justify-end border-b border-border/80 px-4 sm:hidden">
+            <AccountControl user={user} onSignedOut={onSignedOut} />
+          </header>
+        ) : null}
         <nav
           aria-label="Primary"
           className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"

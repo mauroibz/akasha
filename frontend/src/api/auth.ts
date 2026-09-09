@@ -61,6 +61,11 @@ export function setup(
   }).then(authJson<AuthUser>);
 }
 
+export async function logout(): Promise<void> {
+  const response = await fetch("/api/auth/session", { method: "DELETE" });
+  if (!response.ok) throw new Error("Sign out failed");
+}
+
 /**
  * Probe the deployment once before mounting a private route.
  *

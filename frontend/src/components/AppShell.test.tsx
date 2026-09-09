@@ -1,4 +1,5 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -66,5 +67,42 @@ describe("AppShell", () => {
     expect(
       screen.getByRole("button", { name: /go to library/i }),
     ).toBeVisible();
+  });
+
+  it("shows the signed-in person and signs their session out", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const onSignedOut = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/"]}>
+        <AppShell
+          user={{
+            id: 1,
+            username: "mauro",
+            display_name: "Mauro",
+            is_admin: true,
+          }}
+          onSignedOut={onSignedOut}
+        >
+          <Routes>
+            <Route path="/" element={<div>Library page</div>} />
+            <Route path="/login" element={<h1>Sign-in destination</h1>} />
+          </Routes>
+        </AppShell>
+      </MemoryRouter>,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "Mauro" })[0]);
+    await user.click(screen.getByRole("button", { name: "Sign out" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Sign-in destination" }),
+    ).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/session", {
+      method: "DELETE",
+    });
+    expect(onSignedOut).toHaveBeenCalledOnce();
   });
 });

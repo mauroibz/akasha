@@ -97,9 +97,15 @@ function AuthLoading() {
   );
 }
 
-function PrivateRoutes() {
+function PrivateRoutes({
+  user,
+  onSignedOut,
+}: {
+  user?: AuthUser | null;
+  onSignedOut?: () => void;
+}) {
   return (
-    <AppShell>
+    <AppShell user={user} onSignedOut={onSignedOut}>
       <RoutedErrorBoundary
         fallback={(error, reset) => (
           <RouteErrorPage error={error} reset={reset} />
@@ -247,7 +253,23 @@ export function AppContent() {
       </Suspense>
     );
   }
-  return <PrivateRoutes />;
+  return (
+    <PrivateRoutes
+      user={state.user}
+      onSignedOut={() => {
+        client.removeQueries({
+          predicate: (query) => query.queryKey[0] !== "auth",
+        });
+        client.getMutationCache().clear();
+        client.setQueryData<AuthState>(AUTH_STATE_QUERY_KEY, {
+          auth: "on",
+          authenticated: false,
+          setup_required: false,
+          user: null,
+        });
+      }}
+    />
+  );
 }
 
 export function App() {
