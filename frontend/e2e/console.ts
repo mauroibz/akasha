@@ -21,8 +21,9 @@ export const test = base.extend<{
   failOnConsoleErrors: void;
   stubCommonEndpoints: void;
 }>({
-  // `/api/auth/me`, `/api/item-types` and `/api/shelves` are fetched by nearly every screen
-  // (the domain chooser, shelf pickers) and no spec exercises either one
+  // These endpoints are fetched in the background by nearly every screen
+  // (auth mode, domain chooser, shelf pickers, attachments and data tabs), and no spec
+  // exercises their absence
   // failing. ci.yml's e2e job runs no backend, so an unstubbed call here is
   // always a real ECONNREFUSED — wasted retries competing for CPU with the
   // browser under test on a runner with far less headroom than a dev
@@ -43,6 +44,15 @@ export const test = base.extend<{
         route.fulfill({ json: [bookItemType] }),
       );
       await page.route("**/api/shelves", (route) =>
+        route.fulfill({ json: [] }),
+      );
+      await page.route("**/api/items/*/attachments", (route) =>
+        route.fulfill({ json: { attachments: [] } }),
+      );
+      await page.route("**/api/importers", (route) =>
+        route.fulfill({ json: [] }),
+      );
+      await page.route("**/api/exports", (route) =>
         route.fulfill({ json: [] }),
       );
       await use();
