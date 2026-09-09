@@ -1,6 +1,7 @@
 import AxeBuilder from "@axe-core/playwright";
 import { type Page } from "@playwright/test";
 import { expect, test } from "./console";
+import { stubAuth } from "./auth-fixture";
 
 import {
   albumItemType,
@@ -174,6 +175,26 @@ async function expectNoSeriousViolations(page: Page, screen: string) {
   });
   expect(summary, screen).toEqual([]);
 }
+
+test("login has no serious accessibility violations", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubAuth(page, "anonymous");
+  await page.goto("/login");
+  await expect(page.getByLabel("Username")).toBeVisible();
+  await expectNoSeriousViolations(page, "login");
+});
+
+test("first-run setup has no serious accessibility violations", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubAuth(page, "setup");
+  await page.goto("/setup");
+  await expect(
+    page.getByRole("button", { name: "Claim library" }),
+  ).toBeVisible();
+  await expectNoSeriousViolations(page, "setup");
+});
 
 test("library in grid view has no serious accessibility violations", async ({
   page,

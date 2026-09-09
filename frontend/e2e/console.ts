@@ -21,7 +21,7 @@ export const test = base.extend<{
   failOnConsoleErrors: void;
   stubCommonEndpoints: void;
 }>({
-  // `/api/item-types` and `/api/shelves` are fetched by nearly every screen
+  // `/api/auth/me`, `/api/item-types` and `/api/shelves` are fetched by nearly every screen
   // (the domain chooser, shelf pickers) and no spec exercises either one
   // failing. ci.yml's e2e job runs no backend, so an unstubbed call here is
   // always a real ECONNREFUSED — wasted retries competing for CPU with the
@@ -33,6 +33,12 @@ export const test = base.extend<{
   // `page.route("**/api/shelves", ...)` is always registered after this one.
   stubCommonEndpoints: [
     async ({ page }, use) => {
+      // The existing suite exercises the default, intentionally invisible
+      // auth-off deployment. Auth-specific specs install a newer route handler
+      // for this endpoint and therefore override this one.
+      await page.route("**/api/auth/me", (route) =>
+        route.fulfill({ status: 404, json: { detail: "Not Found" } }),
+      );
       await page.route("**/api/item-types", (route) =>
         route.fulfill({ json: [bookItemType] }),
       );
