@@ -51,6 +51,9 @@ const InsightsPage = lazy(async () => ({
 const LoginPage = lazy(async () => ({
   default: (await import("@/pages/LoginPage")).LoginPage,
 }));
+const SetupPage = lazy(async () => ({
+  default: (await import("@/pages/SetupPage")).SetupPage,
+}));
 
 /**
  * Occupies the main region while a route chunk arrives.
@@ -151,7 +154,8 @@ export function AppContent() {
 
   useEffect(() => {
     function requireAuthentication(event: Event) {
-      const detail = (event as CustomEvent<{ kind?: "login" | "setup" }>).detail;
+      const detail = (event as CustomEvent<{ kind?: "login" | "setup" }>)
+        .detail;
       const destination = currentDestination(
         location.pathname,
         location.search,
@@ -210,7 +214,16 @@ export function AppContent() {
     if (location.pathname !== "/setup") {
       return <Navigate to="/setup" replace state={{ returnTo }} />;
     }
-    return <AuthLoading />;
+    return (
+      <Suspense fallback={<AuthLoading />}>
+        <SetupPage
+          onAuthenticated={(user) => {
+            client.setQueryData(AUTH_STATE_QUERY_KEY, authenticatedState(user));
+          }}
+          onNavigate={setResumeTo}
+        />
+      </Suspense>
+    );
   }
   if (!state.authenticated || forcedLogin) {
     if (location.pathname !== "/login") {

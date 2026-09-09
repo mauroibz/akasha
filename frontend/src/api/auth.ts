@@ -45,6 +45,22 @@ export function login(username: string, password: string): Promise<AuthUser> {
   }).then(authJson<AuthUser>);
 }
 
+export function setup(
+  username: string,
+  displayName: string,
+  password: string,
+): Promise<AuthUser> {
+  return fetch("/api/auth/setup", {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      username,
+      display_name: displayName,
+      password,
+    }),
+  }).then(authJson<AuthUser>);
+}
+
 /**
  * Probe the deployment once before mounting a private route.
  *

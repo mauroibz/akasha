@@ -81,16 +81,17 @@ describe("authentication routing", () => {
   it("shows login before rendering a requested private address", async () => {
     vi.stubGlobal(
       "fetch",
-      vi.fn(async () =>
-        new Response(
-          JSON.stringify({
-            auth: "on",
-            authenticated: false,
-            setup_required: false,
-            user: null,
-          }),
-          { status: 200 },
-        ),
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              auth: "on",
+              authenticated: false,
+              setup_required: false,
+              user: null,
+            }),
+            { status: 200 },
+          ),
       ),
     );
 
@@ -120,6 +121,49 @@ describe("authentication routing", () => {
     expect(await screen.findByText("Your library is waiting")).toBeVisible();
     expect(screen.queryByText("Sign out")).toBeNull();
     expect(screen.queryByLabelText("Username")).toBeNull();
+  });
+
+  it("sends every address to first-run setup until the library is claimed", async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.includes("/api/auth/me")) {
+        return new Response(
+          JSON.stringify({
+            auth: "on",
+            authenticated: false,
+            setup_required: true,
+            user: null,
+          }),
+          { status: 200 },
+        );
+      }
+      if (url.includes("/api/auth/setup")) {
+        return new Response(JSON.stringify(admin), { status: 200 });
+      }
+      return libraryResponse(url);
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    renderApp("/shelves/favorites");
+
+    expect(
+      await screen.findByRole("button", { name: "Claim library" }),
+    ).toBeVisible();
+    expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("Username"), "mauro");
+    await user.type(screen.getByLabelText("Display name"), "Mauro");
+    await user.type(screen.getByLabelText("Password"), "right password");
+    await user.click(screen.getByRole("button", { name: "Claim library" }));
+
+    expect(
+      await screen.findByRole("heading", { name: "Favorites" }),
+    ).toBeVisible();
+    expect(
+      fetchMock.mock.calls.filter(([input]) =>
+        String(input).includes("/api/auth/me"),
+      ),
+    ).toHaveLength(1);
   });
 
   it("routes a mid-session refusal to login and returns after success", async () => {
