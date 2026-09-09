@@ -264,6 +264,32 @@
         "title": "BulkSet",
         "type": "object"
       },
+      "ChangePasswordBody": {
+        "properties": {
+          "current_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Current Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "new_password": {
+            "format": "password",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "New Password",
+            "type": "string",
+            "writeOnly": true
+          }
+        },
+        "required": [
+          "current_password",
+          "new_password"
+        ],
+        "title": "ChangePasswordBody",
+        "type": "object"
+      },
       "ColumnSpecResponse": {
         "properties": {
           "label": {
@@ -404,6 +430,75 @@
           "candidates"
         ],
         "title": "CoverCandidates",
+        "type": "object"
+      },
+      "CreateUserBody": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "is_admin": {
+            "default": false,
+            "title": "Is Admin",
+            "type": "boolean"
+          },
+          "password": {
+            "format": "password",
+            "maxLength": 1024,
+            "minLength": 1,
+            "title": "Password",
+            "type": "string",
+            "writeOnly": true
+          },
+          "username": {
+            "maxLength": 100,
+            "minLength": 1,
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "CreateUserBody",
+        "type": "object"
+      },
+      "DeleteUserBody": {
+        "properties": {
+          "action": {
+            "enum": [
+              "transfer",
+              "delete"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "transfer_to_user_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transfer To User Id"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "DeleteUserBody",
         "type": "object"
       },
       "EntryCreateBody": {
@@ -2814,6 +2909,50 @@
         "title": "UndoEffectSummary",
         "type": "object"
       },
+      "UpdateUserBody": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "maxLength": 100,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "is_admin": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Admin"
+          },
+          "password": {
+            "anyOf": [
+              {
+                "format": "password",
+                "maxLength": 1024,
+                "minLength": 1,
+                "type": "string",
+                "writeOnly": true
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Password"
+          }
+        },
+        "title": "UpdateUserBody",
+        "type": "object"
+      },
       "UserResponse": {
         "properties": {
           "display_name": {
@@ -2847,6 +2986,51 @@
           "is_admin"
         ],
         "title": "UserResponse",
+        "type": "object"
+      },
+      "UserSummary": {
+        "properties": {
+          "display_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Display Name"
+          },
+          "entry_count": {
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "id": {
+            "title": "Id",
+            "type": "integer"
+          },
+          "is_admin": {
+            "title": "Is Admin",
+            "type": "boolean"
+          },
+          "shelf_count": {
+            "title": "Shelf Count",
+            "type": "integer"
+          },
+          "username": {
+            "title": "Username",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "username",
+          "display_name",
+          "is_admin",
+          "entry_count",
+          "shelf_count"
+        ],
+        "title": "UserSummary",
         "type": "object"
       },
       "ValidationError": {
@@ -2987,6 +3171,50 @@
           }
         },
         "summary": "Me",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/password": {
+      "patch": {
+        "operationId": "change_password_api_auth_password_patch",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ChangePasswordBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Change Password",
         "tags": [
           "auth"
         ]
@@ -6205,6 +6433,305 @@
           }
         },
         "summary": "Rename Shelf"
+      }
+    },
+    "/api/users": {
+      "get": {
+        "operationId": "list_users_api_users_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserSummary"
+                  },
+                  "title": "Response List Users Api Users Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          }
+        },
+        "summary": "List Users",
+        "tags": [
+          "users"
+        ]
+      },
+      "post": {
+        "operationId": "create_user_api_users_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateUserBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Create User",
+        "tags": [
+          "users"
+        ]
+      }
+    },
+    "/api/users/{user_id}": {
+      "delete": {
+        "operationId": "delete_user_api_users__user_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DeleteUserBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete User",
+        "tags": [
+          "users"
+        ]
+      },
+      "patch": {
+        "operationId": "update_user_api_users__user_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateUserBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UserResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update User",
+        "tags": [
+          "users"
+        ]
       }
     }
   }
