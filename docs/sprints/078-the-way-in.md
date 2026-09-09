@@ -1,6 +1,6 @@
 # Sprint 078 — The way in
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 077
 **Roadmap revision:** 40
 
@@ -161,5 +161,53 @@ frontend API modules calling `fetch` with no shared error handling; `AKASHA_AUTH
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Completed 2026-09-09.**
+
+1. The login route now renders outside the application shell and carries the real form action,
+   method, field names, password types and autocomplete values browsers need. Correct credentials
+   return to the originally requested local route; a wrong password leaves the username, clears
+   and focuses the password field, announces one polite error and does not navigate.
+2. First-run setup likewise renders outside the shell, collects username, display name and a new
+   password, explains that it claims the library already on the install, and makes that library
+   visible immediately after setup.
+3. `api/request.ts` is the single frontend refusal boundary for all six pre-existing API modules.
+   Typed 401 and setup-required events feed one coordinator; concurrent refusals preserve the
+   first requested destination, and a refusal unmounts any open screen/dialog before login.
+4. `/api/auth/me` is fetched once and held in the shared query cache. The shell shows the signed-in
+   display name and a sign-out action in its desktop navigation/mobile header, never as a sixth
+   bottom-navigation item. Sign-out clears private query and mutation state and replaces browser
+   history with login, so Back cannot reveal the library.
+5. Auth-off remains invisible: the account surface is absent, auth routes return to the ordinary
+   library, and the default e2e fixture leaves every existing browser flow unchanged.
+6. Login and setup passed the 390 px keyboard, visible-focus, 44 px target and zero-serious-axe
+   checks. Both are separate lazy chunks; the entry chunk is 88.10 kB (26.25 kB gzip), below
+   DEC-037's 300 kB warning budget. Passwords exist only in local form state and session identity
+   remains in the server's HttpOnly cookie—none enters router state, a query string, local storage
+   or session storage.
+
+Commits: `12d5f82` (shared refusal helper), `230464b` (login screen), `59fed62` (authentication
+coordinator and return destination), `969e55f` (setup), `c10a3e2` (account/sign-out), `71dc706`
+(first-refusal destination fix), and `afea4fb` (authenticated browser flows).
+
+Verification after the implementation froze: `make check` passed; `make test` passed 1,421 backend
+and 318 frontend tests; `npx playwright test` passed 134 with two configuration-dependent skips;
+and `npm run build` passed with the chunk sizes above. The exact test and browser commands had to
+run outside the filesystem sandbox after its known FastAPI TestClient futex stall and loopback
+`EPERM`; neither recurred there. `python scripts/validate_project.py` and `git diff --check` passed
+for the implementation checkpoint and again for closure.
+
+DEC-025 walkthrough: an isolated container built from the completed source claimed a realistically
+seeded *Rayuela*, exposed it immediately, signed out and back in at 390 px, then retained the same
+browser session across a real container restart. That application flow used four taps excluding
+typing. The owner subsequently rebuilt the standing Compose install with `AKASHA_AUTH=on` and
+confirmed the requested real-phone/tailnet checklist worked: Chrome and Firefox offered password
+save/fill and the signed-in session still opened without another login after the overnight check.
+The owner did not supply a separate device tap count, so the reproducible four-application-tap
+measurement is the reported figure; browser password-manager prompt interactions are excluded.
+
+Deviations and impact: the planned order of the setup and routing commits swapped because the
+inherited router RED was already the active TDD step. One additional `[FIX]` commit captures the
+concurrent-401 defect exposed while strengthening that test. No product contract, backend,
+OpenAPI, dependency, migration, canonical spec or future-sprint acceptance criterion changed.
+Sprints 079–082 were reviewed: 079 can consume the cached principal and account surface as planned;
+080's view-as work, 081's trusted-header/session work and 082's release gate remain unchanged.

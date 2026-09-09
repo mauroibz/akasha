@@ -1,6 +1,6 @@
 # Sprint 079 — The second library
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 078
 **Roadmap revision:** 40
 

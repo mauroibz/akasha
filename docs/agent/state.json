@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "in_progress",
-  "active_sprint": "078",
-  "active_sprint_file": "docs/sprints/078-the-way-in.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "077",
+  "project_status": "ready",
+  "active_sprint": "079",
+  "active_sprint_file": "docs/sprints/079-the-second-library.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "078",
   "completed_sprints": [
     "001",
     "002",
@@ -83,8 +83,9 @@
     "074",
     "075",
     "076",
-    "077"
+    "077",
+    "078"
   ],
-  "started_at": "2026-09-09T00:28:29-03:00",
-  "updated_at": "2026-09-09T00:28:29-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-09T12:22:45-03:00"
 }

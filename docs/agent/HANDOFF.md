@@ -1,53 +1,38 @@
-# Handoff — Sprint 078 awaits its real-phone walkthrough
+# Handoff — Sprint 079 ready: the second library
 
-`docs/agent/state.json` reads `project_status: "in_progress"`, `active_sprint: "078"`,
-`active_sprint_file: "docs/sprints/078-the-way-in.md"`, `active_sprint_status: "in_progress"`,
-`last_completed_sprint: "077"`, and `plan_revision: 40`. Keep it there: implementation and
-automated verification are complete, but the sprint's only non-automatable acceptance criterion
-has not been observed on the owner's device.
+`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "079"`,
+`active_sprint_file: "docs/sprints/079-the-second-library.md"`, `active_sprint_status: "ready"`,
+`last_completed_sprint: "078"`, and `plan_revision: 40`. Completed sprints run 001–078;
+`FINAL_SPRINT` remains 82. Claim 079 only after the normal context pass with:
 
-## Delivered and committed
+```console
+python scripts/sync_sprint_state.py --sprint 079 in_progress
+```
 
-- `12d5f82`: shared typed refusal handling across all six frontend API modules.
-- `230464b`: standalone login form and password-manager HTML contract.
-- `59fed62`: cached `/me` coordinator, outside-shell auth routes, safe return destination and
-  mid-session refusal handling.
-- `969e55f`: first-run setup that claims and immediately reveals the existing library.
-- `c10a3e2`: desktop/mobile-header account control and sign-out with private-cache clearing.
-- `71dc706`: concurrent refusals cannot overwrite the first requested destination.
-- `afea4fb`: auth-on end-to-end flows, 390 px/keyboard/44 px coverage and login/setup axe checks.
+## What Sprint 078 leaves behind
 
-Auth-off stays invisible through the default e2e fixture. Login and setup are lazy chunks outside
-`AppShell`. Passwords remain local form state; session credentials remain only in the HttpOnly
-cookie. No backend or OpenAPI contract changed. Review the final worklog entry for TDD detail and
-the complete verification evidence.
+The frontend now has a cached authentication coordinator, standalone login/setup routes, shared
+typed 401/setup-required handling, safe router-state return destinations, private-cache clearing,
+and an account/sign-out control. Auth-off remains invisible. The implementation commits are
+`12d5f82`, `230464b`, `59fed62`, `969e55f`, `c10a3e2`, `71dc706`, and `afea4fb`; the Sprint 078
+Outcome and final worklog carry the acceptance evidence and deviations.
 
-## Green gates
+Frozen gates: `make check` passed; `make test` passed 1,421 backend and 318 frontend tests;
+Playwright passed 134 with two configuration skips; and the production build passed with an
+88.10 kB entry chunk. The owner confirmed the real-phone/tailnet Chrome and Firefox password
+save/fill plus overnight-session walkthrough. No backend/OpenAPI contract or future-sprint plan
+changed.
 
-- `make check`: passed.
-- `make test`: 1,421 backend and 318 frontend tests passed outside the filesystem sandbox. The
-  sandbox run showed its known FastAPI TestClient futex stall, not a test failure.
-- `npx playwright test`: 134 passed, 2 configuration-dependent skips outside the sandbox. The
-  sandbox cannot connect to its loopback webserver (`EPERM`).
-- `npm run build`: passed; entry chunk 88.10 kB / 26.25 kB gzip, with separate login/setup chunks.
-- Disposable-container walkthrough at 390 px: setup claimed a seeded *Rayuela*, sign-out/sign-in
-  worked, and the same browser session survived a real container restart. Four taps excluding
-  typing; scratchpad Playwright result 1 passed. All exact disposable container/image/volumes were
-  removed, and read-only inventory showed no residue.
+## Sprint 079 starting point
 
-## Exact blocker and next action
+Read Sprints 075–078 Outcomes and every 079 Required-context document/code path fresh. The sprint
+adds admin-only user management, self-service password change, explicit transfer-or-delete
+semantics and the exhaustive route-enumerating isolation suite. Its highest-risk rule is that a
+cross-user object lookup returns `404`, while a non-admin calling a management route returns
+`403`; do not blur those cases. User deletion is irreversible and must never default to either
+transfer or delete. `items`, covers and attachments remain the shared cache.
 
-The required walkthrough must still be performed on a real phone over Mauro's tailnet. In Chrome
-and Firefox, confirm that the browser offers to save the password after successful login and to
-fill it on the next visit. Leave that signed-in session overnight, then confirm the application
-opens the next morning without another login. Record the browser names, save/fill observations,
-next-morning result and total tap count.
-
-If all observations pass, no product gate needs rerunning unless code/tests/configuration change:
-update Sprint 078's Outcome, atomically mark 078 completed and 079 ready, append the closure
-worklog/handoff, run `python scripts/validate_project.py` and `git diff --check`, and commit
-`[DOCS] Close sprint 078 and hand off`. If the manual walkthrough finds a defect, resume TDD and
-rerun every invalidated gate. Do not advance the sprint based on the disposable-container proxy.
-
-The owner's standing development stack (`akasha-akasha-1`) was never stopped or changed. No
-account, key, paid service, runtime data or irreversible owner decision was created.
+The owner's standing Compose install now runs the current branch with `AKASHA_AUTH=on` against the
+owner's persistent data volumes and contains the credentialed admin created during the walkthrough.
+Do not use it for Sprint 079 development or destructive user-management tests; use isolated
+temporary data, backups and browser profiles. Do not record or request the owner's password.

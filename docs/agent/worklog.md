@@ -5255,3 +5255,26 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   Outcome, run documentation-only closure checks, atomically complete 078 and ready 079, then
   commit `[DOCS] Close sprint 078 and hand off`. If it exposes a defect, resume TDD without
   advancing the sprint.
+
+## 2026-09-09 — Sprint 078 closed: the way in
+
+- Done: the owner rebuilt the standing Compose install from this branch with `AKASHA_AUTH=on` and
+  confirmed the requested real-phone/tailnet checklist worked, including Chrome and Firefox
+  password save/fill and reopening the overnight session without another login. This supplies the
+  only evidence the automated and disposable-container gates could not. Sprint 078 is completed
+  and Sprint 079 is ready.
+- Verified and how: the frozen implementation remains covered by `make check`; 1,421 backend and
+  318 frontend tests; 134 passing Playwright cases with two configuration skips; a production
+  build with an 88.10 kB entry chunk and separate login/setup chunks; a four-application-tap
+  disposable-container flow; and the owner's real-device confirmation above. Closure-only changes
+  passed `python scripts/validate_project.py` and `git diff --check`; no product gate was
+  invalidated after it ran.
+- Deviations: the owner did not provide a separate real-device tap count, so the Outcome reports
+  the reproducible four application taps from the matching container walkthrough, excluding
+  typing and browser password-manager prompt interactions. The setup/routing commit order swapped,
+  and one separate fix was needed for concurrent 401s; neither changed scope. No canonical spec,
+  backend contract or future sprint changed.
+- Next: Sprint 079 (The second library) is `ready`. It makes admin status enforceable, adds user
+  management and password change, defines transfer-or-delete semantics, and proves route-by-route
+  that two users' libraries cannot leak into each other. Start it with
+  `python scripts/sync_sprint_state.py --sprint 079 in_progress` after the normal context pass.
