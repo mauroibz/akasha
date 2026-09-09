@@ -2,7 +2,7 @@
 
 **Plan revision:** 40
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [076 — The request has a user](076-the-request-has-a-user.md). Sprints 001–075
+**Active sprint:** [077 — A password and a session](077-a-password-and-a-session.md). Sprints 001–076
 are complete — Sprint 071 closed the original v1 plan and the owner's 2026-09-05 readability
 feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section below.
 The owner's 2026-09-07 request for authentication and multiuser reopens the plan through 082 and

@@ -6052,3 +6052,47 @@ agreement with state.json, and the correct successor/activeness invariants; the 
 complete: sprint files are still open". The full insertion ritual (git mv, internal references,
 ROADMAP, FINAL_SPRINT, DEC entry) still carries the DEC-111 documented items — the script owns
 only the file-Status flip and state regeneration.
+## DEC-149 — Sprint 076 executed in one pass: the resolver answers a constant, jobs stay genuinely nullable, and undo hides another user's batch
+
+- **Date:** 2026-09-09
+- **Status:** accepted
+- **Cross-references:** DEC-146 (the plan this executes), DEC-147 (identity's schema choices
+  this sprint consumes: the nullable `jobs.user_id`, the seeded `admin` row), DEC-025 (the
+  walkthrough rule the two-user exercise followed).
+- **Context:** Sprint 076's bet was that a 24-site mechanical refactor, if typed end to end,
+  could not land half-done: a missing argument is a compile error, a resurfaced literal is a
+  failing guard test, and the whole existing suite is the regression witness. The sprint found
+  what it expected (six defaulted signatures plus one bare `EntryRow.user_id == 1` in
+  `enrichment.py`) and one question the plan left for execution: how the pieces that sit between
+  the resolver and the services are shaped, since they decide what Sprints 077–081 actually have
+  to touch.
+- **Decision.**
+  - **`Principal` travels, an `int` does not.** Every service, repository and walker takes the
+    resolved `user_id: int` it needs, but the API layer receives `CurrentUser` (an annotated
+    `Principal` dependency) and forwards `principal.effective_user_id`. The field Sprint 080
+    fills (`acting_as`) is already the one every caller reads, so impersonation widens one file.
+  - **`JobRepository.enqueue(user_id=None)` stays optional, and that is the correct contract,
+    not leftover looseness.** Migration 0019 deliberately gave `jobs.user_id` no default so a
+    batch-less backfill is never forged onto the seeded user; Sprint 076 preserved that by
+    threading `None` through `ClaimedJob.owner` and making the enrichment handler write *no
+    match note* for an owner-less job (the one deliberate behavior change; identical in a
+    one-user install, different the day a second user exists). Enrichment effects, by contrast,
+    are stamped from the batch's own ledger row, never from the job — a job queued before this
+    sprint still points at a batch that knows its owner.
+  - **Undo of another user's batch is a 404, not a 403.** `UndoService` raises `LookupError`
+    for a batch whose owner is not the caller, and the route publishes the same
+    `import_batch_not_found` body as a missing id. An enrichment job is likewise handed to the
+    handler unfiltered; exclusivity is enforced where the ledger is written, and there exactly.
+  - **The export walkers require a user; `iter_items` does not.** `iter_entries`,
+    `iter_export_rows`, `stream_export_view`, `export_json` lost their defaults entirely (AC3),
+    while the item walk stays unscoped because items are the shared cache and carry no opinion
+    nobody holds.
+  - **Worked for two users by flipping the resolver, not by touching it.** The walkthrough
+    overrides the resolver's answer per-user through `app.dependency_overrides` — the FastAPI
+    seam built for exactly the one-case DEC-146 carved out — rather than monkey-patching
+    `current_user` or adding a second seam. Nothing production reads any override.
+- **Consequences.** Sprint 077 turns `current_user`'s body into a session lookup in one file
+  and sets `app.state.auth` to `on` when a session is missing — no route or service signature
+  moves. Sprints 078–081 read `effective_user_id` and inherit impersonation for free. The guard
+  test (`test_no_hardcoded_user_outside_the_resolver`) is now the standing witness that the
+  single-user assumption never comes back through a constructor default.

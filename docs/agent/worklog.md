@@ -5123,3 +5123,34 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   note, and proven on a scratch repo: the swap `--sprint 077 planned --sprint 076 ready
   --plan-revision 41` lands one `ready` file with agreement in one atomic call, while the
   standalone demotion is still refused.
+## 2026-09-09 — Sprint 076 closed: the request has a user (DEC-149)
+
+- Done: executed Sprint 076 (The request has a user) end to end. `api/identity.py`'s
+  resolver is the single place that answers "whose request" (constant while `AKASHA_AUTH`
+  is `off`); every one of the 24 construction sites now takes the answer explicitly; the
+  five `DomainRepository` defaults plus `LibraryService`'s became required arguments;
+  `iter_entries`/`iter_export_rows`/`stream_export_view`/`export_json` are user-scoped
+  (`iter_items` stays unscoped — items are the shared cache); enrichment's literal
+  `EntryRow.user_id == 1` read the job's owner instead (an ownerless job writes no match
+  note — the one deliberate change, DEC-149); the import ledger is stamped deliberately
+  and undo refuses a batch that is not the caller's. Five implementation commits:
+  `2e62032`, `afa9182`, `8e9da80`, `59d9288`, `13afa0e`.
+- Verified and how: `make check` green (mypy strict on 68 files, OpenAPI contract
+  byte-identical both sides, validator). Backend suite 1397 passed (1384 at Sprint 075's
+  close: +5 identity tests — the guard among them written red first, committed `13afa0e` —
+  +4 two-user export tests, +2 ledger/undo tests, +1 ownerless-note test, +1
+  list/facets/insights scoping test); frontend 305 passed
+  (27 files); Playwright
+  128 passed / 2 config-skipped against a fresh backend on a disposable data dir. Benchmark
+  before/after both print "every scenario is within budget", query plans unchanged (the new
+  index-predicate hits `ix_entries_*` user-leading in both runs). DEC-025 walkthrough: two
+  directly-seeded users, one resolver answer each (bruno's pass via
+  `app.dependency_overrides`), and the library list, facets, insights, triage, export and an
+  import round-trip all carried only the acting user's rows everywhere.
+- Deviations: `test_undo.py` doesn't exist (undo coverage lives in `test_jobs.py`), so the
+  undo-ownership test landed in `test_generic_imports.py`; 33 test files and
+  `scripts/benchmark_library.py` picked up explicit `user_id=1` at constructor call sites
+  (named as required by AC6, which asks for every changed test); no assertion logic changed.
+- Next: Sprint 077 (A password and a session) is `ready` — claim it with
+  `python scripts/sync_sprint_state.py --sprint 077 in_progress`; it turns `current_user`'s
+  body into a session lookup and lifts `AKASHA_AUTH=on`.

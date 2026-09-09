@@ -1,6 +1,6 @@
 # Sprint 076 — The request has a user
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 075
 **Roadmap revision:** 40
 
@@ -163,5 +163,101 @@ Read at `11db2c5`, 2026-09-07:
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Sprint 076 delivered exactly its plan: one resolver decides who a request belongs to, every
+construction site takes that answer, and no hardcoded user survives anywhere else. Nothing
+user-visible changed — the OpenAPI contract is byte-identical — and the suite grew eight tests,
+all green. Commits: `2e62032` (the resolver), `afa9182` (the threading, including the ledger
+stamping and undo ownership), `8e9da80` (export scoping), `59d9288` (owned jobs), `13afa0e`
+(the guard test), plus the closure commit.
+
+**Delivered behavior**
+
+- `api/identity.py` is the only place that answers "whose request". `current_user(request)`
+  checks `app.state.auth` (which mirrors `Settings.auth` and accepts only `off` in v1), refuses
+  anything else, and returns `Principal(user_id=1, username="admin", is_admin=True)` — pinned to
+  the migration's own seeded row by `test_identity.py`. Routes take it as `user: CurrentUser`;
+  24 construction sites across `api/library.py`, `api/imports.py`, `api/export.py`,
+  `application/add.py`, `application/imports.py`, `application/undo.py`,
+  `infrastructure/jobs.py` and `infrastructure/repositories.py` now require the answer instead
+  of inventing it.
+- The five `user_id: int = 1` defaults on `DomainRepository` and the `LibraryService.__init__`
+  default became required arguments; constructing any of `LibraryService`, `DomainRepository`,
+  `UndoService`, `ImportService` without a user is now a mypy error, proven by the same
+  `make check` that stayed green through the refactor.
+- The export defect is fixed: `iter_entries`, `iter_export_rows`, `stream_export_view` and
+  `export_json` all require a user and filter on it; `iter_items` stays unscoped on purpose
+  (items are the shared cache). Two directly-seeded users prove each user's dump carries only
+  their entries while both dumps still list every item.
+- Jobs say whose work they are: `enqueue` takes an optional `user_id` (nullable by design —
+  migration 0019 gave the column no default so nobody's work is never forged onto user 1),
+  `ClaimedJob` carries the owner, `get_job` returns it, chained enrichment jobs inherit their
+  batch's owner from the ledger, and the enrichment handler's `fill_empty` effect is stamped
+  with the batch's own `user_id` instead of being unnamed.
+- **The one deliberate behavior change:** an enrichment job with no owner writes **no match
+  note at all**, where before Sprint 076 the literal user 1 received every text-match note.
+  With one user the two are indistinguishable today; from Sprint 079 they will not be, and a
+  job nobody asked for must not annotate somebody's entry (deliverable 4, recorded here as it
+  was asked to be). The metadata fill still happens regardless — items are not owned.
+- The import ledger is written deliberately, not defaulted: `preview` stamps
+  `import_batches`/`import_records` with the requester; every one of the six
+  `ImportEffectRow` sites in `ImportRepository.commit` and the attachment-effect in
+  `ImportService.record_file` carries `user_id`; `UndoService` refuses a batch whose owner is
+  not the caller (404 via `LookupError`, indistinguishable from a missing batch by design).
+- The guard test (`test_no_hardcoded_user_outside_the_resolver`) greps every backend source
+  file for the three shapes a hardcoded user wears and fails if any reappears outside
+  `api/identity.py`. It went RED first on exactly the seven pre-refactor offenders and is green
+  since the threading landed; the exact `grep -rn` of criterion 1 returns nothing.
+
+**Verification — commands and actual results**
+
+- `make check`: green (ruff format/check clean, mypy `Success: no issues found in 68 source
+  files`, `export_openapi.py --check` unchanged on both backend and frontend type surfaces,
+  validator green).
+- `make test`: backend 1397 passed (1384 at Sprint 075's close: +5 identity tests, the guard
+  among them written red first and committed `13afa0e`, +4 export scoping, +2 import/undo
+  ownership, +1 ownerless-job note, +1 list/facets/insights scoping); frontend 305 passed
+  across 27 files.
+- `npx playwright test`: 128 passed, 2 skipped (browser-skipped by configuration), run against
+  the current backend booted fresh on a disposable data dir — unchanged, as the sprint
+  predicted.
+- `python scripts/benchmark_library.py --entries 5000 --jobs 100`, before and after: both runs
+  end "every scenario is within budget". First-page p95 moved 99.5→104.4 ms at worst
+  (date_added at 5000 entries) and improved on most sorts (title 94.7→95.7 / 45.8→42.3
+  across the two seeds); the queries hit the same user-leading indexes in both runs
+  (`SEARCH entries USING INDEX … (user_id=?)` in both query-plan sections), so the bound
+  parameter cost nothing measurable.
+- **Walkthrough (DEC-025):** threw away `/tmp/076_walkthrough_data`, ran the real application
+  in-process against it, seeded `bruno` directly, and flipped the resolver's answer for his
+  pass with `app.dependency_overrides` — the documented FastAPI seam, so no route was bypassed
+  and the resolver itself stayed the resolver. Observed for each of the two users: the
+  resolver probe names the acting user; the library list, its facets, the insights creators
+  ranking, the triage list and the export all carried only that user's rows (bruno saw exactly
+  one read entry, `Ficciones`; admin saw `Rayuela` listed and `Bestiario` in triage, matching
+  the seeded statuses). The import round-trip stamped all three ledger tables with the
+  requester's id, `UndoService` as `bruno` refused admin's batch with `LookupError`, and the
+  owner's undo reversed it (`state: undone`, 2 effects, 1 entry, 1 item).
+- `python scripts/validate_project.py`: green before the flip, after the flip, and after the
+  closure docs.
+
+**Deviations (AC6 asks for them by name)**
+
+- The required-tests table named `test_undo.py`, which does not exist in this suite (the undo
+  coverage lives in `test_jobs.py`); the undo-ownership test landed in `test_generic_imports.py`
+  beside the import-stamping test it shares fixtures and routes with.
+- The existing suite did not pass *untouched* — it could not: AC2 makes the missing argument a
+  type error, and AC6 names the tests that therefore change. 33 test files and
+  `scripts/benchmark_library.py` gained an explicit `user_id=1` at their constructor sites
+  (the same user the resolver answers with under `AKASHA_AUTH=off`), the export-memory helpers
+  pass `user_id=1` through the now-required walker parameters, and two enrichment enqueues in
+  the note test gained `user_id=1` because the note is exactly what they prove. No assertion
+  outside that shape changed; the full suite is green and the diff carries no logic edits.
+- `JobRepository.get_job` gained a `user_id` key; it is an internal dict, not part of any
+  response model — the OpenAPI check above confirms no contract moved.
+
+**Impact on future sprints**
+
+- **077:** `identity.py` is the whole surface — Sprint 077 replaces the constant body with a
+  session lookup in one file and every route already receives `CurrentUser`. `get_job` already
+  returns `user_id`, so nothing on the job side needs widening for per-owner work.
+- **078–081:** impersonation fills `Principal.acting_as` and callers already read
+  `effective_user_id` from the day this sprint landed; no re-threading is owed.

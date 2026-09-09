@@ -1,6 +1,6 @@
 # Sprint 077 — A password and a session
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 076
 **Roadmap revision:** 40
 
