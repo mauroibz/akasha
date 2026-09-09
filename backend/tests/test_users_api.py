@@ -330,18 +330,14 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
         ) as client:
             await login(client, "admin", ADMIN_PASSWORD)
             second = await create_second(client)
-            owned = DomainRepository(
-                app.state.engine, int(second["id"])
-            ).create_or_get_entry(
+            owned = DomainRepository(app.state.engine, int(second["id"])).create_or_get_entry(
                 title="The second library"
             )
             shelf_id = DomainRepository(app.state.engine, int(second["id"])).create_shelf("Moved")
             DomainRepository(app.state.engine, int(second["id"])).attach_shelf(
                 owned.entry_id, shelf_id
             )
-            batch_id = seed_import_ledger(
-                app, int(second["id"]), owned.entry_id, owned.item_id
-            )
+            batch_id = seed_import_ledger(app, int(second["id"]), owned.entry_id, owned.item_id)
             transferred = await client.request(
                 "DELETE",
                 f"/api/users/{second['id']}",
@@ -361,17 +357,23 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
                 ).scalar_one()
                 == 1
             )
-            assert connection.execute(
-                text(
-                    "SELECT count(*) FROM entry_shelves "
-                    "WHERE entry_id=:entry AND shelf_id=:shelf"
-                ),
-                {"entry": owned.entry_id, "shelf": shelf_id},
-            ).scalar_one() == 1
-            assert connection.execute(
-                text("SELECT user_id FROM import_batches WHERE id=:batch"),
-                {"batch": batch_id},
-            ).scalar_one() == 1
+            assert (
+                connection.execute(
+                    text(
+                        "SELECT count(*) FROM entry_shelves "
+                        "WHERE entry_id=:entry AND shelf_id=:shelf"
+                    ),
+                    {"entry": owned.entry_id, "shelf": shelf_id},
+                ).scalar_one()
+                == 1
+            )
+            assert (
+                connection.execute(
+                    text("SELECT user_id FROM import_batches WHERE id=:batch"),
+                    {"batch": batch_id},
+                ).scalar_one()
+                == 1
+            )
             for table in ("import_records", "import_effects", "jobs"):
                 assert (
                     connection.execute(
