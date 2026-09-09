@@ -19,7 +19,7 @@ jobs:
       - uses: actions/checkout@v7
       # Pinned to the exact tag: setup-uv publishes a floating major only for
       # older lines (v6, v6.8), and no `v10` alias exists yet.
-      - uses: astral-sh/setup-uv@v10.0.0
+      - uses: astral-sh/setup-uv@v10.0.1
         with:
           enable-cache: true
           python-version: "3.12"
