@@ -10,9 +10,9 @@ row, not an invention.
 import re
 from pathlib import Path
 
+import httpx
 import pytest
 from fastapi import Request
-from fastapi.testclient import TestClient
 from sqlalchemy import text
 
 from book_tracker.api.identity import CurrentUser, Principal, current_user
@@ -55,8 +55,11 @@ async def test_off_auth_resolves_to_the_seeded_user(tmp_path: Path) -> None:
         received.append(user)
         return {"user_id": user.user_id}
 
-    async with app.router.lifespan_context(app):
-        response = TestClient(app).get("/_identity_probe")
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        response = await client.get("/_identity_probe")
 
     assert response.status_code == 200
     assert response.json() == {"user_id": 1}

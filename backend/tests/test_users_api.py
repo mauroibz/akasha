@@ -470,8 +470,15 @@ async def test_acting_as_ends_on_logout_target_deletion_and_either_password_chan
             )
             assert deleted.status_code == 204
             assert SessionStore(app.state.engine).lookup(token).acting_as_user_id is None
+            assert (await admin.get("/api/entries")).status_code == 200
+            assert (await admin.get("/api/auth/me")).json()["acting_as"] is None
 
             third = await create_second(admin)
+            expired = SessionStore(app.state.engine).create(1, now=datetime(2024, 1, 1, tzinfo=UTC))
+            assert SessionStore(app.state.engine).set_acting_as(expired.token, third["id"]) == 1
+            assert (
+                SessionStore(app.state.engine).lookup(expired.token, now=expired.expires_at) is None
+            )
             assert (await admin.post(f"/api/auth/act-as/{third['id']}")).status_code == 204
             assert (await admin.delete("/api/auth/session")).status_code == 204
             assert SessionStore(app.state.engine).lookup(token) is None

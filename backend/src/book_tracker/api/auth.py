@@ -519,7 +519,8 @@ async def update_user(
     current = _user_by_id(request.app.state.engine, user_id)
     if current is None:
         raise LibraryError("user_not_found", "User was not found", status_code=404)
-    if body.is_admin is False and bool(current["is_admin"]):
+    demoting = body.is_admin is False and bool(current["is_admin"])
+    if demoting:
         with request.app.state.engine.connect() as connection:
             admins = int(
                 connection.execute(text("SELECT count(*) FROM users WHERE is_admin=1")).scalar_one()
@@ -547,7 +548,7 @@ async def update_user(
         if body.password is not None:
             SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
             SessionStore(request.app.state.engine).delete_all(user_id)
-        elif body.is_admin is False:
+        elif demoting:
             SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
     row = _user_by_id(request.app.state.engine, user_id)
     assert row is not None
@@ -594,7 +595,11 @@ async def change_password(
     status_code=204,
     response_class=Response,
     response_model=None,
-    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+    responses={
+        403: {"model": ErrorResponse},
+        404: {"model": ErrorResponse},
+        422: {"model": ErrorResponse},
+    },
 )
 async def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> Response:
     require_auth_mode(request)

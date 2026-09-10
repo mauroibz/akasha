@@ -499,6 +499,38 @@ async def test_admin_acting_as_one_user_can_write_theirs_but_not_a_thirds(
             changed = await admin.patch(f"/api/entries/{bruno_entry.entry_id}", json={"score": 9})
             assert changed.status_code == 200
             assert (await admin.delete(f"/api/entries/{elena_entry.entry_id}")).status_code == 404
+            shelf = await admin.post("/api/shelves", json={"name": "Needs repair"})
+            assert shelf.status_code == 201
+            shelf_id = shelf.json()["id"]
+            assigned = await admin.patch(
+                f"/api/entries/{bruno_entry.entry_id}", json={"shelf_ids": [shelf_id]}
+            )
+            assert assigned.status_code == 200
+            assert assigned.json()["shelves"][0]["name"] == "Needs repair"
+            renamed = await admin.patch(
+                f"/api/shelves/{shelf_id}", json={"name": "Repaired by admin"}
+            )
+            assert renamed.status_code == 200
+            with app.state.engine.connect() as connection:
+                assert (
+                    connection.execute(
+                        text("SELECT user_id FROM shelves WHERE id=:id"), {"id": shelf_id}
+                    ).scalar_one()
+                    == 2
+                )
+            assert (await admin.delete(f"/api/shelves/{shelf_id}")).status_code == 204
+
+            disposable = await admin.post(
+                "/api/entries",
+                json={
+                    "manual": {"item_type": "book", "title": "Wrong import"},
+                    "idempotency_key": "wrong-import",
+                },
+            )
+            assert disposable.status_code == 201
+            assert (
+                await admin.delete(f"/api/entries/{disposable.json()['entry']['id']}")
+            ).status_code == 204
             created = await admin.post(
                 "/api/entries",
                 json={
