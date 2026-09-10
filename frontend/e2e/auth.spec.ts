@@ -32,13 +32,27 @@ test("first-run setup claims the library by keyboard at 390px", async ({
   await expect(
     page.getByText(/claims the library already on this install/i),
   ).toBeVisible();
+  const setupUsername = page.getByLabel("Username");
+  await expect(setupUsername).toHaveAttribute("inputmode", "text");
+  await expect(setupUsername).toHaveAttribute("autocapitalize", "none");
   for (const control of [
-    page.getByLabel("Username"),
+    setupUsername,
     page.getByLabel("Display name"),
     page.getByLabel("Password"),
     page.getByRole("button", { name: "Claim library" }),
   ]) {
     expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  for (const input of [
+    setupUsername,
+    page.getByLabel("Display name"),
+    page.getByLabel("Password"),
+  ]) {
+    expect(
+      await input.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).fontSize),
+      ),
+    ).toBeGreaterThanOrEqual(16);
   }
 
   await expect(page.getByLabel("Username")).toBeFocused();
@@ -81,9 +95,18 @@ test("login returns to the private address that was requested", async ({
   const password = page.getByLabel("Password");
   const submit = page.getByRole("button", { name: "Sign in" });
   await expect(username).toHaveAttribute("autocomplete", "username");
+  await expect(username).toHaveAttribute("inputmode", "text");
+  await expect(username).toHaveAttribute("autocapitalize", "none");
   await expect(password).toHaveAttribute("autocomplete", "current-password");
   for (const control of [username, password, submit]) {
     expect((await control.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  for (const input of [username, password]) {
+    expect(
+      await input.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).fontSize),
+      ),
+    ).toBeGreaterThanOrEqual(16);
   }
   await expect(username).toBeFocused();
   await expectFocusRing(username);
@@ -101,6 +124,51 @@ test("login returns to the private address that was requested", async ({
   await expect(page.getByRole("heading", { name: "Favorites" })).toBeVisible();
 });
 
+test("account sessions stay usable without step-up prompts at 390px", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubAuth(page, "authenticated");
+  await page.route("**/api/users", (route) => route.fulfill({ json: [] }));
+  await page.goto("/");
+  await page.getByRole("button", { name: "Mauro" }).first().click();
+  await page.getByRole("button", { name: "People" }).click();
+
+  await expect(
+    page.getByRole("heading", { name: "Your sessions" }),
+  ).toBeVisible();
+  await expect(page.getByText("Current session")).toBeVisible();
+  await expect(page.getByText("Mobile Safari", { exact: true })).toBeVisible();
+  for (const input of [
+    page.getByLabel("Current password"),
+    page.getByLabel("New password"),
+  ]) {
+    await expect(input).toHaveAttribute("type", "password");
+    expect(
+      await input.evaluate((node) =>
+        Number.parseFloat(getComputedStyle(node).fontSize),
+      ),
+    ).toBeGreaterThanOrEqual(16);
+  }
+  for (const button of [
+    page.getByRole("button", { name: "Sign out this session" }),
+    page.getByRole("button", { name: "Sign out Mobile Safari" }),
+    page.getByRole("button", { name: "Sign out everywhere" }),
+  ]) {
+    expect((await button.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  }
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+
+  await page.getByRole("button", { name: "Sign out Mobile Safari" }).click();
+  await expect(page.getByText("Mobile Safari", { exact: true })).toHaveCount(0);
+});
+
 test("sign out cannot be undone with browser back", async ({ page }) => {
   await stubAuth(page, "authenticated");
   await seedLibrary(page, 1);
@@ -112,7 +180,7 @@ test("sign out cannot be undone with browser back", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Favorites" })).toBeVisible();
 
   await page.getByRole("button", { name: "Mauro" }).click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.goBack();
 
@@ -279,7 +347,7 @@ test("two people build two libraries without seeing each other's rows", async ({
   await page.getByLabel("Initial password").fill("bruno password");
   await page.getByRole("button", { name: "Create person" }).click();
   await page.getByRole("button", { name: "Mauro" }).first().click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await expect(page).toHaveURL(/\/login$/);
   await page.getByLabel("Username").fill("bruno");
   await page.getByLabel("Password").fill("bruno password");
@@ -297,7 +365,7 @@ test("two people build two libraries without seeing each other's rows", async ({
   await expect(page.getByText("Seeded book 0003")).toHaveCount(0);
 
   await page.getByRole("button", { name: "Bruno" }).first().click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByLabel("Username").fill("admin");
   await page.getByLabel("Password").fill("admin password");
   await page.getByRole("button", { name: "Sign in" }).click();
@@ -327,7 +395,7 @@ test("two people build two libraries without seeing each other's rows", async ({
   ).toBeVisible();
   await expect(page.getByText("Ficciones")).toHaveCount(0);
   await page.getByRole("button", { name: "Mauro" }).first().click();
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByLabel("Username").fill("bruno");
   await page.getByLabel("Password").fill("bruno password");
   await page.getByRole("button", { name: "Sign in" }).click();

@@ -74,6 +74,10 @@ export function LoginPage({
           <Input
             id="login-username"
             name="username"
+            type="text"
+            inputMode="text"
+            autoCapitalize="none"
+            spellCheck={false}
             autoComplete="username"
             className="min-h-11"
             value={username}

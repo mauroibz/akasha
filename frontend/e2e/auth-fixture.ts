@@ -21,6 +21,22 @@ export async function stubAuth(page: Page, initial: AuthMode) {
   let setupRequired = initial === "setup";
   let authenticated = initial === "authenticated" || initial === "acting";
   let actingAs = initial === "acting" ? actingUser : null;
+  let sessions = [
+    {
+      id: "current-browser",
+      created_at: "2026-09-01T12:00:00Z",
+      last_seen_at: "2026-09-10T12:00:00Z",
+      user_agent: "Chromium on this device",
+      current: true,
+    },
+    {
+      id: "phone",
+      created_at: "2026-08-01T12:00:00Z",
+      last_seen_at: "2026-09-09T12:00:00Z",
+      user_agent: "Mobile Safari",
+      current: false,
+    },
+  ];
 
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({
@@ -65,6 +81,22 @@ export async function stubAuth(page: Page, initial: AuthMode) {
     authenticated = false;
     actingAs = null;
     await route.fulfill({ status: 204, body: "" });
+  });
+  await page.route("**/api/auth/sessions/*", async (route) => {
+    const id = new URL(route.request().url()).pathname.split("/").pop();
+    const revoked = sessions.find((session) => session.id === id);
+    sessions = sessions.filter((session) => session.id !== id);
+    if (revoked?.current) authenticated = false;
+    await route.fulfill({ status: 204, body: "" });
+  });
+  await page.route("**/api/auth/sessions", async (route) => {
+    if (route.request().method() === "DELETE") {
+      sessions = [];
+      authenticated = false;
+      await route.fulfill({ status: 204, body: "" });
+      return;
+    }
+    await route.fulfill({ json: sessions });
   });
   await page.route("**/api/auth/act-as/**", async (route) => {
     actingAs = actingUser;

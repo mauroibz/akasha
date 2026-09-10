@@ -227,6 +227,10 @@ test("people settings hold at 390px with no serious accessibility violations", a
   await expect(
     page.getByRole("heading", { name: "People", exact: true }).first(),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your sessions" }),
+  ).toBeVisible();
+  await expect(page.getByText("Current session")).toBeVisible();
   for (const control of [
     page.getByLabel("Current password"),
     page.getByLabel("New password"),
