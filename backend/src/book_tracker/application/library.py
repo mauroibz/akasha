@@ -1464,7 +1464,20 @@ class LibraryService:
             filters.get("format", []),
         )
         if excluded_entry_ids:
-            query = query.where(EntryRow.id.not_in(excluded_entry_ids))
+            unique_exclusions = set(excluded_entry_ids)
+            owned_exclusions = set(
+                session.scalars(
+                    select(EntryRow.id).where(
+                        EntryRow.user_id == self.user_id,
+                        EntryRow.id.in_(unique_exclusions),
+                    )
+                )
+            )
+            if owned_exclusions != unique_exclusions:
+                raise LibraryError(
+                    "entry_not_found", "One or more entries were not found", status_code=404
+                )
+            query = query.where(EntryRow.id.not_in(unique_exclusions))
         return list(session.scalars(query))
 
     def bulk_update(

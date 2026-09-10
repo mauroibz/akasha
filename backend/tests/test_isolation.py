@@ -182,10 +182,37 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
 
 
 PRIVATE_PROBES = (
+    (
+        "POST",
+        "/api/entries",
+        {
+            "manual": {"item_type": "book", "title": "Probe"},
+            "idempotency_key": "cross-user-shelf-probe",
+            "shelf_ids": ["SHELF"],
+        },
+        None,
+    ),
     ("GET", "/api/entries/{entry_id}", None, None),
     ("PATCH", "/api/entries/{entry_id}", {"notes": "probe"}, None),
+    ("PATCH", "/api/entries/{second_entry_id}", {"shelf_ids": ["SHELF"]}, None),
     ("DELETE", "/api/entries/{entry_id}", None, None),
     ("PATCH", "/api/entries/bulk", {"entry_ids": ["ENTRY"], "set": {"score": 5}}, None),
+    (
+        "PATCH",
+        "/api/entries/bulk",
+        {"entry_ids": ["SECOND_ENTRY"], "set": {"add_shelves": ["SHELF"]}},
+        None,
+    ),
+    (
+        "PATCH",
+        "/api/entries/bulk",
+        {
+            "filter": {"status": ["unsorted"]},
+            "excluded_entry_ids": ["ENTRY"],
+            "set": {"score": 5},
+        },
+        None,
+    ),
     ("GET", "/api/items/{item_id}", None, None),
     ("PATCH", "/api/items/{item_id}", {"title": "probe"}, None),
     ("GET", "/api/items/{item_id}/cover", None, None),
@@ -231,11 +258,18 @@ async def test_another_users_ids_are_always_404(
     )
     async with app.router.lifespan_context(app):
         ids = _seed_users_and_private_rows(app, tmp_path)
+        ids["second_entry_id"] = (
+            DomainRepository(app.state.engine, 2)
+            .create_or_get_entry(title="Second user's own entry")
+            .entry_id
+        )
         path = path_template.format(**ids)
         payload = (
             json.loads(
                 json.dumps(body)
                 .replace('"ENTRY"', str(ids["entry_id"]))
+                .replace('"SECOND_ENTRY"', str(ids["second_entry_id"]))
+                .replace('"SHELF"', str(ids["shelf_id"]))
                 .replace('"BATCH"', json.dumps(ids["batch_id"]))
             )
             if body
