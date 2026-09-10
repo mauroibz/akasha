@@ -1224,6 +1224,7 @@ def test_the_foreign_key_revision_downgrades_without_the_keys(tmp_path: Path) ->
 
 
 LEDGER_REVISION = "0019_ownership_on_the_import_ledger"
+USER_SCOPED_IMPORT_REVISION = "0020_user_scoped_import_fingerprints"
 
 
 def test_the_import_ledger_and_job_queue_belong_to_the_seeded_user(tmp_path: Path) -> None:
@@ -1502,5 +1503,70 @@ def test_the_ownership_revision_downgrades_without_user_columns(tmp_path: Path) 
     assert connection.execute("SELECT count(*) FROM import_records").fetchone()[0] == 1
     assert connection.execute("SELECT count(*) FROM import_effects").fetchone()[0] == 1
     assert connection.execute("SELECT count(*) FROM jobs").fetchone()[0] == 2
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    connection.close()
+
+
+def test_import_fingerprint_identity_becomes_user_scoped_and_downgrades(tmp_path: Path) -> None:
+    """Two owners may import one source, while each owner still gets idempotency."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", LEDGER_REVISION)
+    database_path = configured.data_dir / "books.db"
+    assert configured.database_url is not None
+    connection = sqlite3.connect(database_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        "INSERT INTO users (id,username,is_admin,created_at,updated_at) VALUES (2,'second',0,?,?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO import_batches "
+        "(id,user_id,kind,fingerprint,state,source_descriptor,preview_summary,counters,"
+        "created_at,updated_at) VALUES "
+        "('first',1,'goodreads','same','previewed','{}','{}','{}',?,?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    with pytest.raises(sqlite3.IntegrityError):
+        connection.execute(
+            "INSERT INTO import_batches "
+            "(id,user_id,kind,fingerprint,state,source_descriptor,preview_summary,counters,"
+            "created_at,updated_at) VALUES "
+            "('blocked',2,'goodreads','same','previewed','{}','{}','{}',?,?)",
+            (NOW, NOW),
+        )
+    connection.rollback()
+    connection.close()
+
+    command.upgrade(alembic_config(configured.database_url), USER_SCOPED_IMPORT_REVISION)
+    connection = sqlite3.connect(database_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        "INSERT INTO import_batches "
+        "(id,user_id,kind,fingerprint,state,source_descriptor,preview_summary,counters,"
+        "created_at,updated_at) VALUES "
+        "('second',2,'goodreads','same','previewed','{}','{}','{}',?,?)",
+        (NOW, NOW),
+    )
+    connection.commit()
+    ddl = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='import_batches'"
+    ).fetchone()[0]
+    assert "CONSTRAINT uq_import_batch_user_input UNIQUE (user_id, kind, fingerprint)" in ddl
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+
+    # A downgrade can restore the old global identity once cross-user duplicates
+    # have been reconciled. The migration must retain the rows and old constraint.
+    connection.execute("DELETE FROM import_batches WHERE id='second'")
+    connection.commit()
+    connection.close()
+    command.downgrade(alembic_config(configured.database_url), LEDGER_REVISION)
+    connection = sqlite3.connect(database_path)
+    ddl = connection.execute(
+        "SELECT sql FROM sqlite_master WHERE name='import_batches'"
+    ).fetchone()[0]
+    assert "CONSTRAINT uq_import_batch_input UNIQUE (kind, fingerprint)" in ddl
+    assert connection.execute("SELECT id FROM import_batches").fetchall() == [("first",)]
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     connection.close()
