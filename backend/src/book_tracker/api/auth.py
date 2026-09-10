@@ -62,6 +62,7 @@ class MeResponse(BaseModel):
     authenticated: bool
     setup_required: bool
     user: UserResponse | None
+    acting_as: UserResponse | None
 
 
 class UserSummary(UserResponse):
@@ -133,6 +134,17 @@ def _user_response(identity: SessionIdentity) -> UserResponse:
         username=identity.username,
         display_name=identity.display_name,
         is_admin=identity.is_admin,
+    )
+
+
+def _acting_as_response(identity: SessionIdentity) -> UserResponse | None:
+    if identity.acting_as_user_id is None or identity.acting_as_username is None:
+        return None
+    return UserResponse(
+        id=identity.acting_as_user_id,
+        username=identity.acting_as_username,
+        display_name=identity.acting_as_display_name,
+        is_admin=bool(identity.acting_as_is_admin),
     )
 
 
@@ -372,6 +384,7 @@ async def me(request: Request) -> MeResponse:
         authenticated=identity is not None,
         setup_required=needs_setup,
         user=_user_response(identity) if identity is not None else None,
+        acting_as=_acting_as_response(identity) if identity is not None else None,
     )
 
 
@@ -532,7 +545,10 @@ async def update_user(
                 text(f"UPDATE users SET {','.join(assignments)} WHERE id=:user_id"), values
             )
         if body.password is not None:
+            SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
             SessionStore(request.app.state.engine).delete_all(user_id)
+        elif body.is_admin is False:
+            SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
     row = _user_by_id(request.app.state.engine, user_id)
     assert row is not None
     return _management_response(row)
@@ -567,8 +583,47 @@ async def change_password(
             },
         )
     token = request.cookies.get(COOKIE_NAME)
+    SessionStore(request.app.state.engine).clear_acting_as_for_user(user.user_id)
     if token:
         SessionStore(request.app.state.engine).delete_other(user.user_id, token)
+    return Response(status_code=204)
+
+
+@router.post(
+    "/act-as/{user_id}",
+    status_code=204,
+    response_class=Response,
+    response_model=None,
+    responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+)
+async def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> Response:
+    require_auth_mode(request)
+    target = _user_by_id(request.app.state.engine, user_id)
+    if target is None:
+        raise LibraryError("user_not_found", "User was not found", status_code=404)
+    if user_id == admin.user_id:
+        raise LibraryError(
+            "invalid_acting_user", "Choose another person's library", status_code=422
+        )
+    token = request.cookies.get(COOKIE_NAME)
+    if token is None or SessionStore(request.app.state.engine).set_acting_as(token, user_id) != 1:
+        return unauthenticated()
+    return Response(status_code=204)
+
+
+@router.delete(
+    "/act-as",
+    status_code=204,
+    response_class=Response,
+    response_model=None,
+    responses={403: {"model": ErrorResponse}},
+)
+async def stop_acting_as(request: Request, _admin: AdminUser) -> Response:
+    require_auth_mode(request)
+    token = request.cookies.get(COOKIE_NAME)
+    if token is None:
+        return unauthenticated()
+    SessionStore(request.app.state.engine).clear_acting_as(token)
     return Response(status_code=204)
 
 

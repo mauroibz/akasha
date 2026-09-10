@@ -44,6 +44,10 @@ class SessionIdentity:
     username: str
     display_name: str | None
     is_admin: bool
+    acting_as_user_id: int | None
+    acting_as_username: str | None
+    acting_as_display_name: str | None
+    acting_as_is_admin: bool | None
 
 
 class SessionStore:
@@ -89,8 +93,12 @@ class SessionStore:
                 connection.execute(
                     text(
                         "SELECT sessions.id, sessions.token_hash, sessions.expires_at, "
-                        "users.id AS user_id, users.username, users.display_name, users.is_admin "
+                        "users.id AS user_id, users.username, users.display_name, users.is_admin, "
+                        "target.id AS acting_as_user_id, target.username AS acting_as_username, "
+                        "target.display_name AS acting_as_display_name, "
+                        "target.is_admin AS acting_as_is_admin "
                         "FROM sessions JOIN users ON users.id = sessions.user_id "
+                        "LEFT JOIN users target ON target.id = sessions.acting_as_user_id "
                         "WHERE sessions.token_hash = :token_hash"
                     ),
                     {"token_hash": digest},
@@ -116,7 +124,62 @@ class SessionStore:
             username=str(row["username"]),
             display_name=(str(row["display_name"]) if row["display_name"] is not None else None),
             is_admin=bool(row["is_admin"]),
+            acting_as_user_id=(
+                int(row["acting_as_user_id"])
+                if row["acting_as_user_id"] is not None and bool(row["is_admin"])
+                else None
+            ),
+            acting_as_username=(
+                str(row["acting_as_username"])
+                if row["acting_as_username"] is not None and bool(row["is_admin"])
+                else None
+            ),
+            acting_as_display_name=(
+                str(row["acting_as_display_name"])
+                if row["acting_as_display_name"] is not None and bool(row["is_admin"])
+                else None
+            ),
+            acting_as_is_admin=(
+                bool(row["acting_as_is_admin"])
+                if row["acting_as_is_admin"] is not None and bool(row["is_admin"])
+                else None
+            ),
         )
+
+    def set_acting_as(self, token: str, user_id: int) -> int:
+        """Point exactly the cookie's session at a target user."""
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                text(
+                    "UPDATE sessions SET acting_as_user_id = :target WHERE token_hash = :token_hash"
+                ),
+                {"target": user_id, "token_hash": token_hash(token)},
+            )
+        return int(result.rowcount)
+
+    def clear_acting_as(self, token: str) -> int:
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                text(
+                    "UPDATE sessions SET acting_as_user_id = NULL "
+                    "WHERE token_hash = :token_hash AND acting_as_user_id IS NOT NULL"
+                ),
+                {"token_hash": token_hash(token)},
+            )
+        return int(result.rowcount)
+
+    def clear_acting_as_for_user(self, user_id: int) -> int:
+        """End modes owned by, or aimed at, a user whose identity changed."""
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                text(
+                    "UPDATE sessions SET acting_as_user_id = NULL "
+                    "WHERE acting_as_user_id = :user_id "
+                    "OR (user_id = :user_id AND acting_as_user_id IS NOT NULL)"
+                ),
+                {"user_id": user_id},
+            )
+        return int(result.rowcount)
 
     def delete(self, token: str) -> int:
         with self.engine.begin() as connection:

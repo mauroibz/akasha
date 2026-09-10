@@ -86,6 +86,8 @@ async def test_auth_off_keeps_routes_absent_and_library_open(tmp_path: Path) -> 
                 "/api/auth/password",
                 {"current_password": PASSWORD, "new_password": "another private password"},
             ),
+            ("post", "/api/auth/act-as/1", None),
+            ("delete", "/api/auth/act-as", None),
             ("get", "/api/users", None),
             ("post", "/api/users", {"username": "somebody", "password": PASSWORD}),
             ("patch", "/api/users/1", {"display_name": "Somebody"}),
@@ -207,6 +209,7 @@ async def test_setup_gates_api_then_claims_the_existing_library(tmp_path: Path) 
                 "authenticated": False,
                 "setup_required": True,
                 "user": None,
+                "acting_as": None,
             }
             shell = await client.get("/books/1")
             assert shell.status_code == 200
@@ -378,6 +381,8 @@ def test_openapi_carries_auth_routes_and_boundary_errors(tmp_path: Path) -> None
         "/api/auth/session",
         "/api/auth/me",
         "/api/auth/setup",
+        "/api/auth/act-as/{user_id}",
+        "/api/auth/act-as",
     ):
         assert path in schema["paths"]
     responses = schema["paths"]["/api/entries"]["get"]["responses"]

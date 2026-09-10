@@ -382,3 +382,102 @@ async def test_transfer_moves_the_library_and_ledger_intact(tmp_path: Path) -> N
                     ).scalar_one()
                     == 1
                 )
+
+
+@pytest.mark.anyio
+async def test_admin_sets_and_clears_acting_as_on_only_the_current_session(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        credential_admin(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as admin:
+            token = await login(admin, "admin", ADMIN_PASSWORD)
+            second = await create_second(admin)
+            sibling = SessionStore(app.state.engine).create(1)
+
+            started = await admin.post(f"/api/auth/act-as/{second['id']}")
+            assert started.status_code == 204
+            me = await admin.get("/api/auth/me")
+            assert me.json()["user"]["id"] == 1
+            assert me.json()["acting_as"] == {
+                "id": second["id"],
+                "username": "bruno",
+                "display_name": "Bruno",
+                "is_admin": False,
+            }
+            assert SessionStore(app.state.engine).lookup(token).acting_as_user_id == second["id"]
+            assert SessionStore(app.state.engine).lookup(sibling.token).acting_as_user_id is None
+
+            stopped = await admin.delete("/api/auth/act-as")
+            assert stopped.status_code == 204
+            assert (await admin.get("/api/auth/me")).json()["acting_as"] is None
+
+
+@pytest.mark.anyio
+async def test_non_admin_is_refused_both_act_as_routes(tmp_path: Path) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        credential_admin(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            await login(client, "admin", ADMIN_PASSWORD)
+            await create_second(client)
+            client.cookies.clear()
+            await login(client, "bruno", SECOND_PASSWORD)
+            for response in (
+                await client.post("/api/auth/act-as/1"),
+                await client.delete("/api/auth/act-as"),
+            ):
+                assert response.status_code == 403
+                assert response.json()["error"]["code"] == "forbidden"
+
+
+@pytest.mark.anyio
+async def test_acting_as_ends_on_logout_target_deletion_and_either_password_change(
+    tmp_path: Path,
+) -> None:
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        credential_admin(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as admin:
+            token = await login(admin, "admin", ADMIN_PASSWORD)
+            second = await create_second(admin)
+            assert (await admin.post(f"/api/auth/act-as/{second['id']}")).status_code == 204
+
+            changed = await admin.patch(
+                "/api/auth/password",
+                json={"current_password": ADMIN_PASSWORD, "new_password": "admin changed"},
+            )
+            assert changed.status_code == 204
+            assert SessionStore(app.state.engine).lookup(token).acting_as_user_id is None
+
+            assert (await admin.post(f"/api/auth/act-as/{second['id']}")).status_code == 204
+            reset = await admin.patch(
+                f"/api/users/{second['id']}", json={"password": "second changed"}
+            )
+            assert reset.status_code == 200
+            assert SessionStore(app.state.engine).lookup(token).acting_as_user_id is None
+
+            assert (await admin.post(f"/api/auth/act-as/{second['id']}")).status_code == 204
+            deleted = await admin.request(
+                "DELETE", f"/api/users/{second['id']}", json={"action": "delete"}
+            )
+            assert deleted.status_code == 204
+            assert SessionStore(app.state.engine).lookup(token).acting_as_user_id is None
+
+            third = await create_second(admin)
+            assert (await admin.post(f"/api/auth/act-as/{third['id']}")).status_code == 204
+            assert (await admin.delete("/api/auth/session")).status_code == 204
+            assert SessionStore(app.state.engine).lookup(token) is None
+            assert (
+                await admin.post(
+                    "/api/auth/login", json={"username": "admin", "password": "admin changed"}
+                )
+            ).status_code == 200
+            assert (await admin.get("/api/auth/me")).json()["acting_as"] is None

@@ -44,6 +44,8 @@ ROUTE_POLICY = {
     ("GET", "/api/auth/me"): "auth",
     ("POST", "/api/auth/setup"): "auth",
     ("PATCH", "/api/auth/password"): "self",
+    ("POST", "/api/auth/act-as/{user_id}"): "admin",
+    ("DELETE", "/api/auth/act-as"): "admin",
     ("GET", "/api/users"): "admin",
     ("POST", "/api/users"): "admin",
     ("PATCH", "/api/users/{user_id}"): "admin",
@@ -457,3 +459,56 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
                 ).scalar_one()
                 == "committed"
             )
+
+
+@pytest.mark.anyio
+async def test_admin_acting_as_one_user_can_write_theirs_but_not_a_thirds(
+    tmp_path: Path,
+) -> None:
+    app = create_app(
+        Settings(data_dir=tmp_path / "data", user_agent_contact="test@example.invalid", auth="on")
+    )
+    async with app.router.lifespan_context(app):
+        _seed_users(app)
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        third_credential = hash_password("third person's password")
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id,username,display_name,password_hash,password_salt,"
+                    "is_admin,created_at,updated_at) VALUES "
+                    "(3,'elena','Elena',:digest,:salt,0,:now,:now)"
+                ),
+                {"digest": third_credential.digest, "salt": third_credential.salt, "now": now},
+            )
+        bruno_entry = DomainRepository(app.state.engine, 2).create_or_get_entry(
+            title="Bruno's private book"
+        )
+        elena_entry = DomainRepository(app.state.engine, 3).create_or_get_entry(
+            title="Elena's private book"
+        )
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as admin:
+            await admin.post(
+                "/api/auth/login", json={"username": "admin", "password": ADMIN_PASSWORD}
+            )
+            assert (await admin.post("/api/auth/act-as/2")).status_code == 204
+            visible = await admin.get(f"/api/entries/{bruno_entry.entry_id}")
+            assert visible.status_code == 200
+            changed = await admin.patch(f"/api/entries/{bruno_entry.entry_id}", json={"score": 9})
+            assert changed.status_code == 200
+            assert (await admin.delete(f"/api/entries/{elena_entry.entry_id}")).status_code == 404
+            created = await admin.post(
+                "/api/entries",
+                json={
+                    "manual": {"item_type": "book", "title": "Fixed by admin"},
+                    "idempotency_key": "fixed-by-admin",
+                },
+            )
+            assert created.status_code == 201
+        with app.state.engine.connect() as connection:
+            rows = connection.execute(text("SELECT user_id, score FROM entries ORDER BY id")).all()
+        assert (2, 9) in rows
+        assert rows[-1].user_id == 2
+        assert any(row.user_id == 3 for row in rows)

@@ -15,9 +15,9 @@ __all__ = ["Principal", "current_user", "CurrentUser", "AdminUser"]
 class Principal:
     """The owner of a request, as a value that travels rather than a lookup.
 
-    `acting_as` is `None` everywhere in v1: impersonation is Sprint 080, and
-    everything that needs "whose rows" was written to use `effective_user_id`
-    from that day on, so no caller knows when the two start to differ.
+    The signed-in identity stays in `user_id`; `acting_as` names whose rows an
+    admin deliberately opened. Callers use `effective_user_id`, so none needs
+    an impersonation branch of its own.
     """
 
     user_id: int
@@ -52,7 +52,7 @@ async def current_user(request: Request) -> Principal:
         user_id=identity.user_id,
         username=identity.username,
         is_admin=identity.is_admin,
-        acting_as=None,
+        acting_as=identity.acting_as_user_id,
     )
 
 

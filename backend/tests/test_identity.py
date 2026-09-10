@@ -11,10 +11,13 @@ import re
 from pathlib import Path
 
 import pytest
+from fastapi import Request
 from fastapi.testclient import TestClient
 from sqlalchemy import text
 
-from book_tracker.api.identity import CurrentUser, Principal
+from book_tracker.api.identity import CurrentUser, Principal, current_user
+from book_tracker.application.passwords import hash_password
+from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 from book_tracker.config import Settings
 from book_tracker.main import create_app
 
@@ -76,6 +79,42 @@ async def test_resolver_names_the_migrations_own_row(tmp_path: Path) -> None:
             ).one()
     assert row.username == "admin"
     assert bool(row.is_admin) is True
+
+
+@pytest.mark.anyio
+async def test_resolver_keeps_the_admin_identity_and_uses_the_acting_users_rows(
+    tmp_path: Path,
+) -> None:
+    app = create_app(
+        Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid", auth="on")
+    )
+    async with app.router.lifespan_context(app):
+        credential = hash_password("unused private password")
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users (id,username,password_hash,password_salt,is_admin,"
+                    "created_at,updated_at) VALUES "
+                    "(2,'bruno',:digest,:salt,0,'2026-09-10T00:00:00Z','2026-09-10T00:00:00Z')"
+                ),
+                {"digest": credential.digest, "salt": credential.salt},
+            )
+        session = SessionStore(app.state.engine).create(1)
+        assert SessionStore(app.state.engine).set_acting_as(session.token, 2) == 1
+        request = Request(
+            {
+                "type": "http",
+                "app": app,
+                "headers": [(b"cookie", f"{SESSION_COOKIE_NAME}={session.token}".encode("ascii"))],
+            }
+        )
+        principal = await current_user(request)
+
+    assert principal.user_id == 1
+    assert principal.effective_user_id == 2
+    assert principal.username == "admin"
+    assert principal.is_admin is True
+    assert principal.acting_as == 2
 
 
 def test_no_hardcoded_user_outside_the_resolver() -> None:

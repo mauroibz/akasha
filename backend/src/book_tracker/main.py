@@ -323,6 +323,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def authentication_boundary(
         request: Request, call_next: Callable[[Request], Awaitable[Response]]
     ) -> Response:
+        async def dispatch(principal: Principal | None = None) -> Response:
+            try:
+                return await call_next(request)
+            finally:
+                if principal is not None and principal.acting_as is not None:
+                    route = request.scope.get("route")
+                    logging.getLogger("book_tracker.audit").info(
+                        "admin_acting_request",
+                        extra={
+                            "admin_user_id": principal.user_id,
+                            "acting_as_user_id": principal.acting_as,
+                            "method": request.method,
+                            "route": getattr(route, "path", request.url.path),
+                        },
+                    )
+
         if configured.auth == "off":
             if request.url.path.startswith("/api/auth/"):
                 return JSONResponse(status_code=404, content={"detail": "Not Found"})
@@ -348,19 +364,27 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 return setup_required_response()
             return await call_next(request)
 
-        if path.startswith("/api/auth/"):
-            return await call_next(request)
         token = request.cookies.get(SESSION_COOKIE_NAME)
         identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+        principal = (
+            Principal(
+                user_id=identity.user_id,
+                username=identity.username,
+                is_admin=identity.is_admin,
+                acting_as=identity.acting_as_user_id,
+            )
+            if identity is not None
+            else None
+        )
+        if path.startswith("/api/auth/"):
+            if principal is not None:
+                request.state.principal = principal
+            return await dispatch(principal)
         if identity is None:
             return unauthenticated()
-        request.state.principal = Principal(
-            user_id=identity.user_id,
-            username=identity.username,
-            is_admin=identity.is_admin,
-            acting_as=None,
-        )
-        return await call_next(request)
+        assert principal is not None
+        request.state.principal = principal
+        return await dispatch(principal)
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:

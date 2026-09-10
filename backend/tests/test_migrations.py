@@ -1570,3 +1570,51 @@ def test_import_fingerprint_identity_becomes_user_scoped_and_downgrades(tmp_path
     assert connection.execute("SELECT id FROM import_batches").fetchall() == [("first",)]
     assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
     connection.close()
+
+
+def test_session_acting_user_is_nullable_set_null_and_reversible(tmp_path: Path) -> None:
+    """View-as lives on the server-side session and target deletion ends it."""
+    from alembic import command
+
+    configured = database_at(tmp_path / "data", USER_SCOPED_IMPORT_REVISION)
+    database_path = configured.data_dir / "books.db"
+    assert configured.database_url is not None
+    connection = sqlite3.connect(database_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    connection.execute(
+        "INSERT INTO users (id,username,is_admin,created_at,updated_at) VALUES (2,'second',0,?,?)",
+        (NOW, NOW),
+    )
+    connection.execute(
+        "INSERT INTO sessions (id,user_id,token_hash,created_at,last_seen_at,expires_at) "
+        "VALUES ('admin-session',1,?, ?, ?, ?)",
+        ("a" * 64, NOW, NOW, "2027-09-10T00:00:00Z"),
+    )
+    connection.commit()
+    connection.close()
+
+    command.upgrade(alembic_config(configured.database_url), "head")
+    connection = sqlite3.connect(database_path)
+    connection.execute("PRAGMA foreign_keys = ON")
+    columns = {row[1]: bool(row[3]) for row in connection.execute("PRAGMA table_info(sessions)")}
+    assert columns["acting_as_user_id"] is False
+    foreign_keys = {
+        (row[2], row[3], row[6]) for row in connection.execute("PRAGMA foreign_key_list(sessions)")
+    }
+    assert ("users", "acting_as_user_id", "SET NULL") in foreign_keys
+    connection.execute("UPDATE sessions SET acting_as_user_id=2 WHERE id='admin-session'")
+    connection.execute("DELETE FROM users WHERE id=2")
+    connection.commit()
+    assert connection.execute(
+        "SELECT acting_as_user_id FROM sessions WHERE id='admin-session'"
+    ).fetchone() == (None,)
+    connection.close()
+
+    command.downgrade(alembic_config(configured.database_url), USER_SCOPED_IMPORT_REVISION)
+    connection = sqlite3.connect(database_path)
+    assert "acting_as_user_id" not in {
+        row[1] for row in connection.execute("PRAGMA table_info(sessions)")
+    }
+    assert connection.execute("SELECT id FROM sessions").fetchall() == [("admin-session",)]
+    assert connection.execute("PRAGMA foreign_key_check").fetchall() == []
+    connection.close()
