@@ -16,7 +16,11 @@ from sqlalchemy.exc import OperationalError, SQLAlchemyError
 from book_tracker.api.auth import (
     LoginRateLimiter,
     bootstrap_admin,
+    error_response,
     has_credentialed_user,
+    set_session_cookie,
+    strip_untrusted_identity_header,
+    trusted_header_user,
     unauthenticated,
     users_router,
 )
@@ -160,6 +164,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.auth = configured.auth
         app.state.cookie_secure = configured.cookie_secure
         app.state.trusted_proxy_peers = configured.trusted_proxy_peers
+        app.state.trusted_proxy_header = configured.trusted_proxy_header
+        app.state.trusted_header_autocreate = configured.trusted_header_autocreate
         app.state.login_limiter = LoginRateLimiter(
             configured.login_max_failures, configured.login_window_seconds
         )
@@ -312,6 +318,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.auth = configured.auth
     app.state.cookie_secure = configured.cookie_secure
     app.state.trusted_proxy_peers = configured.trusted_proxy_peers
+    app.state.trusted_proxy_header = configured.trusted_proxy_header
+    app.state.trusted_header_autocreate = configured.trusted_header_autocreate
 
     @app.exception_handler(AuthenticationRequired)
     async def authentication_required(
@@ -343,6 +351,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if request.url.path.startswith("/api/auth/"):
                 return JSONResponse(status_code=404, content={"detail": "Not Found"})
             return await call_next(request)
+        strip_untrusted_identity_header(
+            request, configured.trusted_proxy_header, configured.trusted_proxy_peers
+        )
         path = request.url.path
         if path.startswith("/api/health/"):
             return await call_next(request)
@@ -366,6 +377,30 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         token = request.cookies.get(SESSION_COOKIE_NAME)
         identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+        issued_token: str | None = None
+        if (
+            identity is None
+            and configured.trusted_proxy_header
+            and path not in {"/api/auth/login", "/api/auth/setup", "/api/auth/session"}
+        ):
+            asserted_identity = request.headers.get(configured.trusted_proxy_header)
+            if asserted_identity:
+                user = trusted_header_user(
+                    request.app.state.engine,
+                    asserted_identity,
+                    autocreate=configured.trusted_header_autocreate,
+                )
+                if user is None:
+                    return error_response(
+                        403,
+                        "unknown_proxy_identity",
+                        "This proxy identity is not allowed to use Akasha",
+                    )
+                created = SessionStore(request.app.state.engine).create(
+                    int(user["id"]), user_agent=request.headers.get("user-agent")
+                )
+                issued_token = created.token
+                identity = SessionStore(request.app.state.engine).lookup(created.token)
         principal = (
             Principal(
                 user_id=identity.user_id,
@@ -376,15 +411,25 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             if identity is not None
             else None
         )
+        if identity is not None:
+            request.state.session_identity = identity
+            request.state.session_id = identity.session_id
+
+        async def dispatch_with_cookie() -> Response:
+            response = await dispatch(principal)
+            if issued_token is not None:
+                set_session_cookie(response, request, issued_token)
+            return response
+
         if path.startswith("/api/auth/"):
             if principal is not None:
                 request.state.principal = principal
-            return await dispatch(principal)
+            return await dispatch_with_cookie()
         if identity is None:
             return unauthenticated()
         assert principal is not None
         request.state.principal = principal
-        return await dispatch(principal)
+        return await dispatch_with_cookie()
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:

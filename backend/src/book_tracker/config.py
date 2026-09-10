@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     # Shared with Sprint 081's trusted identity header: a forwarded scheme is
     # authoritative only when the immediate peer is explicitly trusted.
     trusted_proxy_peers: list[str] = Field(default_factory=list)
+    trusted_proxy_header: str | None = None
+    trusted_header_autocreate: bool = False
     login_max_failures: int = Field(default=5, ge=1)
     login_window_seconds: int = Field(default=300, ge=1)
     admin_username: str | None = None

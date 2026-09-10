@@ -6,9 +6,14 @@ from pathlib import Path
 
 import httpx
 import pytest
+from fastapi import Request
 from sqlalchemy import text
 
-from book_tracker.api.auth import COOKIE_NAME, LoginRateLimiter
+from book_tracker.api.auth import (
+    COOKIE_NAME,
+    LoginRateLimiter,
+    strip_untrusted_identity_header,
+)
 from book_tracker.application.passwords import hash_password
 from book_tracker.application.sessions import SESSION_LIFETIME, SessionStore
 from book_tracker.config import Settings
@@ -388,3 +393,142 @@ def test_openapi_carries_auth_routes_and_boundary_errors(tmp_path: Path) -> None
     responses = schema["paths"]["/api/entries"]["get"]["responses"]
     assert "401" in responses
     assert "409" in responses
+
+
+@pytest.mark.anyio
+async def test_trusted_header_authenticates_a_known_user_and_creates_a_session(
+    tmp_path: Path,
+) -> None:
+    app = create_app(
+        auth_settings(
+            tmp_path,
+            trusted_proxy_header="Tailscale-User-Login",
+            trusted_proxy_peers=["127.0.0.1"],
+        )
+    )
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app, client=("127.0.0.1", 3210)),
+            base_url="http://test",
+        ) as client:
+            response = await client.get(
+                "/api/entries", headers={"Tailscale-User-Login": " MAURO "}
+            )
+
+        assert response.status_code == 200
+        assert COOKIE_NAME in response.cookies
+        with app.state.engine.connect() as connection:
+            assert connection.execute(text("SELECT count(*) FROM sessions")).scalar_one() == 1
+
+
+@pytest.mark.anyio
+async def test_untrusted_identity_header_is_removed_and_request_stays_anonymous(
+    tmp_path: Path,
+) -> None:
+    app = create_app(
+        auth_settings(
+            tmp_path,
+            trusted_proxy_header="Tailscale-User-Login",
+            trusted_proxy_peers=["10.0.0.0/8"],
+        )
+    )
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        scope = {
+            "type": "http",
+            "method": "GET",
+            "scheme": "http",
+            "path": "/api/entries",
+            "raw_path": b"/api/entries",
+            "query_string": b"",
+            "headers": [(b"tailscale-user-login", b"mauro")],
+            "client": ("192.168.1.20", 1234),
+            "server": ("test", 80),
+        }
+        request = Request(scope)
+        strip_untrusted_identity_header(
+            request, "Tailscale-User-Login", ["10.0.0.0/8"]
+        )
+        assert "tailscale-user-login" not in request.headers
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app, client=("192.168.1.20", 3210)),
+            base_url="http://test",
+        ) as client:
+            response = await client.get(
+                "/api/entries", headers={"Tailscale-User-Login": "mauro"}
+            )
+        assert response.status_code == 401
+        assert response.json() == UNAUTHENTICATED
+
+
+@pytest.mark.anyio
+async def test_unknown_trusted_identity_is_refused_unless_autocreate_is_enabled(
+    tmp_path: Path,
+) -> None:
+    settings = {
+        "trusted_proxy_header": "Tailscale-User-Login",
+        "trusted_proxy_peers": ["127.0.0.1"],
+    }
+    app = create_app(auth_settings(tmp_path / "refused", **settings))
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app, client=("127.0.0.1", 3210)),
+            base_url="http://test",
+        ) as client:
+            response = await client.get(
+                "/api/entries", headers={"Tailscale-User-Login": "new@example.com"}
+            )
+        assert response.status_code == 403
+        assert response.json()["error"]["code"] == "unknown_proxy_identity"
+
+    app = create_app(
+        auth_settings(tmp_path / "created", trusted_header_autocreate=True, **settings)
+    )
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app, client=("127.0.0.1", 3210)),
+            base_url="http://test",
+        ) as client:
+            response = await client.get(
+                "/api/entries", headers={"Tailscale-User-Login": "New@Example.com"}
+            )
+        assert response.status_code == 200
+        assert response.json()["total"] == 0
+        with app.state.engine.connect() as connection:
+            created = connection.execute(
+                text(
+                    "SELECT username,is_admin,password_hash,password_salt FROM users "
+                    "WHERE username='new@example.com'"
+                )
+            ).one()
+        assert tuple(created) == ("new@example.com", 0, None, None)
+
+
+@pytest.mark.anyio
+async def test_password_login_remains_available_with_trusted_header_enabled(
+    tmp_path: Path,
+) -> None:
+    app = create_app(
+        auth_settings(
+            tmp_path,
+            trusted_proxy_header="Tailscale-User-Login",
+            trusted_proxy_peers=["127.0.0.1"],
+        )
+    )
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app, client=("127.0.0.1", 3210)),
+            base_url="http://test",
+        ) as client:
+            login = await client.post(
+                "/api/auth/login",
+                headers={"Tailscale-User-Login": "unknown@example.com"},
+                json={"username": "mauro", "password": PASSWORD},
+            )
+            assert login.status_code == 200
+            assert (await client.get("/api/entries")).status_code == 200

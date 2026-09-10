@@ -164,6 +164,20 @@ def peer_is_trusted(request: Request, configured_peers: list[str]) -> bool:
     return False
 
 
+def strip_untrusted_identity_header(
+    request: Request, configured_header: str | None, configured_peers: list[str]
+) -> None:
+    """Remove an asserted identity before any inner application code can see it."""
+    if not configured_header or peer_is_trusted(request, configured_peers):
+        return
+    target = configured_header.casefold().encode("latin-1")
+    request.scope["headers"] = [
+        (name, value)
+        for name, value in request.scope.get("headers", [])
+        if name.lower() != target
+    ]
+
+
 def request_uses_https(request: Request) -> bool:
     override = request.app.state.cookie_secure
     if override is not None:
@@ -248,6 +262,34 @@ def _lookup_user(engine: Engine, username: str) -> dict[str, Any] | None:
             .one_or_none()
         )
     return dict(row) if row is not None else None
+
+
+def trusted_header_user(
+    engine: Engine, asserted_identity: str, *, autocreate: bool
+) -> dict[str, Any] | None:
+    """Resolve a normalized proxy identity, optionally creating its empty account."""
+    username = normalize_username(asserted_identity)
+    if not username or len(username) > 100:
+        return None
+    existing = _lookup_user(engine, username)
+    if existing is not None or not autocreate:
+        return existing
+    now = timestamp(utc_now())
+    try:
+        with engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users "
+                    "(username,display_name,password_hash,password_salt,is_admin,"
+                    "created_at,updated_at) "
+                    "VALUES (:username,NULL,NULL,NULL,0,:now,:now)"
+                ),
+                {"username": username, "now": now},
+            )
+    except IntegrityError:
+        # Another request from the same new device may have won the insert.
+        pass
+    return _lookup_user(engine, username)
 
 
 # Unknown usernames pay one real scrypt too, so they do not disclose an account
@@ -377,8 +419,10 @@ async def logout(request: Request) -> Response:
 async def me(request: Request) -> MeResponse:
     require_auth_mode(request)
     needs_setup = not has_credentialed_user(request.app.state.engine)
-    token = request.cookies.get(COOKIE_NAME)
-    identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+    identity = getattr(request.state, "session_identity", None)
+    if not isinstance(identity, SessionIdentity):
+        token = request.cookies.get(COOKIE_NAME)
+        identity = SessionStore(request.app.state.engine).lookup(token) if token else None
     return MeResponse(
         auth="on",
         authenticated=identity is not None,
