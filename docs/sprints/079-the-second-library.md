@@ -1,6 +1,6 @@
 # Sprint 079 — The second library
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 078
 **Roadmap revision:** 40
 
@@ -168,5 +168,66 @@ second user.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Completed 2026-09-10.**
+
+1. Admin status is now enforced at the user-management boundary. An admin can list people with
+   entry/shelf counts, create an account, rename it, change its admin flag, reset its password and
+   explicitly transfer or delete its library. A non-admin receives `403` from every management
+   route.
+2. Every signed-in person can change their own password. The current session survives; their
+   other sessions are revoked; other people's sessions are untouched. An admin reset revokes all
+   sessions belonging to the reset account.
+3. The People settings screen exposes the full management surface only to admins and Change
+   password to everyone. Auth-off renders neither the route nor the section. The screen passed its
+   390 px, 44 px target and zero-serious-axe checks.
+4. Entries, shelves, formats, triage, insights, exports, imports, undo, attachments and item-backed
+   operations are scoped to the effective user. The runtime route inventory makes every
+   application route declare its isolation treatment and fails when a new route is omitted.
+   Cross-user entry, shelf, batch, job and bulk-selection ids return `404`, deliberately hiding
+   whether the row exists; management authorization alone uses `403`.
+5. The shared cache stayed shared: two people adding the same provider record create one item,
+   fetch and cover but separate entries. An item-addressed route is available only when the caller
+   has their own entry for that shared item; auth-off retains the original unscoped behavior.
+6. Import batches, records, effects and related jobs carry their owner through preview, commit and
+   undo. Migration `0020` changes import identity to unique `(user_id, kind, fingerprint)`, so two
+   people may import the same file without sharing a batch; its upgrade and downgrade are tested.
+7. User removal requires an explicit `transfer` or `delete`. Transfer preserves entries, shelf
+   joins and the complete import ledger; delete removes that private graph while leaving shared
+   items, covers and attachments. Self-deletion, last-admin demotion, invalid targets and
+   case-insensitive username collisions produce stated 409/422 responses rather than server
+   errors.
+
+Commits: `480f356` (admin/user API), `f3d7601` (isolation and migration), `8be1e99` (People and
+password UI), `a3f0a65` (OpenAPI contract), `6807b99` (test formatting), `53c4e1c` (auth-off shared
+item behavior), `12ee9aa` and `c0bfde3` (isolated browser fixtures), `e963455` (multi-user gate),
+`310fb52` (cross-user bulk ids), and `ec43730` (migration round trip).
+
+Verification after the implementation froze: `make check` passed; `make test` passed 1,457
+backend and 320 frontend tests; the OpenAPI producer and `npm run api:check` passed; and
+`npx playwright test` passed 136 with two configuration-dependent skips. Focused final evidence
+also included 64 isolation/migration tests, 31 user/isolation API tests, six People/shell component
+tests and 28 affected auth/accessibility browser tests. The first literal
+`python scripts/export_openapi.py` invocation from the repository root could not import the src
+layout package; the project-prescribed uv environment from `backend/` generated the contract and
+the consumer check passed from `frontend/`. No product failure was hidden by that path correction.
+
+DEC-025 walkthrough: a freshly built auth-on container used two independent browser contexts and
+real persisted SQLite data. The admin added a private book and imported *Rayuela*, created Bruno,
+and Bruno entered an empty library, imported the same *Rayuela*, added another private book,
+created a private shelf, imported then undid *Ficciones*, and opened insights and export. Returning
+to the still-live admin context showed only the admin's entries, shelf and import state; People
+reported Bruno's two entries and one shelf. Live Open Library enrichment requests appeared in the
+container log, and nothing in either context felt leaked. The final scratchpad flow passed in
+12.0 seconds. It used one foreground `docker run --rm` with disposable `/tmp` bind mounts rather
+than named volumes; the container and temporary directories were removed, avoiding repeated
+volume lifecycle approvals.
+
+Deviations and decisions are recorded in DEC-151. In particular, transfer refuses with `409`
+instead of merging or overwriting when the target already owns the same item, shelf slug or import
+fingerprint; without a conflict it moves every row intact. Migration `0020` was required because
+the earlier install-wide fingerprint constraint contradicted two independent libraries. The
+planned `test_undo.py` does not exist, so import/undo ownership lives with the exhaustive isolation
+tests. Sprints 080–082 were reviewed: 080 extends the same inventory with the deliberate act-as
+dimension; 081's session/trusted-header work is unaffected; 082 must carry migration `0020` and
+these realized isolation/deletion contracts into the canonical release documentation. No future
+acceptance criterion or dependency changed.

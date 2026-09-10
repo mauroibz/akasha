@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "in_progress",
-  "active_sprint": "079",
-  "active_sprint_file": "docs/sprints/079-the-second-library.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "078",
+  "project_status": "ready",
+  "active_sprint": "080",
+  "active_sprint_file": "docs/sprints/080-the-admin-sees-everything.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "079",
   "completed_sprints": [
     "001",
     "002",
@@ -84,8 +84,9 @@
     "075",
     "076",
     "077",
-    "078"
+    "078",
+    "079"
   ],
-  "started_at": "2026-09-09T12:32:26-03:00",
-  "updated_at": "2026-09-09T12:32:26-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-10T13:22:01-03:00"
 }

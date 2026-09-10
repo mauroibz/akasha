@@ -1,38 +1,43 @@
-# Handoff — Sprint 079 ready: the second library
+# Handoff — Sprint 080 ready: the admin sees everything
 
-`docs/agent/state.json` reads `project_status: "ready"`, `active_sprint: "079"`,
-`active_sprint_file: "docs/sprints/079-the-second-library.md"`, `active_sprint_status: "ready"`,
-`last_completed_sprint: "078"`, and `plan_revision: 40`. Completed sprints run 001–078;
-`FINAL_SPRINT` remains 82. Claim 079 only after the normal context pass with:
+`docs/agent/state.json` records Sprint 079 completed and Sprint 080 `ready`; completed sprints run
+001–079, plan revision remains 40, and `FINAL_SPRINT` remains 82. Claim 080 only after the normal
+context pass with:
 
 ```console
-python scripts/sync_sprint_state.py --sprint 079 in_progress
+python scripts/sync_sprint_state.py --sprint 080 in_progress
 ```
 
-## What Sprint 078 leaves behind
+## What Sprint 079 leaves behind
 
-The frontend now has a cached authentication coordinator, standalone login/setup routes, shared
-typed 401/setup-required handling, safe router-state return destinations, private-cache clearing,
-and an account/sign-out control. Auth-off remains invisible. The implementation commits are
-`12d5f82`, `230464b`, `59fed62`, `969e55f`, `c10a3e2`, `71dc706`, and `afea4fb`; the Sprint 078
-Outcome and final worklog carry the acceptance evidence and deviations.
+Two authenticated people now have isolated entries, shelves, imports, undo, insights and exports
+over a shared item/cover/attachment cache. Admin-only user management and self-service password
+change are shipped in the People settings surface. Private ownership misses return `404`; a
+non-admin crossing the management boundary receives `403`. User deletion requires explicit
+transfer or delete, and a transfer conflict refuses atomically rather than merging data. DEC-151
+and Sprint 079's Outcome are the realized contract.
 
-Frozen gates: `make check` passed; `make test` passed 1,421 backend and 318 frontend tests;
-Playwright passed 134 with two configuration skips; and the production build passed with an
-88.10 kB entry chunk. The owner confirmed the real-phone/tailnet Chrome and Firefox password
-save/fill plus overnight-session walkthrough. No backend/OpenAPI contract or future-sprint plan
-changed.
+Migration `0020_user_scoped_import_fingerprints` makes import replay identity unique per user.
+The exhaustive inventory in `backend/tests/test_isolation.py` derives application routes from the
+router, requires each route to declare an isolation treatment, and probes URL ids plus ids inside
+bulk bodies. Preserve those cases. Item-addressed routes require the effective user to own an
+entry for the shared item when auth is on; auth-off remains unscoped.
 
-## Sprint 079 starting point
+Frozen gates: `make check` passed; `make test` passed 1,457 backend and 320 frontend tests; the
+OpenAPI producer/consumer passed; Playwright passed 136 with two configuration skips. The real
+two-browser container walkthrough passed, including same-file imports, private shelves,
+import/undo, insights and export, with no observed leak. It used a foreground `docker run --rm`
+and disposable `/tmp` bind mounts rather than named volumes; this is the low-approval pattern to
+reuse for throwaway walkthroughs.
 
-Read Sprints 075–078 Outcomes and every 079 Required-context document/code path fresh. The sprint
-adds admin-only user management, self-service password change, explicit transfer-or-delete
-semantics and the exhaustive route-enumerating isolation suite. Its highest-risk rule is that a
-cross-user object lookup returns `404`, while a non-admin calling a management route returns
-`403`; do not blur those cases. User deletion is irreversible and must never default to either
-transfer or delete. `items`, covers and attachments remain the shared cache.
+## Sprint 080 starting point
 
-The owner's standing Compose install now runs the current branch with `AKASHA_AUTH=on` against the
-owner's persistent data volumes and contains the credentialed admin created during the walkthrough.
-Do not use it for Sprint 079 development or destructive user-management tests; use isolated
-temporary data, backups and browser profiles. Do not record or request the owner's password.
+Read the Sprint 079 Outcome and DEC-151, then inspect `identity.py`, the isolation inventory,
+People/API code, AppShell and logging fresh. `Principal.acting_as` still exists and is null. Sprint
+080 records act-as on the admin's session, changes the resolver's effective answer, adds the
+unmissable persistent banner, and emits exactly one redacted structured audit line per acted
+request. The existing isolation suite must gain an admin dimension; no non-admin assertion may be
+removed or relaxed. Acting as one user must still return `404` for a third user's ids.
+
+The owner's standing Compose install remains out of scope for destructive development checks. Use
+isolated temporary data and profiles; do not request or record the owner's password.

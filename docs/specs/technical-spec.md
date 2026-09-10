@@ -195,7 +195,9 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - source descriptor JSON; never contains arbitrary host paths returned to browsers
 - preview summary JSON, counters JSON, error JSON
 - `created_at`, `committed_at`, `undo_expires_at`
-- unique `(kind, fingerprint)` for committed input identity where practical
+- unique `(user_id, kind, fingerprint)` for committed input identity where practical (migration
+  `0020`): replay is idempotent within one library, while two people may import the same source
+  without sharing a batch
 - `user_id` foreign key to `users`, `NOT NULL` and defaulted to the seeded user (migration `0019`, DEC-146): an import is someone's work, and its undo ledger must follow the same user — two users importing concurrently would otherwise share one undo history
 
 `import_records`

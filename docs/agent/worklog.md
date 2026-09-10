@@ -5278,3 +5278,41 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   management and password change, defines transfer-or-delete semantics, and proves route-by-route
   that two users' libraries cannot leak into each other. Start it with
   `python scripts/sync_sprint_state.py --sprint 079 in_progress` after the normal context pass.
+
+## 2026-09-10 — Sprint 079 closed: the second library (DEC-151)
+
+- Done: enforced admin-only account management; added create/edit/reset/delete APIs; added
+  self-service password change with selective session revocation; shipped the responsive People
+  and Change password settings; scoped every private repository/service/route to the effective
+  user; guarded item-backed shared-cache routes through the caller's own entry; added migration
+  `0020` for per-user import fingerprints; and built a runtime-derived route isolation suite.
+  Eleven implementation commits: `480f356`, `f3d7601`, `8be1e99`, `a3f0a65`, `6807b99`,
+  `53c4e1c`, `12ee9aa`, `c0bfde3`, `e963455`, `310fb52`, `ec43730`.
+- TDD/focused evidence: final isolation plus migration run passed 64; user/isolation API files
+  passed 31; People/AppShell components passed six; affected auth/accessibility Chromium cases
+  passed 28. Migration `0020` now has direct upgrade/downgrade proof, and the isolation probes
+  include foreign shelf ids and `excluded_entry_ids` carried inside bulk request bodies.
+- Exhaustive verification after the implementation froze: `make check` green; `make test` passed
+  1,457 backend and 320 frontend tests; OpenAPI export plus consumer check green; full Playwright
+  passed 136 with two configuration-dependent skips. The first literal OpenAPI script invocation
+  from the repository root failed because the src-layout package was not on Python's path; the
+  Makefile-prescribed uv environment from `backend/` succeeded, followed by the consumer command
+  from `frontend/`. This was command-location correction, not a product failure.
+- DEC-025 walkthrough: built `akasha-s079-walkthrough-20260910`, started one foreground auth-on
+  container with disposable `/tmp` bind mounts, and used separate admin/Bruno browser contexts.
+  The admin's private manual book and *Rayuela* import stayed theirs. Bruno began empty, imported
+  the same *Rayuela*, added a private book, created a shelf, imported and undid *Ficciones*, then
+  opened insights and export. The admin still saw only their own library and People showed Bruno's
+  two entries/one shelf. Live Open Library enrichment calls appeared in the container log; no
+  leak or confusing deletion control was observed. The final scratchpad passed in 12.0 seconds.
+  `docker run --rm` handled the container lifecycle; no named Docker volumes were created, and a
+  read-only `/tmp` inventory confirmed all walkthrough directories were removed.
+- Deviations: transfer refuses atomically with `409` when the target has a duplicate item, shelf
+  slug or import fingerprint instead of merging/overwriting data; migration `0020` was added when
+  the old global fingerprint constraint proved incompatible with independent libraries; and the
+  planned `test_undo.py` does not exist, so undo isolation is covered in `test_isolation.py`.
+  DEC-151 records these decisions. Technical spec import uniqueness was reconciled; Sprint 082
+  still owns the planned full auth/multiuser documentation rewrite.
+- Next: Sprint 080 (The admin sees everything) is `ready`. Extend—not weaken—the Sprint 079 route
+  inventory with the admin act-as dimension, keep the non-admin `404` wall intact, and make the
+  persistent banner and one-redacted-audit-line-per-request the safety properties.

@@ -6136,3 +6136,39 @@ only the file-Status flip and state regeneration.
   Sprint 080 continues to consume `Principal.effective_user_id`; Sprint 081 owns session sliding
   and extends the exact trusted-peer check; Sprint 082 reruns the both-mode container flow that
   Sprint 077 introduced. The existing no-auth installation remains the default and unchanged.
+
+## DEC-151 — Two libraries hide private ids while sharing cached works
+
+- **Date:** 2026-09-10
+- **Status:** accepted
+- **Cross-references:** DEC-025 (walkthroughs), DEC-146 (shared/private ownership table),
+  DEC-149 (effective-user seam), Sprint 079.
+- **Context:** Enforcing the second library exposed three cases the accepted plan described at a
+  policy level but could not settle until real rows existed. First, item ids belong to the shared
+  cache even though item routes expose covers and attachments that a person should reach only
+  through their own library. Second, import fingerprint uniqueness was still install-wide, which
+  made the same file imported by two people collapse into one person's batch. Third, transferring
+  a whole library can collide with the target's per-user item, shelf-slug or import uniqueness;
+  silently merging those rows would contradict the requirement to move them intact.
+- **Decision.**
+  - In auth-on mode, an item-addressed route requires the effective user to own an entry for that
+    item. The underlying item, cover and attachments remain one shared cache, but knowing a shared
+    item id does not grant a route into it. Auth-off keeps the original unscoped behavior.
+  - A private-row ownership miss is indistinguishable from absence: entry, shelf, batch, job and
+    bulk-selection probes answer `404`, including foreign ids supplied inside a request body.
+    `403` is reserved for a known authenticated principal lacking an operation-level privilege,
+    currently the non-admin user-management boundary.
+  - Migration `0020` replaces unique `(kind, fingerprint)` with unique
+    `(user_id, kind, fingerprint)`. Replaying a source stays idempotent within one library while
+    another person may import it into theirs. The downgrade reconciles cross-user duplicates
+    before restoring the old install-wide constraint.
+  - Transfer is all-or-nothing and refuses with `409 transfer_conflict` when the target already
+    owns the same item, normalized shelf slug or import fingerprint. It does not overwrite,
+    rename, merge or discard either person's data. A conflict-free transfer moves entries,
+    shelves, batches, records, effects and jobs without changing their identities.
+- **Consequences.** The runtime-derived isolation inventory is the standing guard for both URL
+  ids and ids nested in bodies. Sprint 080 must add its admin act-as dimension without relaxing
+  the non-admin cases. Operators resolving a transfer conflict must first make an explicit data
+  choice in one of the two libraries; the destructive delete alternative remains explicit and
+  never defaulted. Sprint 082 must describe migration `0020`, shared-cache reachability and this
+  transfer refusal as delivered behavior rather than repeating the proposal literally.

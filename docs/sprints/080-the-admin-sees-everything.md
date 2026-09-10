@@ -1,6 +1,6 @@
 # Sprint 080 — The admin sees everything
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 079
 **Roadmap revision:** 40
 
