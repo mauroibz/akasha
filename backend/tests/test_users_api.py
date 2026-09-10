@@ -411,6 +411,13 @@ async def test_admin_sets_and_clears_acting_as_on_only_the_current_session(
             assert SessionStore(app.state.engine).lookup(token).acting_as_user_id == second["id"]
             assert SessionStore(app.state.engine).lookup(sibling.token).acting_as_user_id is None
 
+            edited = await admin.patch(
+                f"/api/users/{second['id']}",
+                json={"display_name": "Bruno renamed", "is_admin": False},
+            )
+            assert edited.status_code == 200
+            assert SessionStore(app.state.engine).lookup(token).acting_as_user_id == second["id"]
+
             stopped = await admin.delete("/api/auth/act-as")
             assert stopped.status_code == 204
             assert (await admin.get("/api/auth/me")).json()["acting_as"] is None
