@@ -5316,3 +5316,40 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Next: Sprint 080 (The admin sees everything) is `ready`. Extend—not weaken—the Sprint 079 route
   inventory with the admin act-as dimension, keep the non-admin `404` wall intact, and make the
   persistent banner and one-redacted-audit-line-per-request the safety properties.
+
+## 2026-09-10 — Sprint 080 closed: the admin sees everything (DEC-152)
+
+- Done: added migration `0021` and admin-only session act-as start/stop routes; taught the
+  effective-user resolver to target another library while retaining the actual admin; extended
+  `/api/auth/me`; shipped the fixed announced banner, one-action return and client cache boundary;
+  cleared acting state on logout, expiry, deletion, password changes and actual demotion; and
+  emitted one minimal structured audit event per handled acted request. Four implementation
+  commits: `5d9e905`, `b6cd40d`, `bbfe4d6`, `6cbba42`.
+- TDD/focused evidence: user/isolation passed 39; identity/session/logging passed nine; migration
+  `0021` round-trip passed; UI/App passed 12; affected auth/accessibility Chromium passed 29.
+  Added isolation proves target-owned entry and shelf create/edit/delete, third-user `404`, and
+  non-admin `403`. One legacy async identity test was changed from nested synchronous
+  `TestClient` to `httpx.AsyncClient` after reproducing the documented futex stall.
+- Exhaustive verification after implementation freeze: `make check` passed; `make test` passed
+  1,464 backend tests at 90% coverage and 322 frontend tests; the OpenAPI producer/consumer passed;
+  full Playwright passed 137 with two configuration-dependent skips; the production container
+  image built successfully.
+- DEC-025 walkthrough: against fresh auth-on data at 390px, separate admin and Bruno browser
+  profiles held separate libraries. The admin entered Bruno's library, changed a score, assigned
+  a row to Bruno's shelf, deleted a mis-imported row, visited shelves/insights/triage/export, and
+  returned in one press. Bruno's still-authenticated profile saw all three changes. The banner was
+  fixed and unambiguous on library, detail and dialog surfaces. The browser recorded 49 acted API
+  requests and the foreground container emitted exactly 49 `1 → 2` audit events; every event had
+  the same minimal field set and neither the unique private note nor cookie content appeared.
+  The successful scratchpad took 13.7 seconds.
+- Deviations: no acceptance criterion changed. Migration `0021` made the planned session storage
+  concrete. The first walkthrough selector missed shelf text even though its trace and the
+  database showed the assignment; it was replaced with the accessible shelf-removal control and
+  the whole flow was rerun on fresh data. A second startup attempt exposed that Docker-created
+  bind directories could inherit an unusable uid; pre-creating them as the host user fixed it.
+  Walkthroughs used foreground `docker run --rm` with explicit `/tmp` bind mounts, never named
+  volumes, and all four attempt directories were removed in one cleanup.
+- Next: Sprint 081 (Log in once) is `ready`. Verify Tailscale's current header contract from its
+  primary documentation, extend the existing trusted-peer helper, slide session expiry in batches,
+  and add self-service session listing/revocation. Its final phone/tailnet walkthrough requires the
+  owner's real network; do not substitute a mocked header for that evidence.

@@ -1618,6 +1618,9 @@ refactor into a rewrite of the gate. It also keeps the owner's "easy deployments
 - **[080 — The admin sees everything](080-the-admin-sees-everything.md)** — view-as, recorded on
   the session and never in a cookie, with a banner that cannot be dismissed and an audit line per
   request. One resolver branch, because 076 exists.
+  **Delivered 2026-09-10 (DEC-152).** The acting target is a nullable session foreign key; the
+  actual administrator remains visible, target-owned writes and third-user `404`s are proved, and
+  a 390px container walkthrough matched 49 browser requests to 49 content-free audit events.
 - **[081 — Log in once](081-log-in-once.md)** — optional trusted-header authentication from
   `tailscale serve` (off by default, refusing to start without a peer allowlist), sliding 400-day
   sessions, see-and-revoke-your-sessions, and the mobile pass.

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "in_progress",
-  "active_sprint": "080",
-  "active_sprint_file": "docs/sprints/080-the-admin-sees-everything.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "079",
+  "project_status": "ready",
+  "active_sprint": "081",
+  "active_sprint_file": "docs/sprints/081-log-in-once.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "080",
   "completed_sprints": [
     "001",
     "002",
@@ -85,8 +85,9 @@
     "076",
     "077",
     "078",
-    "079"
+    "079",
+    "080"
   ],
-  "started_at": "2026-09-10T16:01:47-03:00",
-  "updated_at": "2026-09-10T16:01:47-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-10T16:55:36-03:00"
 }

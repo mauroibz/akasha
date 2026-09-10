@@ -1,6 +1,6 @@
 # Sprint 081 — Log in once
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 080
 **Roadmap revision:** 40
 

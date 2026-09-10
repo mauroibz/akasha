@@ -6172,3 +6172,27 @@ only the file-Status flip and state regeneration.
   choice in one of the two libraries; the destructive delete alternative remains explicit and
   never defaulted. Sprint 082 must describe migration `0020`, shared-cache reachability and this
   transfer refusal as delivered behavior rather than repeating the proposal literally.
+
+## DEC-152 — Acting in another library keeps the administrator visible
+
+- **Date:** 2026-09-10
+- **Status:** accepted
+- **Cross-references:** DEC-146 (admin view-as may write), DEC-149 (effective-user seam),
+  DEC-151 (private-id isolation), Sprint 080.
+- **Context:** View-as must let an administrator repair another person's data without turning the
+  browser into an impersonation token, leaking a third person's ids, or making it possible to
+  forget whose rows a destructive action will change.
+- **Decision.** Migration `0021` adds nullable `sessions.acting_as_user_id`, referencing `users`
+  with `ON DELETE SET NULL`. The session still resolves the actual administrator; only
+  `Principal.effective_user_id` changes for library ownership. Entering and leaving are
+  admin-only session operations, and switching identities clears client-side library queries and
+  mutations before the new library renders. A fixed, non-dismissible banner names the target and
+  leaves in one action. Password changes for either account, actual demotion, target deletion,
+  expiry and logout end the mode; ordinary profile edits do not. The HTTP boundary emits one
+  `admin_acting_request` event after each handled acted request, containing only both numeric ids,
+  method and templated route.
+- **Consequences.** All existing private services inherit the target through the resolver without
+  route-specific privilege branches. Acting as one user still returns `404` for a third user's
+  private ids. Sprint 081 can create, list and revoke the administrator's real session unchanged;
+  Sprint 082 must document migration `0021`, both act-as routes, the banner and the audit contract
+  as delivered behavior.

@@ -161,8 +161,9 @@ A merged search candidate can retain both Open Library and Google Books identiti
 - `id` opaque text primary key, chosen by the code that creates the row
 - `user_id` foreign key to users with cascade delete — a revocation mechanism that refused to be revoked along with its user would be a worse one
 - `token_hash` required unique text: the server stores only the hash of the session token, never the token itself
+- `acting_as_user_id` nullable foreign key to users with `ON DELETE SET NULL`: only an admin may set it through the act-as API, while the session continues to identify the actual admin
 - `created_at`, `last_seen_at`, `expires_at` required; `user_agent` nullable
-- indexed on `token_hash` (via the unique constraint, the per-request login check) and on `(user_id, expires_at)` (the expiry sweep)
+- indexed on `token_hash` (via the unique constraint, the per-request login check), `(user_id, expires_at)` (the expiry sweep), and `acting_as_user_id` (lifecycle cleanup)
 - created by migration `0017`, first written in Sprint 077. The browser holds a 32-byte URL-safe random token; only its SHA-256 reaches this table. Sessions expire 400 days after creation in this sprint; use refreshes `last_seen_at`, while Sprint 081 owns sliding the expiry and batching that write
 
 Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps; `sessions` keeps `last_seen_at` and `expires_at` in `updated_at`'s place.
@@ -608,7 +609,9 @@ Never expose tracebacks, host filesystem paths, provider keys, or raw SQL.
 The product-spec route list is authoritative, with these refinements:
 
 - Authentication adds `POST /api/auth/login`, `DELETE /api/auth/session`, `GET /api/auth/me`
-  and first-run-only `POST /api/auth/setup`. With `AKASHA_AUTH=off` all four answer 404 and every
+  first-run-only `POST /api/auth/setup`, and admin-only `POST /api/auth/act-as/{user_id}` plus
+  `DELETE /api/auth/act-as`. `GET /api/auth/me` returns the actual signed-in user and the optional
+  acting target. With `AKASHA_AUTH=off` all six answer 404 and every
   older route is unchanged. With it `on`, health routes, auth routes and the SPA shell remain
   reachable anonymously; every other API route answers the ordinary error envelope with
   `401 unauthenticated`. Before any user has a credential that boundary answers
@@ -780,6 +783,9 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
 - Do not log notes, import row contents, API keys, or full provider payloads.
 - Never log passwords, session tokens or cookies. Passwords use scrypt with per-user salts;
   sessions are opaque, server-side and revocable, and the database stores only token hashes.
+- Each completed request made while an admin is acting emits one audit event with the actual
+  admin id, target user id, method and templated route. It never carries query strings, bodies,
+  names, notes or cookie content.
 - Login failures are limited in-process by normalized username and immediate peer in one fixed
   window. The limiter deliberately resets on restart; this is a single-container LAN control,
   not a distributed security boundary.
@@ -812,6 +818,10 @@ Coverage is a diagnostic, not a target to game. Critical domain and import code 
 ## 11. Observability and operations
 
 Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes, and do not rely on call sites to remember: `logging.py` redacts a denylist of keys (notes, review, description, payload, row/record, api_key, token and kin), scrubs configured secret values out of any string so a key embedded in a logged URL cannot escape, truncates oversized values under innocent keys, and recurses into nested structures. Standard-library records are routed through the same chain, so a `logger.warning(..., extra={...})` is rendered and redacted rather than having its structured fields silently dropped.
+
+An admin acting in another library produces exactly one `admin_acting_request` event after each
+handled request. Its only request-specific fields are `admin_user_id`, `acting_as_user_id`,
+`method`, and the router's templated `route`; parameters and user content are deliberately absent.
 
 The final image runs as a non-root user (uid 10001), has a healthcheck, and receives signals directly; `STOPSIGNAL` is `SIGTERM` and uvicorn runs its own graceful shutdown, so a stop closes SQLite rather than killing it mid-write. Compose mounts, by default (DEC-075):
 

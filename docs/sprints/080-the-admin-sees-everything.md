@@ -1,6 +1,6 @@
 # Sprint 080 — The admin sees everything
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 079
 **Roadmap revision:** 40
 
@@ -149,5 +149,48 @@ way to see another library except through the database.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+Completed 2026-09-10. An administrator can now enter another person's complete library from
+People, read and write it through the existing effective-user seam, and return to their own
+library in one action without ever replacing the signed-in identity.
+
+- **Delivered.** Migration `0021` stores a nullable acting target on the server-side session with
+  `ON DELETE SET NULL`. The admin-only start/stop routes and `/api/auth/me` target response drive a
+  fixed, announced banner on every route. Changing identities clears cached library queries and
+  mutations. Logout, expiry, target deletion, either account's password change, and actual admin
+  demotion end the mode; an ordinary profile edit does not. Every handled acted request emits one
+  minimal audit event with the two ids, method and templated route only.
+- **Isolation proof.** The unchanged route inventory still proves user B receives `404` for A's
+  private ids. Added cases prove non-admin act-as is `403`; an admin acting as A can read, create,
+  edit and delete A's entries and shelves with ownership stamped to A; C's ids remain `404`.
+- **TDD and focused verification.** Act-as API, resolver, lifecycle, migration, audit and
+  isolation tests were driven red then green. Final focused runs passed 39 user/isolation tests,
+  nine identity/session/logging tests and the `0021` migration round trip. UI/App focused tests
+  passed 12; the affected auth/accessibility Chromium run passed 29. OpenAPI export and its
+  frontend consumer check passed.
+- **Exhaustive verification after implementation freeze.** `make check` passed, including project
+  validation and the OpenAPI drift checks. `make test` passed 1,464 backend tests at 90% coverage
+  and 322 frontend tests. `npx playwright test` passed 137 with two configuration-dependent skips.
+  The release image built successfully as `akasha-s080-walkthrough-20260910`.
+- **DEC-025 walkthrough.** At 390px, separate admin and Bruno browser profiles held distinct real
+  libraries. While the banner stayed fixed and unambiguous over the library, detail, edit/delete
+  dialogs, shelves, insights, triage and export, the admin changed Bruno's score, assigned Bruno's
+  book to Bruno's shelf and deleted Bruno's mis-imported row. One press restored the admin's own
+  library; Bruno's still-authenticated profile then showed all three changes. The browser recorded
+  49 acted API requests and the foreground container emitted exactly 49 `1 → 2` audit events with
+  one stable field set; Bruno's private note and cookie content were absent. Disposable `/tmp`
+  bind mounts and `docker run --rm` replaced named volumes, and all temporary directories were
+  removed afterward.
+- **Commits.** `5d9e905` added the session/API/resolver/audit behavior; `b6cd40d` fixed lifecycle
+  cleanup and the legacy async test-client stall; `bbfe4d6` pinned ordinary profile edits;
+  `6cbba42` added the banner, cache boundary, People action, OpenAPI contract and browser coverage.
+- **Deviations and decisions.** DEC-152 records migration `0021`, the fixed banner/cache boundary
+  and the post-request audit shape. A prerequisite test-harness defect (a synchronous Starlette
+  `TestClient` nested in an async test) was converted to `httpx.AsyncClient`; product behavior was
+  unchanged. The first walkthrough assertion used an exact-text locator that missed visibly
+  rendered shelf text; its trace and database both showed the assignment, so the selector was
+  corrected to the shelf's accessible remove control and the entire walkthrough was rerun against
+  fresh data. No acceptance criterion was reduced.
+- **Future impact.** Sprint 081 remains correctly scoped: it operates on and revokes the actual
+  administrator session while inheriting act-as unchanged. Sprint 082 must include migration
+  `0021`, the two routes, banner and minimal audit event in its canonical auth documentation; its
+  acceptance criteria and dependency remain valid.

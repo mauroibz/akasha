@@ -1,43 +1,46 @@
-# Handoff — Sprint 080 ready: the admin sees everything
+# Handoff — Sprint 081 ready: log in once
 
-`docs/agent/state.json` records Sprint 079 completed and Sprint 080 `ready`; completed sprints run
-001–079, plan revision remains 40, and `FINAL_SPRINT` remains 82. Claim 080 only after the normal
-context pass with:
+`docs/agent/state.json` records Sprint 080 completed and Sprint 081 `ready`; completed sprints run
+001–080, plan revision is 40, and `FINAL_SPRINT` remains 82. Claim 081 only after the normal context
+pass with:
 
 ```console
-python scripts/sync_sprint_state.py --sprint 080 in_progress
+python scripts/sync_sprint_state.py --sprint 081 in_progress
 ```
 
-## What Sprint 079 leaves behind
+## What Sprint 080 leaves behind
 
-Two authenticated people now have isolated entries, shelves, imports, undo, insights and exports
-over a shared item/cover/attachment cache. Admin-only user management and self-service password
-change are shipped in the People settings surface. Private ownership misses return `404`; a
-non-admin crossing the management boundary receives `403`. User deletion requires explicit
-transfer or delete, and a transfer conflict refuses atomically rather than merging data. DEC-151
-and Sprint 079's Outcome are the realized contract.
+An admin can enter another person's library from People and write to it without losing the actual
+signed-in identity. Migration `0021_session_acting_user` stores the nullable target on the session
+with `ON DELETE SET NULL`; `Principal.effective_user_id` is the sole ownership switch. The fixed,
+announced banner names the target everywhere and returns to the admin's own library in one press.
+Identity switches clear frontend library queries and mutations.
 
-Migration `0020_user_scoped_import_fingerprints` makes import replay identity unique per user.
-The exhaustive inventory in `backend/tests/test_isolation.py` derives application routes from the
-router, requires each route to declare an isolation treatment, and probes URL ids plus ids inside
-bulk bodies. Preserve those cases. Item-addressed routes require the effective user to own an
-entry for the shared item when auth is on; auth-off remains unscoped.
+Acting mode ends on logout, expiry, target deletion, either account's password change, and actual
+admin demotion; ordinary profile edits preserve it. The HTTP boundary emits exactly one
+`admin_acting_request` record per handled acted request with the two numeric ids, method and
+templated route only. DEC-152 and Sprint 080's Outcome are the realized contract. Keep the Sprint
+079 non-admin isolation inventory unchanged: acting as A still gives `404` for C's private ids.
 
-Frozen gates: `make check` passed; `make test` passed 1,457 backend and 320 frontend tests; the
-OpenAPI producer/consumer passed; Playwright passed 136 with two configuration skips. The real
-two-browser container walkthrough passed, including same-file imports, private shelves,
-import/undo, insights and export, with no observed leak. It used a foreground `docker run --rm`
-and disposable `/tmp` bind mounts rather than named volumes; this is the low-approval pattern to
-reuse for throwaway walkthroughs.
+Frozen gates: `make check` passed; `make test` passed 1,464 backend and 322 frontend tests at 90%
+backend coverage; OpenAPI producer/consumer passed; full Playwright passed 137 with two skips. The
+real 390px two-profile container walkthrough changed a score, assigned a shelf and deleted a bad
+row in Bruno's library, then matched 49 browser requests to 49 minimal audit events. The banner was
+never ambiguous. Walkthrough containers used foreground `docker run --rm` plus host-created `/tmp`
+bind directories, so no named-volume start/delete cycle or volume approval was needed.
 
-## Sprint 080 starting point
+## Sprint 081 starting point
 
-Read the Sprint 079 Outcome and DEC-151, then inspect `identity.py`, the isolation inventory,
-People/API code, AppShell and logging fresh. `Principal.acting_as` still exists and is null. Sprint
-080 records act-as on the admin's session, changes the resolver's effective answer, adds the
-unmissable persistent banner, and emits exactly one redacted structured audit line per acted
-request. The existing isolation suite must gain an admin dimension; no non-admin assertion may be
-removed or relaxed. Acting as one user must still return `404` for a third user's ids.
+Read Sprint 080's Outcome and DEC-152, then inspect identity, auth/session storage, config, login
+and account UI fresh. Session rows now include `acting_as_user_id`; session listing and revocation
+must describe and operate on the actual user's sessions, not the effective target. Reuse the exact
+trusted-peer matcher already protecting `X-Forwarded-Proto`; a second trust implementation is a
+defect. Read current Tailscale primary documentation at activation because its header names are an
+external, changeable contract.
 
-The owner's standing Compose install remains out of scope for destructive development checks. Use
-isolated temporary data and profiles; do not request or record the owner's password.
+Sprint 081 adds trusted-header auth (off by default and startup-refused without a peer allowlist),
+batched sliding expiry, session listing/revocation/sign-out-everywhere, and the phone input pass.
+Password login must remain available. The final walkthrough requires Mauro's real tailnet and
+phone: do the disposable/container checks first, then request only the missing real-network
+evidence if needed. The standing Compose install and its credentials remain out of scope unless
+the owner explicitly brings them into the walkthrough.
