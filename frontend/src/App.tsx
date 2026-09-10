@@ -81,6 +81,7 @@ function authenticatedState(user: AuthUser): AuthState {
     authenticated: true,
     setup_required: false,
     user,
+    acting_as: null,
   };
 }
 
@@ -102,13 +103,22 @@ function AuthLoading() {
 
 function PrivateRoutes({
   user,
+  actingAs,
+  onActingAsChanged,
   onSignedOut,
 }: {
   user?: AuthUser | null;
+  actingAs?: AuthUser | null;
+  onActingAsChanged?: (user: AuthUser | null) => void;
   onSignedOut?: () => void;
 }) {
   return (
-    <AppShell user={user} onSignedOut={onSignedOut}>
+    <AppShell
+      user={user}
+      actingAs={actingAs}
+      onActingAsChanged={onActingAsChanged}
+      onSignedOut={onSignedOut}
+    >
       <RoutedErrorBoundary
         fallback={(error, reset) => (
           <RouteErrorPage error={error} reset={reset} />
@@ -126,7 +136,15 @@ function PrivateRoutes({
             <Route
               path="/people"
               element={
-                user ? <PeoplePage user={user} /> : <Navigate to="/" replace />
+                user && onActingAsChanged ? (
+                  <PeoplePage
+                    user={user}
+                    actingAs={actingAs ?? null}
+                    onActAs={onActingAsChanged}
+                  />
+                ) : (
+                  <Navigate to="/" replace />
+                )
               }
             />
             {/* Triage folded into Import as a tab (DEC-079). The old
@@ -267,9 +285,22 @@ export function AppContent() {
       </Suspense>
     );
   }
+
+  function actingAsChanged(actingAs: AuthUser | null) {
+    client.removeQueries({
+      predicate: (query) => query.queryKey[0] !== "auth",
+    });
+    client.getMutationCache().clear();
+    client.setQueryData<AuthState>(AUTH_STATE_QUERY_KEY, (current) =>
+      current ? { ...current, acting_as: actingAs } : current,
+    );
+  }
+
   return (
     <PrivateRoutes
       user={state.user}
+      actingAs={state.acting_as}
+      onActingAsChanged={actingAsChanged}
       onSignedOut={() => {
         client.removeQueries({
           predicate: (query) => query.queryKey[0] !== "auth",
@@ -280,6 +311,7 @@ export function AppContent() {
           authenticated: false,
           setup_required: false,
           user: null,
+          acting_as: null,
         });
       }}
     />

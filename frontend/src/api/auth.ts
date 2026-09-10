@@ -10,6 +10,7 @@ export interface AuthState {
   authenticated: boolean;
   setup_required: boolean;
   user: AuthUser | null;
+  acting_as: AuthUser | null;
 }
 
 export interface ManagedUser extends AuthUser {
@@ -87,9 +88,22 @@ export async function getAuthState(): Promise<AuthState> {
       authenticated: false,
       setup_required: false,
       user: null,
+      acting_as: null,
     };
   }
   return authJson<AuthState>(response);
+}
+
+export async function actAs(userId: number): Promise<void> {
+  const response = await fetch(`/api/auth/act-as/${userId}`, {
+    method: "POST",
+  });
+  if (!response.ok) await authJson(response);
+}
+
+export async function stopActingAs(): Promise<void> {
+  const response = await fetch("/api/auth/act-as", { method: "DELETE" });
+  if (!response.ok) await authJson(response);
 }
 
 export function getUsers(): Promise<ManagedUser[]> {

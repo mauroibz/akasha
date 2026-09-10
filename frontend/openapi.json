@@ -2284,6 +2284,16 @@
       },
       "MeResponse": {
         "properties": {
+          "acting_as": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/UserResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "auth": {
             "title": "Auth",
             "type": "string"
@@ -2311,7 +2321,8 @@
           "auth",
           "authenticated",
           "setup_required",
-          "user"
+          "user",
+          "acting_as"
         ],
         "title": "MeResponse",
         "type": "object"
@@ -3074,6 +3085,85 @@
   },
   "openapi": "3.1.0",
   "paths": {
+    "/api/auth/act-as": {
+      "delete": {
+        "operationId": "stop_acting_as_api_auth_act_as_delete",
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "summary": "Stop Acting As",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
+    "/api/auth/act-as/{user_id}": {
+      "post": {
+        "operationId": "start_acting_as_api_auth_act_as__user_id__post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "user_id",
+            "required": true,
+            "schema": {
+              "title": "User Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Start Acting As",
+        "tags": [
+          "auth"
+        ]
+      }
+    },
     "/api/auth/login": {
       "post": {
         "operationId": "login_api_auth_login_post",

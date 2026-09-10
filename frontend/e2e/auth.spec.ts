@@ -173,6 +173,7 @@ test("two people build two libraries without seeing each other's rows", async ({
     is_admin: false,
   };
   let current: typeof admin | typeof bruno | null = admin;
+  let actingAs: typeof bruno | null = null;
   const people = [
     { ...admin, entry_count: 1, shelf_count: 0 },
     { ...bruno, entry_count: 0, shelf_count: 0 },
@@ -181,6 +182,7 @@ test("two people build two libraries without seeing each other's rows", async ({
     [1, [entry(3)]],
     [2, []],
   ]);
+  let nextEntryId = 20;
 
   await page.route("**/api/auth/me", (route) =>
     route.fulfill({
@@ -189,11 +191,13 @@ test("two people build two libraries without seeing each other's rows", async ({
         authenticated: Boolean(current),
         setup_required: false,
         user: current,
+        acting_as: current ? actingAs : null,
       },
     }),
   );
   await page.route("**/api/auth/session", async (route) => {
     current = null;
+    actingAs = null;
     await route.fulfill({ status: 204, body: "" });
   });
   await page.route("**/api/auth/login", async (route) => {
@@ -205,7 +209,16 @@ test("two people build two libraries without seeing each other's rows", async ({
       body.username === "bruno" && body.password === "bruno password"
         ? bruno
         : admin;
+    actingAs = null;
     await route.fulfill({ json: current });
+  });
+  await page.route("**/api/auth/act-as/**", async (route) => {
+    actingAs = bruno;
+    await route.fulfill({ status: 204, body: "" });
+  });
+  await page.route("**/api/auth/act-as", async (route) => {
+    actingAs = null;
+    await route.fulfill({ status: 204, body: "" });
   });
   await page.route("**/api/users", async (route) => {
     if (route.request().method() === "POST") {
@@ -218,20 +231,30 @@ test("two people build two libraries without seeing each other's rows", async ({
     route.fulfill({ json: [bookItemType] }),
   );
   await page.route("**/api/entries**", async (route) => {
+    const owner = actingAs?.id ?? current!.id;
     if (route.request().method() === "POST") {
       const body = route.request().postDataJSON() as {
         manual: { title: string };
       };
-      const created = entry(20);
+      const created = entry(nextEntryId++);
       created.item.title = body.manual.title;
-      libraries.get(current!.id)!.push(created);
+      libraries.get(owner)!.push(created);
       await route.fulfill({
         status: 201,
         json: { entry: created, already_exists: false, near_matches: [] },
       });
       return;
     }
-    const items = libraries.get(current!.id)!;
+    if (route.request().method() === "PATCH") {
+      const id = Number(
+        new URL(route.request().url()).pathname.split("/").pop(),
+      );
+      const changed = libraries.get(owner)!.find((row) => row.id === id)!;
+      Object.assign(changed, route.request().postDataJSON());
+      await route.fulfill({ json: changed });
+      return;
+    }
+    const items = libraries.get(owner)!;
     await route.fulfill({
       json: {
         items,
@@ -272,4 +295,46 @@ test("two people build two libraries without seeing each other's rows", async ({
   await page.getByRole("button", { name: "Add to library" }).click();
   await expect(page.getByRole("heading", { name: "Ficciones" })).toBeVisible();
   await expect(page.getByText("Seeded book 0003")).toHaveCount(0);
+
+  await page.getByRole("button", { name: "Bruno" }).first().click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByLabel("Username").fill("admin");
+  await page.getByLabel("Password").fill("admin password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await page.getByRole("button", { name: "Mauro" }).first().click();
+  await page.getByRole("button", { name: "People" }).click();
+  await page.getByRole("button", { name: "View Bruno's library" }).click();
+
+  await expect(
+    page.getByRole("status", { name: "Viewing Bruno's library" }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Ficciones" })).toBeVisible();
+  await expect(page.getByText("Seeded book 0003")).toHaveCount(0);
+  const ficciones = page.locator("[data-entry-id='20']");
+  await ficciones.getByRole("button", { name: /^Score for /i }).click();
+  await page.getByRole("button", { name: "Score 9" }).click();
+  await expect(ficciones.getByRole("button", { name: /: 9$/i })).toBeVisible();
+  await page.goto("/add");
+  await page.getByLabel("Title", { exact: true }).fill("Admin repair");
+  await page.getByRole("button", { name: "Add to library" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Admin repair" }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: "Return to your library" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Seeded book 0003" }),
+  ).toBeVisible();
+  await expect(page.getByText("Ficciones")).toHaveCount(0);
+  await page.getByRole("button", { name: "Mauro" }).first().click();
+  await page.getByRole("button", { name: "Sign out" }).click();
+  await page.getByLabel("Username").fill("bruno");
+  await page.getByLabel("Password").fill("bruno password");
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Admin repair" }),
+  ).toBeVisible();
+  await expect(
+    page.locator("[data-entry-id='20']").getByRole("button", { name: /: 9$/i }),
+  ).toBeVisible();
 });

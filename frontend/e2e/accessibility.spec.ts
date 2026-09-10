@@ -246,6 +246,28 @@ test("people settings hold at 390px with no serious accessibility violations", a
   await expectNoSeriousViolations(page, "people settings");
 });
 
+test("the acting-as banner stays usable at 390px with no serious violations", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await stubAuth(page, "acting");
+  await seedLibrary(page, 2);
+  await page.goto("/");
+
+  const banner = page.getByRole("status", { name: "Viewing Bruno's library" });
+  const leave = page.getByRole("button", { name: "Return to your library" });
+  await expect(banner).toBeVisible();
+  expect((await leave.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  expect(
+    await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth -
+        document.documentElement.clientWidth,
+    ),
+  ).toBeLessThanOrEqual(0);
+  await expectNoSeriousViolations(page, "acting as banner");
+});
+
 test("library in grid view has no serious accessibility violations", async ({
   page,
 }) => {

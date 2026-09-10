@@ -22,14 +22,18 @@ const bruno = {
   shelf_count: 1,
 };
 
-function renderPage(user: AuthUser = admin) {
+function renderPage(
+  user: AuthUser = admin,
+  onActAs = vi.fn(),
+  actingAs: AuthUser | null = null,
+) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <PeoplePage user={user} />
+        <PeoplePage user={user} actingAs={actingAs} onActAs={onActAs} />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -129,5 +133,34 @@ describe("PeoplePage", () => {
     expect(screen.queryByRole("heading", { name: "People" })).toBeNull();
     expect(screen.queryByText("Add a person")).toBeNull();
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("opens another person's library without changing who is signed in", async () => {
+    const users = [{ ...admin, entry_count: 12, shelf_count: 4 }, bruno];
+    const fetchMock = vi.fn(
+      async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url === "/api/users") {
+          return new Response(JSON.stringify(users), { status: 200 });
+        }
+        if (url === "/api/auth/act-as/2" && init?.method === "POST") {
+          return new Response(null, { status: 204 });
+        }
+        throw new Error(`Unhandled ${init?.method ?? "GET"} ${url}`);
+      },
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const onActAs = vi.fn();
+    renderPage(admin, onActAs);
+    const user = userEvent.setup();
+
+    await user.click(
+      await screen.findByRole("button", { name: "View Bruno's library" }),
+    );
+
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/act-as/2", {
+      method: "POST",
+    });
+    expect(onActAs).toHaveBeenCalledWith(bruno);
   });
 });

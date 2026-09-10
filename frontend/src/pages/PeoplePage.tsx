@@ -1,9 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
   changePassword,
+  actAs,
   createUser,
   deleteUser,
   getUsers,
@@ -28,7 +30,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function ChangePassword() {
+function ChangePassword({ onChanged }: { onChanged: () => void }) {
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
   const mutation = useMutation({
@@ -37,6 +39,7 @@ function ChangePassword() {
       setCurrent("");
       setNext("");
       toast.success("Password changed. Your other sessions were signed out.");
+      onChanged();
     },
   });
   return (
@@ -93,11 +96,16 @@ function ChangePassword() {
 function PersonRow({
   person,
   currentUser,
+  actingAs,
+  onActAs,
 }: {
   person: ManagedUser;
   currentUser: AuthUser;
+  actingAs: AuthUser | null;
+  onActAs: (user: AuthUser | null) => void;
 }) {
   const cache = useQueryClient();
+  const navigate = useNavigate();
   const [name, setName] = useState(person.display_name ?? "");
   const [isAdmin, setIsAdmin] = useState(person.is_admin);
   const [password, setPassword] = useState("");
@@ -113,6 +121,12 @@ function PersonRow({
         ...(password ? { password } : {}),
       }),
     onSuccess: () => {
+      if (
+        actingAs?.id === person.id &&
+        (Boolean(password) || (person.is_admin && !isAdmin))
+      ) {
+        onActAs(null);
+      }
       setPassword("");
       toast.success(`${person.username} updated`);
       void cache.invalidateQueries({ queryKey: ["users"] });
@@ -129,7 +143,18 @@ function PersonRow({
     onSuccess: () => {
       setDeleting(false);
       toast.success(`${person.username} deleted`);
+      if (actingAs?.id === person.id) {
+        onActAs(null);
+        void navigate("/", { replace: true });
+      }
       void cache.invalidateQueries({ queryKey: ["users"] });
+    },
+  });
+  const view = useMutation({
+    mutationFn: () => actAs(person.id),
+    onSuccess: () => {
+      onActAs(person);
+      void navigate("/", { replace: true });
     },
   });
   return (
@@ -178,6 +203,16 @@ function PersonRow({
         Administrator
       </Label>
       <div className="flex flex-col gap-2 sm:flex-row">
+        {person.id !== currentUser.id ? (
+          <Button
+            variant="outline"
+            className="h-11"
+            disabled={view.isPending}
+            onClick={() => view.mutate()}
+          >
+            View {(person.display_name || person.username) + "'s"} library
+          </Button>
+        ) : null}
         <Button
           className="h-11"
           onClick={() => save.mutate()}
@@ -273,7 +308,15 @@ function PersonRow({
   );
 }
 
-export function PeoplePage({ user }: { user: AuthUser }) {
+export function PeoplePage({
+  user,
+  actingAs,
+  onActAs,
+}: {
+  user: AuthUser;
+  actingAs: AuthUser | null;
+  onActAs: (user: AuthUser | null) => void;
+}) {
   const cache = useQueryClient();
   const [username, setUsername] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -309,7 +352,11 @@ export function PeoplePage({ user }: { user: AuthUser }) {
         lede="Manage your account and the people who use this Akasha install."
       />
       <div className="mt-6 space-y-6">
-        <ChangePassword />
+        <ChangePassword
+          onChanged={() => {
+            if (actingAs) onActAs(null);
+          }}
+        />
         {user.is_admin ? (
           <section className="space-y-4" aria-labelledby="people-heading">
             <div>
@@ -389,7 +436,13 @@ export function PeoplePage({ user }: { user: AuthUser }) {
             ) : null}
             <div className="grid gap-4">
               {users.data?.map((person) => (
-                <PersonRow key={person.id} person={person} currentUser={user} />
+                <PersonRow
+                  key={person.id}
+                  person={person}
+                  currentUser={user}
+                  actingAs={actingAs}
+                  onActAs={onActAs}
+                />
               ))}
             </div>
           </section>

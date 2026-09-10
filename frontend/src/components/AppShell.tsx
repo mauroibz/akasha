@@ -13,7 +13,7 @@ import { type ReactNode, useState } from "react";
 import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
-import { logout, type AuthUser } from "@/api/auth";
+import { logout, stopActingAs, type AuthUser } from "@/api/auth";
 import { AkashaMark } from "@/components/AkashaMark";
 import { DataCredit } from "@/components/DataCredit";
 import { Button } from "@/components/ui/button";
@@ -111,13 +111,60 @@ function AccountControl({
   );
 }
 
+function ActingAsBanner({
+  user,
+  onActingAsChanged,
+}: {
+  user: AuthUser;
+  onActingAsChanged: (user: AuthUser | null) => void;
+}) {
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
+  const name = user.display_name?.trim() || user.username;
+
+  async function leave() {
+    setLeaving(true);
+    try {
+      await stopActingAs();
+      onActingAsChanged(null);
+      void navigate("/", { replace: true });
+    } catch {
+      setLeaving(false);
+      toast.error("You could not return to your library. Try again.");
+    }
+  }
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={`Viewing ${name}'s library`}
+      className="fixed inset-x-0 top-0 z-[60] flex min-h-14 items-center justify-between gap-3 border-b border-amber-500/50 bg-amber-100 px-4 text-amber-950 shadow-sm dark:bg-amber-950 dark:text-amber-50"
+    >
+      <p className="text-sm font-semibold">Viewing {name}&apos;s library</p>
+      <Button
+        variant="outline"
+        className="min-h-11 shrink-0 border-amber-700/40 bg-transparent"
+        disabled={leaving}
+        onClick={() => void leave()}
+      >
+        {leaving ? "Returning…" : "Return to your library"}
+      </Button>
+    </div>
+  );
+}
+
 export function AppShell({
   children,
   user,
+  actingAs,
+  onActingAsChanged,
   onSignedOut,
 }: {
   children: ReactNode;
   user?: AuthUser | null;
+  actingAs?: AuthUser | null;
+  onActingAsChanged?: (user: AuthUser | null) => void;
   onSignedOut?: () => void;
 }) {
   const location = useLocation();
@@ -130,6 +177,15 @@ export function AppShell({
     // eager `motion.*` component into a loud error instead of a silent bundle.
     <LazyMotion features={domAnimation} strict>
       <div className="min-h-screen bg-background text-foreground">
+        {actingAs && onActingAsChanged ? (
+          <>
+            <div className="h-14" aria-hidden="true" />
+            <ActingAsBanner
+              user={actingAs}
+              onActingAsChanged={onActingAsChanged}
+            />
+          </>
+        ) : null}
         <nav
           aria-label="Primary"
           className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"

@@ -105,4 +105,61 @@ describe("AppShell", () => {
     });
     expect(onSignedOut).toHaveBeenCalledOnce();
   });
+
+  it("keeps an announced acting-as banner above the app and leaves in one press", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const onActingAsChanged = vi.fn();
+    const user = userEvent.setup();
+
+    render(
+      <MemoryRouter initialEntries={["/books/7"]}>
+        <AppShell
+          user={{
+            id: 1,
+            username: "mauro",
+            display_name: "Mauro",
+            is_admin: true,
+          }}
+          actingAs={{
+            id: 2,
+            username: "bruno",
+            display_name: "Bruno",
+            is_admin: false,
+          }}
+          onActingAsChanged={onActingAsChanged}
+          onSignedOut={vi.fn()}
+        >
+          <Routes>
+            <Route path="/" element={<h1>Own library</h1>} />
+            <Route
+              path="/books/7"
+              element={<div role="dialog">Edit entry</div>}
+            />
+          </Routes>
+        </AppShell>
+      </MemoryRouter>,
+    );
+
+    const banner = screen.getByRole("status", {
+      name: "Viewing Bruno's library",
+    });
+    expect(banner).toHaveAttribute("aria-live", "polite");
+    expect(screen.getByRole("dialog")).toBeVisible();
+    expect(
+      screen.getAllByRole("button", { name: "Mauro" }).length,
+    ).toBeGreaterThan(0);
+
+    await user.click(
+      screen.getByRole("button", { name: "Return to your library" }),
+    );
+
+    expect(
+      await screen.findByRole("heading", { name: "Own library" }),
+    ).toBeVisible();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/act-as", {
+      method: "DELETE",
+    });
+    expect(onActingAsChanged).toHaveBeenCalledWith(null);
+  });
 });
