@@ -80,6 +80,9 @@ async def test_auth_off_keeps_routes_absent_and_library_open(tmp_path: Path) -> 
         for method, path, body in (
             ("post", "/api/auth/login", {"username": "somebody", "password": PASSWORD}),
             ("delete", "/api/auth/session", None),
+            ("get", "/api/auth/sessions", None),
+            ("delete", "/api/auth/sessions", None),
+            ("delete", "/api/auth/sessions/not-ours", None),
             ("get", "/api/auth/me", None),
             (
                 "post",
@@ -386,6 +389,8 @@ def test_openapi_carries_auth_routes_and_boundary_errors(tmp_path: Path) -> None
         "/api/auth/session",
         "/api/auth/me",
         "/api/auth/setup",
+        "/api/auth/sessions",
+        "/api/auth/sessions/{session_id}",
         "/api/auth/act-as/{user_id}",
         "/api/auth/act-as",
     ):
@@ -393,6 +398,77 @@ def test_openapi_carries_auth_routes_and_boundary_errors(tmp_path: Path) -> None
     responses = schema["paths"]["/api/entries"]["get"]["responses"]
     assert "401" in responses
     assert "409" in responses
+
+
+@pytest.mark.anyio
+async def test_sessions_list_marks_current_and_each_session_can_be_revoked(
+    tmp_path: Path,
+) -> None:
+    app = create_app(auth_settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        other = SessionStore(app.state.engine).create(1, user_agent="Phone")
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app),
+            base_url="http://test",
+            headers={"User-Agent": "Desktop"},
+        ) as client:
+            login = await client.post(
+                "/api/auth/login", json={"username": "mauro", "password": PASSWORD}
+            )
+            current_token = session_cookie(login)
+            response = await client.get("/api/auth/sessions")
+            assert response.status_code == 200
+            sessions = response.json()
+            current = next(row for row in sessions if row["current"])
+            phone = next(row for row in sessions if row["user_agent"] == "Phone")
+            assert current["user_agent"] == "Desktop"
+            assert current["created_at"]
+            assert current["last_seen_at"]
+
+            assert (await client.delete(f"/api/auth/sessions/{phone['id']}")).status_code == 204
+            async with httpx.AsyncClient(
+                transport=httpx.ASGITransport(app),
+                base_url="http://test",
+                cookies={COOKIE_NAME: other.token},
+            ) as phone_client:
+                assert (await phone_client.get("/api/entries")).status_code == 401
+
+            revoked = await client.delete(f"/api/auth/sessions/{current['id']}")
+            assert revoked.status_code == 204
+            client.cookies.set(COOKIE_NAME, current_token)
+            assert (await client.get("/api/entries")).status_code == 401
+
+
+@pytest.mark.anyio
+async def test_sign_out_everywhere_only_revokes_the_current_user(tmp_path: Path) -> None:
+    app = create_app(auth_settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        install_password(app)
+        now = datetime.now(UTC).isoformat().replace("+00:00", "Z")
+        credential = hash_password("bruno password")
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO users "
+                    "(username,password_hash,password_salt,is_admin,created_at,updated_at) "
+                    "VALUES ('bruno',:digest,:salt,0,:now,:now)"
+                ),
+                {"digest": credential.digest, "salt": credential.salt, "now": now},
+            )
+        own_other = SessionStore(app.state.engine).create(1)
+        bruno = SessionStore(app.state.engine).create(2)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            await client.post(
+                "/api/auth/login", json={"username": "mauro", "password": PASSWORD}
+            )
+            response = await client.delete("/api/auth/sessions")
+            assert response.status_code == 204
+            assert (await client.get("/api/entries")).status_code == 401
+        assert SessionStore(app.state.engine).lookup(own_other.token) is None
+        assert SessionStore(app.state.engine).lookup(bruno.token) is not None
 
 
 @pytest.mark.anyio

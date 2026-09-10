@@ -18,6 +18,14 @@ export interface ManagedUser extends AuthUser {
   shelf_count: number;
 }
 
+export interface AuthSession {
+  id: string;
+  created_at: string;
+  last_seen_at: string;
+  user_agent: string | null;
+  current: boolean;
+}
+
 export const AUTH_STATE_QUERY_KEY = ["auth", "me"] as const;
 
 export class AuthRequestError extends Error {
@@ -70,6 +78,24 @@ export function setup(
 export async function logout(): Promise<void> {
   const response = await fetch("/api/auth/session", { method: "DELETE" });
   if (!response.ok) throw new Error("Sign out failed");
+}
+
+export function getSessions(): Promise<AuthSession[]> {
+  return fetch("/api/auth/sessions", {
+    headers: { Accept: "application/json" },
+  }).then(authJson<AuthSession[]>);
+}
+
+export async function revokeSession(id: string): Promise<void> {
+  const response = await fetch(`/api/auth/sessions/${id}`, {
+    method: "DELETE",
+  });
+  if (!response.ok) await authJson(response);
+}
+
+export async function logoutEverywhere(): Promise<void> {
+  const response = await fetch("/api/auth/sessions", { method: "DELETE" });
+  if (!response.ok) await authJson(response);
 }
 
 /**

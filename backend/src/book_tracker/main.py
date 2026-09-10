@@ -425,7 +425,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                 else None
             )
             cookie_token = issued_token or refresh_token
-            if cookie_token is not None:
+            if cookie_token is not None and not getattr(
+                request.state, "suppress_session_cookie", False
+            ):
                 set_session_cookie(response, request, cookie_token)
             return response
 

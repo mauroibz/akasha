@@ -15,6 +15,7 @@ from sqlalchemy import text
 from book_tracker.api.auth import COOKIE_NAME
 from book_tracker.application.add import AddService
 from book_tracker.application.passwords import hash_password
+from book_tracker.application.sessions import SessionStore
 from book_tracker.config import Settings
 from book_tracker.domain.identity import Identifier
 from book_tracker.domain.providers import ItemPayload, SourceRef
@@ -41,6 +42,9 @@ ROUTE_POLICY = {
     ("GET", "/api/health/providers"): "shared",
     ("POST", "/api/auth/login"): "auth",
     ("DELETE", "/api/auth/session"): "auth",
+    ("GET", "/api/auth/sessions"): "self",
+    ("DELETE", "/api/auth/sessions"): "self",
+    ("DELETE", "/api/auth/sessions/{session_id}"): "private-id",
     ("GET", "/api/auth/me"): "auth",
     ("POST", "/api/auth/setup"): "auth",
     ("PATCH", "/api/auth/password"): "self",
@@ -107,6 +111,27 @@ def test_every_application_route_has_an_isolation_policy(tmp_path: Path) -> None
         for method in route.methods or set()
     }
     assert actual == set(ROUTE_POLICY)
+
+
+@pytest.mark.anyio
+async def test_another_users_session_id_is_always_404(tmp_path: Path) -> None:
+    app = create_app(
+        Settings(data_dir=tmp_path / "data", user_agent_contact="test@example.invalid", auth="on")
+    )
+    async with app.router.lifespan_context(app):
+        _seed_users(app)
+        admin_session = SessionStore(app.state.engine).create(1)
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app), base_url="http://test"
+        ) as client:
+            await client.post(
+                "/api/auth/login", json={"username": "bruno", "password": SECOND_PASSWORD}
+            )
+            listed = await client.get("/api/auth/sessions")
+            assert all(row["id"] != admin_session.id for row in listed.json())
+            response = await client.delete(f"/api/auth/sessions/{admin_session.id}")
+        assert response.status_code == 404
+        assert SessionStore(app.state.engine).lookup(admin_session.token) is not None
 
 
 def _seed_users(app: object) -> None:

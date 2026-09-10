@@ -141,6 +141,7 @@ function PrivateRoutes({
                     user={user}
                     actingAs={actingAs ?? null}
                     onActAs={onActingAsChanged}
+                    onSignedOut={onSignedOut ?? (() => undefined)}
                   />
                 ) : (
                   <Navigate to="/" replace />

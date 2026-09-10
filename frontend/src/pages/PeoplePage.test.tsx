@@ -33,7 +33,12 @@ function renderPage(
   return render(
     <QueryClientProvider client={client}>
       <MemoryRouter>
-        <PeoplePage user={user} actingAs={actingAs} onActAs={onActAs} />
+        <PeoplePage
+          user={user}
+          actingAs={actingAs}
+          onActAs={onActAs}
+          onSignedOut={vi.fn()}
+        />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -47,6 +52,9 @@ describe("PeoplePage", () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url === "/api/auth/sessions") {
+          return new Response(JSON.stringify([]), { status: 200 });
+        }
         if (url === "/api/users" && (!init?.method || init.method === "GET")) {
           return new Response(JSON.stringify(users), { status: 200 });
         }
@@ -122,7 +130,9 @@ describe("PeoplePage", () => {
   });
 
   it("shows a non-admin only their password settings", () => {
-    const fetchMock = vi.fn();
+    const fetchMock = vi.fn(
+      async () => new Response(JSON.stringify([]), { status: 200 }),
+    );
     vi.stubGlobal("fetch", fetchMock);
     renderPage(bruno);
 
@@ -132,7 +142,9 @@ describe("PeoplePage", () => {
     ).toBeVisible();
     expect(screen.queryByRole("heading", { name: "People" })).toBeNull();
     expect(screen.queryByText("Add a person")).toBeNull();
-    expect(fetchMock).not.toHaveBeenCalled();
+    expect(fetchMock).toHaveBeenCalledWith("/api/auth/sessions", {
+      headers: { Accept: "application/json" },
+    });
   });
 
   it("opens another person's library without changing who is signed in", async () => {
@@ -140,6 +152,9 @@ describe("PeoplePage", () => {
     const fetchMock = vi.fn(
       async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
+        if (url === "/api/auth/sessions") {
+          return new Response(JSON.stringify([]), { status: 200 });
+        }
         if (url === "/api/users") {
           return new Response(JSON.stringify(users), { status: 200 });
         }

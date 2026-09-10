@@ -65,6 +65,14 @@ class MeResponse(BaseModel):
     acting_as: UserResponse | None
 
 
+class SessionResponse(BaseModel):
+    id: str
+    created_at: datetime
+    last_seen_at: datetime
+    user_agent: str | None
+    current: bool
+
+
 class UserSummary(UserResponse):
     entry_count: int
     shelf_count: int
@@ -412,6 +420,60 @@ async def logout(request: Request) -> Response:
         SessionStore(request.app.state.engine).delete(token)
     response = Response(status_code=204)
     clear_session_cookie(response, request)
+    return response
+
+
+@router.get(
+    "/sessions",
+    response_model=list[SessionResponse],
+    responses={401: {"model": ErrorResponse}},
+)
+async def list_sessions(request: Request, user: CurrentUser) -> list[SessionResponse]:
+    require_auth_mode(request)
+    current_session_id = getattr(request.state, "session_id", None)
+    return [
+        SessionResponse(
+            id=session.id,
+            created_at=session.created_at,
+            last_seen_at=session.last_seen_at,
+            user_agent=session.user_agent,
+            current=session.id == current_session_id,
+        )
+        for session in SessionStore(request.app.state.engine).list_for_user(user.user_id)
+    ]
+
+
+@router.delete(
+    "/sessions",
+    status_code=204,
+    response_class=Response,
+    response_model=None,
+    responses={401: {"model": ErrorResponse}},
+)
+async def logout_everywhere(request: Request, user: CurrentUser) -> Response:
+    require_auth_mode(request)
+    SessionStore(request.app.state.engine).delete_all(user.user_id)
+    request.state.suppress_session_cookie = True
+    response = Response(status_code=204)
+    clear_session_cookie(response, request)
+    return response
+
+
+@router.delete(
+    "/sessions/{session_id}",
+    status_code=204,
+    response_class=Response,
+    response_model=None,
+    responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
+)
+async def revoke_session(session_id: str, request: Request, user: CurrentUser) -> Response:
+    require_auth_mode(request)
+    if SessionStore(request.app.state.engine).delete_for_user(user.user_id, session_id) != 1:
+        raise LibraryError("session_not_found", "Session was not found", status_code=404)
+    response = Response(status_code=204)
+    if session_id == getattr(request.state, "session_id", None):
+        request.state.suppress_session_cookie = True
+        clear_session_cookie(response, request)
     return response
 
 

@@ -53,6 +53,17 @@ class SessionIdentity:
     acting_as_display_name: str | None
     acting_as_is_admin: bool | None
     refreshed: bool = False
+
+
+@dataclass(frozen=True, slots=True)
+class SessionRecord:
+    id: str
+    created_at: datetime
+    last_seen_at: datetime
+    expires_at: datetime
+    user_agent: str | None
+
+
 class SessionStore:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
@@ -202,6 +213,37 @@ class SessionStore:
             result = connection.execute(
                 text("DELETE FROM sessions WHERE token_hash = :token_hash"),
                 {"token_hash": token_hash(token)},
+            )
+        return int(result.rowcount)
+
+    def list_for_user(
+        self, user_id: int, *, now: datetime | None = None
+    ) -> list[SessionRecord]:
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT id,created_at,last_seen_at,expires_at,user_agent FROM sessions "
+                    "WHERE user_id=:user_id AND expires_at>:now "
+                    "ORDER BY last_seen_at DESC, created_at DESC, id"
+                ),
+                {"user_id": user_id, "now": timestamp(now or utc_now())},
+            ).mappings()
+        return [
+            SessionRecord(
+                id=str(row["id"]),
+                created_at=parse_timestamp(str(row["created_at"])),
+                last_seen_at=parse_timestamp(str(row["last_seen_at"])),
+                expires_at=parse_timestamp(str(row["expires_at"])),
+                user_agent=str(row["user_agent"]) if row["user_agent"] is not None else None,
+            )
+            for row in rows
+        ]
+
+    def delete_for_user(self, user_id: int, session_id: str) -> int:
+        with self.engine.begin() as connection:
+            result = connection.execute(
+                text("DELETE FROM sessions WHERE id=:session_id AND user_id=:user_id"),
+                {"session_id": session_id, "user_id": user_id},
             )
         return int(result.rowcount)
 

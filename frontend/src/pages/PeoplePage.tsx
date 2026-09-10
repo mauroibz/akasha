@@ -4,7 +4,6 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import {
-  changePassword,
   actAs,
   createUser,
   deleteUser,
@@ -13,6 +12,7 @@ import {
   type AuthUser,
   type ManagedUser,
 } from "@/api/auth";
+import { AccountSection } from "@/components/AccountSection";
 import { PageHeader } from "@/components/PageHeader";
 import { Panel } from "@/components/Panel";
 import {
@@ -29,69 +29,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-
-function ChangePassword({ onChanged }: { onChanged: () => void }) {
-  const [current, setCurrent] = useState("");
-  const [next, setNext] = useState("");
-  const mutation = useMutation({
-    mutationFn: () => changePassword(current, next),
-    onSuccess: () => {
-      setCurrent("");
-      setNext("");
-      toast.success("Password changed. Your other sessions were signed out.");
-      onChanged();
-    },
-  });
-  return (
-    <Panel className="space-y-4 p-5">
-      <div>
-        <h2 className="text-lg font-semibold">Change password</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          This device stays signed in; your other sessions are closed.
-        </p>
-      </div>
-      <form
-        className="grid gap-4 sm:max-w-md"
-        onSubmit={(event) => {
-          event.preventDefault();
-          mutation.mutate();
-        }}
-      >
-        <Label className="space-y-2">
-          <span>Current password</span>
-          <Input
-            className="h-11"
-            type="password"
-            autoComplete="current-password"
-            value={current}
-            onChange={(event) => setCurrent(event.target.value)}
-          />
-        </Label>
-        <Label className="space-y-2">
-          <span>New password</span>
-          <Input
-            className="h-11"
-            type="password"
-            autoComplete="new-password"
-            value={next}
-            onChange={(event) => setNext(event.target.value)}
-          />
-        </Label>
-        {mutation.isError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {mutation.error.message}
-          </p>
-        ) : null}
-        <Button
-          className="h-11 sm:w-fit"
-          disabled={!current || !next || mutation.isPending}
-        >
-          Change password
-        </Button>
-      </form>
-    </Panel>
-  );
-}
 
 function PersonRow({
   person,
@@ -312,10 +249,12 @@ export function PeoplePage({
   user,
   actingAs,
   onActAs,
+  onSignedOut,
 }: {
   user: AuthUser;
   actingAs: AuthUser | null;
   onActAs: (user: AuthUser | null) => void;
+  onSignedOut: () => void;
 }) {
   const cache = useQueryClient();
   const [username, setUsername] = useState("");
@@ -352,10 +291,11 @@ export function PeoplePage({
         lede="Manage your account and the people who use this Akasha install."
       />
       <div className="mt-6 space-y-6">
-        <ChangePassword
-          onChanged={() => {
+        <AccountSection
+          onPasswordChanged={() => {
             if (actingAs) onActAs(null);
           }}
+          onSignedOut={onSignedOut}
         />
         {user.is_admin ? (
           <section className="space-y-4" aria-labelledby="people-heading">
