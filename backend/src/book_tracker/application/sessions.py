@@ -10,6 +10,10 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy import Engine, text
 
 SESSION_LIFETIME = timedelta(days=400)
+# A busy library can make dozens of authenticated reads for one screen. One
+# durable refresh per device per day keeps annual-login semantics without
+# turning all of those reads into SQLite writes.
+SESSION_REFRESH_INTERVAL = timedelta(days=1)
 SESSION_COOKIE_NAME = "akasha_session"
 _MISSING_TOKEN_HASH = "0" * 64
 
@@ -48,8 +52,7 @@ class SessionIdentity:
     acting_as_username: str | None
     acting_as_display_name: str | None
     acting_as_is_admin: bool | None
-
-
+    refreshed: bool = False
 class SessionStore:
     def __init__(self, engine: Engine) -> None:
         self.engine = engine
@@ -92,7 +95,8 @@ class SessionStore:
             row = (
                 connection.execute(
                     text(
-                        "SELECT sessions.id, sessions.token_hash, sessions.expires_at, "
+                        "SELECT sessions.id, sessions.token_hash, sessions.last_seen_at, "
+                        "sessions.expires_at, "
                         "users.id AS user_id, users.username, users.display_name, users.is_admin, "
                         "target.id AS acting_as_user_id, target.username AS acting_as_username, "
                         "target.display_name AS acting_as_display_name, "
@@ -113,11 +117,22 @@ class SessionStore:
         if row is None or not matches or parse_timestamp(str(row["expires_at"])) <= current:
             return None
 
-        with self.engine.begin() as connection:
-            connection.execute(
-                text("UPDATE sessions SET last_seen_at = :seen WHERE id = :id"),
-                {"seen": timestamp(current), "id": row["id"]},
-            )
+        refreshed = False
+        if parse_timestamp(str(row["last_seen_at"])) <= current - SESSION_REFRESH_INTERVAL:
+            with self.engine.begin() as connection:
+                result = connection.execute(
+                    text(
+                        "UPDATE sessions SET last_seen_at = :seen, expires_at = :expires "
+                        "WHERE id = :id AND last_seen_at = :previous_seen"
+                    ),
+                    {
+                        "seen": timestamp(current),
+                        "expires": timestamp(current + SESSION_LIFETIME),
+                        "id": row["id"],
+                        "previous_seen": row["last_seen_at"],
+                    },
+                )
+            refreshed = result.rowcount == 1
         return SessionIdentity(
             session_id=str(row["id"]),
             user_id=int(row["user_id"]),
@@ -144,6 +159,7 @@ class SessionStore:
                 if row["acting_as_is_admin"] is not None and bool(row["is_admin"])
                 else None
             ),
+            refreshed=refreshed,
         )
 
     def set_acting_as(self, token: str, user_id: int) -> int:

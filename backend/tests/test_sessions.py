@@ -4,7 +4,12 @@ from pathlib import Path
 from sqlalchemy import text
 
 import book_tracker.application.sessions as sessions_module
-from book_tracker.application.sessions import SESSION_LIFETIME, SessionStore
+from book_tracker.application.sessions import (
+    SESSION_LIFETIME,
+    SESSION_REFRESH_INTERVAL,
+    SessionStore,
+    parse_timestamp,
+)
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.migrations import upgrade
@@ -33,16 +38,35 @@ def test_session_create_lookup_refresh_expire_and_delete(tmp_path: Path) -> None
     assert created.token not in row.token_hash
     assert row.user_agent == "Phone browser"
 
-    seen = store.lookup(created.token, now=started + timedelta(hours=2))
+    seen = store.lookup(created.token, now=started + SESSION_REFRESH_INTERVAL / 2)
     assert seen is not None
     assert seen.user_id == 1
     assert seen.username == "admin"
+    assert seen.refreshed is False
+    with engine.connect() as connection:
+        batched = connection.execute(text("SELECT last_seen_at, expires_at FROM sessions")).one()
+    assert batched.last_seen_at == row.last_seen_at
+    assert batched.expires_at == row.expires_at
+
+    refresh_time = started + SESSION_REFRESH_INTERVAL + timedelta(seconds=1)
+    seen = store.lookup(created.token, now=refresh_time)
+    assert seen is not None
+    assert seen.refreshed is True
     with engine.connect() as connection:
         refreshed = connection.execute(text("SELECT last_seen_at, expires_at FROM sessions")).one()
-    assert refreshed.last_seen_at != row.last_seen_at
-    assert refreshed.expires_at == row.expires_at
+    assert parse_timestamp(refreshed.last_seen_at) == refresh_time
+    assert parse_timestamp(refreshed.expires_at) == refresh_time + SESSION_LIFETIME
 
-    assert store.lookup(created.token, now=started + SESSION_LIFETIME) is None
+    # An active device survives the first window, while every refreshed expiry
+    # remains capped at 400 days ahead of the use that moved it.
+    later = refresh_time + SESSION_LIFETIME - timedelta(days=1)
+    assert store.lookup(created.token, now=later) is not None
+    with engine.connect() as connection:
+        active_expiry = connection.execute(text("SELECT expires_at FROM sessions")).scalar_one()
+    assert parse_timestamp(active_expiry) == later + SESSION_LIFETIME
+
+    unused = store.create(1, now=started)
+    assert store.lookup(unused.token, now=started + SESSION_LIFETIME) is None
     assert store.expire(now=started + SESSION_LIFETIME) == 1
 
     replacement = store.create(1, now=started)
@@ -51,7 +75,7 @@ def test_session_create_lookup_refresh_expire_and_delete(tmp_path: Path) -> None
 
     first = store.create(1, now=started)
     second = store.create(1, now=started)
-    assert store.delete_all(1) == 2
+    assert store.delete_all(1) == 3
     assert store.lookup(first.token, now=started) is None
     assert store.lookup(second.token, now=started) is None
 

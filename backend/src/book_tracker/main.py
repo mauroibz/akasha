@@ -417,8 +417,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         async def dispatch_with_cookie() -> Response:
             response = await dispatch(principal)
-            if issued_token is not None:
-                set_session_cookie(response, request, issued_token)
+            refresh_token = (
+                token
+                if identity is not None
+                and identity.refreshed
+                and path != "/api/auth/session"
+                else None
+            )
+            cookie_token = issued_token or refresh_token
+            if cookie_token is not None:
+                set_session_cookie(response, request, cookie_token)
             return response
 
         if path.startswith("/api/auth/"):

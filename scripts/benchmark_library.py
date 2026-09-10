@@ -36,7 +36,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -59,10 +59,14 @@ from recordings import (  # noqa: E402
     RECORDED_ISBN,
     enrichment_providers,
 )
-from sqlalchemy import Engine, text  # noqa: E402
+from sqlalchemy import Engine, event, text  # noqa: E402
 
 from book_tracker.application.enrichment import EnrichmentHandler  # noqa: E402
 from book_tracker.application.library import LibraryService  # noqa: E402
+from book_tracker.application.sessions import (  # noqa: E402
+    SESSION_REFRESH_INTERVAL,
+    SessionStore,
+)
 from book_tracker.config import Settings  # noqa: E402
 from book_tracker.database import create_engine  # noqa: E402
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter  # noqa: E402
@@ -242,7 +246,7 @@ class QueueDrainer:
             self.repository.complete(claimed.id, {"ok": True}, datetime.now(UTC))
             self.completed += 1
 
-    def __enter__(self) -> "QueueDrainer":
+    def __enter__(self) -> QueueDrainer:
         for index in range(self.jobs):
             self.repository.enqueue(None, "enrich_item", {"item_id": index + 1})
         self._thread.start()
@@ -568,6 +572,52 @@ def _duration(seconds: float) -> str:
     return f"{seconds / 3600:.1f}h"
 
 
+def session_refresh_measurement(engine: Engine, iterations: int) -> None:
+    """Measure the authenticated read path and prove its writes are batched."""
+    store = SessionStore(engine)
+    started = datetime.now(UTC)
+    session = store.create(1, user_agent="benchmark", now=started)
+    writes = 0
+
+    def count_writes(
+        _connection: Any,
+        _cursor: Any,
+        statement: str,
+        _parameters: Any,
+        _context: Any,
+        _executemany: bool,
+    ) -> None:
+        nonlocal writes
+        if statement.lstrip().upper().startswith("UPDATE SESSIONS"):
+            writes += 1
+
+    event.listen(engine, "before_cursor_execute", count_writes)
+    try:
+        samples: list[float] = []
+        for _ in range(iterations):
+            before = time.perf_counter()
+            assert store.lookup(session.token, now=started + SESSION_REFRESH_INTERVAL / 2)
+            samples.append((time.perf_counter() - before) * 1000)
+        batched_writes = writes
+        assert store.lookup(
+            session.token,
+            now=started + SESSION_REFRESH_INTERVAL + timedelta(seconds=1),
+        )
+        refresh_writes = writes - batched_writes
+    finally:
+        event.remove(engine, "before_cursor_execute", count_writes)
+
+    samples.sort()
+    p95 = samples[min(len(samples) - 1, int(len(samples) * 0.95))]
+    print("SESSION REFRESH")
+    print(f"  interval: {SESSION_REFRESH_INTERVAL}")
+    print(f"  repeated authenticated lookups: {iterations}")
+    print(f"  p95 lookup: {p95:.2f} ms")
+    print(f"  writes inside interval: {batched_writes}")
+    print(f"  writes after interval: {refresh_writes}")
+    print()
+
+
 def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
     with tempfile.TemporaryDirectory(prefix="akasha-benchmark-") as directory:
         data_dir = Path(directory)
@@ -587,6 +637,7 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
         print(f"iterations per scenario: {iterations}\n")
 
         provider_requests(latency_ms)
+        session_refresh_measurement(engine, iterations)
 
         print("QUERY PLANS (first page, descending)")
         for sort, plan in query_plans(engine, service):
@@ -621,7 +672,10 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
                 print(f"  jobs drained during measurement: {drainer.completed}")
             print()
 
-        print(f"BUDGET (technical-spec section 1): first library page p95 < {FIRST_PAGE_BUDGET_MS:.0f} ms")
+        print(
+            "BUDGET (technical-spec section 1): first library page p95 < "
+            f"{FIRST_PAGE_BUDGET_MS:.0f} ms"
+        )
         if breaches:
             print("VERDICT: over budget")
             for breach in breaches:
@@ -632,7 +686,7 @@ def run(count: int, iterations: int, jobs: int, latency_ms: float) -> int:
 
 
 class _NullContext:
-    def __enter__(self) -> "_NullContext":
+    def __enter__(self) -> _NullContext:
         return self
 
     def __exit__(self, *_: object) -> None:
