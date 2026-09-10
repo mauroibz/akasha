@@ -66,6 +66,15 @@ class Settings(BaseSettings):
         return self
 
     @model_validator(mode="after")
+    def validate_trusted_identity_boundary(self) -> "Settings":
+        if self.auth == "on" and self.trusted_proxy_header and not self.trusted_proxy_peers:
+            raise ValueError(
+                "AKASHA_TRUSTED_PROXY_HEADER requires AKASHA_TRUSTED_PROXY_PEERS; "
+                "otherwise any direct caller could turn it into an authentication bypass"
+            )
+        return self
+
+    @model_validator(mode="after")
     def derive_database_url(self) -> "Settings":
         if self.backup_dir is None:
             self.backup_dir = self.data_dir.parent / "backups"

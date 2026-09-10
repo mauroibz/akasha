@@ -46,3 +46,19 @@ def test_environment_admin_credentials_must_be_set_together() -> None:
         Settings(auth="on", admin_username="admin")
     with pytest.raises(ValidationError, match="together"):
         Settings(auth="on", admin_password="secret")
+
+
+def test_trusted_identity_header_requires_an_explicit_peer_allowlist() -> None:
+    with pytest.raises(ValidationError, match="authentication bypass"):
+        Settings(auth="on", trusted_proxy_header="Tailscale-User-Login")
+
+
+def test_trusted_identity_settings_are_inert_when_authentication_is_off() -> None:
+    configured = Settings(
+        auth="off",
+        trusted_proxy_header="Tailscale-User-Login",
+        trusted_header_autocreate=True,
+    )
+
+    assert configured.trusted_proxy_header == "Tailscale-User-Login"
+    assert configured.trusted_header_autocreate is True
