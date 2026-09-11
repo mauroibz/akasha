@@ -2,11 +2,11 @@
 
 **Status:** implementation baseline 1.0
 **Product source:** [`product-spec.md`](product-spec.md)
-**Last updated:** 2026-07-21
+**Last updated:** 2026-09-11
 
 ## 1. System goals and quality attributes
 
-The application is a single-user, LAN-only web application for recording opinions about book editions. It must remain usable with several thousand entries and while metadata providers are unavailable.
+The application is a self-hosted web application for recording opinions about media — books, albums, anime, films, series. Authentication is optional and off by default; when on, it serves several independent per-user libraries. It must remain usable with several thousand entries per user and while metadata providers are unavailable.
 
 Priority order:
 
@@ -164,7 +164,7 @@ A merged search candidate can retain both Open Library and Google Books identiti
 - `acting_as_user_id` nullable foreign key to users with `ON DELETE SET NULL`: only an admin may set it through the act-as API, while the session continues to identify the actual admin
 - `created_at`, `last_seen_at`, `expires_at` required; `user_agent` nullable
 - indexed on `token_hash` (via the unique constraint, the per-request login check), `(user_id, expires_at)` (the expiry sweep), and `acting_as_user_id` (lifecycle cleanup)
-- created by migration `0017`, first written in Sprint 077. The browser holds a 32-byte URL-safe random token; only its SHA-256 reaches this table. Sessions expire 400 days after creation in this sprint; use refreshes `last_seen_at`, while Sprint 081 owns sliding the expiry and batching that write
+- created by migration `0017`, first written in Sprint 077. The browser holds a 32-byte URL-safe random token; only its SHA-256 reaches this table. Sessions expire 400 days after creation; **use slides the horizon forward (DEC-153, Sprint 081)**: a lookup made at least one day after `last_seen_at` advances both `last_seen_at` and `expires_at` in one write (at most one refresh write per device per day), the new expiry never more than 400 days from that lookup, and `created_at` stays immutable audit data. A session used regularly never expires; an unused one does
 
 Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps; `sessions` keeps `last_seen_at` and `expires_at` in `updated_at`'s place.
 
@@ -228,6 +228,14 @@ This ledger makes undo safe: reverse only effects recorded for the batch; delete
 - `user_id` foreign key to `users`, and **nullable by design** (migration `0019`): an enrichment job acts on a shared cached item and belongs to nobody, while a job chained to an import batch belongs to whoever ran it. The column is how the two are told apart; migration `0019` attributes a `0016` database's rows by `batch_id` (chained to the seeded user, batchless stays `NULL`), and enforcement of the ledger's ownership moves to the resolver in Sprint 076
 
 Jobs survive restart. Handlers are idempotent. The lifespan runner claims one queued job in a short transaction, processes network/file work outside that transaction, and persists progress. On startup, expired `running` jobs return to `queued` with incremented attempts. Cap retries and expose terminal failure.
+
+`provider_usage`
+
+- composite primary key `(provider, day)`, `count` integer
+- one row per provider per UTC day; the in-process fixed-window limiter (DEC-045)
+  increments it, and a day with no rows is a day nothing was counted
+- configuration, not code: `AKASHA_PROVIDER_DAILY_LIMITS` names the metered
+  providers and their ceilings; a provider absent from the mapping is unmetered
 
 `attachments`
 
@@ -790,9 +798,23 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
   window. The limiter deliberately resets on restart; this is a single-container LAN control,
   not a distributed security boundary.
 - No CORS by default in the single-origin deployment.
-- Auth-off means no public exposure. Authentication alone does not authorize an internet-facing
-  deployment; the published-port, HTTPS and proxy boundary remains LAN-only until Sprint 082
-  delivers and verifies the complete operational contract.
+- The exposure rule: no internet-reachable proxy, DNS or port forward unless
+  `AKASHA_AUTH=on`, TLS terminates in front, and the session cookie is `Secure`.
+  Auth-off means no public exposure of any kind. Authentication alone does not
+  authorize an internet-facing deployment; the operator contract for both
+  modes is `docs/operations/runbook.md`'s auth and reverse-proxy sections.
+- The trusted identity header (`AKASHA_TRUSTED_PROXY_HEADER`, off unless
+  configured) authenticates a request by the identity a permitted proxy asserts:
+  only peers inside `AKASHA_TRUSTED_PROXY_PEERS` may carry it, a request from
+  any other peer has the header **stripped before anything reads it**, auth-on
+  startup refuses a configured header without the allowlist, and an unknown
+  identity is refused `403` unless `AKASHA_TRUSTED_HEADER_AUTOCREATE=true`
+  (which creates a non-admin with an empty library and no password). A valid
+  cookie takes precedence over the header, and password login is never disabled
+  by it — the two are alternatives, so a proxy misconfiguration cannot lock
+  anyone out. The header name is the proxy's contract (Tailscale Serve:
+  `Tailscale-User-Login`), kept as configuration so an upstream rename is an
+  environment change, not a release.
 
 ## 10. Testing and quality gates
 
@@ -833,7 +855,7 @@ A fresh named volume is seeded from the image's own `/data`, `/backups` on first
 
 Backups live outside the data volume, not under `/data` (DEC-040): a copy kept inside the volume it protects is lost with that volume. `backup_dir` derives as a sibling of `data_dir`. The backup itself is `book_tracker.backup`, exposed as the `akasha-backup` console script and driven nightly from the host scheduler by `scripts/backup.sh` — the single application process is not a cron daemon. It copies the database through SQLite's online backup API and never file-by-file, archives covers and import audit metadata, writes a manifest and SHA-256 checksums, runs `PRAGMA integrity_check` on the copy, and enforces label-scoped retention. Restore verifies every checksum and the database before writing, and refuses a non-empty target. Nothing on the restore path imports the application, so restoring onto a bare machine needs no configuration.
 
-Migrations run at startup, preceded by an online backup whenever revisions are pending against an existing database; startup fails rather than migrating without one, and the backup is taken once per revision rather than once per restart attempt (DEC-039). Deployment docs cover migration, rollback, backup, restore, and LAN-only proxy guidance in `docs/operations/runbook.md`.
+Migrations run at startup, preceded by an online backup whenever revisions are pending against an existing database; startup fails rather than migrating without one, and the backup is taken once per revision rather than once per restart attempt (DEC-039). Deployment docs cover migration, rollback, backup, restore, the exposure rule and authenticated proxy guidance in `docs/operations/runbook.md`.
 
 ## 12. Deferred decisions and explicit defaults
 
@@ -844,6 +866,6 @@ Defaults adopted until Mauro changes them:
 3. One item is one edition; rereads of another edition remain represented lossily by the same entry and incremented `reread_count`.
 4. Series remains free text in metadata.
 
-Deferred to v2+: authentication, sharing, multiuser UI, Calibre write-back and OPDS. Unscheduled
+Delivered in 2.0 (Sprints 075–081, DEC-146): authentication and multiuser. Still deferred to a future version: sharing, Calibre write-back and OPDS. Unscheduled
 item domains remain speculative; the roadmap-authorized movie line is governed by Sprints 046–047
 and DEC-098 rather than by this deferral.

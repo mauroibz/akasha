@@ -1654,9 +1654,10 @@ OPDS, passkeys, OIDC, email of any kind, and per-user settings. See the proposal
 - **A cover-only third library density.** `readability-proposal.md` §3.1 offers it as optional and
   §5.1 rejects it as a default: a phone has no hover and a cover is not a label.
 - **Auth and multiuser are no longer here.** Both were v2 deferrals with no sprint number until
-  2026-09-07; they are now Sprints 075–082 above, accepted as DEC-146. The exposure rule they
-  gate stands until Sprint 082 rewrites it: no public DNS, port-forwarding, tunnel or
-  internet-reachable proxy while `AKASHA_AUTH` is `off`.
+  2026-09-07; they became Sprints 075–082 (DEC-146) and are delivered. The exposure rule this
+  roadmap carried is rewritten by Sprint 082 as a narrower one: no internet-reachable proxy, DNS
+  or port forward unless `AKASHA_AUTH=on`, TLS terminates in front, and the session cookie is
+  `Secure`.
 - **Sharing, Calibre write-back, OPDS.** Product spec section 9, unchanged, and explicitly outside
   the authentication plan (its section 4). Sharing becomes cheap once Sprint 077 lands and is
   still a separate feature with its own product questions.

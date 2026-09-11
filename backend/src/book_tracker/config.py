@@ -34,8 +34,9 @@ class Settings(BaseSettings):
     # Per-file cap on attachments (DEC-048). Configuration rather than code, like the
     # provider budgets above: 25 MB admits an epub, a PDF scan or a comic issue while
     # refusing the audiobook and video rips that would turn this into a media server.
-    # It bounds the worst single file, not the total — with no auth, anyone on the LAN
-    # can still fill the disk, which is a property of v1 being LAN-only.
+    # It bounds the worst single file, not the total — with auth off, anyone on the
+    # LAN can still fill the disk, and per-user quotas are deliberately not a thing
+    # (DEC-146 §4) even with it on.
     attachment_max_bytes: int = 25 * 1024 * 1024
     # Below this much free space on the data volume, a write that would grow the
     # disk refuses before it starts rather than failing partway through (Sprint

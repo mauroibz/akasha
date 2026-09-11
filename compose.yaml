@@ -1,15 +1,20 @@
-# Akasha — LAN-ONLY.
+# Akasha — the exposure rule.
 #
-# v1 has NO AUTHENTICATION. Anyone who can reach this port can read and change
-# every rating, note and shelf in the library. Publish it to a trusted home
-# network only: never to the internet, never through a port forward, and never
-# behind a reverse proxy that terminates on a public address.
+# Authentication is OFF by default: anyone who can reach this port can read and
+# change every rating, note and shelf in the library. Publish it to a trusted
+# home network only: never to the internet, never through a port forward, and
+# never behind a reverse proxy that terminates on a public address.
+#
+# Exposing it beyond a trusted LAN requires all three of: AKASHA_AUTH=on,
+# TLS terminating in front, and the session cookie Secure
+# (AKASHA_COOKIE_SECURE=true). Authentication alone is not permission to
+# publish; see the runbook's auth section before changing any of this.
 #
 # A host that has joined a VPN or mesh network (WireGuard, Tailscale, ZeroTier
 # and the like) carries an extra interface, and AKASHA_BIND=0.0.0.0 publishes
-# on that one too — an unauthenticated port reachable from outside the
-# building without anyone having forwarded anything. To exclude it, bind
-# AKASHA_BIND to one address rather than to everything.
+# on that one too — a port reachable from outside the building without anyone
+# having forwarded anything. To exclude it, bind AKASHA_BIND to one address
+# rather than to everything.
 #
 # Copy .env.example to .env and set USER_AGENT_CONTACT before the first start.
 
@@ -90,7 +95,7 @@ services:
     init: true
     stop_grace_period: 20s
     labels:
-      org.akasha.security-boundary: "LAN-only; v1 has no authentication and must never be internet-exposed"
+      org.akasha.security-boundary: "Auth off by default; no internet-reachable proxy, DNS or port forward unless AKASHA_AUTH=on, TLS terminates in front, and the cookie is Secure"
 
 volumes:
   data:
