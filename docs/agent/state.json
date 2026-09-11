@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 40,
-  "project_status": "in_progress",
-  "active_sprint": "082",
-  "active_sprint_file": "docs/sprints/082-two-point-oh.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "081",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "082",
   "completed_sprints": [
     "001",
     "002",
@@ -87,8 +87,9 @@
     "078",
     "079",
     "080",
-    "081"
+    "081",
+    "082"
   ],
-  "started_at": "2026-09-11T10:10:03-03:00",
-  "updated_at": "2026-09-11T10:10:03-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-11T12:44:21-03:00"
 }

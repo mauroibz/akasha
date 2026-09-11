@@ -134,7 +134,7 @@ When documents conflict, do not guess. If the product intent is clear, reconcile
 - Imported user data is never overwritten by synchronization; explicit refresh is the only overwrite path.
 - Network providers are never consulted while rendering cached library pages.
 - Calibre is opened read-only.
-- v1 has no auth and must remain LAN-only.
+- The exposure rule: no internet-reachable proxy, DNS or port forward unless `AKASHA_AUTH=on`, TLS terminates in front, and the session cookie is `Secure`. With `AKASHA_AUTH=off` (the default) the application has no authentication and must remain on a trusted LAN — overlay networks included (see the compose warning).
 - A domain is a package under `backend/src/book_tracker/domains/`, and the shared layers never branch on which one they are holding. `if item_type == "book"` above the registry is a defect, not a shortcut — technical spec 6.6 is the contract and `docs/guides/adding-a-domain.md` is how to satisfy it.
 - Internal names are permanent: the code package stays `book_tracker` and the core entities stay `items`/`entries` regardless of product branding. No session renames them to match a brand; user-facing copy is the only thing that follows the brand.
 - Secrets, databases, uploaded imports, and covers are never committed.

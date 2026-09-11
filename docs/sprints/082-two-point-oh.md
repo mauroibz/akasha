@@ -1,6 +1,6 @@
 # Sprint 082 — Two point oh
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 081
 **Roadmap revision:** 40
 
@@ -163,22 +163,16 @@ smoke gate across auth off and auth on because that was required to prove its sh
 
 ## Outcome
 
-**Implementation complete and gates green 2026-09-11; closure pending one owner approval — the
-`AGENTS.md` invariant rewrite (deliverable 1), blocked by the agent platform's write protection
-on that file until the owner consents. Everything else below is done, committed and verified.**
-
-The plan DEC-146 opened is otherwise closed; `2.0.0` is prepared and the sprint deliberately did
-not tag, push or publish anything (the owner makes the release).
+**Completed 2026-09-11.** The plan DEC-146 opened is closed; `2.0.0` is prepared and the sprint
+deliberately did not tag, push or publish anything (the owner makes the release).
 
 - **The exposure rule is narrower, not deleted, and identical everywhere it appears:** no
   internet-reachable proxy, DNS or port forward unless `AKASHA_AUTH=on`, TLS terminates in front,
-  and the session cookie is `Secure`. Written into both specs, the runbook, `README.md`,
-  `.env.example`, `compose.yaml` (header comment and `security-boundary` label) and
-  `SECURITY.md`, whose threat model now describes both modes and puts authentication and
-  cross-user isolation in scope when auth is on. **The `AGENTS.md` invariant rewrite is the one
-  piece not landed: the platform blocks agent writes to that file without owner consent, and the
-  consent request timed out twice. The exact replacement is recorded in the HANDOFF; the sprint
-  closes the moment it lands.**
+  and the session cookie is `Secure`. Written into `AGENTS.md`'s invariants (in place, per
+  deliverable 1 — the owner's go-ahead landed the line after the platform's write protection had
+  held it), both specs, the runbook, `README.md`, `.env.example`, `compose.yaml` (header
+  comment and `security-boundary` label) and `SECURITY.md`, whose threat model now describes both
+  modes and puts authentication and cross-user isolation in scope when auth is on.
 - **Both specs are canonical for what Sprints 075–081 built.** Product spec §9's auth/multiuser
   deferrals became a Delivered paragraph; sharing, Calibre write-back and OPDS stay deferred and
   accurate; §10 row 7 resolved as delivered; §6's route block lists the auth/user routes and the

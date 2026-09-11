@@ -5442,3 +5442,26 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Next: the owner says yes to the AGENTS.md line (or edits it), then any session runs the
   five-minute closure. The release itself (tag `v2.0.0`, push, publish the GitHub Release from
   `docs/operations/release-notes-v2.0.md`) is an owner action the sprint deliberately did not do.
+
+## 2026-09-11 — Sprint 082 closed (complete); the plan is complete
+
+- Done: the owner approved the AGENTS.md invariant rewrite ("go"), the platform's write
+  protection lifted, and the exposure rule's final landing closed deliverable 1. Then the
+  final-sprint closure per WORKFLOW.md: `sync_sprint_state.py --sprint 082 completed` (no
+  successor) set `project_status: complete` with a null active sprint; the ROADMAP's active-sprint
+  line now states the plan is closed; the sprint Outcome's blocked note became the completed
+  record. All 82 sprints are completed; the repo is on `auth-and-multiuser`, clean, local.
+- Verified and how: AC1 re-sweep after the AGENTS.md edit — the only remaining phrase matches are
+  dated history (the sprint's own quote of the old line, v1.0 release notes) and the new
+  invariant itself, which correctly scopes "no authentication" to auth-off. The project validator
+  passed with the completed plan state (sprint files and state.json agree, all 82 listed in
+  order); `git diff --check` clean. No runtime code, tests or gates changed after the frozen
+  exhaustive gate (the AGENTS.md line is agent-instruction text; the specs/runbook/README edits
+  were inside the frozen gate's diff).
+- Deviations: none new. DEC-155 remains the record for the in-gate smoke-block fix and the
+  release decisions.
+- Next: nothing is scheduled. The owner's release actions, whenever wanted: tag `v2.0.0`, push,
+  watch the Release workflow, publish the GitHub Release from
+  `docs/operations/release-notes-v2.0.md`, upgrade the ZimaBoard. The two open observations
+  (DEC-154's residual tailnet proof; contended insights at 10k entries) wait in the decision log
+  for the owner to schedule. A plan revision reopens work and moves `FINAL_SPRINT`.

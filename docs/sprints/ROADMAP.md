@@ -2,7 +2,10 @@
 
 **Plan revision:** 40
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [082 — Two point oh](082-two-point-oh.md). Sprints 001–081
+**Active sprint:** none. Every planned sprint (001–082) is complete — Sprint 082 closed the
+authentication line and the plan; `docs/agent/state.json` reads `project_status: complete`. The
+next line of work opens only by a plan revision (see "Not scheduled" below for what is already
+costed and waiting). Sprints 001–081
 are complete — Sprint 071 closed the original v1 plan and the owner's 2026-09-05 readability
 feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section below.
 The owner's 2026-09-07 request for authentication and multiuser reopens the plan through 082 and
