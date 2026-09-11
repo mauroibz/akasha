@@ -6251,3 +6251,52 @@ only the file-Status flip and state regeneration.
   exceed 500 ms p95 (worst `publisher/count` 1234.8 ms) — a scale no prior benchmark measured; the
   technical-spec budget binds the first library page (contended p95 147.8 ms, within budget), not
   insights.
+
+## DEC-155 — Sprint 082 closes the plan: 2.0.0, the version-surface gate, and what the upgrade rehearsal found
+
+- **Date:** 2026-09-11
+- **Status:** accepted
+- **Supersedes:** nothing. DEC-145's version-check gap is closed by this sprint's deliverable 7;
+  DEC-146's plan is completed by it.
+- **Cross-references:** DEC-145 (the release-procedure and version-gate findings), DEC-146 (the
+  auth plan this release ships), DEC-153 (session horizon), DEC-154 (the waived tailnet walkthrough
+  and the insights-at-10k observation carried into these release notes), Sprint 082.
+- **Context.** Sprint 082 is the release sprint: rewrite the exposure rule everywhere, make both
+  specs canonical for what Sprints 075–081 built, teach the runbook auth, gate the four version
+  surfaces cheaply, bump to `2.0.0`, and write the release notes. Its walkthrough is an upgrade
+  rehearsal against a real v1.8.0 database.
+- **Decision.**
+  - `scripts/validate_project.py` now compares the four version surfaces
+    (`backend/pyproject.toml`, `frontend/package.json`, `main.py`'s FastAPI `version=`,
+    `frontend/openapi.json`) on every run, pyproject as the source of truth; `make check` fails in
+    about a second on a disagreement, with `backend/tests/test_validate_project.py` proving each
+    single-surface disagreement fails. This is DEC-145's cheap gate, delivered as required-test 1.
+  - The exposure rule is one sentence, the same in every file it appears in: *no
+    internet-reachable proxy, DNS or port forward unless `AKASHA_AUTH=on`, TLS terminates in
+    front, and the session cookie is `Secure`.* With auth off, the v1 rule (trusted LAN only)
+    still stands. `AGENTS.md`'s invariant is rewritten in place per the sprint's own instruction.
+  - The release image's both-mode smoke gate now also proves Sprint 081's session surface: the
+    sessions list names both signed-in devices with exactly one current, and revoking the other
+    ends only it. The first version of that block read the list with a cookie the Sprint 077
+    block had already logged out — a defect of the test's own sequencing, fixed by giving the
+    block its own two fresh device logins and rerunning the full gate.
+  - The upgrade rehearsal ran against a copy of the real production database (82 entries,
+    stamp `0016`, no users table) from the ZimaBoard: 2.0.0 started with no configuration change,
+    migrations 0017–0021 ran behind the pre-migration backup, all 82 entries survived byte-for-byte
+    and became the setup-created admin's, a second user was created through the documented route,
+    and cross-user ids answered `404`. Two findings became runbook additions: the library's
+    default view hides `unsorted` rows, so a never-triaged library looks nearly empty on first
+    sight after the upgrade (the Triage inbox holds them; the filter is the cause, not data loss);
+    and the rehearsal's plain `docker compose up` silently inherited the checkout's own `.env`
+    (`AKASHA_AUTH=on`), which a source-checkout operator should know — the deployment path (no
+    checkout) does not have this.
+  - The version surfaces all read `2.0.0`; `frontend/openapi.json` regenerated; the release notes
+    (`docs/operations/release-notes-v2.0.md`) describe the shipped surface including the two
+    recorded deviations (DEC-154's waived walkthrough and the contended-insights-at-10k numbers),
+    and `docs/operations/publishing-images.md`'s end-to-end list gains the missing
+    "publish a GitHub Release" step (DEC-145).
+- **Consequences.** The plan that DEC-146 opened is closed: `FINAL_SPRINT` stays 82 and the
+  project state goes `complete` per WORKFLOW.md's final-sprint rule. Tagging, pushing and
+  publishing remain owner actions, deliberately not performed by this sprint. A future
+  reopening moves `FINAL_SPRINT` again and records the move here. The
+  contended-insights-at-10k finding stays unowned by a sprint until the owner schedules one.

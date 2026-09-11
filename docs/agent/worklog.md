@@ -5407,3 +5407,38 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   exposure rule across nine files, confirms both-mode smoke against the release image, and surfaces
   `2.0.0`. DEC-154's residual proof lands at the owner's first 2.0.0 deployment with the header
   configured.
+
+## 2026-09-11 — Sprint 082 implementation complete; closure blocked on one owner approval
+
+- Done: executed Sprint 082 end to end — exposure rule rewritten across every current-facing
+  document (specs, runbook, README, .env.example, compose.yaml, SECURITY.md); both specs made
+  canonical for Sprints 075–081 (product §9/§10/§6 route block; technical §1/§5.1 all fifteen
+  tables with `provider_usage` added/§9 cookie+header+allowlist/§12); the runbook's
+  "Turning authentication on" and "Running behind `tailscale serve`" sections; the version-surface
+  check in `scripts/validate_project.py` (TDD, 7 new tests); the four surfaces bumped to `2.0.0`
+  with the contract regenerated; the smoke gate extended with Sprint 081's session
+  list/revoke surface and rerun green; `release-notes-v2.0.md` written; `publishing-images.md`
+  gained the GitHub Release step. Commits `f42236d`, `f9fb396`, `7cf0739`, `a849ddf`, `c12b2a7`,
+  `5ce4c32`, `c3f0a1e` + the runbook addition, plus DEC-155 and this record.
+- Verified and how: `make check` green including the new version gate (proved failing per-surface
+  by temporary edits); backend 1,483 passed at 90% coverage; frontend 325 passed; Playwright 138
+  passed + 2 configuration-dependent skips; OpenAPI export + `npm run api:check` green;
+  `make smoke-container` green end to end after the in-gate fix (first sessions block read the
+  list with a cookie the Sprint 077 block had logged out — test-sequencing defect, fixed, full
+  gate rerun). The DEC-025 walkthrough was the upgrade rehearsal against a copy of the real
+  production database (82 entries, stamp 0016, from the ZimaBoard): migrations 0017–0021 ran
+  behind the pre-migration backup, all 82 entries survived byte-for-byte and became the
+  setup-created admin's, a second user was created per the runbook, isolation verified
+  (empty second library, cross-user id 404), source DB untouched at 0016. Two rehearsal findings
+  became runbook additions before closure (unsorted hidden by default — a never-triaged library
+  looks nearly empty after upgrade; and the source-checkout `.env` inheritance note).
+- Deviations: DEC-155 records the smoke-block defect/fix and the release-state decisions.
+- Blocked: **one item only** — the `AGENTS.md` invariant rewrite (line 137), deliverable 1. The
+  agent platform hard-blocks writes to `AGENTS.md` without owner consent; two consent requests
+  timed out unanswered. The exact replacement text is in HANDOFF.md. Once the owner approves (or
+  makes the edit), the remaining closure is: that one line, the AC1 phrase re-sweep, the
+  final-sprint state flip (`--sprint 082 completed`, project → `complete`), worklog, HANDOFF and
+  the `[DOCS]` closure commit. No runtime code, tests or gates are affected by that line.
+- Next: the owner says yes to the AGENTS.md line (or edits it), then any session runs the
+  five-minute closure. The release itself (tag `v2.0.0`, push, publish the GitHub Release from
+  `docs/operations/release-notes-v2.0.md`) is an owner action the sprint deliberately did not do.

@@ -163,5 +163,88 @@ smoke gate across auth off and auth on because that was required to prove its sh
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+**Implementation complete and gates green 2026-09-11; closure pending one owner approval — the
+`AGENTS.md` invariant rewrite (deliverable 1), blocked by the agent platform's write protection
+on that file until the owner consents. Everything else below is done, committed and verified.**
+
+The plan DEC-146 opened is otherwise closed; `2.0.0` is prepared and the sprint deliberately did
+not tag, push or publish anything (the owner makes the release).
+
+- **The exposure rule is narrower, not deleted, and identical everywhere it appears:** no
+  internet-reachable proxy, DNS or port forward unless `AKASHA_AUTH=on`, TLS terminates in front,
+  and the session cookie is `Secure`. Written into both specs, the runbook, `README.md`,
+  `.env.example`, `compose.yaml` (header comment and `security-boundary` label) and
+  `SECURITY.md`, whose threat model now describes both modes and puts authentication and
+  cross-user isolation in scope when auth is on. **The `AGENTS.md` invariant rewrite is the one
+  piece not landed: the platform blocks agent writes to that file without owner consent, and the
+  consent request timed out twice. The exact replacement is recorded in the HANDOFF; the sprint
+  closes the moment it lands.**
+- **Both specs are canonical for what Sprints 075–081 built.** Product spec §9's auth/multiuser
+  deferrals became a Delivered paragraph; sharing, Calibre write-back and OPDS stay deferred and
+  accurate; §10 row 7 resolved as delivered; §6's route block lists the auth/user routes and the
+  previously missing application routes (item-types, insights, cover-candidates, exports,
+  importers, health/live+ready). Technical spec §5.1 now lists all fifteen real tables
+  (`provider_usage` was missing; `schema_probe` is Sprint-001 scaffolding, not a contract table),
+  the `sessions` table description carries DEC-153's sliding horizon, §9's security section owns
+  the cookie policy, trusted-header mechanism, peer allowlist and exposure rule, and §12 marks
+  auth/multiuser delivered.
+- **The runbook teaches auth.** A new "Turning authentication on" section covers the env flip,
+  the setup screen (which claims the existing library for the admin), creating the second person,
+  password loss, proxy lockout recovery (auth-off is reversible; password login never dies), the
+  sessions screen, and a "Running behind `tailscale serve`" subsection with the three settings,
+  the loopback-bind rule and the header-name-is-their-contract note. Verified by *doing* it — see
+  the walkthrough below.
+- **`.env.example` carries every setting** and is now pinned by two tests: every name it documents
+  is accepted by `Settings` (commented or not), and every `Settings` variable is documented in it
+  (image-fixed paths excepted). The sweep found and documented one real gap:
+  `AKASHA_PROVIDER_DAILY_LIMITS` (DEC-045) was never in the file.
+- **The version-surface gate (DEC-145's ask) ships in `scripts/validate_project.py`:** the four
+  surfaces are compared on every `make check`, pyproject the source of truth.
+  `backend/tests/test_validate_project.py` proves each single-surface disagreement fails and
+  agreement passes; the live failure was demonstrated (package.json at `9.9.9` → validator red
+  naming the file). The smoke test's four-surfaces assertion remains the container-side proof.
+- **The version surfaces read `2.0.0`** and `frontend/openapi.json` is regenerated (version-only
+  diff); the export and `npm run api:check` pass.
+- **The both-mode smoke gate covers the final surface.** Audited Sprint 077's block (login,
+  restart survival, logout, cookie shape) and Sprint 081's trusted-header block; extended with
+  one block proving Sprint 081's session surface: two fresh device logins, the list naming both
+  with exactly one current and a user agent, revoking the other ending only it.
+- **Release notes and procedure.** `docs/operations/release-notes-v2.0.md` written in the house
+  shape (versioning note first: 2.0.0 is a major number for a non-breaking release), including
+  both recorded deviations — DEC-154's waived tailnet walkthrough and the
+  contended-insights-at-10k numbers. `publishing-images.md`'s end-to-end list gains the missing
+  "publish a GitHub Release from the release-notes file" step, with DEC-145 named as why.
+- **Required tests (TDD).** `test_validate_project.py` (new, 7 tests: RED on the missing
+  `version_surfaces`, GREEN after implementation, parametrized per-surface failures);
+  `test_settings.py` (+2: `.env.example`↔`Settings` both directions, RED on the commented-name
+  parser and on the provider-limits gap); `test_library_api.py` (+1: the documented route set
+  equals the served router in both auth modes); `scripts/smoke_container.sh` (the release gate).
+  Commits: `f42236d` (version check), `f9fb396` (bump), `7cf0739` (exposure rule + specs),
+  `a849ddf` (smoke coverage), `c12b2a7` (release notes), `5ce4c32` (smoke-block fix),
+  `c3f0a1e` (runbook addition), plus closure.
+- **Exhaustive gate, frozen tree:** `make check` green; backend **1,483 passed** (1,473 + 10 new)
+  at 90% coverage, frontend **325 passed**; full Playwright **138 passed, 2 configuration-dependent
+  skips**; OpenAPI export and consumer check green; `make smoke-container` green end to end
+  (after the in-gate smoke-block fix and full rerun), building the image from the frozen tree and
+  cleaning its own disposable volumes.
+- **Walkthrough (DEC-025), the upgrade rehearsal — done against real data.** A copy of the
+  ZimaBoard's live production database (82 entries, migration stamp `0016`, no users table) was
+  seeded into a throwaway compose project. 2.0.0 started, took the pre-migration backup, ran
+  migrations 0017–0021, and served the library unchanged: all 82 entries present, every row
+  owned by the seeded user, `PRAGMA foreign_key_check` clean, the source DB on the board
+  untouched at `0016`. Then, following only the runbook: the setup screen created the admin
+  (all 82 entries became theirs — verified in the database), the second user was created through
+  the documented route, both signed in, the second user's library was empty, the admin's was
+  intact, a cross-user entry id answered `404`, and the sessions list showed the current device.
+  Two findings became runbook additions before closure: the unsorted-hidden-by-default
+  expectation (a never-triaged library looks nearly empty on `/` after upgrade — the filter, not
+  data loss), and a note that a source-checkout operator's plain `docker compose up` inherits the
+  checkout's own `.env`. Rehearsal volumes, containers and temp files were all removed.
+- **Deviations.** The smoke script's first sessions block failed its own first run by reading the
+  sessions list with a cookie the Sprint 077 block had already logged out — a test-sequencing
+  defect, fixed with fresh device logins and the full gate rerun; recorded as DEC-155. No product
+  behavior changed in this sprint: the runtime diff is one comment in `config.py`, the version
+  literal, and the validator's new check.
+- **Future-sprint review.** There are none — this is `FINAL_SPRINT`; the plan is complete. The
+  two open observations for whoever reopens it are recorded in DEC-154 (the waived tailnet
+  walkthrough's residual proof) and DEC-155 (contended insights at 10k entries).

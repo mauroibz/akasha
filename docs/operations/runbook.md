@@ -346,6 +346,13 @@ Do it in this order:
 4. Sign in as them (or hand them the URL) and confirm their library is empty
    and yours is unchanged.
 
+**One expectation to set before the first sign-in.** The library's default view
+hides `unsorted` rows — it always has. A library whose imports were never
+triaged will look nearly empty on first sight (the inbox/Triage screen holds
+them all, and the status filter can include them). If the library looks
+smaller than expected after the upgrade, that is the filter, not data loss;
+the entry counts in Settings → People name the real totals.
+
 **What each user sees.** Entries, shelves, imports, exports and triage are
 private: two people adding the same book create one shared catalogue record
 (the cover, the metadata) but separate ratings and notes. Cross-user ids answer
