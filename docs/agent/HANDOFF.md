@@ -1,13 +1,13 @@
-# Handoff — the plan is complete: 82 of 82 sprints, project `complete`
+# Handoff — the plan is complete and v2.0.0 is released
 
 `docs/agent/state.json` reads `project_status: complete` with a null active sprint: Sprints
-001–082 are all completed. Sprint 082 ("Two point oh") closed 2026-09-11 with every deliverable,
-test and gate green, including the `AGENTS.md` exposure-rule invariant the owner approved after
-the platform's write protection had held it. There is no active sprint; the repository is on
-`auth-and-multiuser`, clean, all commits local. A new line of work opens only by a plan revision
-(DEC-155 is the record of this plan's close; the reopened-plan mechanics are in
-`docs/agent/WORKFLOW.md`'s final-sprint rule and the seeds-methodology skill's
-end-of-plan revision shape).
+001–082 are all completed. **v2.0.0 shipped 2026-09-11**: PR #19 (73 commits) merged to `main`
+as `c393b57`, tag `v2.0.0` pushed, the Release workflow published
+`ghcr.io/mauroibz/akasha:2.0.0` (+`2.0`, `latest`), and the GitHub Release
+"Akasha 2.0.0 — authentication and multiuser" is live from `release-notes-v2.0.md`. All
+gates ran green on the exact merged tree. A new line of work opens only by a plan revision
+(the reopened-plan mechanics are in `docs/agent/WORKFLOW.md`'s final-sprint rule and the
+seeds-methodology skill's end-of-plan revision shape).
 
 ## What 2.0.0 is, in one paragraph
 

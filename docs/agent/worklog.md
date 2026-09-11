@@ -5465,3 +5465,25 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   `docs/operations/release-notes-v2.0.md`, upgrade the ZimaBoard. The two open observations
   (DEC-154's residual tailnet proof; contended insights at 10k entries) wait in the decision log
   for the owner to schedule. A plan revision reopens work and moves `FINAL_SPRINT`.
+
+## 2026-09-11 — v2.0.0 released: PR #19 merged, tag pushed, image published, GitHub Release live
+
+- Done: the owner directed the release. Pushed `auth-and-multiuser` (73 commits, Sprints 075–082),
+  opened PR #19 (full plan story, migrations, test evidence, deviations), watched CI, merged with
+  a merge commit (`c393b57`), tagged `v2.0.0` on it, pushed the tag, watched the Release workflow
+  publish `ghcr.io/mauroibz/akasha:2.0.0` plus `2.0` and `latest`, and published the GitHub
+  Release "Akasha 2.0.0 — authentication and multiuser" from `release-notes-v2.0.md` (repo-relative
+  links rewritten for the Release page). Local main synced; the branch was kept on the remote.
+- Verified and how: CI on the PR — checks 8m11s, e2e 4m, container 2m13s, all green (one rerun:
+  `test_a_bundle_over_the_declared_caps_is_refused` hit the documented sandboxed-TestClient
+  TaskGroup stall signature; cleared on rerun with zero code change). CI on main after merge —
+  green after one rerun (the DEC-114-quarantined crossfade DOM-budget probe failed 3 attempts on
+  a noisy runner; the identical code had passed the same job on the PR run; cleared on rerun).
+  Registry: `2.0.0`, `2.0`, `latest` all manifest-inspected pullable. Release page lists v2.0.0
+  as Latest. `docker manifest inspect` from a machine that never logged in — public pull works.
+- Deviations: two CI flakes, both known signatures, both resolved by `gh run rerun --failed`
+  with no code change — nothing in the tree differs from the sprint's frozen gates.
+- Next: the ZimaBoard upgrade is the owner's, whenever wanted: `AKASHA_VERSION=2.0.0` in the
+  board's `.env`, `./render-compose.sh`, `docker compose pull && docker compose up -d`. Auth
+  stays off; the runbook's "Turning authentication on" is the on-switch. DEC-154's Tailscale
+  proof lands whenever tailscale reaches the board.
