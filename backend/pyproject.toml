@@ -30,7 +30,7 @@ akasha-attachments = "book_tracker.reclaim:main"
 dev = [
   "mypy>=1.14,<2",
   "pytest>=8.3,<9",
-  "pytest-cov>=6,<7",
+  "pytest-cov>=7.1.0,<8",
   "pytest-timeout>=2.3,<3",
   "ruff>=0.9,<1",
 ]
