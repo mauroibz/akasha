@@ -549,3 +549,110 @@ async def test_a_count_above_the_total_is_stored_rather_than_refused(tmp_path: P
 
     assert beyond.status_code == 200
     assert beyond.json()["progress"] == 200
+
+
+def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
+    """Sprint 082: the routes the specs document are exactly what is served.
+
+    The isolation suite already pins every route to an isolation policy; this
+    test pins the *documented* surface — the technical spec's route list is
+    rewritten this sprint, and a route that drifts between the spec and the
+    router is a spec bug by definition. The authority is the live router.
+    """
+    from fastapi.routing import APIRoute
+
+    from book_tracker.config import Settings
+
+    configured = Settings(
+        data_dir=tmp_path / "data",
+        user_agent_contact="test@example.invalid",
+        auth="on",
+    )
+    app = create_app(configured)
+    served = {
+        (method, route.path)
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and route.path.startswith("/api/")
+        and route.name != "missing_api"
+        for method in route.methods or set()
+    }
+    # The auth surface exists in the contract in both modes (auth-off answers
+    # 404 at runtime); the rest of the application surface is mode-independent.
+    auth_off = create_app(
+        Settings(data_dir=tmp_path / "data2", user_agent_contact="t@example.invalid")
+    )
+    served_off = {
+        (method, route.path)
+        for route in auth_off.routes
+        if isinstance(route, APIRoute)
+        and route.path.startswith("/api/")
+        and route.name != "missing_api"
+        for method in route.methods or set()
+    }
+    assert served == served_off, "auth-on and auth-off must publish the same contract"
+
+    expected = {
+        ("GET", "/api/health/live"),
+        ("GET", "/api/health/ready"),
+        ("GET", "/api/health/providers"),
+        ("POST", "/api/auth/login"),
+        ("DELETE", "/api/auth/session"),
+        ("GET", "/api/auth/sessions"),
+        ("DELETE", "/api/auth/sessions"),
+        ("DELETE", "/api/auth/sessions/{session_id}"),
+        ("GET", "/api/auth/me"),
+        ("POST", "/api/auth/setup"),
+        ("PATCH", "/api/auth/password"),
+        ("POST", "/api/auth/act-as/{user_id}"),
+        ("DELETE", "/api/auth/act-as"),
+        ("GET", "/api/users"),
+        ("POST", "/api/users"),
+        ("PATCH", "/api/users/{user_id}"),
+        ("DELETE", "/api/users/{user_id}"),
+        ("GET", "/api/entries"),
+        ("GET", "/api/insights"),
+        ("GET", "/api/insights/scores"),
+        ("POST", "/api/entries"),
+        ("PATCH", "/api/entries/bulk"),
+        ("POST", "/api/entries/accept-suggested"),
+        ("GET", "/api/entries/{entry_id}"),
+        ("PATCH", "/api/entries/{entry_id}"),
+        ("DELETE", "/api/entries/{entry_id}"),
+        ("GET", "/api/items/{item_id}"),
+        ("PATCH", "/api/items/{item_id}"),
+        ("GET", "/api/item-types"),
+        ("GET", "/api/items/{item_id}/cover"),
+        ("GET", "/api/items/{item_id}/cover-candidates"),
+        ("POST", "/api/items/{item_id}/cover"),
+        ("GET", "/api/items/{item_id}/attachments"),
+        ("POST", "/api/items/{item_id}/attachments"),
+        ("GET", "/api/items/{item_id}/attachments/{attachment_id}"),
+        ("PATCH", "/api/items/{item_id}/attachments/{attachment_id}"),
+        ("DELETE", "/api/items/{item_id}/attachments/{attachment_id}"),
+        ("POST", "/api/items/{item_id}/refresh"),
+        ("POST", "/api/items/{item_id}/cover/fetch"),
+        ("GET", "/api/shelves"),
+        ("POST", "/api/shelves"),
+        ("PATCH", "/api/shelves/{shelf_id}"),
+        ("DELETE", "/api/shelves/{shelf_id}"),
+        ("GET", "/api/search/resolve"),
+        ("GET", "/api/search/preview"),
+        ("GET", "/api/search"),
+        ("POST", "/api/import/{importer_name}/preview"),
+        ("POST", "/api/import/{importer_name}/plan"),
+        ("POST", "/api/import/{importer_name}/batches/{batch_id}/files"),
+        ("GET", "/api/import/{importer_name}/browse"),
+        ("POST", "/api/import/{importer_name}/commit"),
+        ("GET", "/api/import/jobs/{job_id}"),
+        ("DELETE", "/api/import/batches/{batch_id}"),
+        ("GET", "/api/importers"),
+        ("POST", "/api/enrichment/backfill"),
+        ("GET", "/api/export"),
+        ("GET", "/api/exports"),
+        ("GET", "/api/export/{view}"),
+    }
+    assert served == expected, (
+        f"routes on the router but not documented: {sorted(served - expected)}; "
+        f"documented but not served: {sorted(expected - served)}"
+    )
