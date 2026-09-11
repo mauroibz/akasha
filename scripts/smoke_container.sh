@@ -528,6 +528,46 @@ logout_code="$(curl -sS --max-time 20 -o "$workdir/logout-refused.json" -w '%{ht
   || fail "the logged-out client could still read the library: $logout_code"
 printf 'anonymous 401; login 200; restart kept session; logout restored 401\n'
 
+step "Sprint 081: the sessions list sees this device, and revoking it signs it out"
+# The release image must prove the surface Sprint 081 added beside login: a
+# second device's session is listed, revoking it takes effect on its next
+# request, and the revoking device's own session survives.
+login_two_headers="$workdir/login-two-headers.txt"
+curl -fsS --max-time 20 -D "$login_two_headers" -c "$workdir/cookies-two.txt" \
+  -H 'content-type: application/json' \
+  -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/login" >/dev/null \
+  || fail "the second device could not log in"
+sessions_body="$(curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/sessions")"
+printf '%s' "$sessions_body" | python3 -c '
+import json, sys
+
+sessions = json.load(sys.stdin)
+assert len(sessions) == 2, sessions
+current = [s for s in sessions if s["current"]]
+assert len(current) == 1, sessions
+' || fail "the sessions list did not show both devices with one current: $sessions_body"
+other_id="$(printf '%s' "$sessions_body" | python3 -c '
+import json, sys
+
+for session in json.load(sys.stdin):
+    if not session["current"]:
+        print(session["id"])
+        break
+')"
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  -X DELETE "http://127.0.0.1:${AKASHA_PORT}/api/auth/sessions/$other_id" >/dev/null \
+  || fail "revoking the other device failed"
+revoked_code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
+  -b "$workdir/cookies-two.txt" "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$revoked_code" = "401" ] \
+  || fail "the revoked device could still read the library: $revoked_code"
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
+  || fail "revoking another session killed the revoking device's own session"
+printf 'sessions listed both devices; revoking the other ended only it\n'
+
 step "Sprint 081: trusted identity refuses an open boundary and works from its allowlist"
 if COMPOSE_ENV_FILES="$workdir/header-refusal.env" \
   docker compose up --detach --wait --wait-timeout 20 >/dev/null 2>&1; then
@@ -612,5 +652,6 @@ printf 'container, API persistence across recreation, every emitted chunk served
 printf 'read-only Calibre, an in-container restore, a named-volume restore drill through\n'
 printf 'the documented host-side procedure, backups on their own host disk while /data\n'
 printf 'stayed a named volume, a version-tagged build starting without rebuilding, and\n'
-printf 'an auth-on login/restart/logout round-trip on plain HTTP, trusted-header refusal and\n'
-printf 'allowlist paths against the image, and a graceful SIGTERM.\n'
+printf 'an auth-on login/restart/logout round-trip on plain HTTP, the sessions list\n'
+printf 'naming both devices with one current and a revoke ending only its target,\n'
+printf 'trusted-header refusal and allowlist paths against the image, and a graceful SIGTERM.\n'
