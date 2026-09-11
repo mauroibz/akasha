@@ -140,12 +140,14 @@ class ImportService:
         source_root: Path,
         importer: Importer,
         *,
+        user_id: int,
         attachment_max_bytes: int = 25 * 1024 * 1024,
     ) -> None:
         self.engine = engine
         self.data_dir = data_dir
         self.source_root = source_root
         self.importer = importer
+        self.user_id = user_id
         #: The same per-file ceiling the manual `/batches/{id}/files` route enforces
         #: (DEC-083), applied here to a reader-staged attachment too: a source that
         #: already had the bytes on disk does not get a bigger allowance than one that
@@ -155,8 +157,8 @@ class ImportService:
         #: one domain any more (DEC-106): each record resolves its own, and the first
         #: entry is what a record naming no type of its own becomes.
         self.domains = {item_type: DOMAINS[item_type] for item_type in importer.item_types}
-        self.library = DomainRepository(engine)
-        self.imports = ImportRepository(engine)
+        self.library = DomainRepository(engine, user_id)
+        self.imports = ImportRepository(engine, user_id)
 
     def _domain_for(self, record: NormalizedImportRecord) -> Domain:
         """The domain this row targets, refusing one the connector never declared.
@@ -364,7 +366,7 @@ class ImportService:
     def get_preview(self, batch_id: str) -> dict[str, Any]:
         with Session(self.engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None or batch.kind != self.importer.name:
+            if batch is None or batch.user_id != self.user_id or batch.kind != self.importer.name:
                 raise LibraryError(
                     "import_batch_not_found", "Import preview was not found", status_code=404
                 )
@@ -394,7 +396,7 @@ class ImportService:
         moment = (now or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
         with Session(self.engine) as session:
             batch = session.get(ImportBatchRow, batch_id)
-            if batch is None or batch.kind != self.importer.name:
+            if batch is None or batch.user_id != self.user_id or batch.kind != self.importer.name:
                 raise LibraryError(
                     "import_batch_not_found", "Import batch was not found", status_code=404
                 )
@@ -435,19 +437,21 @@ class ImportService:
         and **retains** — the safe direction. The other order would let undo delete a
         file it never put there.
         """
-        attachment = LibraryService(self.engine).record_attachment(
+        attachment = LibraryService(self.engine, self.user_id).record_attachment(
             item_id, filename=filename, sha256=sha256, byte_size=byte_size
         )
         with Session(self.engine) as session:
             record_id = session.scalar(
                 select(ImportRecordRow.id).where(
                     ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.user_id == self.user_id,
                     ImportRecordRow.matched_item_id == item_id,
                 )
             )
             existing = session.scalar(
                 select(ImportEffectRow.effect_id).where(
                     ImportEffectRow.batch_id == batch_id,
+                    ImportEffectRow.user_id == self.user_id,
                     ImportEffectRow.entity_type == "attachment",
                     ImportEffectRow.entity_id == str(attachment["id"]),
                 )
@@ -456,6 +460,7 @@ class ImportService:
                 session.add(
                     ImportEffectRow(
                         batch_id=batch_id,
+                        user_id=self.user_id,
                         record_id=record_id,
                         effect_type="create",
                         entity_type="attachment",

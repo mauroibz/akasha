@@ -123,7 +123,9 @@ _ITEM_COLUMNS = (
 )
 
 
-def _batches(session: Session, columns: tuple[Any, ...]) -> Iterator[list[Any]]:
+def _batches(
+    session: Session, columns: tuple[Any, ...], user_id: int | None = None
+) -> Iterator[list[Any]]:
     """Walk a table in keyset batches, holding one batch at a time.
 
     `yield_per` is not enough here. SQLite's driver has no server-side cursor, so
@@ -132,11 +134,17 @@ def _batches(session: Session, columns: tuple[Any, ...]) -> Iterator[list[Any]]:
     keyset walk issues one bounded query per batch instead, the same technique the
     library list already uses (technical spec 7.2). The key must be the first
     column and must be unique and ordered.
+
+    `user_id` scopes the walk to one owner's rows. `None` walks the whole table,
+    which only the item walk uses: items are the shared cache and an export of
+    them leaks nothing nobody's entry does not already describe (Sprint 076).
     """
     key = columns[0]
     last: Any = None
     while True:
         statement = select(*columns).order_by(key).limit(BATCH)
+        if user_id is not None:
+            statement = statement.where(EntryRow.user_id == user_id)
         if last is not None:
             statement = statement.where(key > last)
         rows = session.execute(statement).all()
@@ -245,8 +253,8 @@ def _formats_for(session: Session, entry_ids: list[int]) -> dict[int, list[str]]
     return formats
 
 
-def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
-    for batch in _batches(session, _ENTRY_COLUMNS):
+def iter_entries(session: Session, user_id: int) -> Iterator[dict[str, Any]]:
+    for batch in _batches(session, _ENTRY_COLUMNS, user_id):
         entry_ids = [entry.id for entry in batch]
         shelves = _shelves_for(session, entry_ids)
         formats = _formats_for(session, entry_ids)
@@ -273,8 +281,12 @@ def iter_entries(session: Session) -> Iterator[dict[str, Any]]:
             }
 
 
-def export_json(engine: Engine, *, now: datetime | None = None) -> Iterator[str]:
-    """Yield the export document in pieces, never holding the whole of it."""
+def export_json(engine: Engine, *, user_id: int, now: datetime | None = None) -> Iterator[str]:
+    """Yield the export document in pieces, never holding the whole of it.
+
+    `user_id` scopes the entries the dump carries. Items follow unscoped: they are
+    the shared cache the entries describe.
+    """
     generated = (now or datetime.now(UTC)).isoformat()
     with Session(engine) as session:
         header = {
@@ -283,7 +295,10 @@ def export_json(engine: Engine, *, now: datetime | None = None) -> Iterator[str]
             "generated_at": generated,
         }
         yield json.dumps(header, ensure_ascii=False)[:-1]
-        for name, rows in (("items", iter_items(session)), ("entries", iter_entries(session))):
+        for name, rows in (
+            ("items", iter_items(session)),
+            ("entries", iter_entries(session, user_id)),
+        ):
             yield f', "{name}": ['
             for index, row in enumerate(rows):
                 yield ("," if index else "") + json.dumps(row, ensure_ascii=False)
@@ -291,7 +306,9 @@ def export_json(engine: Engine, *, now: datetime | None = None) -> Iterator[str]
         yield "}"
 
 
-def _entry_batches_for_type(session: Session, item_type: str) -> Iterator[list[Any]]:
+def _entry_batches_for_type(
+    session: Session, item_type: str, user_id: int | None = None
+) -> Iterator[list[Any]]:
     """`_batches`, joined and filtered to one domain's entries.
 
     A registered export view's rows are always one domain at a time — `type` is a
@@ -310,6 +327,8 @@ def _entry_batches_for_type(session: Session, item_type: str) -> Iterator[list[A
             .order_by(key)
             .limit(BATCH)
         )
+        if user_id is not None:
+            statement = statement.where(EntryRow.user_id == user_id)
         if last is not None:
             statement = statement.where(key > last)
         rows = session.execute(statement).all()
@@ -321,7 +340,7 @@ def _entry_batches_for_type(session: Session, item_type: str) -> Iterator[list[A
         last = rows[-1][0]
 
 
-def iter_export_rows(session: Session, item_type: str) -> Iterator[ExportRow]:
+def iter_export_rows(session: Session, item_type: str, user_id: int) -> Iterator[ExportRow]:
     """The shared walk behind every registered `ExportView` (proposal §2.1).
 
     One domain's entries, joined to their item, identifiers, shelves and formats,
@@ -329,7 +348,7 @@ def iter_export_rows(session: Session, item_type: str) -> Iterator[ExportRow]:
     view built on this never opens a session and never writes SQL — it receives one
     `ExportRow` at a time and decides only how to spell it.
     """
-    for batch in _entry_batches_for_type(session, item_type):
+    for batch in _entry_batches_for_type(session, item_type, user_id):
         item_ids = [entry.item_id for entry in batch]
         entry_ids = [entry.id for entry in batch]
         items = {
@@ -374,7 +393,9 @@ def iter_export_rows(session: Session, item_type: str) -> Iterator[ExportRow]:
             )
 
 
-def stream_export_view(engine: Engine, view: ExportView, item_type: str) -> Iterator[str]:
+def stream_export_view(
+    engine: Engine, view: ExportView, item_type: str, user_id: int
+) -> Iterator[str]:
     """Stream one registered view for one domain — `GET /api/export/{view}`'s walk.
 
     The session is opened here and stays open across the view's own generator: both
@@ -383,4 +404,4 @@ def stream_export_view(engine: Engine, view: ExportView, item_type: str) -> Iter
     `export_json` and the pre-sprint `export_csv` both used).
     """
     with Session(engine) as session:
-        yield from view.write(iter_export_rows(session, item_type))
+        yield from view.write(iter_export_rows(session, item_type, user_id))

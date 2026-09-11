@@ -286,7 +286,7 @@ async def test_a_late_job_from_an_undone_batch_cancels_without_calling_a_provide
         engine = app.state.engine
         item_id = create_item(engine, "Rayuela")
         batch_id = _create_committed_batch(engine)
-        UndoService(engine).undo(batch_id)
+        UndoService(engine, user_id=1).undo(batch_id)
         job_id = JobRepository(engine).enqueue(
             batch_id, "enrich_item", {"item_id": item_id, "isbn": RECORDED_ISBN}
         )
@@ -330,8 +330,11 @@ def create_typed_item(
     return item_id
 
 
-def enqueue(engine: Engine, payload: dict[str, Any]) -> str:
-    return JobRepository(engine).enqueue(None, "enrich_item", payload)
+def enqueue(engine: Engine, payload: dict[str, Any], *, user_id: int | None = None) -> str:
+    """Queue the way Sprint 076 shaped it: without an owner the handler treats the
+    job as nobody's and writes no entry note, so these tests pass the seeded user
+    explicitly whenever the note is the thing being proven."""
+    return JobRepository(engine).enqueue(None, "enrich_item", payload, user_id=user_id)
 
 
 @pytest.mark.anyio
@@ -492,7 +495,9 @@ async def test_a_text_matched_album_writes_a_note_only_when_none_exists(engine: 
             {"item": item_id},
         )
     job_id = enqueue(
-        engine, {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"}
+        engine,
+        {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"},
+        user_id=1,
     )
 
     async def no_sleep(_seconds: float) -> None:
@@ -531,7 +536,9 @@ async def test_a_text_matched_album_writes_a_note_only_when_none_exists(engine: 
             text("UPDATE entries SET notes='my own note' WHERE item_id=:id"), {"id": item_id}
         )
     job_id_2 = enqueue(
-        engine, {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"}
+        engine,
+        {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"},
+        user_id=1,
     )
     async with create_provider_client(replay(routes)) as client:  # type: ignore[arg-type]
         providers = {
@@ -545,6 +552,63 @@ async def test_a_text_matched_album_writes_a_note_only_when_none_exists(engine: 
             text("SELECT notes FROM entries WHERE item_id=:id"), {"id": item_id}
         ).scalar_one()
     assert note_after == "my own note"
+
+
+@pytest.mark.anyio
+async def test_an_ownerless_enrichment_job_writes_no_entry_note(engine: Engine) -> None:
+    """AC5 / Sprint 076: a job with nobody to answer to still completes — but its
+    weak-evidence note lands on no entry, because the handler no longer guesses
+    whose entry it is (before Sprint 076 the literal user 1 received it). The
+    metadata fill still happens: items are the shared cache."""
+    from book_tracker.domains.album.providers import MusicBrainzProvider
+
+    item_id = create_typed_item(engine, "Purpose", "album", ("spotify", "7fZH0aUAjY3ay25obOUf2a"))
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE items SET metadata=:metadata WHERE id=:id"),
+            {"metadata": json.dumps({"creators": ["Justin Bieber"]}), "id": item_id},
+        )
+        connection.execute(
+            text(
+                "INSERT INTO entries (user_id, item_id, status, date_added, "
+                "created_at, updated_at) VALUES (1, :item, 'owned', 'n', 'n', 'n')"
+            ),
+            {"item": item_id},
+        )
+    # Queued the way a batch-less backfill queues it: no owner.
+    job_id = enqueue(
+        engine, {"item_id": item_id, "kind": "spotify", "value": "7fZH0aUAjY3ay25obOUf2a"}
+    )
+
+    async def no_sleep(_seconds: float) -> None:
+        return None
+
+    routes = {
+        "/ws/2/url": (404, recording("musicbrainz_url_no_relation.json")),
+        "/ws/2/release-group": (200, recording("musicbrainz_search_purpose_justin_bieber.json")),
+        "/ws/2/release-group/2660de3c-56db-4bd1-bf99-e162c68e5712": (
+            200,
+            recording("musicbrainz_release_group_purpose.json"),
+        ),
+        "/ws/2/release/006391a6-3f99-4d38-9185-50633c43fe38": (
+            200,
+            recording("musicbrainz_release_purpose.json"),
+        ),
+    }
+    async with create_provider_client(replay(routes)) as client:  # type: ignore[arg-type]
+        providers = {
+            "musicbrainz": MusicBrainzProvider(client, "test@example.invalid", sleep=no_sleep)
+        }
+        result = await EnrichmentHandler(engine, providers).process(job_id, datetime.now(UTC))
+
+    assert result["state"] == "succeeded", result
+    assert "notes" not in result["progress"]["filled"], result
+    with engine.connect() as connection:
+        note = connection.execute(
+            text("SELECT notes FROM entries WHERE item_id=:id"), {"id": item_id}
+        ).scalar_one()
+    # The one word from the same fixture that writes when owned: absent here.
+    assert note is None
 
 
 @pytest.mark.anyio

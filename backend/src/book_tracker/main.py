@@ -2,23 +2,44 @@ import asyncio
 import contextlib
 import logging
 import sqlite3
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
+from typing import Any
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
 
+from book_tracker.api.auth import (
+    LoginRateLimiter,
+    bootstrap_admin,
+    error_response,
+    has_credentialed_user,
+    set_session_cookie,
+    strip_untrusted_identity_header,
+    trusted_header_user,
+    unauthenticated,
+    users_router,
+)
+from book_tracker.api.auth import (
+    router as auth_router,
+)
+from book_tracker.api.auth import (
+    setup_required as setup_required_response,
+)
 from book_tracker.api.export import router as export_router
+from book_tracker.api.identity import AuthenticationRequired, Principal
 from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
+from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.library import LibraryError
+from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 from book_tracker.backup import BackupError, create_backup, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
@@ -140,6 +161,20 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             _back_up_before_migrating(configured)
             upgrade(configured.database_url)
         app.state.engine = create_engine(configured)
+        app.state.auth = configured.auth
+        app.state.cookie_secure = configured.cookie_secure
+        app.state.trusted_proxy_peers = configured.trusted_proxy_peers
+        app.state.trusted_proxy_header = configured.trusted_proxy_header
+        app.state.trusted_header_autocreate = configured.trusted_header_autocreate
+        app.state.login_limiter = LoginRateLimiter(
+            configured.login_max_failures, configured.login_window_seconds
+        )
+        if (
+            configured.auth == "on"
+            and configured.admin_username is not None
+            and configured.admin_password is not None
+        ):
+            bootstrap_admin(app.state.engine, configured.admin_username, configured.admin_password)
         provider_client = create_provider_client()
         app.state.provider_client = provider_client
         app.state.data_dir = configured.data_dir
@@ -277,7 +312,132 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha", version="1.8.0", lifespan=lifespan)
+    app = FastAPI(title="Akasha", version="2.0.0", lifespan=lifespan)
+    # Available before lifespan for route inspection; requests still run only
+    # after lifespan has installed the engine and session store dependencies.
+    app.state.auth = configured.auth
+    app.state.cookie_secure = configured.cookie_secure
+    app.state.trusted_proxy_peers = configured.trusted_proxy_peers
+    app.state.trusted_proxy_header = configured.trusted_proxy_header
+    app.state.trusted_header_autocreate = configured.trusted_header_autocreate
+
+    @app.exception_handler(AuthenticationRequired)
+    async def authentication_required(
+        _request: Request, _error: AuthenticationRequired
+    ) -> JSONResponse:
+        return unauthenticated()
+
+    @app.middleware("http")
+    async def authentication_boundary(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        async def dispatch(principal: Principal | None = None) -> Response:
+            try:
+                return await call_next(request)
+            finally:
+                if principal is not None and principal.acting_as is not None:
+                    route = request.scope.get("route")
+                    logging.getLogger("book_tracker.audit").info(
+                        "admin_acting_request",
+                        extra={
+                            "admin_user_id": principal.user_id,
+                            "acting_as_user_id": principal.acting_as,
+                            "method": request.method,
+                            "route": getattr(route, "path", request.url.path),
+                        },
+                    )
+
+        if configured.auth == "off":
+            if request.url.path.startswith("/api/auth/"):
+                return JSONResponse(status_code=404, content={"detail": "Not Found"})
+            return await call_next(request)
+        strip_untrusted_identity_header(
+            request, configured.trusted_proxy_header, configured.trusted_proxy_peers
+        )
+        path = request.url.path
+        if path.startswith("/api/health/"):
+            return await call_next(request)
+        # The shell and its emitted assets must load before Sprint 078 can draw
+        # a login screen. FastAPI's own contract/docs routes are not shell assets
+        # and remain behind the same boundary as the rest of the application.
+        is_spa_get = request.method == "GET" and path not in {
+            "/openapi.json",
+            "/docs",
+            "/docs/oauth2-redirect",
+            "/redoc",
+        }
+        if not path.startswith("/api/") and is_spa_get:
+            return await call_next(request)
+
+        needs_setup = not has_credentialed_user(request.app.state.engine)
+        if needs_setup:
+            if path not in {"/api/auth/me", "/api/auth/setup"}:
+                return setup_required_response()
+            return await call_next(request)
+
+        token = request.cookies.get(SESSION_COOKIE_NAME)
+        identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+        issued_token: str | None = None
+        if (
+            identity is None
+            and configured.trusted_proxy_header
+            and path not in {"/api/auth/login", "/api/auth/setup", "/api/auth/session"}
+        ):
+            asserted_identity = request.headers.get(configured.trusted_proxy_header)
+            if asserted_identity:
+                user = trusted_header_user(
+                    request.app.state.engine,
+                    asserted_identity,
+                    autocreate=configured.trusted_header_autocreate,
+                )
+                if user is None:
+                    return error_response(
+                        403,
+                        "unknown_proxy_identity",
+                        "This proxy identity is not allowed to use Akasha",
+                    )
+                created = SessionStore(request.app.state.engine).create(
+                    int(user["id"]), user_agent=request.headers.get("user-agent")
+                )
+                issued_token = created.token
+                identity = SessionStore(request.app.state.engine).lookup(created.token)
+        principal = (
+            Principal(
+                user_id=identity.user_id,
+                username=identity.username,
+                is_admin=identity.is_admin,
+                acting_as=identity.acting_as_user_id,
+            )
+            if identity is not None
+            else None
+        )
+        if identity is not None:
+            request.state.session_identity = identity
+            request.state.session_id = identity.session_id
+
+        async def dispatch_with_cookie() -> Response:
+            response = await dispatch(principal)
+            refresh_token = (
+                token
+                if identity is not None and identity.refreshed and path != "/api/auth/session"
+                else None
+            )
+            cookie_token = issued_token or refresh_token
+            if cookie_token is not None and not getattr(
+                request.state, "suppress_session_cookie", False
+            ):
+                set_session_cookie(response, request, cookie_token)
+            return response
+
+        if path.startswith("/api/auth/"):
+            if principal is not None:
+                request.state.principal = principal
+            return await dispatch_with_cookie()
+        if identity is None:
+            return unauthenticated()
+        assert principal is not None
+        request.state.principal = principal
+        return await dispatch_with_cookie()
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:
@@ -396,12 +556,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ]
         return ProviderHealth(providers=rows, degraded=not all(row.available for row in rows))
 
-    app.include_router(library_router)
-    app.include_router(providers_router)
-    app.include_router(imports_router)
-    app.include_router(catalog_router)
-    app.include_router(enrichment_router)
-    app.include_router(export_router)
+    auth_responses: dict[int | str, dict[str, Any]] = {
+        401: {"model": ErrorResponse},
+        409: {"model": ErrorResponse},
+    }
+    app.include_router(auth_router)
+    app.include_router(users_router, responses=auth_responses)
+    app.include_router(library_router, responses=auth_responses)
+    app.include_router(providers_router, responses=auth_responses)
+    app.include_router(imports_router, responses=auth_responses)
+    app.include_router(catalog_router, responses=auth_responses)
+    app.include_router(enrichment_router, responses=auth_responses)
+    app.include_router(export_router, responses=auth_responses)
 
     @app.api_route(
         "/api/{path:path}",

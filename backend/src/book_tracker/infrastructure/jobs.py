@@ -49,6 +49,10 @@ class ClaimedJob:
     state: str
     lease_expires_at: str | None
     heartbeat_at: str | None
+    #: Whose work this job is — the column Sprint 075 added, read back here so
+    #: a handler never guesses. `None` for nobody's jobs (a backfill with no
+    #: batch, or anything queued before the column existed).
+    owner: int | None
 
 
 class JobRepository:
@@ -78,8 +82,17 @@ class JobRepository:
         kind: str,
         payload: Mapping[str, Any],
         *,
+        user_id: int | None = None,
         available_at: datetime | None = None,
     ) -> str:
+        """Queue a job.
+
+        `user_id` names whose work this is. It is optional on purpose: a job
+        with no owner is legitimate (a batch-less backfill must not be forged
+        onto user 1's ledger, which is why Sprint 075 kept the column nullable
+        and gave it no default), and a handler that needs an owner reads it
+        back rather than assuming.
+        """
         job_id = str(uuid.uuid4())
         now = _now()
         available = (available_at or datetime.now(UTC)).isoformat().replace("+00:00", "Z")
@@ -88,6 +101,7 @@ class JobRepository:
                 JobRow(
                     id=job_id,
                     batch_id=batch_id,
+                    user_id=user_id,
                     kind=kind,
                     state="queued",
                     payload=json.dumps(dict(payload)),
@@ -132,6 +146,7 @@ class JobRepository:
                 state=row.state,
                 lease_expires_at=row.lease_expires_at,
                 heartbeat_at=row.heartbeat_at,
+                owner=row.user_id,
             )
 
     def heartbeat(self, job_id: str, now: datetime) -> None:
@@ -271,6 +286,7 @@ class JobRepository:
             return {
                 "id": row.id,
                 "batch_id": row.batch_id,
+                "user_id": row.user_id,
                 "kind": row.kind,
                 "state": row.state,
                 "payload": json.loads(row.payload),

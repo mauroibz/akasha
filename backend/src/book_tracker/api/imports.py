@@ -10,6 +10,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 
+from book_tracker.api.identity import CurrentUser
 from book_tracker.application.imports import ImportService
 from book_tracker.application.library import LibraryError, clean_attachment_filename
 from book_tracker.domain.importers import (
@@ -279,7 +280,7 @@ def read_failure(importer: object, error: ImportReadError) -> LibraryError:
     )
 
 
-def service(request: Request, importer_name: str) -> ImportService:
+def service(request: Request, importer_name: str, user_id: int) -> ImportService:
     importer = IMPORTERS.get(importer_name)
     if importer is None:
         raise LibraryError("importer_not_found", "Importer was not found", status_code=404)
@@ -288,6 +289,7 @@ def service(request: Request, importer_name: str) -> ImportService:
         request.app.state.data_dir,
         request.app.state.calibre_dir,
         importer,
+        user_id=user_id,
         attachment_max_bytes=int(request.app.state.attachment_max_bytes),
     )
 
@@ -538,9 +540,9 @@ def _too_large(spec: ImportInputSpec) -> LibraryError:
 
 
 @router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)
-async def preview(importer_name: str, request: Request) -> PreviewResponse:
+async def preview(importer_name: str, request: Request, user: CurrentUser) -> PreviewResponse:
     ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
-    import_service = service(request, importer_name)
+    import_service = service(request, importer_name, user.effective_user_id)
     source, targets = await _source(request, importer_name)
     try:
         result = import_service.preview(source, targets)
@@ -557,7 +559,7 @@ async def preview(importer_name: str, request: Request) -> PreviewResponse:
 
 
 @router.post("/{importer_name}/plan", response_model=ImportPlanResponse)
-async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
+async def plan(importer_name: str, request: Request, user: CurrentUser) -> ImportPlanResponse:
     """Say which of the offered files are worth sending, before they are sent.
 
     The client uploads the cheap half of the source — for Calibre, `metadata.db` — plus
@@ -589,7 +591,7 @@ async def plan(importer_name: str, request: Request) -> ImportPlanResponse:
             importer.plan(
                 source,
                 candidates,
-                DomainRepository(request.app.state.engine),
+                DomainRepository(request.app.state.engine, user.effective_user_id),
                 ImportReadContext(path_root=request.app.state.calibre_dir),
             ),
         )
@@ -641,7 +643,9 @@ class ImportFileResponse(BaseModel):
     status_code=201,
     response_model=ImportFileResponse,
 )
-async def attach_file(importer_name: str, batch_id: str, request: Request) -> ImportFileResponse:
+async def attach_file(
+    importer_name: str, batch_id: str, request: Request, user: CurrentUser
+) -> ImportFileResponse:
     """Take one file the import wants and attach it to the item it belongs to.
 
     One file per request, and that is the design rather than an implementation
@@ -652,7 +656,7 @@ async def attach_file(importer_name: str, batch_id: str, request: Request) -> Im
     than the import, and the screen can count progress honestly.
     """
     ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
-    import_service = service(request, importer_name)
+    import_service = service(request, importer_name, user.effective_user_id)
     spec = IMPORTERS[importer_name].input
     cap = int(request.app.state.attachment_max_bytes)
     parser = _DiskSpooledMultiPart(
@@ -741,14 +745,16 @@ async def browse(
 
 
 @router.post("/{importer_name}/commit", response_model=CommitResponse)
-async def commit(importer_name: str, body: CommitBody, request: Request) -> CommitResponse:
+async def commit(
+    importer_name: str, body: CommitBody, request: Request, user: CurrentUser
+) -> CommitResponse:
     # Phase A (Sprint 059) measured this call blocking every other request for its
     # whole duration — a large batch is many synchronous SQLAlchemy writes plus a
     # per-item cover install, with not one `await` in between. `off_loop` is the one
     # seam that moves synchronous work off the loop; see its module docstring.
     try:
         result = await off_loop(
-            service(request, importer_name).commit,
+            service(request, importer_name, user.effective_user_id).commit,
             body.batch_id,
             {choice.record_id: choice.model_dump(exclude={"record_id"}) for choice in body.choices},
         )
@@ -763,12 +769,12 @@ async def commit(importer_name: str, body: CommitBody, request: Request) -> Comm
 
 
 @router.get("/jobs/{job_id}", response_model=JobProgressResponse)
-async def get_job_progress(job_id: str, request: Request) -> JobProgressResponse:
+async def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
     from book_tracker.infrastructure.jobs import JobRepository
 
     repo = JobRepository(request.app.state.engine)
     job = repo.get_job(job_id)
-    if job is None:
+    if job is None or (job["user_id"] is not None and job["user_id"] != user.effective_user_id):
         raise LibraryError("job_not_found", "Job was not found", status_code=404)
     return JobProgressResponse.model_validate(job)
 
@@ -787,10 +793,14 @@ async def backfill_enrichment(request: Request) -> BackfillResponse:
 
 
 @router.delete("/batches/{batch_id}", response_model=UndoEffectSummary)
-async def undo_batch(batch_id: str, request: Request) -> UndoEffectSummary:
+async def undo_batch(batch_id: str, request: Request, user: CurrentUser) -> UndoEffectSummary:
     from book_tracker.application.undo import UndoExpiredError, UndoService
 
-    undo = UndoService(request.app.state.engine, data_dir=request.app.state.data_dir)
+    undo = UndoService(
+        request.app.state.engine,
+        user_id=user.effective_user_id,
+        data_dir=request.app.state.data_dir,
+    )
     try:
         result = undo.undo(batch_id)
     except LookupError as error:

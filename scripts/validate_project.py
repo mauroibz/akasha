@@ -49,12 +49,23 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # sprints down to 70 and 71 to close the gap, rather than leaving one, and DEC-139's accepted
 # readability line to 74 — the library, insights and shelves redrawn, which extends the plan
 # after Sprint 071 had closed it).
-FINAL_SPRINT = 74
+FINAL_SPRINT = 82
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
 SPRINT_STATUS_RE = re.compile(r"^\*\*Status:\*\*\s*([a-z_]+)", re.MULTILINE)
 SPRINT_ID_RE = re.compile(r"^(\d{3})-")
+# The four version surfaces (DEC-145's finding, Sprint 082's cheap gate). The
+# release notes have asserted they agree since v1.5; until now the only check
+# lived inside the minutes-long container smoke test. This runs in ~1 ms as
+# part of every `make check`.
+VERSION_SURFACES = (
+    "backend/pyproject.toml",
+    "frontend/package.json",
+    "frontend/openapi.json",
+    "backend/src/book_tracker/main.py",
+)
+FASTAPI_VERSION_RE = re.compile(r'version="([^"]+)"')
 
 
 def load_json(path: Path, errors: list[str]) -> dict[str, object]:
@@ -279,6 +290,73 @@ def validate_text_hygiene(errors: list[str]) -> None:
             errors.append(f"{path.relative_to(ROOT)} has no trailing newline")
 
 
+def validate_version_surfaces(root: Path, errors: list[str]) -> str | None:
+    """Compare the four version surfaces and return the agreed version.
+
+    ``backend/pyproject.toml`` is the source of truth the release procedure
+    reads; the other three must match it. Any disagreement — or a missing or
+    unparseable surface — is an error naming the file.
+    """
+    import tomllib
+
+    versions: dict[str, str] = {}
+
+    pyproject_path = root / "backend/pyproject.toml"
+    try:
+        with pyproject_path.open("rb") as handle:
+            expected = tomllib.load(handle)["project"]["version"]
+    except (OSError, KeyError, ValueError) as exc:
+        errors.append(f"cannot read the version from backend/pyproject.toml: {exc}")
+        return None
+    if not isinstance(expected, str) or not expected:
+        errors.append("backend/pyproject.toml has no project.version string")
+        return None
+    versions["backend/pyproject.toml"] = expected
+
+    package_path = root / "frontend/package.json"
+    package = load_json(package_path, errors)
+    if package:
+        package_version = package.get("version")
+        if isinstance(package_version, str):
+            versions["frontend/package.json"] = package_version
+        else:
+            errors.append("frontend/package.json has no version string")
+
+    contract_path = root / "frontend/openapi.json"
+    contract = load_json(contract_path, errors)
+    if contract:
+        info = contract.get("info")
+        if isinstance(info, dict) and isinstance(info.get("version"), str):
+            versions["frontend/openapi.json"] = str(info["version"])
+        else:
+            errors.append("frontend/openapi.json has no info.version string")
+
+    main_path = root / "backend/src/book_tracker/main.py"
+    try:
+        main_text = main_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        errors.append(f"cannot read backend/src/book_tracker/main.py: {exc}")
+    else:
+        match = FASTAPI_VERSION_RE.search(main_text)
+        if match is None:
+            errors.append("backend/src/book_tracker/main.py has no FastAPI version= string")
+        else:
+            versions["backend/src/book_tracker/main.py"] = match.group(1)
+
+    for surface, version in versions.items():
+        if version != expected:
+            errors.append(
+                f"{surface} says version {version!r} but backend/pyproject.toml says {expected!r}"
+            )
+    return expected
+
+
+def version_surfaces(root: Path, errors: list[str]) -> str | None:
+    """Backward-compatible alias for the tests; the sprint's required-tests
+    table names this function."""
+    return validate_version_surfaces(root, errors)
+
+
 def main() -> int:
     errors: list[str] = []
     validate_required_files(errors)
@@ -286,6 +364,7 @@ def main() -> int:
         validate_state(errors)
     validate_markdown_links(errors)
     validate_text_hygiene(errors)
+    validate_version_surfaces(ROOT, errors)
 
     if errors:
         print("Project validation FAILED:")

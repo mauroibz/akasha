@@ -5850,3 +5850,453 @@ both changes, against 1 of 3 before the second.
   the release procedure in `docs/operations/publishing-images.md` moves the tag and builds the
   image but never publishes a GitHub Release, which is why seven of them are missing — the
   backfill and the procedure change are recorded with the release work itself, not here.
+
+## DEC-146 — Authentication and multiuser accepted; the plan reopens through Sprint 082 and a 2.0.0
+
+- **Date:** 2026-09-07
+- **Status:** accepted
+- **Cross-references:** DEC-145 (the CI repair and the release-procedure gap this planning session
+  opened with), DEC-139 (the previous reopening of a closed plan, and the precedent for how one is
+  done), DEC-023 (fixed-size virtualization, untouched by any of this), DEC-039 (the startup
+  pre-migration backup that Sprint 075 leans on), DEC-114 (the serial Playwright project the
+  isolation and auth specs must not grow into).
+- **Context:** with v1.8.0 shipped and the numbered plan closed at Sprint 074, the owner asked for
+  *"proper auth and multiuser support… a single install serve at least two independent libraries
+  to two users… a basic user/password… any help in reducing user interaction and friction is
+  welcome… a single user setup without auth could still be available for easy deployments… easy
+  mobile access is a priority… plan it as as many sprints necessary to reach its own major release
+  (maybe 2.0?)."* [`auth-and-multiuser-proposal.md`](auth-and-multiuser-proposal.md) was written
+  against the code at `11db2c5` and is accepted whole.
+- **The finding that set the cost.** Half the data-model work was already done, and not by
+  accident: product spec §9 told the project to build the list view as
+  `render(entries WHERE user = X, filter, sort)` and it did. `entries.user_id` and
+  `shelves.user_id` have existed since migration `0002` with `uq_entries_user_item`,
+  `uq_shelves_user_slug` and six user-leading indexes; `LibraryService` takes a `user_id` and
+  filters on it in ten places. The query plans multiuser needs exist and have been benchmarked.
+  What is missing is a `users` table, sessions, `user_id` on the import ledger and jobs, and a
+  user *on the request* — the service is constructed 24 times across 8 files with no user
+  argument, so the default `1` wins every time.
+- **Decision:** eight sprints, 075–082, ending in `2.0.0`, as the proposal's §3 costs them. Four
+  points are worth recording independently of the sprint files.
+  - **`AKASHA_AUTH` defaults to `off` and `off` is bit-for-bit v1.8.0.** This is the whole
+    architectural bet and it is driven by a measurement, not by caution: 213 backend tests call
+    `create_app(`, and authentication on by default breaks every one, turning a refactor into a
+    rewrite of the verification gate. It also satisfies the owner's "easy deployments" requirement
+    for free.
+  - **Sprint 076 stays its own sprint.** It ships no user-visible change and touches 24 call sites
+    across 8 files, which is exactly the shape that gets folded into its neighbour and then goes
+    wrong. Keeping it alone with its own gate is why this plan is eight sprints rather than five;
+    the proposal's §5.5 costs the merged alternative and rejects it.
+  - **Password hashing is `hashlib.scrypt` from the standard library**, not `argon2-cffi`. Ten
+    runtime dependencies is the project's current count and a two-row `users` table on a household
+    LAN does not justify the first C extension added for a marginal algorithmic gain. The stored
+    parameters allow the cost to be raised later without invalidating a password.
+  - **A defect was found while planning and is fixed in Sprint 076, not deferred.**
+    `application/export.py:248` (`iter_entries`) walks every entry row in the database with no
+    `WHERE user_id`, and `export_json` calls it. It is harmless with one user and a data leak the
+    day Sprint 079 lands. It belongs to the sprint that owns scoping, not to the sprint that would
+    have discovered it as a failure.
+- **Four defaults adopted, in the shape of product spec §11.** The proposal's §7 asked the owner
+  four questions. Rather than block eight sprints on them, the proposal's own recommendations are
+  adopted as defaults and each remains cheap to override **before its sprint begins** and
+  expensive after.
+  1. **Attachments stay shared**, hanging off `items` as they do today. Privacy is not a concern
+     by the owner's own instruction, and one copy of a file is better organization than two.
+     Affects Sprint 075's schema and Sprint 079's criterion 8.
+  2. **An admin acting as another user can write**, not only read. "Unrestricted access" was the
+     instruction, and a read-only mode cannot fix the mistake it was opened to investigate.
+     Affects Sprint 080.
+  3. **The trusted-proxy header is built**, off by default, refusing to start without a peer
+     allowlist. It is the largest friction reduction available for a Tailscale deployment and the
+     one setting in the plan that can be misconfigured into a full bypass; every mitigation is a
+     mechanism rather than a sentence in a document. Affects Sprint 081.
+  4. **Calibre stays deployment-wide.** A second user's own Calibre library is a Compose change
+     and an importer argument, not a schema question, and nobody has asked for it. Not scheduled.
+- **What stays deferred after 2.0**, and is said so in the proposal's §4 and again in Sprint 082's
+  documentation: sharing and public read-only links, Calibre write-back, OPDS, passkeys, OIDC,
+  email of any kind, per-user settings, per-user provider budgets, and a native application. None
+  of the eight sprints puts Akasha on the internet — authentication is the precondition for that,
+  not the same thing, and the exposure rule becomes narrower rather than deleted.
+- **Consequences:** `docs/agent/state.json` reopens at `project_status: "ready"` with Sprint 075
+  active and `plan_revision` 40; `FINAL_SPRINT` in `scripts/validate_project.py` moves from 74 to
+  82; the roadmap gains a "Two people, one install" section and loses its "Not scheduled" entries
+  for auth and multiuser. Saved views, which DEC-139 promised would "become Sprint 075 the day the
+  owner asks", becomes a sprint after 082 instead — the number is taken.
+
+## DEC-147 — Identity's choices made once: three revisions, a nullable job owner, and a seeded username
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Cross-references:** DEC-146 (the plan this executes), DEC-092 (the migration-connection
+  exception to the foreign-key pragma that every rebuild since has leaned on), DEC-039 (the
+  pre-migration backup that proved itself again this sprint), DEC-090 (tests read what exists,
+  never enumerate a moving head — except the one list that is definitionally the head).
+- **Context:** Sprint 075 was planned as one migration per deliverable and kept that shape:
+  `0017_users_and_sessions`, `0018_user_foreign_keys`, `0019_ownership_on_the_import_ledger`,
+  plus the `AKASHA_AUTH` setting. Three decisions inside that work were the sprint's to make and
+  are recorded here because they are either data-irreversible after Sprint 079 or the kind of
+  asymmetry a reviewer should meet documented.
+- **Decision.**
+  - **`jobs.user_id` is nullable, with no default.** The proposal's §1 named the column's job as
+    telling an importer's enrichment pass from a background backfill belonging to nobody; the
+    sprint's deliverable 5 contradicted itself halfway through ("NOT NULL, defaulted", then
+    "nullable"). The risks section and the proposal both resolve toward nullable, so that is what
+    landed. A shared item's enrichment claiming a user would be the actual lie; `NULL` is the
+    truthful value for nobody's work. `0019` attributes a `0016` database's existing jobs by
+    `batch_id` — the one fact a `0016` row carries about its origin — so batch-chained jobs
+    become user 1's and standalone ones stay `NULL`. Sprint 076's resolver writes the field going
+    forward.
+  - **The seeded user is named `owner`.** The migration has to pick *something* for the one
+    identity column, and no name was specified anywhere in DEC-146's four adopted defaults.
+    `owner` is casefold-and-strip-normalized already, unambiguous on screen, and Sprint 077's
+    setup screen is where the owner chooses the real one. It is cheap to re-migrate before a
+    second user exists (the decision the sprint's risks section prices) and a data migration
+    after, so if the owner dislikes `owner` before Sprint 078 starts, say so and 0017 is revised
+    in place.
+  - **The `server_default "1"` stays on every `user_id`.** The rebuilds of 0018 keep it and 0019
+    reintroduces it on the ledger tables. It is what lets the unchanged `INSERT` paths of this
+    build keep meaning user 1 — now by reference instead of convention — which is the whole of
+    AC8 ("no behaviour change"). Sprint 076 removes the 24-literal default from code, not the
+    column default from the schema; 079's second user and 077's setup screen decide who else it
+    may mean.
+  - **Two head-pinned tests move with each migration.** `test_pending_revisions_reports_what_is_outstanding`
+    and `test_an_unwritable_backup_directory_stops_the_upgrade` enumerate the revisions above a
+    0006 database, which is definitionally everything above head. AC8's "no edit to any of them"
+    cannot hold for a sprint that moves head, and the project's own precedent — `5b55e53`
+    updated the same two lists when `0016` landed — establishes the reading. No other of the
+    1364 was touched; every behaviour claim landed in the sprint table's files or a new one.
+- **Consequences.** The schema can now name a person without any route able to be touched by one:
+  that is 076. `sessions` sits empty until 077 writes its first hash. The `iter_entries` export
+  defect recorded in DEC-146 is a 076 job — it is harmless while exactly one user exists and there
+  is exactly one. `make smoke-container` passed unchanged on the three-revision image, and the
+  walkthrough on a seeded `0016` copy of the fixture database showed the pre-migration backup, the
+  chain, a commit-undo round trip, and `/openapi.json` still saying 1.8.0 — the sprint's "nothing
+  changed" claim, tested by walking a real library through a real container.
+**Revision (2026-09-08, close day).** The owner took this entry's cheap path: the seeded
+username is `admin`, not `owner`. Migration `0017`'s `_SEED_USERNAME` literal — the only place
+the name exists in code — was changed and the AC test that asserts the seeded row's shape now
+asserts the value `admin` (previously it asserted only normalization). No other surface named
+it. The walkthrough's sqlite audit observed `owner` (it ran minutes before the rename) and is
+recorded as such in Sprint 075's Outcome with the rename noted beside it. This is the bullet's
+cheap-path condition executed (before Sprint 078 starts), so the fix stayed in place: one
+literal and one assertion, no data migration. Post-change evidence: 1382 backend tests pass
+(same count — the rename added one assertion to an existing test), `make check` green,
+validator green. The cheap path is now spent: a rename after Sprint 077's setup screen is the
+data migration the bullet priced.
+
+---
+
+## DEC-148 — state.json is a generated artifact, and the head-pinned test lists are gone
+
+- **Date:** 2026-09-08
+- **Status:** accepted
+- **Cross-references:** DEC-090 (the rule "a test that enumerates what exists today is a test
+  the next change breaks"; DEC-147 cites it with the "except the one list that is definitionally
+  the head" exception — this retires that exception), DEC-147 (the close-day seed rename —
+  owner-directed post-closure operations run through the same discipline),
+  `scripts/sync_sprint_state.py`, `scripts/validate_project.py`.
+- **Context:** Owner-directed methodology feedback after Sprint 075, applied between sprints
+  (075 closed, 076 `ready`, not yet claimed — so everything here is protocol infrastructure
+  rather than sprint scope). Two mechanical footguns from the 075 run get structural fixes here.
+  - *Charge 1: "Which sprint is active / what status does it have" was being stored in two
+    places.* The `Status` line of the sprint file, and `docs/agent/state.json`. The
+    validator *detected* mismatches ("the two must agree"), but each status transition was a
+    two-artifact manual edit, and both halves of the protocol describing that manual edit
+    (AGENTS.md §2.1, §5.2; WORKFLOW.md blocked + final sprint) kept every transition and every
+    close and every block paying the same two-edits tax.
+  - *Charge 2: DEC-090's exception clause made migrations carry a test-edit duty.* Two
+    tests that enumerate everything above head, relative to the 0006 database,
+    were mechanically head-dependent — 0016 had, and 0017 through 0019 each had, updated those
+    literal lists. The accommodation was documented, but the accommodation baked in mechanical
+    labor demanded of every migration.
+- **Decision.**
+  - **The sprint file is the sole source of truth, and state.json is generated from it.**
+    The new `scripts/sync_sprint_state.py`, when given `--sprint NNN <status>`,
+    (1) flips the `Status` of the sprint file (repeated `--sprint` arguments atomically
+    execute the entire close pair), (2) regenerates state.json from the sprint file,
+    (3) refuses illegal transitions and impossible result states (two actives, zero actives,
+    non-sequential successor), and on refusal writes nothing and reverts everything,
+    (4) imports `FINAL_SPRINT` and the status vocabulary from
+    `scripts/validate_project.py`, so the two cannot drift. AGENTS.md §2.1 and §5.2, and
+    WORKFLOW.md's state model, blocked, and final-sprint sections now prescribe the
+    script-based form. The validator's agreement check remains as an independent guard.
+    `started_at` remains under the jurisdiction of the implementing sprint: it is set at the
+    in_progress flip if empty, cleared at the close flip, and never overwritten.
+  - **The pending list is a computation, not an enumeration.** `migrations.py` reads the chain
+    from the version files themselves (`revision_chain_from_files()` parses each file's
+    `revision`/`down_revision` assignment and orders them) and `pending_revisions` is derived
+    from it; the two tests adopt the chain computed after `PRE_PROJECTION` as the expected
+    value. Two new tests fix the chain itself: one compares it against Alembic's own
+    `ScriptDirectory` walk order, and the other verifies that the revision numbers form a
+    gapless consecutive line from `0001..NNNN`. The "except the one list that is definitionally the
+    head" exception DEC-147 coined is retired; future migrations move the tests forward for free.
+- **Consequences.** The close ritual becomes one command; the obligation to edit the test list
+  per migration vanishes. The protocol changes are owner-directed and recorded here rather than
+  in a sprint file for that reason. Unchanged: the validator remains an independent agreement
+  guard (any divergence still fails the gate), the shape of WORKFLOW's final-sprint rule, and
+  DEC-090's general rule (tests read what exists) — only the "except the one list" exception,
+  coined by DEC-147, is retired.
+
+**Revision (2026-09-08, same day).** Building `references/plan-insertion-worked-example.md`'s
+DEC-111 shape on top of this entry surfaced a hole: a mid-plan insertion renumbers every sprint
+at and after the insertion point, and the displaced file must drop `ready -> planned` in the same
+atomic call that activates the inserted sprint. The transition table as shipped allowed no edge
+out of `ready` except `in_progress`/`blocked`, so the commit ritual for an insertion revision
+still required a hand-edit. Added `ready -> planned` to `TRANSITIONS`; it can only compose into a
+legal derived state when the same call promotes another file to the single active slot (the
+derived-state check still refuses zero or two active files on its own). Proven on a scratch repo:
+renamed 076..082 up by one, created the inserted file at `planned`, then one call
+`--sprint 077 planned --sprint 076 ready --plan-revision 41` produced exactly one `ready` file,
+agreement with state.json, and the correct successor/activeness invariants; the standalone
+`ready -> planned` demotion (no activation in the same call) was refused as "project cannot be
+complete: sprint files are still open". The full insertion ritual (git mv, internal references,
+ROADMAP, FINAL_SPRINT, DEC entry) still carries the DEC-111 documented items — the script owns
+only the file-Status flip and state regeneration.
+## DEC-149 — Sprint 076 executed in one pass: the resolver answers a constant, jobs stay genuinely nullable, and undo hides another user's batch
+
+- **Date:** 2026-09-09
+- **Status:** accepted
+- **Cross-references:** DEC-146 (the plan this executes), DEC-147 (identity's schema choices
+  this sprint consumes: the nullable `jobs.user_id`, the seeded `admin` row), DEC-025 (the
+  walkthrough rule the two-user exercise followed).
+- **Context:** Sprint 076's bet was that a 24-site mechanical refactor, if typed end to end,
+  could not land half-done: a missing argument is a compile error, a resurfaced literal is a
+  failing guard test, and the whole existing suite is the regression witness. The sprint found
+  what it expected (six defaulted signatures plus one bare `EntryRow.user_id == 1` in
+  `enrichment.py`) and one question the plan left for execution: how the pieces that sit between
+  the resolver and the services are shaped, since they decide what Sprints 077–081 actually have
+  to touch.
+- **Decision.**
+  - **`Principal` travels, an `int` does not.** Every service, repository and walker takes the
+    resolved `user_id: int` it needs, but the API layer receives `CurrentUser` (an annotated
+    `Principal` dependency) and forwards `principal.effective_user_id`. The field Sprint 080
+    fills (`acting_as`) is already the one every caller reads, so impersonation widens one file.
+  - **`JobRepository.enqueue(user_id=None)` stays optional, and that is the correct contract,
+    not leftover looseness.** Migration 0019 deliberately gave `jobs.user_id` no default so a
+    batch-less backfill is never forged onto the seeded user; Sprint 076 preserved that by
+    threading `None` through `ClaimedJob.owner` and making the enrichment handler write *no
+    match note* for an owner-less job (the one deliberate behavior change; identical in a
+    one-user install, different the day a second user exists). Enrichment effects, by contrast,
+    are stamped from the batch's own ledger row, never from the job — a job queued before this
+    sprint still points at a batch that knows its owner.
+  - **Undo of another user's batch is a 404, not a 403.** `UndoService` raises `LookupError`
+    for a batch whose owner is not the caller, and the route publishes the same
+    `import_batch_not_found` body as a missing id. An enrichment job is likewise handed to the
+    handler unfiltered; exclusivity is enforced where the ledger is written, and there exactly.
+  - **The export walkers require a user; `iter_items` does not.** `iter_entries`,
+    `iter_export_rows`, `stream_export_view`, `export_json` lost their defaults entirely (AC3),
+    while the item walk stays unscoped because items are the shared cache and carry no opinion
+    nobody holds.
+  - **Worked for two users by flipping the resolver, not by touching it.** The walkthrough
+    overrides the resolver's answer per-user through `app.dependency_overrides` — the FastAPI
+    seam built for exactly the one-case DEC-146 carved out — rather than monkey-patching
+    `current_user` or adding a second seam. Nothing production reads any override.
+- **Consequences.** Sprint 077 turns `current_user`'s body into a session lookup in one file
+  and sets `app.state.auth` to `on` when a session is missing — no route or service signature
+  moves. Sprints 078–081 read `effective_user_id` and inherit impersonation for free. The guard
+  test (`test_no_hardcoded_user_outside_the_resolver`) is now the standing witness that the
+  single-user assumption never comes back through a constructor default.
+
+## DEC-150 — Sprint 077 puts authentication at the request boundary and claims the seeded user
+
+- **Date:** 2026-09-09
+- **Status:** accepted
+- **Cross-references:** DEC-025 (walkthroughs), DEC-146 (accepted auth plan), DEC-147 (identity
+  schema), DEC-149 (the `Principal` seam).
+- **Context:** Sprint 077 had to add authentication without making cached-page rendering consult
+  a provider, without breaking the existing unauthenticated deployment, and without reassigning
+  the rows Sprint 075 already attached to the seeded user. It also had to leave deliberate seams
+  for the UI, user administration, impersonation and trusted-header work that follows.
+- **Decision.**
+  - Authentication is enforced once in HTTP middleware. Health routes, the SPA shell, and the
+    setup probes have explicit exceptions; downstream routes continue to receive a `Principal`
+    and remain unaware of cookies. Auth routes stay in the generated OpenAPI contract but return
+    `404` at runtime while `AKASHA_AUTH=off`.
+  - First-run setup atomically adds credentials and the admin flag to seeded user id 1 rather
+    than inserting a replacement. Its existing entries and other owned rows therefore remain
+    attached through their original foreign keys.
+  - A session carries 256 bits from `secrets.token_urlsafe(32)` while SQLite stores only its
+    SHA-256 digest. It has a fixed 400-day expiry and records `last_seen_at` on lookup; sliding
+    expiry and batched refreshes remain Sprint 081's work.
+  - Cookie security follows the direct request scheme unless explicitly overridden.
+    `X-Forwarded-Proto` is accepted only when the immediate peer matches a configured IP address
+    or CIDR. That peer-matching helper is the one Sprint 081 must reuse for trusted identity
+    headers.
+  - The in-process fixed-window limiter tracks normalized username and immediate peer. A locked
+    username is rejected before another scrypt calculation, while a correct password for a
+    different username can still succeed. State intentionally resets with the process.
+  - Passwords use stdlib scrypt with parameters embedded in the stored digest: `n=16384`, `r=8`,
+    `p=1`, a 16-byte random salt and a 32-byte result. On the available Ryzen 5 7600X, 20 native
+    samples measured 24.1 ms median and 29.3 ms p95; a 40-sample container constrained to 0.25
+    CPU measured 101.5 ms median and 106.9 ms p95 (178.7 ms max). The constrained run is a
+    conservative small-server proxy, not a measurement on the owner's ZimaBoard. No password
+    dependency was added.
+- **Consequences.** Sprint 078 can build login and setup screens against stable `/api/auth/*`
+  responses without changing the gate. Sprint 079 creates users using the same password module;
+  Sprint 080 continues to consume `Principal.effective_user_id`; Sprint 081 owns session sliding
+  and extends the exact trusted-peer check; Sprint 082 reruns the both-mode container flow that
+  Sprint 077 introduced. The existing no-auth installation remains the default and unchanged.
+
+## DEC-151 — Two libraries hide private ids while sharing cached works
+
+- **Date:** 2026-09-10
+- **Status:** accepted
+- **Cross-references:** DEC-025 (walkthroughs), DEC-146 (shared/private ownership table),
+  DEC-149 (effective-user seam), Sprint 079.
+- **Context:** Enforcing the second library exposed three cases the accepted plan described at a
+  policy level but could not settle until real rows existed. First, item ids belong to the shared
+  cache even though item routes expose covers and attachments that a person should reach only
+  through their own library. Second, import fingerprint uniqueness was still install-wide, which
+  made the same file imported by two people collapse into one person's batch. Third, transferring
+  a whole library can collide with the target's per-user item, shelf-slug or import uniqueness;
+  silently merging those rows would contradict the requirement to move them intact.
+- **Decision.**
+  - In auth-on mode, an item-addressed route requires the effective user to own an entry for that
+    item. The underlying item, cover and attachments remain one shared cache, but knowing a shared
+    item id does not grant a route into it. Auth-off keeps the original unscoped behavior.
+  - A private-row ownership miss is indistinguishable from absence: entry, shelf, batch, job and
+    bulk-selection probes answer `404`, including foreign ids supplied inside a request body.
+    `403` is reserved for a known authenticated principal lacking an operation-level privilege,
+    currently the non-admin user-management boundary.
+  - Migration `0020` replaces unique `(kind, fingerprint)` with unique
+    `(user_id, kind, fingerprint)`. Replaying a source stays idempotent within one library while
+    another person may import it into theirs. The downgrade reconciles cross-user duplicates
+    before restoring the old install-wide constraint.
+  - Transfer is all-or-nothing and refuses with `409 transfer_conflict` when the target already
+    owns the same item, normalized shelf slug or import fingerprint. It does not overwrite,
+    rename, merge or discard either person's data. A conflict-free transfer moves entries,
+    shelves, batches, records, effects and jobs without changing their identities.
+- **Consequences.** The runtime-derived isolation inventory is the standing guard for both URL
+  ids and ids nested in bodies. Sprint 080 must add its admin act-as dimension without relaxing
+  the non-admin cases. Operators resolving a transfer conflict must first make an explicit data
+  choice in one of the two libraries; the destructive delete alternative remains explicit and
+  never defaulted. Sprint 082 must describe migration `0020`, shared-cache reachability and this
+  transfer refusal as delivered behavior rather than repeating the proposal literally.
+
+## DEC-152 — Acting in another library keeps the administrator visible
+
+- **Date:** 2026-09-10
+- **Status:** accepted
+- **Cross-references:** DEC-146 (admin view-as may write), DEC-149 (effective-user seam),
+  DEC-151 (private-id isolation), Sprint 080.
+- **Context:** View-as must let an administrator repair another person's data without turning the
+  browser into an impersonation token, leaking a third person's ids, or making it possible to
+  forget whose rows a destructive action will change.
+- **Decision.** Migration `0021` adds nullable `sessions.acting_as_user_id`, referencing `users`
+  with `ON DELETE SET NULL`. The session still resolves the actual administrator; only
+  `Principal.effective_user_id` changes for library ownership. Entering and leaving are
+  admin-only session operations, and switching identities clears client-side library queries and
+  mutations before the new library renders. A fixed, non-dismissible banner names the target and
+  leaves in one action. Password changes for either account, actual demotion, target deletion,
+  expiry and logout end the mode; ordinary profile edits do not. The HTTP boundary emits one
+  `admin_acting_request` event after each handled acted request, containing only both numeric ids,
+  method and templated route.
+- **Consequences.** All existing private services inherit the target through the resolver without
+  route-specific privilege branches. Acting as one user still returns `404` for a third user's
+  private ids. Sprint 081 can create, list and revoke the administrator's real session unchanged;
+  Sprint 082 must document migration `0021`, both act-as routes, the banner and the audit contract
+  as delivered behavior.
+
+## DEC-153 — Active sessions renew on a bounded forward horizon
+
+- **Date:** 2026-09-10
+- **Status:** accepted
+- **Cross-references:** DEC-149 (session identity), Sprint 081.
+- **Context:** Sprint 081 requires a regularly used session not to expire, caps expiry at 400 days,
+  and forbids a database write on every authenticated request. An absolute cap measured from the
+  original creation time cannot coexist with indefinite renewal for an active session.
+- **Decision.** A successful lookup made at least one day after `last_seen_at` advances both
+  `last_seen_at` and `expires_at`; the new expiry is at most 400 days from that lookup. Lookups
+  inside the daily interval do not write. `created_at` remains immutable audit data. A valid cookie
+  takes precedence over trusted-header fallback, so act-as state and explicit password login remain
+  stable even when the proxy injects an identity header.
+- **Consequences.** A regularly used session can outlive 400 days from its original creation but
+  never carries more than 400 days of remaining validity. An unused session expires. Session-list
+  activity can lag by less than one day, in exchange for at most one refresh write per active
+  device per day. Sprint 082 must document the forward-horizon interpretation.
+
+## DEC-154 — Sprint 081's real-tailnet walkthrough is waived by the owner; the residual proof is named
+
+- **Date:** 2026-09-11
+- **Status:** accepted (owner-directed waiver)
+- **Supersedes:** nothing. DEC-025 (the walkthrough gate) stands; this entry prices one instance of it.
+- **Cross-references:** DEC-146 (the auth plan and its §7 answer 3: the trusted header is wanted),
+  DEC-153 (session refresh contract), Sprint 081, Sprint 065's Outcome (the same shape of partial
+  walkthrough, owed and recorded).
+- **Context.** Sprint 081's Verification names one walkthrough that cannot be faked with a seeded
+  container: the app behind `tailscale serve`, opened from a tailnet phone for zero-tap login,
+  from a non-tailnet device for rejection, then sign-out-everywhere. On 2026-09-11 the owner
+  described the actual deployment (ZimaBoard on the house LAN, reached by phone through Tailscale
+  occasionally, roughly monthly) and directed closing the sprint without it. Measured, not assumed:
+  neither the workstation (`comma`) nor the deployment target (192.168.100.240) runs
+  `tailscaled`/Tailscale Serve today — the board's overlay is ZeroTier — so the walkthrough has
+  no environment to run in without new infrastructure the owner did not ask to build.
+- **Decision.** Close Sprint 081 with the walkthrough recorded as NOT RUN, waived by the owner.
+  Akasha's half of the trusted-header contract remains proven by `make smoke-container` against the
+  real image: startup refusal without a peer allowlist, an untrusted peer's header stripped to an
+  anonymous `401`, an allowlisted known identity admitted with a session cookie, an unknown identity
+  refused `403`. The unproven half is Tailscale Serve's live `Tailscale-User-Login` injection on the
+  owner's tailnet — an external contract this repository does not control and never pinned
+  (the sprint file itself says to read Tailscale's documentation at activation, not trust a header
+  name written in the plan).
+- **Consequences.** The failure mode is closed: a proxy that does not inject the header leaves the
+  user on the ordinary password login, which acceptance criterion 5 keeps deliberately live, and a
+  misconfigured allowlist cannot lock anyone out. The residual proof owed — one session of the
+  owner putting the container behind Tailscale Serve and tapping once — is small and named here:
+  when the owner first deploys 2.0.0 with the trusted header configured, that deployment session
+  doubles as the walkthrough; record the result (taps observed, non-tailnet rejection, sign-out-
+  everywhere) in the worklog or a superseding DEC. The setting stays off by default, so nothing
+  ships enabled-but-unverified. A second observation from the same session is recorded for the
+  roadmap, not acted on: at 10,000 entries with 200 queued jobs, three contended insights scenarios
+  exceed 500 ms p95 (worst `publisher/count` 1234.8 ms) — a scale no prior benchmark measured; the
+  technical-spec budget binds the first library page (contended p95 147.8 ms, within budget), not
+  insights.
+
+## DEC-155 — Sprint 082 closes the plan: 2.0.0, the version-surface gate, and what the upgrade rehearsal found
+
+- **Date:** 2026-09-11
+- **Status:** accepted
+- **Supersedes:** nothing. DEC-145's version-check gap is closed by this sprint's deliverable 7;
+  DEC-146's plan is completed by it.
+- **Cross-references:** DEC-145 (the release-procedure and version-gate findings), DEC-146 (the
+  auth plan this release ships), DEC-153 (session horizon), DEC-154 (the waived tailnet walkthrough
+  and the insights-at-10k observation carried into these release notes), Sprint 082.
+- **Context.** Sprint 082 is the release sprint: rewrite the exposure rule everywhere, make both
+  specs canonical for what Sprints 075–081 built, teach the runbook auth, gate the four version
+  surfaces cheaply, bump to `2.0.0`, and write the release notes. Its walkthrough is an upgrade
+  rehearsal against a real v1.8.0 database.
+- **Decision.**
+  - `scripts/validate_project.py` now compares the four version surfaces
+    (`backend/pyproject.toml`, `frontend/package.json`, `main.py`'s FastAPI `version=`,
+    `frontend/openapi.json`) on every run, pyproject as the source of truth; `make check` fails in
+    about a second on a disagreement, with `backend/tests/test_validate_project.py` proving each
+    single-surface disagreement fails. This is DEC-145's cheap gate, delivered as required-test 1.
+  - The exposure rule is one sentence, the same in every file it appears in: *no
+    internet-reachable proxy, DNS or port forward unless `AKASHA_AUTH=on`, TLS terminates in
+    front, and the session cookie is `Secure`.* With auth off, the v1 rule (trusted LAN only)
+    still stands. `AGENTS.md`'s invariant is rewritten in place per the sprint's own instruction.
+  - The release image's both-mode smoke gate now also proves Sprint 081's session surface: the
+    sessions list names both signed-in devices with exactly one current, and revoking the other
+    ends only it. The first version of that block read the list with a cookie the Sprint 077
+    block had already logged out — a defect of the test's own sequencing, fixed by giving the
+    block its own two fresh device logins and rerunning the full gate.
+  - The upgrade rehearsal ran against a copy of the real production database (82 entries,
+    stamp `0016`, no users table) from the ZimaBoard: 2.0.0 started with no configuration change,
+    migrations 0017–0021 ran behind the pre-migration backup, all 82 entries survived byte-for-byte
+    and became the setup-created admin's, a second user was created through the documented route,
+    and cross-user ids answered `404`. Two findings became runbook additions: the library's
+    default view hides `unsorted` rows, so a never-triaged library looks nearly empty on first
+    sight after the upgrade (the Triage inbox holds them; the filter is the cause, not data loss);
+    and the rehearsal's plain `docker compose up` silently inherited the checkout's own `.env`
+    (`AKASHA_AUTH=on`), which a source-checkout operator should know — the deployment path (no
+    checkout) does not have this.
+  - The version surfaces all read `2.0.0`; `frontend/openapi.json` regenerated; the release notes
+    (`docs/operations/release-notes-v2.0.md`) describe the shipped surface including the two
+    recorded deviations (DEC-154's waived walkthrough and the contended-insights-at-10k numbers),
+    and `docs/operations/publishing-images.md`'s end-to-end list gains the missing
+    "publish a GitHub Release" step (DEC-145).
+- **Consequences.** The plan that DEC-146 opened is closed: `FINAL_SPRINT` stays 82 and the
+  project state goes `complete` per WORKFLOW.md's final-sprint rule. Tagging, pushing and
+  publishing remain owner actions, deliberately not performed by this sprint. A future
+  reopening moves `FINAL_SPRINT` again and records the move here. The
+  contended-insights-at-10k finding stays unowned by a sprint until the owner schedules one.

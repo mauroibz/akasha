@@ -21,8 +21,9 @@ export const test = base.extend<{
   failOnConsoleErrors: void;
   stubCommonEndpoints: void;
 }>({
-  // `/api/item-types` and `/api/shelves` are fetched by nearly every screen
-  // (the domain chooser, shelf pickers) and no spec exercises either one
+  // These endpoints are fetched in the background by nearly every screen
+  // (auth mode, domain chooser, shelf pickers, attachments and data tabs), and no spec
+  // exercises their absence
   // failing. ci.yml's e2e job runs no backend, so an unstubbed call here is
   // always a real ECONNREFUSED — wasted retries competing for CPU with the
   // browser under test on a runner with far less headroom than a dev
@@ -33,11 +34,40 @@ export const test = base.extend<{
   // `page.route("**/api/shelves", ...)` is always registered after this one.
   stubCommonEndpoints: [
     async ({ page }, use) => {
+      // The existing suite exercises the default, intentionally invisible
+      // auth-off deployment. Auth-specific specs install a newer route handler
+      // for this endpoint and therefore override this one.
+      await page.route("**/api/auth/me", (route) =>
+        route.fulfill({ status: 404, json: { detail: "Not Found" } }),
+      );
       await page.route("**/api/item-types", (route) =>
         route.fulfill({ json: [bookItemType] }),
       );
       await page.route("**/api/shelves", (route) =>
         route.fulfill({ json: [] }),
+      );
+      await page.route("**/api/items/*/attachments", (route) =>
+        route.fulfill({ json: { attachments: [] } }),
+      );
+      await page.route("**/api/importers", (route) =>
+        route.fulfill({ json: [] }),
+      );
+      await page.route("**/api/exports", (route) =>
+        route.fulfill({ json: [] }),
+      );
+      await page.route("**/api/entries?**", (route) =>
+        route.fulfill({
+          json: {
+            items: [],
+            next_cursor: null,
+            total: 0,
+            facets: {
+              status_counts: {},
+              status_counts_by_type: {},
+              format_counts: {},
+            },
+          },
+        }),
       );
       await use();
     },

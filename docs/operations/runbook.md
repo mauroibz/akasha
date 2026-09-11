@@ -4,8 +4,10 @@ Everything here has been performed against a running container, not written from
 the source. Commands assume the repository checked out on the host and `docker`
 with the Compose plugin installed; nothing else is needed.
 
-**Akasha v1 has no authentication.** Anyone who can reach the port can read and
-change every rating, note and shelf. Keep it on a trusted LAN.
+**Authentication is off by default.** With `AKASHA_AUTH=off` anyone who can
+reach the port can read and change every rating, note and shelf — keep it on a
+trusted LAN. Turning authentication on is its own section below:
+[Turning authentication on](#turning-authentication-on).
 
 ## First install
 
@@ -307,22 +309,142 @@ Each overlay is opt-in, invoked explicitly, and never merged in by accident —
 none is named `docker-compose.override.yml`. Use the same `-f` flags on every
 subsequent `docker compose` command for the stack.
 
+## Turning authentication on
+
+Akasha ships with `AKASHA_AUTH=off`: one shared library, no login, trusted LAN
+only. Turning auth on adds accounts — a first-run setup screen, per-user
+libraries, 400-day sliding sessions, a sessions screen to revoke a lost device,
+and an admin who can manage accounts and (as themselves) look into another
+user's library. It changes nothing else: your existing library becomes the
+admin's, and no migration is needed beyond the ones the upgrade already runs.
+
+Do it in this order:
+
+1. Put `AKASHA_AUTH=on` in `.env`:
+
+   ```bash
+   echo "AKASHA_AUTH=on" >> .env
+   docker compose up -d
+   ```
+
+2. Open the application. The first visit shows the **setup screen**, not the
+   library: choose a username, a display name and a password. This account is
+   the admin, and every entry and shelf already in the database becomes theirs —
+   nothing is lost, nothing is reassigned by hand.
+
+   Automation instead of the screen (optional): set the paired
+   `AKASHA_ADMIN_USERNAME` and `AKASHA_ADMIN_PASSWORD` in `.env` before the
+   first auth-on start. Both must be set together or startup refuses. The
+   password lives in a plaintext file, so prefer the setup screen unless you
+   need this; if you do use it, restrict the file's permissions.
+
+3. Create the second person as the admin: sign in, open **Settings → People**,
+   *Add person*. Their library starts empty. Give them the *Admin* flag only if
+   you mean it — an admin can reset passwords, rename accounts and look into
+   any library.
+
+4. Sign in as them (or hand them the URL) and confirm their library is empty
+   and yours is unchanged.
+
+**One expectation to set before the first sign-in.** The library's default view
+hides `unsorted` rows — it always has. A library whose imports were never
+triaged will look nearly empty on first sight (the inbox/Triage screen holds
+them all, and the status filter can include them). If the library looks
+smaller than expected after the upgrade, that is the filter, not data loss;
+the entry counts in Settings → People name the real totals.
+
+**What each user sees.** Entries, shelves, imports, exports and triage are
+private: two people adding the same book create one shared catalogue record
+(the cover, the metadata) but separate ratings and notes. Cross-user ids answer
+`404`, so one user cannot probe whether another's ids exist.
+
+**When a password is lost.** An admin resets it: Settings → People → the
+account → *Reset password*. This signs that account out of every device. The
+admin's own password has no second admin to reset it — recovery for it is
+restoring a database backup from before it was set and redoing setup, so keep
+it in a password manager.
+
+**When a proxy misconfiguration locks everyone out.** Auth-on does not disable
+the fallback: if login ever fails because of a proxy (a wrong
+`X-Forwarded-Proto`, a stripped cookie), reach the container directly on the
+LAN — the published port still serves the ordinary login screen, and password
+login is never disabled by the trusted-header settings. Worst case, set
+`AKASHA_AUTH=off` in `.env` and `docker compose up -d` again: the account
+system stays in the database untouched, and turning auth back on later returns
+to exactly this section.
+
+**Sessions, and signing a device out.** Each sign-in lasts 400 days and slides
+forward while in use, so a regularly used device never asks again. The
+account section (top-right name → *Account*) lists every signed-in device with
+its last use and user agent: *Revoke* ends one, *Sign out everywhere* ends
+them all. Use it when a phone is lost.
+
+### Running behind `tailscale serve`
+
+Tailscale Serve can assert who is at the other end of the tailnet, which lets a
+phone open Akasha signed in already — no login form. It is opt-in and needs
+three settings in `.env`:
+
+```ini
+AKASHA_AUTH=on
+AKASHA_TRUSTED_PROXY_HEADER=Tailscale-User-Login
+AKASHA_TRUSTED_PROXY_PEERS=["127.0.0.1"]
+```
+
+- The peer allowlist is the address Akasha sees the proxy coming from. With
+  `tailscale serve` on the same machine as the published port, that is
+  `127.0.0.1`. **Akasha refuses to start with a header configured and no peer
+  allowlist** — an unbounded allowlist is an authentication bypass, which is
+  exactly what the refusal prevents.
+- The header value must match a username (it is matched case-insensitively
+  after trimming). Your tailnet login `you@example.com` matches a user created
+  with that exact name. An unknown identity is refused with `403` unless
+  `AKASHA_TRUSTED_HEADER_AUTOCREATE=true` — which creates a fresh non-admin
+  account with an empty library and no password on first sight, and is the
+  setting to reach for only if you want every tailnet member to get an account.
+- Then publish the container on loopback only and let Serve own the ingress:
+
+  ```bash
+  # .env
+  AKASHA_BIND=127.0.0.1
+  # on the host, once
+  tailscale serve https / http://127.0.0.1:4441
+  ```
+
+- Password login stays available alongside the header. A device that arrives
+  without the header (Funnel traffic, a tagged node, a misconfigured proxy)
+  gets the ordinary login screen — the two are alternatives, not exclusives,
+  so a proxy problem can never lock you out.
+- Bind the published port to loopback (or the LAN address only) when the
+  header is configured: a caller that reaches the port directly can assert any
+  identity, and the peer allowlist only governs what the proxy is allowed to
+  claim from that address.
+- Tailscale's header name is their contract, not this repository's: if their
+  documentation names a different header one day, change
+  `AKASHA_TRUSTED_PROXY_HEADER` — it is configuration precisely so a rename
+  upstream is an `.env` edit and not a release.
+
 ## Reverse proxy
 
 Nginx Proxy Manager on the same LAN, e.g. `books.home.lan` → `http://<host>:4441`.
 Do not expose that hostname beyond the LAN, do not forward a port to it, and do
-not put it behind a proxy that terminates on a public address. There is no
-login to stop anyone who arrives.
+not put it behind a proxy that terminates on a public address — unless all
+three exposure conditions hold: `AKASHA_AUTH=on`, TLS terminating in front,
+and the session cookie `Secure`. With auth off there is no login to stop
+anyone who arrives.
 
 Set `AKASHA_BIND=127.0.0.1` if the proxy runs on the same machine, so the
 container port is not reachable from the network directly. And note what
 `0.0.0.0` publishes on: a host that has joined a VPN or mesh network
 (WireGuard, Tailscale, ZeroTier and the like) carries an extra interface, and
-`AKASHA_BIND=0.0.0.0` publishes on that one too — an unauthenticated port
-reachable from outside the building without anyone having forwarded anything.
-The way to exclude it is to bind `AKASHA_BIND` to one address rather than to
+`AKASHA_BIND=0.0.0.0` publishes on that one too — a port reachable from
+outside the building without anyone having forwarded anything. The way to
+exclude it is to bind `AKASHA_BIND` to one address rather than to
 everything. The property belongs to overlay networks generally, not to any
 particular one.
+
+For Tailscale specifically — including the zero-tap identity-header login —
+see [Running behind `tailscale serve`](#running-behind-tailscale-serve) above.
 
 ## When something is wrong
 

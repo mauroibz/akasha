@@ -18,7 +18,7 @@ def anyio_backend() -> str:
 async def test_bulk_explicit_ids_and_filter_exclusions_are_atomic(tmp_path: Path) -> None:
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         entries = [repository.create_or_get_entry(title=f"Book {index}") for index in range(3)]
         with app.state.engine.begin() as connection:
             connection.execute(text("UPDATE entries SET suggested_status='read'"))
@@ -76,7 +76,7 @@ async def test_accept_suggested_uses_filter_and_static_routes_are_not_shadowed(
 ) -> None:
     app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         one = repository.create_or_get_entry(title="One")
         two = repository.create_or_get_entry(title="Two")
         with app.state.engine.begin() as connection:

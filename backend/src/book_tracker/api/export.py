@@ -20,6 +20,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
+from book_tracker.api.identity import CurrentUser
 from book_tracker.application.export import export_json, stream_export_view
 from book_tracker.application.library import LibraryError
 from book_tracker.domain.registry import REGISTERED_EXPORTS, ItemTypeName, find_export_view
@@ -48,30 +49,38 @@ class ExportViewResponse(BaseModel):
 
 @router.get("/export")
 async def export(
-    request: Request, format: Literal["json", "csv"] = Query(default="json")
+    request: Request,
+    user: CurrentUser,
+    format: Literal["json", "csv"] = Query(default="json"),
 ) -> StreamingResponse:
     engine = request.app.state.engine
     if format == "csv":
         return StreamingResponse(
-            stream_export_view(engine, GOODREADS_EXPORT, GOODREADS_EXPORT.item_types[0]),
+            stream_export_view(
+                engine,
+                GOODREADS_EXPORT,
+                GOODREADS_EXPORT.item_types[0],
+                user.effective_user_id,
+            ),
             media_type=GOODREADS_EXPORT.media_type,
             headers={"Content-Disposition": f'attachment; filename="{GOODREADS_EXPORT.filename}"'},
         )
     return StreamingResponse(
-        export_json(engine),
+        export_json(engine, user_id=user.effective_user_id),
         media_type="application/json",
         headers={"Content-Disposition": 'attachment; filename="akasha-export.json"'},
     )
 
 
 @router.get("/exports", response_model=list[ExportViewResponse])
-async def available_exports(request: Request) -> list[ExportViewResponse]:
+async def available_exports(request: Request, user: CurrentUser) -> list[ExportViewResponse]:
     engine = request.app.state.engine
     with Session(engine) as session:
         counts: dict[str, int] = {}
         for item_type, count in session.execute(
             select(ItemRow.type, func.count(EntryRow.id))
             .join(EntryRow, EntryRow.item_id == ItemRow.id)
+            .where(EntryRow.user_id == user.effective_user_id)
             .group_by(ItemRow.type)
         ).all():
             counts[item_type] = count
@@ -92,7 +101,9 @@ async def available_exports(request: Request) -> list[ExportViewResponse]:
 
 
 @router.get("/export/{view}")
-async def export_view_route(view: str, request: Request, type: ItemTypeName) -> StreamingResponse:
+async def export_view_route(
+    view: str, request: Request, type: ItemTypeName, user: CurrentUser
+) -> StreamingResponse:
     resolved = find_export_view(type.value, view)
     if resolved is None:
         raise LibraryError(
@@ -102,7 +113,7 @@ async def export_view_route(view: str, request: Request, type: ItemTypeName) -> 
         )
     engine = request.app.state.engine
     return StreamingResponse(
-        stream_export_view(engine, resolved, type.value),
+        stream_export_view(engine, resolved, type.value, user.effective_user_id),
         media_type=resolved.media_type,
         headers={"Content-Disposition": f'attachment; filename="{resolved.filename}"'},
     )

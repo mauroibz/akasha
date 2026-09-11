@@ -31,7 +31,7 @@ def anyio_backend() -> str:
 async def test_key_value_returns_exactly_the_ranked_members(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         cortazar_1 = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         cortazar_2 = repository.create_or_get_entry(
             title="Bestiario", creators=("julio cortazar", "Someone Else")
@@ -43,7 +43,7 @@ async def test_key_value_returns_exactly_the_ranked_members(tmp_path: Path) -> N
                     text("UPDATE entries SET status='read' WHERE id=:id"), {"id": entry.entry_id}
                 )
 
-        service = LibraryService(app.state.engine)
+        service = LibraryService(app.state.engine, 1)
         ranked = service.rank(item_type="book", key="creators", metric="count")
         cortazar_row = next(row for row in ranked["rows"] if row["key"] == "julio cortazar")
 
@@ -58,7 +58,7 @@ async def test_key_value_returns_exactly_the_ranked_members(tmp_path: Path) -> N
 async def test_key_value_filters_over_http(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         match = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         other = repository.create_or_get_entry(title="Other", creators=("Someone Else",))
         with app.state.engine.begin() as connection:
@@ -82,7 +82,7 @@ async def test_key_value_filters_over_http(tmp_path: Path) -> None:
 async def test_key_requires_exactly_one_type(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        service = LibraryService(app.state.engine)
+        service = LibraryService(app.state.engine, 1)
         with pytest.raises(LibraryError) as refused:
             service.list_entries(types=[], key="creators", value="x")
     assert refused.value.status_code == 422
@@ -92,7 +92,7 @@ async def test_key_requires_exactly_one_type(tmp_path: Path) -> None:
 async def test_an_undeclared_key_is_refused(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        service = LibraryService(app.state.engine)
+        service = LibraryService(app.state.engine, 1)
         with pytest.raises(LibraryError) as refused:
             service.list_entries(types=["book"], key="description", value="x")
     assert refused.value.code == "invalid_insight_key"
@@ -110,8 +110,8 @@ async def test_list_shelves_returns_up_to_three_covers_highest_scored_first(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
-        service = LibraryService(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
+        service = LibraryService(app.state.engine, 1)
         shelf = service.create_shelf("Favorites")
 
         best = repository.create_or_get_entry(title="Best", creators=["Author"])
@@ -144,8 +144,8 @@ async def test_a_shelf_with_no_covered_members_returns_an_empty_list(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
-        service = LibraryService(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
+        service = LibraryService(app.state.engine, 1)
         shelf = service.create_shelf("Favorites")
         entry = repository.create_or_get_entry(title="Uncovered", creators=["Author"])
         service.update_entry(entry.entry_id, {"shelf_ids": [shelf["id"]]})
@@ -159,7 +159,7 @@ async def test_a_shelf_with_no_covered_members_returns_an_empty_list(
 async def test_an_empty_shelf_returns_an_empty_covers_list(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        service = LibraryService(app.state.engine)
+        service = LibraryService(app.state.engine, 1)
         shelf = service.create_shelf("Empty")
 
         shelves = service.list_shelves()
@@ -179,8 +179,8 @@ async def test_score_distribution_counts_by_score_and_the_unrated_tail(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
-        service = LibraryService(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
+        service = LibraryService(app.state.engine, 1)
         eight_a = repository.create_or_get_entry(title="A", creators=["X"])
         eight_b = repository.create_or_get_entry(title="B", creators=["X"])
         three = repository.create_or_get_entry(title="C", creators=["X"])
@@ -207,8 +207,8 @@ async def test_score_distribution_honours_type_and_the_four_filters(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
-        service = LibraryService(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
+        service = LibraryService(app.state.engine, 1)
 
         book = repository.create_or_get_entry(
             title="Rayuela", creators=["Julio Cortázar"], item_type="book"
@@ -260,8 +260,8 @@ async def test_score_distribution_honours_type_and_the_four_filters(
 async def test_list_shelves_groups_members_by_item_type(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
-        service = LibraryService(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
+        service = LibraryService(app.state.engine, 1)
         shelf = service.create_shelf("Mixed")
 
         book_a = repository.create_or_get_entry(title="Rayuela", creators=["Cortázar"])
@@ -284,9 +284,58 @@ async def test_an_empty_shelf_returns_an_empty_grouping_not_a_missing_key(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        service = LibraryService(app.state.engine)
+        service = LibraryService(app.state.engine, 1)
         shelf = service.create_shelf("Empty")
 
         shelves = service.list_shelves()
         row = next(row for row in shelves if row["id"] == shelf["id"])
         assert row["members_by_type"] == {}
+
+
+@pytest.mark.anyio
+async def test_list_facets_and_insights_are_scoped_to_one_user(tmp_path: Path) -> None:
+    """Sprint 076 required test: two users seeded directly, and each surface —
+    the entry list, its facets and the insights ranking — carries only the
+    requesting user's rows. The route proves the same thing end-to-end in the
+    walkthrough; this pins it at the service the route delegates to."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        first = DomainRepository(app.state.engine, 1)
+        a = first.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET status='read' WHERE id=:id"), {"id": a.entry_id}
+            )
+            connection.execute(
+                text(
+                    "INSERT INTO users (username, display_name, password_hash, password_salt,"
+                    " is_admin, created_at, updated_at) "
+                    "VALUES ('bruno', 'Bruno', NULL, NULL, 0,"
+                    " '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+                )
+            )
+            bruno = int(
+                connection.execute(text("SELECT id FROM users WHERE username='bruno'")).scalar_one()
+            )
+        second = DomainRepository(app.state.engine, bruno)
+        b = second.create_or_get_entry(title="Ficciones", creators=("Jorge Luis Borges",))
+        with app.state.engine.begin() as connection:
+            connection.execute(
+                text("UPDATE entries SET status='read' WHERE id=:id"), {"id": b.entry_id}
+            )
+
+        for user_id, want_title, want_creator in (
+            (1, "Rayuela", "julio cortazar"),
+            (bruno, "Ficciones", "jorge luis borges"),
+        ):
+            service = LibraryService(app.state.engine, user_id)
+            listed = service.list_entries(types=["book"])
+            titles = [item["item"]["title"] for item in listed["items"]]
+            assert titles == [want_title], titles
+            # Facets are the same walk's shadow: they count only this user's rows.
+            total = sum(listed["facets"]["status_counts"].values())
+            assert total == 1, listed["facets"]["status_counts"]
+            # Insights rank only what this user owns.
+            ranked = service.rank(item_type="book", key="creators", metric="count")
+            keys = {row["key"] for row in ranked["rows"]}
+            assert keys == {want_creator}, keys

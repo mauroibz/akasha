@@ -4930,3 +4930,538 @@ were already cut, a stale bullet from before this session -- removed rather than
 again.
 
 State unchanged otherwise: `project_status: "complete"`, no active sprint.
+
+## 2026-09-07 — Release state repaired, and the authentication plan written
+
+**Done.** Two owner requests, in order.
+
+1. **"Make sure the repo has a current release."** The tags were current (`v1.8.0` on `HEAD`,
+   pushed, four version surfaces agreeing) but CI had been red on `main` since the 1.6.0 bump and
+   the GitHub Releases page still showed `v1.5.0` as latest, seven tags behind. Three test
+   defects, no product defect, all repaired and pushed (DEC-145): the container smoke test's AC4
+   compared the served OpenAPI version against the literal `"1.5.1"` and now reads
+   `backend/pyproject.toml` and checks all four surfaces; an a11y check was sampling a wall-card
+   caption mid-render and now seeds an empty library; a cover assertion raced the dev proxy and
+   now stubs the bytes. Releases published for v1.6.0, v1.7.0 and v1.8.0 at the owner's direction.
+2. **"Plan auth and multiuser as as many sprints as necessary to reach a 2.0."**
+   `docs/auth-and-multiuser-proposal.md` written against the code, accepted by the owner as
+   DEC-146, and scheduled as Sprints 075–082 on branch `auth-and-multiuser`.
+
+**Verified.** `make check`, `make test` (1364 backend, 305 frontend), the full Playwright suite as
+CI runs it (128 passed, 2 skipped), and `make smoke-container` end to end against a real built
+image — the gate that had been red. CI run `34142235640` on `main` is green on all three jobs, the
+first fully green run since 1.6.0.
+
+**Dead end worth recording.** The first repair for the a11y flake moved the check into the serial
+`heavy-library` Playwright project, reasoning that DEC-114 had already quarantined its three
+siblings there. That project runs one worker and `accessibility.spec.ts` sorts ahead of
+`library.spec.ts` in it, so a fourth CPU-heavy axe pass landed immediately before the two
+crossfade DOM-budget probes; both failed on the very next CI run, neither having failed before.
+Reverted and fixed properly by seeding no library — the check's subject is the provider notice and
+the wall card was incidental. **The serial project is a scarce resource, not a quarantine to
+grow.** Recorded in DEC-145 and the handoff.
+
+**Evidence behind the a11y diagnosis.** A throwaway Playwright probe dumped axe's own computed
+values for the three flagged nodes on that screen: `.leading-5` at 18.34:1, `.truncate` and
+`.gap-1.5 > .shrink-0` at 7.47:1, all against a resolved `#0f0f11`. A title at 18:1 cannot fail a
+4.5:1 threshold, which is what ruled out a palette defect rather than an inference from the
+screenshot. The probe was deleted.
+
+**The planning finding that set the plan's cost.** Half the multiuser data-model work was already
+done: `entries.user_id` and `shelves.user_id` since migration `0002`, both unique constraints
+already user-scoped, six user-leading indexes, and a `LibraryService` that takes a `user_id` and
+filters on it in ten places. What is missing is a users table, sessions, `user_id` on the import
+ledger and jobs, and a user on the request — the service is constructed 24 times across 8 files
+with no user argument. Also found while planning and scheduled into Sprint 076:
+`application/export.py:248` (`iter_entries`) has never filtered by user, which is harmless with
+one user and a leak the day Sprint 079 lands.
+
+**Deviations.** None from any sprint — no sprint was active. The four open product questions in
+the proposal's §7 were adopted as DEC-146 defaults in the shape of product spec §11 rather than
+blocking eight sprints; each is named in the handoff as cheap to flip before its sprint.
+
+**Next.** Sprint 075 — Identity in the schema. `users` and `sessions`, foreign keys behind the two
+`user_id` columns that already exist, `user_id` on the import ledger and jobs, everything
+backfilled to one seeded user, and `AKASHA_AUTH` accepting only `off`. A migration that changes
+nothing observable, whose acceptance criterion is that the entire existing suite passes unedited.
+
+
+## 2026-09-08 — Sprint 075 implemented and closed in one session
+
+- Done: `users` + `sessions` (0017), `RESTRICT` FKs onto `entries`/`shelves` via
+  rebuild (0018), `user_id` on `import_batches`/`import_records`/`import_effects`
+  (NOT NULL, default 1) and a deliberately nullable `user_id` on `jobs` attributed
+  by `batch_id` (0019), `AKASHA_AUTH` in `Settings` refusing all but `off` and
+  naming Sprint 077, `.env.example` documented. Six commits: `2cab02e`, `10deb80`,
+  `408b5c6`, `8cbe029`, `01b717a`, `bf77ca6`.
+- Verified, 9/9 acceptance criteria:
+  1. AC1 — upgrade walk from a seeded 0016 library, all six tables populated and
+     every row's `user_id = 1` (`test_users_and_sessions_are_created_from_the_previous_head`,
+     `test_every_user_owned_row_now_points_at_a_real_user`,
+     `test_the_import_ledger_and_job_queue_belong_to_the_seeded_user`);
+  2. AC2 — `test_a_full_downgrade_returns_0016_and_the_application_still_starts`:
+     three-step downgrade, `users`/`sessions` gone, ledger columns gone, rows back,
+     app starts against the downgraded database and re-migrates;
+  3. AC3 — `PRAGMA foreign_key_check` empty asserted after upgrade (`test_migrations.py`
+     and the container audit);
+  4. AC4 — every named constraint and index asserted against `sqlite_master` including
+     the exact column list (`PRAGMA index_info`) of all nine surviving indexes;
+  5. AC5 — exactly one `users` row, `id=1`, `is_admin=1`, credentials NULL, `username`
+     its own normalized form;
+  6. AC6 — `test_a_job_written_by_enrichment_claims_no_user` proves
+     `JobRepository.enqueue` lands `user_id` NULL through the runtime engine, and the
+     ledger test proves the `batch_id`-attributed row carries 1;
+  7. AC7 — `test_settings.py`: `off`, unset, `on` (refuses naming Sprint 077), and
+     `banana`;
+  8. AC8 — `make test` (backend 1382 = baseline 1364 + 18 new; frontend 305), the e2e
+     suite passes unchanged (`npx playwright test`: 128 pass, 2 config-skipped, exit 0);
+     two head-list tests needed a line each (the precedent is the very migration they
+     pin to, and that very thing — `5b55e53` — changed the same two lists);
+  9. AC9 — `test_the_pre_migration_backup_is_taken_and_restores_a_working_0016_database`:
+     the startup backup fires on a 0016 database with all three revisions pending,
+     records revision `0016_import_kind_is_the_registrys` in the manifest, and restores
+     as a working 0016 library.
+  Verification ladder: `make check` green (ruff format + lint, mypy, tsc,
+  OpenAPI-check, validate_project); a migration drill on the real fixture `books.db`
+  (0016) in `tests/fixtures/backup-v1` ran the app-equivalent
+  `migrations.upgrade`/downgrade/re-upgrade dance on a file-based, non-in-memory
+  database; `make smoke-container` end-to-end (exit 0); DEC-025 walkthrough on a
+  container against a throwaway volume seeded from the fixture 0016 — startup wrote
+  the pre-migration backup and ran all three migrations, the sqlite audit had one
+  seeded admin and zero rows, Goodreads preview→commit→undo round-trip with
+  every `import_batches`/`records`/`effects` row `user_id = 1` and enrichment `jobs`
+  NULL, the library rendered the committed *Rayuela* card in a real Chromium,
+  `/openapi.json` unchanged at `Akasha / 1.8.0`.
+- Deviations: documented in DEC-147 — (a) two head-pinned tests updated with the head
+  (AC8's "no edits" cannot coexist with moving the head; the project's own precedent
+  is the very migration they pin); (b) `jobs.user_id` nullable (deliverable 5
+  self-contradicts; the risks section of the proposal resolves it); (c) the seed's
+  username `owner` (nothing specified it, Sprint 077's setup screen is where the real
+  one is chosen); (d) the verification section's `uv run alembic upgrade head` ran
+  as the app's migration API against the same file-based fixture database
+  (the repo's `alembic.ini` ships no `sqlalchemy.url`; it's injected by
+  `migrations.py`).
+- Blocked / unresolved: none.
+- Next: Sprint 076 is `ready`. Claim it: thread a user through the 24 construction
+  sites in 8 files, delete the `user_id=1` literals, fix
+  `application/export.py:248` (`iter_entries`, a leak the day Sprint 079 lands), and
+  keep every `server_default` in the schema — the literal in code, 076, is what moves
+  or dies, never the column default. If the owner speaks before Sprint 076 starts:
+  DEC-147 offers a cheap path to re-migrate 0017 if the seeded username isn't
+  wanted as `owner`.
+
+## 2026-09-08 — Post-closure, owner-directed: seeded username renamed owner -> admin
+
+- Done, owner-directed, immediately after Sprint 075 closed: change the seeded
+  username from `owner` to `admin` as the default. DEC-147 had priced exactly
+  this: while the migration stays in place -- one literal and one assertion.
+- Verified: grep confirmed the name exists in exactly one place of code
+  (`_SEED_USERNAME` in `0017_users_and_sessions.py`); the AC5 test had only
+  asserted normalization, so renamed to a new assertion (`== "admin"`),
+  confirmed RED against the old seed, turned GREEN on the flip; entire backend
+  suite 1382 passed; `make check` green (format, lint, mypy, tsc, OpenAPI
+  1.8.9, validator). No frontend, e2e, container, spec, e2e reference
+  changed; the technical spec didn't name the seed at all.
+- Docs moved with it: DEC-147 gained a revision note (cheap path spent,
+  walkthrough observation annotated), Sprint 075's `Outcome` deliverables
+  line and deviation note now say `admin`, the walkthrough audit bullet
+  keeps the `owner` it actually observed and points at DEC-147, HANDOFF
+  updated to `admin`. No worklog history was renamed; it is history.
+- No state flip: Sprint 075 remains closed; this is an owner-directed post-
+  closure operation, not a new sprint.
+- Next: unchanged -- Sprint 076 on `ready`, `docs/sprints/076-...`.
+
+## 2026-09-08 — Post-closure, owner-directed: feedback 1 + 2 (DEC-148)
+
+- Done, owner-directed, between sprints (075 closed, 076 ready, unclaimed —
+  so protocol infrastructure, not sprint scope). Two structural fixes from the
+  Sprint-075 review:
+  - **Feedback 2 — head-pinned test lists retired.** `migrations.py` gained
+    `revision_chain_from_files()` (AST-parses `revision`/`down_revision` from
+    every `alembic/versions/0NNN_*.py`, chains from `None`);
+    `test_migrations.py` gained `revisions_above()` deriving the pending list
+    from that chain, `test_pending_revisions_reports_what_is_outstanding` and
+    `test_an_unwritable_backup_directory_stops_the_upgrade` now assert against
+    the derived list (with an explicit guard that no literal `0017`/`0018`/
+    `0019` survives), and two new tests lock the chain itself: equality with
+    Alembic's own `ScriptDirectory` walk order, and the revision numbers
+    forming `0001..NNNN` exactly. DEC-090's "except the one list" exception is
+    retired by DEC-148.
+  - **Feedback 1 — state.json is now generated.** New
+    `scripts/sync_sprint_state.py`: flips sprint-file `Status`
+    (`--sprint NNN <status>`, repeatable so the close pair is one atomic
+    call), regenerates `docs/agent/state.json` from all sprint files, refuses
+    illegal transitions/impossible result states and reverts on refusal,
+    reuses `FINAL_SPRINT`/status vocabulary from `validate_project.py`.
+    AGENTS.md §2.1 + §5.2 and WORKFLOW.md (state model, blocked handoff,
+    final sprint) now prescribe the script; validator's agreement check stays
+    as the independent guard. `started_at` is set on in_progress-if-empty and
+    cleared on close, owned by the implementing sprint.
+  - Docs reconciled: DEC-148 recorded; Sprint-075 outcome bullet and HANDOFF's
+    head-pinned note annotated (history preserved, retirement added);
+    docs/README.md's state.json row updated.
+- Verified: `uv run pytest tests/test_migrations.py` 34 passed incl. both new
+  chain tests and the two derived tests. One bug found and fixed on the first
+  run (committed in the same commit): the chain glob had three digit classes
+  but migration filenames use four digits, so the chain came back empty and
+  the new tests failed; after the fix everything was green. Scratch-repo proof
+  of the sync script: ready->in_progress, in_progress->completed + 077 ready,
+  validator green on the result; illegal ready->completed rejected, and on
+  failure no file is written (sprint file vs state.json compared before/after).
+  `make check` green on the real repo. `python scripts/validate_project.py`
+  green. Full backend suite 1384 passed (1382 + the two new chain tests).
+- Deviations: none from the reading order/treatise — owner-directed protocol
+  refinements between sprints are the documented exception path (DEC-148).
+- Next: Sprint 076 stays `ready`; the next claim uses
+  `python scripts/sync_sprint_state.py --sprint 076 in_progress` as its first
+  state step.
+
+- Supplement (same session, same day): while building the insertion case for the
+  seeds-methodology skill update, the transition table shipped in `cc97cac` was found to
+  lack `ready -> planned` — the demotion the displaced sprint file needs during a DEC-111
+  mid-plan insertion renumber. Added it (commit below), recorded as a DEC-148 revision
+  note, and proven on a scratch repo: the swap `--sprint 077 planned --sprint 076 ready
+  --plan-revision 41` lands one `ready` file with agreement in one atomic call, while the
+  standalone demotion is still refused.
+## 2026-09-09 — Sprint 076 closed: the request has a user (DEC-149)
+
+- Done: executed Sprint 076 (The request has a user) end to end. `api/identity.py`'s
+  resolver is the single place that answers "whose request" (constant while `AKASHA_AUTH`
+  is `off`); every one of the 24 construction sites now takes the answer explicitly; the
+  five `DomainRepository` defaults plus `LibraryService`'s became required arguments;
+  `iter_entries`/`iter_export_rows`/`stream_export_view`/`export_json` are user-scoped
+  (`iter_items` stays unscoped — items are the shared cache); enrichment's literal
+  `EntryRow.user_id == 1` read the job's owner instead (an ownerless job writes no match
+  note — the one deliberate change, DEC-149); the import ledger is stamped deliberately
+  and undo refuses a batch that is not the caller's. Five implementation commits:
+  `2e62032`, `afa9182`, `8e9da80`, `59d9288`, `13afa0e`.
+- Verified and how: `make check` green (mypy strict on 68 files, OpenAPI contract
+  byte-identical both sides, validator). Backend suite 1397 passed (1384 at Sprint 075's
+  close: +5 identity tests — the guard among them written red first, committed `13afa0e` —
+  +4 two-user export tests, +2 ledger/undo tests, +1 ownerless-note test, +1
+  list/facets/insights scoping test); frontend 305 passed
+  (27 files); Playwright
+  128 passed / 2 config-skipped against a fresh backend on a disposable data dir. Benchmark
+  before/after both print "every scenario is within budget", query plans unchanged (the new
+  index-predicate hits `ix_entries_*` user-leading in both runs). DEC-025 walkthrough: two
+  directly-seeded users, one resolver answer each (bruno's pass via
+  `app.dependency_overrides`), and the library list, facets, insights, triage, export and an
+  import round-trip all carried only the acting user's rows everywhere.
+- Deviations: `test_undo.py` doesn't exist (undo coverage lives in `test_jobs.py`), so the
+  undo-ownership test landed in `test_generic_imports.py`; 33 test files and
+  `scripts/benchmark_library.py` picked up explicit `user_id=1` at constructor call sites
+  (named as required by AC6, which asks for every changed test); no assertion logic changed.
+- Next: Sprint 077 (A password and a session) is `ready` — claim it with
+  `python scripts/sync_sprint_state.py --sprint 077 in_progress`; it turns `current_user`'s
+  body into a session lookup and lifts `AKASHA_AUTH=on`.
+
+## 2026-09-09 — Sprint 077 closed: a password and a session (DEC-150)
+
+- Done: executed Sprint 077 end to end. Added parameter-carrying stdlib-scrypt credentials;
+  opaque revocable database sessions; login, logout, `me` and one-time setup routes;
+  request-boundary 401/409 enforcement; seeded-user claiming; scheme/trusted-peer-aware cookie
+  security; a per-username/per-peer in-process limiter; optional environment bootstrap; explicit
+  Compose and `.env.example` settings; technical-spec and OpenAPI contracts; and both-mode
+  container smoke coverage. Four implementation commits: `c6c539f`, `e833499`, `3d6bd98`,
+  `040dedb`.
+- Previous-sprint validation: migration/foundation/ownership/scoping tests passed 73 tests before
+  the known sandbox TestClient futex stall; the affected remainder was rerun outside the sandbox
+  with 146 passing. The final full suite independently revalidated Sprints 075 and 076.
+- Verified and how: focused auth/settings/security/password/session tests 34 passed; auth/library
+  regressions 59 passed; `make check` green (formatters, Ruff, ESLint, mypy on 71 files,
+  TypeScript, OpenAPI producer/consumer, validator); `make test` 1,421 backend and 305 frontend
+  tests passed; Playwright 128 passed / 2 config-skipped; OpenAPI export and consumer check green;
+  container smoke green in both modes, including auth-on login, restart persistence and logout.
+- DEC-025 walkthrough: a realistic pre-existing Rayuela row was refused with `setup_required`,
+  then immediately visible after setup claimed user id 1; logout returned it to 401; login plus a
+  container restart preserved access through the stored session. Cleanup used fixed, explicit
+  container/volume/file names only; read-only inventory afterwards found no walkthrough residue.
+- Password cost evidence: Ryzen 5 7600X native median/p95 24.1/29.3 ms (20 samples); container
+  constrained to 0.25 CPU median/p95/max 101.5/106.9/178.7 ms (40 samples). This is a conservative
+  small-server proxy, not an actual ZimaBoard measurement; DEC-150 records the limitation.
+- Deviations: the planned six commits became four coherent slices because auth routes, setup and
+  cookie enforcement shared one request boundary. Sprint 082's smoke deliverable now audits and
+  reruns the coverage Sprint 077 already had to introduce. A first manual walkthrough command was
+  interrupted; exact read-only inventory found no residue, and the successful rerun used no
+  recursive filesystem deletion. One OpenAPI consumer check was first invoked from the backend
+  directory and failed with npm's expected missing-package error; it passed immediately from
+  `frontend/`. No product scope was dropped.
+- Next: Sprint 078 (The way in) is `ready`. It adds the login/setup UI, shared frontend 401/409
+  handling, return-to-destination behavior and the shell account control against the contracts
+  completed here.
+
+## 2026-09-09 — Sprint 078 checkpoint: shared refusal handling and the login form
+
+- Stopped at the owner's request with Sprint 078 intentionally `in_progress`; no state advance.
+- Done and committed: `12d5f82` adds the thin shared `request()` wrapper, typed
+  `Unauthenticated`/`SetupRequired` failures, and routes every call in all six existing frontend
+  API modules through it. Its RED was a missing module; focused request/library/export tests then
+  passed 14 and TypeScript passed. `230464b` adds the auth API login call, standalone branded auth
+  frame, and login form with the real action/method/name/autocomplete/type contract, local-only
+  password state, return destination in router state, wrong-password clearing/focus, and the
+  interrupted-session sentence. Its RED was a missing page; all three focused tests pass.
+- In-progress RED, deliberately uncommitted: `frontend/src/App.test.tsx` contains three routing
+  tests for anonymous private-address gating, invisible auth-off redirects, and a mid-session
+  refusal returning to the requested shelf after login. `npm test -- --run src/App.test.tsx`
+  fails because `App.tsx` does not yet export/implement `AppContent`; `npm run typecheck` names the
+  same missing export. This is the next TDD step, not a product regression in committed code.
+- Next implementation: extend `api/auth.ts` with the one cached `/api/auth/me` probe, restructure
+  `App.tsx` into a testable coordinator inside the router, install the single auth-required event
+  listener, and route login outside `AppShell`. Then write setup RED/GREEN, add account/sign-out,
+  and proceed to auth e2e/accessibility/build/walkthrough gates.
+- No dependencies, backend contracts, generated files, runtime data, external services, or owner
+  environment were changed. The only dirty file at handoff is the intentional untracked RED test
+  above; preserve it.
+
+## 2026-09-09 — Sprint 078 implementation complete; real-device gate remains
+
+- Done: completed the Sprint 078 implementation in five commits after the earlier two slices.
+  `59fed62` adds the cached authentication coordinator, outside-shell gating, safe router-state
+  return destination and centralized refusal transition; `969e55f` adds first-run setup and
+  existing-library claim; `c10a3e2` adds the responsive account control and sign-out;
+  `71dc706` preserves the first requested destination when concurrent refusals arrive; and
+  `afea4fb` adds auth-on browser flows plus login/setup accessibility coverage. The shared
+  auth-off e2e fixture keeps the pre-existing suite unaware of accounts. No password or session
+  token is stored in router state or browser storage.
+- TDD evidence: the inherited `App.test.tsx` failed because `AppContent` did not exist before the
+  coordinator was implemented; setup first failed with the page module missing; and the shell
+  account test first failed with no account control. Focused component/unit tests then passed,
+  including a second refusal after login is already visible so it cannot replace the original
+  destination.
+- Verified and how after the implementation froze: `make check` passed (formatters, Ruff, ESLint,
+  mypy on 71 files, TypeScript, OpenAPI producer/consumer and project validation); the exact
+  `make test` gate passed outside the filesystem sandbox with 1,421 backend and 318 frontend tests;
+  `npx playwright test` passed 134 with two configuration-dependent skips; and `npm run build`
+  passed. Login and setup remained separate lazy chunks; the entry chunk was 88.10 kB (26.25 kB
+  gzip), below DEC-037's 300 kB warning budget. A sandbox-only FastAPI TestClient futex stall and
+  Playwright loopback `EPERM` were environment failures; both exact commands passed when rerun
+  outside that sandbox.
+- Walkthrough evidence available here: built the current source into a disposable isolated
+  container, seeded a realistic pre-existing *Rayuela*, enabled authentication, and drove the
+  complete 390 px setup/sign-out/sign-in flow against the real static frontend and backend. The
+  claimed library was visible immediately. The same browser session survived an actual container
+  restart and still opened the library without another login. The exercised flow took four taps,
+  excluding typing. Its Playwright scratchpad passed 1 test in 9.7 seconds. The exact temporary
+  container, two named volumes and image were removed afterwards; read-only inventory showed no
+  residue, and the owner's standing development stack was never touched.
+- Blocker: Sprint 078 remains `in_progress`. This environment cannot truthfully verify acceptance
+  criterion 3 or the final walkthrough requirement: on a real phone over the owner's tailnet,
+  Chrome and Firefox must each offer to save and later fill the password, and the same session must
+  open the application the next morning without another login. Those observations require the
+  owner's device, browser password stores, tailnet and elapsed overnight time. No required product
+  check failed; the sprint must not close until this manual evidence is supplied.
+- Next: Mauro performs and reports that real-device walkthrough (including browser names, save/fill
+  observations, next-morning persistence and tap count). If it passes, update the Sprint 078
+  Outcome, run documentation-only closure checks, atomically complete 078 and ready 079, then
+  commit `[DOCS] Close sprint 078 and hand off`. If it exposes a defect, resume TDD without
+  advancing the sprint.
+
+## 2026-09-09 — Sprint 078 closed: the way in
+
+- Done: the owner rebuilt the standing Compose install from this branch with `AKASHA_AUTH=on` and
+  confirmed the requested real-phone/tailnet checklist worked, including Chrome and Firefox
+  password save/fill and reopening the overnight session without another login. This supplies the
+  only evidence the automated and disposable-container gates could not. Sprint 078 is completed
+  and Sprint 079 is ready.
+- Verified and how: the frozen implementation remains covered by `make check`; 1,421 backend and
+  318 frontend tests; 134 passing Playwright cases with two configuration skips; a production
+  build with an 88.10 kB entry chunk and separate login/setup chunks; a four-application-tap
+  disposable-container flow; and the owner's real-device confirmation above. Closure-only changes
+  passed `python scripts/validate_project.py` and `git diff --check`; no product gate was
+  invalidated after it ran.
+- Deviations: the owner did not provide a separate real-device tap count, so the Outcome reports
+  the reproducible four application taps from the matching container walkthrough, excluding
+  typing and browser password-manager prompt interactions. The setup/routing commit order swapped,
+  and one separate fix was needed for concurrent 401s; neither changed scope. No canonical spec,
+  backend contract or future sprint changed.
+- Next: Sprint 079 (The second library) is `ready`. It makes admin status enforceable, adds user
+  management and password change, defines transfer-or-delete semantics, and proves route-by-route
+  that two users' libraries cannot leak into each other. Start it with
+  `python scripts/sync_sprint_state.py --sprint 079 in_progress` after the normal context pass.
+
+## 2026-09-10 — Sprint 079 closed: the second library (DEC-151)
+
+- Done: enforced admin-only account management; added create/edit/reset/delete APIs; added
+  self-service password change with selective session revocation; shipped the responsive People
+  and Change password settings; scoped every private repository/service/route to the effective
+  user; guarded item-backed shared-cache routes through the caller's own entry; added migration
+  `0020` for per-user import fingerprints; and built a runtime-derived route isolation suite.
+  Eleven implementation commits: `480f356`, `f3d7601`, `8be1e99`, `a3f0a65`, `6807b99`,
+  `53c4e1c`, `12ee9aa`, `c0bfde3`, `e963455`, `310fb52`, `ec43730`.
+- TDD/focused evidence: final isolation plus migration run passed 64; user/isolation API files
+  passed 31; People/AppShell components passed six; affected auth/accessibility Chromium cases
+  passed 28. Migration `0020` now has direct upgrade/downgrade proof, and the isolation probes
+  include foreign shelf ids and `excluded_entry_ids` carried inside bulk request bodies.
+- Exhaustive verification after the implementation froze: `make check` green; `make test` passed
+  1,457 backend and 320 frontend tests; OpenAPI export plus consumer check green; full Playwright
+  passed 136 with two configuration-dependent skips. The first literal OpenAPI script invocation
+  from the repository root failed because the src-layout package was not on Python's path; the
+  Makefile-prescribed uv environment from `backend/` succeeded, followed by the consumer command
+  from `frontend/`. This was command-location correction, not a product failure.
+- DEC-025 walkthrough: built `akasha-s079-walkthrough-20260910`, started one foreground auth-on
+  container with disposable `/tmp` bind mounts, and used separate admin/Bruno browser contexts.
+  The admin's private manual book and *Rayuela* import stayed theirs. Bruno began empty, imported
+  the same *Rayuela*, added a private book, created a shelf, imported and undid *Ficciones*, then
+  opened insights and export. The admin still saw only their own library and People showed Bruno's
+  two entries/one shelf. Live Open Library enrichment calls appeared in the container log; no
+  leak or confusing deletion control was observed. The final scratchpad passed in 12.0 seconds.
+  `docker run --rm` handled the container lifecycle; no named Docker volumes were created, and a
+  read-only `/tmp` inventory confirmed all walkthrough directories were removed.
+- Deviations: transfer refuses atomically with `409` when the target has a duplicate item, shelf
+  slug or import fingerprint instead of merging/overwriting data; migration `0020` was added when
+  the old global fingerprint constraint proved incompatible with independent libraries; and the
+  planned `test_undo.py` does not exist, so undo isolation is covered in `test_isolation.py`.
+  DEC-151 records these decisions. Technical spec import uniqueness was reconciled; Sprint 082
+  still owns the planned full auth/multiuser documentation rewrite.
+- Next: Sprint 080 (The admin sees everything) is `ready`. Extend—not weaken—the Sprint 079 route
+  inventory with the admin act-as dimension, keep the non-admin `404` wall intact, and make the
+  persistent banner and one-redacted-audit-line-per-request the safety properties.
+
+## 2026-09-10 — Sprint 080 closed: the admin sees everything (DEC-152)
+
+- Done: added migration `0021` and admin-only session act-as start/stop routes; taught the
+  effective-user resolver to target another library while retaining the actual admin; extended
+  `/api/auth/me`; shipped the fixed announced banner, one-action return and client cache boundary;
+  cleared acting state on logout, expiry, deletion, password changes and actual demotion; and
+  emitted one minimal structured audit event per handled acted request. Four implementation
+  commits: `5d9e905`, `b6cd40d`, `bbfe4d6`, `6cbba42`.
+- TDD/focused evidence: user/isolation passed 39; identity/session/logging passed nine; migration
+  `0021` round-trip passed; UI/App passed 12; affected auth/accessibility Chromium passed 29.
+  Added isolation proves target-owned entry and shelf create/edit/delete, third-user `404`, and
+  non-admin `403`. One legacy async identity test was changed from nested synchronous
+  `TestClient` to `httpx.AsyncClient` after reproducing the documented futex stall.
+- Exhaustive verification after implementation freeze: `make check` passed; `make test` passed
+  1,464 backend tests at 90% coverage and 322 frontend tests; the OpenAPI producer/consumer passed;
+  full Playwright passed 137 with two configuration-dependent skips; the production container
+  image built successfully.
+- DEC-025 walkthrough: against fresh auth-on data at 390px, separate admin and Bruno browser
+  profiles held separate libraries. The admin entered Bruno's library, changed a score, assigned
+  a row to Bruno's shelf, deleted a mis-imported row, visited shelves/insights/triage/export, and
+  returned in one press. Bruno's still-authenticated profile saw all three changes. The banner was
+  fixed and unambiguous on library, detail and dialog surfaces. The browser recorded 49 acted API
+  requests and the foreground container emitted exactly 49 `1 → 2` audit events; every event had
+  the same minimal field set and neither the unique private note nor cookie content appeared.
+  The successful scratchpad took 13.7 seconds.
+- Deviations: no acceptance criterion changed. Migration `0021` made the planned session storage
+  concrete. The first walkthrough selector missed shelf text even though its trace and the
+  database showed the assignment; it was replaced with the accessible shelf-removal control and
+  the whole flow was rerun on fresh data. A second startup attempt exposed that Docker-created
+  bind directories could inherit an unusable uid; pre-creating them as the host user fixed it.
+  Walkthroughs used foreground `docker run --rm` with explicit `/tmp` bind mounts, never named
+  volumes, and all four attempt directories were removed in one cleanup.
+- Next: Sprint 081 (Log in once) is `ready`. Verify Tailscale's current header contract from its
+  primary documentation, extend the existing trusted-peer helper, slide session expiry in batches,
+  and add self-service session listing/revocation. Its final phone/tailnet walkthrough requires the
+  owner's real network; do not substitute a mocked header for that evidence.
+
+## 2026-09-10 — Sprint 081 implementation frozen; external walkthrough remains
+
+- Done: implemented trusted-peer identity-header login with safe startup validation and optional
+  non-admin autocreation; daily-batched sliding sessions; self-service session listing, revocation
+  and sign-out-everywhere; responsive phone-safe account/login controls; published session API
+  contract; and real-image proxy-boundary smoke coverage. Nine commits run from `20d2771` through
+  `cba775c`.
+- Verified and how: `make check` passed; `make test` passed 1,473 backend and 325 frontend tests;
+  full Playwright passed 140; OpenAPI producer/consumer checks passed; and `make smoke-container`
+  proved the proxy allowlist refusal/success paths against the built image and cleaned its own
+  disposable Docker resources. A 50-entry probe measured 0.18 ms session lookup p95, zero writes
+  within the refresh interval and one after it.
+- Interrupted: the default 10,000-entry `scripts/benchmark_library.py` run was stopped before it
+  produced a result when the owner asked to close up. It must be rerun and recorded; no process or
+  Docker resource was left running.
+- Remaining gate: use Mauro's real Tailscale Serve and phone to confirm zero-tap tailnet login,
+  rejection outside the tailnet, and desktop invalidation after phone sign-out-everywhere. Sprint
+  081 stays `in_progress`; do not advance the pointer or substitute the mocked-header smoke test.
+- Decision/deviation: DEC-153 resolves the internally incompatible wording by treating 400 days as
+  the maximum forward validity after a batched refresh, while preserving immutable creation time.
+- Next: rerun the full benchmark, collect the owner-only walkthrough evidence, reconcile Sprint
+  082 and canonical docs as required, then close Sprint 081 atomically if both gates pass.
+
+## 2026-09-11 — Sprint 081 closed (complete): benchmark rerun, walkthrough waived by the owner
+
+- Done: reran the interrupted default 10,000-entry `scripts/benchmark_library.py` to completion and
+  closed Sprint 081 on its evidence. No runtime code changed this session; the diff is
+  documentation/state only (sprint Outcome, DEC-154, ROADMAP active-sprint line and 081 delivered
+  marker, worklog, HANDOFF, state flip to 082 ready). Also repaired a drifting ROADMAP line: the
+  "Active sprint" header still read 077 because the 078–080 closers never touched it.
+- Verified and how: the benchmark ran in full
+  (`cd backend && UV_CACHE_DIR=/tmp/akasha-uv-cache uv run python ../scripts/benchmark_library.py`,
+  ~33 s). Session refresh at 10,000 entries: lookup p95 0.09 ms over 25 lookups, 0 writes inside
+  the 1-day interval, 1 write after it — DEC-153's batching contract holds at scale. Every
+  first-library-page scenario inside the 500 ms budget (worst contended p95 147.8 ms, idle
+  67.9 ms). Fresh-scale observation recorded in DEC-154 for the roadmap, not this sprint: three
+  contended insights scenarios exceed 500 ms p95 at 10k entries/200 jobs (worst
+  `publisher/count` 1234.8 ms); the spec budget binds the first library page, and this sprint's
+  diff touches nothing on the insights path. The owner's deployment reality was measured, not
+  assumed: no tailscaled on `comma` or the ZimaBoard (192.168.100.240, whose overlay is ZeroTier);
+  the board still runs the 1.8.0 image bound to the LAN IP.
+- Deviations: the sprint's real-tailnet walkthrough (DEC-025) is NOT RUN — waived by the owner on
+  2026-09-11 after describing the actual use cases (two people on house wifi; occasional phone
+  access where the 400-day sliding session carries the load). Recorded as DEC-154 with the
+  residual proof named: the first real 2.0.0 deployment with the trusted header configured doubles
+  as the walkthrough. Akasha's half of the contract stays proven by the frozen `make smoke-container`
+  gate (startup refusal, untrusted-peer stripping, allowlisted identity admitted, unknown refused).
+- Blocked/open: none for this sprint. For the roadmap: the contended-insights-at-10k numbers above,
+  and the DEC-154 residual proof, both named where the next sessions will find them.
+- Next: Sprint 082 — Two point oh. Read `docs/sprints/082-two-point-oh.md`; it rewrites the
+  exposure rule across nine files, confirms both-mode smoke against the release image, and surfaces
+  `2.0.0`. DEC-154's residual proof lands at the owner's first 2.0.0 deployment with the header
+  configured.
+
+## 2026-09-11 — Sprint 082 implementation complete; closure blocked on one owner approval
+
+- Done: executed Sprint 082 end to end — exposure rule rewritten across every current-facing
+  document (specs, runbook, README, .env.example, compose.yaml, SECURITY.md); both specs made
+  canonical for Sprints 075–081 (product §9/§10/§6 route block; technical §1/§5.1 all fifteen
+  tables with `provider_usage` added/§9 cookie+header+allowlist/§12); the runbook's
+  "Turning authentication on" and "Running behind `tailscale serve`" sections; the version-surface
+  check in `scripts/validate_project.py` (TDD, 7 new tests); the four surfaces bumped to `2.0.0`
+  with the contract regenerated; the smoke gate extended with Sprint 081's session
+  list/revoke surface and rerun green; `release-notes-v2.0.md` written; `publishing-images.md`
+  gained the GitHub Release step. Commits `f42236d`, `f9fb396`, `7cf0739`, `a849ddf`, `c12b2a7`,
+  `5ce4c32`, `c3f0a1e` + the runbook addition, plus DEC-155 and this record.
+- Verified and how: `make check` green including the new version gate (proved failing per-surface
+  by temporary edits); backend 1,483 passed at 90% coverage; frontend 325 passed; Playwright 138
+  passed + 2 configuration-dependent skips; OpenAPI export + `npm run api:check` green;
+  `make smoke-container` green end to end after the in-gate fix (first sessions block read the
+  list with a cookie the Sprint 077 block had logged out — test-sequencing defect, fixed, full
+  gate rerun). The DEC-025 walkthrough was the upgrade rehearsal against a copy of the real
+  production database (82 entries, stamp 0016, from the ZimaBoard): migrations 0017–0021 ran
+  behind the pre-migration backup, all 82 entries survived byte-for-byte and became the
+  setup-created admin's, a second user was created per the runbook, isolation verified
+  (empty second library, cross-user id 404), source DB untouched at 0016. Two rehearsal findings
+  became runbook additions before closure (unsorted hidden by default — a never-triaged library
+  looks nearly empty after upgrade; and the source-checkout `.env` inheritance note).
+- Deviations: DEC-155 records the smoke-block defect/fix and the release-state decisions.
+- Blocked: **one item only** — the `AGENTS.md` invariant rewrite (line 137), deliverable 1. The
+  agent platform hard-blocks writes to `AGENTS.md` without owner consent; two consent requests
+  timed out unanswered. The exact replacement text is in HANDOFF.md. Once the owner approves (or
+  makes the edit), the remaining closure is: that one line, the AC1 phrase re-sweep, the
+  final-sprint state flip (`--sprint 082 completed`, project → `complete`), worklog, HANDOFF and
+  the `[DOCS]` closure commit. No runtime code, tests or gates are affected by that line.
+- Next: the owner says yes to the AGENTS.md line (or edits it), then any session runs the
+  five-minute closure. The release itself (tag `v2.0.0`, push, publish the GitHub Release from
+  `docs/operations/release-notes-v2.0.md`) is an owner action the sprint deliberately did not do.
+
+## 2026-09-11 — Sprint 082 closed (complete); the plan is complete
+
+- Done: the owner approved the AGENTS.md invariant rewrite ("go"), the platform's write
+  protection lifted, and the exposure rule's final landing closed deliverable 1. Then the
+  final-sprint closure per WORKFLOW.md: `sync_sprint_state.py --sprint 082 completed` (no
+  successor) set `project_status: complete` with a null active sprint; the ROADMAP's active-sprint
+  line now states the plan is closed; the sprint Outcome's blocked note became the completed
+  record. All 82 sprints are completed; the repo is on `auth-and-multiuser`, clean, local.
+- Verified and how: AC1 re-sweep after the AGENTS.md edit — the only remaining phrase matches are
+  dated history (the sprint's own quote of the old line, v1.0 release notes) and the new
+  invariant itself, which correctly scopes "no authentication" to auth-off. The project validator
+  passed with the completed plan state (sprint files and state.json agree, all 82 listed in
+  order); `git diff --check` clean. No runtime code, tests or gates changed after the frozen
+  exhaustive gate (the AGENTS.md line is agent-instruction text; the specs/runbook/README edits
+  were inside the frozen gate's diff).
+- Deviations: none new. DEC-155 remains the record for the in-gate smoke-block fix and the
+  release decisions.
+- Next: nothing is scheduled. The owner's release actions, whenever wanted: tag `v2.0.0`, push,
+  watch the Release workflow, publish the GitHub Release from
+  `docs/operations/release-notes-v2.0.md`, upgrade the ZimaBoard. The two open observations
+  (DEC-154's residual tailnet proof; contended insights at 10k entries) wait in the decision log
+  for the owner to schedule. A plan revision reopens work and moves `FINAL_SPRINT`.

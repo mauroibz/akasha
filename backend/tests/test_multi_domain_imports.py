@@ -181,6 +181,7 @@ def _service(app: Any, importer: object) -> ImportService:
         app.state.data_dir,
         app.state.calibre_dir,
         importer,  # type: ignore[arg-type]
+        user_id=1,
     )
 
 

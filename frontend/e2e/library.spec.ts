@@ -618,10 +618,14 @@ test("keyboard guards and reduced motion remain effective", async ({
   await page.emulateMedia({ reducedMotion: "reduce" });
   await seedLibrary(page);
   await page.goto("/");
-  await page.keyboard.press("/");
   const bar = page.getByRole("searchbox", {
     name: "Search your library, or add something new",
   });
+  // Wait for React to install the shortcut listener before sending the key.
+  // `page.goto()` only waits for the document load event; under a full parallel
+  // run it can return while this route is still mounting.
+  await expect(bar).toBeVisible();
+  await page.keyboard.press("/");
   await expect(bar).toBeFocused();
   await page.keyboard.type("a");
   // The guard: typing reaches the bar, never the router. The keystroke must

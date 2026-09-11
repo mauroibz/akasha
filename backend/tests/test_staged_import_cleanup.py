@@ -157,7 +157,7 @@ async def test_undo_still_works_on_a_batch_whose_staging_was_already_collected(
         assert report.reclaimed == (batch_id,)
         assert not staging.exists()
 
-        undo = UndoService(engine, data_dir=tmp_path / "data")
+        undo = UndoService(engine, user_id=1, data_dir=tmp_path / "data")
         result = undo.undo(batch_id)
 
     assert result["state"] != "undone" or result["skipped"] == 0
@@ -185,6 +185,7 @@ def test_an_uncommitted_batch_is_never_a_candidate(tmp_path: Path) -> None:
         session.add(
             ImportBatchRow(
                 id="abandoned",
+                user_id=1,
                 kind="calibre",
                 fingerprint="fp",
                 state="previewed",

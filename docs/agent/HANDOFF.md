@@ -1,140 +1,49 @@
-# Handoff — the plan is complete
+# Handoff — the plan is complete: 82 of 82 sprints, project `complete`
 
-`docs/agent/state.json` reads `project_status: "complete"`, `active_sprint: null`,
-`active_sprint_file: null`, `active_sprint_status: null`, `last_completed_sprint: "074"`.
-`completed_sprints` runs `001` through `074` — every planned sprint, including the three the
-owner's 2026-09-05 readability feedback added (DEC-139) after Sprint 071 closed the original v1
-plan. `FINAL_SPRINT` in `scripts/validate_project.py` is `74`; nothing raises it further without
-the owner asking for a new sprint. A session picking this up should not assume there is an active
-sprint to continue — check with the owner what, if anything, comes next, rather than inventing one.
+`docs/agent/state.json` reads `project_status: complete` with a null active sprint: Sprints
+001–082 are all completed. Sprint 082 ("Two point oh") closed 2026-09-11 with every deliverable,
+test and gate green, including the `AGENTS.md` exposure-rule invariant the owner approved after
+the platform's write protection had held it. There is no active sprint; the repository is on
+`auth-and-multiuser`, clean, all commits local. A new line of work opens only by a plan revision
+(DEC-155 is the record of this plan's close; the reopened-plan mechanics are in
+`docs/agent/WORKFLOW.md`'s final-sprint rule and the seeds-methodology skill's
+end-of-plan revision shape).
 
-## What the three readability sprints delivered
+## What 2.0.0 is, in one paragraph
 
-The owner's report — *"there is a lot of wasted space everywhere... covers and the main number
-should be larger... the insights page reads bland... the shelves tab is too bland"* — became
-`docs/readability-proposal.md`, accepted whole as DEC-139, and built as:
+Authentication and multiuser, off by default. Turn `AKASHA_AUTH=on` and a first-run setup screen
+creates the admin who claims the existing library; each further account gets its own private
+library (entries, shelves, imports, exports, triage scoped; items and covers a shared cache);
+sessions last 400 days and slide while used, are listed and revocable per device; an admin can
+act inside another library behind an unmissable banner with one audit event per request;
+`tailscale serve` can additionally assert identities through a peer-allowlisted header with
+zero-tap login. The exposure rule everywhere: no internet-reachable proxy, DNS or port forward
+unless auth is on, TLS terminates in front, and the cookie is `Secure`. The four version
+surfaces say `2.0.0`; the upgrade is `docker compose pull && up -d` with no action otherwise.
 
-- **Sprint 072 — A wall of covers.** The library card is cover-first (cover ≥70% of card area,
-  pinned height, DEC-023's fixed-size virtualization unchanged), the score and status sit at
-  opposite edges of the cover, one sticky command bar replaces four rows of chrome behind a single
-  **Filters** popover, the response total is visible, six columns at wide widths, list density
-  genuinely dense. Frontend only.
-- **Sprint 073 — Insights with a shape.** A hero panel promotes the leading key with its own
-  superlatives folded in; Decade and Year are one card with a grain toggle; a chronology strip
-  draws decades in time order; a score-distribution band (the sprint's one backend addition,
-  `GET /api/insights/scores`) draws the 1-10 spread; an asymmetric grid sizes cards by rank; the
-  long tail is clickable cards instead of a footnote.
-- **Sprint 074 — A shelf is a place.** The shelves index is a board of cards, each with a
-  scrolling cover rail, a magnitude bar, and one chip per domain it holds (`members_by_type`, the
-  sprint's one backend addition). A domain filter, sort and search work the board. Every shelf
-  gets its own page (`/shelves/:slug`) showing the set whole across every domain it holds — a
-  deliberate, owner-accepted exception to the library's one-domain-at-a-time rule (DEC-065,
-  DEC-139 §2) — with rename and delete moved there off the index, and a shelf can be pinned into
-  the library's command bar.
+## Owner actions left (all optional, nothing is blocked on them)
 
-Two owner-directed layout fixes landed between and after these, outside the sprint sequence, the
-same pattern DEC-138 established:
+1. **The release**, whenever wanted: tag `v2.0.0` on the merged main, push, watch the Release
+   workflow, publish the GitHub Release from `docs/operations/release-notes-v2.0.md`, then
+   upgrade the ZimaBoard (`AKASHA_VERSION=2.0.0`). With auth left off the board's upgrade
+   changes nothing visible. Turning auth on is `docs/operations/runbook.md`'s
+   "Turning authentication on" — proven end to end by Sprint 082's upgrade rehearsal on a copy of
+   the board's own database.
+2. **DEC-154's residual proof**, when Tailscale lands on the board: phone on the tailnet opens
+   signed-in; a non-tailnet device does not; sign-out-everywhere ends the desktop session. Record
+   it in the worklog or a superseding DEC.
 
-- **DEC-142** — the wall card's score and status were one shared, centred pill instead of two
-  controls at the cover's opposite edges (the accepted mockup's own layout). Fixed.
-- **DEC-143** — the library caption had dead space under a visibly pale `bg-surface` fill, and the
-  Insights hero/chronology strip wasted the width they were given. Both fixed; the caption's
-  height is now the content's actual height, and the hero/chronology bars use their space.
+## Known and left, in the order they are likely to bite
 
-Every sprint's own Outcome section (`docs/sprints/07{2,3,4}-*.md`) has full delivered-behaviour
-detail, every acceptance criterion, and every test that changed and why. DEC-140 through DEC-144
-have the decisions worth reading independent of the code.
-
-## Known-degraded, deliberately not fixed (carried forward, still true)
-
-- `/api/health/providers` reports configuration, not reachability.
-- Kitsu's latency tail occasionally exceeds its budget.
-- `languages` mixes vocabularies across movie/series sources.
-- The book domain declares `Creators` where `Authors` would read better.
-- Immediately after an inline status change on a library entry, the Filters popover's status
-  option keeps its stale facet label (e.g. `To read 4`) until reload, even though the filtered
-  response and the visible total are correctly `3 of 20`. A cache-invalidation gap in the
-  facet-counts read (Sprint 072's Outcome, DEC-140). Pick it up in whichever future sprint next
-  touches the status facet query, or a dedicated one if none does soon.
-- `ScoreDistributionCard` (Insights) spans twelve columns and stretches its ten score bars to
-  fill it, the same way the chronology strip did before DEC-143 capped that one. Out of scope for
-  both owner reports that drove DEC-143; recorded there for whenever Insights is next touched.
-- The shelf page's mean score chip is a client-side mean over currently-loaded entries, not a
-  server aggregate — accurate for any shelf that fits on one page, approximate beyond it
-  (Sprint 074's Outcome).
-- "Sort by recently added to" on the shelves board reads a shelf's own `updated_at` (bumped on
-  creation and rename), not a true last-member-addition time — `entry_shelves` has no timestamp
-  column of its own. Adding one is a migration nobody has asked for yet (Sprint 074's Outcome,
-  DEC-144).
-- If `scripts/validate_project.py` ever fails for a reason unrelated to real doc/state
-  inconsistency, check first for a leftover agent worktree under `.claude/worktrees/` — a prior
-  instance of this was git-excluded but still walked by the text-hygiene check. Deleting it clears
-  a false failure. Run from a clean checkout before believing a failure.
-
-## Still owed to the owner
-
-- **Sprint 065's DEC-025 walkthrough against the owner's real imported library** — still
-  outstanding; needs the owner's own container. Every walkthrough since has run against a
-  throwaway seeded backend instead.
-- **DEC-133's open product question** (album ranking ordering `Label` ahead of `Artists`).
-- **Saved views ("smart shelves")** — accepted in principle by DEC-139, needs a `saved_views`
-  table and a migration, deliberately left unscheduled. Becomes a sprint the day the owner asks;
-  `docs/sprints/ROADMAP.md`'s "Not scheduled" section has the design note it carries forward
-  (a saved view must still parse after a filter is added or renamed).
-- The rest of the shelf menu costed in `readability-proposal.md` §5.3 and deferred there: bulk
-  shelving from the library, manual order/queues, shelf goals, merging shelves, auto-shelving
-  rules. None scheduled.
-
-## Branch and authorization
-
-`ui-readability-proposal` (branched from `main` at `1914ffe`) was merged into `main`
-(fast-forward — `main` had no commits of its own past that point), pushed, and tagged `v1.8.0` at
-the owner's explicit request ("commit, merge to main, push and tag a new version"). `main` is now
-current with all of Sprints 072-074 and both layout fixes. Authorization does not carry forward to
-future sessions: do not push, merge, tag, open a PR, or take any remote action again without being
-asked, even though this session did.
-
-## Version and pipeline state
-
-`1.8.0`, tagged, and the four version surfaces agree (`backend/pyproject.toml`,
-`frontend/package.json`, `main.py`'s FastAPI `version=`, `frontend/openapi.json`).
-`docs/operations/release-notes-v1.8.md` has the release notes.
-
-**CI on `main` was red from the 1.6.0 bump until 2026-09-07, and is repaired (DEC-145).** Three
-test defects, no product defect:
-
-- `scripts/smoke_container.sh` AC4 compared the served OpenAPI version against the literal
-  `"1.5.1"`. It now reads `backend/pyproject.toml` and checks all four surfaces against it.
-- `the degraded provider notice has no serious accessibility violations` now seeds an empty
-  library. Axe was sampling a wall-card caption mid-render; the palette measures 7.47:1 and
-  18.34:1 at rest, so the sample was wrong, not the colours. The card was incidental to a check
-  about the provider notice. **A first attempt moved the check into the serial `heavy-library`
-  project instead and made things worse** — that project runs one worker, and a fourth axe pass
-  ahead of the crossfade DOM-budget probes broke both of them. Reverted. Treat the serial project
-  as a scarce resource, not a quarantine to grow.
-- `fetches a missing cover for a domain with no chooser` asserted on an `<img>` whose bytes were
-  never stubbed, racing the dev proxy that has no backend behind it in CI. Stubbed now.
-
-Two gaps those repairs exposed, neither fixed:
-
-- **Nothing cheap checks that the version surfaces agree.** The only check is inside
-  `make smoke-container`, which costs minutes and is not part of `make check`.
-  `scripts/validate_project.py` is where it belongs, whenever someone next touches it.
-- **The release procedure never publishes a GitHub Release.**
-  `docs/operations/publishing-images.md` moves the tag and builds the image, and stops there. The
-  *Releases* page therefore still showed `v1.5.0` as the latest while seven tags stood past it.
-
-## Private data and operational constraints
-
-Unchanged. Secrets, databases, uploaded imports and covers are never committed. v1 has no auth and
-stays LAN-only; Calibre is opened read-only. Every walkthrough across Sprints 072-074 and both
-layout fixes ran against throwaway or mocked fixtures — the owner's own instance was never
-touched, and Sprint 065's walkthrough against it remains the one still owed.
-
-## If a session picks this up with nothing specific asked
-
-There is no active sprint and no numbered work queued. Do not start Sprint 075 or invent new
-scope on your own initiative — saved views is the only named-but-unscheduled candidate, and even
-that is "the day the owner asks," not before. A session with no specific instruction should read
-this file, confirm the state above against `docs/agent/state.json`, and ask the owner what they
-want next rather than guessing.
+1. **Contended insights at 10,000 entries** (DEC-154/DEC-155): `creators/count` 575.4 ms,
+   `creators/score` 594.9 ms, `publisher/count` 1234.8 ms p95 under 200 queued jobs — a scale
+   never measured before this plan's close; the spec budget binds the first library page (147.8
+   ms contended, within budget). A future sprint decides whether insights gets its own budget.
+2. **The board still runs image 1.8.0** (82 entries, almost all `unsorted`, no users table),
+   bound to its LAN IP with ZeroTier unable to reach it; the upgrade is owner action 1.
+3. The dev machine's standing `akasha-akasha-1` (127.0.0.1:8000) is the owner's local
+   081-branch-era build; a `local-081` image also exists locally. Both are prunable once
+   `v2.0.0` is published and the board upgraded.
+4. The e2e/browser suites are the only automated guardrails on the UI contracts; nothing is
+   scheduled after this close, so a regression found in use becomes a plan revision, not a
+   sprint.

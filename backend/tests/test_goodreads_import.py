@@ -191,7 +191,7 @@ async def test_commit_requires_ambiguity_choice_and_preserves_existing_entry(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        existing = DomainRepository(app.state.engine).create_cached_entry(
+        existing = DomainRepository(app.state.engine, 1).create_cached_entry(
             title="Ficciones",
             subtitle=None,
             year=1944,

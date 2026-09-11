@@ -146,6 +146,7 @@ class EntryFormatRow(Base):
 class ImportBatchRow(Base):
     __tablename__ = "import_batches"
     id: Mapped[str] = mapped_column(primary_key=True)
+    user_id: Mapped[int]
     kind: Mapped[str]
     fingerprint: Mapped[str]
     state: Mapped[str]
@@ -163,6 +164,7 @@ class ImportRecordRow(Base):
     __tablename__ = "import_records"
     id: Mapped[int] = mapped_column(primary_key=True)
     batch_id: Mapped[str] = mapped_column(ForeignKey("import_batches.id"))
+    user_id: Mapped[int]
     row_number: Mapped[int]
     normalized_payload: Mapped[str]
     matched_item_id: Mapped[int | None]
@@ -180,6 +182,7 @@ class ImportEffectRow(Base):
     __tablename__ = "import_effects"
     effect_id: Mapped[int] = mapped_column(primary_key=True)
     batch_id: Mapped[str]
+    user_id: Mapped[int]
     record_id: Mapped[int]
     effect_type: Mapped[str]
     entity_type: Mapped[str]
@@ -192,6 +195,7 @@ class JobRow(Base):
     __tablename__ = "jobs"
     id: Mapped[str] = mapped_column(primary_key=True)
     batch_id: Mapped[str | None]
+    user_id: Mapped[int | None]
     kind: Mapped[str]
     state: Mapped[str]
     payload: Mapped[str]

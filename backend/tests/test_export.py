@@ -28,8 +28,12 @@ from book_tracker.main import create_app
 
 
 def _export_csv(engine):
-    """`export_csv`'s pre-sprint call shape, now the `goodreads` view through the walk."""
-    return stream_export_view(engine, GOODREADS_EXPORT, "book")
+    """`export_csv`'s pre-sprint call shape, now the `goodreads` view through the walk.
+
+    Passes the seeded user: everything these memory tests seed belongs to user 1,
+    the same user the resolver answers with when `AKASHA_AUTH=off`.
+    """
+    return stream_export_view(engine, GOODREADS_EXPORT, "book", 1)
 
 
 DERIVED_COLUMNS = (
@@ -54,7 +58,7 @@ def anyio_backend() -> str:
 async def test_export_carries_owner_data_and_omits_derived_columns(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -118,7 +122,7 @@ async def test_export_does_not_special_case_the_item_type(tmp_path: Path) -> Non
     """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         album = repository.create_or_get_entry(
             title="Kind of Blue", creators=("Miles Davis",), item_type="album"
@@ -167,7 +171,7 @@ async def test_export_carries_attachment_references_with_their_digest(tmp_path: 
     """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
@@ -225,7 +229,7 @@ async def test_csv_export_has_the_goodreads_columns_and_survives_hostile_text(
     """Product spec 5.1's column list, and text that breaks naive CSV writers."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(
             title="Rayuela, o el libro de los libros",
             creators=("Julio Cortázar", "Jorge Luis Borges"),
@@ -275,7 +279,7 @@ async def test_csv_export_neutralizes_spreadsheet_formulas(tmp_path: Path) -> No
     """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Ledger", creators=("A. Nobody",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -350,7 +354,9 @@ def test_export_memory_is_flat_against_library_size(tmp_path: Path, exporter: st
     dominated by a fixed ~1 MB of SQLAlchemy statement compilation that does not
     grow with the corpus, so a small library failed a bound the large one passed.
     """
-    generate = export_json if exporter == "json" else _export_csv
+    generate = (
+        (lambda engine: export_json(engine, user_id=1)) if exporter == "json" else _export_csv
+    )
 
     small_app = create_app(settings(tmp_path / "small"))
     with TestClient(small_app):
@@ -387,7 +393,7 @@ async def test_the_goodreads_csv_carries_books_and_leaves_the_other_domains_to_t
     """
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         repository.create_or_get_entry(
             title="Kind of Blue", creators=("Miles Davis",), item_type="album"
@@ -416,7 +422,7 @@ async def test_export_carries_the_format_of_a_copy(tmp_path: Path) -> None:
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -426,7 +432,7 @@ async def test_export_carries_the_format_of_a_copy(tmp_path: Path) -> None:
             f"/api/entries/{album.entry_id}",
             json={"status": "wishlist", "formats": ["vinyl", "digital"]},
         )
-        document = json.loads("".join(export_json(app.state.engine)))
+        document = json.loads("".join(export_json(app.state.engine, user_id=1)))
 
     entry = document["entries"][0]
     assert entry["formats"] == ["digital", "vinyl"]
@@ -455,7 +461,7 @@ async def test_an_exported_entry_keeps_its_progress(tmp_path: Path) -> None:
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         anime = repository.create_or_get_entry(title="Black Clover", creators=("Pierrot",))
         book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
@@ -486,7 +492,7 @@ async def test_the_goodreads_view_round_trips_through_our_own_reader(tmp_path: P
     own reader, not by asserting the bytes look right."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(
             title="Rayuela", creators=("Julio Cortázar", "Jorge Luis Borges")
         )
@@ -532,7 +538,7 @@ async def test_every_registered_domain_has_a_non_empty_table_view(domain, tmp_pa
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         repository.create_or_get_entry(
             title="Conformance row", creators=("Nobody",), item_type=domain.item_type
         )
@@ -561,7 +567,7 @@ async def test_format_csv_is_a_byte_identical_alias_of_the_goodreads_view(tmp_pa
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         alias_response = await client.get("/api/export", params={"format": "csv"})
         view_response = await client.get("/api/export/goodreads", params={"type": "book"})
@@ -584,7 +590,7 @@ async def test_the_table_view_neutralizes_spreadsheet_formulas_too(tmp_path: Pat
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Ledger", creators=("A. Nobody",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -606,7 +612,7 @@ def test_export_view_memory_is_flat_against_library_size(tmp_path: Path, view_na
     assert view is not None
 
     def generate(engine):
-        return stream_export_view(engine, view, "book")
+        return stream_export_view(engine, view, "book", 1)
 
     small_app = create_app(settings(tmp_path / "small"))
     with TestClient(small_app):
@@ -649,7 +655,7 @@ async def test_get_exports_declares_every_view(tmp_path: Path) -> None:
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         repository.create_or_get_entry(
             title="Kind of Blue", creators=("Miles Davis",), item_type="album"
@@ -672,3 +678,125 @@ async def test_get_exports_declares_every_view(tmp_path: Path) -> None:
     assert album_table["count"] == 1
     anime_table = by_id[("table", ("anime",))]
     assert anime_table["count"] == 0
+
+
+def _seed_second_user(engine) -> int:
+    """Seed a second owner the way the sprint said to (AC3): directly, because the
+    route that creates one does not exist until Sprint 079 and this test does not
+    need it — it needs two owners in the database and rows that belong to each."""
+    with engine.begin() as connection:
+        connection.execute(
+            text(
+                "INSERT INTO users (username, display_name, password_hash, password_salt, "
+                "is_admin, created_at, updated_at) "
+                "VALUES ('bruno', 'Bruno', NULL, NULL, 0, "
+                "'2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')"
+            )
+        )
+        return int(
+            connection.execute(text("SELECT id FROM users WHERE username='bruno'")).scalar_one()
+        )
+
+
+def _entry_titles(document: dict) -> list[str]:
+    """Titles behind a dump's entries, keeping the store's split (items are the
+    cache; entries are the owner's opinion of it)."""
+    items = {item["id"]: item["title"] for item in document["items"]}
+    return sorted(items[entry["item_id"]] for entry in document["entries"])
+
+
+@pytest.mark.anyio
+async def test_export_json_returns_only_the_requesting_users_entries(tmp_path: Path) -> None:
+    """AC3 / Sprint 076: two owners seeded, and `export_json` for each returns
+    only that owner's entries. Before this sprint the walk never asked whose
+    entry a row was, so both dumps would have carried both."""
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        DomainRepository(app.state.engine, 1).create_or_get_entry(
+            title="Rayuela", creators=("Julio Cortázar",)
+        )
+        bruno = _seed_second_user(app.state.engine)
+        DomainRepository(app.state.engine, bruno).create_or_get_entry(
+            title="Ficciones", creators=("Jorge Luis Borges",)
+        )
+
+        first = json.loads("".join(export_json(app.state.engine, user_id=1)))
+        second = json.loads("".join(export_json(app.state.engine, user_id=bruno)))
+
+    assert _entry_titles(first) == ["Rayuela"]
+    assert _entry_titles(second) == ["Ficciones"]
+    # The cache is not the leak the sprint fixed: both dumps still describe every
+    # item. Scoping travels the entry walk, not the item walk.
+    assert len(first["items"]) == 2
+    assert len(second["items"]) == 2
+
+
+@pytest.mark.anyio
+async def test_iter_export_rows_is_scoped_the_same_way(tmp_path: Path) -> None:
+    """AC3's second half: the walk behind every registered view filters by
+    owner, so no view can outlive the export route's scope."""
+    from sqlalchemy.orm import Session
+
+    from book_tracker.application.export import iter_export_rows
+
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        DomainRepository(app.state.engine, 1).create_or_get_entry(
+            title="Rayuela", creators=("Julio Cortázar",)
+        )
+        bruno = _seed_second_user(app.state.engine)
+        DomainRepository(app.state.engine, bruno).create_or_get_entry(
+            title="Ficciones", creators=("Jorge Luis Borges",)
+        )
+        with Session(app.state.engine) as session:
+            rows = {row.title for row in iter_export_rows(session, "book", bruno)}
+
+    assert rows == {"Ficciones"}
+
+
+@pytest.mark.anyio
+async def test_iter_items_is_not_scoped_the_cache_is_shared(tmp_path: Path) -> None:
+    """The sprint's explicit carve-out: `iter_items` keeps walking the whole
+    table, because an item describes the work and every owner's dump may carry
+    it; the owner's opinion is the row that is scoped."""
+    from sqlalchemy.orm import Session
+
+    from book_tracker.application.export import iter_items
+
+    app = create_app(settings(tmp_path))
+    async with app.router.lifespan_context(app):
+        DomainRepository(app.state.engine, 1).create_or_get_entry(
+            title="Rayuela", creators=("Julio Cortázar",)
+        )
+        bruno = _seed_second_user(app.state.engine)
+        DomainRepository(app.state.engine, bruno).create_or_get_entry(
+            title="Ficciones", creators=("Jorge Luis Borges",)
+        )
+        with Session(app.state.engine) as session:
+            titles = {item["title"] for item in iter_items(session)}
+
+    assert titles == {"Rayuela", "Ficciones"}
+
+
+@pytest.mark.anyio
+async def test_get_export_route_serves_only_the_requesting_user(tmp_path: Path) -> None:
+    """AC3 at the route: with a second owner's rows present, `GET /api/export`
+    still carries only the requesting user's entries — the resolver answers
+    user 1, and the route passes that answer into the walk."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        DomainRepository(app.state.engine, 1).create_or_get_entry(
+            title="Rayuela", creators=("Julio Cortázar",)
+        )
+        bruno = _seed_second_user(app.state.engine)
+        DomainRepository(app.state.engine, bruno).create_or_get_entry(
+            title="Ficciones", creators=("Jorge Luis Borges",)
+        )
+        response = await client.get("/api/export")
+
+    assert response.status_code == 200
+    document = json.loads(response.text)
+    assert _entry_titles(document) == ["Rayuela"]

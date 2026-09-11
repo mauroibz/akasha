@@ -2,11 +2,11 @@
 
 **Status:** implementation baseline 1.0
 **Product source:** [`product-spec.md`](product-spec.md)
-**Last updated:** 2026-07-21
+**Last updated:** 2026-09-11
 
 ## 1. System goals and quality attributes
 
-The application is a single-user, LAN-only web application for recording opinions about book editions. It must remain usable with several thousand entries and while metadata providers are unavailable.
+The application is a self-hosted web application for recording opinions about media — books, albums, anime, films, series. Authentication is optional and off by default; when on, it serves several independent per-user libraries. It must remain usable with several thousand entries per user and while metadata providers are unavailable.
 
 Priority order:
 
@@ -99,6 +99,13 @@ Environment variables:
 | `TZ` | no | `UTC` | display/default local timezone; stored dates remain ISO |
 | `LOG_LEVEL` | no | `INFO` | structured application log threshold |
 | `AKASHA_ATTACHMENT_MAX_BYTES` | no | `26214400` | per-file cap on attachments; bounds the worst file, not the total |
+| `AKASHA_AUTH` | no | `off` | `off` keeps the implicit seeded user; `on` requires a session for API access |
+| `AKASHA_COOKIE_SECURE` | no | derived | force the session cookie's `Secure` flag; otherwise it follows the trusted request scheme |
+| `AKASHA_TRUSTED_PROXY_PEERS` | no | `[]` | IP addresses/CIDRs allowed to supply `X-Forwarded-Proto`; JSON list |
+| `AKASHA_LOGIN_MAX_FAILURES` | no | `5` | failed logins admitted per username and peer within the fixed window |
+| `AKASHA_LOGIN_WINDOW_SECONDS` | no | `300` | in-process failed-login window; resets on process restart |
+| `AKASHA_ADMIN_USERNAME` | no | empty | paired with `AKASHA_ADMIN_PASSWORD` to bootstrap the first admin at startup |
+| `AKASHA_ADMIN_PASSWORD` | no | empty | optional first-admin secret; plaintext environment/file exposure is the operator's trade-off |
 
 Commit `.env.example` without secrets. Production must fail fast if `USER_AGENT_CONTACT` is absent; tests and local development may use an explicit test default.
 
@@ -140,14 +147,34 @@ A valid ISBN-10 is converted to canonical ISBN-13 before storage, so conversion-
 
 A merged search candidate can retain both Open Library and Google Books identities. The primary source selects explicit refresh; manual-only items have none.
 
-Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps.
+`users`
+
+- `id` integer primary key, seeded with exactly one row (id 1, admin, null credentials) by migration `0017` — the designated owner of every row that said `user_id = 1` by convention until then (DEC-146)
+- `username` required text, unique, stored normalized (stripped and casefolded); `display_name` an optional typed form kept alongside when it differs
+- `password_hash` and `password_salt` required-nullable text: the seeded user has no credential until `POST /api/auth/setup` or the paired bootstrap environment variables give it one. The hash is stdlib scrypt with its `n`/`r`/`p`/`dklen` parameters encoded beside the digest and a fresh random salt per user; comparison is constant-time
+- `is_admin` required integer (SQLite has no boolean type; flags throughout the schema are spelled this way)
+- `created_at`, `updated_at` required
+- `ON DELETE` behavior for everything pointing at this table is stated per table below, not defaulted
+
+`sessions`
+
+- `id` opaque text primary key, chosen by the code that creates the row
+- `user_id` foreign key to users with cascade delete — a revocation mechanism that refused to be revoked along with its user would be a worse one
+- `token_hash` required unique text: the server stores only the hash of the session token, never the token itself
+- `acting_as_user_id` nullable foreign key to users with `ON DELETE SET NULL`: only an admin may set it through the act-as API, while the session continues to identify the actual admin
+- `created_at`, `last_seen_at`, `expires_at` required; `user_agent` nullable
+- indexed on `token_hash` (via the unique constraint, the per-request login check), `(user_id, expires_at)` (the expiry sweep), and `acting_as_user_id` (lifecycle cleanup)
+- created by migration `0017`, first written in Sprint 077. The browser holds a 32-byte URL-safe random token; only its SHA-256 reaches this table. Sessions expire 400 days after creation; **use slides the horizon forward (DEC-153, Sprint 081)**: a lookup made at least one day after `last_seen_at` advances both `last_seen_at` and `expires_at` in one write (at most one refresh write per device per day), the new expiry never more than 400 days from that lookup, and `created_at` stays immutable audit data. A session used regularly never expires; an unused one does
+
+Every mutable table has `created_at` and `updated_at` unless it is an immutable append-only effect row; jobs/batches additionally use their lifecycle timestamps; `sessions` keeps `last_seen_at` and `expires_at` in `updated_at`'s place.
 
 `entries`
 
-- product-spec fields plus foreign key `item_id` with restrict-on-delete
+- product-spec fields plus foreign key `item_id` with restrict-on-delete and foreign key `user_id` to `users` with restrict-on-delete (migration `0018`, DEC-146): a user with a library cannot be deleted out from under it, and Sprint 079 owns what deletion ends up meaning
+- `user_id` is `NOT NULL` with a `server_default` of `1`: while no request carries a user (until Sprint 076 threads one through), it is how an `INSERT` keeps meaning the seeded first user, now by reference instead of convention
 - checks for score, nonnegative `reread_count`, nonnegative `progress`, and boolean `score_provisional`. **There is no CHECK on `status`** (migration `0014`, DEC-067 row 1): the vocabulary is the domain's, and a constraint listing the union of every domain's values could neither express "`owned` is not a book status" nor admit a domain added later without a migration on this table. `validate_status`, keyed on the item's own domain, is the authority and is strictly stronger
 - unique `(user_id, item_id)`
-- indexes supporting status/score/date list paths
+- indexes supporting status/score/date list paths, all user-leading
 
 `entry_formats`
 
@@ -158,7 +185,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 
 `shelves` and `entry_shelves`
 
-- as in product spec, with normalized unique slug per user
+- as in product spec, with normalized unique slug per user, and `user_id` a foreign key to `users` with restrict-on-delete (migration `0018`), defaulted to the seeded user like `entries`
 - shelf rename updates name and slug transactionally and rejects collisions
 - deleting a shelf cascades join rows, never entries
 
@@ -169,7 +196,10 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - source descriptor JSON; never contains arbitrary host paths returned to browsers
 - preview summary JSON, counters JSON, error JSON
 - `created_at`, `committed_at`, `undo_expires_at`
-- unique `(kind, fingerprint)` for committed input identity where practical
+- unique `(user_id, kind, fingerprint)` for committed input identity where practical (migration
+  `0020`): replay is idempotent within one library, while two people may import the same source
+  without sharing a batch
+- `user_id` foreign key to `users`, `NOT NULL` and defaulted to the seeded user (migration `0019`, DEC-146): an import is someone's work, and its undo ledger must follow the same user — two users importing concurrently would otherwise share one undo history
 
 `import_records`
 
@@ -177,6 +207,7 @@ Every mutable table has `created_at` and `updated_at` unless it is an immutable 
 - normalized payload JSON, matched item/entry IDs, match kind, planned action
 - conflicts JSON, validation errors JSON, and explicit ambiguity resolution
 - unique `(batch_id, row_number)`
+- `user_id` as on `import_batches` (migration `0019`)
 
 Preview persists these normalized records, so commit applies exactly the reviewed plan rather than reparsing an upload or rereading a Calibre database that may have changed.
 
@@ -185,6 +216,7 @@ Preview persists these normalized records, so commit applies exactly the reviewe
 - `effect_id` integer primary key and `batch_id`, `record_id`, effect/entity types, entity ID
 - before-values and after-values JSON
 - monotonic `effect_id` provides deterministic reverse-order undo
+- `user_id` as on `import_batches` (migration `0019`)
 
 This ledger makes undo safe: reverse only effects recorded for the batch; delete entities only when the batch created them and they remain unmodified/unreferenced; revert a filled field only if its current value still equals the recorded imported value. Late jobs from an undone batch are ignored.
 
@@ -193,8 +225,17 @@ This ledger makes undo safe: reverse only effects recorded for the batch; delete
 - `id` UUID, nullable `batch_id`, `kind`, `state` (`queued`, `running`, `succeeded`, `failed`, `cancelled`)
 - payload/progress/error JSON, attempts, `available_at`, heartbeat/lease timestamps
 - `created_at`, `updated_at`, `finished_at`
+- `user_id` foreign key to `users`, and **nullable by design** (migration `0019`): an enrichment job acts on a shared cached item and belongs to nobody, while a job chained to an import batch belongs to whoever ran it. The column is how the two are told apart; migration `0019` attributes a `0016` database's rows by `batch_id` (chained to the seeded user, batchless stays `NULL`), and enforcement of the ledger's ownership moves to the resolver in Sprint 076
 
 Jobs survive restart. Handlers are idempotent. The lifespan runner claims one queued job in a short transaction, processes network/file work outside that transaction, and persists progress. On startup, expired `running` jobs return to `queued` with incremented attempts. Cap retries and expose terminal failure.
+
+`provider_usage`
+
+- composite primary key `(provider, day)`, `count` integer
+- one row per provider per UTC day; the in-process fixed-window limiter (DEC-045)
+  increments it, and a day with no rows is a day nothing was counted
+- configuration, not code: `AKASHA_PROVIDER_DAILY_LIMITS` names the metered
+  providers and their ceilings; a provider absent from the mapping is unmetered
 
 `attachments`
 
@@ -575,6 +616,18 @@ Never expose tracebacks, host filesystem paths, provider keys, or raw SQL.
 
 The product-spec route list is authoritative, with these refinements:
 
+- Authentication adds `POST /api/auth/login`, `DELETE /api/auth/session`, `GET /api/auth/me`
+  first-run-only `POST /api/auth/setup`, and admin-only `POST /api/auth/act-as/{user_id}` plus
+  `DELETE /api/auth/act-as`. `GET /api/auth/me` returns the actual signed-in user and the optional
+  acting target. With `AKASHA_AUTH=off` all six answer 404 and every
+  older route is unchanged. With it `on`, health routes, auth routes and the SPA shell remain
+  reachable anonymously; every other API route answers the ordinary error envelope with
+  `401 unauthenticated`. Before any user has a credential that boundary answers
+  `409 setup_required` instead, except for health, `GET /api/auth/me`, setup and the shell.
+- The session cookie is `HttpOnly`, `SameSite=Lax`, `Path=/`, and has a 400-day `Max-Age`.
+  `Secure` follows the request scheme unless `AKASHA_COOKIE_SECURE` forces it. A proxy's
+  `X-Forwarded-Proto` changes that scheme only when the immediate peer matches
+  `AKASHA_TRUSTED_PROXY_PEERS`; an arbitrary client header has no effect.
 - Define static routes such as `/entries/bulk` before `/entries/{entry_id}`.
 - Bulk mutation accepts either explicit `entry_ids` or a validated server-side filter plus `excluded_entry_ids`; never both. This supports select-all across unloaded virtual rows without sending thousands of IDs. Return affected count and apply in one transaction.
 - `GET /entries` accepts repeated `status`, `shelf`, `format`, `type`, `q`, `sort`, `order`, `after`, `limit`, and triage-only flags. Default excludes `unsorted`; an explicit filter can include it. `type` selects domains and is validated against the registry; unlike `shelf` and `format`, repeating it *widens*, because a row has exactly one type. The response is `{items, next_cursor, total, facets}`. `facets.status_counts` is the whole-library total per status — what the inbox badge counts — `facets.status_counts_by_type` splits the same counts by item type, because a status two domains share is not one number on a screen that lists each domain's statuses separately, and `facets.format_counts` does the same for formats. Each facet clears its own dimension, so a count reads as "what you would get if you clicked this". **`type` is the exception and is not one dimension** (DEC-062): both status facets clear it, so the inbox badge keeps agreeing with the domain-agnostic triage surface and an unselected tab still has a count to show, while `format_counts` applies it, because that selector sits under the tab.
@@ -736,8 +789,32 @@ Although LAN-only, treat all imports, provider payloads, images, query parameter
 - **Serve attachments as downloads, never inline.** `Content-Disposition: attachment`, `X-Content-Type-Options: nosniff`, and a fixed `application/octet-stream`. Attachments are the only user-controlled content type the application serves — everything else is re-encoded to JPEG by the cover pipeline — and the SPA shares their origin, so an uploaded HTML or SVG rendered inline would run against the application's own API.
 - Enforce read-only Calibre mount in Compose and read-only SQLite URI/query mode in code.
 - Do not log notes, import row contents, API keys, or full provider payloads.
+- Never log passwords, session tokens or cookies. Passwords use scrypt with per-user salts;
+  sessions are opaque, server-side and revocable, and the database stores only token hashes.
+- Each completed request made while an admin is acting emits one audit event with the actual
+  admin id, target user id, method and templated route. It never carries query strings, bodies,
+  names, notes or cookie content.
+- Login failures are limited in-process by normalized username and immediate peer in one fixed
+  window. The limiter deliberately resets on restart; this is a single-container LAN control,
+  not a distributed security boundary.
 - No CORS by default in the single-origin deployment.
-- No auth means no public exposure. Documentation and Compose comments must state this prominently.
+- The exposure rule: no internet-reachable proxy, DNS or port forward unless
+  `AKASHA_AUTH=on`, TLS terminates in front, and the session cookie is `Secure`.
+  Auth-off means no public exposure of any kind. Authentication alone does not
+  authorize an internet-facing deployment; the operator contract for both
+  modes is `docs/operations/runbook.md`'s auth and reverse-proxy sections.
+- The trusted identity header (`AKASHA_TRUSTED_PROXY_HEADER`, off unless
+  configured) authenticates a request by the identity a permitted proxy asserts:
+  only peers inside `AKASHA_TRUSTED_PROXY_PEERS` may carry it, a request from
+  any other peer has the header **stripped before anything reads it**, auth-on
+  startup refuses a configured header without the allowlist, and an unknown
+  identity is refused `403` unless `AKASHA_TRUSTED_HEADER_AUTOCREATE=true`
+  (which creates a non-admin with an empty library and no password). A valid
+  cookie takes precedence over the header, and password login is never disabled
+  by it — the two are alternatives, so a proxy misconfiguration cannot lock
+  anyone out. The header name is the proxy's contract (Tailscale Serve:
+  `Tailscale-User-Login`), kept as configuration so an upstream rename is an
+  environment change, not a release.
 
 ## 10. Testing and quality gates
 
@@ -764,6 +841,10 @@ Coverage is a diagnostic, not a target to game. Critical domain and import code 
 
 Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes, and do not rely on call sites to remember: `logging.py` redacts a denylist of keys (notes, review, description, payload, row/record, api_key, token and kin), scrubs configured secret values out of any string so a key embedded in a logged URL cannot escape, truncates oversized values under innocent keys, and recurses into nested structures. Standard-library records are routed through the same chain, so a `logger.warning(..., extra={...})` is rendered and redacted rather than having its structured fields silently dropped.
 
+An admin acting in another library produces exactly one `admin_acting_request` event after each
+handled request. Its only request-specific fields are `admin_user_id`, `acting_as_user_id`,
+`method`, and the router's templated `route`; parameters and user content are deliberately absent.
+
 The final image runs as a non-root user (uid 10001), has a healthcheck, and receives signals directly; `STOPSIGNAL` is `SIGTERM` and uvicorn runs its own graceful shutdown, so a stop closes SQLite rather than killing it mid-write. Compose mounts, by default (DEC-075):
 
 - `data:/data` — named volume, `AKASHA_DATA_VOLUME` overridable
@@ -774,7 +855,7 @@ A fresh named volume is seeded from the image's own `/data`, `/backups` on first
 
 Backups live outside the data volume, not under `/data` (DEC-040): a copy kept inside the volume it protects is lost with that volume. `backup_dir` derives as a sibling of `data_dir`. The backup itself is `book_tracker.backup`, exposed as the `akasha-backup` console script and driven nightly from the host scheduler by `scripts/backup.sh` — the single application process is not a cron daemon. It copies the database through SQLite's online backup API and never file-by-file, archives covers and import audit metadata, writes a manifest and SHA-256 checksums, runs `PRAGMA integrity_check` on the copy, and enforces label-scoped retention. Restore verifies every checksum and the database before writing, and refuses a non-empty target. Nothing on the restore path imports the application, so restoring onto a bare machine needs no configuration.
 
-Migrations run at startup, preceded by an online backup whenever revisions are pending against an existing database; startup fails rather than migrating without one, and the backup is taken once per revision rather than once per restart attempt (DEC-039). Deployment docs cover migration, rollback, backup, restore, and LAN-only proxy guidance in `docs/operations/runbook.md`.
+Migrations run at startup, preceded by an online backup whenever revisions are pending against an existing database; startup fails rather than migrating without one, and the backup is taken once per revision rather than once per restart attempt (DEC-039). Deployment docs cover migration, rollback, backup, restore, the exposure rule and authenticated proxy guidance in `docs/operations/runbook.md`.
 
 ## 12. Deferred decisions and explicit defaults
 
@@ -785,6 +866,6 @@ Defaults adopted until Mauro changes them:
 3. One item is one edition; rereads of another edition remain represented lossily by the same entry and incremented `reread_count`.
 4. Series remains free text in metadata.
 
-Deferred to v2+: authentication, sharing, multiuser UI, Calibre write-back and OPDS. Unscheduled
+Delivered in 2.0 (Sprints 075–081, DEC-146): authentication and multiuser. Still deferred to a future version: sharing, Calibre write-back and OPDS. Unscheduled
 item domains remain speculative; the roadmap-authorized movie line is governed by Sprints 046–047
 and DEC-098 rather than by this deferral.

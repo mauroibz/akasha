@@ -238,7 +238,7 @@ def library(tmp_path: Path) -> tuple[Any, Any]:
                 )
         return item_id
 
-    return DomainRepository(engine), add
+    return DomainRepository(engine, 1), add
 
 
 class TestReimportIsIdempotent:

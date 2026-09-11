@@ -67,7 +67,7 @@ async def test_a_patch_is_validated_against_the_fields_of_its_own_type(tmp_path:
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
         with app.state.engine.begin() as connection:
@@ -109,7 +109,7 @@ async def test_metadata_stays_opaque_in_the_response(tmp_path: Path) -> None:
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -204,7 +204,7 @@ async def test_a_tracklist_is_described_as_rows_and_validated_as_rows(tmp_path: 
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
         published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
         with app.state.engine.begin() as connection:
             connection.execute(

@@ -29,7 +29,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 
 ### Non-goals for v1
 
-- Multiuser, auth, registration
+- Multiuser, auth, registration — **auth and multiuser shipped in 2.0** (§9); public registration remains out of scope (an admin creates accounts)
 - Public sharing / profile links
 - Reviews, comments, discussion, follows, activity feeds
 - Reading progress (page counts, % complete), reading sessions, streaks
@@ -56,7 +56,7 @@ save — takes under 20 seconds and never requires leaving the keyboard.
 | Domain generality | Per-domain packages under `domains/`, a code registry, **no plugin runtime** | The registry was extracted once a second domain existed, as planned. See technical spec §6.6 and `docs/guides/adding-a-domain.md` |
 | Metadata precedence | Sync fills empty fields only, never overwrites; explicit per-item re-pull | Hand-corrections must survive re-sync |
 | List rendering | TanStack Virtual + keyset pagination on `/` and the triage surface | Calibre libraries reach thousands of rows |
-| Auth | None. LAN-only; internal proxying allowed, no internet-reachable route | Deferred with sharing; see §9 |
+| Auth | Optional, off by default (2.0). With auth on: accounts, per-user libraries, 400-day sessions. Exposure rule unchanged until all three hold: auth on, TLS in front, cookie `Secure` | Delivered as DEC-146; see §9 |
 | Rereads | Lossy — latest dates + one score, `reread_count` only | Matches actual usage |
 
 ---
@@ -516,9 +516,25 @@ but undefined `items.import_source` shortcut.
 
 ## 6. HTTP API
 
-FastAPI, JSON, no auth in v1 (bind to LAN / behind Nginx Proxy Manager).
+FastAPI, JSON. Authentication is optional and off by default (§9); with it on,
+the auth routes below govern sign-in and every other route answers `401`
+without a session. Bind to LAN / behind Nginx Proxy Manager either way.
 
 ```
+POST   /api/auth/login                  → {username, password}, sets the session cookie
+DELETE /api/auth/session                → logout: revokes this session, clears the cookie
+GET    /api/auth/me                     → auth mode, signed-in user, acting target, setup state
+POST   /api/auth/setup                  → first-run only: creates the admin from the seeded user
+GET    /api/auth/sessions               → every signed-in device, the current one marked
+DELETE /api/auth/sessions               → sign out everywhere
+DELETE /api/auth/sessions/{id}          → revoke one device
+PATCH  /api/auth/password               → change your own password (current one required)
+POST   /api/auth/act-as/{user_id}       → admin: work inside another library, banner stays
+DELETE /api/auth/act-as                 → admin: return to your own library
+GET    /api/users                       → admin: accounts with entry/shelf counts
+POST   /api/users                       → admin: create an account
+PATCH  /api/users/{user_id}            → admin: rename, display name, admin flag
+DELETE /api/users/{user_id}            → admin: remove with explicit transfer or delete
 GET    /api/search?q=…                 → merged candidates
 GET    /api/search/resolve?url=…       → single candidate, or edition candidates for a work URL
 POST   /api/entries                    → {source, source_id, source_refs?[]} | {manual: {...}}
@@ -537,12 +553,20 @@ DELETE /api/entries/{id}
 GET    /api/items/{id}
 PATCH  /api/items/{id}                 → manual metadata correction
 POST   /api/items/{id}/refresh         → re-pull from source, OVERWRITES edits
+GET    /api/items/{id}/cover           → the stored cover image
+GET    /api/items/{id}/cover-candidates → alternative covers for choosing
 POST   /api/items/{id}/cover           → upload replacement cover
+POST   /api/items/{id}/cover/fetch     → re-fetch the cover from providers
+PATCH  /api/items/{id}/attachments/{aid} → rename an attachment
 GET    /api/items/{id}/attachments     → files attached to this edition
 POST   /api/items/{id}/attachments     → upload one opaque file, size-capped
 GET    /api/items/{id}/attachments/{aid} → download; always Content-Disposition: attachment
 DELETE /api/items/{id}/attachments/{aid} → detach; the bytes go when nothing references them
+GET    /api/item-types                 → each domain's fields, statuses, formats
+GET    /api/insights                    → per-domain rankings by a groupable field
+GET    /api/insights/scores             → the 1-10 score distribution
 GET    /api/shelves
+POST   /api/shelves                     → create a shelf
 PATCH  /api/shelves/{id}               → rename
 DELETE /api/shelves/{id}               → detaches, does not delete entries
 
@@ -557,8 +581,13 @@ DELETE /api/import/batches/{id}        → undo an import batch
 
 GET    /api/export                     → whole library as entity-shaped JSON;
                                           ?format=csv for a Goodreads-shaped CSV
+GET    /api/exports                     → the available export views
+GET    /api/export/{view}               → one export view's file
 POST   /api/enrichment/backfill        → re-queue enrichment for items whose
                                           metadata or cover is still empty
+GET    /api/importers                   → the registered import connectors
+GET    /api/health/live                 → liveness, no dependencies
+GET    /api/health/ready                → readiness, disk headroom included
 GET    /api/health/providers           → which providers are configured, and
                                           whether search is degraded
 ```
@@ -893,26 +922,30 @@ blob's path *is* its digest. The nightly DB backup (§8) remains non-optional in
 production — the export is a portability story, not a restore story. There is no
 export button in the UI; the route is the surface.
 
-**v2 — Auth.** None in v1; LAN-only. Internal Nginx Proxy Manager routing is
-allowed, but there must be no public DNS, internet port-forwarding, tunnel, or
-internet-reachable proxy host until authentication exists. When auth lands:
-single env-var password with a signed session cookie, which is also the
-prerequisite for public share links. Docker may bind the container normally;
-restrict exposure at published ports, firewall, DNS, and proxy layers. Keep this
-warning in Compose so future-you doesn't expose it while adding a host at 1am.
+**Delivered — authentication and multiuser (2.0).** Sprints 075–081 built it
+whole (DEC-146): a `users` table with scrypt credentials, opaque server-side
+sessions on a 400-day sliding horizon, a first-run setup screen that claims the
+existing library for the admin, per-user libraries (entries, shelves, imports,
+exports and triage all scoped; items and covers remain a shared cache), an
+admin who manages accounts and can look into another library without replacing
+their own signed-in identity, a sessions screen that lists and revokes devices,
+optional trusted-header login behind `tailscale serve`, and a login/setup
+surface that works on a phone. `AKASHA_AUTH` defaults to `off`, so a
+single-user install upgrades with no action and no visible change. The
+exposure rule narrows rather than deletes: no internet-reachable proxy, DNS or
+port forward unless auth is on, TLS terminates in front, and the cookie is
+`Secure`. The operator path is the runbook's
+[Turning authentication on](../operations/runbook.md#turning-authentication-on).
 
 **v2 — sharing.** Public read-only list URLs. Cheap *if* the list view is
 already `render(entries WHERE user=X, filter, sort)` and authorization is a
-separate check. Build the view that way now; add the route later.
-
-**v2 — multiuser.** `user_id` on `entries` and `shelves` reduces data-model
-churn, but multiuser still requires a real users table, ownership backfill,
-authentication identities, authorization checks, and uniqueness validation.
-Do not claim it is migration-free.
+separate check — both have been true since Sprint 076 — but it is still a
+separate feature with its own product questions (does a shared list update
+live, can it be revoked, does it leak the shelf name). Still deferred.
 
 **v2 — Calibre write-back.** Pushing your scores into Calibre's `ratings` table
-so the two stay in sync. Technically easy given the identical 0–10 scale, but it
-means writing to a DB another program owns. Not worth the risk in v1.
+so the two stay in sync. Technically easy given the identical 0–10 scale, but
+it means writing to a DB another program owns. Still deferred.
 
 **v2 — OPDS / Content Server as an alternative Calibre path.** If the library
 ever lives on a different machine than the tracker, Calibre's Content Server
@@ -970,7 +1003,7 @@ Resolved during spec review; recorded so they aren't reopened.
 | 4 | Rereads | Stay lossy: latest dates, one score, `reread_count`. No `readings` table |
 | 5 | Scale | TanStack Virtual + keyset pagination; animation budget spent on interactions, not scrolling (§6, §7) |
 | 6 | Export | Deferred through v1; nightly DB backup mandatory in the meantime (§9). **Delivered in Sprint 024** — entity-shaped JSON plus a Goodreads CSV, attachments by reference (DEC-054) |
-| 7 | Auth | Deferred to v2. LAN-only; internal NPM is allowed, but no internet-reachable proxy/DNS/forwarding until auth (§9) |
+| 7 | Auth | **Delivered in 2.0 (DEC-146, Sprints 075–081)** — accounts, per-user libraries, 400-day sliding sessions, device revocation, optional trusted-header login; off by default. The exposure rule holds until all three conditions are met: auth on, TLS in front, cookie `Secure` (§9) |
 
 ---
 

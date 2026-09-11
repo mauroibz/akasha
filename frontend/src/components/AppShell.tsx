@@ -1,10 +1,27 @@
-import { Bookmark, ChartBar, LibraryBig, Plus, Upload } from "lucide-react";
+import {
+  Bookmark,
+  ChartBar,
+  LibraryBig,
+  LogOut,
+  Plus,
+  Settings,
+  Upload,
+  UserRound,
+} from "lucide-react";
 import { LazyMotion, domAnimation } from "motion/react";
-import { type ReactNode } from "react";
-import { NavLink, useLocation } from "react-router-dom";
+import { type ReactNode, useState } from "react";
+import { NavLink, useLocation, useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
+import { logout, stopActingAs, type AuthUser } from "@/api/auth";
 import { AkashaMark } from "@/components/AkashaMark";
 import { DataCredit } from "@/components/DataCredit";
+import { Button } from "@/components/ui/button";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
 
@@ -33,7 +50,123 @@ const navItems: readonly NavItem[] = [
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];
 
-export function AppShell({ children }: { children: ReactNode }) {
+function AccountControl({
+  user,
+  onSignedOut,
+}: {
+  user: AuthUser;
+  onSignedOut: () => void;
+}) {
+  const navigate = useNavigate();
+  const [signingOut, setSigningOut] = useState(false);
+  const name = user.display_name?.trim() || user.username;
+
+  async function signOut() {
+    setSigningOut(true);
+    try {
+      await logout();
+      onSignedOut();
+      void navigate("/login", {
+        replace: true,
+        state: { returnTo: "/" },
+      });
+    } catch {
+      setSigningOut(false);
+      toast.error("You could not be signed out. Try again.");
+    }
+  }
+
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <Button
+          variant="ghost"
+          className="min-h-11 max-w-48 gap-2 px-3 text-muted-foreground"
+          aria-label={name}
+        >
+          <UserRound className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span className="truncate">{name}</span>
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent align="end" className="w-44 p-2">
+        <Button
+          variant="ghost"
+          className="min-h-11 w-full justify-start gap-2"
+          onClick={() => void navigate("/people")}
+        >
+          <Settings className="h-4 w-4" aria-hidden="true" />
+          {user.is_admin ? "People" : "Settings"}
+        </Button>
+        <Button
+          variant="ghost"
+          className="min-h-11 w-full justify-start gap-2"
+          disabled={signingOut}
+          onClick={() => void signOut()}
+        >
+          <LogOut className="h-4 w-4" aria-hidden="true" />
+          {signingOut ? "Signing out…" : "Sign out"}
+        </Button>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+function ActingAsBanner({
+  user,
+  onActingAsChanged,
+}: {
+  user: AuthUser;
+  onActingAsChanged: (user: AuthUser | null) => void;
+}) {
+  const navigate = useNavigate();
+  const [leaving, setLeaving] = useState(false);
+  const name = user.display_name?.trim() || user.username;
+
+  async function leave() {
+    setLeaving(true);
+    try {
+      await stopActingAs();
+      onActingAsChanged(null);
+      void navigate("/", { replace: true });
+    } catch {
+      setLeaving(false);
+      toast.error("You could not return to your library. Try again.");
+    }
+  }
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label={`Viewing ${name}'s library`}
+      className="fixed inset-x-0 top-0 z-[60] flex min-h-14 items-center justify-between gap-3 border-b border-amber-500/50 bg-amber-100 px-4 text-amber-950 shadow-sm dark:bg-amber-950 dark:text-amber-50"
+    >
+      <p className="text-sm font-semibold">Viewing {name}&apos;s library</p>
+      <Button
+        variant="outline"
+        className="min-h-11 shrink-0 border-amber-700/40 bg-transparent"
+        disabled={leaving}
+        onClick={() => void leave()}
+      >
+        {leaving ? "Returning…" : "Return to your library"}
+      </Button>
+    </div>
+  );
+}
+
+export function AppShell({
+  children,
+  user,
+  actingAs,
+  onActingAsChanged,
+  onSignedOut,
+}: {
+  children: ReactNode;
+  user?: AuthUser | null;
+  actingAs?: AuthUser | null;
+  onActingAsChanged?: (user: AuthUser | null) => void;
+  onSignedOut?: () => void;
+}) {
   const location = useLocation();
   return (
     // `domAnimation` deliberately omits Motion's projection features, so
@@ -44,6 +177,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     // eager `motion.*` component into a loud error instead of a silent bundle.
     <LazyMotion features={domAnimation} strict>
       <div className="min-h-screen bg-background text-foreground">
+        {actingAs && onActingAsChanged ? (
+          <>
+            <div className="h-14" aria-hidden="true" />
+            <ActingAsBanner
+              user={actingAs}
+              onActingAsChanged={onActingAsChanged}
+            />
+          </>
+        ) : null}
         <nav
           aria-label="Primary"
           className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
@@ -80,7 +222,17 @@ export function AppShell({ children }: { children: ReactNode }) {
               <span>{item.label}</span>
             </NavLink>
           ))}
+          {user && onSignedOut ? (
+            <div className="ml-auto">
+              <AccountControl user={user} onSignedOut={onSignedOut} />
+            </div>
+          ) : null}
         </nav>
+        {user && onSignedOut ? (
+          <header className="flex min-h-14 items-center justify-end border-b border-border/80 px-4 sm:hidden">
+            <AccountControl user={user} onSignedOut={onSignedOut} />
+          </header>
+        ) : null}
         <nav
           aria-label="Primary"
           className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"

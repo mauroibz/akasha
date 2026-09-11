@@ -65,6 +65,9 @@ smoke_tag="smoke-$$"
 #                 copies, including its AKASHA_ENVIRONMENT=development
 #   no-contact.env  example.env minus USER_AGENT_CONTACT: must refuse to start
 printf 'AKASHA_ATTACHMENT_MAX_BYTES=1024\nAKASHA_SQLITE_BUSY_TIMEOUT_MS=12000\nTMDB_READ_TOKEN=token-for-smoke\n' > "$workdir/smoke.env"
+printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\n' > "$workdir/auth.env"
+printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\nAKASHA_TRUSTED_PROXY_HEADER=Tailscale-User-Login\n' > "$workdir/header-refusal.env"
+printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\nAKASHA_TRUSTED_PROXY_HEADER=Tailscale-User-Login\nAKASHA_TRUSTED_PROXY_PEERS=["127.0.0.1"]\n' > "$workdir/header.env"
 : > "$workdir/bare.env"
 printf 'USER_AGENT_CONTACT=%s\nTZ=UTC\n' "$USER_AGENT_CONTACT" > "$workdir/defaults.env"
 cp .env.example "$workdir/example.env"
@@ -106,7 +109,7 @@ container_env() {
   docker compose exec -T akasha python -c '
 import json
 from os import environ
-print(json.dumps({name: environ.get(name) for name in sorted(environ) if name.startswith("AKASHA_") or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
+print(json.dumps({name: environ.get(name) for name in sorted(environ) if (name.startswith("AKASHA_") and "PASSWORD" not in name) or name in ("TMDB_READ_TOKEN", "TZ", "LOG_LEVEL")}))
 '
 }
 
@@ -472,6 +475,152 @@ wait_healthy
 [ "$(docker inspect --format '{{.Config.Image}}' "$(docker compose ps -q akasha)")" = "$smoke_tag_image" ] \
   || fail "the running container did not come from the version tag"
 
+step "Sprint 077: authentication survives restart and logout revokes it"
+COMPOSE_ENV_FILES="$workdir/auth.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+refused_code="$(curl -sS --max-time 20 -o "$workdir/auth-refused.json" -w '%{http_code}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$refused_code" = "401" ] || fail "auth-on library was not refused before login: $refused_code $(cat "$workdir/auth-refused.json")"
+python3 - "$workdir/auth-refused.json" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], encoding="utf-8") as handle:
+    error = json.load(handle)["error"]
+assert error == {
+    "code": "unauthenticated",
+    "message": "Authentication is required",
+    "details": {},
+}, error
+PY
+login_headers="$workdir/login-headers.txt"
+login_body="$(curl -fsS --max-time 20 -D "$login_headers" -c "$workdir/cookies.txt" \
+  -H 'content-type: application/json' \
+  -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/login")"
+printf '%s' "$login_body" | python3 -c '
+import json, sys
+
+user = json.load(sys.stdin)
+assert user["username"] == "smoke-admin", user
+assert user["is_admin"] is True, user
+' || fail "login did not return the bootstrapped admin: $login_body"
+grep -qi 'Set-Cookie: akasha_session=' "$login_headers" \
+  || fail "login set no session cookie"
+if grep -qi 'Set-Cookie: .*; Secure' "$login_headers"; then
+  fail "plain HTTP login set a Secure cookie that the LAN client cannot return"
+fi
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
+  || fail "the authenticated cookie could not read the library"
+COMPOSE_ENV_FILES="$workdir/auth.env" docker compose down --timeout 10 >/dev/null
+COMPOSE_ENV_FILES="$workdir/auth.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
+  || fail "the database-backed session did not survive restart"
+curl -fsS --max-time 20 -b "$workdir/cookies.txt" -c "$workdir/cookies.txt" \
+  -X DELETE "http://127.0.0.1:${AKASHA_PORT}/api/auth/session" >/dev/null \
+  || fail "logout failed"
+logout_code="$(curl -sS --max-time 20 -o "$workdir/logout-refused.json" -w '%{http_code}' \
+  -b "$workdir/cookies.txt" "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$logout_code" = "401" ] \
+  || fail "the logged-out client could still read the library: $logout_code"
+printf 'anonymous 401; login 200; restart kept session; logout restored 401\n'
+
+step "Sprint 081: the sessions list sees both devices, and revoking one ends only it"
+# The release image must prove the surface Sprint 081 added beside login.
+# The Sprint 077 block above logged its own cookie out, so this block signs in
+# twice as fresh devices first: A (the revoker) and B (the one to be revoked).
+curl -fsS --max-time 20 -c "$workdir/cookies-a.txt" \
+  -H 'content-type: application/json' \
+  -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/login" >/dev/null \
+  || fail "the revoking device could not log in"
+curl -fsS --max-time 20 -c "$workdir/cookies-b.txt" \
+  -H 'content-type: application/json' \
+  -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/login" >/dev/null \
+  || fail "the second device could not log in"
+sessions_body="$(curl -fsS --max-time 20 -b "$workdir/cookies-a.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/sessions")"
+printf '%s' "$sessions_body" | python3 -c '
+import json, sys
+
+sessions = json.load(sys.stdin)
+assert len(sessions) == 2, sessions
+current = [s for s in sessions if s["current"]]
+assert len(current) == 1, sessions
+assert current[0]["user_agent"], sessions
+' || fail "the sessions list did not show both devices with one current: $sessions_body"
+other_id="$(printf '%s' "$sessions_body" | python3 -c '
+import json, sys
+
+for session in json.load(sys.stdin):
+    if not session["current"]:
+        print(session["id"])
+        break
+')"
+curl -fsS --max-time 20 -b "$workdir/cookies-a.txt" \
+  -X DELETE "http://127.0.0.1:${AKASHA_PORT}/api/auth/sessions/$other_id" >/dev/null \
+  || fail "revoking the other device failed"
+revoked_code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
+  -b "$workdir/cookies-b.txt" "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$revoked_code" = "401" ] \
+  || fail "the revoked device could still read the library: $revoked_code"
+curl -fsS --max-time 20 -b "$workdir/cookies-a.txt" \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
+  || fail "revoking another session killed the revoking device's own session"
+printf 'sessions listed both devices; revoking the other ended only it\n'
+
+step "Sprint 081: trusted identity refuses an open boundary and works from its allowlist"
+if COMPOSE_ENV_FILES="$workdir/header-refusal.env" \
+  docker compose up --detach --wait --wait-timeout 20 >/dev/null 2>&1; then
+  fail "the image started with a trusted identity header but no peer allowlist"
+fi
+COMPOSE_ENV_FILES="$workdir/header-refusal.env" \
+  docker compose logs --no-color akasha >"$workdir/header-refusal.txt" 2>&1
+grep -q "authentication bypass" "$workdir/header-refusal.txt" \
+  || fail "the trusted-header refusal did not name the bypass risk: $(cat "$workdir/header-refusal.txt")"
+COMPOSE_ENV_FILES="$workdir/header.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+untrusted_header_code="$(curl -sS --max-time 20 -o "$workdir/untrusted-header.json" \
+  -w '%{http_code}' -H 'Tailscale-User-Login: smoke-admin' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$untrusted_header_code" = "401" ] \
+  || fail "a header from outside the allowlist was not anonymous: $untrusted_header_code"
+header_result="$(COMPOSE_ENV_FILES="$workdir/header.env" docker compose exec -T akasha python -c '
+import json
+from urllib.request import Request, urlopen
+
+request = Request(
+    "http://127.0.0.1:8000/api/entries",
+    headers={"Tailscale-User-Login": "smoke-admin"},
+)
+with urlopen(request, timeout=20) as response:
+    assert response.status == 200, response.status
+    assert json.load(response)["total"] >= 1
+    print(response.headers.get("Set-Cookie", ""))
+')"
+printf '%s' "$header_result" | grep -q 'akasha_session=' \
+  || fail "the allowlisted header created no browser session: $header_result"
+COMPOSE_ENV_FILES="$workdir/header.env" docker compose exec -T akasha python -c '
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+request = Request(
+    "http://127.0.0.1:8000/api/entries",
+    headers={"Tailscale-User-Login": "unknown-tailnet-user@example.invalid"},
+)
+try:
+    urlopen(request, timeout=20)
+except HTTPError as error:
+    assert error.code == 403, error.code
+else:
+    raise AssertionError("unknown trusted identity was admitted")
+' || fail "the default trusted-header policy did not refuse an unknown identity"
+printf 'no allowlist refused startup; untrusted peer 401; allowlisted known identity 200; unknown identity 403\n'
+
 step "Signals: SIGTERM stops the container promptly and cleanly"
 container="$(docker compose ps -q akasha)"
 started="$(date +%s)"
@@ -508,4 +657,6 @@ printf 'container, API persistence across recreation, every emitted chunk served
 printf 'read-only Calibre, an in-container restore, a named-volume restore drill through\n'
 printf 'the documented host-side procedure, backups on their own host disk while /data\n'
 printf 'stayed a named volume, a version-tagged build starting without rebuilding, and\n'
-printf 'a graceful SIGTERM.\n'
+printf 'an auth-on login/restart/logout round-trip on plain HTTP, the sessions list\n'
+printf 'naming both devices with one current and a revoke ending only its target,\n'
+printf 'trusted-header refusal and allowlist paths against the image, and a graceful SIGTERM.\n'

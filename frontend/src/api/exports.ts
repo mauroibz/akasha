@@ -1,4 +1,5 @@
 import { ImportRequestError, responseJson } from "@/api/imports";
+import { request } from "@/api/request";
 
 /**
  * One declared export view, shaped like `ImporterDefinition` pointed the other way
@@ -19,7 +20,7 @@ export interface ExportViewDefinition {
 }
 
 export function getExports() {
-  return fetch("/api/exports").then((response) =>
+  return request("/api/exports").then((response) =>
     responseJson<ExportViewDefinition[]>(response),
   );
 }
@@ -51,7 +52,7 @@ function filenameFrom(response: Response): string {
  * (AC4). The object URL is revoked once the browser has taken the click.
  */
 export async function downloadExport(url: string): Promise<void> {
-  const response = await fetch(url);
+  const response = await request(url);
   if (!response.ok) {
     const value = (await response.json().catch(() => null)) as {
       error?: { code?: string; message?: string; user_message?: string };

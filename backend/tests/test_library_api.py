@@ -25,11 +25,11 @@ async def test_patch_service_refuses_an_unknown_entry_value_naming_the_domain(
 ) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        created = DomainRepository(app.state.engine).create_or_get_entry(
+        created = DomainRepository(app.state.engine, 1).create_or_get_entry(
             title="Unknown value", creators=("Nobody",)
         )
         with pytest.raises(LibraryError) as refused:
-            LibraryService(app.state.engine).update_entry(
+            LibraryService(app.state.engine, 1).update_entry(
                 created.entry_id, {"future_domain_value": "would otherwise be ignored"}
             )
 
@@ -42,7 +42,7 @@ async def test_patch_service_refuses_an_unknown_entry_value_naming_the_domain(
 async def test_entry_item_and_shelf_lifecycle(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         with app.state.engine.begin() as connection:
             connection.execute(
@@ -110,7 +110,7 @@ def test_openapi_describes_static_routes_and_response_contracts(tmp_path: Path) 
 async def test_shelf_entry_counts_and_deletion_retains_entries(tmp_path: Path) -> None:
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
@@ -145,7 +145,7 @@ async def test_get_shelves_carries_covers_in_its_schema(tmp_path: Path) -> None:
     """Sprint 071 deliverable 1: `GET /api/shelves` carries `covers`, over real HTTP."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         created = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         repository.set_cover_path(created.item_id, f"{created.item_id}.jpg")
         async with httpx.AsyncClient(
@@ -169,7 +169,7 @@ async def test_get_shelves_carries_members_by_type_in_its_schema(tmp_path: Path)
     """Sprint 074 deliverable 1: a mixed shelf's domains, over real HTTP."""
     app = create_app(settings(tmp_path))
     async with app.router.lifespan_context(app):
-        repository = DomainRepository(app.state.engine)
+        repository = DomainRepository(app.state.engine, 1)
         book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
         album = repository.create_or_get_entry(
             title="Discovery", creators=("Daft Punk",), item_type="album"
@@ -201,7 +201,7 @@ async def test_get_shelves_carries_members_by_type_in_its_schema(tmp_path: Path)
 
 async def _one_of_each(app: object) -> tuple[int, int]:
     """A book entry and an album entry, returned as (book_entry_id, album_entry_id)."""
-    repository = DomainRepository(app.state.engine)  # type: ignore[attr-defined]
+    repository = DomainRepository(app.state.engine, 1)  # type: ignore[attr-defined]
     book = repository.create_or_get_entry(title="Rayuela", creators=("Julio Cortázar",))
     album = repository.create_or_get_entry(title="Discovery", creators=("Daft Punk",))
     with app.state.engine.begin() as connection:  # type: ignore[attr-defined]
@@ -451,7 +451,7 @@ async def test_the_facets_under_a_domain_filter(tmp_path: Path) -> None:
 
 async def _an_anime(app: object) -> int:
     """One anime entry, whose domain is the only one declaring progress."""
-    repository = DomainRepository(app.state.engine)  # type: ignore[attr-defined]
+    repository = DomainRepository(app.state.engine, 1)  # type: ignore[attr-defined]
     anime = repository.create_or_get_entry(title="Black Clover", creators=("Studio Pierrot",))
     with app.state.engine.begin() as connection:  # type: ignore[attr-defined]
         connection.execute(
@@ -549,3 +549,110 @@ async def test_a_count_above_the_total_is_stored_rather_than_refused(tmp_path: P
 
     assert beyond.status_code == 200
     assert beyond.json()["progress"] == 200
+
+
+def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
+    """Sprint 082: the routes the specs document are exactly what is served.
+
+    The isolation suite already pins every route to an isolation policy; this
+    test pins the *documented* surface — the technical spec's route list is
+    rewritten this sprint, and a route that drifts between the spec and the
+    router is a spec bug by definition. The authority is the live router.
+    """
+    from fastapi.routing import APIRoute
+
+    from book_tracker.config import Settings
+
+    configured = Settings(
+        data_dir=tmp_path / "data",
+        user_agent_contact="test@example.invalid",
+        auth="on",
+    )
+    app = create_app(configured)
+    served = {
+        (method, route.path)
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and route.path.startswith("/api/")
+        and route.name != "missing_api"
+        for method in route.methods or set()
+    }
+    # The auth surface exists in the contract in both modes (auth-off answers
+    # 404 at runtime); the rest of the application surface is mode-independent.
+    auth_off = create_app(
+        Settings(data_dir=tmp_path / "data2", user_agent_contact="t@example.invalid")
+    )
+    served_off = {
+        (method, route.path)
+        for route in auth_off.routes
+        if isinstance(route, APIRoute)
+        and route.path.startswith("/api/")
+        and route.name != "missing_api"
+        for method in route.methods or set()
+    }
+    assert served == served_off, "auth-on and auth-off must publish the same contract"
+
+    expected = {
+        ("GET", "/api/health/live"),
+        ("GET", "/api/health/ready"),
+        ("GET", "/api/health/providers"),
+        ("POST", "/api/auth/login"),
+        ("DELETE", "/api/auth/session"),
+        ("GET", "/api/auth/sessions"),
+        ("DELETE", "/api/auth/sessions"),
+        ("DELETE", "/api/auth/sessions/{session_id}"),
+        ("GET", "/api/auth/me"),
+        ("POST", "/api/auth/setup"),
+        ("PATCH", "/api/auth/password"),
+        ("POST", "/api/auth/act-as/{user_id}"),
+        ("DELETE", "/api/auth/act-as"),
+        ("GET", "/api/users"),
+        ("POST", "/api/users"),
+        ("PATCH", "/api/users/{user_id}"),
+        ("DELETE", "/api/users/{user_id}"),
+        ("GET", "/api/entries"),
+        ("GET", "/api/insights"),
+        ("GET", "/api/insights/scores"),
+        ("POST", "/api/entries"),
+        ("PATCH", "/api/entries/bulk"),
+        ("POST", "/api/entries/accept-suggested"),
+        ("GET", "/api/entries/{entry_id}"),
+        ("PATCH", "/api/entries/{entry_id}"),
+        ("DELETE", "/api/entries/{entry_id}"),
+        ("GET", "/api/items/{item_id}"),
+        ("PATCH", "/api/items/{item_id}"),
+        ("GET", "/api/item-types"),
+        ("GET", "/api/items/{item_id}/cover"),
+        ("GET", "/api/items/{item_id}/cover-candidates"),
+        ("POST", "/api/items/{item_id}/cover"),
+        ("GET", "/api/items/{item_id}/attachments"),
+        ("POST", "/api/items/{item_id}/attachments"),
+        ("GET", "/api/items/{item_id}/attachments/{attachment_id}"),
+        ("PATCH", "/api/items/{item_id}/attachments/{attachment_id}"),
+        ("DELETE", "/api/items/{item_id}/attachments/{attachment_id}"),
+        ("POST", "/api/items/{item_id}/refresh"),
+        ("POST", "/api/items/{item_id}/cover/fetch"),
+        ("GET", "/api/shelves"),
+        ("POST", "/api/shelves"),
+        ("PATCH", "/api/shelves/{shelf_id}"),
+        ("DELETE", "/api/shelves/{shelf_id}"),
+        ("GET", "/api/search/resolve"),
+        ("GET", "/api/search/preview"),
+        ("GET", "/api/search"),
+        ("POST", "/api/import/{importer_name}/preview"),
+        ("POST", "/api/import/{importer_name}/plan"),
+        ("POST", "/api/import/{importer_name}/batches/{batch_id}/files"),
+        ("GET", "/api/import/{importer_name}/browse"),
+        ("POST", "/api/import/{importer_name}/commit"),
+        ("GET", "/api/import/jobs/{job_id}"),
+        ("DELETE", "/api/import/batches/{batch_id}"),
+        ("GET", "/api/importers"),
+        ("POST", "/api/enrichment/backfill"),
+        ("GET", "/api/export"),
+        ("GET", "/api/exports"),
+        ("GET", "/api/export/{view}"),
+    }
+    assert served == expected, (
+        f"routes on the router but not documented: {sorted(served - expected)}; "
+        f"documented but not served: {sorted(expected - served)}"
+    )

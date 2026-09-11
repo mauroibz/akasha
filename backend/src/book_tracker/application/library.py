@@ -132,9 +132,12 @@ class LibraryError(Exception):
 
 
 class LibraryService:
-    def __init__(self, engine: Engine, user_id: int = 1) -> None:
+    def __init__(
+        self, engine: Engine, user_id: int, *, item_access_requires_entry: bool = False
+    ) -> None:
         self.engine = engine
         self.user_id = user_id
+        self.item_access_requires_entry = item_access_requires_entry
 
     @contextmanager
     def _write(self) -> Iterator[Session]:
@@ -160,7 +163,15 @@ class LibraryService:
         return entry
 
     def _item(self, session: Session, item_id: int) -> ItemRow:
-        item = session.get(ItemRow, item_id)
+        # Items are a shared metadata cache, but a request reaches one only
+        # through its own entry. Sharing the row avoids duplicate metadata and
+        # files; it does not make another person's catalogue enumerable by id.
+        query = select(ItemRow).where(ItemRow.id == item_id)
+        if self.item_access_requires_entry:
+            query = query.join(EntryRow, EntryRow.item_id == ItemRow.id).where(
+                EntryRow.user_id == self.user_id
+            )
+        item = session.scalar(query)
         if item is None:
             raise LibraryError("item_not_found", "Item was not found", status_code=404)
         return item
@@ -474,6 +485,7 @@ class LibraryService:
         if cleaned is None:
             raise LibraryError("invalid_attachment_name", "A file needs a name", status_code=422)
         with self._write() as session:
+            self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
                     AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
@@ -491,6 +503,7 @@ class LibraryService:
     def get_attachment(self, item_id: int, attachment_id: int) -> dict[str, Any]:
         """Scoped by item on purpose: an id alone must not reach another item's file."""
         with Session(self.engine) as session:
+            self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
                     AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
@@ -505,6 +518,7 @@ class LibraryService:
     def delete_attachment(self, item_id: int, attachment_id: int, *, data_dir: Path) -> None:
         """Drop the row, then the blob only if no other row still points at it."""
         with self._write() as session:
+            self._item(session, item_id)
             row = session.execute(
                 select(AttachmentRow).where(
                     AttachmentRow.id == attachment_id, AttachmentRow.item_id == item_id
@@ -1450,7 +1464,20 @@ class LibraryService:
             filters.get("format", []),
         )
         if excluded_entry_ids:
-            query = query.where(EntryRow.id.not_in(excluded_entry_ids))
+            unique_exclusions = set(excluded_entry_ids)
+            owned_exclusions = set(
+                session.scalars(
+                    select(EntryRow.id).where(
+                        EntryRow.user_id == self.user_id,
+                        EntryRow.id.in_(unique_exclusions),
+                    )
+                )
+            )
+            if owned_exclusions != unique_exclusions:
+                raise LibraryError(
+                    "entry_not_found", "One or more entries were not found", status_code=404
+                )
+            query = query.where(EntryRow.id.not_in(unique_exclusions))
         return list(session.scalars(query))
 
     def bulk_update(

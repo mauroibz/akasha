@@ -1,4 +1,5 @@
 import type { EntryStatus, LibraryEntry } from "./library";
+import { request } from "./request";
 
 export interface SourceRef {
   source: string;
@@ -35,7 +36,7 @@ export async function previewCandidate(
   signal?: AbortSignal,
 ): Promise<SearchCandidate> {
   const params = new URLSearchParams({ source, source_id: sourceId });
-  const response = await fetch(`/api/search/preview?${params.toString()}`, {
+  const response = await request(`/api/search/preview?${params.toString()}`, {
     headers: { Accept: "application/json" },
     signal,
   });
@@ -81,15 +82,16 @@ export function searchCandidates(
   const route = resolved
     ? `/api/search/resolve?url=${encodeURIComponent(value.trim())}`
     : `/api/search?q=${encodeURIComponent(value.trim())}&type=${encodeURIComponent(itemType)}`;
-  return fetch(route, { headers: { Accept: "application/json" }, signal }).then(
-    async (response) => ({
-      items: await json<SearchCandidate[]>(
-        response,
-        "Metadata providers are unavailable",
-      ),
-      warning: response.headers.get("X-Provider-Warning"),
-    }),
-  );
+  return request(route, {
+    headers: { Accept: "application/json" },
+    signal,
+  }).then(async (response) => ({
+    items: await json<SearchCandidate[]>(
+      response,
+      "Metadata providers are unavailable",
+    ),
+    warning: response.headers.get("X-Provider-Warning"),
+  }));
 }
 export { getShelves, createShelf } from "./shelves";
 export function createEntry(body: {
@@ -103,7 +105,7 @@ export function createEntry(body: {
   idempotency_key?: string;
   confirm_near_match?: boolean;
 }) {
-  return fetch("/api/entries", {
+  return request("/api/entries", {
     method: "POST",
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(body),

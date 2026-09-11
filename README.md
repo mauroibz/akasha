@@ -34,9 +34,12 @@ enjoy, but today it supports Books, Albums, Anime, Movies and Series. See
 [Domains](#domains-and-stack) for more info.
 
 > [!WARNING]
-> **v1 has no authentication of any kind.** Anyone who can reach the port can read
-> and change everything. Run it on a trusted LAN, never on the public internet.
-> See [SECURITY.md](SECURITY.md) for the full threat model.
+> **Authentication is off by default.** Anyone who can reach the port can read
+> and change everything. Run it on a trusted LAN, never on the public
+> internet. To expose it beyond the LAN, turn `AKASHA_AUTH=on`, terminate TLS
+> in front, and set the session cookie `Secure` — see
+> [SECURITY.md](SECURITY.md) and [the operator runbook](docs/operations/runbook.md#turning-authentication-on)
+> for the full contract.
 
 ## What it does
 
@@ -44,6 +47,11 @@ enjoy, but today it supports Books, Albums, Anime, Movies and Series. See
 (Open Library, Google Books, MusicBrainz, AniList and Kitsu) to find any piece of media you are
 thinking of.
 Paste a URL or an ISBN and it resolves that instead of guessing.
+- **Optional accounts.** Off by default, one shared library, no login. Turn
+`AKASHA_AUTH=on` and you get a first-run setup screen, per-user libraries,
+sign-in that lasts 400 days, a sessions list to revoke a lost device, and an
+admin who can look after accounts. See
+[the runbook](docs/operations/runbook.md#turning-authentication-on).
 - **Record your opinion.** Give it a score out of ten, leave notes if you have them.
 Did you drop the book halfway through? Do you want to buy this album in vinyl some day?
 Add your item to a shelf and give it a status.
@@ -161,6 +169,7 @@ and never reaches the process.
 | Variable               | Default          | What it does                                                                               |
 | ---------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
 | `USER_AGENT_CONTACT`   | *required*       | Contact address sent to metadata providers                                                 |
+| `AKASHA_AUTH`          | `off`            | `on` turns on accounts, per-user libraries and login — the runbook's [auth section](docs/operations/runbook.md#turning-authentication-on) is the guide |
 | `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
 | `TMDB_READ_TOKEN`     | *empty*          | Optional. The movie domain's poster fallback for films with a TMDB id and no IMDb id       |
 | `AKASHA_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |

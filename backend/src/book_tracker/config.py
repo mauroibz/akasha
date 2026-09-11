@@ -1,6 +1,7 @@
 from pathlib import Path
+from typing import Literal
 
-from pydantic import Field, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -33,8 +34,9 @@ class Settings(BaseSettings):
     # Per-file cap on attachments (DEC-048). Configuration rather than code, like the
     # provider budgets above: 25 MB admits an epub, a PDF scan or a comic issue while
     # refusing the audiobook and video rips that would turn this into a media server.
-    # It bounds the worst single file, not the total — with no auth, anyone on the LAN
-    # can still fill the disk, which is a property of v1 being LAN-only.
+    # It bounds the worst single file, not the total — with auth off, anyone on the
+    # LAN can still fill the disk, and per-user quotas are deliberately not a thing
+    # (DEC-146 §4) even with it on.
     attachment_max_bytes: int = 25 * 1024 * 1024
     # Below this much free space on the data volume, a write that would grow the
     # disk refuses before it starts rather than failing partway through (Sprint
@@ -44,7 +46,34 @@ class Settings(BaseSettings):
     # mode this guards against is running out entirely, not running low.
     min_free_bytes: int = 500 * 1024 * 1024
     sqlite_busy_timeout_ms: int = 5_000
+    # Authentication is opt-in so every existing install remains unchanged.
+    auth: Literal["off", "on"] = "off"
+    cookie_secure: bool | None = None
+    # Shared with Sprint 081's trusted identity header: a forwarded scheme is
+    # authoritative only when the immediate peer is explicitly trusted.
+    trusted_proxy_peers: list[str] = Field(default_factory=list)
+    trusted_proxy_header: str | None = None
+    trusted_header_autocreate: bool = False
+    login_max_failures: int = Field(default=5, ge=1)
+    login_window_seconds: int = Field(default=300, ge=1)
+    admin_username: str | None = None
+    admin_password: SecretStr | None = None
     static_dir: Path | None = None
+
+    @model_validator(mode="after")
+    def validate_admin_bootstrap(self) -> "Settings":
+        if (self.admin_username is None) != (self.admin_password is None):
+            raise ValueError("AKASHA_ADMIN_USERNAME and AKASHA_ADMIN_PASSWORD must be set together")
+        return self
+
+    @model_validator(mode="after")
+    def validate_trusted_identity_boundary(self) -> "Settings":
+        if self.auth == "on" and self.trusted_proxy_header and not self.trusted_proxy_peers:
+            raise ValueError(
+                "AKASHA_TRUSTED_PROXY_HEADER requires AKASHA_TRUSTED_PROXY_PEERS; "
+                "otherwise any direct caller could turn it into an authentication bypass"
+            )
+        return self
 
     @model_validator(mode="after")
     def derive_database_url(self) -> "Settings":

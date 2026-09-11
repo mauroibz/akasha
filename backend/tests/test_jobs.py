@@ -436,7 +436,7 @@ class TestUndo:
         entry_id = _create_entry(engine, item_id, "read", 8)
         _add_create_effect(engine, batch_id, 1, "item", item_id)
         _add_create_effect(engine, batch_id, 1, "entry", entry_id)
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         result = undo.undo(batch_id)
         assert result["reverted_entries"] >= 1
         assert result["reverted_items"] >= 1
@@ -466,7 +466,7 @@ class TestUndo:
                 {"iid": item_id, "sha": "a" * 64},
             )
 
-        result = UndoService(engine).undo(batch_id)
+        result = UndoService(engine, user_id=1).undo(batch_id)
 
         assert result["retained_items"] >= 1
         with engine.connect() as conn:
@@ -490,7 +490,7 @@ class TestUndo:
         attachment_id = _attach(engine, item_id, "book.epub", blob.sha256, blob.byte_size)
         _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
 
-        result = UndoService(engine, data_dir=tmp_path).undo(batch_id)
+        result = UndoService(engine, user_id=1, data_dir=tmp_path).undo(batch_id)
 
         assert result["reverted_items"] >= 1
         with engine.connect() as conn:
@@ -511,7 +511,7 @@ class TestUndo:
         _attach(engine, other_id, "book.epub", blob.sha256, blob.byte_size)
         _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
 
-        UndoService(engine, data_dir=tmp_path).undo(batch_id)
+        UndoService(engine, user_id=1, data_dir=tmp_path).undo(batch_id)
 
         with engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM attachments")) == 1
@@ -528,7 +528,7 @@ class TestUndo:
         attachment_id = _attach(engine, item_id, "My copy.epub", blob.sha256, blob.byte_size)
         _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
 
-        result = UndoService(engine, data_dir=tmp_path).undo(batch_id)
+        result = UndoService(engine, user_id=1, data_dir=tmp_path).undo(batch_id)
 
         assert result["retained_items"] >= 1
         with engine.connect() as conn:
@@ -546,7 +546,7 @@ class TestUndo:
         attachment_id = _attach(engine, item_id, "book.epub", blob.sha256, blob.byte_size)
         _add_attachment_effect(engine, batch_id, attachment_id, item_id, "book.epub", blob.sha256)
 
-        undo = UndoService(engine, data_dir=tmp_path)
+        undo = UndoService(engine, user_id=1, data_dir=tmp_path)
         undo.undo(batch_id)
         again = undo.undo(batch_id)
 
@@ -562,7 +562,7 @@ class TestUndo:
         _add_create_effect(engine, batch_id, 1, "item", item_id)
         _add_create_effect(engine, batch_id, 1, "entry", entry_id)
 
-        UndoService(engine).undo(batch_id)
+        UndoService(engine, user_id=1).undo(batch_id)
 
         with engine.connect() as conn:
             assert conn.scalar(text("SELECT count(*) FROM items")) == 0
@@ -578,7 +578,7 @@ class TestUndo:
         # User later edited the year to 1950
         with engine.begin() as conn:
             conn.execute(text("UPDATE items SET year=1950 WHERE id=:id"), {"id": item_id})
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         result = undo.undo(batch_id)
         assert result["retained"] >= 1
         with engine.connect() as conn:
@@ -595,7 +595,7 @@ class TestUndo:
         _create_entry(engine, item_id, "read", 7)
         # Batch filled year on this existing item (no create effect)
         _add_fill_empty_effect(engine, batch_id, 1, "item", str(item_id), "year", None, 2000)
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         result = undo.undo(batch_id)
         # Year should be reverted (current 2000 matches after 2000)
         assert result["reverted"] >= 1
@@ -612,7 +612,7 @@ class TestUndo:
         _create_entry(engine, item_id, "read", 9)
         # Batch only filled year on this pre-existing item
         _add_fill_empty_effect(engine, batch_id, 1, "item", str(item_id), "year", None, 2000)
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         result = undo.undo(batch_id)
         assert result["reverted_entries"] == 0
         with engine.connect() as conn:
@@ -640,7 +640,7 @@ class TestUndoReporting:
         # User edited year to 1950 after import
         with engine.begin() as conn:
             conn.execute(text("UPDATE items SET year=1950 WHERE id=:id"), {"id": item_id})
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         result = undo.undo(batch_id)
         assert "reverted" in result
         assert "retained" in result
@@ -679,7 +679,7 @@ class TestUndoReporting:
                 text("UPDATE items SET creator_sort_override=:v WHERE id=:id"),
                 {"v": "Borges Acevedo, Jorge Luis", "id": corrected},
             )
-        UndoService(engine).undo(batch_id)
+        UndoService(engine, user_id=1).undo(batch_id)
         with engine.connect() as conn:
             values = conn.execute(
                 text("SELECT id, creator_sort_override FROM items ORDER BY id")
@@ -696,7 +696,7 @@ class TestUndoReporting:
         entry_id = _create_entry(engine, item_id, "unsorted")
         _add_create_effect(engine, batch_id, 1, "item", item_id)
         _add_create_effect(engine, batch_id, 1, "entry", entry_id)
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         undo.undo(batch_id)
         second = undo.undo(batch_id)
         assert second["reverted"] == 0
@@ -722,7 +722,7 @@ class TestUndoReporting:
                     "now": now.isoformat().replace("+00:00", "Z"),
                 },
             )
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         with pytest.raises(UndoExpiredError):
             undo.undo("expired-1")
 
@@ -741,7 +741,7 @@ class TestLateJobCancellation:
         job_id = repo.enqueue(
             batch_id, "enrich_item", {"item_id": item_id, "isbn": "9780141187761"}
         )
-        undo = UndoService(engine)
+        undo = UndoService(engine, user_id=1)
         undo.undo(batch_id)
         with Session(engine) as session:
             job = session.get(JobRow, job_id)

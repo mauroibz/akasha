@@ -1,4 +1,5 @@
 import type { BundleMember } from "@/features/import/bundle";
+import { request } from "@/api/request";
 
 export interface ImportRecord {
   record_id: number;
@@ -179,13 +180,13 @@ export async function responseJson<T>(response: Response): Promise<T> {
 }
 
 export function getImporters() {
-  return fetch("/api/importers").then((response) =>
+  return request("/api/importers").then((response) =>
     responseJson<ImporterDefinition[]>(response),
   );
 }
 
 export function browseImportSource(importerId: string, path: string) {
-  return fetch(
+  return request(
     `/api/import/${encodeURIComponent(importerId)}/browse?path=${encodeURIComponent(path)}`,
   ).then((response) => responseJson<ImportBrowseListing>(response));
 }
@@ -229,7 +230,7 @@ export function planImport(
       })),
     ),
   );
-  return fetch(`/api/import/${encodeURIComponent(importer.id)}/plan`, {
+  return request(`/api/import/${encodeURIComponent(importer.id)}/plan`, {
     method: "POST",
     body: form,
   }).then((response) => responseJson<ImportPlanResult>(response));
@@ -261,7 +262,7 @@ export function previewImport(
       form.append(spec.field, member.file, member.path);
     }
     if (chosen) form.append("targets", chosen.join(","));
-    return fetch(url, { method: "POST", body: form }).then((response) =>
+    return request(url, { method: "POST", body: form }).then((response) =>
       responseJson<ImportPreview>(response),
     );
   }
@@ -272,7 +273,7 @@ export function previewImport(
     for (const file of source as File[])
       form.append(spec.field, file, file.name);
     if (chosen) form.append("targets", chosen.join(","));
-    return fetch(url, { method: "POST", body: form }).then((response) =>
+    return request(url, { method: "POST", body: form }).then((response) =>
       responseJson<ImportPreview>(response),
     );
   }
@@ -280,11 +281,11 @@ export function previewImport(
     const form = new FormData();
     form.append(spec.field, source as File);
     if (chosen) form.append("targets", chosen.join(","));
-    return fetch(url, { method: "POST", body: form }).then((response) =>
+    return request(url, { method: "POST", body: form }).then((response) =>
       responseJson<ImportPreview>(response),
     );
   }
-  return fetch(url, {
+  return request(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -299,7 +300,7 @@ export function commitImport(
   batchId: string,
   choices: Array<{ record_id: number; item_id: number | null }>,
 ) {
-  return fetch(`/api/import/${encodeURIComponent(importerId)}/commit`, {
+  return request(`/api/import/${encodeURIComponent(importerId)}/commit`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ batch_id: batchId, choices }),
@@ -323,20 +324,20 @@ export function uploadImportFile(
   const form = new FormData();
   form.append("path", member.path);
   form.append("file", member.file, member.path);
-  return fetch(
+  return request(
     `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/files`,
     { method: "POST", body: form },
   ).then((response) => responseJson<ImportFileResult>(response));
 }
 
 export function getJobProgress(jobId: string) {
-  return fetch(`/api/import/jobs/${jobId}`).then((response) =>
+  return request(`/api/import/jobs/${jobId}`).then((response) =>
     responseJson<JobProgress>(response),
   );
 }
 
 export function undoBatch(batchId: string) {
-  return fetch(`/api/import/batches/${batchId}`, {
+  return request(`/api/import/batches/${batchId}`, {
     method: "DELETE",
   }).then((response) => responseJson<UndoResult>(response));
 }
