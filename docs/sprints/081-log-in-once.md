@@ -173,5 +173,27 @@ to list or revoke sessions from a screen.
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs,
-deviations/decisions, and impact on every future sprint._
+_In progress. Implementation and automated verification are complete; the real-tailnet walkthrough
+and the full 10,000-entry benchmark remain open._
+
+- Trusted-proxy authentication is implemented behind an explicit header plus peer allowlist. An
+  untrusted peer's header is stripped, an unknown identity is refused unless autocreate is enabled,
+  password login remains available, and auth-off leaves the feature inert. The runtime refuses an
+  auth-on configuration that trusts a header without bounded peers. Commits: `20d2771`, `3d65463`,
+  `c661c9d`, `3e365c6`.
+- Sessions refresh at most once per day and slide expiry to a maximum 400-day forward horizon;
+  requests inside the interval do not write. Users can list and revoke only their own sessions,
+  identify the current one, and sign out everywhere. The responsive account UI includes the same
+  controls. Commits: `e2fbe0c`, `c608c87`, `cf2731e`.
+- The OpenAPI contract includes the session routes (`1916e9d`), and the new Python was formatted
+  without behavior changes (`cba775c`). DEC-153 records the refresh horizon and identity precedence.
+- Frozen automated gates passed: `make check`; `make test` (1,473 backend and 325 frontend tests);
+  full Playwright (140 tests); OpenAPI export and consumer check; and `make smoke-container`, whose
+  real image proved startup refusal, untrusted-peer rejection, allowlisted known-user success with
+  a cookie, and unknown-user refusal. The smoke target owns its disposable Docker-volume lifecycle.
+- A 50-entry benchmark probe measured session lookup p95 at 0.18 ms, zero writes inside the daily
+  interval, and one write after it. The required default 10,000-entry benchmark was interrupted
+  before its result and must be rerun; no result is claimed.
+- Remaining completion gate: Mauro must exercise the configured container through real Tailscale
+  Serve from a tailnet phone and a non-tailnet device, then sign out everywhere and confirm the
+  desktop session ends. A mocked identity header is not a substitute for that evidence.

@@ -6196,3 +6196,21 @@ only the file-Status flip and state regeneration.
   private ids. Sprint 081 can create, list and revoke the administrator's real session unchanged;
   Sprint 082 must document migration `0021`, both act-as routes, the banner and the audit contract
   as delivered behavior.
+
+## DEC-153 — Active sessions renew on a bounded forward horizon
+
+- **Date:** 2026-09-10
+- **Status:** accepted
+- **Cross-references:** DEC-149 (session identity), Sprint 081.
+- **Context:** Sprint 081 requires a regularly used session not to expire, caps expiry at 400 days,
+  and forbids a database write on every authenticated request. An absolute cap measured from the
+  original creation time cannot coexist with indefinite renewal for an active session.
+- **Decision.** A successful lookup made at least one day after `last_seen_at` advances both
+  `last_seen_at` and `expires_at`; the new expiry is at most 400 days from that lookup. Lookups
+  inside the daily interval do not write. `created_at` remains immutable audit data. A valid cookie
+  takes precedence over trusted-header fallback, so act-as state and explicit password login remain
+  stable even when the proxy injects an identity header.
+- **Consequences.** A regularly used session can outlive 400 days from its original creation but
+  never carries more than 400 days of remaining validity. An unused session expires. Session-list
+  activity can lag by less than one day, in exchange for at most one refresh write per active
+  device per day. Sprint 082 must document the forward-horizon interpretation.

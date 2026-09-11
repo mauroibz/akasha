@@ -5353,3 +5353,26 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   primary documentation, extend the existing trusted-peer helper, slide session expiry in batches,
   and add self-service session listing/revocation. Its final phone/tailnet walkthrough requires the
   owner's real network; do not substitute a mocked header for that evidence.
+
+## 2026-09-10 — Sprint 081 implementation frozen; external walkthrough remains
+
+- Done: implemented trusted-peer identity-header login with safe startup validation and optional
+  non-admin autocreation; daily-batched sliding sessions; self-service session listing, revocation
+  and sign-out-everywhere; responsive phone-safe account/login controls; published session API
+  contract; and real-image proxy-boundary smoke coverage. Nine commits run from `20d2771` through
+  `cba775c`.
+- Verified and how: `make check` passed; `make test` passed 1,473 backend and 325 frontend tests;
+  full Playwright passed 140; OpenAPI producer/consumer checks passed; and `make smoke-container`
+  proved the proxy allowlist refusal/success paths against the built image and cleaned its own
+  disposable Docker resources. A 50-entry probe measured 0.18 ms session lookup p95, zero writes
+  within the refresh interval and one after it.
+- Interrupted: the default 10,000-entry `scripts/benchmark_library.py` run was stopped before it
+  produced a result when the owner asked to close up. It must be rerun and recorded; no process or
+  Docker resource was left running.
+- Remaining gate: use Mauro's real Tailscale Serve and phone to confirm zero-tap tailnet login,
+  rejection outside the tailnet, and desktop invalidation after phone sign-out-everywhere. Sprint
+  081 stays `in_progress`; do not advance the pointer or substitute the mocked-header smoke test.
+- Decision/deviation: DEC-153 resolves the internally incompatible wording by treating 400 days as
+  the maximum forward validity after a batched refresh, while preserving immutable creation time.
+- Next: rerun the full benchmark, collect the owner-only walkthrough evidence, reconcile Sprint
+  082 and canonical docs as required, then close Sprint 081 atomically if both gates pass.
