@@ -101,6 +101,30 @@ describe("authentication routing", () => {
     expect(screen.queryByRole("navigation", { name: "Primary" })).toBeNull();
   });
 
+  it("keeps password login available when a proxy identity is unknown", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({
+              error: {
+                code: "unknown_proxy_identity",
+                message: "This proxy identity is not allowed to use Akasha",
+                details: {},
+              },
+            }),
+            { status: 403 },
+          ),
+      ),
+    );
+
+    renderApp("/");
+
+    expect(await screen.findByLabelText("Username")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Sign in" })).toBeVisible();
+  });
+
   it("keeps auth off invisible and redirects its auth addresses home", async () => {
     vi.stubGlobal(
       "fetch",

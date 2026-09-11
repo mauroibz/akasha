@@ -117,6 +117,25 @@ export async function getAuthState(): Promise<AuthState> {
       acting_as: null,
     };
   }
+  if (response.status === 403) {
+    const body = (await response
+      .clone()
+      .json()
+      .catch(() => null)) as {
+      error?: { code?: string };
+    } | null;
+    if (body?.error?.code === "unknown_proxy_identity") {
+      // A proxy identity that Akasha does not know is refused, but password
+      // login remains the operator's independent way in.
+      return {
+        auth: "on",
+        authenticated: false,
+        setup_required: false,
+        user: null,
+        acting_as: null,
+      };
+    }
+  }
   return authJson<AuthState>(response);
 }
 
