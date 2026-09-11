@@ -312,7 +312,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha", version="1.8.0", lifespan=lifespan)
+    app = FastAPI(title="Akasha", version="2.0.0", lifespan=lifespan)
     # Available before lifespan for route inspection; requests still run only
     # after lifespan has installed the engine and session store dependencies.
     app.state.auth = configured.auth
