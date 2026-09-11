@@ -66,6 +66,8 @@ smoke_tag="smoke-$$"
 #   no-contact.env  example.env minus USER_AGENT_CONTACT: must refuse to start
 printf 'AKASHA_ATTACHMENT_MAX_BYTES=1024\nAKASHA_SQLITE_BUSY_TIMEOUT_MS=12000\nTMDB_READ_TOKEN=token-for-smoke\n' > "$workdir/smoke.env"
 printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\n' > "$workdir/auth.env"
+printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\nAKASHA_TRUSTED_PROXY_HEADER=Tailscale-User-Login\n' > "$workdir/header-refusal.env"
+printf 'USER_AGENT_CONTACT=smoke@example.invalid\nAKASHA_AUTH=on\nAKASHA_ADMIN_USERNAME=smoke-admin\nAKASHA_ADMIN_PASSWORD=smoke-only-password\nAKASHA_TRUSTED_PROXY_HEADER=Tailscale-User-Login\nAKASHA_TRUSTED_PROXY_PEERS=["127.0.0.1"]\n' > "$workdir/header.env"
 : > "$workdir/bare.env"
 printf 'USER_AGENT_CONTACT=%s\nTZ=UTC\n' "$USER_AGENT_CONTACT" > "$workdir/defaults.env"
 cp .env.example "$workdir/example.env"
@@ -526,6 +528,54 @@ logout_code="$(curl -sS --max-time 20 -o "$workdir/logout-refused.json" -w '%{ht
   || fail "the logged-out client could still read the library: $logout_code"
 printf 'anonymous 401; login 200; restart kept session; logout restored 401\n'
 
+step "Sprint 081: trusted identity refuses an open boundary and works from its allowlist"
+if COMPOSE_ENV_FILES="$workdir/header-refusal.env" \
+  docker compose up --detach --wait --wait-timeout 20 >/dev/null 2>&1; then
+  fail "the image started with a trusted identity header but no peer allowlist"
+fi
+COMPOSE_ENV_FILES="$workdir/header-refusal.env" \
+  docker compose logs --no-color akasha >"$workdir/header-refusal.txt" 2>&1
+grep -q "authentication bypass" "$workdir/header-refusal.txt" \
+  || fail "the trusted-header refusal did not name the bypass risk: $(cat "$workdir/header-refusal.txt")"
+COMPOSE_ENV_FILES="$workdir/header.env" docker compose up --detach --wait=false >/dev/null
+wait_healthy
+untrusted_header_code="$(curl -sS --max-time 20 -o "$workdir/untrusted-header.json" \
+  -w '%{http_code}' -H 'Tailscale-User-Login: smoke-admin' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+[ "$untrusted_header_code" = "401" ] \
+  || fail "a header from outside the allowlist was not anonymous: $untrusted_header_code"
+header_result="$(COMPOSE_ENV_FILES="$workdir/header.env" docker compose exec -T akasha python -c '
+import json
+from urllib.request import Request, urlopen
+
+request = Request(
+    "http://127.0.0.1:8000/api/entries",
+    headers={"Tailscale-User-Login": "smoke-admin"},
+)
+with urlopen(request, timeout=20) as response:
+    assert response.status == 200, response.status
+    assert json.load(response)["total"] >= 1
+    print(response.headers.get("Set-Cookie", ""))
+')"
+printf '%s' "$header_result" | grep -q 'akasha_session=' \
+  || fail "the allowlisted header created no browser session: $header_result"
+COMPOSE_ENV_FILES="$workdir/header.env" docker compose exec -T akasha python -c '
+from urllib.error import HTTPError
+from urllib.request import Request, urlopen
+
+request = Request(
+    "http://127.0.0.1:8000/api/entries",
+    headers={"Tailscale-User-Login": "unknown-tailnet-user@example.invalid"},
+)
+try:
+    urlopen(request, timeout=20)
+except HTTPError as error:
+    assert error.code == 403, error.code
+else:
+    raise AssertionError("unknown trusted identity was admitted")
+' || fail "the default trusted-header policy did not refuse an unknown identity"
+printf 'no allowlist refused startup; untrusted peer 401; allowlisted known identity 200; unknown identity 403\n'
+
 step "Signals: SIGTERM stops the container promptly and cleanly"
 container="$(docker compose ps -q akasha)"
 started="$(date +%s)"
@@ -562,4 +612,5 @@ printf 'container, API persistence across recreation, every emitted chunk served
 printf 'read-only Calibre, an in-container restore, a named-volume restore drill through\n'
 printf 'the documented host-side procedure, backups on their own host disk while /data\n'
 printf 'stayed a named volume, a version-tagged build starting without rebuilding, and\n'
-printf 'an auth-on login/restart/logout round-trip on plain HTTP, and a graceful SIGTERM.\n'
+printf 'an auth-on login/restart/logout round-trip on plain HTTP, trusted-header refusal and\n'
+printf 'allowlist paths against the image, and a graceful SIGTERM.\n'
