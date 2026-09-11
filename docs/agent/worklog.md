@@ -5376,3 +5376,34 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   the maximum forward validity after a batched refresh, while preserving immutable creation time.
 - Next: rerun the full benchmark, collect the owner-only walkthrough evidence, reconcile Sprint
   082 and canonical docs as required, then close Sprint 081 atomically if both gates pass.
+
+## 2026-09-11 — Sprint 081 closed (complete): benchmark rerun, walkthrough waived by the owner
+
+- Done: reran the interrupted default 10,000-entry `scripts/benchmark_library.py` to completion and
+  closed Sprint 081 on its evidence. No runtime code changed this session; the diff is
+  documentation/state only (sprint Outcome, DEC-154, ROADMAP active-sprint line and 081 delivered
+  marker, worklog, HANDOFF, state flip to 082 ready). Also repaired a drifting ROADMAP line: the
+  "Active sprint" header still read 077 because the 078–080 closers never touched it.
+- Verified and how: the benchmark ran in full
+  (`cd backend && UV_CACHE_DIR=/tmp/akasha-uv-cache uv run python ../scripts/benchmark_library.py`,
+  ~33 s). Session refresh at 10,000 entries: lookup p95 0.09 ms over 25 lookups, 0 writes inside
+  the 1-day interval, 1 write after it — DEC-153's batching contract holds at scale. Every
+  first-library-page scenario inside the 500 ms budget (worst contended p95 147.8 ms, idle
+  67.9 ms). Fresh-scale observation recorded in DEC-154 for the roadmap, not this sprint: three
+  contended insights scenarios exceed 500 ms p95 at 10k entries/200 jobs (worst
+  `publisher/count` 1234.8 ms); the spec budget binds the first library page, and this sprint's
+  diff touches nothing on the insights path. The owner's deployment reality was measured, not
+  assumed: no tailscaled on `comma` or the ZimaBoard (192.168.100.240, whose overlay is ZeroTier);
+  the board still runs the 1.8.0 image bound to the LAN IP.
+- Deviations: the sprint's real-tailnet walkthrough (DEC-025) is NOT RUN — waived by the owner on
+  2026-09-11 after describing the actual use cases (two people on house wifi; occasional phone
+  access where the 400-day sliding session carries the load). Recorded as DEC-154 with the
+  residual proof named: the first real 2.0.0 deployment with the trusted header configured doubles
+  as the walkthrough. Akasha's half of the contract stays proven by the frozen `make smoke-container`
+  gate (startup refusal, untrusted-peer stripping, allowlisted identity admitted, unknown refused).
+- Blocked/open: none for this sprint. For the roadmap: the contended-insights-at-10k numbers above,
+  and the DEC-154 residual proof, both named where the next sessions will find them.
+- Next: Sprint 082 — Two point oh. Read `docs/sprints/082-two-point-oh.md`; it rewrites the
+  exposure rule across nine files, confirms both-mode smoke against the release image, and surfaces
+  `2.0.0`. DEC-154's residual proof lands at the owner's first 2.0.0 deployment with the header
+  configured.

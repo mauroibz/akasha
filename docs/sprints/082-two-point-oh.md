@@ -1,6 +1,6 @@
 # Sprint 082 — Two point oh
 
-**Status:** planned
+**Status:** ready
 **Depends on:** 081
 **Roadmap revision:** 40
 

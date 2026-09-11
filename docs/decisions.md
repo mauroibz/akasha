@@ -6214,3 +6214,40 @@ only the file-Status flip and state regeneration.
   never carries more than 400 days of remaining validity. An unused session expires. Session-list
   activity can lag by less than one day, in exchange for at most one refresh write per active
   device per day. Sprint 082 must document the forward-horizon interpretation.
+
+## DEC-154 — Sprint 081's real-tailnet walkthrough is waived by the owner; the residual proof is named
+
+- **Date:** 2026-09-11
+- **Status:** accepted (owner-directed waiver)
+- **Supersedes:** nothing. DEC-025 (the walkthrough gate) stands; this entry prices one instance of it.
+- **Cross-references:** DEC-146 (the auth plan and its §7 answer 3: the trusted header is wanted),
+  DEC-153 (session refresh contract), Sprint 081, Sprint 065's Outcome (the same shape of partial
+  walkthrough, owed and recorded).
+- **Context.** Sprint 081's Verification names one walkthrough that cannot be faked with a seeded
+  container: the app behind `tailscale serve`, opened from a tailnet phone for zero-tap login,
+  from a non-tailnet device for rejection, then sign-out-everywhere. On 2026-09-11 the owner
+  described the actual deployment (ZimaBoard on the house LAN, reached by phone through Tailscale
+  occasionally, roughly monthly) and directed closing the sprint without it. Measured, not assumed:
+  neither the workstation (`comma`) nor the deployment target (192.168.100.240) runs
+  `tailscaled`/Tailscale Serve today — the board's overlay is ZeroTier — so the walkthrough has
+  no environment to run in without new infrastructure the owner did not ask to build.
+- **Decision.** Close Sprint 081 with the walkthrough recorded as NOT RUN, waived by the owner.
+  Akasha's half of the trusted-header contract remains proven by `make smoke-container` against the
+  real image: startup refusal without a peer allowlist, an untrusted peer's header stripped to an
+  anonymous `401`, an allowlisted known identity admitted with a session cookie, an unknown identity
+  refused `403`. The unproven half is Tailscale Serve's live `Tailscale-User-Login` injection on the
+  owner's tailnet — an external contract this repository does not control and never pinned
+  (the sprint file itself says to read Tailscale's documentation at activation, not trust a header
+  name written in the plan).
+- **Consequences.** The failure mode is closed: a proxy that does not inject the header leaves the
+  user on the ordinary password login, which acceptance criterion 5 keeps deliberately live, and a
+  misconfigured allowlist cannot lock anyone out. The residual proof owed — one session of the
+  owner putting the container behind Tailscale Serve and tapping once — is small and named here:
+  when the owner first deploys 2.0.0 with the trusted header configured, that deployment session
+  doubles as the walkthrough; record the result (taps observed, non-tailnet rejection, sign-out-
+  everywhere) in the worklog or a superseding DEC. The setting stays off by default, so nothing
+  ships enabled-but-unverified. A second observation from the same session is recorded for the
+  roadmap, not acted on: at 10,000 entries with 200 queued jobs, three contended insights scenarios
+  exceed 500 ms p95 (worst `publisher/count` 1234.8 ms) — a scale no prior benchmark measured; the
+  technical-spec budget binds the first library page (contended p95 147.8 ms, within budget), not
+  insights.

@@ -2,7 +2,7 @@
 
 **Plan revision:** 40
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [077 — A password and a session](077-a-password-and-a-session.md). Sprints 001–076
+**Active sprint:** [082 — Two point oh](082-two-point-oh.md). Sprints 001–081
 are complete — Sprint 071 closed the original v1 plan and the owner's 2026-09-05 readability
 feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section below.
 The owner's 2026-09-07 request for authentication and multiuser reopens the plan through 082 and
@@ -1623,7 +1623,11 @@ refactor into a rewrite of the gate. It also keeps the owner's "easy deployments
   a 390px container walkthrough matched 49 browser requests to 49 content-free audit events.
 - **[081 — Log in once](081-log-in-once.md)** — optional trusted-header authentication from
   `tailscale serve` (off by default, refusing to start without a peer allowlist), sliding 400-day
-  sessions, see-and-revoke-your-sessions, and the mobile pass.
+  sessions, see-and-revoke-your-own-sessions, and the mobile pass.
+  **Delivered 2026-09-11 (DEC-153, DEC-154).** The batching contract holds at 10,000 entries
+  (lookup p95 0.09 ms, zero refresh writes inside the daily interval); the real-tailnet walkthrough
+  is waived by the owner with the residual proof named in DEC-154 — the smoke gate already proves
+  Akasha's half of the trusted-header contract against the real image.
 - **[082 — Two point oh](082-two-point-oh.md)** — the exposure rule rewritten narrower rather
   than deleted across nine files, both specs made canonical, a runbook section that is followed
   rather than reviewed, Sprint 077's both-mode smoke gate reconfirmed against the release image,

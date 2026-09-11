@@ -1,42 +1,45 @@
-# Handoff — Sprint 081 in progress: external walkthrough remains
+# Handoff — Sprint 082 active: Two point oh
 
-`docs/agent/state.json` records Sprint 081 as `in_progress`; completed sprints run 001–080 and
-`FINAL_SPRINT` remains 82. Do not claim or advance another sprint.
+`docs/agent/state.json` records Sprint 082 as the active sprint (`ready`); completed sprints run
+001–081 and `FINAL_SPRINT` remains 82. Sprint 081 closed 2026-09-11 with the owner waiving its
+real-tailnet walkthrough (DEC-154) — do not reopen 081; read its Outcome before touching the
+trusted-header code.
 
-## Frozen implementation
+## What Sprint 081 left behind
 
-Trusted identity-header login reuses the configured trusted-peer matcher. Auth-on startup refuses
-a header without peers; untrusted headers are stripped; unknown identities default to 403;
-autocreate is explicit and produces a non-admin with no password. Valid cookies take precedence
-and password login remains usable. Current Tailscale Serve documentation names
-`Tailscale-User-Login`, but the header remains configurable.
+- Trusted identity-header login (off by default, peer-allowlist-gated), daily-batched sliding
+  400-day sessions, self-service session listing/revocation/sign-out-everywhere, and the mobile
+  pass. Commits `20d2771`..`cba775c`, contracts in DEC-153.
+- The 10,000-entry benchmark completed: lookup p95 0.09 ms, zero refresh writes inside the daily
+  interval, one after. First library page contended p95 147.8 ms (budget 500 ms).
+- **Walkthrough NOT RUN, owner-waived (DEC-154).** The residual proof — the owner putting the
+  container behind Tailscale Serve and observing zero-tap login, non-tailnet rejection, and
+  sign-out-everywhere ending the desktop session — lands at the first real 2.0.0 deployment with
+  the header configured. Neither the workstation nor the ZimaBoard runs tailscaled today; the
+  board's overlay is ZeroTier. The smoke gate already proves Akasha's half (startup refusal,
+  untrusted-peer stripping, allowlisted identity admitted with a cookie, unknown identity 403).
 
-Sessions refresh in daily batches to a 400-day forward horizon. Users can list and revoke their own
-sessions and sign out everywhere from the responsive Account section. The actual user owns these
-operations even during admin act-as. DEC-153 is the realized expiry/precedence contract.
+## Known and left, in the order they are likely to bite
 
-Implementation commits: `20d2771`, `3d65463`, `e2fbe0c`, `c608c87`, `cf2731e`, `c661c9d`,
-`3e365c6`, `1916e9d`, `cba775c`.
+1. **DEC-154 residual proof** — when the owner deploys 2.0.0 with `AKASHA_TRUSTED_PROXY_HEADER`
+   set, that session doubles as the waived walkthrough; record taps observed, non-tailnet
+   rejection, and sign-out-everywhere in the worklog or a superseding DEC.
+2. **Contended insights at 10k entries** — `creators/count` 575.4 ms, `creators/score` 594.9 ms,
+   `publisher/count` 1234.8 ms p95 under 200 queued jobs: over the 500 ms convention at a scale
+   never measured before, on a path 081 did not touch (spec budget binds the first library page).
+   Recorded in DEC-154; a future sprint decides whether insights get its own budget/measurement.
+3. **The board (192.168.100.240) still runs image 1.8.0** bound to the LAN IP; the working
+   deployment has no users, no auth, no sessions yet. Upgrading it is the owner's decision at
+   2.0.0 release time (Sprint 082 territory), not something a sprint does unasked.
+4. The dev machine's `akasha-akasha-1` (127.0.0.1:8000) is the owner's local instance of the
+   auth branch (built 2026-09-10, pre-081 code — it predates the session routes). If a future
+   session needs current-code container behavior, rebuild rather than reuse it; a `local-081`
+   image from this branch already exists (built 2026-09-11).
 
-## Evidence already frozen
+## Sprint 082 in one paragraph
 
-- `make check` passed.
-- `make test` passed 1,473 backend and 325 frontend tests.
-- Full Playwright passed 140 tests.
-- OpenAPI export and frontend consumer check passed.
-- `make smoke-container` passed the real-image startup refusal, untrusted-peer rejection,
-  allowlisted known-user success/cookie and unknown-user refusal. Its single Make target owns
-  disposable Docker setup and cleanup, avoiding separate volume approvals.
-- The 50-entry benchmark probe reported 0.18 ms session lookup p95, zero refresh writes inside one
-  day and one after it.
-
-## Exact remaining work
-
-1. Rerun the default 10,000-entry `scripts/benchmark_library.py` command to completion and record
-   its lookup p95/write counts. The prior run was interrupted before a result; nothing is running.
-2. Ask Mauro to perform the sprint's real-network walkthrough: serve the configured container with
-   Tailscale, open it on a tailnet phone and observe zero-tap login, verify a non-tailnet device is
-   not logged in, then sign out everywhere on the phone and verify the desktop session ends.
-3. If both pass, finish the Sprint 081 Outcome/roadmap reconciliation, run the documentation-only
-   closure checks, atomically mark 081 completed and 082 ready, and create the prescribed closure
-   commit. If either fails, resume TDD and invalidate the affected gates normally.
+Rewrite the exposure rule across nine files (auth exists; the rule narrows rather than deletes),
+make both specs' auth sections canonical, turn the runbook's reverse-proxy section into the
+followed Tailscale/LAN guidance, reconfirm Sprint 077's both-mode smoke gate against the release
+image, and surface `2.0.0` together (version bump, release notes, image tag). Its file:
+`docs/sprints/082-two-point-oh.md`.

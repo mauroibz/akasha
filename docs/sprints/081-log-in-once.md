@@ -1,6 +1,6 @@
 # Sprint 081 — Log in once
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 080
 **Roadmap revision:** 40
 
@@ -173,9 +173,6 @@ to list or revoke sessions from a screen.
 
 ## Outcome
 
-_In progress. Implementation and automated verification are complete; the real-tailnet walkthrough
-and the full 10,000-entry benchmark remain open._
-
 - Trusted-proxy authentication is implemented behind an explicit header plus peer allowlist. An
   untrusted peer's header is stripped, an unknown identity is refused unless autocreate is enabled,
   password login remains available, and auth-off leaves the feature inert. The runtime refuses an
@@ -191,9 +188,23 @@ and the full 10,000-entry benchmark remain open._
   full Playwright (140 tests); OpenAPI export and consumer check; and `make smoke-container`, whose
   real image proved startup refusal, untrusted-peer rejection, allowlisted known-user success with
   a cookie, and unknown-user refusal. The smoke target owns its disposable Docker-volume lifecycle.
-- A 50-entry benchmark probe measured session lookup p95 at 0.18 ms, zero writes inside the daily
-  interval, and one write after it. The required default 10,000-entry benchmark was interrupted
-  before its result and must be rerun; no result is claimed.
-- Remaining completion gate: Mauro must exercise the configured container through real Tailscale
-  Serve from a tailnet phone and a non-tailnet device, then sign out everywhere and confirm the
-  desktop session ends. A mocked identity header is not a substitute for that evidence.
+- The required default 10,000-entry `scripts/benchmark_library.py` run completed 2026-09-11:
+  session lookup p95 **0.09 ms** over 25 authenticated lookups, **zero** refresh writes inside the
+  daily interval, **one** write after it — the DEC-153 batching contract holds at the full scale.
+  Every first-library-page scenario is inside the 500 ms budget (worst contended p95 147.8 ms,
+  idle 67.9 ms). Observation, out of sprint scope and recorded for the roadmap: at this
+  previously unmeasured scale, three contended *insights* scenarios exceed 500 ms p95
+  (`creators/count` 575.4 ms, `creators/score` 594.9 ms, `publisher/count` 1234.8 ms, 200 queued
+  jobs). The technical-spec budget binds the first library page, not insights, and Sprint 081
+  touched nothing on the insights path; the numbers are a fresh-scale finding, not a regression
+  from this sprint's diff.
+- **Walkthrough (DEC-025): NOT RUN — waived by the owner, recorded as DEC-154.** The tailnet
+  walkthrough is the one gate that needs the owner's own network. On 2026-09-11 the owner
+  directed closing without it: neither the workstation nor the deployment target runs
+  Tailscale Serve today, and remote access is occasional. Akasha's half of the contract is
+  proven by `make smoke-container` against the real image (startup refusal without peers,
+  untrusted-peer stripping to anonymous `401`, allowlisted known identity `200` with a session
+  cookie, unknown identity `403`); the unproven half is Tailscale Serve's live header injection
+  on the owner's tailnet, which is an external contract this repository does not control. The
+  failure mode is closed: a misconfigured or non-injecting proxy leaves users on the ordinary
+  password login, which criterion 5 keeps live. DEC-154 carries the residual proof owed.
