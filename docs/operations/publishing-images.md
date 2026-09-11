@@ -27,11 +27,17 @@ branch push or a pull request. It:
    green, and `bash scripts/smoke_container.sh` passes against the frozen tree.
 2. Bump the version surfaces if a sprint has not already done it (`backend/pyproject.toml`,
    `frontend/package.json`, `main.py`'s FastAPI `version=`) and regenerate
-   `frontend/openapi.json` (`make openapi`).
+   `frontend/openapi.json` (`make openapi`). `make check` fails if any of the four
+   surfaces disagrees (Sprint 082), so a bump that missed one is caught in a second.
 3. Tag and push — see "Push a version tag" below. This is an owner action.
 4. Watch the *Actions* tab for the `Release` run. A green run's log ends with the pushed
    tags: `1.5.3`, `1.5`, `latest`.
-5. Update `AKASHA_VERSION` in the runbook's examples and this release's
+5. **Publish a GitHub Release from the release-notes file.** On the repository's
+   *Releases* page, *Draft a new release*, choose the tag, title it after the version,
+   and paste `docs/operations/release-notes-vX.Y.Z.md` as the description. This step
+   exists because seven releases had tags and no Release (DEC-145): a tag is what
+   automation reads, a Release is what a person reading the repository sees first.
+6. Update `AKASHA_VERSION` in the runbook's examples and this release's
    `docs/operations/release-notes-vX.Y.Z.md` if the version changed.
 
 ## Verifying a published image
