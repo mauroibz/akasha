@@ -528,17 +528,21 @@ logout_code="$(curl -sS --max-time 20 -o "$workdir/logout-refused.json" -w '%{ht
   || fail "the logged-out client could still read the library: $logout_code"
 printf 'anonymous 401; login 200; restart kept session; logout restored 401\n'
 
-step "Sprint 081: the sessions list sees this device, and revoking it signs it out"
-# The release image must prove the surface Sprint 081 added beside login: a
-# second device's session is listed, revoking it takes effect on its next
-# request, and the revoking device's own session survives.
-login_two_headers="$workdir/login-two-headers.txt"
-curl -fsS --max-time 20 -D "$login_two_headers" -c "$workdir/cookies-two.txt" \
+step "Sprint 081: the sessions list sees both devices, and revoking one ends only it"
+# The release image must prove the surface Sprint 081 added beside login.
+# The Sprint 077 block above logged its own cookie out, so this block signs in
+# twice as fresh devices first: A (the revoker) and B (the one to be revoked).
+curl -fsS --max-time 20 -c "$workdir/cookies-a.txt" \
+  -H 'content-type: application/json' \
+  -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
+  "http://127.0.0.1:${AKASHA_PORT}/api/auth/login" >/dev/null \
+  || fail "the revoking device could not log in"
+curl -fsS --max-time 20 -c "$workdir/cookies-b.txt" \
   -H 'content-type: application/json' \
   -d '{"username":"smoke-admin","password":"smoke-only-password"}' \
   "http://127.0.0.1:${AKASHA_PORT}/api/auth/login" >/dev/null \
   || fail "the second device could not log in"
-sessions_body="$(curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+sessions_body="$(curl -fsS --max-time 20 -b "$workdir/cookies-a.txt" \
   "http://127.0.0.1:${AKASHA_PORT}/api/auth/sessions")"
 printf '%s' "$sessions_body" | python3 -c '
 import json, sys
@@ -547,6 +551,7 @@ sessions = json.load(sys.stdin)
 assert len(sessions) == 2, sessions
 current = [s for s in sessions if s["current"]]
 assert len(current) == 1, sessions
+assert current[0]["user_agent"], sessions
 ' || fail "the sessions list did not show both devices with one current: $sessions_body"
 other_id="$(printf '%s' "$sessions_body" | python3 -c '
 import json, sys
@@ -556,14 +561,14 @@ for session in json.load(sys.stdin):
         print(session["id"])
         break
 ')"
-curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+curl -fsS --max-time 20 -b "$workdir/cookies-a.txt" \
   -X DELETE "http://127.0.0.1:${AKASHA_PORT}/api/auth/sessions/$other_id" >/dev/null \
   || fail "revoking the other device failed"
 revoked_code="$(curl -sS --max-time 20 -o /dev/null -w '%{http_code}' \
-  -b "$workdir/cookies-two.txt" "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
+  -b "$workdir/cookies-b.txt" "http://127.0.0.1:${AKASHA_PORT}/api/entries")"
 [ "$revoked_code" = "401" ] \
   || fail "the revoked device could still read the library: $revoked_code"
-curl -fsS --max-time 20 -b "$workdir/cookies.txt" \
+curl -fsS --max-time 20 -b "$workdir/cookies-a.txt" \
   "http://127.0.0.1:${AKASHA_PORT}/api/entries" >/dev/null \
   || fail "revoking another session killed the revoking device's own session"
 printf 'sessions listed both devices; revoking the other ended only it\n'
