@@ -216,9 +216,7 @@ class SessionStore:
             )
         return int(result.rowcount)
 
-    def list_for_user(
-        self, user_id: int, *, now: datetime | None = None
-    ) -> list[SessionRecord]:
+    def list_for_user(self, user_id: int, *, now: datetime | None = None) -> list[SessionRecord]:
         with self.engine.connect() as connection:
             rows = connection.execute(
                 text(

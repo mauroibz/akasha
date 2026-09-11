@@ -461,9 +461,7 @@ async def test_sign_out_everywhere_only_revokes_the_current_user(tmp_path: Path)
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="http://test"
         ) as client:
-            await client.post(
-                "/api/auth/login", json={"username": "mauro", "password": PASSWORD}
-            )
+            await client.post("/api/auth/login", json={"username": "mauro", "password": PASSWORD})
             response = await client.delete("/api/auth/sessions")
             assert response.status_code == 204
             assert (await client.get("/api/entries")).status_code == 401
@@ -488,9 +486,7 @@ async def test_trusted_header_authenticates_a_known_user_and_creates_a_session(
             transport=httpx.ASGITransport(app, client=("127.0.0.1", 3210)),
             base_url="http://test",
         ) as client:
-            response = await client.get(
-                "/api/entries", headers={"Tailscale-User-Login": " MAURO "}
-            )
+            response = await client.get("/api/entries", headers={"Tailscale-User-Login": " MAURO "})
 
         assert response.status_code == 200
         assert COOKIE_NAME in response.cookies
@@ -523,18 +519,14 @@ async def test_untrusted_identity_header_is_removed_and_request_stays_anonymous(
             "server": ("test", 80),
         }
         request = Request(scope)
-        strip_untrusted_identity_header(
-            request, "Tailscale-User-Login", ["10.0.0.0/8"]
-        )
+        strip_untrusted_identity_header(request, "Tailscale-User-Login", ["10.0.0.0/8"])
         assert "tailscale-user-login" not in request.headers
 
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app, client=("192.168.1.20", 3210)),
             base_url="http://test",
         ) as client:
-            response = await client.get(
-                "/api/entries", headers={"Tailscale-User-Login": "mauro"}
-            )
+            response = await client.get("/api/entries", headers={"Tailscale-User-Login": "mauro"})
         assert response.status_code == 401
         assert response.json() == UNAUTHENTICATED
 

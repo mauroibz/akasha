@@ -180,9 +180,7 @@ def strip_untrusted_identity_header(
         return
     target = configured_header.casefold().encode("latin-1")
     request.scope["headers"] = [
-        (name, value)
-        for name, value in request.scope.get("headers", [])
-        if name.lower() != target
+        (name, value) for name, value in request.scope.get("headers", []) if name.lower() != target
     ]
 
 
