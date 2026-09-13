@@ -6395,3 +6395,63 @@ Three product questions were put to the owner (2026-09-13) and answered:
   otherwise).
 - The "Not scheduled" saved-views and shelf-menu items remain where they are; nothing about
   this reopening moves them.
+
+## DEC-157 — Two hotfixes the released triage owed: Discard on the selection bar, and back-where-you-came-from on detail
+
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Supersedes:** nothing.
+- **Cross-references:** product spec §5 (Triage — the action bar already listed *Delete*), §6 (the
+  route list), technical spec §7.1 (bulk selection), §8 (the triage paragraph and the new one
+  after it), DEC-026 (the destructive fill keeps its contrast by using the score chip's
+  dark-ink pattern), DEC-025 (the walkthrough gate).
+
+### Context
+
+After the 2.0.0 release, and before claiming Sprint 083, the owner asked for two hotfixes that
+"se nos pasaron por oversight":
+
+1. **The triage list had no way to discard rows.** The product spec's selection-bar list has
+   carried *Delete* since v1 ("*Set status · Add shelves · Set score · Clear provisional ·
+   Delete*. All apply to the whole selection in one request") but no action was built and no
+   bulk-removal endpoint existed — `DELETE /entries/{id}` is per-row only. The owner's flow
+   requirement, to avoid click errors: select rows first, and the action appears on the
+   selection's own panel as a **red button**.
+2. **Detail's back control always went to the library.** A triage row opens `/books/{id}`
+   (`TriagePage.tsx` row click and `Enter`), and `DetailPage` rendered the shared `BackToLibrary`
+   control unconditionally — mid-inbox, "← Library" abandons the triage session instead of
+   resuming it.
+
+### Decision
+
+- **Discard is a selection-bar action, never a per-row control.** A red button appears in the
+  bulk action bar only while a checkbox selection (explicit ids or `Ctrl/Cmd+A` with
+  exclusions) exists; it opens the same AlertDialog pattern the detail page's own delete uses,
+  and only the confirmed dialog sends the request. One request removes the whole selection:
+  `DELETE /api/entries/bulk`, accepting the same selection shapes as `PATCH /entries/bulk`
+  (`entry_ids` or `filter` plus `excluded_entry_ids`, never both — the `set` half is dropped, so
+  the model is the shared `BulkSelection` base) and applying in one transaction through the same
+  `_selection` the other bulk actions resolve. Shelf and format rows cascade with the entry
+  (migration 0015); the cached item and cover remain, so re-adding is instant — the dialog says
+  so, as the detail page's does. The red fill uses dark ink on `--destructive` (the DEC-026
+  score-chip pattern), because white on red-500 fails axe's contrast threshold and so does
+  red-500 ink on the bar's raised surface.
+- **Back follows the navigator's state.** A triage row navigates with `state.from = "triage"`;
+  the detail page reads it and renders "← Triage" returning to `/import?tab=triage`. Absent
+  state — a deep link, a shared URL, the library — keeps "← Library" exactly as before, so
+  shared links keep their meaning. The shared control stays one component with default
+  parameters; its five other call sites are untouched.
+
+### Consequences
+
+- The multi-user isolation of the new endpoint is pinned: the route-policy inventory lists it
+  `private-id`, the cross-user probe (another user's id in `entry_ids`) expects the same 404 as
+  every other id-addressed write, and the documented-route guard includes it. During the
+  walkthrough the isolation suite caught two mis-conceived probes (deleting the acting user's
+  *own* row legitimately succeeds) — those were test errors, not boundary errors; the
+  user-scoped `_selection` the endpoint reuses was never in question.
+- Undo of an import batch is unaffected: undo replays the batch's own effects and skips rows a
+  person removed by hand (`session.get` misses count as `skipped`), so a discarded row is the
+  already-supported "edited after import" shape, now reachable on purpose.
+- This is owner-directed post-release work between sprints: Sprint 083 stays `ready`,
+  untouched, and its file is the next session's first read. Nothing in the plan moved.

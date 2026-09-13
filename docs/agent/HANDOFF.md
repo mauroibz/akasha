@@ -6,6 +6,14 @@ reopened on 2026-09-13 at the owner's request: an importer for a hand-written CS
 `exports/Libros.csv`, 104 rows, title/author columns, **no identifiers** — unlike every existing
 connector, which reads platform exports whose IDs made bulk matching trivial.
 
+**Before this sprint starts: two hotfixes landed in the tree (DEC-157, worklog 2026-09-13).**
+Triage's selection bar now has the red Discard action (confirm dialog, one `DELETE
+/api/entries/bulk` request over the shared selection shape), and a detail page opened from a
+triage row shows "← Triage" instead of "← Library". Verified through the full gate plus a live
+walkthrough; `frontend/openapi.json` was regenerated for the new route. Nothing in Sprint 083's
+contract is affected — but its e2e stubs route `**/api/entries/bulk` by method now, which the
+discard specs in `frontend/e2e/triage.spec.ts` show the pattern for.
+
 ## What Sprint 083 delivers (read the sprint file for the contract)
 
 A `list` connector (book domain) with a screen-pickable column mapping (auto-detect by header,

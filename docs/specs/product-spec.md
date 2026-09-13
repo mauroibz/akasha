@@ -549,6 +549,10 @@ PATCH  /api/entries/bulk               → {entry_ids[]} or
                                           {set:{status?, score?, add_shelves?[],
                                           remove_shelves?[], clear_provisional?}}
 POST   /api/entries/accept-suggested   → {filter} applies suggested_status in bulk
+DELETE /api/entries/bulk               → {entry_ids[]} or
+                                          {filter, excluded_entry_ids[]}; removes
+                                          the selection in one request (triage's
+                                          Discard)
 DELETE /api/entries/{id}
 GET    /api/items/{id}
 PATCH  /api/items/{id}                 → manual metadata correction

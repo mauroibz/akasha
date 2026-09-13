@@ -5520,3 +5520,43 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   Library search fixtures early (DEC-025) so D3's handler replays recorded real responses. The
   owner's real CSV stays in the git-ignored `exports/`; the synthetic 12-row fixture is what
   tests use.
+
+## 2026-09-13 — Two owner-directed hotfixes between sprints (DEC-157); Sprint 083 untouched
+
+- Done: implemented the two triage hotfixes the owner asked for before Sprint 083, without
+  claiming or touching any sprint state. (1) **Discard**: a red button on the bulk action bar,
+  present only while a selection exists, opening the AlertDialog confirmation before it sends
+  `DELETE /api/entries/bulk` — a new endpoint accepting the same selection shapes as the PATCH
+  (`entry_ids`, or `filter` plus `excluded_entry_ids`), removing the selection in one
+  transaction through the shared user-scoped `_selection`. Backend: `bulk_delete` in
+  `application/library.py`, the route and the `BulkSelection` base in `api/library.py` (PATCH
+  inherits it, DELETE uses it alone so no `set` is demanded). Frontend: `bulkDeleteEntries` in
+  `api/library.ts`, the button + dialog + mutation in `TriagePage.tsx`. (2) **Back from
+  detail**: triage rows navigate with `state.from = "triage"`, `DetailPage` reads it and renders
+  "← Triage" back to `/import?tab=triage`; a deep link or library entry keeps "← Library". The
+  shared `BackToLibrary` grew default-typed `to`/`label` props; no other call site changed.
+- Verified and how, in ladder order: focused backend suite `tests/test_bulk_api.py` (new bulk
+  delete test: explicit ids, filter+exclusions, missing-id 404); the two regression guards the
+  new route tripped were updated as designed — `test_isolation.py` (`ROUTE_POLICY` gains
+  `("DELETE", "/api/entries/bulk"): private-id`; one cross-user probe expects 404) and
+  `test_library_api.py`'s documented-route set. Then the exhaustive gate: `make check` green
+  (lint, typecheck, OpenAPI regenerated — `frontend/openapi.json` +105 lines — and the
+  type-contract check), `make test` green (backend 1485, frontend Vitest 325), full Playwright
+  green (141 passed, 2 skipped as always: production-bundle + scratchpad projects), including
+  three new triage specs (confirmed-discard flow, Ctrl+A discard through filter+exclusions,
+  detail-returns-to-triage) and the triage accessibility specs — which caught a real contrast
+  failure (white on red-500) fixed by adopting the DEC-026 score-chip pattern (dark ink on the
+  destructive fill). **Walkthrough against the live app** (DEC-025): backend on :8001 with a
+  disposable data dir, frontend on :5174 with `AKASHA_E2E_BACKEND` pointing at it; five rows
+  seeded through the real API; the browser exercised row→detail→"← Triage"→triage, the red
+  Discard button's colors, dialog Cancel leaving all 5 rows (DB-audited), dialog confirm
+  removing exactly 2 (DB-audited: 3 left, `PRAGMA foreign_key_check` clean, facets badge
+  agrees). The only console 404s were the designed contracts (auth/me with auth off, cover
+  absent on a manual add). Script kept as `frontend/scripts/walkthrough-hotfixes.mjs`.
+- Deviations: none. The product spec already specified the bar's *Delete* — this session
+  implemented what §5 said rather than changing it. Product-spec §6 route list and technical
+  spec §7.1/§8 updated to match the shipped contract; DEC-157 records both fixes.
+- Blocked/open: none.
+- Next: claim Sprint 083 with `sync_sprint_state.py --sprint 083 in_progress` and execute the
+  sprint file as written. The two hotfixes ship with the board's next image build; they are in
+  the tree, not in any released version yet.
