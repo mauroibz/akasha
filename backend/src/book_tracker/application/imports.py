@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from book_tracker.application.enrichment import enqueue_enrichment_backfill
 from book_tracker.application.library import LibraryError, LibraryService, clean_attachment_filename
+from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.importers import (
     Importer,
     ImportReadContext,
@@ -446,6 +447,124 @@ class ImportService:
             "summary": summary,
             "records": records,
         }
+
+    def answer_proposal(
+        self,
+        batch_id: str,
+        record_id: int,
+        *,
+        source: str | None = None,
+        source_id: str | None = None,
+        discard: bool = False,
+    ) -> dict[str, Any]:
+        """Record the owner's answer to a row's proposals (Sprint 083 D4).
+
+        Confirming re-stages the record's item half from the proposal's payload —
+        title, creators, identifiers, year and metadata from the provider — and
+        recomputes `planned_action` against the library, so **commit needs no new
+        path**: exact identity may now resolve `reuse_item`, and the per-row
+        domain validation applies exactly as it did at preview. The entry half is
+        the owner's own and never touched: score, notes and the triage suggestion
+        stay what the spreadsheet said.
+
+        Discarding marks every proposal of the record not-chosen: none of these
+        is the book, and the row stays importable exactly as typed.
+
+        Both require the batch to have drained (`previewed`): answering a row
+        while its searches are still running would race the job rewriting the
+        same record's proposals.
+        """
+        with Session(self.engine) as session:
+            batch = session.get(ImportBatchRow, batch_id)
+            if batch is None or batch.user_id != self.user_id or batch.kind != self.importer.name:
+                raise LibraryError(
+                    "import_batch_not_found", "Import preview was not found", status_code=404
+                )
+            if batch.state == "matching":
+                raise LibraryError(
+                    "import_batch_not_committable",
+                    "This import is still searching; answer its rows once the search finishes",
+                    status_code=409,
+                )
+            if batch.state != "previewed":
+                raise LibraryError(
+                    "import_batch_not_committable",
+                    f"Import batch is {batch.state}, so it takes no answers",
+                    status_code=409,
+                )
+            record = session.get(ImportRecordRow, record_id)
+            if record is None or record.batch_id != batch_id or record.user_id != self.user_id:
+                raise LibraryError(
+                    "import_record_not_found", "Import row was not found", status_code=404
+                )
+
+        if discard:
+            self.imports.discard_proposals(batch_id, record_id)
+        else:
+            assert source is not None and source_id is not None
+            self.imports.choose_proposal(
+                batch_id, record_id, proposal_source=source, proposal_source_id=source_id
+            )
+            chosen = self.imports.chosen_proposal(batch_id, record_id)
+            assert chosen is not None
+            payload = chosen["payload"]
+            with Session(self.engine) as session:
+                record = session.get(ImportRecordRow, record_id)
+                assert record is not None
+                stored = json.loads(record.normalized_payload)
+                stored["item"] = {
+                    "title": payload.get("title") or stored["item"]["title"],
+                    "subtitle": payload.get("subtitle"),
+                    "year": payload.get("year"),
+                    "identifiers": dict(payload.get("identifiers") or {}),
+                    "metadata": dict(payload.get("metadata") or {}),
+                    "creator_sort": None,
+                }
+                # The identity the owner confirmed is storage, not matching
+                # evidence: commit takes it onto the item through the confirmed
+                # channel, bypassing the connector's empty identity declaration
+                # (which governs what the *reader* trusts, D1.6).
+                stored["item"]["confirmed_identifiers"] = dict(payload.get("identifiers") or {})
+                if payload.get("creators"):
+                    stored["item"]["metadata"]["creators"] = list(payload["creators"])
+                if payload.get("language"):
+                    stored["item"]["metadata"]["language"] = payload["language"]
+                record.normalized_payload = json.dumps(stored, ensure_ascii=False)
+                session.commit()
+
+            # planned_action recomputes against the library, the same way preview
+            # computed it: an exact identity may now match an existing item.
+            with Session(self.engine) as session:
+                record = session.get(ImportRecordRow, record_id)
+                assert record is not None
+                stored = json.loads(record.normalized_payload)
+                identifiers = [
+                    normalize_identifier(kind, value)
+                    for kind, value in stored["item"]["identifiers"].items()
+                    if kind in self.importer.identity_kinds
+                ]
+                creators = stored["item"]["metadata"].get("creators", [])
+                first_creator = str(creators[0]) if isinstance(creators, list) and creators else ""
+                match = self.library.match(
+                    identifiers=identifiers,
+                    title=stored["item"]["title"],
+                    first_author=first_creator,
+                )
+                if record.planned_action not in {"error", "identity_conflict"}:
+                    if match.kind is MatchKind.AMBIGUOUS:
+                        record.planned_action = "ambiguous"
+                        record.conflicts = json.dumps({"candidates": list(match.candidates)})
+                    elif match.kind is MatchKind.IDENTITY_CONFLICT:
+                        record.planned_action = "identity_conflict"
+                    else:
+                        record.planned_action = (
+                            "reuse_item" if match.item_id is not None else "create_item"
+                        )
+                    record.match_kind = match.kind.value
+                    record.matched_item_id = match.item_id
+                    session.commit()
+
+        return self.get_preview(batch_id)
 
     def resolve_file(self, batch_id: str, path: str, *, now: datetime | None = None) -> int:
         """Which committed item a file offered under `path` belongs to.

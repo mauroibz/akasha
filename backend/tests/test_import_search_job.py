@@ -475,7 +475,7 @@ class TestPreviewIntegration:
             from book_tracker.application.import_search import ImportSearchHandler
             from book_tracker.infrastructure.jobs import JobRepository
 
-            jobs = JobRepository(app.state.engine)
+            JobRepository(app.state.engine)
             with Session_of(app.state.engine) as session:
                 from sqlalchemy import text
 

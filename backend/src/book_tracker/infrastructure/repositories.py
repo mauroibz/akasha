@@ -884,6 +884,15 @@ class ImportRepository:
                     for key, value in item_payload["identifiers"].items()
                     if key in identity_kinds and value
                 }
+                # A search-then-confirm row (Sprint 083 D4) carries identities its
+                # connector never declared, because the owner confirmed them from
+                # a provider's result: the declaration governs what the *reader*
+                # may trust, not what an explicit confirmation stored. Present
+                # only on rows whose proposal was confirmed, so every existing
+                # connector's commit is byte-for-byte unchanged.
+                confirmed = item_payload.get("confirmed_identifiers")
+                if isinstance(confirmed, dict):
+                    identity_values = {**identity_values, **confirmed}
                 for identity_kind, identity_value in identity_values.items():
                     exact = session.scalar(
                         select(ItemIdentifierRow.item_id).where(

@@ -427,3 +427,215 @@ class TestRoutes:
         # Every other connector declares none, and the absent key stays absent
         # in behaviour rather than arriving as an empty patch to the screen.
         assert listed["goodreads"]["input"]["fields"] == []
+
+
+class TestConfirmDiscard:
+    """D4: choosing a proposal re-stages the row from the provider's payload;
+    discard keeps the row as typed. Commit needs no new path."""
+
+    @pytest.fixture
+    def anyio_backend(self) -> str:
+        return "asyncio"
+
+    async def _drain(self, app, batch_id: str) -> None:
+        """Run the batch's search job the way the runner would, against a
+        provider double, so no network is spent and the proposals exist."""
+        from sqlalchemy import text as sql_text
+        from sqlalchemy.orm import Session
+
+        from book_tracker.application.import_search import ImportSearchHandler
+        from book_tracker.domain.providers import SearchCandidate, SourceRef
+
+        with Session(app.state.engine) as session:
+            job_id = session.execute(
+                sql_text("SELECT id FROM jobs WHERE batch_id = :b"), {"b": batch_id}
+            ).scalar_one()
+
+        class Double:
+            name = "openlibrary"
+            item_type = "book"
+
+            async def search(self, query: str, limit: int = 20):
+                return [
+                    SearchCandidate(
+                        source="openlibrary",
+                        source_id="OL1M",
+                        source_refs=(SourceRef(source="openlibrary", source_id="OL1M"),),
+                        title="Rayuela",
+                        subtitle=None,
+                        creators=("Julio Cortázar",),
+                        year=1963,
+                        cover_url=None,
+                        identifiers={"isbn": "9788437604572"},
+                        language="es",
+                        metadata={"publisher": "Sudamericana"},
+                    )
+                ]
+
+        handler = ImportSearchHandler(
+            app.state.engine, {"openlibrary": Double()}, rate_limiter=None
+        )
+        result = await handler.process(job_id, None)
+        assert result["state"] == "succeeded"
+
+    async def _preview(self, client):
+        response = await client.post(
+            "/api/import/list/preview",
+            files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
+        )
+        assert response.status_code == 201
+        return response.json()
+
+    @pytest.mark.anyio
+    async def test_confirming_re_stages_the_row_from_the_payload(self, tmp_path: Path) -> None:
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            body = await self._preview(client)
+            batch_id = body["batch_id"]
+            await self._drain(app, batch_id)
+            records = (await self._preview(client))["records"]
+            rayuela = next(record for record in records if record["title"] == "Rayuela")
+            assert rayuela["proposals"], "the drained search wrote proposals"
+            proposal = rayuela["proposals"][0]
+
+            confirm = await client.post(
+                f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
+                json={"source": proposal["source"], "source_id": proposal["source_id"]},
+            )
+            assert confirm.status_code == 200
+
+            refreshed = next(
+                record
+                for record in (await self._preview(client))["records"]
+                if record["record_id"] == rayuela["record_id"]
+            )
+            # The row is re-staged from the provider's payload: identifiers and
+            # metadata the spreadsheet never had.
+            assert refreshed["item"]["identifiers"] == {"isbn": "9788437604572"}
+            assert refreshed["item"]["year"] == 1963
+            assert refreshed["item"]["metadata"]["publisher"] == "Sudamericana"
+            assert refreshed["proposals"][0]["chosen"] is True
+
+    @pytest.mark.anyio
+    async def test_discard_keeps_the_row_as_typed(self, tmp_path: Path) -> None:
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            body = await self._preview(client)
+            batch_id = body["batch_id"]
+            await self._drain(app, batch_id)
+            records = (await self._preview(client))["records"]
+            rayuela = next(record for record in records if record["title"] == "Rayuela")
+
+            discard = await client.post(
+                f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
+                json={"discard": True},
+            )
+            assert discard.status_code == 200
+
+            refreshed = next(
+                record
+                for record in (await self._preview(client))["records"]
+                if record["record_id"] == rayuela["record_id"]
+            )
+            assert refreshed["item"]["identifiers"] == {}
+            assert refreshed["item"]["metadata"]["creators"] == ["Julio Cortázar"]
+            assert all(proposal["chosen"] is False for proposal in refreshed["proposals"])
+
+    @pytest.mark.anyio
+    async def test_commit_after_confirm_carries_the_provider_identity(self, tmp_path: Path) -> None:
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            body = await self._preview(client)
+            batch_id = body["batch_id"]
+            await self._drain(app, batch_id)
+            records = (await self._preview(client))["records"]
+            rayuela = next(record for record in records if record["title"] == "Rayuela")
+            proposal = rayuela["proposals"][0]
+            await client.post(
+                f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
+                json={"source": proposal["source"], "source_id": proposal["source_id"]},
+            )
+            commit = await client.post("/api/import/list/commit", json={"batch_id": batch_id})
+            assert commit.status_code == 200
+
+            import sqlite3
+
+            with sqlite3.connect(tmp_path / "books.db") as connection:
+                found = connection.execute(
+                    "SELECT identifiers FROM items WHERE title = 'Rayuela'"
+                ).fetchone()
+                assert found and "9788437604572" in found[0]
+                homer = connection.execute(
+                    "SELECT identifiers FROM items WHERE title = 'Homero'"
+                ).fetchone()
+                assert homer and homer[0] == "{}"
+
+    @pytest.mark.anyio
+    async def test_another_users_batch_is_not_found(self, tmp_path: Path) -> None:
+        """The proposal surface is inside the import boundary: another user's
+        batch is the same not-found it always was (the 079 isolation pattern,
+        driven through the service the routes wrap)."""
+        import httpx
+
+        from book_tracker.application.library import LibraryError
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            body = await self._preview(client)
+            batch_id = body["batch_id"]
+
+            from sqlalchemy import text as sql_text
+
+            with app.state.engine.begin() as connection:
+                connection.execute(
+                    sql_text(
+                        "INSERT INTO users (id, username, display_name, password_hash,"
+                        " password_salt, is_admin, created_at, updated_at)"
+                        " VALUES (2, 'second', 'Second', 'x', 'y', 0,"
+                        " '2026-09-13T00:00:00Z', '2026-09-13T00:00:00Z')"
+                    )
+                )
+
+            from book_tracker.application.imports import ImportService
+            from book_tracker.domains.book.list import IMPORTER as LIST_IMPORTER
+
+            service = ImportService(
+                app.state.engine,
+                tmp_path,
+                tmp_path,
+                LIST_IMPORTER,
+                user_id=2,
+                attachment_max_bytes=1024,
+            )
+            with pytest.raises(LibraryError) as refused:
+                service.get_preview(batch_id)
+            assert refused.value.status_code == 404

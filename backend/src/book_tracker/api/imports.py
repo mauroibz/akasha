@@ -783,6 +783,49 @@ async def commit(
     return CommitResponse.model_validate(result)
 
 
+class ProposalAnswerBody(BaseModel):
+    """Which proposal the owner confirmed, or the explicit discard.
+
+    A connector without a search phase never sees this body: the route exists on
+    the shared router, but `answer_proposal` refuses any batch that is not
+    `previewed` with proposals — for every other connector the preview GET a
+    confirm would need is already the answer.
+    """
+
+    source: str | None = None
+    source_id: str | None = None
+    discard: bool = False
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/proposal",
+    response_model=PreviewResponse,
+)
+async def answer_row_proposal(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    body: ProposalAnswerBody,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Confirm one proposal for one row, or discard the row's proposals.
+
+    Confirming re-stages the row's item half from the provider's payload and
+    recomputes its planned action, so the commit that follows needs no new path
+    (Sprint 083 D4). Discarding keeps the row exactly as the spreadsheet typed
+    it. Both require the batch's searches to have drained.
+    """
+    result = service(request, importer_name, user.effective_user_id).answer_proposal(
+        batch_id,
+        record_id,
+        source=body.source,
+        source_id=body.source_id,
+        discard=body.discard,
+    )
+    return PreviewResponse.model_validate(result)
+
+
 @router.get("/jobs/{job_id}", response_model=JobProgressResponse)
 async def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
     from book_tracker.infrastructure.jobs import JobRepository

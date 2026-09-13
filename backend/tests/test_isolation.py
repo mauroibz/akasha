@@ -60,6 +60,9 @@ ROUTE_POLICY = {
     ("POST", "/api/entries"): "private-write",
     ("PATCH", "/api/entries/bulk"): "private-id",
     ("DELETE", "/api/entries/bulk"): "private-id",
+    ("POST", "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/proposal"): (
+        "private-id"
+    ),
     ("POST", "/api/entries/accept-suggested"): "private-write",
     ("GET", "/api/entries/{entry_id}"): "private-id",
     ("PATCH", "/api/entries/{entry_id}"): "private-id",
@@ -196,6 +199,48 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
             ),
             {"id": batch_id, "now": now, "expires": expires},
         )
+        record_payload = json.dumps(
+            {
+                "row_number": 2,
+                "item": {
+                    "title": "Only Admin Owns",
+                    "subtitle": None,
+                    "year": None,
+                    "identifiers": {},
+                    "metadata": {},
+                    "creator_sort": None,
+                },
+                "entry": {
+                    "score": None,
+                    "notes": None,
+                    "date_added": None,
+                    "values": {},
+                    "score_provisional": False,
+                    "suggested_status": None,
+                },
+                "shelves": [],
+                "source_fields": {},
+                "item_type": None,
+                "cover_stage": None,
+            }
+        )
+        record_id = int(
+            connection.execute(
+                text(
+                    "INSERT INTO import_records "
+                    "(batch_id,user_id,row_number,normalized_payload,conflicts,"
+                    "validation_errors,planned_action,match_kind,created_at,updated_at) VALUES "
+                    "(:batch,1,2,:payload,:conflicts,'[]','create_item','new',:now,:now)"
+                    " RETURNING id"
+                ),
+                {
+                    "batch": batch_id,
+                    "payload": record_payload,
+                    "conflicts": json.dumps({"candidates": []}),
+                    "now": now,
+                },
+            ).scalar_one()
+        )
     job_id = JobRepository(app.state.engine).enqueue(
         batch_id, "enrich_item", {"item_id": owned.item_id}, user_id=1
     )
@@ -205,6 +250,7 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
         "shelf_id": shelf,
         "attachment_id": attachment_id,
         "batch_id": batch_id,
+        "record_id": record_id,
         "job_id": job_id,
     }
 
@@ -264,6 +310,12 @@ PRIVATE_PROBES = (
     ("PATCH", "/api/shelves/{shelf_id}", {"name": "probe"}, None),
     ("DELETE", "/api/shelves/{shelf_id}", None, None),
     ("POST", "/api/import/calibre/commit", {"batch_id": "BATCH", "choices": []}, None),
+    (
+        "POST",
+        "/api/import/list/batches/{batch_id}/records/{record_id}/proposal",
+        {"source": "openlibrary", "source_id": "OL1M"},
+        None,
+    ),
     (
         "POST",
         "/api/import/calibre/batches/{batch_id}/files",
