@@ -5591,3 +5591,49 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Blocked/open: none.
 - Next: Sprint 083, as before. The prune command ships with the next image build like the
   hotfixes do.
+
+## 2026-09-13 — Sprint 083 in progress: the backend search-then-confirm pipeline (D1–D4)
+
+- Done: claimed Sprint 083 (`sync_sprint_state.py --sprint 083 in_progress`, state commit riding
+  the D1 slice) and delivered the four backend deliverables under TDD, one commit each:
+  **D1** `417b864` the list reader (`domains/book/list.py`) — column mapping as a connector
+  declaration (`ImportInputSpec.fields`, route forwards form fields into new
+  `ImportSource.options`), header auto-detect with accent folding and trimmed headers,
+  first-two-columns fallback, honest error rows, `identity_kinds = frozenset()`,
+  match-always-NEW, mapping composing the fingerprint; shared changes: error rows skip
+  per-row validation, conformance allows the empty identity declaration, `help_url` is
+  https-or-absent.
+  **D2** `8081bdc` migration 0022 `import_proposals` + repo CRUD (add rewrites a record's
+  top-N, choose clears siblings, discard, chosen read) + proposals riding the preview GET
+  with summary counts.
+  **D3** `7c6afa4` `application/import_search.py` — sequential per-row provider search
+  (owner's "secuencial y async"), top-3 proposals, quota consult per provider per row with
+  defer-without-attempt, rate-limiter pacing, no-results-is-an-answer, all-fail containment;
+  the `SearchingImporter.search_job` declaration stages `matching` + one job; commit's
+  existing state gate gives the 409; handler registered beside `enrich_item`; undo cancels
+  in-flight searches.
+  **D4** `079f300` `POST .../records/{record_id}/proposal` + `ImportService.answer_proposal`
+  — confirm re-stages the item half from the payload and recomputes planned_action (commit
+  needs no new path), the confirmed identity travels a `confirmed_identifiers` channel so
+  the connector's empty declaration still governs *reader* trust, discard keeps the row as
+  typed, both require a drained batch. The isolation inventory caught the new route as
+  designed (private-id + cross-user probe 404; the seeded batch now carries a record row).
+- Verified and how: every slice TDD-first (33 + 8 + 12 + 4 new tests respectively); focused
+  regression after D4 green (339 across list/job/proposals/generic/goodreads/isolation/
+  conformance); ruff + mypy clean; `make openapi` regenerated after the catalog and route
+  surface moved and `api:check` green. The job's provider boundary uses doubles for the
+  failure shapes per the sprint file; AC5's recorded-fixture replay is still owed (below).
+- Deviations: none from the sprint contract. Two shared-layer relaxations the sprint itself
+  specifies (conformance on empty identity_kinds; `_validate` skipping reader-error rows) are
+  recorded in the D1 commit message. The `rank` column is named `rank` not `score` (D2.1's
+  "score" read as a confidence; it is merge_and_rank's position — the migration docstring
+  says so).
+- Blocked/open: none.
+- Next: **D4.2 frontend** (ImportPage: per-row proposal cards with Confirm/Try another/
+  Discard, disabled while `matching`; progress bar fed by the job route; the `fields` inputs
+  for the column mapping) + Vitest; **D5** conformance assertions for the new optional
+  surfaces, product-spec §5.4 + technical-spec §6, OpenAPI examples; recorded Open Library
+  search fixtures + replay tests (AC5 — capture early, DEC-025); the sanitized 12-row CSV
+  fixture; then the exhaustive gate (`make test`, Playwright, walkthrough AC8 on a fresh
+  data dir) and the atomic close. One straggler: an unused-import cleanup in
+  `test_import_proposals.py` rides the next commit.

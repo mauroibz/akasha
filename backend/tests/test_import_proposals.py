@@ -241,7 +241,6 @@ class TestPreviewExposure:
 
     @pytest.mark.anyio
     async def test_proposals_ride_the_preview_response(self, tmp_path: Path) -> None:
-        import httpx
 
         from book_tracker.main import create_app
 
