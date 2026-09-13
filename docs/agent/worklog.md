@@ -5560,3 +5560,34 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Next: claim Sprint 083 with `sync_sprint_state.py --sprint 083 in_progress` and execute the
   sprint file as written. The two hotfixes ship with the board's next image build; they are in
   the tree, not in any released version yet.
+
+## 2026-09-13 — The item cache's cleanup half: akasha-prune (DEC-158), follow-up to the hotfixes
+
+- Done: closed the lifecycle gap the hotfix testing surfaced. The owner's rule — a cache either
+  has a cleanup mechanism (and the dialogs stop mentioning it) or should not be kept — went to
+  clarify; he chose the operator-command sweep in the house style, now, before Sprint 083. Built
+  `backend/src/book_tracker/prune_items.py`: `akasha-prune prune [--apply]`, a dry-run-by-default
+  sweep that removes items no entry of ANY user references and no import record still claims,
+  together with their cover files, cascaded identifier/source rows, and attachment blobs no other
+  row shares; stale covers no item points at; never touching files that are not ours. Registered
+  the console script in pyproject.toml. Both delete dialogs (detail Delete, triage Discard)
+  dropped the "remain cached so re-adding is instant" sentence — storage the reader could not
+  verify or act on. Runbook gained the "Pruning the item cache" section; product-spec open
+  question 2 is now answered in two halves (keep because instant/shared, clean because
+  akasha-prune); DEC-158 records it.
+- Verified and how: TDD — `backend/tests/test_prune_items.py` written first (13 tests weighted
+  towards what it must NOT remove: another user's entry keeps the item, a shared blob survives,
+  an import-claimed item is immune, foreign files reported not touched, dry run removes nothing,
+  CLI exits and reports), RED against the missing module, then GREEN. Two real module bugs the
+  tests caught: the blob refcount was compared against item ids instead of live digests (shared
+  blob would have been deleted), and `kept` ignored import-claimed items. Focused suites green
+  (prune + reclaim together: 28), then the exhaustive gate: `make check` green (ruff had 5
+  fixables in the new files — fixed), `make test` green (backend 1498 including the 13 new,
+  frontend Vitest 33 files), full Playwright green. Live proof: rebuilt the local container
+  (`compose.build.yaml`) and ran the dry run and the applied run against the live data dir
+  (details below).
+- Deviations: none. The delete dialogs' copy change is frontend runtime code, so the affected
+  e2e specs were re-run; none asserted the removed sentence.
+- Blocked/open: none.
+- Next: Sprint 083, as before. The prune command ships with the next image build like the
+  hotfixes do.

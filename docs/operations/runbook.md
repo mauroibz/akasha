@@ -234,6 +234,37 @@ reclaiming the live copy cannot reach the bytes.
 There is no schedule for it and it deliberately does not run itself. It deletes
 by inference, and inference belongs behind a person.
 
+## Pruning the item cache
+
+Deleting an entry — the detail page's Delete, triage's Discard, an import undo —
+leaves its item behind on purpose: the item is the metadata cache that makes
+re-adding instant, and since 2.0 it is shared between users, so one person's
+discard cannot take the row another person's entry still uses. But nothing
+collected the items that lost their *last* entry, so the cache only grew. This
+sweep closes that half of the lifecycle:
+
+```bash
+docker compose exec akasha akasha-prune prune
+```
+
+Like `akasha-attachments reclaim`, it **reports and removes nothing by default**.
+An item is a candidate only when no entry of any user references it and no
+import record still claims it — a batch inside its undo window can still
+resurrect its rows, and an undo that finds them gone would do less than it
+promises. With the item go its cover file, its identifiers and sources (which
+cascade with the row), and its attachment blobs once no other row shares the
+digest. Anything under `covers/` that is not a `{item_id}.jpg` the application
+wrote is reported and left alone. Read the list, then act on it:
+
+```bash
+docker compose exec akasha akasha-prune prune --apply
+```
+
+Safe to run while the stack is serving: SQLite serializes writers, and the
+candidate list is read in one pass before any removal begins. Nothing is
+scheduled and nothing runs on its own, for the same reason as the attachment
+sweep — deletion by inference belongs behind a person.
+
 ## Restoring
 
 As with a rollback, this restores into a fresh volume and flips which one

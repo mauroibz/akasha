@@ -6455,3 +6455,66 @@ After the 2.0.0 release, and before claiming Sprint 083, the owner asked for two
   already-supported "edited after import" shape, now reachable on purpose.
 - This is owner-directed post-release work between sprints: Sprint 083 stays `ready`,
   untouched, and its file is the next session's first read. Nothing in the plan moved.
+
+## DEC-158 — The item cache gets its cleanup half: akasha-prune, and the dialogs stop promising permanence
+
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Supersedes:** the open half of product-spec open question 2 (the "prune orphans maintenance action"
+  it once waved through); DEC-050's scope note that the reclaim command "deliberately does not
+  generalize to covers".
+- **Cross-references:** DEC-047, DEC-049, DEC-050 (the attachment lifecycle and the inference
+  rules this sweep inherits), DEC-146 (items as a shared cache between users), DEC-157 (the
+  Discard action that made the gap visible), Sprint 082 (the 2.0.0 release the dialogs shipped in).
+
+### Context
+
+Testing the DEC-157 hotfixes locally, the owner asked why a deleted entry keeps its cached item
+and cover, and whether anything ever collects them. Measured from the tree:
+
+- The keep is load-bearing, not accidental: `AddService` consults `cached_item_for_source`
+  (`application/add.py:189`) so a re-add is instant and costs no provider quota, and since 2.0
+  `LibraryService._item` treats items as a shared cache — one user's delete cannot remove a row
+  another user's entry still uses.
+- Nothing ever collected an item that lost its last entry. `reclaim_attachments` (DEC-049/050) is
+  scoped to the attachment store by decision; the product spec's open question 2 had waved orphaned
+  covers through on size (~50 KB); the roadmap never scheduled a prune. Delete an entry and its item,
+  cover, and any attachment rows survive forever, unreachable by any surface — including the blob a
+  discarded Calibre book's cached item still holds, which the attachment sweep counts as referenced
+  and will not collect.
+- Both delete dialogs (detail's Delete, triage's Discard since DEC-157) promised "the metadata and
+  cover remain cached so re-adding is instant" — a promise about storage the user cannot see and had
+  no way to act on.
+
+The owner's rule: either there is a cleanup mechanism (and the dialogs should not warn about the
+cache), or there is none (and the cache should not be kept). He chose the first, with the sweep as
+an operator command in the house style.
+
+### Decision
+
+- **`akasha-prune`** joins `akasha-attachments` and `akasha-backup` as the third operator command,
+  and follows their inference rules: dry-run by default, `--apply` to act, report everything,
+  never touch what it did not write, no schedule — deletion by inference stays behind a person.
+- A candidate is an item **no entry of any user references and no import record still claims** —
+  a batch inside its undo window can still resurrect its rows, and `UndoService` already skips
+  missing rows as `skipped`, so pruning a claimed item would make an undo silently do less than it
+  promises. With the item go its cover (`covers/{id}.jpg`), its identifiers and sources (cascading
+  since migration 0002), and its attachment blobs **only when no other row shares the digest** —
+  the same refcount `delete_blob_if_unreferenced` applies. Stale covers no item points at are
+  collected too: same leak, same directory.
+- The dialogs stop describing storage: detail's Delete and triage's Discard say the row leaves
+  your library and nothing else. The cache sentence was a promise about disk the reader could
+  neither verify nor influence.
+
+### Consequences
+
+- The prune never runs itself. An operator who never runs it has exactly today's behaviour plus
+  honest dialog copy; an operator who runs it reclaims disk. The runbook documents both commands
+  side by side.
+- An item inside an un-undone import batch is immune to the prune until that batch is undone or
+  its window passes — the ledger's claim is stronger than "no entries", deliberately.
+- Re-adding a pruned item costs one provider round trip, same as the first add ever did; nothing
+  about the add path changes.
+- The command reads the database through plain `sqlite3` in one read-only pass before any
+  removal, the pattern `reclaim_attachments` established for maintenance commands that must not
+  depend on loadable application settings.

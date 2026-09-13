@@ -1022,17 +1022,16 @@ acceptance criteria.
    books are searchable and appear in shelf views, just hidden from the default
    list on `/`. The alternative is full quarantine until triaged. Low stakes,
    easy to flip later.
-2. **Deleting an entry — what happens to the item?** Spec leaves orphaned
-   `items` rows and their covers in place, treating them as cache so re-adding
-   is instant, with a manual "prune orphans" maintenance action. Only matters
-   for disk usage, and covers are ~50KB each. **Attachments changed the stakes
-   of this and it is now answered for them** (DEC-047, DEC-049): an attached
-   file is 2.5 MB rather than 50 KB and is not re-fetchable cache, so removing
-   an attachment deletes its bytes once nothing references them, and
-   `akasha-attachments reclaim` collects any blob that was orphaned some other
-   way. The orphaned *cover* is still left in place: the reclaim command is
-   scoped to the attachment store and deliberately does not generalize to
-   covers, which are cache the application can re-fetch.
+2. **Deleting an entry — what happens to the item?** Answered in two halves. The
+   item is kept as cache — it is what makes re-adding instant and, since 2.0, is
+   shared between users, so one person's delete cannot take the row another's
+   entry uses. The cleanup half is `akasha-prune` (DEC-158): an operator command,
+   dry-run by default, removing items no entry of any user references together
+   with their covers and unshared attachment blobs. Attachments changed the stakes
+   once already (DEC-047, DEC-049): a blob is 2.5 MB rather than 50 KB, so its
+   reclamation is refcounted and gated behind `--apply` exactly like the item
+   prune. Neither runs on a schedule — deletion by inference belongs behind a
+   person.
 3. **Work vs edition.** One row = one edition; a reread of a different edition
    is the same entry with `reread_count++`. Changing this means a different
    uniqueness constraint on `entries`. Recommendation stands: don't.
