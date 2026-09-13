@@ -18,7 +18,7 @@ import unicodedata
 from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from book_tracker.domain.importers import (
     ImportEntry,
@@ -201,6 +201,11 @@ class ListImporter:
     )
     identity_kinds: frozenset[str] = frozenset()
     error_codes = frozenset({"invalid_csv", "missing_columns", "column_not_mapped"})
+    #: The search-then-confirm opt-in (Sprint 083 D3): preview stages this
+    #: connector's batches in `matching` with one search job enqueued, and
+    #: commit waits until the job drains. Reached by declaration, never by a
+    #: shared-layer branch on the connector's name.
+    search_job: Literal["search_import_rows"] = "search_import_rows"
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

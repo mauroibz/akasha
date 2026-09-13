@@ -6,7 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-from sqlalchemy import Engine, select
+from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
 from book_tracker.application.enrichment import enqueue_enrichment_backfill
@@ -55,6 +55,10 @@ def batch_item_ids(engine: Engine, batch_id: str) -> list[int]:
             )
             if item_id is not None
         ]
+
+
+def _now_iso() -> str:
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _stored_record(record: NormalizedImportRecord) -> dict[str, Any]:
@@ -367,6 +371,30 @@ class ImportService:
             kind=self.importer.name,
             source_descriptor=snapshot.source_descriptor,
         )
+        # A connector whose rows need provider search before they can be decided
+        # (Sprint 083 D3) stages its batch in `matching` and enqueues one search
+        # job; commit refuses until the job flips the batch back to `previewed`.
+        # Reached by the connector's declaration, the same opt-in shape as
+        # `browsable`/`incremental` — the shared pipeline never branches on
+        # which connector it is holding.
+        searching = getattr(self.importer, "search_job", None)
+        if searching == "search_import_rows":
+            from book_tracker.infrastructure.jobs import JobRepository
+
+            with self.engine.begin() as connection:
+                connection.execute(
+                    text(
+                        "UPDATE import_batches SET state = 'matching', updated_at = :now"
+                        " WHERE id = :id"
+                    ),
+                    {"now": _now_iso(), "id": batch_id},
+                )
+            JobRepository(self.engine).enqueue(
+                batch_id,
+                "search_import_rows",
+                {"batch_id": batch_id},
+                user_id=self.user_id,
+            )
         return self.get_preview(batch_id)
 
     def get_preview(self, batch_id: str) -> dict[str, Any]:

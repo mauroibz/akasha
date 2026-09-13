@@ -348,7 +348,9 @@ class TestRoutes:
             )
         assert preview.status_code == 201
         body = preview.json()
-        assert body["state"] == "previewed"
+        # This connector previews in `matching` (Sprint 083 D3): the background
+        # search job owns the batch until its queue drains.
+        assert body["state"] == "matching"
         transposed = [record for record in body["records"] if record["title"] == "Iliada"]
         assert transposed[0]["creators"] == ["Homero"]
         # The mapping composes the fingerprint, so this is not the auto-detected

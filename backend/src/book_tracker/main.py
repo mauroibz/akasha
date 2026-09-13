@@ -38,6 +38,7 @@ from book_tracker.api.library import ErrorResponse
 from book_tracker.api.library import router as library_router
 from book_tracker.api.providers import router as providers_router
 from book_tracker.application.enrichment import EnrichmentHandler
+from book_tracker.application.import_search import ImportSearchHandler
 from book_tracker.application.library import LibraryError
 from book_tracker.application.sessions import SESSION_COOKIE_NAME, SessionStore
 from book_tracker.backup import BackupError, create_backup, read_manifest
@@ -287,9 +288,15 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             cover_client=provider_client,
             data_dir=configured.data_dir,
         )
+        search_handler = ImportSearchHandler(
+            app.state.engine,
+            app.state.providers,
+            rate_limiter=rate_limiter,
+            quota=app.state.provider_quota,
+        )
         job_runner = JobRunner(
             app.state.engine,
-            {"enrich_item": enrichment_handler},
+            {"enrich_item": enrichment_handler, "search_import_rows": search_handler},
             rate_limiter=rate_limiter,
             data_dir=configured.data_dir,
         )

@@ -459,6 +459,23 @@ class IncrementalImporter(Protocol):
     ) -> ImportPlan: ...
 
 
+@runtime_checkable
+class SearchingImporter(Protocol):
+    """A connector whose rows need provider search before they can be decided.
+
+    Separate from `Importer` for the same reason the other opt-ins are: one
+    connector in eight is the first source with no identity to trust, and the
+    other seven must not grow a check they can never satisfy. A connector that
+    declares this is telling the shared pipeline two things: preview its
+    batches in the `matching` state with one `search_import_rows` job enqueued,
+    and refuse commit until the job flips the batch back to `previewed` — the
+    search-then-confirm contract (Sprint 083 D3), reached by declaration the
+    same way `browsable` and `incremental` are.
+    """
+
+    search_job: Literal["search_import_rows"]
+
+
 def planned_upload(candidates: Sequence[ImportCandidate], plan: ImportPlan) -> ImportPlan:
     """The plan as the boundary may publish it.
 
