@@ -59,6 +59,7 @@ ROUTE_POLICY = {
     ("GET", "/api/insights/scores"): "private-collection",
     ("POST", "/api/entries"): "private-write",
     ("PATCH", "/api/entries/bulk"): "private-id",
+    ("DELETE", "/api/entries/bulk"): "private-id",
     ("POST", "/api/entries/accept-suggested"): "private-write",
     ("GET", "/api/entries/{entry_id}"): "private-id",
     ("PATCH", "/api/entries/{entry_id}"): "private-id",
@@ -240,6 +241,9 @@ PRIVATE_PROBES = (
         },
         None,
     ),
+    # Bulk discard names other people's ids only through the same 404 as every
+    # other id-addressed write; the selection never sees them.
+    ("DELETE", "/api/entries/bulk", {"entry_ids": ["ENTRY"]}, None),
     ("GET", "/api/items/{item_id}", None, None),
     ("PATCH", "/api/items/{item_id}", {"title": "probe"}, None),
     ("GET", "/api/items/{item_id}/cover", None, None),

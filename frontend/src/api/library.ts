@@ -535,7 +535,7 @@ export interface BulkSet {
   clear_provisional?: boolean;
 }
 
-export interface BulkBody {
+export interface BulkSelection {
   entry_ids?: number[];
   filter?: {
     status?: EntryStatus[];
@@ -543,6 +543,9 @@ export interface BulkBody {
     q?: string;
   };
   excluded_entry_ids?: number[];
+}
+
+export interface BulkBody extends BulkSelection {
   set: BulkSet;
 }
 
@@ -553,6 +556,17 @@ export async function bulkUpdateEntries(body: BulkBody): Promise<number> {
     body: JSON.stringify(body),
   });
   if (!response.ok) throw new Error("Bulk update failed");
+  const data = (await response.json()) as { affected: number };
+  return data.affected;
+}
+
+export async function bulkDeleteEntries(body: BulkSelection): Promise<number> {
+  const response = await request("/api/entries/bulk", {
+    method: "DELETE",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) throw new Error("Bulk delete failed");
   const data = (await response.json()) as { affected: number };
   return data.affected;
 }

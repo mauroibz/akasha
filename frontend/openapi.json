@@ -200,6 +200,44 @@
         "title": "BulkBody",
         "type": "object"
       },
+      "BulkSelection": {
+        "description": "The selection half of a bulk request \u2014 the one shape every bulk action\nresolves, so *Discard* understands the same `entry_ids`-or-`filter`\nselection the action bar already sends everywhere else.",
+        "properties": {
+          "entry_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Ids"
+          },
+          "excluded_entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Excluded Entry Ids",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "BulkSelection",
+        "type": "object"
+      },
       "BulkSet": {
         "properties": {
           "add_formats": {
@@ -3960,6 +3998,73 @@
       }
     },
     "/api/entries/bulk": {
+      "delete": {
+        "description": "Remove the selection's entries in one transaction (triage's Discard).\n\nSame selection shape as `PATCH /entries/bulk`: explicit `entry_ids` or a\nserver-side `filter` plus `excluded_entry_ids`, never both. Deleting has no\n`set` to send, so the body is the selection half alone.",
+        "operationId": "bulk_delete_entries_api_entries_bulk_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Delete Entries"
+      },
       "patch": {
         "operationId": "bulk_entries_api_entries_bulk_patch",
         "requestBody": {

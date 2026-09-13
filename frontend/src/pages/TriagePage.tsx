@@ -12,6 +12,7 @@ import {
 
 import {
   acceptSuggestedStatuses,
+  bulkDeleteEntries,
   bulkUpdateEntries,
   getLibraryPage,
   patchEntry,
@@ -26,7 +27,18 @@ import { Check } from "lucide-react";
 
 import { CoverImage } from "@/components/CoverImage";
 import { PageHeader } from "@/components/PageHeader";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
+import { buttonVariants } from "@/components/ui/button-variants";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
@@ -320,6 +332,31 @@ export function TriagePage() {
     onError: () => toast.error("Could not accept suggested statuses"),
   });
 
+  // Discard is the one bulk action that removes rows rather than editing them,
+  // so it both asks first (the dialog) and reports failures by name.
+  const [confirmDiscard, setConfirmDiscard] = useState(false);
+  const discardMutation = useMutation({
+    mutationFn: (body: Parameters<typeof bulkDeleteEntries>[0]) =>
+      bulkDeleteEntries(body),
+    onSuccess: (affected) => {
+      toast.success(
+        `${affected} ${affected === 1 ? "entry" : "entries"} discarded`,
+      );
+      setSelectedIds(new Set());
+      setAllMatching(false);
+      setExcludedIds(new Set());
+      setConfirmDiscard(false);
+      void queryClient.invalidateQueries({ queryKey: ["triage"] });
+      void queryClient.invalidateQueries({ queryKey: ["library"] });
+    },
+    onError: () => {
+      setConfirmDiscard(false);
+      toast.error("Could not discard the selection", {
+        description: "No entries were removed.",
+      });
+    },
+  });
+
   const selectionCount = allMatching
     ? (firstPage?.total ?? 0) - excludedIds.size
     : selectedIds.size;
@@ -349,10 +386,9 @@ export function TriagePage() {
     );
   }, [allMatching, entries, selectedIds, itemTypes.data]);
 
-  // Build bulk body from selection state
-  const buildBulkBody = (
-    set: Parameters<typeof bulkUpdateEntries>[0]["set"],
-  ) => {
+  // Build the selection half every bulk action sends, then let each action
+  // attach what it does with it.
+  const buildSelection = () => {
     if (allMatching) {
       return {
         filter: {
@@ -361,14 +397,17 @@ export function TriagePage() {
           q: filters.query.trim() || undefined,
         },
         excluded_entry_ids: Array.from(excludedIds),
-        set,
       };
     }
     return {
       entry_ids: Array.from(selectedIds),
-      set,
     };
   };
+
+  // Build bulk body from selection state
+  const buildBulkBody = (
+    set: Parameters<typeof bulkUpdateEntries>[0]["set"],
+  ) => ({ ...buildSelection(), set });
 
   // Triage is a primary reading surface, so the page owns its scroll just as it
   // does for the library. A nested 70vh scroller wastes the rest of the viewport
@@ -799,6 +838,22 @@ export function TriagePage() {
                 >
                   Clear provisional
                 </Button>
+                {/* The one destructive bulk action, and deliberately not a per-row
+                    control: a checkbox selection is explicit, the bar only
+                    exists while it is visible, and the dialog is the second
+                    deliberate click — the click-error safety the per-row flow
+                    could not offer (product spec §5, triage). Filled red with
+                    dark ink, the score chip's own pattern (DEC-026): white on
+                    red-500 misses the contrast threshold, and so does red-500
+                    ink on this raised surface. */}
+                <Button
+                  variant="destructive"
+                  className="rounded-full text-sm text-background hover:bg-destructive/90 hover:text-background"
+                  disabled={discardMutation.isPending}
+                  onClick={() => setConfirmDiscard(true)}
+                >
+                  {discardMutation.isPending ? "Discarding…" : "Discard"}
+                </Button>
                 <Button
                   variant="secondary"
                   className="rounded-full text-sm"
@@ -813,6 +868,44 @@ export function TriagePage() {
               </m.div>
             </div>
           )}
+
+          <AlertDialog
+            open={confirmDiscard}
+            onOpenChange={(open) => {
+              if (!open && !discardMutation.isPending) setConfirmDiscard(false);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>
+                  Discard{" "}
+                  {selectionCount === 1
+                    ? "this entry"
+                    : `these ${selectionCount} entries`}
+                  ?
+                </AlertDialogTitle>
+                <AlertDialogDescription>
+                  They will be removed from your library. The cached metadata
+                  and covers remain, so re-adding any of them is instant.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction
+                  className={cn(
+                    buttonVariants({ variant: "destructive" }),
+                    "rounded-full px-5",
+                  )}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    discardMutation.mutate(buildSelection());
+                  }}
+                >
+                  Discard {selectionCount === 1 ? "entry" : "entries"}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Virtualized table */}
           <div
