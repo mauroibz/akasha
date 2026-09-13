@@ -102,7 +102,12 @@ def assert_importer_contract(importer: object) -> None:
     assert_declared_targets(importer)
     assert isinstance(importer.input, ImportInputSpec)
     assert importer.input.field and importer.input.field.isidentifier()
-    assert importer.identity_kinds, f"{importer.name} declares no authoritative identity kinds"
+    # Empty is legal and rare: a source with no durable identity trusts nothing
+    # (DEC-082), which is exactly what a hand-written spreadsheet is. The set
+    # must still be declared — `frozenset()` is a choice, `None` a defect — and
+    # the reader is held to it by ImportService._validate refusing any identity
+    # kind a record carries that the connector did not declare.
+    assert isinstance(importer.identity_kinds, frozenset)
     assert all(kind for kind in importer.identity_kinds)
     assert callable(importer.read), f"{importer.name} declares no reader"
     assert callable(importer.stage), f"{importer.name} declares no staging strategy"
@@ -808,6 +813,7 @@ def test_importers_are_registered_under_every_domain_they_target() -> None:
     assert {importer.name for importer in IMPORTERS_BY_DOMAIN["book"]} == {
         "goodreads",
         "calibre",
+        "list",
     }
     # Indexing a two-domain connector twice must not publish it twice.
     assert len(IMPORTERS) == len({importer.name for importer in IMPORTERS.values()})

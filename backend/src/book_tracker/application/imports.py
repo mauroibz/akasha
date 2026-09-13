@@ -279,7 +279,13 @@ class ImportService:
         snapshot = replace(
             snapshot,
             records=tuple(
-                replace(record, entry=replace(record.entry, values=self._validate(record)))
+                replace(
+                    record,
+                    entry=replace(
+                        record.entry,
+                        values=self._validate(record) if not record.errors else record.entry.values,
+                    ),
+                )
                 for record in snapshot.records
             ),
         )

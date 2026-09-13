@@ -114,6 +114,10 @@ class ImportInputResponse(BaseModel):
     accepts_files: bool = False
     max_bytes: int | None = None
     max_files: int | None = None
+    #: Extra form fields this connector reads from the same upload request, by
+    #: name — the screen renders an input per entry, and the route forwards
+    #: exactly these into the connector's options.
+    fields: list[str] = Field(default_factory=list)
     #: Other ways into the same connector, each rendered beneath the primary. One deep.
     alternates: "list[ImportInputResponse]" = Field(default_factory=list)
 
@@ -374,7 +378,18 @@ async def _source(
             if size > cap:
                 raise _too_large(spec)
             chunks.append(chunk)
-        return ImportSource(data=b"".join(chunks), filename=upload.filename), targets
+        # A connector may declare extra form fields (the list's column mapping);
+        # the route forwards exactly those, because a name the connector did not
+        # declare is the client guessing at an API that does not exist.
+        options = {
+            name: value
+            for name in spec.fields
+            if isinstance(value := form.get(name), str) and value.strip()
+        }
+        return (
+            ImportSource(data=b"".join(chunks), filename=upload.filename, options=options or None),
+            targets,
+        )
     try:
         body = await request.json()
         value = body.get(spec.field) if isinstance(body, dict) else None

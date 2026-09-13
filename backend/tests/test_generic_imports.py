@@ -141,12 +141,15 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
     assert alternates["export"]["alternates"] == []
 
     # The screen renders what the connector declares, so what it declares has to
-    # arrive intact: ordered steps, an empty state and an https help address.
+    # arrive intact: ordered steps, an empty state and an https help address when
+    # the connector has one. `help_url` may be absent — a hand-written list has
+    # no platform to link to (the spec's "https, or absent", DEC-080) — so the
+    # guard is that it is *never wrong*, not that it is always present.
     for row in published:
         spec = row["input"]
         assert spec["guide"] and all(step.strip() for step in spec["guide"])
         assert spec["empty_state"]
-        assert spec["help_url"].startswith("https://")
+        assert spec["help_url"] is None or spec["help_url"].startswith("https://")
     assert any("review/import" in step for step in goodreads["input"]["guide"])
     assert any("provisional" in step.lower() for step in goodreads["input"]["guide"])
     assert any("metadata.db" in step for step in calibre["input"]["guide"])

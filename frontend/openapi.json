@@ -1446,6 +1446,13 @@
             "title": "Field",
             "type": "string"
           },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
           "guide": {
             "items": {
               "type": "string"

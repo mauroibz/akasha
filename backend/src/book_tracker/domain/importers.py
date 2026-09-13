@@ -92,13 +92,19 @@ class ImportInputSpec:
     #: one of them is how a limit stops meaning anything.
     max_bytes: int | None = None
     max_files: int | None = None
-    #: What a bundle from this input may contain, as anchored glob patterns over the
-    #: relative path of each member: `"metadata.db"` is that file at the root and
+    #: What a bundle from this input may contain, as anchored glob patterns over
+    #: the relative path of each member: `"metadata.db"` is that file at the root and
     #: nothing else, `"**/cover.jpg"` is that name at any depth below the root. `**`
     #: is only meaningful as the first segment. Required by `kind="directory"`,
     #: because the shared route has to refuse a member before it writes a byte and
     #: only the connector knows what its source is shaped like.
     members: tuple[str, ...] = ()
+    #: Extra form fields this connector reads from the same upload request, by
+    #: name — the shared route forwards exactly these from the form into
+    #: `ImportSource.options` and publishes them on the catalog, so a source
+    #: whose *interpretation* is a choice (which column of a hand-written list
+    #: holds the title) is a connector declaration rather than a screen patch.
+    fields: tuple[str, ...] = ()
 
 
 def valid_member_pattern(pattern: str) -> bool:
@@ -234,6 +240,12 @@ class ImportSource:
     export: Path | None = None
     #: The client's offer, as raw JSON, when this source came through the plan route.
     manifest: str | None = None
+    #: Connector-declared form fields the client sent with the source, validated
+    #: by the connector itself (the shared route only forwards names it declared
+    #: in `ImportInputSpec.fields`). A spreadsheet the owner mapped by hand is
+    #: the first source whose *interpretation* is a choice the client made, so
+    #: the mapping rides here rather than in the fingerprint-breaking bytes.
+    options: Mapping[str, Any] | None = None
 
 
 @dataclass(frozen=True)
