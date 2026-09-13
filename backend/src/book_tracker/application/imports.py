@@ -383,13 +383,41 @@ class ImportService:
                     .order_by(ImportRecordRow.row_number)
                 )
             )
-            return {
-                "batch_id": batch.id,
-                "fingerprint": batch.fingerprint,
-                "state": batch.state,
-                "summary": json.loads(batch.preview_summary),
-                "records": [_preview_record(row) for row in rows],
-            }
+        # Proposals ride along when the connector's search job has produced
+        # them; a connector with no proposal store reads exactly as it always
+        # did, because the per-record list is empty and the summary counts
+        # default to zero (Sprint 083 D2.3).
+        proposals = self.imports.proposals_for_batch(batch_id)
+        proposals_by_record: dict[int, list[dict[str, Any]]] = {}
+        for proposal in proposals:
+            proposals_by_record.setdefault(proposal["record_id"], []).append(
+                {
+                    "source": proposal["source"],
+                    "source_id": proposal["source_id"],
+                    "payload": proposal["payload"],
+                    "rank": proposal["rank"],
+                    "chosen": proposal["chosen"],
+                }
+            )
+        records = []
+        for row in rows:
+            record = _preview_record(row)
+            record["proposals"] = proposals_by_record.get(record["record_id"], [])
+            records.append(record)
+        summary = json.loads(batch.preview_summary)
+        if proposals:
+            summary.setdefault("rows_with_proposals", len(proposals_by_record))
+            summary.setdefault("proposals_total", len(proposals))
+        else:
+            summary.setdefault("rows_with_proposals", 0)
+            summary.setdefault("proposals_total", 0)
+        return {
+            "batch_id": batch.id,
+            "fingerprint": batch.fingerprint,
+            "state": batch.state,
+            "summary": summary,
+            "records": records,
+        }
 
     def resolve_file(self, batch_id: str, path: str, *, now: datetime | None = None) -> int:
         """Which committed item a file offered under `path` belongs to.

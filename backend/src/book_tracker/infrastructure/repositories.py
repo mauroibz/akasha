@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from sqlalchemy import Engine, delete, func, select
+from sqlalchemy import Engine, delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,7 @@ from book_tracker.infrastructure.models import (
     EntryShelfRow,
     ImportBatchRow,
     ImportEffectRow,
+    ImportProposalRow,
     ImportRecordRow,
     ItemIdentifierRow,
     ItemRow,
@@ -586,6 +587,165 @@ class ImportRepository:
     def __init__(self, engine: Engine, user_id: int) -> None:
         self.engine = engine
         self.user_id = user_id
+
+    # -- Proposals (Sprint 083 D2) ------------------------------------------
+
+    def add_proposals(
+        self,
+        *,
+        batch_id: str,
+        record_id: int,
+        proposals: Sequence[Mapping[str, Any]],
+    ) -> None:
+        """Store one record's ranked proposals, replacing any the job already wrote.
+
+        The search job writes a record's top-N in one call after its searches
+        settle; re-running the job for a record (a resumed quota wait) rewrites
+        them rather than appending, so a row can never show two answers from
+        two passes.
+        """
+        now = _now()
+        with DomainRepository(self.engine, self.user_id)._write() as session:
+            session.execute(
+                delete(ImportProposalRow).where(
+                    ImportProposalRow.batch_id == batch_id,
+                    ImportProposalRow.record_id == record_id,
+                    ImportProposalRow.user_id == self.user_id,
+                )
+            )
+            for proposal in proposals:
+                session.add(
+                    ImportProposalRow(
+                        batch_id=batch_id,
+                        user_id=self.user_id,
+                        record_id=record_id,
+                        source=str(proposal["source"]),
+                        source_id=str(proposal["source_id"]),
+                        payload_json=json.dumps(proposal["payload"], ensure_ascii=False),
+                        rank=int(proposal["rank"]),
+                        chosen=None,
+                        created_at=now,
+                    )
+                )
+
+    def proposals_for_batch(self, batch_id: str) -> list[dict[str, Any]]:
+        """Every proposal of the batch, in record then rank order, as the routes
+        and the preview screen read them."""
+        with Session(self.engine) as session:
+            rows = list(
+                session.scalars(
+                    select(ImportProposalRow)
+                    .where(
+                        ImportProposalRow.batch_id == batch_id,
+                        ImportProposalRow.user_id == self.user_id,
+                    )
+                    .order_by(ImportProposalRow.record_id, ImportProposalRow.rank)
+                )
+            )
+            return [
+                {
+                    "id": row.id,
+                    "record_id": row.record_id,
+                    "source": row.source,
+                    "source_id": row.source_id,
+                    "payload": json.loads(row.payload_json),
+                    "rank": row.rank,
+                    "chosen": None if row.chosen is None else bool(row.chosen),
+                }
+                for row in rows
+            ]
+
+    def choose_proposal(
+        self,
+        batch_id: str,
+        record_id: int,
+        *,
+        proposal_source: str,
+        proposal_source_id: str,
+    ) -> None:
+        """Mark one proposal chosen and clear the record's others.
+
+        A record the user does not own is the same 404 the batch itself gives,
+        raised here as `LookupError` the route maps — the proposal store is
+        inside the import boundary, not a new surface beside it.
+        """
+        with DomainRepository(self.engine, self.user_id)._write() as session:
+            owned = session.scalar(
+                select(ImportRecordRow.id).where(
+                    ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.id == record_id,
+                    ImportRecordRow.user_id == self.user_id,
+                )
+            )
+            if owned is None:
+                raise LookupError(f"{batch_id}/{record_id}")
+            target = session.scalar(
+                select(ImportProposalRow).where(
+                    ImportProposalRow.batch_id == batch_id,
+                    ImportProposalRow.record_id == record_id,
+                    ImportProposalRow.user_id == self.user_id,
+                    ImportProposalRow.source == proposal_source,
+                    ImportProposalRow.source_id == proposal_source_id,
+                )
+            )
+            if target is None:
+                raise LookupError(f"{batch_id}/{record_id}/{proposal_source}")
+            for row in session.scalars(
+                select(ImportProposalRow).where(
+                    ImportProposalRow.batch_id == batch_id,
+                    ImportProposalRow.record_id == record_id,
+                    ImportProposalRow.user_id == self.user_id,
+                )
+            ):
+                row.chosen = 1 if row.id == target.id else 0
+
+    def discard_proposals(self, batch_id: str, record_id: int) -> None:
+        """The owner's explicit discard: none of these is the book; keep my row
+        as typed. Every proposal of the record is marked not-chosen."""
+        with DomainRepository(self.engine, self.user_id)._write() as session:
+            owned = session.scalar(
+                select(ImportRecordRow.id).where(
+                    ImportRecordRow.batch_id == batch_id,
+                    ImportRecordRow.id == record_id,
+                    ImportRecordRow.user_id == self.user_id,
+                )
+            )
+            if owned is None:
+                raise LookupError(f"{batch_id}/{record_id}")
+            session.execute(
+                update(ImportProposalRow)
+                .where(
+                    ImportProposalRow.batch_id == batch_id,
+                    ImportProposalRow.record_id == record_id,
+                    ImportProposalRow.user_id == self.user_id,
+                )
+                .values(chosen=0)
+            )
+
+    def chosen_proposal(self, batch_id: str, record_id: int) -> dict[str, Any] | None:
+        """The one confirmed proposal for a record, or None when unanswered."""
+        with Session(self.engine) as session:
+            row = session.scalar(
+                select(ImportProposalRow).where(
+                    ImportProposalRow.batch_id == batch_id,
+                    ImportProposalRow.record_id == record_id,
+                    ImportProposalRow.user_id == self.user_id,
+                    ImportProposalRow.chosen == 1,
+                )
+            )
+            if row is None:
+                return None
+            return {
+                "id": row.id,
+                "record_id": row.record_id,
+                "source": row.source,
+                "source_id": row.source_id,
+                "payload": json.loads(row.payload_json),
+                "rank": row.rank,
+                "chosen": True,
+            }
+
+    # -- Batches -------------------------------------------------------------
 
     def get_batch_by_fingerprint(self, kind: str, fingerprint: str) -> str | None:
         with Session(self.engine) as session:
