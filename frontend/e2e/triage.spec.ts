@@ -1152,6 +1152,52 @@ test("triage puts a selection on a shelf in bulk", async ({ page }) => {
   await expect(page.getByText("2 entries updated")).toBeVisible();
 });
 
+test("the detail page a triage row opens returns to triage", async ({
+  page,
+}) => {
+  const entries = makeEntries(2);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  // The detail page's own GET, shaped like the seed the other specs use.
+  await page.route("**/api/entries/1", (route) =>
+    route.fulfill({ json: { ...entries[0], status: "unsorted" } }),
+  );
+  await page.route("**/api/item-types", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/items/1", (route) =>
+    route.fulfill({ json: entries[0].item }),
+  );
+  await page.route("**/api/items/1/attachments", (route) =>
+    route.fulfill({ json: { attachments: [] } }),
+  );
+
+  await page.goto("/import?tab=triage");
+  await page.getByText("Book 1", { exact: true }).click();
+  await expect(page).toHaveURL(/\/books\/1$/);
+
+  // Back returns to the inbox it was opened from, not the library.
+  await expect(page.getByRole("link", { name: /← triage/i })).toBeVisible();
+  await page.getByRole("link", { name: /← triage/i }).click();
+  await expect(page).toHaveURL(/\/import\?tab=triage$/);
+  await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
+
+  // A deep link with no triage behind it still offers the library, the only
+  // place a reader would expect to land.
+  await page.goto("/books/1");
+  await expect(page.getByRole("link", { name: /← library/i })).toBeVisible();
+});
+
 test("the retired /triage address still lands on the folded tab", async ({
   page,
 }) => {

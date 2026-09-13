@@ -590,7 +590,7 @@ export function TriagePage() {
       if (event.key === "Enter") {
         event.preventDefault();
         if (selectionCount === 0 && focusedId !== null) {
-          void navigate(`/books/${focusedId}`);
+          void navigate(`/books/${focusedId}`, { state: { from: "triage" } });
         } else {
           // After bulk action, advance focus
           const current = Math.max(
@@ -963,7 +963,9 @@ export function TriagePage() {
                       )
                         return;
                       setFocusedId(entry.id);
-                      void navigate(`/books/${entry.id}`);
+                      void navigate(`/books/${entry.id}`, {
+                        state: { from: "triage" },
+                      });
                     }}
                     onFocus={() => setFocusedId(entry.id)}
                   >
