@@ -6300,3 +6300,98 @@ only the file-Status flip and state regeneration.
   publishing remain owner actions, deliberately not performed by this sprint. A future
   reopening moves `FINAL_SPRINT` again and records the move here. The
   contended-insights-at-10k finding stays unowned by a sprint until the owner schedules one.
+
+## DEC-156 — The plan reopens: a hand-written CSV imports by search-then-confirm (Sprint 083)
+
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Supersedes:** nothing. DEC-155 closed the plan at 82 and named the reopening mechanism this
+  entry now exercises; DEC-146's completed line is untouched.
+- **Cross-references:** DEC-080 (a connector declares its own guidance), DEC-082 (a source with no
+  durable identity should not guess), DEC-045 (search spends recorded, background work is
+  budgeted), DEC-106 (preview idempotency is the source *and* what was asked of it), DEC-155
+  (the completed-plan invariants), Sprint 083.
+
+### Context
+
+The owner asked (2026-09-13) for an importer unlike the seven existing ones: a CSV or TXT
+**written by a user**, not exported by a platform. `exports/Libros.csv` (104 rows, git-ignored,
+never committed) has title and author columns and no identifiers at all — every prior connector
+leaned on per-row IDs (Goodreads ISBNs, Calibre UUIDs, IMDb/Letterboxd/Trakt ids, Spotify URIs,
+MyAnimeList ids), which made its bulk matching against the local library trivial. The request:
+let the owner pick which columns to import; search the domain's providers row by row (sequential,
+async, because public metadata APIs are rate-limited); propose the best result per row; let the
+owner swap in the right result or discard it when none matches.
+
+Measured in the worktree before planning, from live code:
+
+- `Importer.match` (`domain/importers.py:355`) is a **local-library** seam (`ImportMatcher`,
+  `infrastructure/repositories.py`); no provider is reachable from preview. The new source has no
+  identity, so nothing in the existing matching path can answer for it.
+- `ImportService._validate` (`application/imports.py:190-198`) refuses a batch whose records carry
+  identifier kinds the connector did not declare — an identity-free connector declares
+  `identity_kinds = frozenset()` and must emit no identifiers, which is exactly the source's shape.
+- The provider search seam is domain-keyed and already shared (`application/providers.py`
+  `search_providers`, `merge_and_rank` in `domain/providers.py:148`), bounded at 10 s per
+  provider; books have Open Library keyless and Google Books keyed (`GOOGLE_BOOKS_API_KEY` set).
+- A durable, rate-limited, user-scoped job system exists (`infrastructure/jobs.py`: claim/lease/
+  heartbeat/backoff, `JobRunner` in the FastAPI lifespan, `RateLimiter(0.5s)` in `main.py:275`,
+  `ProviderQuota` blocking for background work per DEC-045's split), and `GET /api/import/jobs/
+  {id}` already serves progress (`api/imports.py:771`).
+- `import_batches.state` is free text with no CHECK (migration 0016 constrained only `kind`), so
+  a new `matching` lifecycle state needs no schema change to that column.
+- Triage operates on committed `unsorted` entries (`TriagePage.tsx`, DEC-086); the preview screen
+  already renders per-row decisions for `ambiguous` rows (`ImportPage.tsx:843`).
+
+Three product questions were put to the owner (2026-09-13) and answered:
+
+1. **Where matching lives:** as a background job between preview and commit — the preview screen
+   polls progress and **commit stays blocked until the queue for the batch drains**. (Not
+   raw-rows-first-then-match-after-commit; not synchronous.)
+2. **What a confirmation fills:** the provider's **full payload** — cover, ISBNs, synopsis,
+   publisher, page count, language, year — the same `ItemPayload` the add path fetches.
+3. **What is mapped:** **title and author only**. The CSV's other columns (Editorial, Idioma,
+   Formato, Estado, Precio, Comentarios) are not mapped to any domain field — the owner's answer:
+   "va a depender completamente del dominio y lo que contenga el csv que el usuario provea.
+   Matchearlo no está en scope, solo importa para la búsqueda. Queda a futuro."
+
+### Decision
+
+- The plan reopens at **Sprint 083 — "A list you wrote yourself"**
+  (`docs/sprints/083-a-list-you-wrote.md`, created `ready` in the same commit per the
+  end-of-plan revision shape; `FINAL_SPRINT` moves 82 → 83 in `scripts/validate_project.py`).
+- The connector is a **generic delimited-text reader** in the book domain (`list`), with a
+  connector-declared column-mapping option the shared screen renders (auto-detect by header,
+  first-two-columns fallback — satisfying the owner's "seleccionar qué columnas usar" without a
+  per-connector screen patch, the `browsable`/`incremental` declaration pattern extended).
+- Provider matching is a **new durable job kind** `search_import_rows`, sequential per row,
+  rate-limited and quota-aware (enrichment-shaped spending, per DEC-045's split, because nobody
+  is waiting on any single row), storing **top-N (3) merged proposals per row** in a new
+  `import_proposals` table (migration 0022). The batch's `state` gains `matching` between
+  `previewed` stages; commit refuses it (409).
+- **Confirm re-stages the row** from the proposal's payload through the existing
+  `normalized_payload` channel — commit, undo, triage and enrichment need no new code path;
+  **discard keeps the typed row**; unconfirmed rows land as typed. Decisions are per row, and a
+  chosen proposal is user data that survives re-preview.
+- The CSV's non-search columns ride uninterpreted in `source_fields`. Mapping them is a future
+  decision for whatever domain and spreadsheet a future user brings.
+
+### Consequences
+
+- `docs/agent/state.json` reads `project_status: ready` with Sprint 083 active (generated by
+  `sync_sprint_state.py` from the sprint file's `Status: ready`, never hand-edited — DEC-148).
+- The `matching` state, the proposals table and the confirm routes are **domain-neutral shared
+  surface**: the conformance suite must prove no shared layer branches on the connector's name,
+  and a second connector's data exercises the neutrality (technical spec 6.6's contract).
+- Interactive search remains recorded-never-blocked; the import job is budgeted like enrichment —
+  a large import may wait out a provider's daily window, which the progress surface must show
+  rather than hide. `AKASHA_PROVIDER_DAILY_LIMITS` stays the owner's dial.
+- ~104 rows at one search per row against Open Library (keyless) is the realistic load; the
+  sequential 1×1 shape is the owner's explicit instruction and is not to be traded for
+  concurrency without a superseding decision.
+- Sprint 083's walkthrough must run against **recorded real Open Library responses** (DEC-025):
+  the correctness of the proposal pipeline is proven against the recorded boundary, with the
+  live boundary exercised once in the walkthrough if it is up (DEC-108's substitution rule
+  otherwise).
+- The "Not scheduled" saved-views and shelf-menu items remain where they are; nothing about
+  this reopening moves them.

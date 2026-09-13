@@ -1,49 +1,60 @@
-# Handoff — the plan is complete and v2.0.0 is released
+# Handoff — Sprint 083 (ready): a list you wrote yourself
 
-`docs/agent/state.json` reads `project_status: complete` with a null active sprint: Sprints
-001–082 are all completed. **v2.0.0 shipped 2026-09-11**: PR #19 (73 commits) merged to `main`
-as `c393b57`, tag `v2.0.0` pushed, the Release workflow published
-`ghcr.io/mauroibz/akasha:2.0.0` (+`2.0`, `latest`), and the GitHub Release
-"Akasha 2.0.0 — authentication and multiuser" is live from `release-notes-v2.0.md`. All
-gates ran green on the exact merged tree. A new line of work opens only by a plan revision
-(the reopened-plan mechanics are in `docs/agent/WORKFLOW.md`'s final-sprint rule and the
-seeds-methodology skill's end-of-plan revision shape).
+`docs/agent/state.json` reads `project_status: ready` with **Sprint 083 active**
+(`docs/sprints/083-a-list-you-wrote.md`, `Status: ready`, plan revision 41, DEC-156). The plan
+reopened on 2026-09-13 at the owner's request: an importer for a hand-written CSV/TXT —
+`exports/Libros.csv`, 104 rows, title/author columns, **no identifiers** — unlike every existing
+connector, which reads platform exports whose IDs made bulk matching trivial.
 
-## What 2.0.0 is, in one paragraph
+## What Sprint 083 delivers (read the sprint file for the contract)
 
-Authentication and multiuser, off by default. Turn `AKASHA_AUTH=on` and a first-run setup screen
-creates the admin who claims the existing library; each further account gets its own private
-library (entries, shelves, imports, exports, triage scoped; items and covers a shared cache);
-sessions last 400 days and slide while used, are listed and revocable per device; an admin can
-act inside another library behind an unmissable banner with one audit event per request;
-`tailscale serve` can additionally assert identities through a peer-allowlisted header with
-zero-tap login. The exposure rule everywhere: no internet-reachable proxy, DNS or port forward
-unless auth is on, TLS terminates in front, and the cookie is `Secure`. The four version
-surfaces say `2.0.0`; the upgrade is `docker compose pull && up -d` with no action otherwise.
+A `list` connector (book domain) with a screen-pickable column mapping (auto-detect by header,
+first-two-columns fallback); a new `matching` batch state with one durable `search_import_rows`
+job per preview that searches the domain's providers **sequentially, one row at a time**
+(rate-limited, quota-aware, resumable), storing top-3 merged proposals per row in a new
+`import_proposals` table (migration 0022); confirm re-stages the row from the provider's full
+payload, discard keeps the typed row; commit is refused while `matching`. The three owner
+decisions (background matching before commit, full payload on confirm, title/author only —
+extra columns deliberately unmapped, "queda a futuro") are recorded in the sprint file and
+DEC-156.
 
-## Owner actions left (all optional, nothing is blocked on them)
+## Where the research left the ground truth
 
-1. **The release**, whenever wanted: tag `v2.0.0` on the merged main, push, watch the Release
-   workflow, publish the GitHub Release from `docs/operations/release-notes-v2.0.md`, then
-   upgrade the ZimaBoard (`AKASHA_VERSION=2.0.0`). With auth left off the board's upgrade
-   changes nothing visible. Turning auth on is `docs/operations/runbook.md`'s
-   "Turning authentication on" — proven end to end by Sprint 082's upgrade rehearsal on a copy of
-   the board's own database.
-2. **DEC-154's residual proof**, when Tailscale lands on the board: phone on the tailnet opens
-   signed-in; a non-tailnet device does not; sign-out-everywhere ends the desktop session. Record
-   it in the worklog or a superseding DEC.
+Measured 2026-09-13, file:line in the sprint file's Required context and baseline sections:
+
+- `Importer.match` is a local-library seam only; provider search lives in
+  `application/providers.py:search_providers` (concurrent, 10 s bound, `merge_and_rank`).
+- `ImportService._validate` (`application/imports.py:190`) refuses undeclared identifier kinds —
+  the new connector declares `identity_kinds = frozenset()` and emits none.
+- The job system is general (`infrastructure/jobs.py`, `JobRunner` in `main.py:292`'s handler
+  table, `RateLimiter(0.5)` at `main.py:275`, `ProviderQuota` blocking for background work);
+  `GET /api/import/jobs/{id}` already exists (`api/imports.py:771`).
+- `import_batches.state` is free text (no CHECK — migration 0016 constrained only `kind`), so
+  `matching` needs no migration on that table; only the proposals table is new.
+- The CSV's traps are enumerated in the sprint baseline: trailing-space header `Editorial `,
+  transposed `Homero,Iliada` row, collection volumes (`Duma key 2`), typos, two quoted titles,
+  two dictionary rows, `et al` author. It stays in the git-ignored `exports/` — never committed;
+  tests use a synthetic fixture shaped like it.
+- Google Books is keyed and enabled in this checkout's `.env`; Open Library is keyless.
 
 ## Known and left, in the order they are likely to bite
 
-1. **Contended insights at 10,000 entries** (DEC-154/DEC-155): `creators/count` 575.4 ms,
-   `creators/score` 594.9 ms, `publisher/count` 1234.8 ms p95 under 200 queued jobs — a scale
-   never measured before this plan's close; the spec budget binds the first library page (147.8
-   ms contended, within budget). A future sprint decides whether insights gets its own budget.
-2. **The board still runs image 1.8.0** (82 entries, almost all `unsorted`, no users table),
-   bound to its LAN IP with ZeroTier unable to reach it; the upgrade is owner action 1.
-3. The dev machine's standing `akasha-akasha-1` (127.0.0.1:8000) is the owner's local
-   081-branch-era build; a `local-081` image also exists locally. Both are prunable once
-   `v2.0.0` is published and the board upgraded.
-4. The e2e/browser suites are the only automated guardrails on the UI contracts; nothing is
-   scheduled after this close, so a regression found in use becomes a plan revision, not a
-   sprint.
+1. **The version surfaces all read `2.0.0`** and the validator gates them (DEC-155). Sprint 083
+   adds no release; do not bump them.
+2. **DEC-154's residual proof** (Tailscale tailnet walkthrough) is still owed by the owner,
+   unrelated to this sprint.
+3. **Contended insights at 10k entries** (DEC-155) remains unowned by a sprint.
+4. **The dev machine's standing `akasha-akasha-1`** container and `local-081` image are prunable
+   once the board is upgraded to 2.0.0 (owner action).
+5. **Sprint 083's walkthrough** must prove the proposal pipeline against recorded real Open
+   Library responses (DEC-025), not mocks; capture the fixtures early in the sprint — if Open
+   Library is shedding (the DEC-108 maxlag incident class), the capture script needs patience
+   and the fixtures README records observed throttling.
+
+## Protocol notes for whoever executes
+
+- This was a docs-only planning session: no state flipped beyond the plan revision itself, no
+  code changed, `make test` not owed (no application code changed). Claim the sprint with
+  `python scripts/sync_sprint_state.py --sprint 083 in_progress` when starting.
+- The sprint file's Commit checkpoints, Verification section and explicit non-scope are binding.
+  The "Not scheduled" section of the ROADMAP is untouched by this reopening.
