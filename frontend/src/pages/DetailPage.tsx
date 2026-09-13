@@ -645,7 +645,6 @@ export function DetailPage() {
             <AlertDialogTitle>Remove this from your library?</AlertDialogTitle>
             <AlertDialogDescription>
               Your score, status, notes, and shelf assignments will be deleted.
-              The metadata and cover remain cached so re-adding is instant.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (

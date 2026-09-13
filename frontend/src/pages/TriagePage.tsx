@@ -885,8 +885,7 @@ export function TriagePage() {
                   ?
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  They will be removed from your library. The cached metadata
-                  and covers remain, so re-adding any of them is instant.
+                  They will be removed from your library.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
