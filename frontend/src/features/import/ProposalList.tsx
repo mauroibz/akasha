@@ -2,13 +2,10 @@ import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import {
-  answerProposal,
-  researchRow,
-  type ImportProposal,
-} from "@/api/imports";
+import { answerProposal, type ImportProposal } from "@/api/imports";
 import { CoverImage } from "@/components/CoverImage";
 import { Button } from "@/components/ui/button";
+import { ResearchForm } from "@/features/import/RowControls";
 import { cn } from "@/lib/utils";
 
 /**
@@ -119,121 +116,6 @@ function ProposalCard({
 }
 
 /**
- * The editable title/author and its "Search again" trigger — on every row,
- * not only empty ones (the owner's 2026-09-14 decision: a bad query can also
- * produce wrong proposals). Pre-fills with the row's current text; the
- * spreadsheet's own cells stay untouched in `source_fields`.
- */
-function SearchAgain({
-  title,
-  author,
-  recordId,
-  batchId,
-  importerId,
-  disabled,
-  onAnswered,
-}: {
-  title: string;
-  author: string;
-  recordId: number;
-  batchId: string;
-  importerId: string;
-  disabled: boolean;
-  onAnswered: () => void;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [draftTitle, setDraftTitle] = useState(title);
-  const [draftAuthor, setDraftAuthor] = useState(author);
-
-  const research = useMutation({
-    mutationFn: () =>
-      researchRow(importerId, batchId, recordId, {
-        title: draftTitle,
-        author: draftAuthor,
-      }),
-    onSuccess: () => {
-      setEditing(false);
-      toast.success("Searched again", {
-        description: "The row now carries the edited text and fresh results.",
-      });
-      onAnswered();
-    },
-    onError: () => {
-      toast.error("The search could not run", {
-        description: "The row was not changed.",
-      });
-    },
-  });
-
-  if (disabled && !editing) return null;
-  return (
-    <div className="space-y-2">
-      {editing && (
-        <form
-          className="space-y-2 rounded-xl border border-border bg-surface p-3"
-          onSubmit={(event) => {
-            event.preventDefault();
-            research.mutate();
-          }}
-        >
-          <label className="block">
-            <span className="text-sm text-muted-foreground">Title</span>
-            <input
-              className="mt-1 h-11 w-full rounded-md border border-input bg-transparent px-3 text-base focus-ring"
-              value={draftTitle}
-              onChange={(event) => setDraftTitle(event.target.value)}
-              autoFocus
-            />
-          </label>
-          <label className="block">
-            <span className="text-sm text-muted-foreground">Author</span>
-            <input
-              className="mt-1 h-11 w-full rounded-md border border-input bg-transparent px-3 text-base focus-ring"
-              value={draftAuthor}
-              onChange={(event) => setDraftAuthor(event.target.value)}
-            />
-          </label>
-          <div className="flex gap-2">
-            <Button
-              size="sm"
-              className="rounded-full"
-              type="submit"
-              disabled={research.isPending || !draftTitle.trim()}
-            >
-              {research.isPending ? "Searching…" : "Search again"}
-            </Button>
-            <Button
-              size="sm"
-              variant="secondary"
-              className="rounded-full"
-              type="button"
-              onClick={() => setEditing(false)}
-            >
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-      {!editing && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="rounded-full text-xs"
-          disabled={disabled}
-          onClick={() => {
-            setDraftTitle(title);
-            setDraftAuthor(author);
-            setEditing(true);
-          }}
-        >
-          Wrong text? Edit and search again
-        </Button>
-      )}
-    </div>
-  );
-}
-
-/**
  * The proposals the background search found for one row, ranked, with the
  * owner's answer per result: confirm one, or discard the lot and keep the row
  * exactly as the spreadsheet typed it (Sprint 083 D4.2).
@@ -242,9 +124,11 @@ function SearchAgain({
  * still rewrite this record's proposals, and answering it mid-flight would be
  * answering a question that is still being asked.
  *
- * The 2026-09-14 owner feedback adds two affordances: "Show more" unfolds the
- * stored ten past the first three, and an editable title/author with a
- * "Search again" button on every row.
+ * The 2026-09-14 owner feedback shapes the action area: the secondary
+ * actions — Show more, the edit-and-re-search trigger, the discard — sit side
+ * by side in one wrapping row under the proposals (one line to scan, the same
+ * height for every row), and the edit form opens above them, pushing nothing
+ * sideways.
  */
 export function ProposalList({
   recordId,
@@ -282,6 +166,7 @@ export function ProposalList({
   });
 
   const [expanded, setExpanded] = useState(false);
+  const [editing, setEditing] = useState(false);
 
   const answered = proposals.some(
     (proposal) => proposal.chosen === true || proposal.chosen === false,
@@ -297,15 +182,6 @@ export function ProposalList({
             ? "Searching…"
             : "No results. Fix the text and search again, or keep the row as you typed it."}
         </p>
-        <SearchAgain
-          title={title}
-          author={author}
-          recordId={recordId}
-          batchId={batchId}
-          importerId={importerId}
-          disabled={matching}
-          onAnswered={onAnswered}
-        />
       </div>
     );
   }
@@ -328,58 +204,80 @@ export function ProposalList({
           />
         ))}
       </ul>
-      {!expanded && hidden > 0 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="rounded-full text-xs"
-          onClick={() => setExpanded(true)}
-        >
-          Show more ({hidden})
-        </Button>
+      {editing && (
+        <ResearchForm
+          recordId={recordId}
+          batchId={batchId}
+          importerId={importerId}
+          initialTitle={title}
+          initialAuthor={author}
+          onSearched={() => {
+            setEditing(false);
+            setExpanded(false);
+            onAnswered();
+          }}
+          onCancel={() => setEditing(false)}
+        />
       )}
-      {expanded && proposals.length > COLLAPSED && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="rounded-full text-xs"
-          onClick={() => setExpanded(false)}
-        >
-          Show fewer
-        </Button>
-      )}
-      <SearchAgain
-        title={title}
-        author={author}
-        recordId={recordId}
-        batchId={batchId}
-        importerId={importerId}
-        disabled={matching}
-        onAnswered={onAnswered}
-      />
-      {answered ? (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="rounded-full text-xs"
-          disabled={matching || discard.isPending}
-          onClick={() => discard.mutate()}
-        >
-          Undo my answer
-        </Button>
-      ) : (
-        // The row's own way out: none of these is the book, and the row stays
-        // exactly as the spreadsheet typed it (D4.2's Discard).
-        <Button
-          variant="outline"
-          size="sm"
-          className="rounded-full text-xs"
-          disabled={matching || discard.isPending}
-          onClick={() => discard.mutate()}
-        >
-          None of these — keep as typed
-        </Button>
-      )}
+      {/* The row's secondary actions, side by side in one wrapping row:
+          the fold, the correction, and the way out read as peers of one
+          decision about this row, not a paragraph of buttons. */}
+      <div className="flex flex-wrap items-center gap-2">
+        {!expanded && hidden > 0 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs"
+            onClick={() => setExpanded(true)}
+          >
+            Show more ({hidden})
+          </Button>
+        )}
+        {expanded && proposals.length > COLLAPSED && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs"
+            onClick={() => setExpanded(false)}
+          >
+            Show fewer
+          </Button>
+        )}
+        {!editing && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs"
+            disabled={matching}
+            onClick={() => setEditing(true)}
+          >
+            Wrong text? Edit and search again
+          </Button>
+        )}
+        {answered ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="rounded-full text-xs"
+            disabled={matching || discard.isPending}
+            onClick={() => discard.mutate()}
+          >
+            Undo my answer
+          </Button>
+        ) : (
+          // The row's own way out: none of these is the book, and the row
+          // stays exactly as the spreadsheet typed it (D4.2's Discard).
+          <Button
+            variant="outline"
+            size="sm"
+            className="rounded-full text-xs"
+            disabled={matching || discard.isPending}
+            onClick={() => discard.mutate()}
+          >
+            None of these — keep as typed
+          </Button>
+        )}
+      </div>
     </div>
   );
 }
