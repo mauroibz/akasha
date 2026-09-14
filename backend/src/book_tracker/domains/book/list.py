@@ -174,7 +174,7 @@ def _mapping_from_options(options: Mapping[str, Any] | None, width: int) -> dict
 
 class ListImporter:
     name = "list"
-    label = "A list you wrote"
+    label = "Custom list"
     item_types: tuple[str, ...] = (DOMAIN.item_type,)
     input = ImportInputSpec(
         kind="upload",

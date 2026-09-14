@@ -859,7 +859,7 @@ class ImportRepository:
             created_items = created_entries = unchanged = 0
             now = _now()
             for row in rows:
-                if row.planned_action in {"error", "identity_conflict"}:
+                if row.planned_action in {"error", "identity_conflict", "excluded"}:
                     continue
                 payload = json.loads(row.normalized_payload)
                 domain = domains.get(payload.get("item_type") or "", default_domain)

@@ -324,17 +324,22 @@ class TestTheJob:
         assert ImportRepository(engine, 1).proposals_for_batch("b1")
 
     @pytest.mark.anyio
-    async def test_top_n_is_capped_at_three(self, tmp_path: Path) -> None:
+    async def test_top_n_is_capped_at_ten(self, tmp_path: Path) -> None:
+        """Ten stored (the owner's 2026-09-14 'Show more'), three rendered:
+        the providers are consulted once per row, so the deeper results cost
+        nothing but storage."""
         engine = make_engine(tmp_path)
         stage_preview(engine, [{"title": "Rayuela", "author": "Julio Cortázar"}])
-        provider = FakeProvider([candidate(f"Result {index}", f"OL{index}M") for index in range(6)])
+        provider = FakeProvider(
+            [candidate(f"Result {index}", f"OL{index}M") for index in range(20)]
+        )
         jobs = JobRepository(engine)
         job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
         handler = make_handler(engine, [provider])
         await handler.process(job_id, NOW)
         proposals = ImportRepository(engine, 1).proposals_for_batch("b1")
-        assert len(proposals) == 3
-        assert [p["rank"] for p in proposals] == [0, 1, 2]
+        assert len(proposals) == 10
+        assert [p["rank"] for p in proposals] == list(range(10))
 
     @pytest.mark.anyio
     async def test_no_results_is_an_answer_not_an_error(self, tmp_path: Path) -> None:

@@ -2580,6 +2580,35 @@
         "title": "RefreshBody",
         "type": "object"
       },
+      "RowSearchBody": {
+        "description": "The edited text a re-search should query, either half optional.\n\nAn omitted half keeps the row's current value \u2014 the owner edits what is\nwrong and leaves the rest alone.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "RowSearchBody",
+        "type": "object"
+      },
       "ScoreDistributionResponse": {
         "properties": {
           "counts": {
@@ -4863,6 +4892,168 @@
         ]
       }
     },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/exclude": {
+      "post": {
+        "description": "Keep one row out of the commit entirely.\n\nThe owner's 2026-09-14 decision: 'none of these is the book' must not\nforce a keep-as-typed row into the library. The row's planned action\nbecomes `excluded` \u2014 commit's existing skip set \u2014 and the summary\nrecounts so the commit gate tells the truth. Every connector's rows can\nbe excluded; the route is shared surface, reached from the list\nconnector's screen today.",
+        "operationId": "exclude_row_api_import__importer_name__batches__batch_id__records__record_id__exclude_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Exclude Row",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/include": {
+      "post": {
+        "description": "Undo a row's exclusion: it returns to what preview planned for it.",
+        "operationId": "include_row_api_import__importer_name__batches__batch_id__records__record_id__include_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Include Row",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/proposal": {
       "post": {
         "description": "Confirm one proposal for one row, or discard the row's proposals.\n\nConfirming re-stages the row's item half from the provider's payload and\nrecomputes its planned action, so the commit that follows needs no new path\n(Sprint 083 D4). Discarding keeps the row exactly as the spreadsheet typed\nit. Both require the batch's searches to have drained.",
@@ -4949,6 +5140,97 @@
           }
         },
         "summary": "Answer Row Proposal",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/search": {
+      "post": {
+        "description": "Edit a row's title/author and search it again.\n\nThe owner's 2026-09-14 decision, available on any row (a bad query can\nalso produce wrong proposals, not only an empty result): the typed row is\nre-staged with the edited text and its proposals are replaced. The spend\nis interactive-shaped (DEC-045): recorded, never blocked \u2014 a person is\nwaiting on the answer.",
+        "operationId": "research_row_api_import__importer_name__batches__batch_id__records__record_id__search_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowSearchBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Research Row",
         "tags": [
           "imports"
         ]

@@ -826,6 +826,92 @@ async def answer_row_proposal(
     return PreviewResponse.model_validate(result)
 
 
+class RowSearchBody(BaseModel):
+    """The edited text a re-search should query, either half optional.
+
+    An omitted half keeps the row's current value — the owner edits what is
+    wrong and leaves the rest alone.
+    """
+
+    title: str | None = None
+    author: str | None = None
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/exclude",
+    response_model=PreviewResponse,
+)
+async def exclude_row(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Keep one row out of the commit entirely.
+
+    The owner's 2026-09-14 decision: 'none of these is the book' must not
+    force a keep-as-typed row into the library. The row's planned action
+    becomes `excluded` — commit's existing skip set — and the summary
+    recounts so the commit gate tells the truth. Every connector's rows can
+    be excluded; the route is shared surface, reached from the list
+    connector's screen today.
+    """
+    result = service(request, importer_name, user.effective_user_id).exclude_row(
+        batch_id, record_id
+    )
+    return PreviewResponse.model_validate(result)
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/include",
+    response_model=PreviewResponse,
+)
+async def include_row(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Undo a row's exclusion: it returns to what preview planned for it."""
+    result = service(request, importer_name, user.effective_user_id).include_row(
+        batch_id, record_id
+    )
+    return PreviewResponse.model_validate(result)
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/search",
+    response_model=PreviewResponse,
+)
+async def research_row(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    body: RowSearchBody,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Edit a row's title/author and search it again.
+
+    The owner's 2026-09-14 decision, available on any row (a bad query can
+    also produce wrong proposals, not only an empty result): the typed row is
+    re-staged with the edited text and its proposals are replaced. The spend
+    is interactive-shaped (DEC-045): recorded, never blocked — a person is
+    waiting on the answer.
+    """
+    result = await service(request, importer_name, user.effective_user_id).research_row(
+        batch_id,
+        record_id,
+        title=body.title,
+        author=body.author,
+        providers=request.app.state.providers,
+        quota=getattr(request.app.state, "provider_quota", None),
+    )
+    return PreviewResponse.model_validate(result)
+
+
 @router.get(
     "/{importer_name}/batches/{batch_id}",
     response_model=PreviewResponse,

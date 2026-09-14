@@ -63,6 +63,16 @@ ROUTE_POLICY = {
     ("POST", "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/proposal"): (
         "private-id"
     ),
+    (
+        "POST",
+        "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/exclude",
+    ): ("private-id"),
+    ("POST", "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/include"): (
+        "private-id"
+    ),
+    ("POST", "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/search"): (
+        "private-id"
+    ),
     ("GET", "/api/import/{importer_name}/batches/{batch_id}"): "private-id",
     ("POST", "/api/entries/accept-suggested"): "private-write",
     ("GET", "/api/entries/{entry_id}"): "private-id",
@@ -315,6 +325,14 @@ PRIVATE_PROBES = (
         "POST",
         "/api/import/list/batches/{batch_id}/records/{record_id}/proposal",
         {"source": "openlibrary", "source_id": "OL1M"},
+        None,
+    ),
+    ("POST", "/api/import/list/batches/{batch_id}/records/{record_id}/exclude", None, None),
+    ("POST", "/api/import/list/batches/{batch_id}/records/{record_id}/include", None, None),
+    (
+        "POST",
+        "/api/import/list/batches/{batch_id}/records/{record_id}/search",
+        {"title": "probe"},
         None,
     ),
     ("GET", "/api/import/list/batches/{batch_id}", None, None),

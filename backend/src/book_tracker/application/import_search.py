@@ -28,14 +28,14 @@ than burning attempts.
 import asyncio
 import json
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from sqlalchemy import Engine, select, text
 from sqlalchemy.orm import Session
 
-from book_tracker.application.providers import search_providers
+from book_tracker.application.providers import ProvidersUnavailable, search_providers
 from book_tracker.domain.importers import Importer
 from book_tracker.domain.providers import SearchCandidate
 from book_tracker.domain.registry import DOMAINS, IMPORTERS
@@ -46,11 +46,14 @@ from book_tracker.infrastructure.repositories import ImportRepository
 
 logger = logging.getLogger(__name__)
 
-#: How many merged results a row keeps as proposals. The top-3 list exists so
-#: the owner can pick a different result than the first when provider relevance
-#: is poor — the sprint's own risk list names Spanish-title relevance as the
-#: case where that matters.
-TOP_N = 3
+#: How many merged results a row keeps as proposals. Ten stored, three
+#: rendered by default: the top-3 list exists so the owner can pick a
+#: different result than the first when provider relevance is poor, and the
+#: deeper seven exist for the rows where the right answer ranks badly (a
+#: Spanish-titled translation searched in English, a common-word title). The
+#: screen exposes the rest behind a "Show more"; the providers are already
+#: consulted for the row, so storing ten costs no additional call.
+TOP_N = 10
 
 SEARCH_JOB_KIND = "search_import_rows"
 
@@ -156,12 +159,8 @@ class ImportSearchHandler:
             # Only the providers that serve this row's domain are asked — the
             # interactive search's `_providers_for` rule, applied per row. A
             # provider of another domain would spend its quota to offer
-            # candidates the row could never use.
-            serving = [
-                provider
-                for provider in self.providers.values()
-                if getattr(provider, "item_type", domain.item_type) == domain.item_type
-            ]
+            # candidates the row could never use. (Kept below the rate-limiter
+            # wait so the consult sees the moment it happens at.)
 
             # The rate limiter gates rows, not providers: one acquire per row
             # keeps the sequential pacing the owner specified. A gate that is
@@ -176,6 +175,11 @@ class ImportSearchHandler:
             # The quota consult is per provider (DEC-045's budgeted half): a
             # capped provider is skipped for this row, and when nothing remains
             # the job defers without spending an attempt.
+            serving = [
+                provider
+                for provider in self.providers.values()
+                if getattr(provider, "item_type", domain.item_type) == domain.item_type
+            ]
             allowed = [
                 provider
                 for provider in serving
@@ -238,6 +242,45 @@ class ImportSearchHandler:
                 "total": len(rows),
             },
         }
+
+
+async def search_row(
+    query: str,
+    *,
+    providers: Sequence[Any],
+    domain: Any,
+    quota: ProviderQuota | None = None,
+    now: datetime,
+    budgeted: bool,
+) -> list[SearchCandidate]:
+    """Search one row's query through its own domain's providers.
+
+    The one seam the background job and the interactive re-search share, so
+    the row's domain-scoping rule (a provider of another domain is never
+    asked) lives in exactly one place. `budgeted` picks DEC-045's half: the
+    background job consults-and-defers, the interactive re-search — a person
+    waiting on the answer — records what it spends and is never blocked.
+    """
+    serving = [
+        provider
+        for provider in providers
+        if getattr(provider, "item_type", domain.item_type) == domain.item_type
+    ]
+    if budgeted:
+        serving = [
+            provider for provider in serving if quota is None or quota.allows(provider.name, now)
+        ]
+        if not serving:
+            return []
+    try:
+        candidates = await search_providers(query, serving, domain=domain)
+    except ProvidersUnavailable:
+        return []
+    finally:
+        for provider in serving:
+            if quota is not None:
+                quota.record(provider.name, now)
+    return candidates
 
 
 def _proposal_payload(candidate: SearchCandidate, rank: int) -> dict[str, Any]:
