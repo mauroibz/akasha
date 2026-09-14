@@ -512,7 +512,7 @@ to the entries/items it created or filled. The canonical columns and undo
 semantics are defined in the technical spec; do not add the previously proposed
 but undefined `items.import_source` shortcut.
 
-### 5.4 A list you wrote yourself
+### 5.4 Custom list
 
 Every other connector reads an export a platform produced, and that platform's
 identifiers made matching trivial. This one reads a spreadsheet a person typed —
@@ -536,16 +536,22 @@ The flow (the owner's three recorded decisions, 2026-09-13):
    is refused until the search has drained; a provider over its daily budget
    pauses the job and it resumes on its own, without spending retry attempts.
 3. **Confirm or discard each row.** A row's proposals are listed ranked — cover,
-   title, authors, year, language, provider — and confirming one re-stages the
+   title, authors, year, language, provider — the first three rendered with
+   the rest behind a "Show more" (ten are stored). Confirming one re-stages the
    row from that provider's full payload: the ISBNs, the year, the publisher the
    spreadsheet never had. Committing then needs no new path; a confirmed identity
    the connector never declared is trusted because the owner confirmed it.
    Discarding means "none of these is the book": the row stays importable
    exactly as typed. Unconfirmed rows commit as typed too — the owner decides
-   per row, not per batch.
+   per row, not per batch. A row can also be **excluded from the commit
+   entirely** — "Don't import this row" — which the summary recounts and the
+   control itself undoes.
 4. Rows whose search found nothing show that as the answer it is; a row whose
    searches all failed is marked failed and stays discardable. No result is ever
-   an error the owner must fix.
+   an error the owner must fix. Any row's title and author can be **edited and
+   searched again** — a bad query can also produce wrong proposals, not only an
+   empty result — and the row then carries the edited text with fresh
+   proposals.
 5. After commit, the rows land in Triage as `unsorted` like every import, with
    the confirmed ones carrying provider metadata and covers from the
    enrichment path.
@@ -634,6 +640,12 @@ GET    /api/import/{connector}/batches/{id}
 POST   /api/import/{connector}/batches/{id}/records/{rid}/proposal
                                       → {source, source_id} confirms one proposal,
                                          {discard} keeps the row as typed
+POST   /api/import/{connector}/batches/{id}/records/{rid}/exclude
+                                      → keep this row out of the commit
+                                         entirely (include undoes it)
+POST   /api/import/{connector}/batches/{id}/records/{rid}/search
+                                      → {title?, author?} edit the row's text
+                                         and search it again
 DELETE /api/import/batches/{id}        → undo an import batch
 
 GET    /api/export                     → whole library as entity-shaped JSON;

@@ -6518,3 +6518,44 @@ an operator command in the house style.
 - The command reads the database through plain `sqlite3` in one read-only pass before any
   removal, the pattern `reclaim_attachments` established for maintenance commands that must not
   depend on loadable application settings.
+
+## DEC-159 — The owner's first-pass feedback on the list importer ships as a hotfix-style batch
+
+- Date: 2026-09-14
+- Status: accepted
+- Context: The owner validated Sprint 083's search-then-confirm flow against his real
+  `exports/Libros.csv` on a locally rebuilt container and reported five findings plus one
+  non-defect. The plan is formally complete (all 83 sprints, DEC-155), so there was no active
+  sprint to claim; the owner chose the hotfix-style batch (the DEC-157 precedent) over a new
+  sprint: build all items now, full gate, rebuild his container, record in worklog and here.
+- Findings, as decided with the owner:
+  1. The connector's label reads **"Custom list"** now (`list.py:177`); the internal `list`
+     id, the code and every historical record keep the old name — internal names are
+     permanent, user-facing copy follows the owner's word.
+  2. The scroll-to-top report ("clicking a cover sends me back to the top") was a real
+     defect with a wrong suspect: the preview heading re-focused on every 2 s poll tick and
+     every answer refresh, pulling the page to its top mid-browse. The cover click was
+     innocent. Fixed by keying the focus effect on the batch id (`ImportPage.tsx`).
+  3. Top-3 was a chosen default, not a technical limit — the search already returns up to
+     20 per row. **Ten are stored**, three render, the rest fold behind "Show more (N)"
+     (TOP_N 10, `import_search.py`).
+  4. Edit-and-re-search is available on **any** row, not only empty ones (the owner's
+     explicit choice: a bad query can also produce wrong proposals). `POST
+     .../records/{rid}/search` re-stages the edited text and replaces the proposals; the
+     spend is interactive-shaped (DEC-045): recorded, never blocked. A re-search clears any
+     earlier answer — it asks a different question.
+  5. "None of these is the book" no longer forces a keep: `POST .../records/{rid}/exclude`
+     keeps the row out of the commit entirely (planned_action `excluded`, commit's existing
+     skip set, the stored summary recomputed from live rows), and `include` undoes it.
+  6. The triage "missing metadata" report was a non-defect: the DB audit showed every
+     confirmed row carrying year, publisher, page count, description and an installed
+     cover — Triage renders title + creator + a 36px cover by design (the detail page is
+     where metadata lives). The owner chose to keep the row as is.
+- Consequences: three new shared-surface routes (private-id in the isolation inventory,
+  documented-route set updated, OpenAPI regenerated); the exclusion and the re-search are
+  connector-neutral surfaces every import row can use, reached from the list screen today;
+  the per-row search seam (`search_row`) is the one place the background job and the
+  interactive re-search share, so the row's domain-scoping rule cannot drift between them.
+  Full gate re-run on the final tree (backend 1576, Vitest 333, `make check`, Playwright
+  143+2 skips) and the live walkthrough extended to exercise all three new controls —
+  WALKTHROUGH CLEAN (detail in the worklog).

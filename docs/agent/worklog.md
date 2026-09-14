@@ -5691,3 +5691,35 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   upgrades past 2.0.0 (this sprint ships in the next image build).
 - Next: the plan is complete — 083 was the last scheduled sprint. State flips to
   `complete`; anything further is owner-directed extension (DEC-079's shape).
+
+## 2026-09-14 — The owner's first-pass feedback batch (DEC-159): custom list, show more, re-search, exclusion
+
+- Done: the owner validated the Sprint 083 flow against his real `exports/Libros.csv` on the
+  rebuilt local container and reported six items; built hotfix-style (no sprint claim — the
+  plan is complete), all decisions confirmed with him in one clarify pass. Shipped in three
+  commits: `866cbc6` (backend: the Custom list label, TOP_N 3->10, the exclude/include and
+  re-search routes with summary recompute, isolation + documented-route inventories, OpenAPI
+  regen), `fa55cf7` (frontend: the scroll-to-top fix — the heading focus keyed on batch id,
+  not every poll tick; Show more/Show fewer; the edit-and-search-again form on every drained
+  row and on no-result rows; the per-row "Don't import this row" control that is its own
+  undo; RowControls.tsx new). The triage "missing metadata" report was disproven by a live DB
+  audit (every confirmed row carries full metadata + cover; Triage renders minimally by
+  design) and the owner chose to keep the row as is — no change.
+- Verified and how: TDD — four new backend suite entries (label, ten stored, exclusion with
+  commit skip + DB audit, re-search with the double swapped into the app's provider registry
+  so nothing depends on the live boundary, DEC-025) plus the cap test re-derived for ten;
+  371 focused backend tests, then the full gate on the final tree: backend 1576, Vitest 333
+  (three new: show more, exclude/restore, re-search), `make check` green (OpenAPI --check,
+  api:check, validator), full Playwright 143 passed + 2 config skips (the list-connector spec
+  extended with the exclusion flow, a new Show-more spec, one legacy /import/i selector
+  hardened). Live walkthrough on a fresh data dir against live Open Library + Google Books,
+  script extended: show more unfolded, the transposed Homero row re-searched with corrected
+  text and got fresh proposals, exclusion recounted the gate 10->9 and the row never landed,
+  commit 9 (12 - 2 designed errors - 1 excluded), both confirmed rows canonical isbn + cover
+  installed, undo restored 0. WALKTHROUGH CLEAN.
+- Deviations: none from the owner's decisions (all six recorded in DEC-159). The two control
+  pairs share one route shape each (exclude/include, search) rather than one overloaded
+  body — the isolation inventory reads cleaner for it.
+- Blocked/open: none.
+- Next: the owner re-validates on his rebuilt container; the batch ships with the next image
+  build alongside DEC-157/158.
