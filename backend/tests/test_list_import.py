@@ -639,3 +639,94 @@ class TestConfirmDiscard:
             with pytest.raises(LibraryError) as refused:
                 service.get_preview(batch_id)
             assert refused.value.status_code == 404
+
+
+class TestSyntheticFixture:
+    @pytest.fixture
+    def anyio_backend(self) -> str:
+        return "asyncio"
+
+    """The sanitized 12-row fixture, shaped like the owner's real CSV (BOM,
+    CRLF, the trailing-space header, a transposed row, a collection volume, a
+    typo, an `et al` author, a quoted comma, a no-title row, a short row) but
+    with rows written for this suite — the real file never leaves the
+    git-ignored `exports/`."""
+
+    FIXTURE = Path(__file__).parent / "fixtures" / "imports" / "list_synthetic.csv"
+
+    def test_the_fixture_auto_maps_and_reads_honestly(self) -> None:
+        data = self.FIXTURE.read_bytes()
+        importer = ListImporter()
+        snapshot = importer.read(ImportSource(data=data, filename="list_synthetic.csv"), CONTEXT)
+        # 12 data rows (the fixture the sprint names), one header, every
+        # non-empty row present — including the error rows the reader refuses
+        # to invent data for.
+        assert len(snapshot.records) == 12
+        titles = {record.item.title for record in snapshot.records}
+        assert "Rayuela" in titles
+        assert '"Will Grayson, Will Grayson"'.strip('"') in titles or (
+            "Will Grayson, Will Grayson" in titles
+        )
+        # The transposed row reads literally; confirm is the safety net.
+        assert "Homero" in titles
+        # Error rows are present with their reasons.
+        empty_title = [record for record in snapshot.records if not record.item.title]
+        assert empty_title and empty_title[0].errors[0]["field"] == "title"
+        short = [
+            record
+            for record in snapshot.records
+            if record.item.title == "Solo un título"
+        ]
+        assert short and {"field": "author", "code": "missing"} in [
+            {"field": error["field"], "code": error["code"]}
+            for error in short[0].errors
+        ]
+        # The unmapped columns ride verbatim, trailing-space header and all.
+        rayuela = next(
+            record for record in snapshot.records if record.item.title == "Rayuela"
+        )
+        assert rayuela.source_fields["Editorial"] == "Sudamericana"
+        assert rayuela.source_fields["Idioma"] == "Castellano"
+
+    @pytest.mark.anyio
+    async def test_the_fixture_round_trips_the_service(self, tmp_path: Path) -> None:
+        """The whole preview path on the fixture: staging, summary counts that
+        agree with the record list, and the matching state this connector
+        previews in (AC4's shape, through the service)."""
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(
+            Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
+        )
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(
+                transport=httpx.ASGITransport(app), base_url="http://test"
+            ) as client,
+        ):
+            preview = await client.post(
+                "/api/import/list/preview",
+                files={
+                    "file": (
+                        "list_synthetic.csv",
+                        self.FIXTURE.read_bytes(),
+                        "text/csv",
+                    )
+                },
+            )
+            assert preview.status_code == 201
+            body = preview.json()
+            assert body["state"] == "matching"
+            summary = body["summary"]
+            records = body["records"]
+            assert summary["total"] == len(records)
+            # The summary's own definition: rows the commit will refuse.
+            assert summary["errors"] == sum(
+                1
+                for record in records
+                if record["planned_action"] in ("error", "identity_conflict")
+            )
+            assert summary["total"] == 12

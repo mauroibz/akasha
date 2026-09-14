@@ -512,6 +512,48 @@ to the entries/items it created or filled. The canonical columns and undo
 semantics are defined in the technical spec; do not add the previously proposed
 but undefined `items.import_source` shortcut.
 
+### 5.4 A list you wrote yourself
+
+Every other connector reads an export a platform produced, and that platform's
+identifiers made matching trivial. This one reads a spreadsheet a person typed —
+`exports/Libros.csv`, 104 rows, a title column and an author column and **no
+identifiers at all** — and the product answer to a source with no identity is
+**search-then-confirm**, not a bigger heuristic.
+
+The flow (the owner's three recorded decisions, 2026-09-13):
+
+1. **Upload and mapping.** Drop the CSV/TXT (comma, semicolon or tab; BOM and
+   CRLF tolerated). Title and author columns are found from the headers —
+   Spanish and English, accents folded — and the first two columns are the
+   fallback; the screen offers explicit column numbers that override both.
+   Only title and author are read. The file's other columns ride uninterpreted
+   in each row's source fields, visible on the preview, mapped to nothing —
+   mapping them is future work for whatever spreadsheet a future user brings.
+2. **The search runs in the background while the preview stays open.** One job
+   walks the rows in order — sequential, one row at a time, respecting public-API
+   rate limits — and searches the domain's providers for each, storing the merged
+   top three results as proposals. The preview shows the live counts and commit
+   is refused until the search has drained; a provider over its daily budget
+   pauses the job and it resumes on its own, without spending retry attempts.
+3. **Confirm or discard each row.** A row's proposals are listed ranked — cover,
+   title, authors, year, language, provider — and confirming one re-stages the
+   row from that provider's full payload: the ISBNs, the year, the publisher the
+   spreadsheet never had. Committing then needs no new path; a confirmed identity
+   the connector never declared is trusted because the owner confirmed it.
+   Discarding means "none of these is the book": the row stays importable
+   exactly as typed. Unconfirmed rows commit as typed too — the owner decides
+   per row, not per batch.
+4. Rows whose search found nothing show that as the answer it is; a row whose
+   searches all failed is marked failed and stays discardable. No result is ever
+   an error the owner must fix.
+5. After commit, the rows land in Triage as `unsorted` like every import, with
+   the confirmed ones carrying provider metadata and covers from the
+   enrichment path.
+
+Nothing in this flow resolves a match by itself: the connector's own match is
+always "new", because a source with no identity should not guess. The provider's
+relevance ranking is the matcher; the owner's confirm is the decision.
+
 ---
 
 ## 6. HTTP API
@@ -581,6 +623,17 @@ POST   /api/import/calibre/preview     → chosen-folder upload (metadata.db + c
 POST   /api/import/calibre/commit      → {batch_id, options}
 GET    /api/import/calibre/browse      → ?path=, folder names under the mount
 GET    /api/import/jobs/{id}           → progress for background enrichment
+POST   /api/import/list/preview       → CSV/TXT upload (+ optional column mapping),
+                                         returns the dry-run report in `matching`
+POST   /api/import/list/commit        → {batch_id}; refused (409) until the
+                                         background search has drained
+GET    /api/import/{connector}/batches/{id}
+                                      → re-read one previewed batch; the poll while
+                                         a list import's search runs (its response
+                                         carries the job's live counts)
+POST   /api/import/{connector}/batches/{id}/records/{rid}/proposal
+                                      → {source, source_id} confirms one proposal,
+                                         {discard} keeps the row as typed
 DELETE /api/import/batches/{id}        → undo an import batch
 
 GET    /api/export                     → whole library as entity-shaped JSON;

@@ -46,8 +46,11 @@ from book_tracker.domain.importers import (
     Importer,
     ImportInputSpec,
     ImportPlan,
+    ImportReadContext,
     ImportReadError,
+    ImportSource,
     IncrementalImporter,
+    SearchingImporter,
     declared_read_error,
     planned_upload,
     valid_member_pattern,
@@ -66,6 +69,7 @@ from book_tracker.domain.registry import (
     IMPORTERS,
     IMPORTERS_BY_DOMAIN,
     REGISTERED_EXPORTS,
+    REGISTERED_IMPORTERS,
     EntryFormat,
     EntryStatus,
     ItemTypeName,
@@ -1648,3 +1652,71 @@ async def test_a_broken_recognizer_does_not_deny_another_domain_its_turn(
     resolved = await resolve_input("anything at all", {"stub": _StubProvider()})  # type: ignore[dict-item]
 
     assert [row.title for row in resolved] == ["Resolved anyway"]
+
+
+def test_a_connector_may_declare_a_search_phase() -> None:
+    """Sprint 083 D5: the search-then-confirm opt-in is a declaration.
+
+    A connector that declares `search_job` is telling the shared pipeline two
+    things — preview its batches `matching` with one job enqueued, and refuse
+    commit until the job drains — and the declaration must be exactly the one
+    value the pipeline knows, or a typo would silently stage a batch nothing
+    ever drains.
+    """
+
+    class Searching(_DeclaringImporter):
+        search_job = "search_import_rows"
+
+    assert isinstance(Searching(), SearchingImporter)
+    # The one value the pipeline recognizes; a connector cannot invent a job.
+    assert Searching().search_job == "search_import_rows"
+    # Exactly one registered connector declares it — the one with no identity
+    # to trust — and the identity-carrying seven do not.
+    searching = [
+        importer.name
+        for importer in REGISTERED_IMPORTERS
+        if isinstance(importer, SearchingImporter)
+    ]
+    assert searching == ["list"], (
+        f"only a connector with no trusted identity should declare a search phase: {searching}"
+    )
+
+
+def test_a_connector_may_declare_upload_fields() -> None:
+    """Sprint 083 D5: extra form fields are a declaration the route forwards.
+
+    The catalog publishes `fields` and the shared upload route forwards exactly
+    those names; a connector with no declaration renders no inputs and the route
+    forwards nothing — which is what all seven other connectors do.
+    """
+
+    for importer in REGISTERED_IMPORTERS:
+        spec = importer.input
+        assert isinstance(spec.fields, tuple), f"{importer.name} declares fields wrongly"
+        assert all(
+            name.isidentifier() for name in spec.fields
+        ), f"{importer.name} declares a field name a form cannot carry"
+    assert IMPORTERS["list"].input.fields == ("title_column", "author_column")
+    assert all(
+        importer.input.fields == () for importer in REGISTERED_IMPORTERS if importer.name != "list"
+    )
+
+
+def test_the_empty_identity_declaration_is_held_to_its_own_word() -> None:
+    """Sprint 083 D5: `identity_kinds = frozenset()` is a choice, and the
+    boundary holds a connector to it — a reader emitting any identity against
+    an empty declaration is refused whole (the case the sprint named the point
+    of the empty set)."""
+    from book_tracker.domains.book.list import IMPORTER as LIST_IMPORTER
+
+    assert LIST_IMPORTER.identity_kinds == frozenset()
+    snapshot = LIST_IMPORTER.read(
+        ImportSource(
+            data=b"T\xedtulo del libro,Autor\r\nRayuela,Julio Cort\xc3\xa1zar\r\n".decode(
+                "latin-1"
+            ).encode("utf-8"),
+            filename="x.csv",
+        ),
+        ImportReadContext(path_root=Path("/tmp")),
+    )
+    assert all(record.item.identifiers == {} for record in snapshot.records)

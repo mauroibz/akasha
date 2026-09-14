@@ -263,3 +263,13 @@ DEC-125). All four albums are real rows from the owner's own Spotify library.
 | `musicbrainz_release_group_purpose.json`, `musicbrainz_release_purpose.json` | The same `fetch()` chain as Plastic Beach, for the release group pass 2 resolved (`2660de3c-…`) — proving pass 2 hands off to the identical code pass 1 does. |
 | `musicbrainz_search_in_rainbows_radiohead.json` | `GET /release-group?query=releasegroup:"In Rainbows" AND artist:"Radiohead"` — the **near-miss-adjacent** case: the correct release group scores 100, but three plausible others (`Live in Rainbows` 92, `In Rainbows Disk 2` 87, `In Rainbows: From the Basement` 83) share the same query. Proves the resolver reads the top result's own title rather than trusting "a result came back" — a score-92 near-title-match must not be accepted as an exact one. |
 | `musicbrainz_search_no_match.json` | The same query shape for a title and artist that do not exist — `count: 0`, an empty `release-groups` list. The genuine "no usable result" case pass 2 must turn into `record_not_found`, never a guess. |
+
+One **existing** file gained a second consumer on 2026-09-13 for Sprint 083:
+`search_rayuela.json` now also pins the import-search job's proposal mapping (AC5)
+besides the interactive-search tests that already read it. Nothing was re-recorded —
+the capture's query (`Rayuela Cortázar`) is exactly the query the job builds from a
+`Rayuela`/`Julio Cortázar` row, so the recorded answer proves the mapping the same
+way it proves the interactive one. The job's other failure shapes (quota deferral,
+containment, no-results) are proven with provider doubles in `test_import_search_job.py`,
+which the sprint file names as the deliberate split: correctness replays recordings,
+failure containment is synthetic.

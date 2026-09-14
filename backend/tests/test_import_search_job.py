@@ -29,6 +29,7 @@ from book_tracker.database import create_engine
 from book_tracker.domain.providers import SearchCandidate, SourceRef
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.quota import ProviderQuota
+from book_tracker.domain.registry import DOMAINS
 from book_tracker.infrastructure.repositories import ImportRepository
 from book_tracker.migrations import upgrade
 
@@ -534,3 +535,95 @@ class TestPreviewIntegration:
             assert result["state"] == "succeeded"
             with Session_of(engine) as session:
                 assert session.execute(text_batch_state(batch_id)).scalar_one() == "previewed"
+
+
+class TestRecordedFixtureReplay:
+    """AC5: the job's proposal pipeline proven against recorded real Open
+    Library responses (DEC-025), never a mock of the provider contract."""
+
+    @pytest.fixture
+    def anyio_backend(self) -> str:
+        return "asyncio"
+
+    @pytest.mark.anyio
+    async def test_the_job_produces_real_proposals_from_the_recording(
+        self, tmp_path: Path
+    ) -> None:
+        from recordings import recording, replay
+
+        from book_tracker.domains.book.providers import OpenLibraryProvider
+        from book_tracker.infrastructure.providers import create_provider_client
+
+        engine = make_engine(tmp_path)
+        stage_preview(
+            engine,
+            [
+                {"title": "Rayuela", "author": "Julio Cortázar"},
+                {"title": "Ficciones", "author": "Jorge Luis Borges"},
+            ],
+        )
+        transport = replay(
+            {
+                "/search.json": (200, recording("search_rayuela.json")),
+            }
+        )
+        async with create_provider_client(transport=transport) as provider_client:
+            provider = OpenLibraryProvider(provider_client, "test@example.invalid")
+            jobs = JobRepository(engine)
+            job_id = jobs.enqueue(
+                "b1", "search_import_rows", {"batch_id": "b1"}, user_id=1
+            )
+            handler = make_handler(engine, [provider])
+            result = await handler.process(job_id, NOW)
+
+        assert result["state"] == "succeeded"
+        proposals = ImportRepository(engine, 1).proposals_for_batch("b1")
+        assert proposals, "the recorded search produced proposals"
+        first = proposals[0]
+        # The payload is the recorded response's own data, mapped by the
+        # provider the way the interactive search maps it — not invented here.
+        assert first["source"] == "openlibrary"
+        assert first["payload"]["title"] == "Rayuela"
+        assert first["payload"]["creators"] == ["Julio Cortázar"]
+        assert first["rank"] == 0
+        # Both rows were searched even though only one had a recording: the
+        # replay answers every query with the same recording, which is exactly
+        # the fixture's point — one recorded answer proves the mapping.
+        assert result["progress"]["searched"] == 2
+
+    @pytest.mark.anyio
+    async def test_the_recording_survives_the_whole_merge_path(self, tmp_path: Path) -> None:
+        """The proposal is what `merge_and_rank` produced, ranked: the replay
+        runs the real provider, the real merge, and the job stores the result
+        of both — the same path the interactive search takes."""
+        from recordings import recording, replay
+
+        from book_tracker.application.providers import search_providers
+        from book_tracker.domains.book.providers import OpenLibraryProvider
+        from book_tracker.infrastructure.providers import create_provider_client
+
+        transport = replay({"/search.json": (200, recording("search_rayuela.json"))})
+        async with create_provider_client(transport=transport) as provider_client:
+            provider = OpenLibraryProvider(provider_client, "test@example.invalid")
+            interactive = await search_providers(
+                "Rayuela Julio Cortázar", [provider], domain=DOMAINS["book"]
+            )
+
+        engine = make_engine(tmp_path)
+        stage_preview(engine, [{"title": "Rayuela", "author": "Julio Cortázar"}])
+        jobs = JobRepository(engine)
+        job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
+        async with create_provider_client(transport=replay(
+            {"/search.json": (200, recording("search_rayuela.json"))}
+        )) as provider_client:
+            handler = make_handler(
+                engine,
+                [OpenLibraryProvider(provider_client, "t@e.invalid")],
+            )
+            await handler.process(job_id, NOW)
+
+        proposals = ImportRepository(engine, 1).proposals_for_batch("b1")
+        # One candidate per interactive merge result, same order, same titles.
+        assert [p["payload"]["title"] for p in proposals] == [
+            candidate.title for candidate in interactive[: len(proposals)]
+        ]

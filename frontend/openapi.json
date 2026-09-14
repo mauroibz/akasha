@@ -2483,6 +2483,40 @@
         "title": "ProgressSpecResponse",
         "type": "object"
       },
+      "ProposalAnswerBody": {
+        "description": "Which proposal the owner confirmed, or the explicit discard.\n\nA connector without a search phase never sees this body: the route exists on\nthe shared router, but `answer_proposal` refuses any batch that is not\n`previewed` with proposals \u2014 for every other connector the preview GET a\nconfirm would need is already the answer.",
+        "properties": {
+          "discard": {
+            "default": false,
+            "title": "Discard",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          }
+        },
+        "title": "ProposalAnswerBody",
+        "type": "object"
+      },
       "ProviderHealth": {
         "properties": {
           "degraded": {
@@ -4685,6 +4719,78 @@
         ]
       }
     },
+    "/api/import/{importer_name}/batches/{batch_id}": {
+      "get": {
+        "description": "Re-read one previewed batch without re-sending its source.\n\nThe preview POST is idempotent by fingerprint and remains the way in; this\nread exists because a batch in its matching phase is polled for minutes\n(Sprint 083), and re-uploading a file the server already staged to learn\nits progress is exactly the cost an idempotent read should not have.",
+        "operationId": "read_preview_api_import__importer_name__batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Preview",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/api/import/{importer_name}/batches/{batch_id}/files": {
       "post": {
         "description": "Take one file the import wants and attach it to the item it belongs to.\n\nOne file per request, and that is the design rather than an implementation\ndetail (DEC-083). Folding these into the preview bundle would bound the feature\nby the size of the whole library instead of by the size of one file, so a shelf\nof any size would eventually stop importing; here a 600-book library behaves\nexactly like an 18-book one, a file that cannot be stored costs one book rather\nthan the import, and the screen can count progress honestly.",
@@ -4752,6 +4858,97 @@
           }
         },
         "summary": "Attach File",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/proposal": {
+      "post": {
+        "description": "Confirm one proposal for one row, or discard the row's proposals.\n\nConfirming re-stages the row's item half from the provider's payload and\nrecomputes its planned action, so the commit that follows needs no new path\n(Sprint 083 D4). Discarding keeps the row exactly as the spreadsheet typed\nit. Both require the batch's searches to have drained.",
+        "operationId": "answer_row_proposal_api_import__importer_name__batches__batch_id__records__record_id__proposal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalAnswerBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Row Proposal",
         "tags": [
           "imports"
         ]
