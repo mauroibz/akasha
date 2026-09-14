@@ -1548,6 +1548,23 @@ class LibraryService:
                 entry.updated_at = now
             return len(entries)
 
+    def bulk_delete(
+        self,
+        *,
+        entry_ids: Sequence[int] | None,
+        filters: Mapping[str, Any] | None,
+        excluded_entry_ids: Sequence[int],
+    ) -> int:
+        # The one bulk action that is not a write: the selection goes, in one
+        # transaction, through the same selection rule every other bulk action
+        # resolves. Shelf and format rows cascade (migration 0015), so a deleted
+        # entry leaves nothing behind it owned.
+        with self._write() as session:
+            entries = self._selection(session, entry_ids, filters, excluded_entry_ids)
+            for entry in entries:
+                session.delete(entry)
+            return len(entries)
+
     def accept_suggested(self, filters: Mapping[str, Any]) -> int:
         with self._write() as session:
             selection_filters = dict(filters)

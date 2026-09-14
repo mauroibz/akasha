@@ -1,6 +1,31 @@
 import type { BundleMember } from "@/features/import/bundle";
 import { request } from "@/api/request";
 
+/**
+ * One provider result offered for one row of a list import (Sprint 083).
+ *
+ * `rank` is the position the domain's merge produced, not a confidence, and
+ * `chosen` is the owner's answer: null before anyone answered, true for the
+ * pick, false for what a discard cleared.
+ */
+export interface ImportProposal {
+  source: string;
+  source_id: string;
+  rank: number;
+  chosen: boolean | null;
+  payload: {
+    title: string;
+    subtitle: string | null;
+    creators: string[];
+    year: number | null;
+    identifiers: Record<string, string>;
+    language: string | null;
+    metadata: Record<string, unknown>;
+    cover_url: string | null;
+    cover_fallback_urls: string[];
+  };
+}
+
 export interface ImportRecord {
   record_id: number;
   row_number: number;
@@ -31,6 +56,12 @@ export interface ImportRecord {
     suggested_status: string | null;
   };
   source_fields: Record<string, unknown>;
+  /**
+   * The provider results offered for this row. Present on every record for
+   * every connector — an empty list when the connector has no search phase —
+   * because the shape is shared and the screen renders what arrives.
+   */
+  proposals: ImportProposal[];
   cover_staged?: boolean;
   /**
    * Whether an ebook file was already staged for automatic post-commit
@@ -57,6 +88,12 @@ export interface ImportInputSpec {
   accepts_files: boolean;
   max_bytes: number | null;
   max_files: number | null;
+  /**
+   * Extra form fields this connector reads from the same upload request, by
+   * name — the screen renders an input per entry (Sprint 083: the list
+   * connector's title/author column mapping). Absent means none.
+   */
+  fields?: string[];
   /** Other ways into the same connector, each rendered beneath the primary. One deep. */
   alternates: ImportInputSpec[];
 }
@@ -105,6 +142,10 @@ export class ImportRequestError extends Error {
 export interface ImportPreview {
   batch_id: string;
   fingerprint: string;
+  /**
+   * `previewed` for every connector, `matching` for one whose background
+   * search is still running (Sprint 083): commit is refused while it lasts.
+   */
   state: string;
   summary: {
     total: number;
@@ -116,8 +157,22 @@ export interface ImportPreview {
     /** Rows of a kind no library holds, counted so they are never silent. */
     skipped_unsupported: number;
     skipped_reasons: Array<{ reason: string; count: number }>;
+    /** How many rows have at least one proposal, and how many proposals exist. */
+    rows_with_proposals?: number;
+    proposals_total?: number;
   };
   records: ImportRecord[];
+  /**
+   * Live counts of the batch's search job while it runs, so the screen polls
+   * the idempotent preview alone. Absent for every connector without a search
+   * phase.
+   */
+  search_progress?: {
+    searched: number;
+    total: number;
+    job_state: string;
+    wait_reason?: string;
+  };
 }
 export interface ImportResult {
   batch_id: string;
@@ -285,6 +340,8 @@ export function previewImport(
       responseJson<ImportPreview>(response),
     );
   }
+  // The overload carrying a connector's declared form fields (Sprint 083: the
+  // list's column mapping). The route forwards exactly the declared names.
   return request(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -293,6 +350,98 @@ export function previewImport(
       ...(chosen ? { targets: chosen } : {}),
     }),
   }).then((response) => responseJson<ImportPreview>(response));
+}
+
+export function previewImportWithOptions(
+  importer: ImporterDefinition,
+  spec: ImportInputSpec,
+  source: File | string | File[] | BundleMember[],
+  options: Record<string, string>,
+) {
+  const url = `/api/import/${encodeURIComponent(importer.id)}/preview`;
+  const form = new FormData();
+  if (spec.kind === "upload") {
+    form.append(spec.field, source as File);
+  } else {
+    throw new Error("Only an upload source carries connector fields");
+  }
+  for (const [name, value] of Object.entries(options)) form.append(name, value);
+  return request(url, { method: "POST", body: form }).then((response) =>
+    responseJson<ImportPreview>(response),
+  );
+}
+
+/**
+ * Re-read a previewed batch without re-sending its source (Sprint 083).
+ *
+ * The preview POST stays idempotent by fingerprint; this read is what a batch
+ * in its matching phase is polled through — re-uploading a file the server
+ * already staged to learn its progress is exactly the cost an idempotent read
+ * should not have.
+ */
+export function getPreview(importerId: string, batchId: string) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}`,
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
+export function answerProposal(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+  answer: { source: string; source_id: string } | { discard: true },
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/proposal`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(answer),
+    },
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
+/** Keep one row out of the commit entirely (the owner's 2026-09-14 decision:
+ * "none of these is the book" must not force a keep-as-typed row in). */
+export function excludeRow(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/exclude`,
+    { method: "POST" },
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
+/** Undo an exclusion. */
+export function includeRow(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/include`,
+    { method: "POST" },
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
+/** Edit a row's title/author and search it again — available on any row,
+ * because a bad query can also produce wrong proposals. */
+export function researchRow(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+  query: { title?: string; author?: string },
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/search`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(query),
+    },
+  ).then((response) => responseJson<ImportPreview>(response));
 }
 
 export function commitImport(

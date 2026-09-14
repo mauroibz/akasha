@@ -114,6 +114,10 @@ class ImportInputResponse(BaseModel):
     accepts_files: bool = False
     max_bytes: int | None = None
     max_files: int | None = None
+    #: Extra form fields this connector reads from the same upload request, by
+    #: name — the screen renders an input per entry, and the route forwards
+    #: exactly these into the connector's options.
+    fields: list[str] = Field(default_factory=list)
     #: Other ways into the same connector, each rendered beneath the primary. One deep.
     alternates: "list[ImportInputResponse]" = Field(default_factory=list)
 
@@ -374,7 +378,18 @@ async def _source(
             if size > cap:
                 raise _too_large(spec)
             chunks.append(chunk)
-        return ImportSource(data=b"".join(chunks), filename=upload.filename), targets
+        # A connector may declare extra form fields (the list's column mapping);
+        # the route forwards exactly those, because a name the connector did not
+        # declare is the client guessing at an API that does not exist.
+        options = {
+            name: value
+            for name in spec.fields
+            if isinstance(value := form.get(name), str) and value.strip()
+        }
+        return (
+            ImportSource(data=b"".join(chunks), filename=upload.filename, options=options or None),
+            targets,
+        )
     try:
         body = await request.json()
         value = body.get(spec.field) if isinstance(body, dict) else None
@@ -766,6 +781,153 @@ async def commit(
         code = "unresolved_ambiguities" if str(error).startswith("[") else str(error)
         raise LibraryError(code, "Import preview cannot be committed", status_code=409) from error
     return CommitResponse.model_validate(result)
+
+
+class ProposalAnswerBody(BaseModel):
+    """Which proposal the owner confirmed, or the explicit discard.
+
+    A connector without a search phase never sees this body: the route exists on
+    the shared router, but `answer_proposal` refuses any batch that is not
+    `previewed` with proposals — for every other connector the preview GET a
+    confirm would need is already the answer.
+    """
+
+    source: str | None = None
+    source_id: str | None = None
+    discard: bool = False
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/proposal",
+    response_model=PreviewResponse,
+)
+async def answer_row_proposal(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    body: ProposalAnswerBody,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Confirm one proposal for one row, or discard the row's proposals.
+
+    Confirming re-stages the row's item half from the provider's payload and
+    recomputes its planned action, so the commit that follows needs no new path
+    (Sprint 083 D4). Discarding keeps the row exactly as the spreadsheet typed
+    it. Both require the batch's searches to have drained.
+    """
+    result = service(request, importer_name, user.effective_user_id).answer_proposal(
+        batch_id,
+        record_id,
+        source=body.source,
+        source_id=body.source_id,
+        discard=body.discard,
+    )
+    return PreviewResponse.model_validate(result)
+
+
+class RowSearchBody(BaseModel):
+    """The edited text a re-search should query, either half optional.
+
+    An omitted half keeps the row's current value — the owner edits what is
+    wrong and leaves the rest alone.
+    """
+
+    title: str | None = None
+    author: str | None = None
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/exclude",
+    response_model=PreviewResponse,
+)
+async def exclude_row(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Keep one row out of the commit entirely.
+
+    The owner's 2026-09-14 decision: 'none of these is the book' must not
+    force a keep-as-typed row into the library. The row's planned action
+    becomes `excluded` — commit's existing skip set — and the summary
+    recounts so the commit gate tells the truth. Every connector's rows can
+    be excluded; the route is shared surface, reached from the list
+    connector's screen today.
+    """
+    result = service(request, importer_name, user.effective_user_id).exclude_row(
+        batch_id, record_id
+    )
+    return PreviewResponse.model_validate(result)
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/include",
+    response_model=PreviewResponse,
+)
+async def include_row(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Undo a row's exclusion: it returns to what preview planned for it."""
+    result = service(request, importer_name, user.effective_user_id).include_row(
+        batch_id, record_id
+    )
+    return PreviewResponse.model_validate(result)
+
+
+@router.post(
+    "/{importer_name}/batches/{batch_id}/records/{record_id}/search",
+    response_model=PreviewResponse,
+)
+async def research_row(
+    importer_name: str,
+    batch_id: str,
+    record_id: int,
+    body: RowSearchBody,
+    request: Request,
+    user: CurrentUser,
+) -> PreviewResponse:
+    """Edit a row's title/author and search it again.
+
+    The owner's 2026-09-14 decision, available on any row (a bad query can
+    also produce wrong proposals, not only an empty result): the typed row is
+    re-staged with the edited text and its proposals are replaced. The spend
+    is interactive-shaped (DEC-045): recorded, never blocked — a person is
+    waiting on the answer.
+    """
+    result = await service(request, importer_name, user.effective_user_id).research_row(
+        batch_id,
+        record_id,
+        title=body.title,
+        author=body.author,
+        providers=request.app.state.providers,
+        quota=getattr(request.app.state, "provider_quota", None),
+    )
+    return PreviewResponse.model_validate(result)
+
+
+@router.get(
+    "/{importer_name}/batches/{batch_id}",
+    response_model=PreviewResponse,
+)
+async def read_preview(
+    importer_name: str, batch_id: str, request: Request, user: CurrentUser
+) -> PreviewResponse:
+    """Re-read one previewed batch without re-sending its source.
+
+    The preview POST is idempotent by fingerprint and remains the way in; this
+    read exists because a batch in its matching phase is polled for minutes
+    (Sprint 083), and re-uploading a file the server already staged to learn
+    its progress is exactly the cost an idempotent read should not have.
+    """
+    result = service(request, importer_name, user.effective_user_id).get_preview(batch_id)
+    return PreviewResponse.model_validate(result)
 
 
 @router.get("/jobs/{job_id}", response_model=JobProgressResponse)

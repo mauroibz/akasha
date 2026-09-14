@@ -143,8 +143,11 @@ test("confirmed deletion removes the entry and returns to library", async ({
   await expect(
     page.getByRole("alertdialog", { name: /remove this/i }),
   ).toBeVisible();
-  // The dialog states books remain
-  await expect(page.getByText(/remain/i)).toBeVisible();
+  // The dialog states what deletion removes (DEC-158: it no longer promises
+  // anything about the item cache — storage the reader cannot verify).
+  await expect(
+    page.getByText(/score, status, notes, and shelf assignments/i),
+  ).toBeVisible();
   // Confirm deletion
   await page
     .getByRole("alertdialog", { name: /remove this/i })

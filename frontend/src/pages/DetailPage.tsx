@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 
 import type { FieldSpec } from "@/api/library";
@@ -157,6 +157,13 @@ export function DetailPage() {
   const entryId = Number(useParams().entryId);
   const cache = useQueryClient();
   const navigate = useNavigate();
+  // Where this detail page was opened from, when it says: a triage row sends
+  // `from: "triage"` so its back control returns to the inbox the reader was
+  // working through, instead of the library. Absent (a deep link, the library)
+  // means the library — the only place left to go back to.
+  const from = (useLocation().state as { from?: string } | null)?.from;
+  const backTo = from === "triage" ? "/import?tab=triage" : "/";
+  const backLabel = from === "triage" ? "Triage" : "Library";
   const [dialog, setDialog] = useState<
     "opinion" | "metadata" | "refresh" | "delete" | "cover" | null
   >(null);
@@ -266,7 +273,7 @@ export function DetailPage() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <BackToLibrary />
+      <BackToLibrary to={backTo} label={backLabel} />
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
           <CoverImage
@@ -638,7 +645,6 @@ export function DetailPage() {
             <AlertDialogTitle>Remove this from your library?</AlertDialogTitle>
             <AlertDialogDescription>
               Your score, status, notes, and shelf assignments will be deleted.
-              The metadata and cover remain cached so re-adding is instant.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {deleteError && (

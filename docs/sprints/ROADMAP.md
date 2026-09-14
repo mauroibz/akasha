@@ -1,15 +1,15 @@
 # Implementation Roadmap
 
-**Plan revision:** 40
+**Plan revision:** 41
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none. Every planned sprint (001–082) is complete — Sprint 082 closed the
-authentication line and the plan; `docs/agent/state.json` reads `project_status: complete`. The
-next line of work opens only by a plan revision (see "Not scheduled" below for what is already
-costed and waiting). Sprints 001–081
-are complete — Sprint 071 closed the original v1 plan and the owner's 2026-09-05 readability
-feedback (DEC-139) extended it through 072–074, covered in the "Covers first" section below.
-The owner's 2026-09-07 request for authentication and multiuser reopens the plan through 082 and
-a 2.0.0 release; see "Two people, one install" below, and
+**Active sprint:** none — the plan is complete. Sprints 001–083 are done: Sprint 082 closed
+the authentication line and shipped 2.0.0, and the owner's 2026-09-13 request for a
+hand-written-CSV importer reopened the plan as Sprint 083, delivered 2026-09-14 (see "A
+list you wrote yourself" below, accepted as **DEC-156**). Earlier lines: Sprint 071 closed
+the original v1 plan and the owner's 2026-09-05 readability feedback (DEC-139) extended it
+through 072–074, covered in the
+"Covers first" section below. The owner's 2026-09-07 request for authentication and multiuser
+reopened the plan through 082 and a 2.0.0 release; see "Two people, one install" below, and
 [`../auth-and-multiuser-proposal.md`](../auth-and-multiuser-proposal.md) accepted as **DEC-146**.
 
 ## Shape of the plan
@@ -195,6 +195,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [058](058-published-image.md) | An image you pull, not a build you run | 056 | blocked |
 | [059](059-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
+| [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
 
 ## Sprint contracts
 
@@ -1638,6 +1639,36 @@ refactor into a rewrite of the gate. It also keeps the owner's "easy deployments
 
 Explicitly outside it, and still deferred after 2.0: sharing and public links, Calibre write-back,
 OPDS, passkeys, OIDC, email of any kind, and per-user settings. See the proposal's §4.
+
+## A list you wrote yourself — the hand-written-CSV importer
+
+Asked for by the owner on 2026-09-13 and planned as **Sprint 083 (DEC-156)**: every importer so far
+reads an export another platform produced, whose per-row IDs made bulk import a solved problem.
+`exports/Libros.csv` is the first source with none — 104 hand-typed rows of Spanish and English
+titles with author, publisher, language and condition columns, no ISBNs, no IDs, no dates, and the
+kind of noise a human typist produces (a transposed author/title row, collection-volume suffixes,
+plain-text typos, two dictionaries). The product answer is a **search-then-confirm** flow, not a
+bigger heuristic:
+
+- **[083 — A list you wrote yourself](083-a-list-you-wrote.md)** — a generic delimited-text
+  connector (`list`, targeting books) whose column mapping the importer screen lets the owner
+  pick (auto-detected from headers by default, first-two-columns fallback), whose rows carry no
+  identity at all (`identity_kinds` empty — the first connector that trusts nothing), and whose
+  preview stages a new `matching` state: one durable `search_import_rows` job searches the
+  domain's providers **sequentially, one row at a time** (rate-limited, quota-aware, resumable)
+  and stores the merged top-N results per row as durable proposals. Confirm re-stages the row from
+  the provider's full payload (cover, ISBNs, synopsis, publisher, pages — decision 2); discard keeps
+  the typed row; unconfirmed rows land as typed. Commit is refused while the batch is `matching`,
+  and the existing preview screen grows the proposal cards and the progress bar. The three owner
+  decisions that shaped it — background matching before commit, full payload on confirm, and
+  **title/author only** (the CSV's other columns are deliberately unmapped, "queda a futuro") —
+  are recorded in the sprint file and DEC-156.
+
+  **Delivered 2026-09-14.** All of it, plus the three fixes the live walkthrough surfaced
+  (the row search stays inside the row's own domain; a confirmed identity lands under the
+  canonical kind the add path writes, so the enrichment backfill installs the cover; a
+  discard after a confirm restores the row exactly as typed) — detail in the sprint file's
+  Outcome. The plan is complete.
 
 ## Not scheduled
 

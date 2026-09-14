@@ -200,6 +200,44 @@
         "title": "BulkBody",
         "type": "object"
       },
+      "BulkSelection": {
+        "description": "The selection half of a bulk request \u2014 the one shape every bulk action\nresolves, so *Discard* understands the same `entry_ids`-or-`filter`\nselection the action bar already sends everywhere else.",
+        "properties": {
+          "entry_ids": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "integer"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Entry Ids"
+          },
+          "excluded_entry_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Excluded Entry Ids",
+            "type": "array"
+          },
+          "filter": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/EntryFilter"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "title": "BulkSelection",
+        "type": "object"
+      },
       "BulkSet": {
         "properties": {
           "add_formats": {
@@ -1408,6 +1446,13 @@
             "title": "Field",
             "type": "string"
           },
+          "fields": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields",
+            "type": "array"
+          },
           "guide": {
             "items": {
               "type": "string"
@@ -2438,6 +2483,40 @@
         "title": "ProgressSpecResponse",
         "type": "object"
       },
+      "ProposalAnswerBody": {
+        "description": "Which proposal the owner confirmed, or the explicit discard.\n\nA connector without a search phase never sees this body: the route exists on\nthe shared router, but `answer_proposal` refuses any batch that is not\n`previewed` with proposals \u2014 for every other connector the preview GET a\nconfirm would need is already the answer.",
+        "properties": {
+          "discard": {
+            "default": false,
+            "title": "Discard",
+            "type": "boolean"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source"
+          },
+          "source_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Id"
+          }
+        },
+        "title": "ProposalAnswerBody",
+        "type": "object"
+      },
       "ProviderHealth": {
         "properties": {
           "degraded": {
@@ -2499,6 +2578,35 @@
           "overwrite"
         ],
         "title": "RefreshBody",
+        "type": "object"
+      },
+      "RowSearchBody": {
+        "description": "The edited text a re-search should query, either half optional.\n\nAn omitted half keeps the row's current value \u2014 the owner edits what is\nwrong and leaves the rest alone.",
+        "properties": {
+          "author": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Author"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "title": "RowSearchBody",
         "type": "object"
       },
       "ScoreDistributionResponse": {
@@ -3123,7 +3231,7 @@
   },
   "info": {
     "title": "Akasha",
-    "version": "2.0.0"
+    "version": "2.1.0"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -3960,6 +4068,73 @@
       }
     },
     "/api/entries/bulk": {
+      "delete": {
+        "description": "Remove the selection's entries in one transaction (triage's Discard).\n\nSame selection shape as `PATCH /entries/bulk`: explicit `entry_ids` or a\nserver-side `filter` plus `excluded_entry_ids`, never both. Deleting has no\n`set` to send, so the body is the selection half alone.",
+        "operationId": "bulk_delete_entries_api_entries_bulk_delete",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BulkSelection"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AffectedResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Bulk Delete Entries"
+      },
       "patch": {
         "operationId": "bulk_entries_api_entries_bulk_patch",
         "requestBody": {
@@ -4573,6 +4748,78 @@
         ]
       }
     },
+    "/api/import/{importer_name}/batches/{batch_id}": {
+      "get": {
+        "description": "Re-read one previewed batch without re-sending its source.\n\nThe preview POST is idempotent by fingerprint and remains the way in; this\nread exists because a batch in its matching phase is polled for minutes\n(Sprint 083), and re-uploading a file the server already staged to learn\nits progress is exactly the cost an idempotent read should not have.",
+        "operationId": "read_preview_api_import__importer_name__batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Read Preview",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
     "/api/import/{importer_name}/batches/{batch_id}/files": {
       "post": {
         "description": "Take one file the import wants and attach it to the item it belongs to.\n\nOne file per request, and that is the design rather than an implementation\ndetail (DEC-083). Folding these into the preview bundle would bound the feature\nby the size of the whole library instead of by the size of one file, so a shelf\nof any size would eventually stop importing; here a 600-book library behaves\nexactly like an 18-book one, a file that cannot be stored costs one book rather\nthan the import, and the screen can count progress honestly.",
@@ -4640,6 +4887,350 @@
           }
         },
         "summary": "Attach File",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/exclude": {
+      "post": {
+        "description": "Keep one row out of the commit entirely.\n\nThe owner's 2026-09-14 decision: 'none of these is the book' must not\nforce a keep-as-typed row into the library. The row's planned action\nbecomes `excluded` \u2014 commit's existing skip set \u2014 and the summary\nrecounts so the commit gate tells the truth. Every connector's rows can\nbe excluded; the route is shared surface, reached from the list\nconnector's screen today.",
+        "operationId": "exclude_row_api_import__importer_name__batches__batch_id__records__record_id__exclude_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Exclude Row",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/include": {
+      "post": {
+        "description": "Undo a row's exclusion: it returns to what preview planned for it.",
+        "operationId": "include_row_api_import__importer_name__batches__batch_id__records__record_id__include_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Include Row",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/proposal": {
+      "post": {
+        "description": "Confirm one proposal for one row, or discard the row's proposals.\n\nConfirming re-stages the row's item half from the provider's payload and\nrecomputes its planned action, so the commit that follows needs no new path\n(Sprint 083 D4). Discarding keeps the row exactly as the spreadsheet typed\nit. Both require the batch's searches to have drained.",
+        "operationId": "answer_row_proposal_api_import__importer_name__batches__batch_id__records__record_id__proposal_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalAnswerBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer Row Proposal",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/search": {
+      "post": {
+        "description": "Edit a row's title/author and search it again.\n\nThe owner's 2026-09-14 decision, available on any row (a bad query can\nalso produce wrong proposals, not only an empty result): the typed row is\nre-staged with the edited text and its proposals are replaced. The spend\nis interactive-shaped (DEC-045): recorded, never blocked \u2014 a person is\nwaiting on the answer.",
+        "operationId": "research_row_api_import__importer_name__batches__batch_id__records__record_id__search_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "importer_name",
+            "required": true,
+            "schema": {
+              "title": "Importer Name",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "record_id",
+            "required": true,
+            "schema": {
+              "title": "Record Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RowSearchBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PreviewResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Research Row",
         "tags": [
           "imports"
         ]

@@ -616,6 +616,24 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("POST", "/api/entries"),
         ("PATCH", "/api/entries/bulk"),
         ("POST", "/api/entries/accept-suggested"),
+        ("DELETE", "/api/entries/bulk"),
+        ("GET", "/api/import/{importer_name}/batches/{batch_id}"),
+        (
+            "POST",
+            "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/proposal",
+        ),
+        (
+            "POST",
+            "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/exclude",
+        ),
+        (
+            "POST",
+            "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/include",
+        ),
+        (
+            "POST",
+            "/api/import/{importer_name}/batches/{batch_id}/records/{record_id}/search",
+        ),
         ("GET", "/api/entries/{entry_id}"),
         ("PATCH", "/api/entries/{entry_id}"),
         ("DELETE", "/api/entries/{entry_id}"),

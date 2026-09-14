@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "book-tracker"
-version = "2.0.0"
+version = "2.1.0"
 requires-python = ">=3.12,<3.15"
 dependencies = [
   "alembic>=1.14,<2",
@@ -25,6 +25,7 @@ dependencies = [
 # __main__ and warn about it in every nightly cron log.
 akasha-backup = "book_tracker.backup:main"
 akasha-attachments = "book_tracker.reclaim:main"
+akasha-prune = "book_tracker.prune_items:main"
 
 [dependency-groups]
 dev = [

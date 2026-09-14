@@ -512,6 +512,54 @@ to the entries/items it created or filled. The canonical columns and undo
 semantics are defined in the technical spec; do not add the previously proposed
 but undefined `items.import_source` shortcut.
 
+### 5.4 Custom list
+
+Every other connector reads an export a platform produced, and that platform's
+identifiers made matching trivial. This one reads a spreadsheet a person typed —
+`exports/Libros.csv`, 104 rows, a title column and an author column and **no
+identifiers at all** — and the product answer to a source with no identity is
+**search-then-confirm**, not a bigger heuristic.
+
+The flow (the owner's three recorded decisions, 2026-09-13):
+
+1. **Upload and mapping.** Drop the CSV/TXT (comma, semicolon or tab; BOM and
+   CRLF tolerated). Title and author columns are found from the headers —
+   Spanish and English, accents folded — and the first two columns are the
+   fallback; the screen offers explicit column numbers that override both.
+   Only title and author are read. The file's other columns ride uninterpreted
+   in each row's source fields, visible on the preview, mapped to nothing —
+   mapping them is future work for whatever spreadsheet a future user brings.
+2. **The search runs in the background while the preview stays open.** One job
+   walks the rows in order — sequential, one row at a time, respecting public-API
+   rate limits — and searches the domain's providers for each, storing the merged
+   top three results as proposals. The preview shows the live counts and commit
+   is refused until the search has drained; a provider over its daily budget
+   pauses the job and it resumes on its own, without spending retry attempts.
+3. **Confirm or discard each row.** A row's proposals are listed ranked — cover,
+   title, authors, year, language, provider — the first three rendered with
+   the rest behind a "Show more" (ten are stored). Confirming one re-stages the
+   row from that provider's full payload: the ISBNs, the year, the publisher the
+   spreadsheet never had. Committing then needs no new path; a confirmed identity
+   the connector never declared is trusted because the owner confirmed it.
+   Discarding means "none of these is the book": the row stays importable
+   exactly as typed. Unconfirmed rows commit as typed too — the owner decides
+   per row, not per batch. A row can also be **excluded from the commit
+   entirely** — "Don't import this row" — which the summary recounts and the
+   control itself undoes.
+4. Rows whose search found nothing show that as the answer it is; a row whose
+   searches all failed is marked failed and stays discardable. No result is ever
+   an error the owner must fix. Any row's title and author can be **edited and
+   searched again** — a bad query can also produce wrong proposals, not only an
+   empty result — and the row then carries the edited text with fresh
+   proposals.
+5. After commit, the rows land in Triage as `unsorted` like every import, with
+   the confirmed ones carrying provider metadata and covers from the
+   enrichment path.
+
+Nothing in this flow resolves a match by itself: the connector's own match is
+always "new", because a source with no identity should not guess. The provider's
+relevance ranking is the matcher; the owner's confirm is the decision.
+
 ---
 
 ## 6. HTTP API
@@ -549,6 +597,10 @@ PATCH  /api/entries/bulk               → {entry_ids[]} or
                                           {set:{status?, score?, add_shelves?[],
                                           remove_shelves?[], clear_provisional?}}
 POST   /api/entries/accept-suggested   → {filter} applies suggested_status in bulk
+DELETE /api/entries/bulk               → {entry_ids[]} or
+                                          {filter, excluded_entry_ids[]}; removes
+                                          the selection in one request (triage's
+                                          Discard)
 DELETE /api/entries/{id}
 GET    /api/items/{id}
 PATCH  /api/items/{id}                 → manual metadata correction
@@ -577,6 +629,23 @@ POST   /api/import/calibre/preview     → chosen-folder upload (metadata.db + c
 POST   /api/import/calibre/commit      → {batch_id, options}
 GET    /api/import/calibre/browse      → ?path=, folder names under the mount
 GET    /api/import/jobs/{id}           → progress for background enrichment
+POST   /api/import/list/preview       → CSV/TXT upload (+ optional column mapping),
+                                         returns the dry-run report in `matching`
+POST   /api/import/list/commit        → {batch_id}; refused (409) until the
+                                         background search has drained
+GET    /api/import/{connector}/batches/{id}
+                                      → re-read one previewed batch; the poll while
+                                         a list import's search runs (its response
+                                         carries the job's live counts)
+POST   /api/import/{connector}/batches/{id}/records/{rid}/proposal
+                                      → {source, source_id} confirms one proposal,
+                                         {discard} keeps the row as typed
+POST   /api/import/{connector}/batches/{id}/records/{rid}/exclude
+                                      → keep this row out of the commit
+                                         entirely (include undoes it)
+POST   /api/import/{connector}/batches/{id}/records/{rid}/search
+                                      → {title?, author?} edit the row's text
+                                         and search it again
 DELETE /api/import/batches/{id}        → undo an import batch
 
 GET    /api/export                     → whole library as entity-shaped JSON;
@@ -1018,17 +1087,16 @@ acceptance criteria.
    books are searchable and appear in shelf views, just hidden from the default
    list on `/`. The alternative is full quarantine until triaged. Low stakes,
    easy to flip later.
-2. **Deleting an entry — what happens to the item?** Spec leaves orphaned
-   `items` rows and their covers in place, treating them as cache so re-adding
-   is instant, with a manual "prune orphans" maintenance action. Only matters
-   for disk usage, and covers are ~50KB each. **Attachments changed the stakes
-   of this and it is now answered for them** (DEC-047, DEC-049): an attached
-   file is 2.5 MB rather than 50 KB and is not re-fetchable cache, so removing
-   an attachment deletes its bytes once nothing references them, and
-   `akasha-attachments reclaim` collects any blob that was orphaned some other
-   way. The orphaned *cover* is still left in place: the reclaim command is
-   scoped to the attachment store and deliberately does not generalize to
-   covers, which are cache the application can re-fetch.
+2. **Deleting an entry — what happens to the item?** Answered in two halves. The
+   item is kept as cache — it is what makes re-adding instant and, since 2.0, is
+   shared between users, so one person's delete cannot take the row another's
+   entry uses. The cleanup half is `akasha-prune` (DEC-158): an operator command,
+   dry-run by default, removing items no entry of any user references together
+   with their covers and unshared attachment blobs. Attachments changed the stakes
+   once already (DEC-047, DEC-049): a blob is 2.5 MB rather than 50 KB, so its
+   reclamation is refcounted and gated behind `--apply` exactly like the item
+   prune. Neither runs on a schedule — deletion by inference belongs behind a
+   person.
 3. **Work vs edition.** One row = one edition; a reread of a different edition
    is the same entry with `reread_count++`. Changing this means a different
    uniqueness constraint on `entries`. Recommendation stands: don't.

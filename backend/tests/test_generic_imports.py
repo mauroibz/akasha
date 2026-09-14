@@ -141,12 +141,15 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
     assert alternates["export"]["alternates"] == []
 
     # The screen renders what the connector declares, so what it declares has to
-    # arrive intact: ordered steps, an empty state and an https help address.
+    # arrive intact: ordered steps, an empty state and an https help address when
+    # the connector has one. `help_url` may be absent — a hand-written list has
+    # no platform to link to (the spec's "https, or absent", DEC-080) — so the
+    # guard is that it is *never wrong*, not that it is always present.
     for row in published:
         spec = row["input"]
         assert spec["guide"] and all(step.strip() for step in spec["guide"])
         assert spec["empty_state"]
-        assert spec["help_url"].startswith("https://")
+        assert spec["help_url"] is None or spec["help_url"].startswith("https://")
     assert any("review/import" in step for step in goodreads["input"]["guide"])
     assert any("provisional" in step.lower() for step in goodreads["input"]["guide"])
     assert any("metadata.db" in step for step in calibre["input"]["guide"])
@@ -608,8 +611,17 @@ async def test_a_bundle_without_a_database_is_refused_with_something_to_do(
 
 
 @pytest.mark.anyio
+@pytest.mark.timeout(120)
 async def test_a_bundle_over_the_declared_caps_is_refused(tmp_path: Path) -> None:
-    """The caps are the connector's, not the shared route's 5 MiB (deliverable 1)."""
+    """The caps are the connector's, not the shared route's 5 MiB (deliverable 1).
+
+    Its own bound: the too-many-files half parses max_files + 1 = 10,001
+    multipart parts, which Sprint 051's 30 s default measured at 11.7 s of
+    headroom on a dev workstation — a shared CI runner's I/O pushed the same
+    parse past 30 s three times in a row (PR #20). The parts count is the
+    connector's real declared cap, so the honest bound is this test's clock,
+    not a smaller fixture."""
+
     library = _bundle_library(tmp_path / "Calibre Library")
     app = _no_mount_app(tmp_path)
     calibre = IMPORTERS["calibre"]

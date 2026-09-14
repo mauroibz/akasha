@@ -720,6 +720,112 @@ test("triage bulk status update with selection", async ({ page }) => {
   await expect(page.getByText("3 entries updated")).toBeVisible();
 });
 
+test("triage discards a selection in one confirmed request", async ({
+  page,
+}) => {
+  const entries = makeEntries(6);
+  const deletes: unknown[] = [];
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.route("**/api/entries/bulk", async (route) => {
+    if (route.request().method() !== "DELETE") {
+      return route.fulfill({ json: { affected: 0 } });
+    }
+    deletes.push(route.request().postDataJSON());
+    return route.fulfill({ json: { affected: 2 } });
+  });
+
+  await page.goto("/import?tab=triage");
+  await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
+  await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
+  await expect(page.getByText("2 selected")).toBeVisible();
+
+  // The red discard action asks before it deletes: one stray click on the
+  // wrong checkbox selection must not remove entries from the library.
+  const discard = page.getByRole("button", { name: /discard/i });
+  await expect(discard).toBeVisible();
+  await expect(discard).toHaveCSS("background-color", "rgb(239, 68, 68)");
+  await expect(discard).toHaveCSS("color", "rgb(9, 9, 11)");
+  await discard.click();
+  await expect(deletes).toEqual([]);
+  await expect(
+    page.getByRole("alertdialog").filter({ hasText: /discard/i }),
+  ).toBeVisible();
+
+  await page.getByRole("button", { name: /cancel/i }).click();
+  await expect(page.getByRole("alertdialog")).toHaveCount(0);
+  expect(deletes).toEqual([]);
+
+  await discard.click();
+  await page.getByRole("button", { name: "Discard entries" }).click();
+  await expect.poll(() => deletes).toEqual([{ entry_ids: [1, 2] }]);
+  await expect(page.getByText("2 entries discarded")).toBeVisible();
+  // The selection and its bar go with the rows it removed.
+  await expect(page.getByText("2 selected")).toHaveCount(0);
+  await expect(page.getByRole("toolbar", { name: "Bulk actions" })).toHaveCount(
+    0,
+  );
+});
+
+test("triage Ctrl+A discards through the filter with exclusions", async ({
+  page,
+}) => {
+  const entries = makeEntries(50);
+  const deletes: unknown[] = [];
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: 200,
+        facets: {
+          status_counts: { unsorted: 200 },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  await page.route("**/api/entries/bulk", async (route) => {
+    if (route.request().method() !== "DELETE") {
+      return route.fulfill({ json: { affected: 0 } });
+    }
+    deletes.push(route.request().postDataJSON());
+    return route.fulfill({ json: { affected: 199 } });
+  });
+
+  await page.goto("/import?tab=triage");
+  await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
+  await page.keyboard.press("Control+a");
+  await expect(page.getByText("200 selected")).toBeVisible();
+  await page.locator('[data-entry-id="7"] [role="checkbox"]').click();
+  await expect(page.getByText("199 selected")).toBeVisible();
+
+  const discard = page.getByRole("button", { name: /discard/i });
+  await discard.click();
+  await page.getByRole("button", { name: "Discard entries" }).click();
+  await expect
+    .poll(() => deletes)
+    .toMatchObject([
+      {
+        filter: { status: ["unsorted"] },
+        excluded_entry_ids: [7],
+      },
+    ]);
+});
+
 test("triage Ctrl+A selects all matching with server-side exclusions", async ({
   page,
 }) => {
@@ -1044,6 +1150,52 @@ test("triage puts a selection on a shelf in bulk", async ({ page }) => {
       set: { add_shelves: [7] },
     });
   await expect(page.getByText("2 entries updated")).toBeVisible();
+});
+
+test("the detail page a triage row opens returns to triage", async ({
+  page,
+}) => {
+  const entries = makeEntries(2);
+  await page.route("**/api/entries?**", (route) =>
+    route.fulfill({
+      json: {
+        items: entries,
+        next_cursor: null,
+        total: entries.length,
+        facets: {
+          status_counts: { unsorted: entries.length },
+          status_counts_by_type: {},
+          format_counts: {},
+        },
+      },
+    }),
+  );
+  // The detail page's own GET, shaped like the seed the other specs use.
+  await page.route("**/api/entries/1", (route) =>
+    route.fulfill({ json: { ...entries[0], status: "unsorted" } }),
+  );
+  await page.route("**/api/item-types", (route) => route.fulfill({ json: [] }));
+  await page.route("**/api/items/1", (route) =>
+    route.fulfill({ json: entries[0].item }),
+  );
+  await page.route("**/api/items/1/attachments", (route) =>
+    route.fulfill({ json: { attachments: [] } }),
+  );
+
+  await page.goto("/import?tab=triage");
+  await page.getByText("Book 1", { exact: true }).click();
+  await expect(page).toHaveURL(/\/books\/1$/);
+
+  // Back returns to the inbox it was opened from, not the library.
+  await expect(page.getByRole("link", { name: /← triage/i })).toBeVisible();
+  await page.getByRole("link", { name: /← triage/i }).click();
+  await expect(page).toHaveURL(/\/import\?tab=triage$/);
+  await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
+
+  // A deep link with no triage behind it still offers the library, the only
+  // place a reader would expect to land.
+  await page.goto("/books/1");
+  await expect(page.getByRole("link", { name: /← library/i })).toBeVisible();
 });
 
 test("the retired /triage address still lands on the folded tab", async ({

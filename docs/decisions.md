@@ -6300,3 +6300,262 @@ only the file-Status flip and state regeneration.
   publishing remain owner actions, deliberately not performed by this sprint. A future
   reopening moves `FINAL_SPRINT` again and records the move here. The
   contended-insights-at-10k finding stays unowned by a sprint until the owner schedules one.
+
+## DEC-156 — The plan reopens: a hand-written CSV imports by search-then-confirm (Sprint 083)
+
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Supersedes:** nothing. DEC-155 closed the plan at 82 and named the reopening mechanism this
+  entry now exercises; DEC-146's completed line is untouched.
+- **Cross-references:** DEC-080 (a connector declares its own guidance), DEC-082 (a source with no
+  durable identity should not guess), DEC-045 (search spends recorded, background work is
+  budgeted), DEC-106 (preview idempotency is the source *and* what was asked of it), DEC-155
+  (the completed-plan invariants), Sprint 083.
+
+### Context
+
+The owner asked (2026-09-13) for an importer unlike the seven existing ones: a CSV or TXT
+**written by a user**, not exported by a platform. `exports/Libros.csv` (104 rows, git-ignored,
+never committed) has title and author columns and no identifiers at all — every prior connector
+leaned on per-row IDs (Goodreads ISBNs, Calibre UUIDs, IMDb/Letterboxd/Trakt ids, Spotify URIs,
+MyAnimeList ids), which made its bulk matching against the local library trivial. The request:
+let the owner pick which columns to import; search the domain's providers row by row (sequential,
+async, because public metadata APIs are rate-limited); propose the best result per row; let the
+owner swap in the right result or discard it when none matches.
+
+Measured in the worktree before planning, from live code:
+
+- `Importer.match` (`domain/importers.py:355`) is a **local-library** seam (`ImportMatcher`,
+  `infrastructure/repositories.py`); no provider is reachable from preview. The new source has no
+  identity, so nothing in the existing matching path can answer for it.
+- `ImportService._validate` (`application/imports.py:190-198`) refuses a batch whose records carry
+  identifier kinds the connector did not declare — an identity-free connector declares
+  `identity_kinds = frozenset()` and must emit no identifiers, which is exactly the source's shape.
+- The provider search seam is domain-keyed and already shared (`application/providers.py`
+  `search_providers`, `merge_and_rank` in `domain/providers.py:148`), bounded at 10 s per
+  provider; books have Open Library keyless and Google Books keyed (`GOOGLE_BOOKS_API_KEY` set).
+- A durable, rate-limited, user-scoped job system exists (`infrastructure/jobs.py`: claim/lease/
+  heartbeat/backoff, `JobRunner` in the FastAPI lifespan, `RateLimiter(0.5s)` in `main.py:275`,
+  `ProviderQuota` blocking for background work per DEC-045's split), and `GET /api/import/jobs/
+  {id}` already serves progress (`api/imports.py:771`).
+- `import_batches.state` is free text with no CHECK (migration 0016 constrained only `kind`), so
+  a new `matching` lifecycle state needs no schema change to that column.
+- Triage operates on committed `unsorted` entries (`TriagePage.tsx`, DEC-086); the preview screen
+  already renders per-row decisions for `ambiguous` rows (`ImportPage.tsx:843`).
+
+Three product questions were put to the owner (2026-09-13) and answered:
+
+1. **Where matching lives:** as a background job between preview and commit — the preview screen
+   polls progress and **commit stays blocked until the queue for the batch drains**. (Not
+   raw-rows-first-then-match-after-commit; not synchronous.)
+2. **What a confirmation fills:** the provider's **full payload** — cover, ISBNs, synopsis,
+   publisher, page count, language, year — the same `ItemPayload` the add path fetches.
+3. **What is mapped:** **title and author only**. The CSV's other columns (Editorial, Idioma,
+   Formato, Estado, Precio, Comentarios) are not mapped to any domain field — the owner's answer:
+   "va a depender completamente del dominio y lo que contenga el csv que el usuario provea.
+   Matchearlo no está en scope, solo importa para la búsqueda. Queda a futuro."
+
+### Decision
+
+- The plan reopens at **Sprint 083 — "A list you wrote yourself"**
+  (`docs/sprints/083-a-list-you-wrote.md`, created `ready` in the same commit per the
+  end-of-plan revision shape; `FINAL_SPRINT` moves 82 → 83 in `scripts/validate_project.py`).
+- The connector is a **generic delimited-text reader** in the book domain (`list`), with a
+  connector-declared column-mapping option the shared screen renders (auto-detect by header,
+  first-two-columns fallback — satisfying the owner's "seleccionar qué columnas usar" without a
+  per-connector screen patch, the `browsable`/`incremental` declaration pattern extended).
+- Provider matching is a **new durable job kind** `search_import_rows`, sequential per row,
+  rate-limited and quota-aware (enrichment-shaped spending, per DEC-045's split, because nobody
+  is waiting on any single row), storing **top-N (3) merged proposals per row** in a new
+  `import_proposals` table (migration 0022). The batch's `state` gains `matching` between
+  `previewed` stages; commit refuses it (409).
+- **Confirm re-stages the row** from the proposal's payload through the existing
+  `normalized_payload` channel — commit, undo, triage and enrichment need no new code path;
+  **discard keeps the typed row**; unconfirmed rows land as typed. Decisions are per row, and a
+  chosen proposal is user data that survives re-preview.
+- The CSV's non-search columns ride uninterpreted in `source_fields`. Mapping them is a future
+  decision for whatever domain and spreadsheet a future user brings.
+
+### Consequences
+
+- `docs/agent/state.json` reads `project_status: ready` with Sprint 083 active (generated by
+  `sync_sprint_state.py` from the sprint file's `Status: ready`, never hand-edited — DEC-148).
+- The `matching` state, the proposals table and the confirm routes are **domain-neutral shared
+  surface**: the conformance suite must prove no shared layer branches on the connector's name,
+  and a second connector's data exercises the neutrality (technical spec 6.6's contract).
+- Interactive search remains recorded-never-blocked; the import job is budgeted like enrichment —
+  a large import may wait out a provider's daily window, which the progress surface must show
+  rather than hide. `AKASHA_PROVIDER_DAILY_LIMITS` stays the owner's dial.
+- ~104 rows at one search per row against Open Library (keyless) is the realistic load; the
+  sequential 1×1 shape is the owner's explicit instruction and is not to be traded for
+  concurrency without a superseding decision.
+- Sprint 083's walkthrough must run against **recorded real Open Library responses** (DEC-025):
+  the correctness of the proposal pipeline is proven against the recorded boundary, with the
+  live boundary exercised once in the walkthrough if it is up (DEC-108's substitution rule
+  otherwise).
+- The "Not scheduled" saved-views and shelf-menu items remain where they are; nothing about
+  this reopening moves them.
+
+## DEC-157 — Two hotfixes the released triage owed: Discard on the selection bar, and back-where-you-came-from on detail
+
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Supersedes:** nothing.
+- **Cross-references:** product spec §5 (Triage — the action bar already listed *Delete*), §6 (the
+  route list), technical spec §7.1 (bulk selection), §8 (the triage paragraph and the new one
+  after it), DEC-026 (the destructive fill keeps its contrast by using the score chip's
+  dark-ink pattern), DEC-025 (the walkthrough gate).
+
+### Context
+
+After the 2.0.0 release, and before claiming Sprint 083, the owner asked for two hotfixes that
+"se nos pasaron por oversight":
+
+1. **The triage list had no way to discard rows.** The product spec's selection-bar list has
+   carried *Delete* since v1 ("*Set status · Add shelves · Set score · Clear provisional ·
+   Delete*. All apply to the whole selection in one request") but no action was built and no
+   bulk-removal endpoint existed — `DELETE /entries/{id}` is per-row only. The owner's flow
+   requirement, to avoid click errors: select rows first, and the action appears on the
+   selection's own panel as a **red button**.
+2. **Detail's back control always went to the library.** A triage row opens `/books/{id}`
+   (`TriagePage.tsx` row click and `Enter`), and `DetailPage` rendered the shared `BackToLibrary`
+   control unconditionally — mid-inbox, "← Library" abandons the triage session instead of
+   resuming it.
+
+### Decision
+
+- **Discard is a selection-bar action, never a per-row control.** A red button appears in the
+  bulk action bar only while a checkbox selection (explicit ids or `Ctrl/Cmd+A` with
+  exclusions) exists; it opens the same AlertDialog pattern the detail page's own delete uses,
+  and only the confirmed dialog sends the request. One request removes the whole selection:
+  `DELETE /api/entries/bulk`, accepting the same selection shapes as `PATCH /entries/bulk`
+  (`entry_ids` or `filter` plus `excluded_entry_ids`, never both — the `set` half is dropped, so
+  the model is the shared `BulkSelection` base) and applying in one transaction through the same
+  `_selection` the other bulk actions resolve. Shelf and format rows cascade with the entry
+  (migration 0015); the cached item and cover remain, so re-adding is instant — the dialog says
+  so, as the detail page's does. The red fill uses dark ink on `--destructive` (the DEC-026
+  score-chip pattern), because white on red-500 fails axe's contrast threshold and so does
+  red-500 ink on the bar's raised surface.
+- **Back follows the navigator's state.** A triage row navigates with `state.from = "triage"`;
+  the detail page reads it and renders "← Triage" returning to `/import?tab=triage`. Absent
+  state — a deep link, a shared URL, the library — keeps "← Library" exactly as before, so
+  shared links keep their meaning. The shared control stays one component with default
+  parameters; its five other call sites are untouched.
+
+### Consequences
+
+- The multi-user isolation of the new endpoint is pinned: the route-policy inventory lists it
+  `private-id`, the cross-user probe (another user's id in `entry_ids`) expects the same 404 as
+  every other id-addressed write, and the documented-route guard includes it. During the
+  walkthrough the isolation suite caught two mis-conceived probes (deleting the acting user's
+  *own* row legitimately succeeds) — those were test errors, not boundary errors; the
+  user-scoped `_selection` the endpoint reuses was never in question.
+- Undo of an import batch is unaffected: undo replays the batch's own effects and skips rows a
+  person removed by hand (`session.get` misses count as `skipped`), so a discarded row is the
+  already-supported "edited after import" shape, now reachable on purpose.
+- This is owner-directed post-release work between sprints: Sprint 083 stays `ready`,
+  untouched, and its file is the next session's first read. Nothing in the plan moved.
+
+## DEC-158 — The item cache gets its cleanup half: akasha-prune, and the dialogs stop promising permanence
+
+- **Date:** 2026-09-13
+- **Status:** accepted
+- **Supersedes:** the open half of product-spec open question 2 (the "prune orphans maintenance action"
+  it once waved through); DEC-050's scope note that the reclaim command "deliberately does not
+  generalize to covers".
+- **Cross-references:** DEC-047, DEC-049, DEC-050 (the attachment lifecycle and the inference
+  rules this sweep inherits), DEC-146 (items as a shared cache between users), DEC-157 (the
+  Discard action that made the gap visible), Sprint 082 (the 2.0.0 release the dialogs shipped in).
+
+### Context
+
+Testing the DEC-157 hotfixes locally, the owner asked why a deleted entry keeps its cached item
+and cover, and whether anything ever collects them. Measured from the tree:
+
+- The keep is load-bearing, not accidental: `AddService` consults `cached_item_for_source`
+  (`application/add.py:189`) so a re-add is instant and costs no provider quota, and since 2.0
+  `LibraryService._item` treats items as a shared cache — one user's delete cannot remove a row
+  another user's entry still uses.
+- Nothing ever collected an item that lost its last entry. `reclaim_attachments` (DEC-049/050) is
+  scoped to the attachment store by decision; the product spec's open question 2 had waved orphaned
+  covers through on size (~50 KB); the roadmap never scheduled a prune. Delete an entry and its item,
+  cover, and any attachment rows survive forever, unreachable by any surface — including the blob a
+  discarded Calibre book's cached item still holds, which the attachment sweep counts as referenced
+  and will not collect.
+- Both delete dialogs (detail's Delete, triage's Discard since DEC-157) promised "the metadata and
+  cover remain cached so re-adding is instant" — a promise about storage the user cannot see and had
+  no way to act on.
+
+The owner's rule: either there is a cleanup mechanism (and the dialogs should not warn about the
+cache), or there is none (and the cache should not be kept). He chose the first, with the sweep as
+an operator command in the house style.
+
+### Decision
+
+- **`akasha-prune`** joins `akasha-attachments` and `akasha-backup` as the third operator command,
+  and follows their inference rules: dry-run by default, `--apply` to act, report everything,
+  never touch what it did not write, no schedule — deletion by inference stays behind a person.
+- A candidate is an item **no entry of any user references and no import record still claims** —
+  a batch inside its undo window can still resurrect its rows, and `UndoService` already skips
+  missing rows as `skipped`, so pruning a claimed item would make an undo silently do less than it
+  promises. With the item go its cover (`covers/{id}.jpg`), its identifiers and sources (cascading
+  since migration 0002), and its attachment blobs **only when no other row shares the digest** —
+  the same refcount `delete_blob_if_unreferenced` applies. Stale covers no item points at are
+  collected too: same leak, same directory.
+- The dialogs stop describing storage: detail's Delete and triage's Discard say the row leaves
+  your library and nothing else. The cache sentence was a promise about disk the reader could
+  neither verify nor influence.
+
+### Consequences
+
+- The prune never runs itself. An operator who never runs it has exactly today's behaviour plus
+  honest dialog copy; an operator who runs it reclaims disk. The runbook documents both commands
+  side by side.
+- An item inside an un-undone import batch is immune to the prune until that batch is undone or
+  its window passes — the ledger's claim is stronger than "no entries", deliberately.
+- Re-adding a pruned item costs one provider round trip, same as the first add ever did; nothing
+  about the add path changes.
+- The command reads the database through plain `sqlite3` in one read-only pass before any
+  removal, the pattern `reclaim_attachments` established for maintenance commands that must not
+  depend on loadable application settings.
+
+## DEC-159 — The owner's first-pass feedback on the list importer ships as a hotfix-style batch
+
+- Date: 2026-09-14
+- Status: accepted
+- Context: The owner validated Sprint 083's search-then-confirm flow against his real
+  `exports/Libros.csv` on a locally rebuilt container and reported five findings plus one
+  non-defect. The plan is formally complete (all 83 sprints, DEC-155), so there was no active
+  sprint to claim; the owner chose the hotfix-style batch (the DEC-157 precedent) over a new
+  sprint: build all items now, full gate, rebuild his container, record in worklog and here.
+- Findings, as decided with the owner:
+  1. The connector's label reads **"Custom list"** now (`list.py:177`); the internal `list`
+     id, the code and every historical record keep the old name — internal names are
+     permanent, user-facing copy follows the owner's word.
+  2. The scroll-to-top report ("clicking a cover sends me back to the top") was a real
+     defect with a wrong suspect: the preview heading re-focused on every 2 s poll tick and
+     every answer refresh, pulling the page to its top mid-browse. The cover click was
+     innocent. Fixed by keying the focus effect on the batch id (`ImportPage.tsx`).
+  3. Top-3 was a chosen default, not a technical limit — the search already returns up to
+     20 per row. **Ten are stored**, three render, the rest fold behind "Show more (N)"
+     (TOP_N 10, `import_search.py`).
+  4. Edit-and-re-search is available on **any** row, not only empty ones (the owner's
+     explicit choice: a bad query can also produce wrong proposals). `POST
+     .../records/{rid}/search` re-stages the edited text and replaces the proposals; the
+     spend is interactive-shaped (DEC-045): recorded, never blocked. A re-search clears any
+     earlier answer — it asks a different question.
+  5. "None of these is the book" no longer forces a keep: `POST .../records/{rid}/exclude`
+     keeps the row out of the commit entirely (planned_action `excluded`, commit's existing
+     skip set, the stored summary recomputed from live rows), and `include` undoes it.
+  6. The triage "missing metadata" report was a non-defect: the DB audit showed every
+     confirmed row carrying year, publisher, page count, description and an installed
+     cover — Triage renders title + creator + a 36px cover by design (the detail page is
+     where metadata lives). The owner chose to keep the row as is.
+- Consequences: three new shared-surface routes (private-id in the isolation inventory,
+  documented-route set updated, OpenAPI regenerated); the exclusion and the re-search are
+  connector-neutral surfaces every import row can use, reached from the list screen today;
+  the per-row search seam (`search_row`) is the one place the background job and the
+  interactive re-search share, so the row's domain-scoping rule cannot drift between them.
+  Full gate re-run on the final tree (backend 1576, Vitest 333, `make check`, Playwright
+  143+2 skips) and the live walkthrough extended to exercise all three new controls —
+  WALKTHROUGH CLEAN (detail in the worklog).

@@ -413,19 +413,26 @@ class BulkSet(BaseModel):
         return self
 
 
-class BulkBody(BaseModel):
+class BulkSelection(BaseModel):
+    """The selection half of a bulk request — the one shape every bulk action
+    resolves, so *Discard* understands the same `entry_ids`-or-`filter`
+    selection the action bar already sends everywhere else."""
+
     entry_ids: list[int] | None = None
     filter: EntryFilter | None = None
     excluded_entry_ids: list[int] = Field(default_factory=list)
-    set: BulkSet
 
     @model_validator(mode="after")
-    def exactly_one_selection(self) -> "BulkBody":
+    def exactly_one_selection(self) -> "BulkSelection":
         if (self.entry_ids is None) == (self.filter is None):
             raise ValueError("provide exactly one of entry_ids or filter")
         if self.entry_ids is not None and self.excluded_entry_ids:
             raise ValueError("exclusions require filter selection")
         return self
+
+
+class BulkBody(BulkSelection):
+    set: BulkSet
 
 
 class AcceptSuggestedBody(BaseModel):
@@ -602,6 +609,23 @@ async def bulk_entries(body: BulkBody, library: Library) -> AffectedResponse:
 @router.post("/entries/accept-suggested", response_model=AffectedResponse)
 async def accept_suggested(body: AcceptSuggestedBody, library: Library) -> AffectedResponse:
     affected = library.accept_suggested(body.filter.model_dump(mode="json"))
+    return AffectedResponse(affected=affected)
+
+
+@router.delete("/entries/bulk", response_model=AffectedResponse, responses=ERRORS)
+async def bulk_delete_entries(body: BulkSelection, library: Library) -> AffectedResponse:
+    """Remove the selection's entries in one transaction (triage's Discard).
+
+    Same selection shape as `PATCH /entries/bulk`: explicit `entry_ids` or a
+    server-side `filter` plus `excluded_entry_ids`, never both. Deleting has no
+    `set` to send, so the body is the selection half alone.
+    """
+    filter_values = body.filter.model_dump(mode="json") if body.filter else None
+    affected = library.bulk_delete(
+        entry_ids=body.entry_ids,
+        filters=filter_values,
+        excluded_entry_ids=body.excluded_entry_ids,
+    )
     return AffectedResponse(affected=affected)
 
 

@@ -904,3 +904,304 @@ test("the import source strip fits a phone with seven connectors, and scrolls wi
     );
   for (const height of heights) expect(height).toBeGreaterThanOrEqual(44);
 });
+
+test("the list connector searches, proposes, and takes the owner's answers before commit (Sprint 083)", async ({
+  page,
+}) => {
+  // The search-then-confirm flow against stubbed routes: the batch stages in
+  // `matching` with a live job progress, the poll drains it to `previewed`,
+  // each row's proposals render with Confirm/Discard controls, and the
+  // answers ride the proposal route the backend defines. The provider half of
+  // the real flow is proven against recorded Open Library responses in the
+  // backend suite (DEC-025); this spec pins the screen's contract.
+  const listRecord = (overrides: Record<string, unknown> = {}) => ({
+    record_id: 1,
+    row_number: 2,
+    title: "Rayuela",
+    creators: ["Julio Cortázar"],
+    suggested_status: null,
+    score: null,
+    score_provisional: false,
+    shelves: [],
+    errors: [],
+    planned_action: "create_item",
+    match_kind: "new",
+    candidates: [],
+    item: {
+      title: "Rayuela",
+      subtitle: null,
+      year: null,
+      identifiers: {},
+      metadata: { creators: ["Julio Cortázar"] },
+      creator_sort: null,
+    },
+    entry: {
+      score: null,
+      notes: null,
+      date_added: null,
+      values: {},
+      score_provisional: false,
+      suggested_status: null,
+    },
+    source_fields: { Editorial: "Sudamericana" },
+    proposals: [],
+    ...overrides,
+  });
+  const proposal = {
+    source: "openlibrary",
+    source_id: "OL1M",
+    rank: 0,
+    chosen: null,
+    payload: {
+      title: "Rayuela",
+      subtitle: null,
+      creators: ["Julio Cortázar"],
+      year: 1963,
+      identifiers: { isbn: "9788437604572" },
+      language: "es",
+      metadata: { publisher: "Sudamericana" },
+      cover_url: null,
+      cover_fallback_urls: [],
+    },
+  };
+
+  let answered = false;
+  let excluded = false;
+  let commitBody: unknown;
+  await page.route("**/api/import/list/preview", async (route) => {
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "list-1",
+        fingerprint: "csv",
+        state: "matching",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        search_progress: { searched: 0, total: 1, job_state: "running" },
+        records: [listRecord({ proposals: [] })],
+      },
+    });
+  });
+  await page.route("**/api/import/list/batches/list-1", async (route) => {
+    await route.fulfill({
+      json: {
+        batch_id: "list-1",
+        fingerprint: "csv",
+        state: "previewed",
+        summary: { total: 1, ready: excluded ? 0 : 1, errors: 0, ambiguous: 0 },
+        records: [
+          listRecord({
+            planned_action: excluded ? "excluded" : "create_item",
+            proposals: [{ ...proposal, chosen: answered ? true : null }],
+          }),
+        ],
+      },
+    });
+  });
+  await page.route(
+    "**/api/import/list/batches/list-1/records/1/exclude",
+    async (route) => {
+      excluded = true;
+      await route.fulfill({ status: 200, json: { ok: true } });
+    },
+  );
+  await page.route(
+    "**/api/import/list/batches/list-1/records/1/include",
+    async (route) => {
+      excluded = false;
+      await route.fulfill({ status: 200, json: { ok: true } });
+    },
+  );
+  await page.route(
+    "**/api/import/list/batches/list-1/records/1/proposal",
+    async (route) => {
+      answered = true;
+      await route.fulfill({
+        json: {
+          batch_id: "list-1",
+          fingerprint: "csv",
+          state: "previewed",
+          summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+          records: [listRecord({ proposals: [{ ...proposal, chosen: true }] })],
+        },
+      });
+    },
+  );
+  await page.route("**/api/import/list/commit", async (route) => {
+    commitBody = route.request().postDataJSON();
+    await route.fulfill({
+      json: {
+        batch_id: "list-1",
+        state: "committed",
+        created_items: 1,
+        created_entries: 1,
+        unchanged_entries: 0,
+        unsorted_entries: 1,
+      },
+    });
+  });
+
+  await page.goto("/import");
+  await page.getByRole("tab", { name: /custom list/i }).click();
+  // The declared column mapping renders from the catalog's declaration.
+  await expect(page.getByLabel(/title is column/i)).toBeVisible();
+  await expect(page.getByLabel(/author is column/i)).toBeVisible();
+  // The drop-zone's label also names its guide list, so the file input is
+  // reached by id rather than by label (the input is the drop zone's own).
+  await page.locator("#list-source").setInputFiles({
+    name: "libros.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Título del libro,Autor\r\nRayuela,Julio Cortázar"),
+  });
+  await page.getByRole("button", { name: /preview/i }).click();
+
+  // The searching banner shows the job's live counts, and the commit gate is
+  // closed while the batch is still matching.
+  await expect(page.getByTestId("search-progress")).toContainText(
+    "Searching for matches: 0 of 1 rows searched.",
+  );
+  const gate = page.getByRole("button", {
+    name: /waiting for the search/i,
+  });
+  await expect(gate).toBeDisabled();
+
+  // The poll (2s interval) drains the batch and the proposals render.
+  const confirm = page.getByRole("button", { name: "Confirm", exact: true });
+  await expect(confirm).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.getByRole("button", { name: /import 1 ready row/i }),
+  ).toBeEnabled();
+  await expect(page.getByText(/is one of these the book\?/i)).toBeVisible();
+  await expect(page.getByText("openlibrary")).toBeVisible();
+
+  // The row's own way out exists before any answer.
+  await expect(
+    page.getByRole("button", { name: /none of these — keep as typed/i }),
+  ).toBeEnabled();
+
+  // Confirming rides the proposal route.
+  await confirm.click();
+  await expect(page.getByText("Confirmed")).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /undo my answer/i }),
+  ).toBeEnabled();
+
+  // The owner's 2026-09-14 batch: a row can leave the import entirely, and
+  // the exclusion is its own undo. Excluded, the commit gate counts it out.
+  const exclude = page.getByRole("button", { name: /don't import this row/i });
+  await exclude.click();
+  await expect(
+    page.getByRole("button", { name: /import this row after all/i }),
+  ).toBeVisible({ timeout: 10_000 });
+  await expect(
+    page.getByRole("button", { name: /import 0 ready rows/i }),
+  ).toBeDisabled();
+  await page
+    .getByRole("button", { name: /import this row after all/i })
+    .click();
+  await expect(
+    page.getByRole("button", { name: /import 1 ready row/i }),
+  ).toBeEnabled({ timeout: 10_000 });
+
+  await page.getByRole("button", { name: /import 1 ready row/i }).click();
+  await expect(page.getByRole("status")).toContainText("1 entry added");
+  expect(commitBody).toEqual({ batch_id: "list-1", choices: [] });
+});
+
+test("the list connector unfolds deeper proposals behind Show more (2026-09-14 owner batch)", async ({
+  page,
+}) => {
+  // Ten are stored per row; three render. The stub offers five so the fold is
+  // visible without a real provider: the deeper answers exist for the rows
+  // where the right result ranks badly.
+  const listRecord = (overrides: Record<string, unknown> = {}) => ({
+    record_id: 1,
+    row_number: 2,
+    title: "Rayuela",
+    creators: ["Julio Cortázar"],
+    suggested_status: null,
+    score: null,
+    score_provisional: false,
+    shelves: [],
+    errors: [],
+    planned_action: "create_item",
+    match_kind: "new",
+    candidates: [],
+    item: {
+      title: "Rayuela",
+      subtitle: null,
+      year: null,
+      identifiers: {},
+      metadata: { creators: ["Julio Cortázar"] },
+      creator_sort: null,
+    },
+    entry: {
+      score: null,
+      notes: null,
+      date_added: null,
+      values: {},
+      score_provisional: false,
+      suggested_status: null,
+    },
+    source_fields: {},
+    proposals: [],
+    ...overrides,
+  });
+  const five = [1, 2, 3, 4, 5].map((index) => ({
+    source: "openlibrary",
+    source_id: `OL${index}M`,
+    rank: index - 1,
+    chosen: null,
+    payload: {
+      title: `Rayuela edition ${index}`,
+      subtitle: null,
+      creators: ["Julio Cortázar"],
+      year: 1963,
+      identifiers: { isbn: `978000000000${index}` },
+      language: "es",
+      metadata: {},
+      cover_url: null,
+      cover_fallback_urls: [],
+    },
+  }));
+
+  await page.route("**/api/import/list/preview", (route) =>
+    route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "list-1",
+        fingerprint: "csv",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [listRecord({ proposals: five })],
+      },
+    }),
+  );
+
+  await page.goto("/import");
+  await page.getByRole("tab", { name: /custom list/i }).click();
+  await page.locator("#list-source").setInputFiles({
+    name: "libros.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Título del libro,Autor\r\nRayuela,Julio Cortázar"),
+  });
+  await page.getByRole("button", { name: /preview/i }).click();
+
+  // Three render; Show more names the two it holds back.
+  await expect(
+    page.getByRole("button", { name: "Confirm", exact: true }),
+  ).toHaveCount(3);
+  await page.getByRole("button", { name: /show more \(2\)/i }).click();
+  await expect(
+    page.getByRole("button", { name: "Confirm", exact: true }),
+  ).toHaveCount(5);
+  // And it folds back.
+  await page.getByRole("button", { name: /show fewer/i }).click();
+  await expect(
+    page.getByRole("button", { name: "Confirm", exact: true }),
+  ).toHaveCount(3);
+
+  // The edit-and-research affordance is on every drained row.
+  await expect(
+    page.getByRole("button", { name: /wrong text\? edit and search again/i }),
+  ).toBeVisible();
+});

@@ -191,6 +191,28 @@ class ImportEffectRow(Base):
     after_values: Mapped[str]
 
 
+class ImportProposalRow(Base):
+    """One provider result offered for one record (Sprint 083 D2).
+
+    `rank` is the position `merge_and_rank` produced, not a confidence. `chosen`
+    is the owner's answer: NULL before anyone answered, 1 for the picked
+    proposal, 0 for the ones a discard cleared — the same integer-as-boolean
+    convention `is_primary` and `score_provisional` use.
+    """
+
+    __tablename__ = "import_proposals"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    batch_id: Mapped[str] = mapped_column(ForeignKey("import_batches.id"))
+    user_id: Mapped[int]
+    record_id: Mapped[int] = mapped_column(ForeignKey("import_records.id"))
+    source: Mapped[str]
+    source_id: Mapped[str]
+    payload_json: Mapped[str]
+    rank: Mapped[int]
+    chosen: Mapped[int | None]
+    created_at: Mapped[str]
+
+
 class JobRow(Base):
     __tablename__ = "jobs"
     id: Mapped[str] = mapped_column(primary_key=True)
