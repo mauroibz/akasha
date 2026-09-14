@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 41,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 42,
+  "project_status": "ready",
+  "active_sprint": "084",
+  "active_sprint_file": "docs/sprints/084-any-list-any-domain.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "083",
   "completed_sprints": [
     "001",
@@ -92,5 +92,5 @@
     "083"
   ],
   "started_at": "",
-  "updated_at": "2026-09-14T13:10:10-03:00"
+  "updated_at": "2026-09-14T17:35:06-03:00"
 }

@@ -1,11 +1,12 @@
 # Implementation Roadmap
 
-**Plan revision:** 41
+**Plan revision:** 42
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the plan is complete. Sprints 001–083 are done: Sprint 082 closed
-the authentication line and shipped 2.0.0, and the owner's 2026-09-13 request for a
-hand-written-CSV importer reopened the plan as Sprint 083, delivered 2026-09-14 (see "A
-list you wrote yourself" below, accepted as **DEC-156**). Earlier lines: Sprint 071 closed
+**Active sprint:** [084 — Any list, any domain](084-any-list-any-domain.md) (ready). Sprints 001–083
+are done and v2.1.0 is released: Sprint 082 shipped 2.0.0, Sprint 083 delivered the
+hand-written-CSV importer plus the owner's feedback batch (DEC-159), and the owner's
+2026-09-14 request to make it domain-selectable reopens the plan as Sprint 084 (DEC-160,
+the DEC-079 extension shape). Earlier lines: Sprint 071 closed
 the original v1 plan and the owner's 2026-09-05 readability feedback (DEC-139) extended it
 through 072–074, covered in the
 "Covers first" section below. The owner's 2026-09-07 request for authentication and multiuser
@@ -196,6 +197,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [059](059-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 | [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
+| [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | ready |
 
 ## Sprint contracts
 
@@ -1669,6 +1671,25 @@ bigger heuristic:
   canonical kind the add path writes, so the enrichment backfill installs the cover; a
   discard after a confirm restores the row exactly as typed) — detail in the sprint file's
   Outcome. The plan is complete.
+
+## Any list, any domain — the importer generalizes
+
+Asked for by the owner on 2026-09-14 while validating v2.1.0's list importer
+against his real CSV, and planned as **Sprint 084 (DEC-160)**: the flow the
+custom list built — read a file, iterate rows, search each, confirm before
+commit — is domain-blind by construction, so the target domain can be a
+choice rather than a birthright.
+
+- **[084 — Any list, any domain](084-any-list-any-domain.md)** — the list reader
+  moves from the book package to the registry declaring every registered domain;
+  the header word lists and the second column's name become per-domain
+  declarations (an album list auto-maps "Album"/"Artista", a film list is one
+  column); the screen gains a single-pick domain dropdown beside the file input
+  whose choice composes the fingerprint (one list, one domain per batch); the
+  search job, the proposal store, confirm, exclusion and re-search are reused
+  unchanged and re-proven against a second domain's recorded provider fixtures.
+  Acceptance includes a live non-book walkthrough (an album or film list end to
+  end) and the no-domain-branching rule the conformance suite enforces.
 
 ## Not scheduled
 

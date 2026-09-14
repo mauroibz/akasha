@@ -6559,3 +6559,43 @@ an operator command in the house style.
   Full gate re-run on the final tree (backend 1576, Vitest 333, `make check`, Playwright
   143+2 skips) and the live walkthrough extended to exercise all three new controls —
   WALKTHROUGH CLEAN (detail in the worklog).
+
+## DEC-160 — The plan reopens again: the custom list becomes any-domain (Sprint 084)
+
+- Date: 2026-09-14
+- Status: accepted
+- Context: While validating the just-released v2.1.0 list importer against his real
+  `exports/Libros.csv`, the owner asked the structural question: *"Given that the structure
+  is 'read file, iterate over rows, lookup for each', what is keeping us from having the
+  target domain be selectable? … a domain dropdown + change the column mapping, and reuse
+  the system."* He directed a planned sprint in the roadmap, no implementation without a
+  plan. The plan had closed (all 83 sprints, DEC-155); this is the DEC-079 extension shape
+  a second time.
+- What the code says (measured 2026-09-14, after the v2.1.0 tag): nothing structural blocks
+  it. `Importer.item_types` already drives every downstream seam — `ImportService.preview`
+  supports multi-target connectors (`chosen_targets`, per-row `_target_of`, DEC-106, with
+  MyAnimeList as the live precedent); the search job resolves each row's domain from the
+  record's own `item_type` and asks only that domain's providers (the 2026-09-14 fix in
+  `import_search.py`); confirm re-stages from the proposal payload and commit resolves each
+  row's domain per record. The only book-specific things in the reader are the
+  `TITLE_HEADERS`/`AUTHOR_HEADERS` word lists, the `domains/book` import, and the label
+  copy — and every domain already declares its creators label (`Authors`/`Artists`/
+  `Directors` via `FieldSpec`), so the second column's name is a declaration away.
+- Decision: Sprint 084 ("Any list, any domain", roadmap revision 42) generalizes the
+  connector: the reader moves to the registry declaring every registered domain; the header
+  word lists become a per-domain declaration (books keep their lists verbatim; album adds
+  artist words; film/series/anime declare title words only and the reader treats a missing
+  creator column as empty, not an error); the screen renders a single-pick domain dropdown
+  whose choice rides the existing `targets` form field and composes the fingerprint (one
+  list, one domain per batch); the entire search-then-confirm machinery is reused
+  unchanged and re-proven against a non-book domain's recorded provider fixtures (DEC-025)
+  plus a live non-book walkthrough. The no-domain-branching invariant (technical spec 6.6)
+  governs the design: the declaration drives, `if domain == "book"` above a declaration is
+  a defect.
+- Consequences: `FINAL_SPRINT` moves 83 → 84 in `scripts/validate_project.py` (the move
+  recorded in its comment's decision list); state.json flips `complete → ready` pointing at
+  the new sprint file; the sprint file is created at `ready` in the same change set (the
+  validator requires it). A new domain becomes list-importable by declaring list headers
+  — zero connector changes. Mixed-domain batches are explicitly out (one list, one
+  domain); so is extra-column mapping (still the recorded "queda a futuro"). No release in
+  the sprint; the version surfaces stay 2.1.0.

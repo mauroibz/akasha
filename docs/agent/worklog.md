@@ -5723,3 +5723,38 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Blocked/open: none.
 - Next: the owner re-validates on his rebuilt container; the batch ships with the next image
   build alongside DEC-157/158.
+
+## 2026-09-14 — v2.1.0 published (PR #20) and Sprint 084 planned (DEC-160)
+
+- Done: the owner directed a minor release of everything since v2.0.0, then — while
+  validating the list importer against his real CSV — directed the next sprint planned in
+  the roadmap (no implementation without a plan). Release: version surfaces bumped
+  together to 2.1.0 (pyproject, package.json, FastAPI version, OpenAPI regen — the
+  validator's version-surface gate green), `release-notes-v2.1.md` written and linked from
+  the doc map, README's AKASHA_VERSION row pinned, branch `release-v2.1.0` pushed, PR #20
+  opened with the full test plan and decision references, merged with a merge commit after
+  CI, tagged `v2.1.0` on the merge commit, the Release workflow published
+  `ghcr.io/mauroibz/akasha:2.1.0` + `:2.1` + `:latest`, the manifest verified anonymously,
+  and the GitHub Release published from the committed notes with links rewritten.
+  Planning: the six-artifact plan revision (revision 42) landing Sprint 084 — Any list,
+  any domain (DEC-160), the sprint file created at `ready`, FINAL_SPRINT moved 83 → 84
+  with the move recorded in the validator's comment, state.json `complete → ready`.
+- Verified and how: the full gate on the bumped tree before pushing — backend 1576,
+  Vitest 333, `make check` green (including the version-surface comparison and OpenAPI
+  `--check`), Playwright 143 + 2 configuration-dependent skips; PR CI ran checks/e2e/
+  container. CI triage worth recording: the checks job failed **three consecutive times**
+  on `test_a_bundle_over_the_declared_caps_is_refused` with what looked like the v2.0.0
+  sandbox-TestClient stall — but the second TaskGroup sub-exception named the real story:
+  pytest-timeout's 30 s firing inside the multipart parse of the too-many-files half
+  (10,001 parts = the calibre connector's real declared cap; Sprint 051 had measured this
+  same test at 11.7 s on a workstation, and shared-runner I/O ate the headroom). The fix
+  is a per-test `@pytest.mark.timeout(120)` with the reason in its docstring (commit
+  `d077489`), not a rerun: the second identical failure removed the rerun-only option, the
+  third made it a measurement. The plan revision's validator, doc-map links and text
+  hygiene pass green.
+- Deviations: none from the owner's directives. The release session kept the v2.0.0
+  precedent's shape (PR → merge commit → tag the merge → watch the workflow → anonymous
+  manifest check → GitHub Release from committed notes).
+- Blocked/open: none. The board's upgrade (`AKASHA_VERSION=2.1.0`, compose pull + up -d)
+  stays an owner action.
+- Next: execute Sprint 084 per its file when the owner says go.

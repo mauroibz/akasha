@@ -1,59 +1,68 @@
-# Handoff — the plan is complete (Sprint 083 closed 2026-09-14)
+# Handoff — Sprint 084 (ready): any list, any domain
 
-`docs/agent/state.json` reads `project_status: complete` with no active sprint:
-**every planned sprint 001–083 is completed.** Sprint 083 — "A list you wrote
-yourself", the hand-written-CSV search-then-confirm importer (DEC-156, plan
-revision 41) — closed green: all acceptance criteria verified, the full gate
-run on the final tree (backend 1569, Vitest 330, `make check`, Playwright
-142+2 skips), and the AC8 walkthrough exercised live against Open Library and
-Google Books on a fresh data dir. Detail lives in the sprint file's Outcome
-and the 2026-09-14 worklog entry.
+`docs/agent/state.json` reads `project_status: ready` with **Sprint 084 active**
+(`docs/sprints/084-any-list-any-domain.md`, `Status: ready`, plan revision 42,
+DEC-160). v2.1.0 is released (PR #20 merged, tag `v2.1.0`, image on ghcr,
+GitHub Release published); this sprint reopens the plan a second time, at the
+owner's direction, to make the custom-list importer domain-selectable.
 
-## What shipped this sprint (short version)
+## What Sprint 084 delivers (read the sprint file for the contract)
 
-A `list` connector (book domain): column mapping auto-detected from headers
-(accents folded) or picked on the screen; rows with no identity; a `matching`
-batch state with one durable sequential `search_import_rows` job per preview
-searching the row's own domain's providers, quota-aware, rate-limited; top-3
-proposals per row in `import_proposals` (migration 0022); confirm re-stages the
-row from the provider's full payload with the identity normalized the way the
-add path does (canonical `isbn` — covers then arrive through the post-commit
-enrichment backfill); discard keeps the row exactly as typed, including after a
-confirm ("Undo my answer"); commit refused while `matching`.
+The owner's structural question — the flow is "read file, iterate rows, search
+each", so why is the domain fixed? — measured as *nothing structural blocks
+it*: `item_types` already drives every seam (multi-target preview with
+`chosen_targets`; the per-row domain-scoped provider search; confirm's
+re-staging; commit's per-record domain resolution). The book-specific parts are
+only the header word lists, the package import and the label copy. The sprint:
+the reader moves to the registry declaring every registered domain; the word
+lists and the creators-column label become per-domain declarations; the screen
+gains a single-pick domain dropdown whose choice composes the fingerprint (one
+list, one domain); the search-then-confirm machinery is reused unchanged and
+re-proven against a non-book domain's recorded fixtures plus a live non-book
+walkthrough.
+
+## Where the release session left things (2026-09-14)
+
+- **v2.1.0 is out**: PR #20 (merge commit on main, tag `v2.1.0`), the Release
+  workflow published `ghcr.io/mauroibz/akasha:2.1.0` + `:2.1` + `:latest`,
+  verified by anonymous manifest inspect; the GitHub Release carries
+  `docs/operations/release-notes-v2.1.md` with links rewritten.
+- **One CI flake was triaged as a real bound, not a flake**: the checks job
+  failed three times on `test_a_bundle_over_the_declared_caps_is_refused` —
+  not the v2.0.0 sandbox stall but pytest-timeout's 30 s firing inside the
+  10,001-part multipart parse (max_files + 1 is the connector's real declared
+  cap; Sprint 051 measured this test at 11.7 s on a workstation, and a shared
+  runner's I/O ate the headroom). The fix — a per-test
+  `@pytest.mark.timeout(120)` with the reason in its docstring — is on main
+  in commit `d077489` and in the PR. A rerun-only response stopped being
+  right on the second identical failure.
+- The release-session worklog entry and the post-release HANDOFF are appended.
 
 ## Known and left, in the order they are likely to bite
 
-1. **The version surfaces all read `2.0.0`** (DEC-155). Sprint 083's work is in
-   the tree, unpublished — the hotfixes (DEC-157), akasha-prune (DEC-158) and
-   this sprint ship with the next image build. The release itself is
-   owner-directed (the publishing-session shape, `references/publishing-a-
-   release-session.md` in the seeds skill, is the precedent).
-2. **DEC-154's residual proof** (the Tailscale tailnet walkthrough) is still
-   owed by the owner, unrelated to this sprint.
-3. **Contended insights at 10k entries** (DEC-155) remains unowned by a sprint —
-   a fresh-scale finding, recorded in the decisions log for whoever plans the
-   next line of work.
-4. **The dev machine's standing `akasha-akasha-1` container and `local-081`
-   image** are prunnable once the board is upgraded past 2.0.0 (owner action).
+1. **The version surfaces all read `2.1.0`** and the validator gates them;
+   Sprint 084 adds no release and must not bump them.
+2. **DEC-154's residual proof** (Tailscale tailnet walkthrough) is still owed
+   by the owner.
+3. **Contended insights at 10k entries** (DEC-155) remains unowned by a sprint.
+4. **The dev machine's standing container** runs a locally-built image under
+   the reused `1.5.7` tag (compose.build.yaml overlay) — it now carries 2.1.0
+   plus everything since; the board still needs its own `AKASHA_VERSION=2.1.0`
+   pull to upgrade.
+5. **Non-book provider relevance** for hand-written text is Sprint 084's own
+   risk item: MusicBrainz text search for Spanish-titled albums may be weaker
+   than Open Library's. The top-10 + edit + discard + exclude affordances are
+   the designed answer; record observed relevance, do not fix providers.
 
-## If the owner directs more work
+## Protocol notes for whoever executes
 
-The state machine's rule (WORKFLOW.md): a regression discovered now belongs to
-a newly planned remediation or extension sprint — the DEC-079 plan-extension
-shape (state `complete → ready` with a new sprint file at `ready`, FINAL_SPRINT
-moved, plan revision bumped, one `docs:` commit). Nothing in the roadmap's
-"Not scheduled" list has changed.
-
-## Session notes
-
-- The interrupted frontend session left uncommitted residue with no worklog
-  entry; this session audited it (commit `6f72992`'s message accounts for every
-  file) and closed the sprint on top.
-- Three defects found and fixed during closure are recorded in the Outcome
-  with their TDD entry points: discard-after-confirm leaving provider data,
-  the cross-domain row search, and the raw `isbn13` identifier key. The first
-  two had shipped in D3/D4 believing the contract was met — the live
-  walkthrough is what proved otherwise.
-- `frontend/scripts/walkthrough-list.mjs` is the re-runnable AC8 script; it
-  needs a fresh data dir per attempt (preview replays by fingerprint) —
-  backend :8002, frontend dev :5175 with `AKASHA_E2E_BACKEND`.
+- This was a docs-only planning session riding a release session: the release
+  (code + tag + publish) was owner-directed; the plan revision is the six-artifact
+  set (ROADMAP revision 42, state.json, DEC-160, FINAL_SPRINT 83 → 84 in the
+  validator with the move recorded, this HANDOFF, the sprint file at `ready`).
+- Claim the sprint with `python scripts/sync_sprint_state.py --sprint 084
+  in_progress` when starting. The sprint file's Commit checkpoints, Verification
+  and explicit non-scope are binding.
+- The v2.1.0 regression suite is the contract Sprint 084 must not weaken: every
+  existing list-import assertion (books) stays green byte-for-byte while the
+  connector generalizes.
