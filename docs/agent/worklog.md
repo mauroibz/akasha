@@ -5637,3 +5637,57 @@ nothing observable, whose acceptance criterion is that the entire existing suite
   fixture; then the exhaustive gate (`make test`, Playwright, walkthrough AC8 on a fresh
   data dir) and the atomic close. One straggler: an unused-import cleanup in
   `test_import_proposals.py` rides the next commit.
+
+## 2026-09-14 — Sprint 083 closed: the search-then-confirm importer, end to end
+
+- Done: resumed the interrupted session's residue (no worklog entry had been left; the
+  uncommitted diff was the missing per-row Discard control, the two import routes missing
+  from the documented-route set, formatting that never landed, and the untracked AC8
+  walkthrough script) and closed Sprint 083. Three real defects found by auditing the
+  residue and running the live walkthrough, all TDD'd RED first: (1) **discard after
+  confirm left the provider's identifiers on a "keep as typed" row** — confirm now stashes
+  the typed item half and discard restores it, re-planning through the connector's own
+  match; (2) **the row search queried every domain's providers** — the live run proposed a
+  Cinemeta movie and a TV series for the Rayuela book row; the handler now resolves each
+  row's domain from the record's `item_type` and asks only that domain's providers, and its
+  hardcoded `kind != "list"` guard became the declaration check (AC9); (3) **confirm
+  stored the provider's raw identifier key (`isbn13`)** while every other surface keys on
+  the canonical `isbn` the add path writes — the confirmed row was invisible to the
+  enrichment join (its cover never arrived) and to exact-identity matching; confirm now
+  normalizes through the same identity rule the add path applies. Also repaired a
+  pre-existing break on main the Playwright run surfaced (reproduced on a clean tree):
+  editorial.spec.ts still asserted the delete-dialog sentence DEC-158 removed — a
+  prerequisite defect fix, recorded in `0a03f81`. Commits: `6f72992` (discard semantics +
+  the missing control + routes + formatting), `0a03f81` (the list-connector e2e spec +
+  catalog stub + the editorial repair), `94aaa7e` (domain-scoped search + canonical
+  identity + the hardened walkthrough script).
+- Verified and how: focused suites 343 green (list/job/proposals/generic/conformance/
+  isolation, including the three new TDD entries); backend exhaustive 1569 passed; frontend
+  Vitest 330 passed (33 files) including the new discard Vitest (toast-surface asserted
+  via findToast; ImportPage's harness now mounts the Toaster, which made one legacy
+  unscoped toast assertion ambiguous — scoped to the result panel's role=status);
+  `make check` green (ruff, eslint, mypy 74 files, tsc, OpenAPI `--check` no drift,
+  api:check, validator); full Playwright 142 passed + 2 configuration-dependent skips
+  (production-bundle, scratchpad), the new list-connector spec included. **AC8 live
+  walkthrough** on a fresh disposable data dir (backend :8002 auth-off + frontend dev
+  :5175 with AKASHA_E2E_BACKEND) against the **live** Open Library + Google Books
+  boundary: upload → auto-mapping → matching → 12/12 searched → confirm Rayuela + El
+  Hobbit, discard La cúpula 1 → commit 10 unsorted (the fixture's 2 designed error rows
+  refused — the honest reading of "12 entries") → both confirmed rows carry canonical
+  `isbn` and covers installed (polled ~5 s, Open Library edition→work→covers) → backfill
+  no-op → undo through the screen's own controls → 0 rows. Backend log audited: zero
+  cross-domain provider calls, one transient ConnectError contained as designed. Script
+  kept as `frontend/scripts/walkthrough-list.mjs`. Container: not owed (no deployment or
+  env change).
+- Deviations: technical-spec §6 updated to describe the two `94aaa7e` behaviors (the row's
+  own domain's providers; confirm's canonical identity + the enrichment-path cover +
+  discard-restores-typed-row) — the spec had described the first implementation's
+  book-hardcoded shape. AC8's "12 entries" is recorded in the Outcome as 10 committed of
+  12 rows: the fixture deliberately includes an empty-title row and a short row that AC3
+  requires refusing. No new DEC entry: both fixes implement the sprint's own contract
+  (AC7 "the same ItemPayload the add path fetches", AC9 no-domain-branching).
+- Blocked/open: none. DEC-154's Tailscale walkthrough remains owed by the owner; the
+  dev-machine standing container and `local-081` image remain prunnable once the board
+  upgrades past 2.0.0 (this sprint ships in the next image build).
+- Next: the plan is complete — 083 was the last scheduled sprint. State flips to
+  `complete`; anything further is owner-directed extension (DEC-079's shape).

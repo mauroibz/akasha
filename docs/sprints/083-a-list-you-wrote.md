@@ -1,6 +1,6 @@
 # Sprint 083 — A list you wrote yourself
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 082
 **Roadmap revision:** 41
 
@@ -462,4 +462,112 @@ Written failing first, per the ladder:
 
 ## Outcome
 
-_Not started. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+Delivered 2026-09-14 across two sessions (backend D1–D5 on 2026-09-13, the
+frontend/walkthrough/fix slice resumed and closed on 2026-09-14), TDD
+throughout. Commits, in order:
+
+- D1 `417b864` the list reader — column mapping as a connector declaration,
+  header auto-detect (accents folded, trailing spaces trimmed), honest error
+  rows, `identity_kinds = frozenset()`, match-always-NEW, mapping composing
+  the fingerprint.
+- D2 `8081bdc` migration 0022 `import_proposals` + repo CRUD + proposals riding
+  the preview GET with summary counts. The rank column is named `rank` not
+  `score` (it is `merge_and_rank`'s position — the migration docstring says so).
+- D3 `7c6afa4` `application/import_search.py` — sequential per-row search,
+  top-3 proposals, quota defer-without-attempt, rate-limiter pacing,
+  no-results-is-an-answer, all-fail containment; the `SearchingImporter`
+  declaration stages `matching` + one job; commit's state gate gives the 409.
+- D4 `079f300` the confirm/discard route + `ImportService.answer_proposal` —
+  confirm re-stages the item half and recomputes `planned_action`, the
+  confirmed identity travels `confirmed_identifiers`, discard keeps the row as
+  typed, both require a drained batch. Isolation inventory updated as designed.
+- D4.2 `05ea8e8` the ImportPage search-then-confirm screen — proposal cards,
+  the job-progress banner, the column-mapping inputs rendered from the
+  declaration, commit gated while `matching`.
+- D5 `7655148` the sanitized 12-row fixture, recorded Open Library replay
+  tests, conformance assertions for the new optional surfaces, product-spec
+  §5.4, technical-spec §6, §6 route list, OpenAPI regenerated + examples.
+- Frontend completion + the interrupted session's residue `6f72992` — the
+  missing per-row Discard control ("None of these — keep as typed", D4.2's
+  third control), the two import routes added to the documented-route set,
+  formatting that never landed, and the fix to the residue audit's finding:
+  **discard after confirm now restores the typed row** (confirm stashes the
+  typed item half; discard puts it back and re-plans through the connector's
+  own match — the old path left the provider's identifiers on a "keep as
+  typed" row).
+- E2E `0a03f81` the list-connector Playwright spec (stubbed routes: matching
+  banner, gated commit, drained poll, Confirm/Discard, the proposal route
+  shape) + the list connector in the shared e2e catalog stub. Also repaired a
+  pre-existing break on main the run surfaced: editorial.spec.ts asserted the
+  delete-dialog sentence DEC-158 removed (reproduced on a clean tree; a
+  prerequisite defect fix, not sprint scope).
+- Walkthrough fixes `94aaa7e` — two AC8-live findings, both TDD'd:
+  **the row search queried every domain's providers** (the live run proposed a
+  Cinemeta movie and a series for the Rayuela book row); the handler now
+  resolves each row's domain from the record's own `item_type` and asks only
+  that domain's providers, and its `kind != "list"` guard became the
+  declaration check (AC9's rule). **Confirm stored the provider's raw
+  identifier key** (`isbn13`) while every other surface keys on the canonical
+  `isbn` the add path writes, leaving the confirmed row invisible to the
+  enrichment join (no cover ever) and to exact-identity matching; confirm now
+  normalizes through the same identity rule. The walkthrough script hardened
+  with what the live run taught (undo wait on the result heading, the metahub
+  cover 404 is a designed absence, the confirmed title may be the provider's
+  own, covers are polled for — async enrichment).
+
+**Verification (all run on the final tree):**
+
+- Focused: `pytest tests/test_list_import.py tests/test_import_search_job.py`
+  (56), then the route/conformance regression
+  `tests/test_generic_imports.py tests/test_domain_conformance.py
+  tests/test_import_proposals.py tests/test_isolation.py` — 343 focused green.
+- Backend exhaustive: 1569 passed.
+- Frontend Vitest: 330 passed (33 files), including the new discard test.
+- `make check`: ruff format/check, eslint --max-warnings=0, mypy (74 files),
+  tsc, OpenAPI `--check` (no drift), `api:check`, `validate_project.py` — green.
+- Full Playwright: 142 passed, 2 skipped (production-bundle + scratchpad
+  projects, as always), including the new list-connector spec.
+- **Walkthrough (AC8)** on a fresh disposable data dir (`/tmp/akasha-s083`,
+  auth off, backend :8002 + frontend dev :5175 with `AKASHA_E2E_BACKEND`),
+  against the **live** Open Library and Google Books boundary (keyless/keyed;
+  both answering — no replay substitution needed, and the correctness suite's
+  recorded-fixture replays satisfy DEC-025 for the provider contract):
+  upload → auto-mapping → `matching` → 12/12 rows searched (banner polled) →
+  confirm Rayuela + El Hobbit, discard La cúpula 1 → commit → **10 entries
+  `unsorted`** (12 rows − the fixture's 2 designed error rows: a missing title
+  and a short row — the sprint's "12 entries" reads every row committing; the
+  fixture deliberately includes rows that must not) → both confirmed rows carry
+  the canonical `isbn` and **covers installed** (polled: Open Library edition →
+  work → covers.openlibrary.org, ~5 s) → backfill no-op on them → undo through
+  the screen's own controls → 0 rows. Backend log audited: only
+  openlibrary.org and googleapis.com consulted (zero cross-domain provider
+  calls), one `ConnectError` on a single row contained as designed. Script
+  kept as `frontend/scripts/walkthrough-list.mjs` (run-unique, DB-audited).
+- Container: not owed (no deployment or env change); `make smoke-container`
+  not run for that reason.
+
+**Deviations and decisions:**
+
+- The fixture's honest 10-of-12 commit count (above) is the one reading of
+  AC8's "12 entries" that keeps the fixture honest — the alternative (a fixture
+  without error rows) would stop proving AC3.
+- Confirm normalizes identifiers (canonical `isbn`, not the provider's
+  `isbn13`) and the cover arrives through the post-commit enrichment backfill
+  rather than at confirm time — this is the "same install path enrichment
+  uses" AC7 names, and it is how the add path behaves too (cover installs are
+  async there as well). Technical spec §6 updated to say exactly this.
+- The discard-restores-typed-row behavior (D4's "discard keeps the row as
+  typed" applied to the confirm-then-reconsider path) is recorded in technical
+  spec §6 alongside the confirm contract.
+- The interrupted session left no worklog entry; its residue is accounted for
+  in `6f72992`'s message (what landed, what was formatting, what was missing).
+- No new DEC entry was needed: the two `94aaa7e` fixes implement the sprint's
+  own contract (AC7's canonical identity via "the same ItemPayload the add
+  path fetches", AC9's no-domain-branching) rather than deviating from it. The
+  editorial.spec.ts repair is recorded in its commit as a prerequisite defect.
+
+**Impact on future sprints:** none — 083 was the last planned sprint; the
+plan is complete. The roadmap's "Not scheduled" list is unchanged. The
+`matching` state, the proposal store, and the searching declaration are now
+shared surfaces any future connector may declare (the technical spec's §6
+paragraphs and the conformance suite describe them).

@@ -1096,7 +1096,9 @@ describe("ImportPage", () => {
     // Scoped to the result panel: the same sentence also fires as a toast,
     // so an unscoped text query is ambiguous once the Toaster is mounted.
     const status = screen.getByRole("status");
-    expect(within(status).getByText(/import complete: 3 entries added/i)).toBeVisible();
+    expect(
+      within(status).getByText(/import complete: 3 entries added/i),
+    ).toBeVisible();
 
     const preview = requests.find((request) =>
       request.url.endsWith("calibre/preview"),
@@ -1906,9 +1908,7 @@ describe("the list connector's search-then-confirm surfaces", () => {
       }
       if (url.endsWith("/batches/list-1")) {
         // The poll: the discard marks every proposal not-chosen.
-        const shown = answered
-          ? { ...proposal, chosen: false }
-          : proposal;
+        const shown = answered ? { ...proposal, chosen: false } : proposal;
         return new Response(
           JSON.stringify({
             batch_id: "list-1",
@@ -1954,7 +1954,9 @@ describe("the list connector's search-then-confirm surfaces", () => {
     // Discarding keeps the row as typed, confirmed on the visible toast
     // surface (DEC-024's rule: assert the node lives in the toast).
     await userEvent.click(discard);
-    expect(await findToast(/kept "rayuela" as you typed it/i)).toBeInTheDocument();
+    expect(
+      await findToast(/kept "rayuela" as you typed it/i),
+    ).toBeInTheDocument();
     expect(answers).toEqual([{ discard: true }]);
     // The answer renders, with the undo control in its place.
     await screen.findByText(/your answer:/i);
