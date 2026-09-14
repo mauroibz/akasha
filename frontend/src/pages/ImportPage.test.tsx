@@ -6,6 +6,8 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
+import { Toaster } from "@/components/ui/sonner";
+import { findToast } from "@/test/toast";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -22,6 +24,7 @@ function renderImportPage(path = "/import") {
     <QueryClientProvider client={new QueryClient()}>
       <MemoryRouter initialEntries={[path]}>
         <ImportPage />
+        <Toaster />
       </MemoryRouter>
     </QueryClientProvider>,
   );
@@ -1090,7 +1093,10 @@ describe("ImportPage", () => {
 
     expect(await screen.findByText(/attached 1 of 2 ebooks/i)).toBeVisible();
     expect(screen.getByText(/B\/Two \(2\)\/two\.pdf/)).toBeVisible();
-    expect(screen.getByText(/import complete: 3 entries added/i)).toBeVisible();
+    // Scoped to the result panel: the same sentence also fires as a toast,
+    // so an unscoped text query is ambiguous once the Toaster is mounted.
+    const status = screen.getByRole("status");
+    expect(within(status).getByText(/import complete: 3 entries added/i)).toBeVisible();
 
     const preview = requests.find((request) =>
       request.url.endsWith("calibre/preview"),
@@ -1859,5 +1865,101 @@ describe("the list connector's search-then-confirm surfaces", () => {
     expect(confirmCalls).toEqual([
       { source: "openlibrary", source_id: "OL1M" },
     ]);
+  });
+
+  it("discards a row's proposals and keeps it as typed", async () => {
+    const answers: unknown[] = [];
+    let answered = false;
+    const proposal = {
+      source: "openlibrary",
+      source_id: "OL1M",
+      rank: 0,
+      chosen: null,
+      payload: {
+        title: "Rayuela",
+        subtitle: null,
+        creators: ["Julio Cortázar"],
+        year: 1963,
+        identifiers: { isbn: "9788437604572" },
+        language: "es",
+        metadata: {},
+        cover_url: null,
+        cover_fallback_urls: [],
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.endsWith("/records/1/proposal")) {
+        answers.push(JSON.parse(String(init?.body ?? "{}")));
+        answered = true;
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: [proposal] })],
+          }),
+        );
+      }
+      if (url.endsWith("/batches/list-1")) {
+        // The poll: the discard marks every proposal not-chosen.
+        const shown = answered
+          ? { ...proposal, chosen: false }
+          : proposal;
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: [shown] })],
+          }),
+        );
+      }
+      if (url.endsWith("/api/import/list/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: [proposal] })],
+          }),
+          { status: 201 },
+        );
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File(["Título,Autor\r\n"], "libros.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+
+    // An unanswered row offers the explicit way out beside the proposals.
+    const discard = await screen.findByRole("button", {
+      name: /none of these — keep as typed/i,
+    });
+    expect(discard).toBeEnabled();
+
+    // Discarding keeps the row as typed, confirmed on the visible toast
+    // surface (DEC-024's rule: assert the node lives in the toast).
+    await userEvent.click(discard);
+    expect(await findToast(/kept "rayuela" as you typed it/i)).toBeInTheDocument();
+    expect(answers).toEqual([{ discard: true }]);
+    // The answer renders, with the undo control in its place.
+    await screen.findByText(/your answer:/i);
+    expect(
+      await screen.findByRole("button", { name: /undo my answer/i }),
+    ).toBeEnabled();
   });
 });

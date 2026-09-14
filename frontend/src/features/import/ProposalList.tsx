@@ -178,7 +178,7 @@ export function ProposalList({
           />
         ))}
       </ul>
-      {answered && (
+      {answered ? (
         <Button
           variant="ghost"
           size="sm"
@@ -187,6 +187,18 @@ export function ProposalList({
           onClick={() => discard.mutate()}
         >
           Undo my answer
+        </Button>
+      ) : (
+        // The row's own way out: none of these is the book, and the row stays
+        // exactly as the spreadsheet typed it (D4.2's Discard).
+        <Button
+          variant="outline"
+          size="sm"
+          className="rounded-full text-xs"
+          disabled={matching || discard.isPending}
+          onClick={() => discard.mutate()}
+        >
+          None of these — keep as typed
         </Button>
       )}
     </div>

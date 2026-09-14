@@ -13,7 +13,9 @@ from book_tracker.application.enrichment import enqueue_enrichment_backfill
 from book_tracker.application.library import LibraryError, LibraryService, clean_attachment_filename
 from book_tracker.domain.identity import normalize_identifier
 from book_tracker.domain.importers import (
+    ImportEntry,
     Importer,
+    ImportItem,
     ImportReadContext,
     ImportSnapshot,
     ImportSource,
@@ -518,6 +520,67 @@ class ImportService:
 
         if discard:
             self.imports.discard_proposals(batch_id, record_id)
+            # The final answer governs: an owner who confirmed and then
+            # reconsidered gets the typed row back, exactly as the spreadsheet
+            # wrote it — no provider identity, metadata or year riding along on
+            # a "none of these is the book" row. Rows that were never answered
+            # keep the item half the reader gave them.
+            with Session(self.engine) as session:
+                record = session.get(ImportRecordRow, record_id)
+                assert record is not None
+                stored = json.loads(record.normalized_payload)
+                typed = stored.pop("typed_item", None)
+                if typed is not None:
+                    stored["item"] = typed
+                    record.normalized_payload = json.dumps(stored, ensure_ascii=False)
+                    session.commit()
+            if typed is not None:
+                # The restored row re-plans through the connector's own match,
+                # the same rule preview applied — never a hard-coded action, so
+                # a future search-then-confirm connector with its own matching
+                # keeps working without this service knowing it.
+                with Session(self.engine) as session:
+                    record = session.get(ImportRecordRow, record_id)
+                    assert record is not None
+                    stored = json.loads(record.normalized_payload)
+                    normalized = NormalizedImportRecord(
+                        row_number=stored["row_number"],
+                        item=ImportItem(
+                            title=stored["item"]["title"],
+                            subtitle=stored["item"].get("subtitle"),
+                            year=stored["item"].get("year"),
+                            identifiers=stored["item"].get("identifiers") or {},
+                            metadata=stored["item"].get("metadata") or {},
+                            creator_sort=stored["item"].get("creator_sort"),
+                        ),
+                        entry=ImportEntry(
+                            score=stored["entry"].get("score"),
+                            notes=stored["entry"].get("notes"),
+                            date_added=stored["entry"].get("date_added"),
+                            values=stored["entry"].get("values") or {},
+                            score_provisional=bool(stored["entry"].get("score_provisional")),
+                            suggested_status=stored["entry"].get("suggested_status"),
+                        ),
+                        shelves=tuple(stored.get("shelves", ())),
+                        errors=json.loads(record.validation_errors or "[]")
+                        if isinstance(record.validation_errors, str)
+                        else (),
+                        source_fields=stored.get("source_fields") or {},
+                        item_type=stored.get("item_type"),
+                    )
+                    match = self.importer.match(normalized, self.library)
+                    if match.kind is MatchKind.AMBIGUOUS:
+                        record.planned_action = "ambiguous"
+                        record.conflicts = json.dumps({"candidates": list(match.candidates)})
+                    elif match.kind is MatchKind.IDENTITY_CONFLICT:
+                        record.planned_action = "identity_conflict"
+                    else:
+                        record.planned_action = (
+                            "reuse_item" if match.item_id is not None else "create_item"
+                        )
+                    record.match_kind = match.kind.value
+                    record.matched_item_id = match.item_id
+                    session.commit()
         else:
             assert source is not None and source_id is not None
             self.imports.choose_proposal(
@@ -530,6 +593,10 @@ class ImportService:
                 record = session.get(ImportRecordRow, record_id)
                 assert record is not None
                 stored = json.loads(record.normalized_payload)
+                # What the spreadsheet said, stashed so the discard that
+                # reverses this confirmation can put it back — the entry half
+                # is the owner's own and never staged from a proposal.
+                stored["typed_item"] = stored["item"]
                 stored["item"] = {
                     "title": payload.get("title") or stored["item"]["title"],
                     "subtitle": payload.get("subtitle"),

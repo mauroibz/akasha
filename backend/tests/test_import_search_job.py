@@ -27,9 +27,9 @@ import pytest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.domain.providers import SearchCandidate, SourceRef
+from book_tracker.domain.registry import DOMAINS
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.quota import ProviderQuota
-from book_tracker.domain.registry import DOMAINS
 from book_tracker.infrastructure.repositories import ImportRepository
 from book_tracker.migrations import upgrade
 
@@ -546,9 +546,7 @@ class TestRecordedFixtureReplay:
         return "asyncio"
 
     @pytest.mark.anyio
-    async def test_the_job_produces_real_proposals_from_the_recording(
-        self, tmp_path: Path
-    ) -> None:
+    async def test_the_job_produces_real_proposals_from_the_recording(self, tmp_path: Path) -> None:
         from recordings import recording, replay
 
         from book_tracker.domains.book.providers import OpenLibraryProvider
@@ -570,9 +568,7 @@ class TestRecordedFixtureReplay:
         async with create_provider_client(transport=transport) as provider_client:
             provider = OpenLibraryProvider(provider_client, "test@example.invalid")
             jobs = JobRepository(engine)
-            job_id = jobs.enqueue(
-                "b1", "search_import_rows", {"batch_id": "b1"}, user_id=1
-            )
+            job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
             handler = make_handler(engine, [provider])
             result = await handler.process(job_id, NOW)
 
@@ -613,9 +609,9 @@ class TestRecordedFixtureReplay:
         stage_preview(engine, [{"title": "Rayuela", "author": "Julio Cortázar"}])
         jobs = JobRepository(engine)
         job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
-        async with create_provider_client(transport=replay(
-            {"/search.json": (200, recording("search_rayuela.json"))}
-        )) as provider_client:
+        async with create_provider_client(
+            transport=replay({"/search.json": (200, recording("search_rayuela.json"))})
+        ) as provider_client:
             handler = make_handler(
                 engine,
                 [OpenLibraryProvider(provider_client, "t@e.invalid")],

@@ -558,6 +558,62 @@ class TestConfirmDiscard:
             assert all(proposal["chosen"] is False for proposal in refreshed["proposals"])
 
     @pytest.mark.anyio
+    async def test_discard_after_confirm_restores_the_typed_row(self, tmp_path: Path) -> None:
+        """The undo half of D4: an owner who confirms and then reconsiders
+        discards, and the row returns to exactly what the spreadsheet said —
+        no provider identifiers, metadata or year survive the final answer."""
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            body = await self._preview(client)
+            batch_id = body["batch_id"]
+            await self._drain(app, batch_id)
+            records = (await self._preview(client))["records"]
+            rayuela = next(record for record in records if record["title"] == "Rayuela")
+            proposal = rayuela["proposals"][0]
+
+            confirm = await client.post(
+                f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
+                json={"source": proposal["source"], "source_id": proposal["source_id"]},
+            )
+            assert confirm.status_code == 200
+            staged = next(
+                record
+                for record in (await self._preview(client))["records"]
+                if record["record_id"] == rayuela["record_id"]
+            )
+            assert staged["item"]["identifiers"] == {"isbn": "9788437604572"}
+            assert staged["item"]["year"] == 1963
+
+            discard = await client.post(
+                f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
+                json={"discard": True},
+            )
+            assert discard.status_code == 200
+
+            refreshed = next(
+                record
+                for record in (await self._preview(client))["records"]
+                if record["record_id"] == rayuela["record_id"]
+            )
+            # The final answer governs: the typed row is back, exactly as the
+            # spreadsheet wrote it, with no provider data riding along.
+            assert refreshed["item"]["identifiers"] == {}
+            assert refreshed["item"]["year"] is None
+            assert refreshed["item"]["subtitle"] is None
+            assert refreshed["item"]["metadata"] == {"creators": ["Julio Cortázar"]}
+            assert refreshed["planned_action"] == "create_item"
+            assert refreshed["match_kind"] == "new"
+            assert all(proposal["chosen"] is False for proposal in refreshed["proposals"])
+
+    @pytest.mark.anyio
     async def test_commit_after_confirm_carries_the_provider_identity(self, tmp_path: Path) -> None:
         import httpx
 
@@ -672,19 +728,12 @@ class TestSyntheticFixture:
         # Error rows are present with their reasons.
         empty_title = [record for record in snapshot.records if not record.item.title]
         assert empty_title and empty_title[0].errors[0]["field"] == "title"
-        short = [
-            record
-            for record in snapshot.records
-            if record.item.title == "Solo un título"
-        ]
+        short = [record for record in snapshot.records if record.item.title == "Solo un título"]
         assert short and {"field": "author", "code": "missing"} in [
-            {"field": error["field"], "code": error["code"]}
-            for error in short[0].errors
+            {"field": error["field"], "code": error["code"]} for error in short[0].errors
         ]
         # The unmapped columns ride verbatim, trailing-space header and all.
-        rayuela = next(
-            record for record in snapshot.records if record.item.title == "Rayuela"
-        )
+        rayuela = next(record for record in snapshot.records if record.item.title == "Rayuela")
         assert rayuela.source_fields["Editorial"] == "Sudamericana"
         assert rayuela.source_fields["Idioma"] == "Castellano"
 
@@ -698,14 +747,10 @@ class TestSyntheticFixture:
         from book_tracker.config import Settings
         from book_tracker.main import create_app
 
-        app = create_app(
-            Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid")
-        )
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
         async with (
             app.router.lifespan_context(app),
-            httpx.AsyncClient(
-                transport=httpx.ASGITransport(app), base_url="http://test"
-            ) as client,
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
         ):
             preview = await client.post(
                 "/api/import/list/preview",

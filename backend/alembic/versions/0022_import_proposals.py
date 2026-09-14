@@ -46,16 +46,15 @@ def upgrade() -> None:
         # NULL = not answered; 1 = chosen; 0 = cleared by a discard
         sa.Column("chosen", sa.Integer(), nullable=True),
         sa.Column("created_at", sa.Text(), nullable=False),
-        sa.CheckConstraint(
-            "chosen IN (0, 1)", name="ck_import_proposals_chosen_boolean"
-        ),
+        sa.CheckConstraint("chosen IN (0, 1)", name="ck_import_proposals_chosen_boolean"),
         sa.CheckConstraint("rank >= 0", name="ck_import_proposals_rank_nonnegative"),
         sa.UniqueConstraint(
             "record_id", "source", "source_id", name="uq_import_proposals_identity"
         ),
     )
-    op.create_index("ix_import_proposals_batch_record", "import_proposals",
-                    ["batch_id", "record_id"])
+    op.create_index(
+        "ix_import_proposals_batch_record", "import_proposals", ["batch_id", "record_id"]
+    )
     op.create_index("ix_import_proposals_user", "import_proposals", ["user_id"])
 
 
