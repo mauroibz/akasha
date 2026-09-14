@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from sqlalchemy import text
 
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
@@ -236,6 +237,67 @@ class TestTheJob:
         assert state == "previewed"
         assert result["progress"]["searched"] == 2
         assert result["progress"]["total"] == 2
+
+    @pytest.mark.anyio
+    async def test_a_provider_of_another_domain_is_never_asked(self, tmp_path: Path) -> None:
+        """AC9's neutrality proof with a second domain's data: the row search
+        asks only the providers that serve the row's own domain. Before the
+        fix the handler passed every enabled provider — a book row proposed a
+        movie and a series in the live walkthrough, spending other domains'
+        quota to offer answers the row could never use."""
+        engine = make_engine(tmp_path)
+        stage_preview(engine, [{"title": "Rayuela", "author": "Julio Cortázar"}])
+        book_provider = FakeProvider([candidate("Rayuela", "OL1M")])
+
+        class MovieProvider(FakeProvider):
+            name = "cinemeta"
+            item_type = "movie"
+
+        movie_provider = MovieProvider([candidate("Room in Rome", "tt123")])
+        jobs = JobRepository(engine)
+        job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
+
+        handler = make_handler(engine, [book_provider, movie_provider])
+        result = await handler.process(job_id, NOW)
+
+        assert result["state"] == "succeeded"
+        assert book_provider.queries == ["Rayuela Julio Cortázar"]
+        assert movie_provider.queries == [], "a movie provider answered a book row"
+        proposals = ImportRepository(engine, 1).proposals_for_batch("b1")
+        assert [p["payload"]["title"] for p in proposals] == ["Rayuela"]
+
+    @pytest.mark.anyio
+    async def test_the_handler_serves_any_searching_connectors_batch(self, tmp_path: Path) -> None:
+        """The handler is a shared layer (AC9): the batch it serves is the one
+        whose **registered connector declared the search job** — a batch of a
+        connector with no search phase (goodreads) is refused without naming
+        any connector in this handler, so a future searching connector needs
+        only its declaration, no handler change."""
+        engine = make_engine(tmp_path)
+        # A batch staged as goodreads: a real registered connector whose
+        # declaration has no search_job.
+        batch_id = stage_preview(engine, [{"title": "Kind of Blue", "author": ""}])
+        with engine.begin() as connection:
+            connection.execute(
+                text("UPDATE import_batches SET kind = 'goodreads' WHERE id = :id"),
+                {"id": batch_id},
+            )
+        provider = FakeProvider([candidate("Kind of Blue", "MB1")])
+        jobs = JobRepository(engine)
+        job_id = jobs.enqueue(batch_id, "search_import_rows", {"batch_id": batch_id}, user_id=1)
+        handler = make_handler(engine, [provider])
+        refused = await handler.process(job_id, NOW)
+        assert refused["state"] == "failed"
+        assert refused["error_code"] == "batch_not_found"
+        assert provider.queries == [], "a connector with no search phase was searched"
+
+        # The registered searching connector's batch still runs.
+        other = stage_preview(engine, [{"title": "Rayuela", "author": ""}], batch_id="b2")
+        other_job = jobs.enqueue(other, "search_import_rows", {"batch_id": other}, user_id=1)
+        result = await handler.process(other_job, NOW)
+        assert result["state"] == "succeeded"
+        assert provider.queries == ["Rayuela"]
+        assert ImportRepository(engine, 1).proposals_for_batch(other)
 
     @pytest.mark.anyio
     async def test_error_rows_are_searched_like_any_other(self, tmp_path: Path) -> None:

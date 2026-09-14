@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from book_tracker.application.enrichment import enqueue_enrichment_backfill
 from book_tracker.application.library import LibraryError, LibraryService, clean_attachment_filename
-from book_tracker.domain.identity import normalize_identifier
+from book_tracker.domain.identity import InvalidIdentifier, normalize_identifier
 from book_tracker.domain.importers import (
     ImportEntry,
     Importer,
@@ -608,8 +608,22 @@ class ImportService:
                 # The identity the owner confirmed is storage, not matching
                 # evidence: commit takes it onto the item through the confirmed
                 # channel, bypassing the connector's empty identity declaration
-                # (which governs what the *reader* trusts, D1.6).
-                stored["item"]["confirmed_identifiers"] = dict(payload.get("identifiers") or {})
+                # (which governs what the *reader* trusts, D1.6). Normalized
+                # through the same identity rule the add path applies, so the
+                # stored kind is the canonical one (`isbn`, never a raw provider
+                # key like `isbn13`) — the enrichment join and the library's
+                # exact-identity match key on the canonical kind, and a raw key
+                # would leave the confirmed row coverless and unmatchable
+                # forever.
+                confirmed: dict[str, str] = {}
+                for kind, value in (payload.get("identifiers") or {}).items():
+                    try:
+                        identifier = normalize_identifier(kind, str(value))
+                    except InvalidIdentifier:
+                        continue
+                    confirmed[identifier.kind] = identifier.normalized_value
+                stored["item"]["identifiers"] = dict(confirmed)
+                stored["item"]["confirmed_identifiers"] = dict(confirmed)
                 if payload.get("creators"):
                     stored["item"]["metadata"]["creators"] = list(payload["creators"])
                 if payload.get("language"):

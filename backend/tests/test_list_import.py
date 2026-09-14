@@ -466,7 +466,11 @@ class TestConfirmDiscard:
                         creators=("Julio Cortázar",),
                         year=1963,
                         cover_url=None,
-                        identifiers={"isbn": "9788437604572"},
+                        # The real provider shape: OpenLibraryProvider's
+                        # candidates key their ISBN as `isbn13` (the `_isbn`
+                        # helper), so the confirm path must normalize to the
+                        # canonical `isbn` kind exactly as the add path does.
+                        identifiers={"isbn13": "9788437604572"},
                         language="es",
                         metadata={"publisher": "Sudamericana"},
                     )
@@ -649,6 +653,24 @@ class TestConfirmDiscard:
                     "SELECT identifiers FROM items WHERE title = 'Homero'"
                 ).fetchone()
                 assert homer and homer[0] == "{}"
+                # The confirmed identity lands under its canonical kind, the
+                # same kind the add path writes: a raw provider key (`isbn13`)
+                # is invisible to the enrichment join and the library's
+                # exact-identity match, so the confirmed row would never get
+                # its cover fetched nor match a future import.
+                kinds = connection.execute(
+                    "SELECT kind, normalized_value FROM item_identifiers"
+                    " JOIN items ON items.id = item_identifiers.item_id"
+                    " WHERE items.title = 'Rayuela'"
+                ).fetchall()
+                assert kinds == [("isbn", "9788437604572")]
+                # And the row is backfillable: enrichment keys on the isbn.
+                backfillable = connection.execute(
+                    "SELECT count(*) FROM item_identifiers"
+                    " JOIN items ON items.id = item_identifiers.item_id"
+                    " WHERE items.title = 'Rayuela' AND item_identifiers.kind = 'isbn'"
+                ).fetchone()
+                assert backfillable and backfillable[0] == 1
 
     @pytest.mark.anyio
     async def test_another_users_batch_is_not_found(self, tmp_path: Path) -> None:

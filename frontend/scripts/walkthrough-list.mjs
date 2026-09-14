@@ -31,7 +31,12 @@ const page = await browser.newPage();
 page.on("console", (message) => {
   if (message.type() === "error") {
     const url = message.location().url;
-    const designed = url.includes("/api/auth/me") || url.includes("/cover");
+    // A provider-served cover that is not there (covers/proposals both) is
+    // the designed absence; live.metahub.space URLs carry no "/cover".
+    const designed =
+      url.includes("/api/auth/me") ||
+      url.includes("/cover") ||
+      /metahub\.space\/poster/.test(url);
     if (!designed) problems.push(message.text());
   }
 });
@@ -124,11 +129,22 @@ if (committed.total !== 10)
   problems.push(
     `expected 10 unsorted entries (12 rows, 2 refused), saw ${committed.total}`,
   );
+// A confirmed row carries the provider's own title (its payload re-stages the
+// item half), so El Hobbit may land as "The Hobbit" — match either.
 const confirmedRows = committed.items.filter((entry) =>
-  ["Rayuela", "El Hobbit"].includes(entry.item.title),
+  ["Rayuela", "El Hobbit", "The Hobbit"].includes(entry.item.title),
 );
+if (confirmedRows.length !== 2)
+  problems.push(`expected 2 confirmed rows, saw ${confirmedRows.length}`);
 for (const entry of confirmedRows) {
-  const detail = await api(`/api/entries/${entry.id}`);
+  // The cover arrives through the post-commit enrichment backfill (the same
+  // install path the add path uses), so poll for it rather than asserting it
+  // synchronously — TESTING.md's async-enrichment rule.
+  let detail = await api(`/api/entries/${entry.id}`);
+  for (let i = 0; i < 24 && !detail.item.cover_url; i++) {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    detail = await api(`/api/entries/${entry.id}`);
+  }
   const hasIsbn = Object.keys(detail.item.identifiers).length > 0;
   console.log(
     `${entry.item.title}: identifiers=${JSON.stringify(detail.item.identifiers)} cover=${detail.item.cover_url ? "yes" : "no"}`,
@@ -137,6 +153,8 @@ for (const entry of confirmedRows) {
     problems.push(
       `${entry.item.title} was confirmed but carries no identifier`,
     );
+  if (!detail.item.cover_url)
+    problems.push(`${entry.item.title} stayed coverless after backfill`);
 }
 const dome = committed.items.find(
   (entry) => entry.item.title === "La cúpula 1",
@@ -156,7 +174,11 @@ const undo = await page
   .getByRole("button", { name: /undo this import/i })
   .click()
   .then(() => page.getByRole("button", { name: /confirm undo/i }).click())
-  .then(() => page.getByText(/import undone/i).waitFor({ timeout: 60000 }))
+  .then(() =>
+    page
+      .getByRole("heading", { name: /import undone/i })
+      .waitFor({ timeout: 60000 }),
+  )
   .then(() => true)
   .catch(() => false);
 if (!undo) problems.push("the undo control did not complete");
