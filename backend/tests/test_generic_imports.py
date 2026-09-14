@@ -611,8 +611,17 @@ async def test_a_bundle_without_a_database_is_refused_with_something_to_do(
 
 
 @pytest.mark.anyio
+@pytest.mark.timeout(120)
 async def test_a_bundle_over_the_declared_caps_is_refused(tmp_path: Path) -> None:
-    """The caps are the connector's, not the shared route's 5 MiB (deliverable 1)."""
+    """The caps are the connector's, not the shared route's 5 MiB (deliverable 1).
+
+    Its own bound: the too-many-files half parses max_files + 1 = 10,001
+    multipart parts, which Sprint 051's 30 s default measured at 11.7 s of
+    headroom on a dev workstation — a shared CI runner's I/O pushed the same
+    parse past 30 s three times in a row (PR #20). The parts count is the
+    connector's real declared cap, so the honest bound is this test's clock,
+    not a smaller fixture."""
+
     library = _bundle_library(tmp_path / "Calibre Library")
     app = _no_mount_app(tmp_path)
     calibre = IMPORTERS["calibre"]
