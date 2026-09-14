@@ -826,6 +826,24 @@ async def answer_row_proposal(
     return PreviewResponse.model_validate(result)
 
 
+@router.get(
+    "/{importer_name}/batches/{batch_id}",
+    response_model=PreviewResponse,
+)
+async def read_preview(
+    importer_name: str, batch_id: str, request: Request, user: CurrentUser
+) -> PreviewResponse:
+    """Re-read one previewed batch without re-sending its source.
+
+    The preview POST is idempotent by fingerprint and remains the way in; this
+    read exists because a batch in its matching phase is polled for minutes
+    (Sprint 083), and re-uploading a file the server already staged to learn
+    its progress is exactly the cost an idempotent read should not have.
+    """
+    result = service(request, importer_name, user.effective_user_id).get_preview(batch_id)
+    return PreviewResponse.model_validate(result)
+
+
 @router.get("/jobs/{job_id}", response_model=JobProgressResponse)
 async def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
     from book_tracker.infrastructure.jobs import JobRepository

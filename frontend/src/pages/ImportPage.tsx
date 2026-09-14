@@ -19,15 +19,17 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   commitImport,
   getImporters,
+  getPreview,
   type ImportInputSpec,
   ImportRequestError,
   planImport,
   previewImport,
+  previewImportWithOptions,
   type ImporterDefinition,
-  undoBatch,
   type ImportPreview,
   type ImportResult,
   type UndoResult,
+  undoBatch,
   uploadImportFile,
 } from "@/api/imports";
 import type { BundleMember, CalibreBundle } from "@/features/import/bundle";
@@ -37,6 +39,7 @@ import {
   narrowedTo,
 } from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
+import { ProposalList } from "@/features/import/ProposalList";
 import { describeRowError } from "@/features/import/errors";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { weightClass } from "@/features/library/insights";
@@ -132,6 +135,13 @@ export function ImportPage() {
     reason: string | null;
   } | null>(null);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
+  /**
+   * The column mapping a list connector asks for, as the owner typed it —
+   * column numbers as strings, sent with the next preview only (Sprint 083).
+   */
+  const [columnMapping, setColumnMapping] = useState<Record<string, string>>(
+    {},
+  );
   const [choices, setChoices] = useState<Record<number, number | "new">>({});
   const [result, setResult] = useState<ImportResult | null>(null);
   const [undoResult, setUndoResult] = useState<UndoResult | null>(null);
@@ -241,6 +251,22 @@ export function ImportPage() {
         : fallbackSource || importers[0]?.id || "",
     );
   };
+
+  const matching = preview?.state === "matching";
+  // A searching batch is polled through the idempotent preview read — the
+  // response carries the job's live counts, and flips its own state to
+  // `previewed` the moment the queue drains. The poll stops itself then.
+  useEffect(() => {
+    if (!preview || preview.state !== "matching" || !source) return;
+    const timer = window.setInterval(() => {
+      void getPreview(source, preview.batch_id)
+        .then((fresh) => setPreview(fresh))
+        .catch(() => {
+          /* the next tick retries; a batch deleted mid-poll is not a screen error */
+        });
+    }, 2000);
+    return () => window.clearInterval(timer);
+  }, [preview, source]);
 
   const unresolved =
     preview?.records.filter(
@@ -442,12 +468,51 @@ export function ImportPage() {
       );
     if (spec.kind === "upload")
       return (
-        <SourceDropZone
-          importer={importer}
-          inputId={inputId}
-          file={file}
-          onFile={setFile}
-        />
+        <div className="space-y-3">
+          <SourceDropZone
+            importer={importer}
+            inputId={inputId}
+            file={file}
+            onFile={setFile}
+          />
+          {/* The connector's declared fields, rendered from the declaration:
+              a list asks which columns hold the title and the author (Sprint
+              083), and every connector with no fields shows nothing — no
+              branch on which connector this is (the same rule the guide and
+              the target checkboxes follow). */}
+          {spec.fields && spec.fields.length > 0 && (
+            <div className="flex flex-wrap gap-3">
+              {spec.fields.map((name) => (
+                <label key={name} className="block">
+                  <span className="text-sm text-muted-foreground">
+                    {name === "title_column"
+                      ? "Title is column"
+                      : name === "author_column"
+                        ? "Author is column"
+                        : name}
+                  </span>
+                  <Input
+                    type="number"
+                    min={1}
+                    className="mt-1 h-11 w-28"
+                    value={columnMapping[name] ?? ""}
+                    placeholder="auto"
+                    onChange={(event) =>
+                      setColumnMapping((old) => ({
+                        ...old,
+                        [name]: event.target.value,
+                      }))
+                    }
+                  />
+                </label>
+              ))}
+              <p className="w-full text-xs text-muted-foreground">
+                Leave them empty and the columns are found from the headers; the
+                first two columns are the fallback.
+              </p>
+            </div>
+          )}
+        </div>
       );
     return (
       <div className="space-y-3">
@@ -592,12 +657,37 @@ export function ImportPage() {
                     const importer = activeImporter as ImporterDefinition;
                     void sendable(importer, submission)
                       .then((source) =>
-                        previewImport(
-                          importer,
-                          submission.spec,
-                          source,
-                          chosenFor(importer),
-                        ),
+                        // A connector that declared extra fields gets them
+                        // appended to the same upload, keyed by connector so
+                        // switching tabs never carries one source's mapping
+                        // into another's request.
+                        Object.keys(columnMapping).length > 0 &&
+                        submission.spec.fields &&
+                        submission.spec.fields.length > 0
+                          ? previewImportWithOptions(
+                              importer,
+                              submission.spec,
+                              source,
+                              Object.fromEntries(
+                                Object.entries(columnMapping)
+                                  .filter(([name]) =>
+                                    submission.spec.fields!.includes(name),
+                                  )
+                                  // The screen speaks 1-based column numbers;
+                                  // the reader's contract is 0-based.
+                                  .map(([name, value]) => [
+                                    name,
+                                    String(Number(value) - 1),
+                                  ])
+                                  .filter(([, value]) => Number(value) >= 0),
+                              ),
+                            )
+                          : previewImport(
+                              importer,
+                              submission.spec,
+                              source,
+                              chosenFor(importer),
+                            ),
                       )
                       .then(setPreview)
                       .catch((reason: Error) => setError(asFailure(reason)))
@@ -759,6 +849,22 @@ export function ImportPage() {
                     );
                   })()}
                 </p>
+                {matching && preview.search_progress && (
+                  <p
+                    className="mt-2 text-sm text-muted-foreground"
+                    role="status"
+                    data-testid="search-progress"
+                  >
+                    {preview.search_progress.wait_reason ===
+                    "provider_quota_exhausted"
+                      ? `Searching paused for today's provider budget; it resumes automatically. ${
+                          preview.search_progress.searched
+                        } of ${preview.search_progress.total} rows searched.`
+                      : `Searching for matches: ${
+                          preview.search_progress.searched
+                        } of ${preview.search_progress.total} rows searched.`}
+                  </p>
+                )}
                 {/* What the import left behind, on its own line and never counted
                 as an error. The two are kept apart because they are different
                 answers: one is a library you did not choose, the other is a kind
@@ -840,6 +946,23 @@ export function ImportPage() {
                           {describeRowError(row, recordDomain)}
                         </p>
                       ))}
+                      {(record.proposals?.length ?? 0) > 0 && !result && (
+                        <ProposalList
+                          recordId={record.record_id}
+                          title={record.title}
+                          proposals={record.proposals}
+                          batchId={preview.batch_id}
+                          importerId={source}
+                          matching={matching}
+                          onAnswered={() => {
+                            void getPreview(source, preview.batch_id)
+                              .then((fresh) => setPreview(fresh))
+                              .catch(() => {
+                                /* answered; the next poll or action reads fresh */
+                              });
+                          }}
+                        />
+                      )}
                       {record.planned_action === "ambiguous" && (
                         <div className="mt-3 block">
                           <Label htmlFor={`choice-${record.record_id}`}>
@@ -880,7 +1003,9 @@ export function ImportPage() {
                 </div>
                 <Button
                   className="mt-6 rounded-full px-5"
-                  disabled={pending || unresolved > 0 || ready === 0}
+                  disabled={
+                    pending || matching || unresolved > 0 || ready === 0
+                  }
                   onClick={() => {
                     setPending(true);
                     setError(null);
@@ -949,7 +1074,9 @@ export function ImportPage() {
                 >
                   {pending
                     ? "Importing…"
-                    : `Import ${ready} ready ${ready === 1 ? "row" : "rows"}`}
+                    : matching
+                      ? "Waiting for the search to finish…"
+                      : `Import ${ready} ready ${ready === 1 ? "row" : "rows"}`}
                 </Button>
               </section>
             )}

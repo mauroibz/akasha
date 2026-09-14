@@ -1,5 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1578,5 +1584,280 @@ describe("ImportPage", () => {
         screen.queryByRole("heading", { level: 1, name: "Inbox" }),
       ).toBeNull();
     });
+  });
+});
+
+const listImporter = {
+  id: "list",
+  label: "A list you wrote",
+  item_types: ["book"],
+  attachment_max_bytes: 25 * 1024 * 1024,
+  input: {
+    kind: "upload",
+    label: "Your list (CSV or text)",
+    field: "file",
+    accept: ".csv,.txt,.tsv,text/csv,text/plain",
+    placeholder: null,
+    help: null,
+    guide: ["Save your list as CSV or plain text."],
+    empty_state: "Drop your list here, or choose a file.",
+    help_url: null,
+    browsable: false,
+    accepts_files: false,
+    max_bytes: null,
+    max_files: null,
+    fields: ["title_column", "author_column"],
+    alternates: [],
+  },
+};
+
+const listRecord = (overrides: Record<string, unknown> = {}) => ({
+  record_id: 1,
+  row_number: 2,
+  title: "Rayuela",
+  creators: ["Julio Cortázar"],
+  suggested_status: null,
+  score: null,
+  score_provisional: false,
+  shelves: [],
+  errors: [],
+  planned_action: "create_item",
+  match_kind: "new",
+  candidates: [],
+  item: {
+    title: "Rayuela",
+    subtitle: null,
+    year: null,
+    identifiers: {},
+    metadata: { creators: ["Julio Cortázar"] },
+    creator_sort: null,
+  },
+  entry: {
+    score: null,
+    notes: null,
+    date_added: null,
+    values: {},
+    score_provisional: false,
+    suggested_status: null,
+  },
+  source_fields: { Editorial: "Sudamericana" },
+  proposals: [],
+  ...overrides,
+});
+
+describe("the list connector's search-then-confirm surfaces", () => {
+  it("renders the declared column mapping inputs", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+    await screen.findByRole("tab", { name: /a list you wrote/i });
+    expect(await screen.findByLabelText(/title is column/i)).toBeVisible();
+    expect(await screen.findByLabelText(/author is column/i)).toBeVisible();
+    // The honest default is stated, not hidden.
+    expect(
+      screen.getByText(/first two columns are the fallback/i),
+    ).toBeVisible();
+  });
+
+  it("shows no mapping inputs for a connector that declares none", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/importers")
+        return new Response(JSON.stringify([importers[0]]));
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+    await screen.findByRole("tab", { name: /goodreads/i });
+    expect(screen.queryByLabelText(/title is column/i)).toBeNull();
+  });
+
+  it("polls while matching and shows the live search progress", async () => {
+    let reads = 0;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (String(input).endsWith("/api/import/list/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "matching",
+            summary: { total: 2, ready: 2, errors: 0, ambiguous: 0 },
+            search_progress: { searched: 1, total: 2, job_state: "running" },
+            records: [listRecord()],
+          }),
+          { status: 201 },
+        );
+      if (String(input).endsWith("/api/import/list/batches/list-1")) {
+        reads += 1;
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: reads < 2 ? "matching" : "previewed",
+            summary: { total: 2, ready: 2, errors: 0, ambiguous: 0 },
+            ...(reads < 2
+              ? {
+                  search_progress: {
+                    searched: 2,
+                    total: 2,
+                    job_state: "running",
+                  },
+                }
+              : {}),
+            records: [
+              listRecord({
+                proposals: [
+                  {
+                    source: "openlibrary",
+                    source_id: "OL1M",
+                    rank: 0,
+                    chosen: null,
+                    payload: {
+                      title: "Rayuela",
+                      subtitle: null,
+                      creators: ["Julio Cortázar"],
+                      year: 1963,
+                      identifiers: { isbn: "9788437604572" },
+                      language: "es",
+                      metadata: { publisher: "Sudamericana" },
+                      cover_url: null,
+                      cover_fallback_urls: [],
+                    },
+                  },
+                ],
+              }),
+            ],
+          }),
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    // The drop zone needs a file before the preview can be sent.
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    const file = new File(["Título,Autor\r\n"], "libros.csv", {
+      type: "text/csv",
+    });
+    await userEvent.upload(input, file);
+
+    const previewButton = await screen.findByRole("button", {
+      name: /preview/i,
+    });
+    await userEvent.click(previewButton);
+
+    // The matching banner shows the job's live counts.
+    expect(
+      await screen.findByText(/searching for matches: 1 of 2 rows searched/i),
+    ).toBeVisible();
+    // The poll reads the batch on its interval; once drained, the commit gate
+    // reopens. The interval is 2s, so the wait must outlast it.
+    expect(
+      await screen.findByText(/import 2 ready rows/i, {}, { timeout: 6000 }),
+    ).toBeVisible();
+  });
+
+  it("confirms a proposal once the search has drained", async () => {
+    const confirmCalls: unknown[] = [];
+    let answered = false;
+    const proposal = {
+      source: "openlibrary",
+      source_id: "OL1M",
+      rank: 0,
+      chosen: null,
+      payload: {
+        title: "Rayuela",
+        subtitle: null,
+        creators: ["Julio Cortázar"],
+        year: 1963,
+        identifiers: { isbn: "9788437604572" },
+        language: "es",
+        metadata: {},
+        cover_url: null,
+        cover_fallback_urls: [],
+      },
+    };
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.endsWith("/records/1/proposal")) {
+        confirmCalls.push(JSON.parse(String(init?.body ?? "{}")));
+        answered = true;
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: [proposal] })],
+          }),
+        );
+      }
+      if (url.endsWith("/batches/list-1")) {
+        // The poll: drained, with the proposal marked by the answer when one
+        // has been given.
+        const shown = answered ? { ...proposal, chosen: true } : proposal;
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: [shown] })],
+          }),
+        );
+      }
+      if (url.endsWith("/api/import/list/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "matching",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            search_progress: { searched: 0, total: 1, job_state: "running" },
+            records: [listRecord({ proposals: [proposal] })],
+          }),
+          { status: 201 },
+        );
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File(["Título,Autor\r\n"], "libros.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+
+    // While matching, the commit gate says so and is disabled.
+    expect(
+      screen.getByRole("button", { name: /waiting for the search/i }),
+    ).toBeDisabled();
+
+    // The poll drains the batch; the proposal's Confirm is now live.
+    const confirm = await waitFor(
+      () => screen.getByRole("button", { name: /^confirm$/i }),
+      { timeout: 6000 },
+    );
+    await screen.findByText(/import 1 ready row/i, {}, { timeout: 6000 });
+    expect(confirm).toBeEnabled();
+
+    // Answering confirms the chosen proposal.
+    await userEvent.click(confirm);
+    await screen.findByText("Confirmed");
+    expect(confirmCalls).toEqual([
+      { source: "openlibrary", source_id: "OL1M" },
+    ]);
   });
 });

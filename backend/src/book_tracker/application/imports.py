@@ -33,6 +33,7 @@ from book_tracker.domain.spec import (
 )
 from book_tracker.infrastructure.attachments import AttachmentError, store_blob
 from book_tracker.infrastructure.covers import CoverError, install_cover
+from book_tracker.infrastructure.jobs import JobRepository
 from book_tracker.infrastructure.models import (
     ImportBatchRow,
     ImportEffectRow,
@@ -380,8 +381,6 @@ class ImportService:
         # which connector it is holding.
         searching = getattr(self.importer, "search_job", None)
         if searching == "search_import_rows":
-            from book_tracker.infrastructure.jobs import JobRepository
-
             with self.engine.begin() as connection:
                 connection.execute(
                     text(
@@ -440,12 +439,31 @@ class ImportService:
         else:
             summary.setdefault("rows_with_proposals", 0)
             summary.setdefault("proposals_total", 0)
+        # A batch still in its matching phase carries its search job's live
+        # progress, so the screen polls one endpoint — the idempotent preview
+        # GET — and reads the same counts the job route would give (Sprint
+        # 083 D3.2). Absent for every connector without a search phase.
+        search_progress: dict[str, Any] | None = None
+        if batch.state == "matching":
+            jobs = JobRepository(self.engine).list_batch_jobs(batch_id)
+            for job in jobs:
+                if job["kind"] == "search_import_rows" and job["state"] in (
+                    "queued",
+                    "running",
+                ):
+                    progress = dict(job["progress"])
+                    progress["job_state"] = job["state"]
+                    if job.get("error_code"):
+                        progress["wait_reason"] = job["error_code"]
+                    search_progress = progress
+                    break
         return {
             "batch_id": batch.id,
             "fingerprint": batch.fingerprint,
             "state": batch.state,
             "summary": summary,
             "records": records,
+            **({"search_progress": search_progress} if search_progress else {}),
         }
 
     def answer_proposal(
