@@ -1,10 +1,24 @@
+import { useState } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { toast } from "sonner";
 
-import { answerProposal, type ImportProposal } from "@/api/imports";
+import {
+  answerProposal,
+  researchRow,
+  type ImportProposal,
+} from "@/api/imports";
 import { CoverImage } from "@/components/CoverImage";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+
+/**
+ * How many proposals a row shows before its "Show more" unfolds the rest.
+ * Ten are stored per row (the owner's 2026-09-14 feedback); three render by
+ * default so a healthy row stays scannable, and the deeper answers — where a
+ * badly-ranked Spanish title or a common-word query lands — are one click
+ * away rather than a re-search.
+ */
+const COLLAPSED = 3;
 
 /**
  * One proposal, as the row's confirm step offers it. The provider's own name
@@ -105,6 +119,121 @@ function ProposalCard({
 }
 
 /**
+ * The editable title/author and its "Search again" trigger — on every row,
+ * not only empty ones (the owner's 2026-09-14 decision: a bad query can also
+ * produce wrong proposals). Pre-fills with the row's current text; the
+ * spreadsheet's own cells stay untouched in `source_fields`.
+ */
+function SearchAgain({
+  title,
+  author,
+  recordId,
+  batchId,
+  importerId,
+  disabled,
+  onAnswered,
+}: {
+  title: string;
+  author: string;
+  recordId: number;
+  batchId: string;
+  importerId: string;
+  disabled: boolean;
+  onAnswered: () => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draftTitle, setDraftTitle] = useState(title);
+  const [draftAuthor, setDraftAuthor] = useState(author);
+
+  const research = useMutation({
+    mutationFn: () =>
+      researchRow(importerId, batchId, recordId, {
+        title: draftTitle,
+        author: draftAuthor,
+      }),
+    onSuccess: () => {
+      setEditing(false);
+      toast.success("Searched again", {
+        description: "The row now carries the edited text and fresh results.",
+      });
+      onAnswered();
+    },
+    onError: () => {
+      toast.error("The search could not run", {
+        description: "The row was not changed.",
+      });
+    },
+  });
+
+  if (disabled && !editing) return null;
+  return (
+    <div className="space-y-2">
+      {editing && (
+        <form
+          className="space-y-2 rounded-xl border border-border bg-surface p-3"
+          onSubmit={(event) => {
+            event.preventDefault();
+            research.mutate();
+          }}
+        >
+          <label className="block">
+            <span className="text-sm text-muted-foreground">Title</span>
+            <input
+              className="mt-1 h-11 w-full rounded-md border border-input bg-transparent px-3 text-base focus-ring"
+              value={draftTitle}
+              onChange={(event) => setDraftTitle(event.target.value)}
+              autoFocus
+            />
+          </label>
+          <label className="block">
+            <span className="text-sm text-muted-foreground">Author</span>
+            <input
+              className="mt-1 h-11 w-full rounded-md border border-input bg-transparent px-3 text-base focus-ring"
+              value={draftAuthor}
+              onChange={(event) => setDraftAuthor(event.target.value)}
+            />
+          </label>
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              className="rounded-full"
+              type="submit"
+              disabled={research.isPending || !draftTitle.trim()}
+            >
+              {research.isPending ? "Searching…" : "Search again"}
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="rounded-full"
+              type="button"
+              onClick={() => setEditing(false)}
+            >
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
+      {!editing && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full text-xs"
+          disabled={disabled}
+          onClick={() => {
+            setDraftTitle(title);
+            setDraftAuthor(author);
+            setEditing(true);
+          }}
+        >
+          Wrong text? Edit and search again
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/**
  * The proposals the background search found for one row, ranked, with the
  * owner's answer per result: confirm one, or discard the lot and keep the row
  * exactly as the spreadsheet typed it (Sprint 083 D4.2).
@@ -112,10 +241,15 @@ function ProposalCard({
  * While the batch is still `matching` the controls are disabled — the job may
  * still rewrite this record's proposals, and answering it mid-flight would be
  * answering a question that is still being asked.
+ *
+ * The 2026-09-14 owner feedback adds two affordances: "Show more" unfolds the
+ * stored ten past the first three, and an editable title/author with a
+ * "Search again" button on every row.
  */
 export function ProposalList({
   recordId,
   title,
+  author,
   proposals,
   batchId,
   importerId,
@@ -124,6 +258,7 @@ export function ProposalList({
 }: {
   recordId: number;
   title: string;
+  author: string;
   proposals: ImportProposal[];
   batchId: string;
   importerId: string;
@@ -146,19 +281,34 @@ export function ProposalList({
     },
   });
 
-  if (proposals.length === 0) {
-    return (
-      <p className="mt-3 rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
-        {matching
-          ? "Searching…"
-          : "No results. The row stays exactly as you typed it."}
-      </p>
-    );
-  }
+  const [expanded, setExpanded] = useState(false);
 
   const answered = proposals.some(
     (proposal) => proposal.chosen === true || proposal.chosen === false,
   );
+  const shown = expanded ? proposals : proposals.slice(0, COLLAPSED);
+  const hidden = proposals.length - shown.length;
+
+  if (proposals.length === 0) {
+    return (
+      <div className="mt-3 space-y-2">
+        <p className="rounded-xl border border-dashed border-border p-3 text-sm text-muted-foreground">
+          {matching
+            ? "Searching…"
+            : "No results. Fix the text and search again, or keep the row as you typed it."}
+        </p>
+        <SearchAgain
+          title={title}
+          author={author}
+          recordId={recordId}
+          batchId={batchId}
+          importerId={importerId}
+          disabled={matching}
+          onAnswered={onAnswered}
+        />
+      </div>
+    );
+  }
 
   return (
     <div className="mt-3 space-y-2">
@@ -166,7 +316,7 @@ export function ProposalList({
         {answered ? "Your answer:" : "Is one of these the book?"}
       </p>
       <ul className="space-y-2">
-        {proposals.map((proposal) => (
+        {shown.map((proposal) => (
           <ProposalCard
             key={`${proposal.source}-${proposal.source_id}`}
             proposal={proposal}
@@ -178,6 +328,35 @@ export function ProposalList({
           />
         ))}
       </ul>
+      {!expanded && hidden > 0 && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full text-xs"
+          onClick={() => setExpanded(true)}
+        >
+          Show more ({hidden})
+        </Button>
+      )}
+      {expanded && proposals.length > COLLAPSED && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="rounded-full text-xs"
+          onClick={() => setExpanded(false)}
+        >
+          Show fewer
+        </Button>
+      )}
+      <SearchAgain
+        title={title}
+        author={author}
+        recordId={recordId}
+        batchId={batchId}
+        importerId={importerId}
+        disabled={matching}
+        onAnswered={onAnswered}
+      />
       {answered ? (
         <Button
           variant="ghost"

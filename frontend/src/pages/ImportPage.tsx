@@ -40,6 +40,7 @@ import {
 } from "@/features/import/bundle";
 import { ConnectorGuide } from "@/features/import/ConnectorGuide";
 import { ProposalList } from "@/features/import/ProposalList";
+import { NoResultRow, RowExcludeControl } from "@/features/import/RowControls";
 import { describeRowError } from "@/features/import/errors";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { weightClass } from "@/features/library/insights";
@@ -171,8 +172,13 @@ export function ImportPage() {
   }, []);
 
   useEffect(() => {
+    // Focus the preview heading when a NEW batch arrives, not on every poll
+    // tick or owner answer: a searching batch re-reads itself every 2 s and
+    // every answer refreshes the preview, and each refocus pulled the page
+    // back to the top mid-browse (the owner's 2026-09-14 report).
     if (preview) heading.current?.focus();
-  }, [preview]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview?.batch_id]);
   useEffect(() => {
     if (result) resultRef.current?.focus();
   }, [result]);
@@ -895,11 +901,36 @@ export function ImportPage() {
                   {preview.records.map((record) => (
                     <article
                       key={record.record_id}
-                      className="rounded-xl border border-border bg-surface p-4"
+                      className={cn(
+                        "rounded-xl border border-border bg-surface p-4",
+                        record.planned_action === "excluded" && "opacity-60",
+                      )}
                     >
-                      <h3 className="font-semibold">
-                        {record.title || `Row ${record.row_number}`}
-                      </h3>
+                      <div className="flex items-start justify-between gap-3">
+                        <h3 className="font-semibold">
+                          {record.title || `Row ${record.row_number}`}
+                        </h3>
+                        {!result && !matching && (
+                          // The owner's 2026-09-14 decision: a row the owner
+                          // does not want can leave the import entirely, not
+                          // only land as typed. Placed on the row itself so it
+                          // reads as a decision about THIS row, next to the
+                          // title it is a decision about.
+                          <RowExcludeControl
+                            recordId={record.record_id}
+                            excluded={record.planned_action === "excluded"}
+                            batchId={preview.batch_id}
+                            importerId={source}
+                            onChanged={() => {
+                              void getPreview(source, preview.batch_id)
+                                .then((fresh) => setPreview(fresh))
+                                .catch(() => {
+                                  /* the next poll or action reads fresh */
+                                });
+                            }}
+                          />
+                        )}
+                      </div>
                       <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
                         <span>
                           {record.creators.join(", ") || "Creator missing"}
@@ -950,6 +981,7 @@ export function ImportPage() {
                         <ProposalList
                           recordId={record.record_id}
                           title={record.title}
+                          author={record.creators.join(", ")}
                           proposals={record.proposals}
                           batchId={preview.batch_id}
                           importerId={source}
@@ -963,6 +995,27 @@ export function ImportPage() {
                           }}
                         />
                       )}
+                      {record.proposals?.length === 0 &&
+                        !result &&
+                        !matching && (
+                          // A row the search finished on with nothing to show
+                          // still owns its affordances: the edit-and-re-search
+                          // form, and the way out of the import entirely.
+                          <NoResultRow
+                            recordId={record.record_id}
+                            title={record.title}
+                            author={record.creators.join(", ")}
+                            batchId={preview.batch_id}
+                            importerId={source}
+                            onAnswered={() => {
+                              void getPreview(source, preview.batch_id)
+                                .then((fresh) => setPreview(fresh))
+                                .catch(() => {
+                                  /* answered; the next poll or action reads fresh */
+                                });
+                            }}
+                          />
+                        )}
                       {record.planned_action === "ambiguous" && (
                         <div className="mt-3 block">
                           <Label htmlFor={`choice-${record.record_id}`}>

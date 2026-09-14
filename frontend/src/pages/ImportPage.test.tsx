@@ -454,14 +454,20 @@ describe("ImportPage", () => {
       name: /choice for Ficciones/i,
     });
     expect(choice).toHaveTextContent(/choose/i);
-    expect(screen.getByRole("button", { name: /import/i })).toBeDisabled();
+    // Exact-name: the row-level "Don't import this row" control also matches
+    // a loose /import/i since the owner's 2026-09-14 batch.
+    expect(
+      screen.getByRole("button", { name: /^import \d+ ready rows?$/i }),
+    ).toBeDisabled();
 
     await userEvent.click(choice);
     await userEvent.click(
       await screen.findByRole("option", { name: /use existing item 7/i }),
     );
     expect(choice).toHaveTextContent(/use existing item 7/i);
-    expect(screen.getByRole("button", { name: /import/i })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: /^import \d+ ready rows?$/i }),
+    ).toBeEnabled();
   });
   it("sends a finished import to the rows it left unsorted", async () => {
     // The defect: a commit reported "1 entry added" and the library showed
@@ -1597,7 +1603,7 @@ describe("ImportPage", () => {
 
 const listImporter = {
   id: "list",
-  label: "A list you wrote",
+  label: "Custom list",
   item_types: ["book"],
   attachment_max_bytes: 25 * 1024 * 1024,
   input: {
@@ -1661,7 +1667,7 @@ describe("the list connector's search-then-confirm surfaces", () => {
       return new Response(JSON.stringify([]), { status: 404 });
     });
     renderImportPage();
-    await screen.findByRole("tab", { name: /a list you wrote/i });
+    await screen.findByRole("tab", { name: /custom list/i });
     expect(await screen.findByLabelText(/title is column/i)).toBeVisible();
     expect(await screen.findByLabelText(/author is column/i)).toBeVisible();
     // The honest default is stated, not hidden.
@@ -1962,6 +1968,316 @@ describe("the list connector's search-then-confirm surfaces", () => {
     await screen.findByText(/your answer:/i);
     expect(
       await screen.findByRole("button", { name: /undo my answer/i }),
+    ).toBeEnabled();
+  });
+
+  it("shows three proposals and unfolds the rest behind Show more", async () => {
+    const five = [1, 2, 3, 4, 5].map((index) => ({
+      source: "openlibrary",
+      source_id: `OL${index}M`,
+      rank: index - 1,
+      chosen: null,
+      payload: {
+        title: `Rayuela edition ${index}`,
+        subtitle: null,
+        creators: ["Julio Cortázar"],
+        year: 1963,
+        identifiers: { isbn: `978000000000${index}` },
+        language: "es",
+        metadata: {},
+        cover_url: null,
+        cover_fallback_urls: [],
+      },
+    }));
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.endsWith("/api/import/list/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: five })],
+          }),
+          { status: 201 },
+        );
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File(["Título,Autor\r\n"], "libros.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+
+    // Three render; the deeper two wait behind Show more.
+    expect(
+      await screen.findAllByRole("button", { name: /^confirm$/i }),
+    ).toHaveLength(3);
+    const more = await screen.findByRole("button", {
+      name: /show more \(2\)/i,
+    });
+    await userEvent.click(more);
+    expect(
+      await screen.findAllByRole("button", { name: /^confirm$/i }),
+    ).toHaveLength(5);
+    await userEvent.click(
+      await screen.findByRole("button", { name: /show fewer/i }),
+    );
+    expect(
+      await screen.findAllByRole("button", { name: /^confirm$/i }),
+    ).toHaveLength(3);
+  });
+
+  it("excludes a row from the commit and takes it back", async () => {
+    const calls: string[] = [];
+    let excluded = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.endsWith("/exclude") || url.endsWith("/include")) {
+        calls.push(url.endsWith("/exclude") ? "exclude" : "include");
+        excluded = url.endsWith("/exclude");
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: {
+              total: 1,
+              ready: excluded ? 0 : 1,
+              errors: 0,
+              ambiguous: 0,
+            },
+            records: [
+              listRecord({
+                planned_action: excluded ? "excluded" : "create_item",
+              }),
+            ],
+          }),
+        );
+      }
+      if (url.endsWith("/batches/list-1")) {
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: {
+              total: 1,
+              ready: excluded ? 0 : 1,
+              errors: 0,
+              ambiguous: 0,
+            },
+            records: [
+              listRecord({
+                planned_action: excluded ? "excluded" : "create_item",
+              }),
+            ],
+          }),
+        );
+      }
+      if (url.endsWith("/api/import/list/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord()],
+          }),
+          { status: 201 },
+        );
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File(["Título,Autor\r\n"], "libros.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+
+    const exclude = await screen.findByRole("button", {
+      name: /don't import this row/i,
+    });
+    await userEvent.click(exclude);
+    expect(calls).toEqual(["exclude"]);
+    // The control becomes its own undo.
+    expect(
+      await screen.findByRole("button", {
+        name: /import this row after all/i,
+      }),
+    ).toBeEnabled();
+    await userEvent.click(
+      screen.getByRole("button", { name: /import this row after all/i }),
+    );
+    expect(calls).toEqual(["exclude", "include"]);
+    expect(
+      await screen.findByRole("button", { name: /don't import this row/i }),
+    ).toBeEnabled();
+  });
+
+  it("re-searches a row with edited title and author", async () => {
+    const bodies: unknown[] = [];
+    let searched = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.endsWith("/search")) {
+        bodies.push(JSON.parse(String(init?.body ?? "{}")));
+        searched = true;
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [
+              listRecord({
+                title: "La Ilíada",
+                item: {
+                  title: "La Ilíada",
+                  subtitle: null,
+                  year: null,
+                  identifiers: {},
+                  metadata: { creators: ["Homero"] },
+                  creator_sort: null,
+                },
+                proposals: searched
+                  ? [
+                      {
+                        source: "openlibrary",
+                        source_id: "OL9M",
+                        rank: 0,
+                        chosen: null,
+                        payload: {
+                          title: "La Ilíada",
+                          subtitle: null,
+                          creators: ["Homero"],
+                          year: null,
+                          identifiers: { isbn: "9780000000009" },
+                          language: "es",
+                          metadata: {},
+                          cover_url: null,
+                          cover_fallback_urls: [],
+                        },
+                      },
+                    ]
+                  : [],
+              }),
+            ],
+          }),
+        );
+      }
+      if (url.endsWith("/api/import/list/preview"))
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [listRecord({ proposals: [] })],
+          }),
+          { status: 201 },
+        );
+      if (url.endsWith("/batches/list-1")) {
+        // The refresh after an answer: the re-searched row carries its new
+        // text and the fresh result.
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            records: [
+              listRecord({
+                title: searched ? "La Ilíada" : "Rayuela",
+                item: searched
+                  ? {
+                      title: "La Ilíada",
+                      subtitle: null,
+                      year: null,
+                      identifiers: {},
+                      metadata: { creators: ["Homero"] },
+                      creator_sort: null,
+                    }
+                  : undefined,
+                proposals: searched
+                  ? [
+                      {
+                        source: "openlibrary",
+                        source_id: "OL9M",
+                        rank: 0,
+                        chosen: null,
+                        payload: {
+                          title: "La Ilíada",
+                          subtitle: null,
+                          creators: ["Homero"],
+                          year: null,
+                          identifiers: { isbn: "9780000000009" },
+                          language: "es",
+                          metadata: {},
+                          cover_url: null,
+                          cover_fallback_urls: [],
+                        },
+                      },
+                    ]
+                  : [],
+              }),
+            ],
+          }),
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File(["Título,Autor\r\n"], "libros.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+
+    // A drained row with no results owns its way out.
+    await userEvent.click(
+      await screen.findByRole("button", {
+        name: /wrong text\? edit and search again/i,
+      }),
+    );
+    await userEvent.clear(screen.getByLabelText(/^title$/i));
+    await userEvent.type(screen.getByLabelText(/^title$/i), "La Ilíada");
+    await userEvent.click(
+      screen.getByRole("button", { name: /search again/i }),
+    );
+    expect(bodies).toEqual([{ title: "La Ilíada", author: "Julio Cortázar" }]);
+    expect(await findToast("Searched again")).toBeInTheDocument();
+    // The fresh result renders from the re-searched row: its Confirm control
+    // is the proof the proposal arrived (the title now exists as both the
+    // row's and the proposal's text, so the text alone is ambiguous).
+    expect(
+      await screen.findByRole("button", { name: /^confirm$/i }),
     ).toBeEnabled();
   });
 });

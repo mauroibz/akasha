@@ -327,7 +327,7 @@ export async function stubImporters(page: Page) {
         },
         {
           id: "list",
-          label: "A list you wrote",
+          label: "Custom list",
           item_types: ["book"],
           attachment_max_bytes: 25 * 1024 * 1024,
           input: {

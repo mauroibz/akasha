@@ -48,7 +48,7 @@ async function api(path, init) {
 
 // 1. Upload through the real UI with auto mapping.
 await page.goto(`${BASE}/import`);
-await page.getByRole("tab", { name: /a list you wrote/i }).click();
+await page.getByRole("tab", { name: /custom list/i }).click();
 const chooser = page.getByRole("button", {
   name: /your list \(csv or text\)/i,
 });
@@ -113,6 +113,53 @@ await page
   .waitFor({ timeout: 15000 });
 console.log("discarded: La cúpula 1 (kept as typed)");
 
+// 4b. The 2026-09-14 owner batch, live: Show more, re-search, exclusion.
+// Show more: a row with more than three stored proposals folds the rest.
+const trutlesCard = cards.filter({ hasText: "Trutles" });
+const more = trutlesCard.getByRole("button", { name: /show more/i });
+if ((await more.count()) > 0) {
+  await more.first().click();
+  console.log("show more: unfolded the deeper proposals");
+  await trutlesCard
+    .getByRole("button", { name: /show fewer/i })
+    .first()
+    .click();
+}
+
+// Re-search: the transposed Homero row (title "Homero", author "Iliada")
+// gets its text corrected and searched again.
+const homerCard = cards.filter({ hasText: "Homero" });
+await homerCard
+  .getByRole("button", { name: /edit and search again/i })
+  .first()
+  .click();
+await homerCard.getByLabel("Title").fill("La Ilíada");
+await homerCard.getByLabel("Author").fill("Homero");
+await homerCard.getByRole("button", { name: /search again/i }).click();
+await page.getByText("Searched again").waitFor({ timeout: 60000 });
+console.log("re-search: Homero row edited and searched again");
+
+// Exclusion: a row leaves the import entirely, and the gate counts it out.
+const dumaCard = cards.filter({ hasText: "Duma key" });
+const beforeReady = await page
+  .getByRole("button", { name: /import (\d+) ready rows?/i })
+  .textContent()
+  .then((t) => Number(t.match(/import (\d+) ready/i)?.[1] ?? 0));
+await dumaCard.getByRole("button", { name: /don't import this row/i }).click();
+await page
+  .getByRole("button", { name: /import this row after all/i })
+  .first()
+  .waitFor({ timeout: 15000 });
+const afterReady = await page
+  .getByRole("button", { name: /import (\d+) ready rows?/i })
+  .textContent()
+  .then((t) => Number(t.match(/import (\d+) ready/i)?.[1] ?? 0));
+if (afterReady !== beforeReady - 1)
+  problems.push(
+    `exclusion did not recount: ${beforeReady} -> ${afterReady} (expected ${beforeReady - 1})`,
+  );
+console.log(`excluded: Duma key 2 (ready ${beforeReady} -> ${afterReady})`);
+
 // 5. Commit.
 await page.getByRole("button", { name: /import \d+ ready rows?/i }).click();
 await page
@@ -125,9 +172,9 @@ console.log(`unsorted after commit: ${committed.total}`);
 // commit refuses by design, so 10 entries land — the honest count for this
 // fixture. The sprint's "12 entries" reads every row committing; the fixture
 // deliberately includes rows that must not.
-if (committed.total !== 10)
+if (committed.total !== 9)
   problems.push(
-    `expected 10 unsorted entries (12 rows, 2 refused), saw ${committed.total}`,
+    `expected 9 unsorted entries (12 rows, 2 refused, 1 excluded), saw ${committed.total}`,
   );
 // A confirmed row carries the provider's own title (its payload re-stages the
 // item half), so El Hobbit may land as "The Hobbit" — match either.
@@ -162,6 +209,8 @@ const dome = committed.items.find(
 if (dome && Object.keys(dome.item.identifiers).length > 0) {
   problems.push("the discarded row carries an identifier it should not have");
 }
+const duma = committed.items.find((entry) => entry.item.title === "Duma key 2");
+if (duma) problems.push("the excluded row landed in the library");
 
 // 6. Enrichment backfill changes nothing on them (all fields already full).
 const backfill = await api("/api/enrichment/backfill", {

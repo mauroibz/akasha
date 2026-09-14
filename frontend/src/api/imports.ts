@@ -401,6 +401,49 @@ export function answerProposal(
   ).then((response) => responseJson<ImportPreview>(response));
 }
 
+/** Keep one row out of the commit entirely (the owner's 2026-09-14 decision:
+ * "none of these is the book" must not force a keep-as-typed row in). */
+export function excludeRow(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/exclude`,
+    { method: "POST" },
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
+/** Undo an exclusion. */
+export function includeRow(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/include`,
+    { method: "POST" },
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
+/** Edit a row's title/author and search it again — available on any row,
+ * because a bad query can also produce wrong proposals. */
+export function researchRow(
+  importerId: string,
+  batchId: string,
+  recordId: number,
+  query: { title?: string; author?: string },
+) {
+  return request(
+    `/api/import/${encodeURIComponent(importerId)}/batches/${encodeURIComponent(batchId)}/records/${recordId}/search`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(query),
+    },
+  ).then((response) => responseJson<ImportPreview>(response));
+}
+
 export function commitImport(
   importerId: string,
   batchId: string,
