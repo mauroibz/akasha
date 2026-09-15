@@ -1,7 +1,7 @@
 # Sprint 085 — List comforts
 
 **Sprint:** 085
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 43
 **Depends on:** 084
 **Owner:** Mauro

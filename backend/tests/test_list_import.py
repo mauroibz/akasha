@@ -87,18 +87,25 @@ def read_all(
     data: str,
     mapping: dict[str, int] | None = None,
     domain: str | None = "book",
+    options: dict[str, str] | None = None,
 ):
-    options: dict[str, str] | None = None
+    merged: dict[str, str] = dict(options or {})
     if mapping is not None:
-        options = {
-            "title_column": str(mapping["title"] + 1),
-            "author_column": str(mapping["author"] + 1),
-        }
+        merged.update(
+            {
+                "title_column": str(mapping["title"] + 1),
+                "author_column": str(mapping["author"] + 1),
+            }
+        )
     if domain is not None:
-        options = {**(options or {}), "targets": domain}
+        merged["targets"] = domain
     importer = ListImporter()
     return importer.read(
-        ImportSource(data=data.encode("utf-8"), filename="libros.csv", options=options),
+        ImportSource(
+            data=data.encode("utf-8"),
+            filename="libros.csv",
+            options=merged or None,
+        ),
         CONTEXT,
     )
 
@@ -1332,6 +1339,88 @@ class TestAnyDomain20260914:
         assert not blade.errors
         assert blade.source_fields["Año visto"] == "2024"
         assert all(record.item_type == "movie" for record in snapshot.records)
+
+    def test_no_creators_maps_title_only(self) -> None:
+        """The owner's 2026-09-15 ask: a checkbox opts the list out of the
+        creator column ("most queries work without them"). With no_creators
+        set, a two-column list maps the title only — no positional creator
+        fallback, no author in the record — and the search query carries no
+        creator."""
+        parsed = read_all(
+            "Título,Autor\r\nRayuela,Julio Cortázar\r\nEl Hobbit,Tolkien",
+            domain="book",
+            options={"no_creators": "true"},
+        )
+        assert len(parsed.records) == 2
+        assert parsed.records[0].item.title == "Rayuela"
+        assert parsed.records[0].item.metadata.get("creators") is None
+        assert parsed.records[1].item.title == "El Hobbit"
+        assert parsed.records[1].item.metadata.get("creators") is None
+
+    def test_no_creators_beats_an_explicit_author_column(self) -> None:
+        """The checkbox is the owner's final answer about the creator column;
+        an author_column number beside it is a contradiction, so the reader
+        refuses rather than silently preferring one."""
+        try:
+            read_all(
+                "Título,Autor\r\nRayuela,Julio Cortázar",
+                domain="book",
+                options={"no_creators": "true", "author_column": "1"},
+            )
+        except Exception as error:  # ListCSVError
+            assert "creator" in str(error).lower() or "author" in str(error).lower()
+        else:
+            raise AssertionError("expected a refusal for no_creators + author_column")
+
+    def test_no_creators_off_keeps_v2_2_0_behavior(self) -> None:
+        """Unchecked is byte-for-byte today: the second column is the creator."""
+        parsed = read_all(
+            "Título,Autor\r\nRayuela,Julio Cortázar",
+            domain="book",
+        )
+        assert parsed.records[0].item.metadata.get("creators") == ["Julio Cortázar"]
+
+    def test_no_creators_on_a_single_column_list(self) -> None:
+        """A one-column list with the checkbox set is the film/series shape on
+        any domain — valid, title only."""
+        parsed = read_all("Título\r\nBlade Runner", domain="book", options={"no_creators": "true"})
+        assert parsed.records[0].item.title == "Blade Runner"
+
+    @pytest.fixture
+    def anyio_backend(self) -> str:
+        return "asyncio"
+
+    @pytest.mark.anyio
+    async def test_no_creators_rides_the_upload_route(self, tmp_path) -> None:
+        """The checkbox reaches the reader through the same options channel the
+        column mapping rides: a declared flag on the input spec, forwarded by
+        the route (never an undeclared form name)."""
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            response = await client.post(
+                "/api/import/list/preview",
+                files={
+                    "file": (
+                        "libros.csv",
+                        "Título,Autor\r\nRayuela,Julio Cortázar".encode(),
+                        "text/csv",
+                    )
+                },
+                data={"targets": "book", "no_creators": "true"},
+            )
+            assert response.status_code == 201
+            body = response.json()
+            record = body["records"][0]
+            assert record["item"]["title"] == "Rayuela"
+            assert record["item"]["metadata"].get("creators") is None
 
     def test_book_autodetection_is_unchanged(self) -> None:
         """The v2.1.0 regression contract: books keep their word lists and

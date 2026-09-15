@@ -154,6 +154,21 @@ def sniff_mapping(
     return headers, mapping
 
 
+def _flag(options: Mapping[str, Any] | None, key: str) -> bool:
+    """A checkbox's form value: any of the truthy spellings a form can send."""
+    raw = (options or {}).get(key)
+    return isinstance(raw, str) and raw.strip().lower() in {"true", "1", "on", "yes"}
+
+
+def _title_index(headers: Sequence[str], title_words: Sequence[str], width: int) -> int:
+    """The title column by header word, else the first column."""
+    folded = tuple(_fold(word) for word in title_words)
+    for index, header in enumerate(headers):
+        if _fold(header) in folded:
+            return index
+    return 0
+
+
 def _mapping_from_options(
     options: Mapping[str, Any] | None, width: int, requires_creator: bool
 ) -> dict[str, int] | None:
@@ -252,6 +267,10 @@ class ListImporter:
         # A list row has no identity to route it: the library is picked once
         # for the whole batch, before the file can even be interpreted.
         single_domain_pick=True,
+        # The owner's 2026-09-15 ask: the creator column is optional. A flag,
+        # not a field — it is a boolean the reader honors, not a number the
+        # screen maps.
+        flags=("no_creators",),
         # Written for a person who typed this file themselves: there is no
         # platform to re-export from, so every step is about the file they hold.
         guide=(
@@ -301,7 +320,20 @@ class ListImporter:
             raise ListCSVError("invalid_csv", "The file holds no rows")
         headers = [cell.strip() for cell in rows[0]]
         width = max(len(row) for row in rows)
-        if width < 2 and columns.requires_creator:
+        # The owner's 2026-09-15 ask: the creator column is optional by
+        # checkbox ("most queries work without them, and for series is hard
+        # to define or know"). Checked, the list is title-only on any domain —
+        # the same rule a domain with no creator words already follows — so
+        # the two-column minimum for creator-expecting domains lifts too.
+        no_creators = _flag(source.options, "no_creators")
+        if no_creators and "author_column" in (source.options or {}):
+            raise ListCSVError(
+                "invalid_column_mapping",
+                "The list is set to read no creators, so an author column "
+                "cannot also be chosen; clear one of the two",
+                {"key": "author_column"},
+            )
+        if width < 2 and columns.requires_creator and not no_creators:
             raise ListCSVError(
                 "missing_columns",
                 "The file needs at least two columns",
@@ -313,8 +345,13 @@ class ListImporter:
                 "The file needs at least a title column",
                 {"columns": width},
             )
-        explicit = _mapping_from_options(source.options, width, columns.requires_creator)
-        if explicit is not None:
+        explicit = _mapping_from_options(
+            source.options, width, columns.requires_creator and not no_creators
+        )
+        if no_creators:
+            # Title only — never the positional creator fallback.
+            mapping = {"title": _title_index(headers, columns.title_headers, width)}
+        elif explicit is not None:
             mapping = explicit
         else:
             _, mapping = sniff_mapping(

@@ -121,6 +121,9 @@ class ImportInputResponse(BaseModel):
     #: Whether the connector's target is a single-pick library choice made
     #: before the source can be interpreted (Sprint 084's list connector).
     single_domain_pick: bool = False
+    #: Boolean options this connector's reader reads, forwarded from the same
+    #: upload request (Sprint 085's list: the creators column is optional).
+    flags: list[str] = Field(default_factory=list)
     #: Other ways into the same connector, each rendered beneath the primary. One deep.
     alternates: "list[ImportInputResponse]" = Field(default_factory=list)
 
@@ -389,6 +392,15 @@ async def _source(
             for name in spec.fields
             if isinstance(value := form.get(name), str) and value.strip()
         }
+        # Declared boolean options ride the same channel; a flag's value is
+        # whatever truthy spelling the form sent (the reader folds it).
+        options.update(
+            {
+                name: value
+                for name in getattr(spec, "flags", ())
+                if isinstance(value := form.get(name), str) and value.strip()
+            }
+        )
         # The target libraries are an option the reader may need before it can
         # interpret its source: the list reader takes its column vocabulary
         # from the chosen domain (Sprint 084), so the choice must reach `read`

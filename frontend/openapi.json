@@ -1453,6 +1453,13 @@
             "title": "Fields",
             "type": "array"
           },
+          "flags": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Flags",
+            "type": "array"
+          },
           "guide": {
             "items": {
               "type": "string"

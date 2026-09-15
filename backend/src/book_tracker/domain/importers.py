@@ -112,6 +112,12 @@ class ImportInputSpec:
     #: rows carry their own type (a multi-domain export) keeps the
     #: tick-many checkboxes.
     single_domain_pick: bool = False
+    #: Boolean options this connector's reader reads, declared so the route
+    #: can forward them without guessing at an API (the same rule `fields`
+    #: follows — an undeclared name is the client guessing). A flag rides the
+    #: same options channel a column mapping does; the reader decides what it
+    #: means. Empty for every connector that reads no booleans.
+    flags: tuple[str, ...] = ()
 
 
 def valid_member_pattern(pattern: str) -> bool:
