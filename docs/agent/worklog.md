@@ -5867,3 +5867,40 @@ flag now opts the row out of the requirement.
 surfaces and notes are already bumped and committed; then the plan stands
 complete at 85/85 again. Owner-side: rebuild the dev container whenever
 wanted.
+
+---
+
+## 2026-09-15 (final) — The owner's refinement batch (hotfix session, DEC-163)
+
+**Done.** Four refinements on the just-shipped v2.2.1, the DEC-159 hotfix shape
+(no sprint claim, full gate owed): (1) the importer tabs stack two lines — the
+connector's name the anchor, the library tag beneath it; (2) the no-creators
+checkbox moved into the column-mapping fieldset it governs, a real group with
+its own accessible name; (3) a separator selector (Auto/comma/semicolon/tab)
+as a declared `delimiter` field — the reader takes the pick over sniffing,
+refuses an unknown one by name, and composes the fingerprint; (4) a one-line
+sample row beneath the mapping splits the first data row on the chosen (or
+sniffed) separator with the mapping applied — display-only, the preview
+remains the truth (the owner's "if too hard, skip" clause did not apply).
+Plus the owner's CI ask: the one documented flake class (the heavy-library
+crossfade probes) is now named, budgeted and bounded (DEC-163) — test.slow(),
+30 s assertion budgets, a project-scoped retry policy, no DEC-023 bound
+loosened.
+
+**Verified and how.** Backend 1605; Vitest 339; make check green (OpenAPI
+regenerated for the declared field); Playwright 145+2 skipped on the full
+parallel run; live walkthrough CLEAN on a fresh data dir against real
+providers — the two-line tab measured (label@249 badge@251), the checkbox
+inside the mapping group, the sample row splitting live on the picked
+separator, and a semicolon batch previewing end to end. Two lint nits fixed
+en route (a duplicate fixture, ruff formatting).
+
+**Deviations.** The badge placement decision the owner left open resolved to
+below, not above: in a horizontal strip the name is the anchor the eye scans
+for, so the tag reading beneath it keeps the scan line clean; measured in the
+walkthrough output. The sample row is client-side and deliberately cheap —
+it is a peek, not a promise; the preview stays the authority.
+
+**Next.** Push and watch CI — the first run under the DEC-163 policy. The
+owner's dev container rebuild is the delivery vehicle for validation
+(the two-file compose form).
