@@ -135,8 +135,16 @@ def sniff_mapping(
     )
     mapping: dict[str, int] = {}
     mapping["title"] = title_index if title_index is not None else 0
-    if len(headers) >= 2:
-        mapping["author"] = author_index if author_index is not None else 1
+    if author_index is not None:
+        mapping["author"] = author_index
+    elif creator_words and len(headers) >= 2:
+        # The domain expects a creator column and no header matched: the
+        # second column is the honest default for a plain two-column list.
+        mapping["author"] = 1
+    # else: a domain that declares no creator words reads no creator column
+    # — its lists are often one column wide, and grabbing the second column
+    # (a year, a format) as the creator would import a confident wrong fact
+    # (Sprint 084: the film fixture's `Año visto` must ride in source_fields).
     if len(headers) >= 2 and title_index is None and author_index == 0:
         # A single creator header that matched column 0: title falls back to
         # the first column too, which would make title and creator the same

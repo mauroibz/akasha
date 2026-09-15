@@ -34,8 +34,20 @@ from book_tracker.domain.list import (
     sniff_mapping,
 )
 from book_tracker.domain.matching import MatchDecision, MatchKind
+from book_tracker.domain.registry import DOMAINS
 
 CONTEXT = ImportReadContext(path_root=Path("/tmp"))
+
+
+def book_words() -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """The book domain's declared list vocabulary, for the auto-detect tests
+    that read it the way the reader does."""
+    columns = DOMAINS["book"].list_columns
+    assert columns is not None
+    return columns.title_headers, columns.creator_headers
+
+
+BOOK_TITLES, BOOK_CREATORS = book_words()
 
 
 def csv_source(data: str, filename: str = "libros.csv", domain: str = "book") -> ImportSource:
@@ -108,21 +120,37 @@ class TestDelimiterSniffing:
 
 class TestAutoDetection:
     def test_the_owners_headers_map_by_name_including_the_trailing_space(self) -> None:
-        header, mapping = sniff_mapping(["Título del libro", "Autor", "Editorial ", "Idioma"])
+        header, mapping = sniff_mapping(
+            ["Título del libro", "Autor", "Editorial ", "Idioma"],
+            title_words=BOOK_TITLES,
+            creator_words=BOOK_CREATORS,
+        )
         assert mapping == {"title": 0, "author": 1}
 
     def test_english_headers_map_too(self) -> None:
-        _, mapping = sniff_mapping(["Book name", "Author", "Publisher"])
+        _, mapping = sniff_mapping(
+            ["Book name", "Author", "Publisher"],
+            title_words=BOOK_TITLES,
+            creator_words=BOOK_CREATORS,
+        )
         assert mapping == {"title": 0, "author": 1}
 
     def test_unknown_headers_fall_back_to_the_first_two_columns(self) -> None:
-        _, mapping = sniff_mapping(["Cosa", "Otra cosa", "Tercera"])
+        _, mapping = sniff_mapping(
+            ["Cosa", "Otra cosa", "Tercera"],
+            title_words=BOOK_TITLES,
+            creator_words=BOOK_CREATORS,
+        )
         assert mapping == {"title": 0, "author": 1}
 
     def test_author_only_is_not_a_title(self) -> None:
         # A header that matches author but nothing matching title: title falls
         # back to the first column, author takes the matched one.
-        _, mapping = sniff_mapping(["Nombre", "Autor"])
+        _, mapping = sniff_mapping(
+            ["Nombre", "Autor"],
+            title_words=BOOK_TITLES,
+            creator_words=BOOK_CREATORS,
+        )
         assert mapping == {"title": 0, "author": 1}
 
 
@@ -1129,6 +1157,42 @@ class TestAnyDomain20260914:
         # complaint — the reader cannot even interpret the file's shape
         # without knowing whose vocabulary to read it with.
         assert refused.value.code == "invalid_import_target"
+
+    def test_the_album_fixture_reads_honestly(self) -> None:
+        """A real-shaped Spanish album list: Álbum/Artista headers auto-map
+        (the album domain's words), the unmapped columns ride verbatim, and
+        every row carries item_type album."""
+        data = Path("tests/fixtures/imports/list_albums_es.csv").read_bytes()
+        snapshot = ListImporter().read(
+            ImportSource(data=data, filename="list_albums_es.csv", options={"targets": "album"}),
+            CONTEXT,
+        )
+        assert len(snapshot.records) == 4
+        by_title = records_by_title(snapshot)
+        kind = by_title["Kind of Blue"]
+        assert kind.item.metadata["creators"] == ["Miles Davis"]
+        assert kind.item_type == "album"
+        assert not kind.errors
+        assert kind.source_fields["Formato"] == "Vinilo"
+        assert all(record.item_type == "album" for record in snapshot.records)
+
+    def test_the_film_fixture_reads_one_column_honestly(self) -> None:
+        """A real-shaped Spanish film list: the Película header auto-maps (the
+        movie domain's words), there is no creator column and that is valid,
+        and the unmapped columns ride verbatim."""
+        data = Path("tests/fixtures/imports/list_films_es.csv").read_bytes()
+        snapshot = ListImporter().read(
+            ImportSource(data=data, filename="list_films_es.csv", options={"targets": "movie"}),
+            CONTEXT,
+        )
+        assert len(snapshot.records) == 4
+        by_title = records_by_title(snapshot)
+        blade = by_title["Blade Runner"]
+        assert blade.item.metadata == {}  # no creators: an empty fact
+        assert blade.item_type == "movie"
+        assert not blade.errors
+        assert blade.source_fields["Año visto"] == "2024"
+        assert all(record.item_type == "movie" for record in snapshot.records)
 
     def test_book_autodetection_is_unchanged(self) -> None:
         """The v2.1.0 regression contract: books keep their word lists and

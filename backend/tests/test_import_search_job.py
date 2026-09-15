@@ -113,7 +113,7 @@ def stage_preview(engine, rows: list[dict[str, Any]], *, batch_id: str = "b1") -
                 },
                 "shelves": [],
                 "source_fields": {},
-                "item_type": None,
+                "item_type": row.get("item_type"),
                 "cover_stage": None,
                 "errors": row.get("errors", []),
                 "planned_action": row.get("planned_action", "create_item"),
@@ -692,3 +692,41 @@ class TestRecordedFixtureReplay:
         assert [p["payload"]["title"] for p in proposals] == [
             candidate.title for candidate in interactive[: len(proposals)]
         ]
+
+    @pytest.mark.anyio
+    async def test_an_album_row_produces_real_proposals_from_the_recording(
+        self, tmp_path: Path
+    ) -> None:
+        """Sprint 084 AC2/AC5: the pipeline is domain-blind, proven against a
+        recorded MusicBrainz album search — a non-book row's proposals come
+        from its own domain's provider, carrying the recorded response's own
+        data (DEC-025's rule extended past books)."""
+        from recordings import recording, replay
+
+        from book_tracker.domains.album.providers import MusicBrainzProvider
+        from book_tracker.infrastructure.providers import create_provider_client
+
+        engine = make_engine(tmp_path)
+        stage_preview(
+            engine,
+            [{"title": "Kind of Blue", "author": "Miles Davis", "item_type": "album"}],
+        )
+        transport = replay(
+            {"/ws/2/release-group": (200, recording("musicbrainz_search_kind_of_blue.json"))}
+        )
+        async with create_provider_client(transport=transport) as provider_client:
+            provider = MusicBrainzProvider(provider_client, "test@example.invalid")
+            jobs = JobRepository(engine)
+            job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
+            handler = make_handler(engine, [provider])
+            result = await handler.process(job_id, NOW)
+
+        assert result["state"] == "succeeded"
+        proposals = ImportRepository(engine, 1).proposals_for_batch("b1")
+        assert proposals, "the recorded album search produced proposals"
+        first = proposals[0]
+        # The recorded response's own answer: the intended release group scores
+        # 100 (the README's own note about this fixture), proposed as rank 0.
+        assert first["payload"]["title"] == "Kind of Blue"
+        assert "Miles Davis" in (first["payload"]["creators"] or [])
+        assert first["source"] == "musicbrainz"
