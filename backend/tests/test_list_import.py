@@ -527,7 +527,11 @@ class TestRoutes:
         ):
             catalog = await client.get("/api/importers")
         listed = {row["id"]: row for row in catalog.json()}
-        assert listed["list"]["input"]["fields"] == ["title_column", "author_column"]
+        assert listed["list"]["input"]["fields"] == [
+            "title_column",
+            "author_column",
+            "delimiter",
+        ]
         # Every other connector declares none, and the absent key stays absent
         # in behaviour rather than arriving as an empty patch to the screen.
         assert listed["goodreads"]["input"]["fields"] == []
@@ -1340,6 +1344,42 @@ class TestAnyDomain20260914:
         assert blade.source_fields["Año visto"] == "2024"
         assert all(record.item_type == "movie" for record in snapshot.records)
 
+    def test_an_explicit_delimiter_overrides_sniffing(self) -> None:
+        """The owner's 2026-09-15 ask: a chosen separator is the final word.
+        A semicolon file whose titles hold commas reads as semicolons when
+        the screen says so — sniffing is the default, not the authority."""
+        parsed = read_all(
+            "Título;Autor\r\nRayuela;Julio Cortázar",
+            domain="book",
+            options={"delimiter": ";"},
+        )
+        assert parsed.records[0].item.title == "Rayuela"
+        assert parsed.records[0].item.metadata.get("creators") == ["Julio Cortázar"]
+
+    def test_an_explicit_delimiter_composes_the_fingerprint(self) -> None:
+        """The same file read with two separators is two imports, never a
+        stale replay of each other (the mapping's rule, applied to the
+        separator)."""
+        first = read_all("Título;Autor\r\nRayuela;Julio Cortázar", domain="book")
+        second = read_all(
+            "Título;Autor\r\nRayuela;Julio Cortázar",
+            domain="book",
+            options={"delimiter": ";"},
+        )
+        assert first.fingerprint != second.fingerprint
+
+    def test_an_unknown_delimiter_is_refused_by_name(self) -> None:
+        """Only the three the reader knows; anything else names the thing
+        to fix rather than guessing (the connector's own error rule)."""
+        try:
+            read_all("T,A\r\nX,Y", domain="book", options={"delimiter": "|"})
+        except Exception as error:
+            # The refusal names the thing to fix (the connector's own error
+            # rule) — a `|` is not a separator the reader knows.
+            assert "separator" in str(error).lower()
+        else:
+            raise AssertionError("expected a refusal for an unknown delimiter")
+
     def test_no_creators_row_has_no_missing_author_error(self) -> None:
         """The flag opts the row out of the creator requirement too: the
         record carries no `author missing` error (the rule a no-creator-words
@@ -1398,6 +1438,39 @@ class TestAnyDomain20260914:
         any domain — valid, title only."""
         parsed = read_all("Título\r\nBlade Runner", domain="book", options={"no_creators": "true"})
         assert parsed.records[0].item.title == "Blade Runner"
+
+    @pytest.fixture
+    def anyio_backend(self) -> str:
+        return "asyncio"
+
+    @pytest.mark.anyio
+    async def test_a_declared_delimiter_rides_the_upload_route(self, tmp_path) -> None:
+        """A semicolon list read as semicolons because the owner said so."""
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            response = await client.post(
+                "/api/import/list/preview",
+                files={
+                    "file": (
+                        "libros.csv",
+                        "Título;Autor\r\nRayuela;Julio Cortázar".encode("utf-8"),
+                        "text/csv",
+                    )
+                },
+                data={"targets": "book", "delimiter": ";"},
+            )
+            assert response.status_code == 201
+            record = response.json()["records"][0]
+            assert record["item"]["title"] == "Rayuela"
+            assert record["item"]["metadata"].get("creators") == ["Julio Cortázar"]
 
     @pytest.fixture
     def anyio_backend(self) -> str:

@@ -1728,7 +1728,11 @@ def test_a_connector_may_declare_upload_fields() -> None:
         assert all(name.isidentifier() for name in spec.fields), (
             f"{importer.name} declares a field name a form cannot carry"
         )
-    assert IMPORTERS["list"].input.fields == ("title_column", "author_column")
+    assert IMPORTERS["list"].input.fields == (
+        "title_column",
+        "author_column",
+        "delimiter",
+    )
     assert all(
         importer.input.fields == () for importer in REGISTERED_IMPORTERS if importer.name != "list"
     )

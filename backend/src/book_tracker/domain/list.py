@@ -154,6 +154,25 @@ def sniff_mapping(
     return headers, mapping
 
 
+#: The separators a person's spreadsheet actually uses. Everything else is
+#: a refusal that names the thing to fix, not a guess.
+KNOWN_DELIMITERS = {",", ";", "\t"}
+
+
+def _declared_delimiter(options: Mapping[str, Any] | None) -> str | None:
+    """The separator the owner picked, validated against the known three."""
+    raw = (options or {}).get("delimiter")
+    if raw is None or (isinstance(raw, str) and not raw.strip()):
+        return None
+    if isinstance(raw, str) and raw.strip() in KNOWN_DELIMITERS:
+        return raw.strip()
+    raise ListCSVError(
+        "invalid_delimiter",
+        "The separator must be a comma, a semicolon or a tab",
+        {"value": raw if isinstance(raw, str) else type(raw).__name__},
+    )
+
+
 def _flag(options: Mapping[str, Any] | None, key: str) -> bool:
     """A checkbox's form value: any of the truthy spellings a form can send."""
     raw = (options or {}).get(key)
@@ -263,7 +282,11 @@ class ListImporter:
         # The two columns are a choice the reader makes, published to the
         # screen through the catalog so the mapping UI renders from a
         # declaration.
-        fields=("title_column", "author_column"),
+        # `delimiter` declares the separator pick (2026-09-15 ask) beside
+        # the column numbers: the route forwards exactly the declared names,
+        # and the screen renders each by its own name the way it already
+        # renders the column labels.
+        fields=("title_column", "author_column", "delimiter"),
         # A list row has no identity to route it: the library is picked once
         # for the whole batch, before the file can even be interpreted.
         single_domain_pick=True,
@@ -309,7 +332,10 @@ class ListImporter:
             text = source.data.decode("utf-8-sig")
         except UnicodeDecodeError as error:
             raise ListCSVError("invalid_csv", "The file must be UTF-8 text") from error
-        delimiter = detect_delimiter(text)
+        # The owner's chosen separator is the final word (2026-09-15 ask):
+        # sniffing is the default, never the authority over an explicit pick.
+        declared_delimiter = _declared_delimiter(source.options)
+        delimiter = declared_delimiter or detect_delimiter(text)
         try:
             reader = csv.reader(io.StringIO(text, newline=""), delimiter=delimiter)
             rows = list(reader)
@@ -397,6 +423,11 @@ class ListImporter:
             # file read with and without its creators is two imports, and a
             # re-preview of the other one must never replay this one's batch.
             fingerprint = f"{fingerprint}#nocreator"
+        if declared_delimiter is not None:
+            # A chosen separator is part of the identity for the same reason
+            # (the owner's 2026-09-15 ask): the same bytes read with two
+            # separators are two imports.
+            fingerprint = f"{fingerprint}#d={declared_delimiter!r}"
         return ImportSnapshot(
             fingerprint=fingerprint,
             filename=source.filename or "list.csv",
