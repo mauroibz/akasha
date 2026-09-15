@@ -568,8 +568,11 @@ generalization of 2026-09-14):
    empty result — and the row then carries the edited text with fresh
    proposals.
 5. After commit, the rows land in Triage as `unsorted` like every import, with
-   the confirmed ones carrying provider metadata and covers from the
-   enrichment path.
+   the confirmed ones carrying provider metadata and the cover the owner saw
+   on the confirmed card — fetched and staged at confirm, installed by the
+   commit's own cover channel (the identifier-keyed enrichment backfill may
+   still fill more later, but a row whose provider offers no identifier — a
+   MusicBrainz release-group — gets its cover this way, not by luck).
 
 Nothing in this flow resolves a match by itself: the connector's own match is
 always "new", because a source with no identity should not guess. The provider's

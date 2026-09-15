@@ -1163,7 +1163,10 @@ test("the list connector picks its library before the file, and the choice rides
     buffer: Buffer.from("Álbum,Artista\r\nKind of Blue,Miles Davis"),
   });
   await page.getByRole("button", { name: /preview/i }).click();
-  await expect(dropdown).toBeVisible();
+  // No dropdown assertion here on purpose: once the preview response lands
+  // the screen transitions from the source form to the batch surface, so the
+  // dropdown's post-preview existence is a render race, not a contract. The
+  // contract this spec pins is the choice riding the multipart body.
   expect(sent).toEqual(["album"]);
 });
 

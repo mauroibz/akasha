@@ -12,7 +12,10 @@ import { readFileSync } from "node:fs";
 const BASE = "http://127.0.0.1:5175";
 const API = "http://127.0.0.1:8002";
 const CSV = readFileSync(
-  new URL("../../backend/tests/fixtures/imports/list_albums_es.csv", import.meta.url),
+  new URL(
+    "../../backend/tests/fixtures/imports/list_albums_es.csv",
+    import.meta.url,
+  ),
 );
 
 const problems = [];
@@ -43,7 +46,9 @@ await page
 // The mapping labels speak the album domain's own words.
 await page.getByText(/artists is column/i).waitFor({ timeout: 10000 });
 
-const chooser = page.getByRole("button", { name: /your list \(csv or text\)/i });
+const chooser = page.getByRole("button", {
+  name: /your list \(csv or text\)/i,
+});
 await chooser.setInputFiles({
   name: "list_albums_es.csv",
   mimeType: "text/csv",
@@ -69,11 +74,16 @@ console.log("search drained; commit gate open");
 const cards = page.getByRole("article");
 console.log(`rows rendered: ${await cards.count()}`);
 const kindCard = cards.filter({ hasText: "Kind of Blue" });
-const confirmCount = await kindCard.getByRole("button", { name: /^confirm$/i }).count();
+const confirmCount = await kindCard
+  .getByRole("button", { name: /^confirm$/i })
+  .count();
 if (confirmCount === 0) {
   problems.push("Kind of Blue has no Confirm control — no proposals?");
 } else {
-  await kindCard.getByRole("button", { name: /^confirm$/i }).first().click();
+  await kindCard
+    .getByRole("button", { name: /^confirm$/i })
+    .first()
+    .click();
   await page.getByText("Confirmed").first().waitFor({ timeout: 15000 });
   console.log("confirmed: Kind of Blue (MusicBrainz payload)");
 }
@@ -84,15 +94,21 @@ await page
   .getByText("Import complete:", { exact: false })
   .first()
   .waitFor({ timeout: 60000 });
-const committed = await api("/api/entries?status=unsorted&limit=200&type=album");
+const committed = await api(
+  "/api/entries?status=unsorted&limit=200&type=album",
+);
 console.log(`album unsorted after commit: ${committed.total}`);
 if (committed.total !== 4)
   problems.push(`expected 4 album entries, saw ${committed.total}`);
 for (const entry of committed.items) {
   if (entry.item.type !== "album")
-    problems.push(`${entry.item.title} landed as ${entry.item.type}, not album`);
+    problems.push(
+      `${entry.item.title} landed as ${entry.item.type}, not album`,
+    );
 }
-const kind = committed.items.find((entry) => entry.item.title === "Kind of Blue");
+const kind = committed.items.find(
+  (entry) => entry.item.title === "Kind of Blue",
+);
 if (kind) {
   const detail = await api(`/api/entries/${kind.id}`);
   console.log(
@@ -116,9 +132,7 @@ if (kind) {
 const undo = await page
   .getByRole("button", { name: /undo this import/i })
   .click()
-  .then(() =>
-    page.getByRole("button", { name: /confirm undo/i }).click(),
-  )
+  .then(() => page.getByRole("button", { name: /confirm undo/i }).click())
   .then(() =>
     page
       .getByRole("heading", { name: /import undone/i })
