@@ -60,6 +60,10 @@ export default tseslint.config(
   },
   {
     files: ["scripts/**/*.mjs", "*.config.{js,ts}"],
-    languageOptions: { globals: globals.node },
+    // Node at the top level, plus the browser surface page.evaluate
+    // callbacks run in (the walkthroughs probe the live DOM).
+    languageOptions: {
+      globals: { ...globals.node, ...globals.browser },
+    },
   },
 );
