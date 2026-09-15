@@ -136,6 +136,78 @@ await page
   .waitFor({ timeout: 300_000 });
 console.log("editor-correction batch: drained");
 
+// ---- The 2026-09-15 refinement batch ----
+// 1. The badge reads BELOW the importer's name.
+const badgeProbe = await page.evaluate(() => {
+  const strip = document.querySelector(
+    '[role="tablist"][aria-label="Import source"]',
+  );
+  const trigger = strip?.querySelector('[role="tab"]') ?? null;
+  if (!trigger) return null;
+  const label = trigger.querySelector("span.block");
+  const badge = trigger.querySelector("span.inline-flex");
+  if (!label || !badge) return { missing: true };
+  return {
+    labelTop: label.getBoundingClientRect().top,
+    badgeTop: badge.getBoundingClientRect().top,
+    badgeText: badge.textContent?.trim() ?? "",
+  };
+});
+if (!badgeProbe || badgeProbe.missing)
+  problems.push("the two-line tab (label above badge) did not render");
+else {
+  console.log(
+    `tab: label@${Math.round(badgeProbe.labelTop)} badge@${Math.round(badgeProbe.badgeTop)} "${badgeProbe.badgeText}"`,
+  );
+  if (badgeProbe.badgeTop < badgeProbe.labelTop)
+    problems.push("the badge reads above the name, not below");
+}
+
+// 2-4. The mapping group: checkbox inside it, separator select, sample row.
+await page.goto(`${BASE}/import`);
+const mapping = page.getByRole("group", { name: /column mapping/i });
+await mapping.waitFor({ timeout: 10_000 });
+const checkboxInGroup = await mapping
+  .getByRole("checkbox", { name: /no creators column/i })
+  .count();
+if (checkboxInGroup !== 1)
+  problems.push(`the checkbox is not in the mapping group (${checkboxInGroup})`);
+
+const separator = mapping.getByRole("combobox", { name: /separator/i });
+if ((await separator.count()) !== 1)
+  problems.push("the separator select is missing from the mapping group");
+
+// A typed semicolon row + the separator pick: the sample updates live.
+await page
+  .getByRole("textbox", { name: /or type your list here/i })
+  .fill("Título;Autor\r\nRayuela;Julio Cortázar");
+await separator.selectOption(";");
+const sample = await mapping
+  .getByText(/Sample:/i)
+  .textContent()
+  .catch(() => null);
+console.log(`sample row: ${JSON.stringify(sample)}`);
+if (!sample || !sample.includes("Rayuela | Julio Cortázar"))
+  problems.push(`the sample row did not split on the chosen separator: ${sample}`);
+
+// The picked separator rides the preview: a semicolon list reads correctly.
+await page.getByRole("button", { name: /preview/i }).click();
+await page
+  .getByText(/searching for matches|preview/i)
+  .first()
+  .waitFor({ timeout: 30_000 });
+const committedFilms = await api("/api/entries?status=unsorted&limit=200");
+const rayuela2 = committedFilms.items.find(
+  (entry) => entry.item.title === "Rayuela",
+);
+if (!rayuela2) problems.push("the semicolon batch's Rayuela row did not preview");
+else {
+  const detail = await api(`/api/entries/${rayuela2.id}`);
+  console.log(
+    `semicolon batch Rayuela: title=${JSON.stringify(detail.item.title)} creators=${JSON.stringify(detail.item.metadata?.creators ?? [])}`,
+  );
+}
+
 console.log(
   problems.length ? `PROBLEMS:\n${problems.join("\n")}` : "WALKTHROUGH CLEAN",
 );
