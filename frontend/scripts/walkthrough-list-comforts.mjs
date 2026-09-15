@@ -171,7 +171,9 @@ const checkboxInGroup = await mapping
   .getByRole("checkbox", { name: /no creators column/i })
   .count();
 if (checkboxInGroup !== 1)
-  problems.push(`the checkbox is not in the mapping group (${checkboxInGroup})`);
+  problems.push(
+    `the checkbox is not in the mapping group (${checkboxInGroup})`,
+  );
 
 const separator = mapping.getByRole("combobox", { name: /separator/i });
 if ((await separator.count()) !== 1)
@@ -188,7 +190,9 @@ const sample = await mapping
   .catch(() => null);
 console.log(`sample row: ${JSON.stringify(sample)}`);
 if (!sample || !sample.includes("Rayuela | Julio Cortázar"))
-  problems.push(`the sample row did not split on the chosen separator: ${sample}`);
+  problems.push(
+    `the sample row did not split on the chosen separator: ${sample}`,
+  );
 
 // The picked separator rides the preview: a semicolon list reads correctly.
 await page.getByRole("button", { name: /preview/i }).click();
@@ -200,7 +204,8 @@ const committedFilms = await api("/api/entries?status=unsorted&limit=200");
 const rayuela2 = committedFilms.items.find(
   (entry) => entry.item.title === "Rayuela",
 );
-if (!rayuela2) problems.push("the semicolon batch's Rayuela row did not preview");
+if (!rayuela2)
+  problems.push("the semicolon batch's Rayuela row did not preview");
 else {
   const detail = await api(`/api/entries/${rayuela2.id}`);
   console.log(
