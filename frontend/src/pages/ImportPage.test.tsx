@@ -1604,7 +1604,7 @@ describe("ImportPage", () => {
 const listImporter = {
   id: "list",
   label: "Custom list",
-  item_types: ["book"],
+  item_types: ["book", "album", "movie", "series", "anime"],
   attachment_max_bytes: 25 * 1024 * 1024,
   input: {
     kind: "upload",
@@ -1621,9 +1621,28 @@ const listImporter = {
     max_bytes: null,
     max_files: null,
     fields: ["title_column", "author_column"],
+    single_domain_pick: true,
     alternates: [],
   },
 };
+
+
+const listItemTypes = [
+  {
+    id: "book",
+    label: "Books",
+    fields: [
+      { name: "creators", label: "Author", type: "text", multiplicity: "many" },
+    ],
+  },
+  {
+    id: "album",
+    label: "Albums",
+    fields: [
+      { name: "creators", label: "Artist", type: "text", multiplicity: "many" },
+    ],
+  },
+];
 
 const listRecord = (overrides: Record<string, unknown> = {}) => ({
   record_id: 1,
@@ -1660,20 +1679,80 @@ const listRecord = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("the list connector's search-then-confirm surfaces", () => {
-  it("renders the declared column mapping inputs", async () => {
+  it("renders the declared column mapping inputs, in the picked library's words", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/importers")
         return new Response(JSON.stringify([listImporter]));
+      if (String(input).startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
       return new Response(JSON.stringify([]), { status: 404 });
     });
     renderImportPage();
     await screen.findByRole("tab", { name: /custom list/i });
     expect(await screen.findByLabelText(/title is column/i)).toBeVisible();
+    // The second column's name follows the picked library: books say Author.
     expect(await screen.findByLabelText(/author is column/i)).toBeVisible();
+    // Pick albums and the label becomes the album domain's own word.
+    const dropdown = screen.getByRole("combobox", {
+      name: /which library is this list for\?/i,
+    });
+    await userEvent.selectOptions(dropdown, "album");
+    expect(await screen.findByLabelText(/artist is column/i)).toBeVisible();
     // The honest default is stated, not hidden.
     expect(
       screen.getByText(/first two columns are the fallback/i),
     ).toBeVisible();
+  });
+
+  it("offers a single-pick library dropdown for a multi-domain list and sends the choice", async () => {
+    const bodies: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
+      if (url.endsWith("/api/import/list/preview")) {
+        const form = init?.body as FormData;
+        bodies.push(String(form.get("targets")));
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f#album",
+            state: "matching",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            search_progress: { searched: 0, total: 1, job_state: "running" },
+            records: [listRecord()],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    // The dropdown renders from the declaration (not checkboxes: a list row
+    // has no identity to route it, so the choice is made once for the batch).
+    const dropdown = await screen.findByRole("combobox", {
+      name: /which library is this list for\?/i,
+    });
+    expect(within(dropdown).getByRole("option", { name: /albums/i })).toBeInTheDocument();
+    expect(within(dropdown).getByRole("option", { name: /books/i })).toBeInTheDocument();
+
+    // The default is the first declared domain; choosing another sends it.
+    await userEvent.selectOptions(dropdown, "album");
+
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File(["Álbum,Artista\r\n"], "discos.csv", { type: "text/csv" }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+    expect(bodies).toEqual(["album"]);
   });
 
   it("shows no mapping inputs for a connector that declares none", async () => {

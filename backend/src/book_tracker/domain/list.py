@@ -249,6 +249,9 @@ class ListImporter:
         # screen through the catalog so the mapping UI renders from a
         # declaration.
         fields=("title_column", "author_column"),
+        # A list row has no identity to route it: the library is picked once
+        # for the whole batch, before the file can even be interpreted.
+        single_domain_pick=True,
         # Written for a person who typed this file themselves: there is no
         # platform to re-export from, so every step is about the file they hold.
         guide=(

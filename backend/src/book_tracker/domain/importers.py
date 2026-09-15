@@ -105,6 +105,13 @@ class ImportInputSpec:
     #: whose *interpretation* is a choice (which column of a hand-written list
     #: holds the title) is a connector declaration rather than a screen patch.
     fields: tuple[str, ...] = ()
+    #: Whether the connector's target must be picked as exactly one library
+    #: before the source can be interpreted (Sprint 084). A list row carries
+    #: no identity, so nothing downstream of the reader can route it — the
+    #: choice is the batch's, made once on the screen, while a connector whose
+    #: rows carry their own type (a multi-domain export) keeps the
+    #: tick-many checkboxes.
+    single_domain_pick: bool = False
 
 
 def valid_member_pattern(pattern: str) -> bool:

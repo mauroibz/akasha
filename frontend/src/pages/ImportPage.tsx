@@ -131,6 +131,23 @@ export function ImportPage() {
    * ticked and the only thing a single-domain connector can mean.
    */
   const [targets, setTargets] = useState<Record<string, string[]>>({});
+  // The single-pick library choice for connectors whose rows cannot route
+  // themselves (Sprint 084's list): one domain per batch, chosen before the
+  // file can be interpreted.
+  const [domainPicks, setDomainPicks] = useState<Record<string, string>>({});
+
+  /**
+   * What the picked library calls the second column of a list (Sprint 084):
+   * the domain's own creators word — Author for books, Artist for albums —
+   * falling back to the neutral "Creator" the way every label falls back
+   * when a domain has not said otherwise.
+   */
+  const creatorWordFor = (importer: ImporterDefinition) => {
+    const picked = domainPicks[importer.id] ?? importer.item_types[0];
+    const known = itemTypes.data?.find((type) => type.id === picked);
+    const creators = known?.fields.find((field) => field.name === "creators");
+    return creators?.label ?? "Creator";
+  };
   const [skipped, setSkipped] = useState<{
     held: number;
     reason: string | null;
@@ -288,6 +305,11 @@ export function ImportPage() {
   // actually true, since most visits need neither.
   const itemTypes = useItemTypes(
     importers.some((importer) => importer.item_types.length > 1) ||
+      // The list connector needs the domains' names and creators words for its
+      // dropdown and mapping labels (Sprint 084).
+      importers.some(
+        (importer) => importer.input.single_domain_pick === true,
+      ) ||
       (preview?.records.some((record) => record.errors.length > 0) ?? false),
   );
   // A record carries no domain of its own — only a connector that fills more
@@ -301,9 +323,17 @@ export function ImportPage() {
       ? itemTypes.data.find((type) => type.id === activeImporter.item_types[0])
       : undefined;
 
-  /** What this connector is currently set to bring in. Everything, by default. */
-  const chosenFor = (importer: ImporterDefinition) =>
-    targets[importer.id] ?? importer.item_types;
+  /**
+   * What this connector is currently set to bring in. Everything, by default —
+   * except a connector whose target is a single-pick library choice (Sprint
+   * 084's list): a list row carries no identity to route it, so the pick is
+   * the batch's, defaults to the first declared library, and is exactly one.
+   */
+  const chosenFor = (importer: ImporterDefinition) => {
+    if (importer.input.single_domain_pick)
+      return [domainPicks[importer.id] ?? importer.item_types[0]];
+    return targets[importer.id] ?? importer.item_types;
+  };
 
   /** The library's own name for a domain, falling back to its id (DEC-080). */
   const libraryLabel = (itemType: string) =>
@@ -318,6 +348,9 @@ export function ImportPage() {
    * and Calibre look exactly as they always did.
    */
   const renderTargets = (importer: ImporterDefinition) => {
+    // A single-pick connector chose its one library above the file input;
+    // tick-many checkboxes would promise a mixed batch the reader refuses.
+    if (importer.input.single_domain_pick) return null;
     if (importer.item_types.length < 2) return null;
     const chosen = chosenFor(importer);
     return (
@@ -475,6 +508,42 @@ export function ImportPage() {
     if (spec.kind === "upload")
       return (
         <div className="space-y-3">
+          {spec.single_domain_pick && importer.item_types.length > 1 && (
+            // The library choice comes before the file: the connector cannot
+            // interpret the list — which headers are titles, whether a second
+            // column is even required — until it knows whose vocabulary to
+            // read with (Sprint 084). Rendered from the declaration, not a
+            // branch on the connector's name.
+            <div>
+              <label htmlFor={`${importer.id}-domain`} className="block">
+                <span className="text-sm text-muted-foreground">
+                  Which library is this list for?
+                </span>
+                <select
+                  id={`${importer.id}-domain`}
+                  className="mt-1 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-base focus-ring"
+                  value={domainPicks[importer.id] ?? importer.item_types[0]}
+                  onChange={(event) =>
+                    setDomainPicks((current) => ({
+                      ...current,
+                      [importer.id]: event.target.value,
+                    }))
+                  }
+                >
+                  {importer.item_types.map((itemType) => {
+                    const known = itemTypes.data?.find(
+                      (type) => type.id === itemType,
+                    );
+                    return (
+                      <option key={itemType} value={itemType}>
+                        {known ? known.label : itemType}
+                      </option>
+                    );
+                  })}
+                </select>
+              </label>
+            </div>
+          )}
           <SourceDropZone
             importer={importer}
             inputId={inputId}
@@ -494,7 +563,7 @@ export function ImportPage() {
                     {name === "title_column"
                       ? "Title is column"
                       : name === "author_column"
-                        ? "Author is column"
+                        ? `${creatorWordFor(importer)} is column`
                         : name}
                   </span>
                   <Input

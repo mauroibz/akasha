@@ -118,6 +118,9 @@ class ImportInputResponse(BaseModel):
     #: name — the screen renders an input per entry, and the route forwards
     #: exactly these into the connector's options.
     fields: list[str] = Field(default_factory=list)
+    #: Whether the connector's target is a single-pick library choice made
+    #: before the source can be interpreted (Sprint 084's list connector).
+    single_domain_pick: bool = False
     #: Other ways into the same connector, each rendered beneath the primary. One deep.
     alternates: "list[ImportInputResponse]" = Field(default_factory=list)
 

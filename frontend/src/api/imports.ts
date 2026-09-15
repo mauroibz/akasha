@@ -94,6 +94,12 @@ export interface ImportInputSpec {
    * connector's title/author column mapping). Absent means none.
    */
   fields?: string[];
+  /**
+   * Whether the connector's target is a single-pick library choice made
+   * before the source can be interpreted (Sprint 084's list connector: a
+   * row carries no identity, so the library is the batch's choice).
+   */
+  single_domain_pick?: boolean;
   /** Other ways into the same connector, each rendered beneath the primary. One deep. */
   alternates: ImportInputSpec[];
 }

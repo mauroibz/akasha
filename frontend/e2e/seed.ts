@@ -328,7 +328,7 @@ export async function stubImporters(page: Page) {
         {
           id: "list",
           label: "Custom list",
-          item_types: ["book"],
+          item_types: ["book", "album", "movie", "series", "anime"],
           attachment_max_bytes: 25 * 1024 * 1024,
           input: {
             kind: "upload",
@@ -349,6 +349,9 @@ export async function stubImporters(page: Page) {
             // the screen renders the inputs from the declaration (DEC-080's
             // rule exercised by the catalog's newest shape).
             fields: ["title_column", "author_column"],
+            // Sprint 084: a list row carries no identity, so the library is a
+            // single-pick choice made before the file can be interpreted.
+            single_domain_pick: true,
             alternates: [],
           },
         },

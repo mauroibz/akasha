@@ -3,7 +3,14 @@ import { fileURLToPath } from "node:url";
 import { expect, test } from "./console";
 
 import { chooseOption } from "./radix";
-import { entry, stubExports, stubImporters } from "./seed";
+import {
+  albumItemType,
+  bookItemType,
+  entry,
+  stubExports,
+  stubImporters,
+  stubItemTypes,
+} from "./seed";
 
 const record = {
   record_id: 1,
@@ -968,6 +975,7 @@ test("the list connector searches, proposes, and takes the owner's answers befor
   let answered = false;
   let excluded = false;
   let commitBody: unknown;
+  await stubItemTypes(page, [bookItemType]);
   await page.route("**/api/import/list/preview", async (route) => {
     await route.fulfill({
       status: 201,
@@ -1042,9 +1050,11 @@ test("the list connector searches, proposes, and takes the owner's answers befor
 
   await page.goto("/import");
   await page.getByRole("tab", { name: /custom list/i }).click();
-  // The declared column mapping renders from the catalog's declaration.
+  // The declared column mapping renders from the catalog's declaration,
+  // in the picked library's own words (books call the second column
+  // Creators — the domain's field label, Sprint 084).
   await expect(page.getByLabel(/title is column/i)).toBeVisible();
-  await expect(page.getByLabel(/author is column/i)).toBeVisible();
+  await expect(page.getByLabel(/creators is column/i)).toBeVisible();
   // The drop-zone's label also names its guide list, so the file input is
   // reached by id rather than by label (the input is the drop zone's own).
   await page.locator("#list-source").setInputFiles({
@@ -1105,6 +1115,57 @@ test("the list connector searches, proposes, and takes the owner's answers befor
   await page.getByRole("button", { name: /import 1 ready row/i }).click();
   await expect(page.getByRole("status")).toContainText("1 entry added");
   expect(commitBody).toEqual({ batch_id: "list-1", choices: [] });
+});
+
+test("the list connector picks its library before the file, and the choice rides the preview (Sprint 084)", async ({
+  page,
+}) => {
+  const sent: string[] = [];
+  // The domain dropdown and the creators-word label read the domains' own
+  // published labels: books and albums, the way the real API serves them.
+  await stubItemTypes(page, [bookItemType, albumItemType]);
+  await page.route("**/api/import/list/preview", async (route) => {
+    const form = route.request().postDataJSON;
+    // Multipart: read the targets field off the request body
+    const body = route.request().postData() ?? "";
+    const match = body.match(/name="targets"\r\n\r\n([^\r]+)\r\n/);
+    sent.push(match ? match[1] : "(none)");
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "list-1",
+        fingerprint: "csv#album",
+        state: "previewed",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        records: [],
+      },
+    });
+  });
+
+  await page.goto("/import");
+  await page.getByRole("tab", { name: /custom list/i }).click();
+
+  // The dropdown renders from the declaration — one pick, not checkboxes.
+  const dropdown = page.getByRole("combobox", {
+    name: /which library is this list for\?/i,
+  });
+  await expect(dropdown).toBeVisible();
+  // The tick-many checkboxes are absent: the reader refuses a mixed batch.
+  await expect(page.getByRole("checkbox", { name: /albums?/i })).toHaveCount(0);
+
+  // Pick albums; the mapping label follows the album domain's own word.
+  await dropdown.selectOption("album");
+  // The album domain's own creators word (Artists, per its field spec).
+  await expect(page.getByText(/artists is column/i)).toBeVisible();
+
+  await page.locator("#list-source").setInputFiles({
+    name: "discos.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from("Álbum,Artista\r\nKind of Blue,Miles Davis"),
+  });
+  await page.getByRole("button", { name: /preview/i }).click();
+  await expect(dropdown).toBeVisible();
+  expect(sent).toEqual(["album"]);
 });
 
 test("the list connector unfolds deeper proposals behind Show more (2026-09-14 owner batch)", async ({
