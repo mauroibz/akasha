@@ -256,7 +256,7 @@ export async function stubImporters(page: Page) {
             // Sprint 083: the connector declares its configurable mapping, and
             // the screen renders the inputs from the declaration (DEC-080's
             // rule exercised by the catalog's newest shape).
-            fields: ["title_column", "author_column"],
+            fields: ["title_column", "author_column", "delimiter"],
             flags: ["no_creators"],
             // Sprint 084: a list row carries no identity, so the library is a
             // single-pick choice made before the file can be interpreted.

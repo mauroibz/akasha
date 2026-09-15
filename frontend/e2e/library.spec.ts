@@ -406,6 +406,12 @@ test("the edition year line is readable at every width, not clipped", async ({
 test("changing sort crossfades the container and animates no row", async ({
   page,
 }) => {
+  // The animation sampler watches every frame of a real transition; under a
+  // shared runner's CPU contention the transition itself can stall past the
+  // default 5s assertion budget, and a retry redraws the whole seeded page.
+  // `test.slow()` triples the budget for exactly these probes rather than
+  // loosening any bound (DEC-163).
+  test.slow();
   await seedLibrary(page);
   await page.goto("/");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();
@@ -425,8 +431,11 @@ test("changing sort crossfades the container and animates no row", async ({
     await expect(page.locator("[data-library-container]")).not.toHaveAttribute(
       "data-probe",
       "before",
+      { timeout: 30_000 },
     );
-    await expect(page.locator("[data-entry-id='1']")).toBeVisible();
+    await expect(page.locator("[data-entry-id='1']")).toBeVisible({
+      timeout: 30_000,
+    });
   });
 
   // Technical spec section 8: rows do not use layout animations. Not "should
@@ -441,6 +450,7 @@ test("changing sort crossfades the container and animates no row", async ({
 });
 
 test("the mounted-DOM budget holds through a crossfade", async ({ page }) => {
+  test.slow();
   await seedLibrary(page);
   await page.goto("/");
   await expect(page.locator("[data-entry-id='1']")).toBeVisible();

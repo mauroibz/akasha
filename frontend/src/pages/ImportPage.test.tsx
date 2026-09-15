@@ -1620,7 +1620,7 @@ const listImporter = {
     accepts_files: false,
     max_bytes: null,
     max_files: null,
-    fields: ["title_column", "author_column"],
+    fields: ["title_column", "author_column", "delimiter"],
     single_domain_pick: true,
     flags: ["no_creators"],
     alternates: [],
@@ -1898,6 +1898,95 @@ describe("the list connector's search-then-confirm surfaces", () => {
       await screen.findByRole("button", { name: /preview/i }),
     );
     await waitFor(() => expect(flags).toEqual([null, "true"]));
+  });
+
+  it("renders the badge below the importer's name (owner batch 2026-09-15)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/importers") {
+        return new Response(JSON.stringify([listImporter]));
+      }
+      if (String(input).startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    // The label is the anchor line; the domain tag reads beneath it, the
+    // owner's ask: side-by-side "read weird".
+    const trigger = (await screen.findByRole("tab", {
+      name: /custom list/i,
+    })) as HTMLElement;
+    const label = trigger.querySelector("span.block");
+    const badge = trigger.querySelector("span.inline-flex");
+    expect(label).not.toBeNull();
+    expect(badge).not.toBeNull();
+    if (label && badge) {
+      expect(label.getBoundingClientRect().top).toBeLessThanOrEqual(
+        badge.getBoundingClientRect().top,
+      );
+      expect(badge.textContent).toMatch(/any library/i);
+    }
+  });
+
+  it("groups the creators checkbox with the column mapping and offers a separator pick (owner batch 2026-09-15)", async () => {
+    const bodies: string[][] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
+      if (url.endsWith("/api/import/list/preview")) {
+        const form = init?.body as FormData;
+        bodies.push([
+          String(form.get("delimiter")),
+          String(form.get("no_creators")),
+        ]);
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f#book",
+            state: "matching",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            search_progress: { searched: 0, total: 1, job_state: "running" },
+            records: [listRecord()],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const editor = await screen.findByRole("textbox", {
+      name: /or type your list here/i,
+    });
+    await userEvent.type(editor, "Título;Autor\r\nRayuela;Julio Cortázar");
+
+    // The checkbox lives inside the mapping section (the owner's ask), named
+    // by its own control, and the separator select sits beside the columns.
+    const mapping = await screen.findByRole("group", {
+      name: /column mapping/i,
+    });
+    expect(
+      within(mapping).getByRole("checkbox", { name: /no creators column/i }),
+    ).toBeInTheDocument();
+    const separator = within(mapping).getByRole("combobox", {
+      name: /separator/i,
+    });
+
+    // Picking semicolon splits the sample row on it, live, before any
+    // preview (the owner's "see if the config is applying" ask).
+    await userEvent.selectOptions(separator, ";");
+    expect(
+      await within(mapping).findByText(/Rayuela \| Julio Cortázar/),
+    ).toBeInTheDocument();
+
+    // Default Auto + unchecked sent nothing; the picked separator now rides.
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+    await waitFor(() => expect(bodies).toEqual([[";", "null"]]));
   });
 
   it("renders a per-importer domain indicator from item_types (Sprint 085)", async () => {

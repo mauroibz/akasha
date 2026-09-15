@@ -42,6 +42,10 @@ export default defineConfig({
   // defect fails the same test every time, and CI's failures before this
   // change did not — a different, unrelated test each run. Zero locally,
   // where the difference does not bite.
+  // CI retries exist for exactly one documented class (DEC-163): the
+  // heavy-library animation/DOM probes, which watch real frame timing on a
+  // shared runner. Everything else fails fast — a red fast suite is worth
+  // more than a green slow one.
   retries: process.env.CI ? 2 : 0,
   // Per-test bound, stated rather than Playwright's unstated 30 s default: a
   // wedged spec fails with its name instead of looking like slow work
@@ -81,6 +85,10 @@ export default defineConfig({
       testMatch: /(library|accessibility)\.spec\.ts/,
       grep: HEAVY_LIBRARY,
       workers: 1,
+      // The probes are the one flake class retries exist for (DEC-163); a
+      // third retry costs minutes and has never once turned a genuine
+      // failure green — it only delayed the report.
+      retries: process.env.CI ? 3 : 0,
       use: { ...devices["Desktop Chrome"] },
     },
     {

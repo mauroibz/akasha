@@ -541,7 +541,11 @@ generalization of 2026-09-14):
    you uploaded and correct it inline, editing it makes it the source, and
    typed rows import with no file at all. The creators column is optional by
    checkbox — most queries work without it — and when the box is checked the
-   list reads titles only, on any domain. Title and
+   list reads titles only, on any domain. The separator can be picked
+   explicitly (comma, semicolon, tab — auto-detect is the default, never the
+   authority over an explicit pick), and a one-line sample row beneath the
+   mapping shows how the current configuration would read the first row
+   before anything is sent. Title and
    creator columns are found from the headers — each domain's own words,
    Spanish and English, accents folded — and the first two columns are the
    fallback for a domain that expects a creator; a domain that declares none

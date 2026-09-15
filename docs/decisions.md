@@ -6657,3 +6657,30 @@ an operator command in the house style.
   semantics are the owner's call and are recorded in the sprint's risks: a
   query with no creator may be noisier for common titles; edit-and-re-search
   is the designed answer.
+
+## DEC-163 — The CI's one flake class is named, budgeted, and bounded
+
+- Date: 2026-09-15
+- Status: accepted
+- Context: the owner asked for a permanent fix for failing CIs: "im tired of getting a
+  notification and it makes the warnings useless." The failure history on main shows
+  exactly one repeat offender: the heavy-library crossfade specs
+  (`library.spec.ts:406/443`) — animation-frame samplers that watch a real
+  transition under a shared 2-worker runner's CPU contention, where the transition
+  itself can stall past the 5 s default assertion budget. The two other recent red
+  runs were real defects (the Sprint 085 landing-tab assumptions), which CI caught
+  correctly and the fixes followed.
+- Decision: name the class and budget it, rather than loosening any bound or deleting
+  the probes. (1) Both crossfade specs declare `test.slow()` — a struggling run gets
+  three times the budget instead of dying mid-sample and paying a full reseed on
+  retry. (2) The probe-attribute assertions carry explicit 30 s budgets. (3) The
+  heavy-library project keeps CI retries (now 3, up from the global 2) because a
+  re-watch of a stalled transition is exactly what a retry is for; every other
+  project fails fast — a red fast suite is worth more than a green slow one. (4) No
+  DEC-023 bound changed: rows <20, cards <48, containers 1, exactly as before.
+- Consequences: a genuine regression in the crossfade still fails (three generous
+  budgets in a row is a real stall); a contention blip recovers within the run
+  instead of paging the owner. The class is documented in `playwright.config.ts` at
+  the retries declaration, so the next person tuning it knows what the retries are
+  for. If a *second* flake class ever appears, it gets its own named handling — not
+  a silent global retry bump.

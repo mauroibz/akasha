@@ -122,6 +122,10 @@ export function ImportPage() {
   const [noCreatorsByImporter, setNoCreatorsByImporter] = useState<
     Record<string, boolean>
   >({});
+  // The chosen separator, keyed by connector (empty = auto, the sniffed one).
+  const [delimitersByImporter, setDelimitersByImporter] = useState<
+    Record<string, string>
+  >({});
   const [libraryPath, setLibraryPath] = useState("");
   const [bundle, setBundle] = useState<CalibreBundle | null>(null);
   const [exportFiles, setExportFiles] = useState<File[]>([]);
@@ -313,6 +317,42 @@ export function ImportPage() {
   // The list connector's owners' checkbox (2026-09-15), keyed by connector so
   // switching tabs never carries one source's answer into another's request.
   const noCreators = !!noCreatorsByImporter[activeImporter?.id ?? ""];
+  const chosenDelimiter = delimitersByImporter[activeImporter?.id ?? ""] ?? "";
+
+  /**
+   * A one-line peek at how the current config would read the typed or
+   * dropped rows (the owner's 2026-09-15 ask, kept deliberately cheap):
+   * the first data row, split on the chosen separator — or the sniffed one
+   * when Auto — with the columns the mapping would pick named above them.
+   * Display only; the preview remains the truth.
+   */
+  const sampleRowFor = (importer: ImporterDefinition): string => {
+    const source = typedList.trim() || "";
+    const lines = source.split(/\r\n|\n/).filter(Boolean);
+    const data = lines.length > 1 ? lines[1] : (lines[0] ?? "");
+    if (!data) return "";
+    const pick = delimitersByImporter[importer.id] || "";
+    const semis = (data.match(/;/g) ?? []).length;
+    const tabs = (data.match(/\t/g) ?? []).length;
+    const commas = (data.match(/,/g) ?? []).length;
+    const sniffed =
+      semis > commas && semis >= tabs
+        ? ";"
+        : tabs > commas && tabs > semis
+          ? "\t"
+          : ",";
+    const separator = pick || sniffed;
+    const cells = data.split(separator).map((cell) => cell.trim());
+    const titleIndex = Number(columnMapping["title_column"]) - 1;
+    const creatorIndex = Number(columnMapping["author_column"]) - 1;
+    const title =
+      cells[Number.isFinite(titleIndex) ? titleIndex : 0] ?? cells[0];
+    const creator =
+      cells[Number.isFinite(creatorIndex) ? creatorIndex : 1] ?? cells[1] ?? "";
+    return noCreatorsByImporter[importer.id]
+      ? `Sample: ${title}`
+      : `Sample: ${[title, creator].filter(Boolean).join(" | ")}`;
+  };
   // A connector that can fill more than one library needs their names for the
   // target checkboxes, and a failed preview row needs the domain's own field
   // labels to describe what went wrong (AC3) — fetched only once either is
@@ -591,23 +631,7 @@ export function ImportPage() {
               }
             }}
           />
-          {spec.flags?.includes("no_creators") && (
-            <label className="flex items-center gap-2">
-              <Checkbox
-                checked={noCreators}
-                onCheckedChange={(checked) =>
-                  setNoCreatorsByImporter((current) => ({
-                    ...current,
-                    [importer.id]: checked === true,
-                  }))
-                }
-                aria-label="No creators column"
-              />
-              <span className="text-sm text-muted-foreground">
-                No creators column — search by title alone
-              </span>
-            </label>
-          )}
+
           {spec.flags?.includes("no_creators") && (
             <div>
               <label htmlFor={`${importer.id}-typed`} className="block">
@@ -639,36 +663,90 @@ export function ImportPage() {
               branch on which connector this is (the same rule the guide and
               the target checkboxes follow). */}
           {spec.fields && spec.fields.length > 0 && (
-            <div className="flex flex-wrap gap-3">
-              {spec.fields.map((name) => (
-                <label key={name} className="block">
-                  <span className="text-sm text-muted-foreground">
-                    {name === "title_column"
-                      ? "Title is column"
-                      : name === "author_column"
-                        ? `${creatorWordFor(importer)} is column`
-                        : name}
-                  </span>
-                  <Input
-                    type="number"
-                    min={1}
-                    className="mt-1 h-11 w-28"
-                    value={columnMapping[name] ?? ""}
-                    placeholder="auto"
-                    onChange={(event) =>
-                      setColumnMapping((old) => ({
-                        ...old,
-                        [name]: event.target.value,
+            <fieldset
+              className="flex flex-wrap gap-3 rounded-lg border border-border p-3"
+              // A real group with its own accessible name: the controls read
+              // as one mapping unit (the owner's 2026-09-15 refinement).
+              aria-label="Column mapping"
+            >
+              {spec.fields.map((name) =>
+                name === "delimiter" ? (
+                  <label key={name} className="block">
+                    <span className="text-sm text-muted-foreground">
+                      Separator
+                    </span>
+                    <select
+                      aria-label="Separator"
+                      className="mt-1 h-11 w-36 rounded-md border border-input bg-surface-raised px-3 text-base focus-ring"
+                      value={delimitersByImporter[importer.id] ?? ""}
+                      onChange={(event) =>
+                        setDelimitersByImporter((current) => ({
+                          ...current,
+                          [importer.id]: event.target.value,
+                        }))
+                      }
+                    >
+                      <option value="">Auto</option>
+                      <option value=",">Comma</option>
+                      <option value=";">Semicolon</option>
+                      <option value="&#9;">Tab</option>
+                    </select>
+                  </label>
+                ) : (
+                  <label key={name} className="block">
+                    <span className="text-sm text-muted-foreground">
+                      {name === "title_column"
+                        ? "Title is column"
+                        : name === "author_column"
+                          ? `${creatorWordFor(importer)} is column`
+                          : name}
+                    </span>
+                    <Input
+                      type="number"
+                      min={1}
+                      className="mt-1 h-11 w-28"
+                      value={columnMapping[name] ?? ""}
+                      placeholder="auto"
+                      onChange={(event) =>
+                        setColumnMapping((old) => ({
+                          ...old,
+                          [name]: event.target.value,
+                        }))
+                      }
+                    />
+                  </label>
+                ),
+              )}
+              {spec.flags?.includes("no_creators") && (
+                <label className="flex items-end gap-2 pb-1.5">
+                  <Checkbox
+                    checked={noCreators}
+                    onCheckedChange={(checked) =>
+                      setNoCreatorsByImporter((current) => ({
+                        ...current,
+                        [importer.id]: checked === true,
                       }))
                     }
+                    aria-label="No creators column"
                   />
+                  <span className="text-sm text-muted-foreground">
+                    No creators column
+                  </span>
                 </label>
-              ))}
+              )}
               <p className="w-full text-xs text-muted-foreground">
                 Leave them empty and the columns are found from the headers; the
                 first two columns are the fallback.
               </p>
-            </div>
+              {spec.fields.includes("delimiter") && (
+                <p
+                  className="w-full font-mono text-xs text-muted-foreground"
+                  aria-live="polite"
+                >
+                  {sampleRowFor(importer)}
+                </p>
+              )}
+            </fieldset>
           )}
         </div>
       );
@@ -767,16 +845,17 @@ export function ImportPage() {
         <TabsTrigger
           key={importer.id}
           value={importer.id}
-          className="min-h-11 shrink-0 gap-2"
+          className="min-h-11 shrink-0 items-start gap-1 px-3"
         >
-          {importer.label}
-          {/* The connector's own declaration names its libraries (the
-              owner's 2026-09-15 ask): a multi-domain source serves any
-              library, a single-domain one names its one — never a
-              hardcoded list. The dot is presentational colour, deliberately
-              not the accent (no semantic collision, the ScorePicker rule);
-              the text carries the meaning alone. */}
-          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+          {/* Two lines (the owner's 2026-09-15 refinement): the connector's
+              name is the anchor line, the library tag reads beneath it —
+              side by side read weird. Rendered from the declaration, never a
+              hardcoded list; the muted dot is presentational, deliberately
+              not the accent (no semantic collision, the ScorePicker rule). */}
+          <span className="block min-w-0 text-left font-medium">
+            {importer.label}
+          </span>
+          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
             <span
               aria-hidden="true"
               className="h-1.5 w-1.5 rounded-full bg-primary/70"
@@ -844,7 +923,9 @@ export function ImportPage() {
                         // switching tabs never carries one source's mapping
                         // into another's request.
                         Object.keys(columnMapping).length > 0 ||
-                        (noCreators && !!submission.spec.flags?.length)
+                        (noCreators && !!submission.spec.flags?.length) ||
+                        (!!chosenDelimiter &&
+                          !!submission.spec.fields?.includes("delimiter"))
                           ? previewImportWithOptions(
                               importer,
                               submission.spec,
@@ -862,10 +943,13 @@ export function ImportPage() {
                                     String(Number(value) - 1),
                                   ])
                                   .filter(([, value]) => Number(value) >= 0),
-                                // The owner's checkbox rides the same
-                                // options channel the mapping does.
+                                // The owner's checkbox and separator ride
+                                // the same options channel the mapping does.
                                 ...(noCreators
                                   ? ([["no_creators", "true"]] as const)
+                                  : []),
+                                ...(chosenDelimiter
+                                  ? ([["delimiter", chosenDelimiter]] as const)
                                   : []),
                               ]),
                               chosenFor(importer),
