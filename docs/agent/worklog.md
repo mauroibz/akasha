@@ -5904,3 +5904,35 @@ it is a peek, not a promise; the preview stays the authority.
 **Next.** Push and watch CI — the first run under the DEC-163 policy. The
 owner's dev container rebuild is the delivery vehicle for validation
 (the two-file compose form).
+
+---
+
+## 2026-09-15 (evening) — The alignment pass and v2.2.2 (hotfix session)
+
+**Done.** The owner's two polish asks on the just-landed refinement batch:
+(1) the mapping controls share one grid — labels on one baseline, h-11
+controls on the next, the no-creators checkbox landed on the inputs'
+baseline through an invisible label line, two columns on a phone and one
+tidy row from `sm` up; (2) the source strip was redesigned as quiet two-line
+cards (name in the reading voice, library caption beneath, active card
+raised — no pill chrome, no colored chip). Shipped as **v2.2.2**: tag on
+e001db1 (CI green first run under the DEC-163 policy — the crossfade probes
+passed clean), images :2.2.2/:2.2/:latest verified anonymously pullable,
+GitHub Release published from the committed notes, dev container rebuilt
+and bundle-verified.
+
+**Verified and how.** Geometric probe against the live dev server: name@447
+above caption@449 on the first card, left-anchored, 44px touch height; four
+equal 220px grid cells, one label baseline (1228), one control baseline
+(1252). Gates on the release tree: backend 1605, Vitest 339, make check
+green, Playwright 145+2 skipped (full parallel). The badge spec follows the
+redesign (its intent — caption below name — unchanged).
+
+**Deviations.** The owner left the redesign open ("however you see fit"):
+cards with a plain text caption, not a chip — a chip's color would collide
+with the score ramp's semantics (the ScorePicker rule), and text carries
+the meaning alone.
+
+**Next.** Nothing owed. The plan stands complete at 85/85; v2.2.2 is the
+current release. Further owner feedback follows the DEC-159/DEC-163 hotfix
+shape: batch it, full gate, ship as a patch.
