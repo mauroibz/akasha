@@ -756,7 +756,12 @@ export function ImportPage() {
     // direction).
     <TabsList
       aria-label="Import source"
-      className="flex h-auto min-w-0 max-w-full gap-1 overflow-x-auto"
+      // `justify-start`, never the shadcn default `justify-center`: the
+      // badges widened the tabs past the strip's width, and centered flex
+      // content overflows BOTH sides — the first tab painted left of the
+      // scroll box, where no scrollLeft could reach it (found by Sprint
+      // 085's own walkthrough). Left-anchored, the overflow is scrollable.
+      className="flex h-auto min-w-0 max-w-full justify-start gap-1 overflow-x-auto"
     >
       {importers.map((importer) => (
         <TabsTrigger

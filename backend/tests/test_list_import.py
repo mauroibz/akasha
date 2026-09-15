@@ -1340,6 +1340,19 @@ class TestAnyDomain20260914:
         assert blade.source_fields["Año visto"] == "2024"
         assert all(record.item_type == "movie" for record in snapshot.records)
 
+    def test_no_creators_row_has_no_missing_author_error(self) -> None:
+        """The flag opts the row out of the creator requirement too: the
+        record carries no `author missing` error (the rule a no-creator-words
+        domain already follows)."""
+        parsed = read_all(
+            "Título,Autor\r\nRayuela,Julio Cortázar",
+            domain="book",
+            options={"no_creators": "true"},
+        )
+        record = parsed.records[0]
+        assert record.item.title == "Rayuela"
+        assert record.errors == ()
+
     def test_no_creators_maps_title_only(self) -> None:
         """The owner's 2026-09-15 ask: a checkbox opts the list out of the
         creator column ("most queries work without them"). With no_creators

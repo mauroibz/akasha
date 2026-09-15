@@ -529,11 +529,19 @@ batch; a mixed batch is refused rather than guessed.
 The flow (the owner's three recorded decisions, 2026-09-13, and the
 generalization of 2026-09-14):
 
-1. **Pick the library, then upload and map.** A list row carries no identity,
-   so nothing downstream can route it: the library is picked once, from the
-   connector's declared domains, and the choice is part of the import's
-   identity (the same file for two libraries is two imports). Drop the
-   CSV/TXT (comma, semicolon or tab; BOM and CRLF tolerated). Title and
+1. **Pick the library, then upload, paste or type.** A list row carries no
+   identity, so nothing downstream can route it: the library is picked once,
+   from the connector's declared domains, and the choice is part of the
+   import's identity (the same file for two libraries is two imports). The
+   custom list leads the import strip — a hand-written list is the source a
+   person always has — and every connector's tab names the library it serves
+   (Any for the list, Books for Goodreads) from its own declaration. Drop the
+   CSV/TXT (comma, semicolon or tab; BOM and CRLF tolerated) or type the rows
+   straight into the editor: a dropped file fills it so you can check what
+   you uploaded and correct it inline, editing it makes it the source, and
+   typed rows import with no file at all. The creators column is optional by
+   checkbox — most queries work without it — and when the box is checked the
+   list reads titles only, on any domain. Title and
    creator columns are found from the headers — each domain's own words,
    Spanish and English, accents folded — and the first two columns are the
    fallback for a domain that expects a creator; a domain that declares none

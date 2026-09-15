@@ -1884,7 +1884,9 @@ describe("the list connector's search-then-confirm surfaces", () => {
     await userEvent.click(
       await screen.findByRole("tab", { name: /goodreads/i }),
     );
-    await userEvent.click(await screen.findByRole("tab", { name: /custom list/i }));
+    await userEvent.click(
+      await screen.findByRole("tab", { name: /custom list/i }),
+    );
     await userEvent.type(
       await screen.findByRole("textbox", { name: /or type your list here/i }),
       "Título,Autor\r\nRayuela,Julio Cortázar",

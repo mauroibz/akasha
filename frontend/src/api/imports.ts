@@ -377,8 +377,7 @@ export function previewImportWithOptions(
   for (const [name, value] of Object.entries(options)) form.append(name, value);
   // The library pick rides every path (Sprint 084): a mapping or a flag must
   // not silently drop the domain the owner chose before the file.
-  if (targets && targets.length)
-    form.append("targets", targets.join(","));
+  if (targets && targets.length) form.append("targets", targets.join(","));
   return request(url, { method: "POST", body: form }).then((response) =>
     responseJson<ImportPreview>(response),
   );

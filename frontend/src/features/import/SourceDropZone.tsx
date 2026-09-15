@@ -51,7 +51,10 @@ export function SourceDropZone({
       </p>
       <Input
         id={inputId}
-        autoFocus
+        // No autoFocus: the custom list leads the strip now (Sprint 085), so
+        // this input renders on the import screen's first paint — focusing it
+        // scrolled the freshly-opened page mid-viewport and buried the source
+        // strip under the fixed header. The input is one Tab away.
         className="mt-3 h-11 py-2"
         type="file"
         accept={accept ?? undefined}

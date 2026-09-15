@@ -364,7 +364,17 @@ class ListImporter:
         source_row = 1  # the header, if any
         for row in rows[1:]:
             source_row += 1
-            records.append(self._record(row, mapping, headers, source_row, item_type, columns))
+            records.append(
+                self._record(
+                    row,
+                    mapping,
+                    headers,
+                    source_row,
+                    item_type,
+                    columns,
+                    no_creators=no_creators,
+                )
+            )
         if not records:
             raise ListCSVError("invalid_csv", "The file holds a header and no rows")
 
@@ -382,6 +392,11 @@ class ListImporter:
                 f"{letter}{mapping[key]}" for key, letter in (("title", "t"), ("author", "a"))
             )
             fingerprint = f"{fingerprint}#{suffix}"
+        if no_creators:
+            # The checkbox is part of the identity too (Sprint 085): the same
+            # file read with and without its creators is two imports, and a
+            # re-preview of the other one must never replay this one's batch.
+            fingerprint = f"{fingerprint}#nocreator"
         return ImportSnapshot(
             fingerprint=fingerprint,
             filename=source.filename or "list.csv",
@@ -404,6 +419,8 @@ class ListImporter:
         row_number: int,
         item_type: str,
         columns: Any,
+        *,
+        no_creators: bool = False,
     ) -> NormalizedImportRecord:
         def cell(index: int) -> str:
             return row[index].strip() if index < len(row) else ""
@@ -415,8 +432,9 @@ class ListImporter:
             errors.append({"field": "title", "code": "required", "value": ""})
         # A domain that declared creator words expects the column; one that
         # declared none treats an empty creator as an empty fact (Sprint 084:
-        # a film list is often one column).
-        if columns.requires_creator and not author:
+        # a film list is often one column). The owner's no_creators checkbox
+        # (Sprint 085) opts a creator-expecting domain into that same rule.
+        if columns.requires_creator and not no_creators and not author:
             errors.append({"field": "author", "code": "missing"})
         # The original cells ride uninterpreted: the columns this connector
         # does not map are the owner's own words, and triage shows them
