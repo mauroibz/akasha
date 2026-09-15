@@ -270,7 +270,7 @@ class TestPreviewExposure:
             # The preview GET of a staged batch the service knows: the route is
             # reached through the connector that owns the batch.
             from book_tracker.application.imports import ImportService
-            from book_tracker.domains.book.list import IMPORTER as LIST_IMPORTER
+            from book_tracker.domain.list import IMPORTER as LIST_IMPORTER
 
             service = ImportService(
                 engine,

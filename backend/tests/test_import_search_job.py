@@ -501,6 +501,7 @@ class TestPreviewIntegration:
             preview = await client.post(
                 "/api/import/list/preview",
                 files={"file": ("libros.csv", self.LIST_CSV, "text/csv")},
+                data={"targets": "book"},
             )
             assert preview.status_code == 201
             body = preview.json()
@@ -535,6 +536,7 @@ class TestPreviewIntegration:
             preview = await client.post(
                 "/api/import/list/preview",
                 files={"file": ("libros.csv", self.LIST_CSV, "text/csv")},
+                data={"targets": "book"},
             )
             batch_id = preview.json()["batch_id"]
 

@@ -17,6 +17,7 @@ from book_tracker.domain.spec import (
     EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ListColumnSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -121,4 +122,27 @@ DOMAIN = Domain(
     enrichment=BOOK_ENRICHMENT,
     recognize=lambda value: recognize_book_input(value),
     chooses_covers=True,
+    list_columns=ListColumnSpec(
+        # The owner's own CSV named these; kept verbatim from the Sprint 083
+        # reader (the v2.1.0 regression contract).
+        title_headers=(
+            "titulo",
+            "titulo del libro",
+            "libro",
+            "nombre",
+            "nombre del libro",
+            "title",
+            "book name",
+            "book title",
+        ),
+        creator_headers=(
+            "autor",
+            "autora",
+            "autor del libro",
+            "author",
+            "writer",
+            "escritor",
+            "escritora",
+        ),
+    ),
 )

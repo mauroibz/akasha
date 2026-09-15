@@ -386,6 +386,13 @@ async def _source(
             for name in spec.fields
             if isinstance(value := form.get(name), str) and value.strip()
         }
+        # The target libraries are an option the reader may need before it can
+        # interpret its source: the list reader takes its column vocabulary
+        # from the chosen domain (Sprint 084), so the choice must reach `read`
+        # the same way the column mapping does — via options, not a shared-layer
+        # branch on the connector's name.
+        if targets is not None:
+            options["targets"] = " ".join(targets)
         return (
             ImportSource(data=b"".join(chunks), filename=upload.filename, options=options or None),
             targets,

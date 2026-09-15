@@ -16,6 +16,7 @@ from book_tracker.domain.spec import (
     EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ListColumnSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -141,6 +142,27 @@ DOMAIN = Domain(
     enrichment=ALBUM_ENRICHMENT,
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,
+    list_columns=ListColumnSpec(
+        title_headers=(
+            "album",
+            "albumes",
+            "disco",
+            "titulo",
+            "titulo del album",
+            "title",
+        ),
+        creator_headers=(
+            "artista",
+            "artista del album",
+            "grupo",
+            "banda",
+            "musico",
+            "artist",
+            "band",
+            "musician",
+        ),
+        creator_label="Artist",
+    ),
     # "Various Artists" is not an artist; ranking by creator would put it third in the
     # owner's own library (measured, docs/spotify-import-and-insights-viability.md).
     insight_suppressed_keys=frozenset({normalize_text("Various Artists")}),

@@ -392,7 +392,20 @@ class Importer(Protocol):
 
     name: str
     label: str
-    item_types: tuple[str, ...]
+
+    @property
+    def item_types(self) -> tuple[str, ...]:
+        """The domains this connector can fill, ordered, first-declared first.
+
+        Declared as a read-only property: every existing connector holds it as
+        a plain attribute (which satisfies this), and the one connector that
+        derives it from the registry at access time (the custom list, whose
+        served domains are every domain that declared list columns — Sprint
+        084) can satisfy it too without the registration order constraining
+        the import graph.
+        """
+        ...
+
     input: ImportInputSpec
     identity_kinds: frozenset[str]
     #: Every code this connector's reader may raise. Closed, so a screen can decide

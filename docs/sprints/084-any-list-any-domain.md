@@ -1,6 +1,6 @@
 # Sprint 084 — Any list, any domain
 
-**Status:** ready
+**Status:** in_progress
 **Depends on:** 083
 **Roadmap revision:** 42
 

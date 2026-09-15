@@ -29,6 +29,7 @@ from book_tracker.domain.spec import (
     EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ListColumnSpec,
     ProgressSpec,
     StatusSpec,
     UrlMatch,
@@ -204,4 +205,15 @@ DOMAIN = Domain(
     progress=ProgressSpec("Episodes watched", "episode", total_field="episodes"),
     recognize=lambda value: recognize_series_url(value),
     chooses_covers=False,
+    list_columns=ListColumnSpec(
+        title_headers=(
+            "serie",
+            "series",
+            "titulo",
+            "title",
+            "show",
+            "nombre",
+            "name",
+        ),
+    ),
 )

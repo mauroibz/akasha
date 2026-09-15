@@ -455,6 +455,37 @@ def suppressed_keys_are_normalized(domain: Domain) -> None:
 
 
 @registry_check
+def list_columns_name_real_columns_or_none(domain: Domain) -> None:
+    """Sprint 084: the custom-list connector reads a domain's column
+    vocabulary, so a declaration is checked and `None` is deliberate.
+
+    A domain that declares `list_columns` must name at least one title word,
+    its creator words may be empty (a film list is often one column) and its
+    `creator_label` must exist when creator words exist — a label for a column
+    the domain says it reads. Everything is compared folded, the way the
+    reader matches headers.
+    """
+    if domain.list_columns is None:
+        return
+    columns = domain.list_columns
+    assert columns.title_headers, f"{domain.item_type} declares list columns with no title words"
+    for word in columns.title_headers:
+        assert word.strip() == word and word == word.strip().casefold(), (
+            f"{domain.item_type} title word {word!r} is not trimmed-and-folded"
+        )
+    for word in columns.creator_headers:
+        assert word.strip() == word and word == word.strip().casefold(), (
+            f"{domain.item_type} creator word {word!r} is not trimmed-and-folded"
+        )
+    if columns.creator_headers and columns.creator_label is None:
+        creators = next((field for field in domain.fields if field.name == "creators"), None)
+        assert creators is not None, (
+            f"{domain.item_type} declares creator column words but has no "
+            "creators field to put them in"
+        )
+
+
+@registry_check
 def the_cover_chooser_is_only_declared_where_it_can_work(domain: Domain) -> None:
     """DEC-067 row 7 chose to declare the capability, not to generalise the mechanism.
 
@@ -1229,6 +1260,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "identity": "identity_is_a_strategy",
         "recognize": "the_recognizer_answers_for_any_string",
         "chooses_covers": "the_cover_chooser_is_only_declared_where_it_can_work",
+        "list_columns": "list_columns_name_real_columns_or_none",
         "enrichment": "enrichment_is_answerable_by_this_domain",
         "progress": "progress_counts_something_this_domain_declares",
         "insight_suppressed_keys": "suppressed_keys_are_normalized",
@@ -1707,7 +1739,7 @@ def test_the_empty_identity_declaration_is_held_to_its_own_word() -> None:
     boundary holds a connector to it — a reader emitting any identity against
     an empty declaration is refused whole (the case the sprint named the point
     of the empty set)."""
-    from book_tracker.domains.book.list import IMPORTER as LIST_IMPORTER
+    from book_tracker.domain.list import IMPORTER as LIST_IMPORTER
 
     assert LIST_IMPORTER.identity_kinds == frozenset()
     snapshot = LIST_IMPORTER.read(
@@ -1716,6 +1748,7 @@ def test_the_empty_identity_declaration_is_held_to_its_own_word() -> None:
                 "latin-1"
             ).encode("utf-8"),
             filename="x.csv",
+            options={"targets": "book"},
         ),
         ImportReadContext(path_root=Path("/tmp")),
     )

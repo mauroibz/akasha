@@ -15,6 +15,7 @@ from enum import StrEnum
 
 from book_tracker.domain.exports import ExportView, make_table_view
 from book_tracker.domain.importers import Importer
+from book_tracker.domain.list import IMPORTER as LIST_IMPORTER
 from book_tracker.domain.spec import Domain
 from book_tracker.domains.album import DOMAIN as ALBUM
 from book_tracker.domains.album.spotify import IMPORTER as SPOTIFY_IMPORTER
@@ -24,7 +25,6 @@ from book_tracker.domains.book import DOMAIN as BOOK
 from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
 from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
-from book_tracker.domains.book.list import IMPORTER as LIST_IMPORTER
 from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.movie.imdb import IMPORTER as IMDB_IMPORTER
 from book_tracker.domains.movie.letterboxd import IMPORTER as LETTERBOXD_IMPORTER

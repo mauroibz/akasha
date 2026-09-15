@@ -159,6 +159,36 @@ class ProgressSpec:
 
 
 @dataclass(frozen=True)
+class ListColumnSpec:
+    """How a hand-written list names this domain's two interesting columns
+    (Sprint 084).
+
+    The custom-list connector is domain-declared: which header words point at
+    the title column and which at the creator column is this domain's own
+    vocabulary, the same way `entry_field_labels` is. `creator_headers` may be
+    empty — a film list is often one column of titles, and a domain whose rows
+    carry no meaningful creator must not demand one. `creator_label` is what
+    the mapping screen calls the second column (Author, Artist, Director);
+    absent, it falls back to the domain's `creators` field label, and to the
+    neutral word for a domain that declares no creators field.
+    """
+
+    title_headers: tuple[str, ...]
+    creator_headers: tuple[str, ...] = ()
+    creator_label: str | None = None
+
+    @property
+    def requires_creator(self) -> bool:
+        """Whether a row without a creator cell is an error for this domain.
+
+        A domain that declared creator words expects the column to exist; a
+        domain that declared none treats an empty creator as an empty fact,
+        not a refusal.
+        """
+        return bool(self.creator_headers)
+
+
+@dataclass(frozen=True)
 class EnrichmentSpec:
     """What background enrichment means for one domain (DEC-067 row 3).
 
@@ -288,6 +318,12 @@ class Domain:
     #: a domain that has not thought about covers offers no chooser, rather than one
     #: that cannot answer.
     chooses_covers: bool = False
+    #: How a hand-written list names this domain's columns (Sprint 084), or
+    #: `None` for a domain the custom-list connector does not serve. `None` is
+    #: the deliberate default — a domain that has not declared its list
+    #: vocabulary is not list-importable, rather than silently borrowing
+    #: another domain's words — the same shape `chooses_covers` above takes.
+    list_columns: "ListColumnSpec | None" = None
     #: Normalized (`normalize_text`) values an insights ranking omits by default
     #: (Sprint 065). Not an identity claim — an album domain suppresses "Various
     #: Artists" because the owner said so, not because it fails some test of what an

@@ -27,6 +27,7 @@ from book_tracker.domain.spec import (
     EnrichmentSpec,
     FieldSpec,
     FormatSpec,
+    ListColumnSpec,
     StatusSpec,
     UrlMatch,
     split_url,
@@ -195,4 +196,18 @@ DOMAIN = Domain(
     progress=None,
     recognize=lambda value: recognize_movie_url(value),
     chooses_covers=False,
+    list_columns=ListColumnSpec(
+        # A film list is often one column of titles: no creator words, so a
+        # missing creator column is an empty fact rather than an error.
+        title_headers=(
+            "pelicula",
+            "peliculas",
+            "titulo",
+            "title",
+            "film",
+            "movie",
+            "nombre",
+            "name",
+        ),
+    ),
 )

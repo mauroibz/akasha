@@ -272,8 +272,17 @@ class ImportService:
         fingerprint already in the database resolving: a connector declaring one domain
         always selects all of it, so its sources fingerprint exactly as they always did
         and no batch staged before this contract is orphaned.
+
+        A reader that consumed the target choice to interpret its source (Sprint
+        084's list reader reads the chosen domain's column vocabulary, and its
+        fingerprint already carries the choice) states so in its source
+        descriptor: the reader's composition is the identity, and appending the
+        subset again would only double it.
         """
         if set(targets) == set(self.domains):
+            return snapshot.fingerprint
+        descriptor = snapshot.source_descriptor or {}
+        if descriptor.get("item_type") in targets:
             return snapshot.fingerprint
         return f"{snapshot.fingerprint}#{'+'.join(targets)}"
 

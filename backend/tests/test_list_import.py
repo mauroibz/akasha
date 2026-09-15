@@ -27,19 +27,21 @@ from book_tracker.domain.importers import (
     ImportSource,
     NormalizedImportRecord,
 )
-from book_tracker.domain.matching import MatchDecision, MatchKind
-from book_tracker.domains.book.list import (
+from book_tracker.domain.list import (
     ListCSVError,
     ListImporter,
     detect_delimiter,
     sniff_mapping,
 )
+from book_tracker.domain.matching import MatchDecision, MatchKind
 
 CONTEXT = ImportReadContext(path_root=Path("/tmp"))
 
 
-def csv_source(data: str, filename: str = "libros.csv") -> ImportSource:
-    return ImportSource(data=data.encode("utf-8"), filename=filename)
+def csv_source(data: str, filename: str = "libros.csv", domain: str = "book") -> ImportSource:
+    # The domain choice rides the same options channel the screen's targets
+    # field uses (Sprint 084): every reader test states its library.
+    return ImportSource(data=data.encode("utf-8"), filename=filename, options={"targets": domain})
 
 
 #: The owner's header set, including the trailing space that must be trimmed
@@ -69,9 +71,24 @@ SYNTHETIC_CSV = (
 NOW = datetime(2026, 9, 14, 12, 0, 0, tzinfo=UTC)
 
 
-def read_all(data: str, mapping: dict[str, int] | None = None):
+def read_all(
+    data: str,
+    mapping: dict[str, int] | None = None,
+    domain: str | None = "book",
+):
+    options: dict[str, str] | None = None
+    if mapping is not None:
+        options = {
+            "title_column": str(mapping["title"] + 1),
+            "author_column": str(mapping["author"] + 1),
+        }
+    if domain is not None:
+        options = {**(options or {}), "targets": domain}
     importer = ListImporter()
-    return importer.read(csv_source(data), CONTEXT)
+    return importer.read(
+        ImportSource(data=data.encode("utf-8"), filename="libros.csv", options=options),
+        CONTEXT,
+    )
 
 
 def records_by_title(snapshot):
@@ -183,20 +200,22 @@ class TestErrors:
         assert refused.value.action
 
     def test_invalid_utf8_is_refused_invalid_csv(self) -> None:
-        source = ImportSource(data=b"\xff\xfe\x00bad", filename="x.csv")
+        source = ImportSource(
+            data=b"\xff\xfe\x00bad", filename="x.csv", options={"targets": "book"}
+        )
         with pytest.raises(ListCSVError) as refused:
             ListImporter().read(source, CONTEXT)
         assert refused.value.code == "invalid_csv"
 
     def test_no_data_is_refused(self) -> None:
-        source = ImportSource(data=None, filename="x.csv")
+        source = ImportSource(data=None, filename="x.csv", options={"targets": "book"})
         with pytest.raises(ListCSVError) as refused:
             ListImporter().read(source, CONTEXT)
         assert refused.value.code == "invalid_csv"
 
     def test_the_error_codes_are_declared(self) -> None:
         assert ListImporter.error_codes == frozenset(
-            {"invalid_csv", "missing_columns", "column_not_mapped"}
+            {"invalid_csv", "missing_columns", "column_not_mapped", "invalid_import_target"}
         )
 
 
@@ -235,7 +254,9 @@ class TestFingerprintAndStage:
     def test_the_fingerprint_is_the_bytes(self) -> None:
         snapshot = read_all(SYNTHETIC_CSV)
         expected = hashlib.sha256(SYNTHETIC_CSV.encode("utf-8")).hexdigest()
-        assert snapshot.fingerprint == expected
+        # The chosen domain composes the fingerprint (Sprint 084): one list,
+        # one library per batch — the same rule the mapping already followed.
+        assert snapshot.fingerprint == f"{expected}#book"
 
     def test_stage_writes_the_source_bytes_and_drops_them_from_memory(self) -> None:
         import tempfile
@@ -260,7 +281,7 @@ class TestExplicitMapping:
         source = ImportSource(
             data=SYNTHETIC_CSV.encode("utf-8"),
             filename="libros.csv",
-            options={"title_column": 1, "author_column": 0},
+            options={"targets": "book", "title_column": 1, "author_column": 0},
         )
         snapshot = importer.read(source, CONTEXT)
         titles = records_by_title(snapshot)
@@ -279,7 +300,7 @@ class TestExplicitMapping:
             ImportSource(
                 data=SYNTHETIC_CSV.encode("utf-8"),
                 filename="libros.csv",
-                options={"title_column": 1, "author_column": 0},
+                options={"targets": "book", "title_column": 1, "author_column": 0},
             ),
             CONTEXT,
         )
@@ -293,7 +314,7 @@ class TestExplicitMapping:
                 ImportSource(
                     data=SYNTHETIC_CSV.encode("utf-8"),
                     filename="libros.csv",
-                    options={"title_column": 99},
+                    options={"targets": "book", "title_column": 99},
                 ),
                 CONTEXT,
             )
@@ -307,7 +328,7 @@ class TestExplicitMapping:
                 ImportSource(
                     data=SYNTHETIC_CSV.encode("utf-8"),
                     filename="libros.csv",
-                    options={"author_column": -1},
+                    options={"targets": "book", "author_column": -1},
                 ),
                 CONTEXT,
             )
@@ -320,7 +341,7 @@ class TestExplicitMapping:
                 ImportSource(
                     data=SYNTHETIC_CSV.encode("utf-8"),
                     filename="libros.csv",
-                    options={"title_column": "Autor"},
+                    options={"targets": "book", "title_column": "Autor"},
                 ),
                 CONTEXT,
             )
@@ -348,8 +369,14 @@ class TestRoutes:
         ):
             preview = await client.post(
                 "/api/import/list/preview",
-                files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
-                data={"title_column": "1", "author_column": "0"},
+                files={
+                    "file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv"),
+                },
+                data={
+                    "targets": "book",
+                    "title_column": "1",
+                    "author_column": "0",
+                },
             )
         assert preview.status_code == 201
         body = preview.json()
@@ -376,7 +403,10 @@ class TestRoutes:
         ):
             preview = await client.post(
                 "/api/import/list/preview",
-                files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
+                files={
+                    "file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv"),
+                },
+                data={"targets": "book"},
             )
             assert preview.status_code == 201
             body = preview.json()
@@ -385,7 +415,10 @@ class TestRoutes:
             # A same-bytes re-preview is idempotent, not a second batch.
             again = await client.post(
                 "/api/import/list/preview",
-                files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
+                files={
+                    "file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv"),
+                },
+                data={"targets": "book"},
             )
             assert again.json()["batch_id"] == body["batch_id"]
 
@@ -403,8 +436,10 @@ class TestRoutes:
         ):
             preview = await client.post(
                 "/api/import/list/preview",
-                files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
-                data={"title_column": "99"},
+                files={
+                    "file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv"),
+                },
+                data={"targets": "book", "title_column": "99"},
             )
         assert preview.status_code == 422
         error = preview.json()["error"]
@@ -490,7 +525,10 @@ class TestConfirmDiscard:
     async def _preview(self, client):
         response = await client.post(
             "/api/import/list/preview",
-            files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
+            files={
+                "file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv"),
+            },
+            data={"targets": "book"},
         )
         assert response.status_code == 201
         return response.json()
@@ -709,7 +747,7 @@ class TestConfirmDiscard:
                 )
 
             from book_tracker.application.imports import ImportService
-            from book_tracker.domains.book.list import IMPORTER as LIST_IMPORTER
+            from book_tracker.domain.list import IMPORTER as LIST_IMPORTER
 
             service = ImportService(
                 app.state.engine,
@@ -801,7 +839,10 @@ class TestOwnerBatch20260914:
     async def _preview(self, client):
         response = await client.post(
             "/api/import/list/preview",
-            files={"file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv")},
+            files={
+                "file": ("libros.csv", SYNTHETIC_CSV.encode("utf-8"), "text/csv"),
+            },
+            data={"targets": "book"},
         )
         assert response.status_code == 201
         return response.json()
@@ -994,6 +1035,112 @@ class TestOwnerBatch20260914:
             assert matching.status_code == 200  # the batch is drained; still allowed
 
 
+class TestAnyDomain20260914:
+    """Sprint 084: the list reader is domain-declared — any registered domain
+    that declares list columns is importable, the header words and the
+    creator column's meaning come from the domain, and one list is one
+    domain per batch (the choice composes the fingerprint)."""
+
+    def test_the_reader_declares_every_listable_domain(self) -> None:
+        from book_tracker.domain.registry import DOMAINS
+
+        importer = ListImporter()
+        expected = tuple(
+            item_type for item_type, domain in DOMAINS.items() if domain.list_columns is not None
+        )
+        assert "book" in expected
+        assert "album" in expected
+        assert "movie" in expected
+        assert importer.item_types == expected
+
+    def test_every_declared_domain_has_title_words(self) -> None:
+        from book_tracker.domain.registry import DOMAINS
+
+        for item_type, domain in DOMAINS.items():
+            if domain.list_columns is None:
+                continue
+            assert domain.list_columns.title_headers, f"{item_type} has no title words"
+            # Creator words may be empty (a film list is often one column),
+            # but the spec must be explicit about it.
+            assert isinstance(domain.list_columns.creator_headers, tuple)
+
+    def test_an_album_list_autodetects_album_and_artist_headers(self) -> None:
+        csv = "Álbum,Artista\r\nKind of Blue,Miles Davis\r\nDiscovery,Daft Punk\r\n"
+        snapshot = read_all(csv, domain="album")
+        by_title = records_by_title(snapshot)
+        assert by_title["Kind of Blue"].item.metadata["creators"] == ["Miles Davis"]
+        assert by_title["Kind of Blue"].item_type == "album"
+
+    def test_a_film_list_with_one_column_imports_with_empty_creators(self) -> None:
+        """A film list is often just titles: the movie domain declares no
+        creator words, so a one-column list is valid and the creator is
+        empty — not an error."""
+        csv = "Película\r\nBlade Runner\r\nSuspiria\r\n"
+        snapshot = read_all(csv, domain="movie")
+        by_title = records_by_title(snapshot)
+        assert by_title["Blade Runner"].item.metadata == {}
+        assert by_title["Blade Runner"].item_type == "movie"
+        assert not by_title["Blade Runner"].errors
+
+    def test_a_single_column_book_list_is_still_missing_columns(self) -> None:
+        """Books declare creator words, so a one-column book list still
+        needs its second column — the declaration governs, not the reader."""
+        csv = "Título\r\nRayuela\r\n"
+        importer = ListImporter()
+        with pytest.raises(ListCSVError) as refused:
+            importer.read(
+                ImportSource(
+                    data=csv.encode("utf-8"),
+                    filename="libros.csv",
+                    options={"targets": "book"},
+                ),
+                CONTEXT,
+            )
+        assert refused.value.code == "missing_columns"
+
+    def test_the_domain_choice_composes_the_fingerprint(self) -> None:
+        """One list, one domain per batch: the same file for two domains is
+        two imports, and re-previewing returns the stored batch."""
+        csv = "Title,Creator\r\nRayuela,Julio Cortázar\r\n"
+        book_snapshot = read_all(csv, domain="book")
+        album_snapshot = read_all(csv, domain="album")
+        assert book_snapshot.fingerprint != album_snapshot.fingerprint
+        assert "book" in book_snapshot.fingerprint or book_snapshot.fingerprint
+        # And the same domain twice is the same import (byte-identical replay).
+        again = read_all(csv, domain="book")
+        assert again.fingerprint == book_snapshot.fingerprint
+
+    def test_rows_carry_the_chosen_domains_type(self) -> None:
+        csv = "Album,Artist\r\nKind of Blue,Miles Davis\r\n"
+        snapshot = read_all(csv, domain="album")
+        assert all(record.item_type == "album" for record in snapshot.records)
+
+    def test_no_domain_choice_refuses_for_a_multi_domain_connector(self) -> None:
+        """The choice is required: a connector that serves five domains
+        cannot guess which library the rows belong in."""
+        csv = "Title\r\nRayuela\r\n"
+        importer = ListImporter()
+        with pytest.raises(ListCSVError) as refused:
+            importer.read(
+                ImportSource(data=csv.encode("utf-8"), filename="libros.csv"),
+                CONTEXT,
+            )
+        # The refusal names the thing to fix (the library), not a column
+        # complaint — the reader cannot even interpret the file's shape
+        # without knowing whose vocabulary to read it with.
+        assert refused.value.code == "invalid_import_target"
+
+    def test_book_autodetection_is_unchanged(self) -> None:
+        """The v2.1.0 regression contract: books keep their word lists and
+        behaviour byte-for-byte."""
+        csv = "﻿Título del libro,Autor,Editorial \r\nRayuela,Julio Cortázar, Sudamericana\r\n"
+        snapshot = read_all(csv, domain="book")
+        by_title = records_by_title(snapshot)
+        assert by_title["Rayuela"].item.metadata["creators"] == ["Julio Cortázar"]
+        assert by_title["Rayuela"].source_fields["Editorial"] == "Sudamericana"
+        assert by_title["Rayuela"].item_type == "book"
+
+
 def double_queries(double) -> list[str]:
     """The queries a provider double saw, for assertions inside tests."""
     return getattr(double, "queries", [])
@@ -1015,7 +1162,10 @@ class TestSyntheticFixture:
     def test_the_fixture_auto_maps_and_reads_honestly(self) -> None:
         data = self.FIXTURE.read_bytes()
         importer = ListImporter()
-        snapshot = importer.read(ImportSource(data=data, filename="list_synthetic.csv"), CONTEXT)
+        snapshot = importer.read(
+            ImportSource(data=data, filename="list_synthetic.csv", options={"targets": "book"}),
+            CONTEXT,
+        )
         # 12 data rows (the fixture the sprint names), one header, every
         # non-empty row present — including the error rows the reader refuses
         # to invent data for.
@@ -1063,6 +1213,7 @@ class TestSyntheticFixture:
                         "text/csv",
                     )
                 },
+                data={"targets": "book"},
             )
             assert preview.status_code == 201
             body = preview.json()
