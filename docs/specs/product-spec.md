@@ -520,15 +520,30 @@ identifiers made matching trivial. This one reads a spreadsheet a person typed �
 identifiers at all** — and the product answer to a source with no identity is
 **search-then-confirm**, not a bigger heuristic.
 
-The flow (the owner's three recorded decisions, 2026-09-13):
+**Any list, any domain** (Sprint 084, DEC-160): the library a list belongs to
+is a choice made before the file can be interpreted, and every domain that
+declares its list vocabulary — its header words, whether a creator column is
+required at all — is importable the same way. One list is one library per
+batch; a mixed batch is refused rather than guessed.
 
-1. **Upload and mapping.** Drop the CSV/TXT (comma, semicolon or tab; BOM and
-   CRLF tolerated). Title and author columns are found from the headers —
+The flow (the owner's three recorded decisions, 2026-09-13, and the
+generalization of 2026-09-14):
+
+1. **Pick the library, then upload and map.** A list row carries no identity,
+   so nothing downstream can route it: the library is picked once, from the
+   connector's declared domains, and the choice is part of the import's
+   identity (the same file for two libraries is two imports). Drop the
+   CSV/TXT (comma, semicolon or tab; BOM and CRLF tolerated). Title and
+   creator columns are found from the headers — each domain's own words,
    Spanish and English, accents folded — and the first two columns are the
-   fallback; the screen offers explicit column numbers that override both.
-   Only title and author are read. The file's other columns ride uninterpreted
-   in each row's source fields, visible on the preview, mapped to nothing —
-   mapping them is future work for whatever spreadsheet a future user brings.
+   fallback for a domain that expects a creator; a domain that declares none
+   (a film list is often one column) reads a title column and treats a
+   missing creator as an empty fact. The screen offers explicit column
+   numbers that override both, labelled in the picked library's own words
+   (Author, Artist, Creators). Only title and creator are read. The file's
+   other columns ride uninterpreted in each row's source fields, visible on
+   the preview, mapped to nothing — mapping them is future work for whatever
+   spreadsheet a future user brings.
 2. **The search runs in the background while the preview stays open.** One job
    walks the rows in order — sequential, one row at a time, respecting public-API
    rate limits — and searches the domain's providers for each, storing the merged

@@ -1527,6 +1527,11 @@
               }
             ],
             "title": "Placeholder"
+          },
+          "single_domain_pick": {
+            "default": false,
+            "title": "Single Domain Pick",
+            "type": "boolean"
           }
         },
         "required": [

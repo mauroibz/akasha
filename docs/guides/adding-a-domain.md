@@ -209,6 +209,7 @@ DOMAIN = Domain(
     enrichment=None,                # background enrichment: see §6
     recognize=lambda value: recognize_album_url(value),
     chooses_covers=False,           # the cover chooser: see §5
+    list_columns=None,              # the custom-list vocabulary: see §8's list note
 )
 ```
 
@@ -520,6 +521,19 @@ method, an empty or shouted error vocabulary, a nested `alternate`, two inputs s
 non-positive `max_bytes`/`max_files`, `kind="directory"`/`kind="export"` without `accepts_files` or
 `members`, an invalid member pattern, a record whose `source_files` fall outside those members, or
 `incremental` without a `plan` method.
+
+#### The custom list (Sprint 084)
+
+A domain becomes importable from a hand-written list the moment it declares
+its list vocabulary — `list_columns=ListColumnSpec(title_headers=…,
+creator_headers=…, creator_label=…)`. No connector change: the shared list
+reader serves exactly the domains that declare one, reads the chosen
+library's words for header auto-detection, and treats a missing creator
+column as valid only when the domain declared no creator words. `None` (the
+default) means *not list-importable*, deliberately. The conformance suite
+(`list_columns_name_real_columns_or_none`) checks the declaration: title
+words present, trimmed and folded, and creator words only on a domain that
+has a creators field.
 
 ### Step 6 — Prove it
 

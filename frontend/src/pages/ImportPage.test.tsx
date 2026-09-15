@@ -1626,7 +1626,6 @@ const listImporter = {
   },
 };
 
-
 const listItemTypes = [
   {
     id: "book",
@@ -1736,8 +1735,12 @@ describe("the list connector's search-then-confirm surfaces", () => {
     const dropdown = await screen.findByRole("combobox", {
       name: /which library is this list for\?/i,
     });
-    expect(within(dropdown).getByRole("option", { name: /albums/i })).toBeInTheDocument();
-    expect(within(dropdown).getByRole("option", { name: /books/i })).toBeInTheDocument();
+    expect(
+      within(dropdown).getByRole("option", { name: /albums/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(dropdown).getByRole("option", { name: /books/i }),
+    ).toBeInTheDocument();
 
     // The default is the first declared domain; choosing another sends it.
     await userEvent.selectOptions(dropdown, "album");

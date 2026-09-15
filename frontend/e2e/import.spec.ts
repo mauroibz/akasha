@@ -1125,7 +1125,6 @@ test("the list connector picks its library before the file, and the choice rides
   // published labels: books and albums, the way the real API serves them.
   await stubItemTypes(page, [bookItemType, albumItemType]);
   await page.route("**/api/import/list/preview", async (route) => {
-    const form = route.request().postDataJSON;
     // Multipart: read the targets field off the request body
     const body = route.request().postData() ?? "";
     const match = body.match(/name="targets"\r\n\r\n([^\r]+)\r\n/);
