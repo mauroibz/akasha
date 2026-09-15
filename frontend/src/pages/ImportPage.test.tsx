@@ -1900,7 +1900,7 @@ describe("the list connector's search-then-confirm surfaces", () => {
     await waitFor(() => expect(flags).toEqual([null, "true"]));
   });
 
-  it("renders the badge below the importer's name (owner batch 2026-09-15)", async () => {
+  it("renders the library caption below the importer's name (owner batch 2026-09-15)", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/importers") {
         return new Response(JSON.stringify([listImporter]));
@@ -1911,20 +1911,21 @@ describe("the list connector's search-then-confirm surfaces", () => {
     });
     renderImportPage();
 
-    // The label is the anchor line; the domain tag reads beneath it, the
-    // owner's ask: side-by-side "read weird".
+    // The card's two lines: the name is the anchor, the library caption
+    // reads beneath it — a quiet text line, not a chip (the redesign).
     const trigger = (await screen.findByRole("tab", {
       name: /custom list/i,
     })) as HTMLElement;
-    const label = trigger.querySelector("span.block");
-    const badge = trigger.querySelector("span.inline-flex");
-    expect(label).not.toBeNull();
-    expect(badge).not.toBeNull();
-    if (label && badge) {
-      expect(label.getBoundingClientRect().top).toBeLessThanOrEqual(
-        badge.getBoundingClientRect().top,
+    const name = trigger.querySelector("span.font-medium");
+    const caption = trigger.querySelector("span.text-muted-foreground");
+    expect(name).not.toBeNull();
+    expect(caption).not.toBeNull();
+    if (name && caption) {
+      expect(name.textContent).toMatch(/custom list/i);
+      expect(caption.textContent).toMatch(/any library/i);
+      expect(name.getBoundingClientRect().top).toBeLessThanOrEqual(
+        caption.getBoundingClientRect().top,
       );
-      expect(badge.textContent).toMatch(/any library/i);
     }
   });
 

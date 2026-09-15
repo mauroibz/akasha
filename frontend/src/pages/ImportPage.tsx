@@ -664,20 +664,21 @@ export function ImportPage() {
               the target checkboxes follow). */}
           {spec.fields && spec.fields.length > 0 && (
             <fieldset
-              className="flex flex-wrap gap-3 rounded-lg border border-border p-3"
-              // A real group with its own accessible name: the controls read
-              // as one mapping unit (the owner's 2026-09-15 refinement).
+              // One grid so every control shares two baselines: labels on
+              // one line, h-11 controls on the next — the owner's alignment
+              // ask. Two columns on a phone, one tidy row from `sm` up.
+              className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-lg border border-border p-3 sm:grid-cols-4"
               aria-label="Column mapping"
             >
               {spec.fields.map((name) =>
                 name === "delimiter" ? (
-                  <label key={name} className="block">
+                  <label key={name} className="flex min-w-0 flex-col gap-1">
                     <span className="text-sm text-muted-foreground">
                       Separator
                     </span>
                     <select
                       aria-label="Separator"
-                      className="mt-1 h-11 w-36 rounded-md border border-input bg-surface-raised px-3 text-base focus-ring"
+                      className="h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-base focus-ring"
                       value={delimitersByImporter[importer.id] ?? ""}
                       onChange={(event) =>
                         setDelimitersByImporter((current) => ({
@@ -693,7 +694,7 @@ export function ImportPage() {
                     </select>
                   </label>
                 ) : (
-                  <label key={name} className="block">
+                  <label key={name} className="flex min-w-0 flex-col gap-1">
                     <span className="text-sm text-muted-foreground">
                       {name === "title_column"
                         ? "Title is column"
@@ -704,7 +705,7 @@ export function ImportPage() {
                     <Input
                       type="number"
                       min={1}
-                      className="mt-1 h-11 w-28"
+                      className="h-11 w-full"
                       value={columnMapping[name] ?? ""}
                       placeholder="auto"
                       onChange={(event) =>
@@ -718,29 +719,39 @@ export function ImportPage() {
                 ),
               )}
               {spec.flags?.includes("no_creators") && (
-                <label className="flex items-end gap-2 pb-1.5">
-                  <Checkbox
-                    checked={noCreators}
-                    onCheckedChange={(checked) =>
-                      setNoCreatorsByImporter((current) => ({
-                        ...current,
-                        [importer.id]: checked === true,
-                      }))
-                    }
-                    aria-label="No creators column"
-                  />
-                  <span className="text-sm text-muted-foreground">
-                    No creators column
+                <div className="flex min-w-0 flex-col gap-1">
+                  {/* An invisible label line so the checkbox lands on the
+                      same baseline as the number inputs beside it. */}
+                  <span
+                    aria-hidden="true"
+                    className="invisible text-sm text-muted-foreground"
+                  >
+                    Creators
                   </span>
-                </label>
+                  <label className="flex h-11 items-center gap-2">
+                    <Checkbox
+                      checked={noCreators}
+                      onCheckedChange={(checked) =>
+                        setNoCreatorsByImporter((current) => ({
+                          ...current,
+                          [importer.id]: checked === true,
+                        }))
+                      }
+                      aria-label="No creators column"
+                    />
+                    <span className="text-sm text-muted-foreground">
+                      No creators
+                    </span>
+                  </label>
+                </div>
               )}
-              <p className="w-full text-xs text-muted-foreground">
+              <p className="col-span-full text-xs text-muted-foreground">
                 Leave them empty and the columns are found from the headers; the
                 first two columns are the fallback.
               </p>
               {spec.fields.includes("delimiter") && (
                 <p
-                  className="w-full font-mono text-xs text-muted-foreground"
+                  className="col-span-full font-mono text-xs text-muted-foreground"
                   aria-live="polite"
                 >
                   {sampleRowFor(importer)}
@@ -834,32 +845,29 @@ export function ImportPage() {
     // direction).
     <TabsList
       aria-label="Import source"
-      // `justify-start`, never the shadcn default `justify-center`: the
-      // badges widened the tabs past the strip's width, and centered flex
-      // content overflows BOTH sides — the first tab painted left of the
-      // scroll box, where no scrollLeft could reach it (found by Sprint
-      // 085's own walkthrough). Left-anchored, the overflow is scrollable.
-      className="flex h-auto min-w-0 max-w-full justify-start gap-1 overflow-x-auto"
+      // `justify-start`, never the shadcn default `justify-center`: centered
+      // flex content overflowing a scroll box paints left of it, unreachable
+      // (Sprint 085's walkthrough). Left-anchored, the overflow scrolls.
+      // No pill background: the strip is a quiet row of two-line cards —
+      // the connector's name in the reading voice, the library it serves as
+      // a caption beneath — and the active card is shown by the ring, not by
+      // a filled well (the owner's 2026-09-15 "ugly" report).
+      className="flex h-auto min-w-0 max-w-full justify-start gap-2 overflow-x-auto bg-transparent p-0"
     >
       {importers.map((importer) => (
         <TabsTrigger
           key={importer.id}
           value={importer.id}
-          className="min-h-11 shrink-0 items-start gap-1 px-3"
+          className="min-h-11 shrink-0 items-start gap-0 rounded-lg border border-transparent px-3 py-2 text-left data-[state=active]:border-border data-[state=active]:bg-surface-raised data-[state=active]:shadow-sm"
         >
-          {/* Two lines (the owner's 2026-09-15 refinement): the connector's
-              name is the anchor line, the library tag reads beneath it —
-              side by side read weird. Rendered from the declaration, never a
-              hardcoded list; the muted dot is presentational, deliberately
-              not the accent (no semantic collision, the ScorePicker rule). */}
-          <span className="block min-w-0 text-left font-medium">
+          {/* Two lines: the name is the anchor, the library caption reads
+              beneath it — from the connector's own `item_types`, never a
+              hardcoded list. The caption is plain text, deliberately not a
+              colored chip (no semantic collision, the ScorePicker rule). */}
+          <span className="block min-w-0 text-sm font-medium leading-tight">
             {importer.label}
           </span>
-          <span className="mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
-            <span
-              aria-hidden="true"
-              className="h-1.5 w-1.5 rounded-full bg-primary/70"
-            />
+          <span className="mt-0.5 block truncate text-[11px] leading-tight text-muted-foreground">
             {importer.item_types.length > 1
               ? "Any library"
               : ((Array.isArray(itemTypes.data)
