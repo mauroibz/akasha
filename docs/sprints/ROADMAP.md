@@ -2,7 +2,7 @@
 
 **Plan revision:** 43
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [085 — List comforts](085-list-comforts.md) (ready). Sprints 001–084 are done: Sprint 082
+**Active sprint:** none — the plan is complete. Sprints 001–085 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -201,7 +201,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 | [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
 | [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
-| [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | ready |
+| [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | completed |
 
 ## Sprint contracts
 
@@ -1713,6 +1713,16 @@ choice rather than a birthright.
   and a colored per-importer domain indicator ("Any" for the list, "Books"
   for goodreads/calibre) rendered from each connector's own `item_types`.
   Ships as v2.2.1.
+
+  **Delivered and closed 2026-09-15.** All four, live-proven — plus the
+  three defects the live check surfaced: the strip's centered-flex overflow
+  made its first tab unclickable once the badges widened it (a real
+  user-facing defect, not a script artifact), the drop zone's autoFocus
+  scrolled every /import visit mid-viewport once the list rendered on first
+  paint, and the no_creators flag initially skipped only the header mapping
+  while the row still errored `author missing`. Gates: backend 1601,
+  Vitest 337, make check green, Playwright 137+2 skipped, walkthrough clean
+  against real providers.
 
 ## Not scheduled
 

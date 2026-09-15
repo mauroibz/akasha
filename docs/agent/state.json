@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 43,
-  "project_status": "in_progress",
-  "active_sprint": "085",
-  "active_sprint_file": "docs/sprints/085-list-comforts.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "084",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "085",
   "completed_sprints": [
     "001",
     "002",
@@ -90,8 +90,9 @@
     "081",
     "082",
     "083",
-    "084"
+    "084",
+    "085"
   ],
-  "started_at": "2026-09-15T10:57:30-03:00",
-  "updated_at": "2026-09-15T10:57:30-03:00"
+  "started_at": "",
+  "updated_at": "2026-09-15T11:49:01-03:00"
 }

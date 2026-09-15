@@ -1,7 +1,7 @@
 # Sprint 085 — List comforts
 
 **Sprint:** 085
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 43
 **Depends on:** 084
 **Owner:** Mauro
@@ -141,3 +141,82 @@ Measured 2026-09-15 in this worktree (all file:line from live source):
 - Mapping a list's extra columns to domain fields (unchanged, "queda a futuro").
 - Mixed-domain batches (unchanged).
 - Any new connector or provider.
+
+## Outcome
+
+_Delivered 2026-09-15. All seven acceptance criteria verified live; the
+walkthrough found two defects the suites could not see, both fixed and
+re-proven. Shipped as v2.2.1._
+
+**Delivered behavior.**
+
+- **AC1/AC2 (typed entries, editor mirrors uploads).** A paste-or-type
+  editor beside the file input: typed rows preview with no file at all —
+  the bytes travel as the upload the connector declared
+  (`pasted-list.csv`), same route, same reader, no new API surface. A
+  dropped text file fills the editor through a `FileReader` (jsdom's File
+  has no `.text()`, so the component tests and the browser agree), and
+  editing the editor makes it the source.
+- **AC3 (the creators checkbox).** `ImportInputSpec.flags` declares a
+  connector's boolean options the way `fields` declares string ones (the
+  route forwards exactly what was declared); the list declares
+  `no_creators`. The reader maps titles only on any domain — the same rule
+  a no-creator-words domain follows — lifts the two-column minimum,
+  refuses an `author_column` sent beside the flag as the contradiction it
+  is, skips the positional creator fallback, drops the row-level
+  `author missing` error, and composes the fingerprint (`#nocreator`), so
+  the same file with and without its creators is two imports. Unchecked is
+  v2.2.0 byte-for-byte.
+- **AC4 (order).** The custom list leads `REGISTERED_IMPORTERS` (order is
+  presentation only; the derived indexes are order-independent). The one
+  test that read connectors positionally now keys by id — the same defect
+  class its own comment documents.
+- **AC5 (badges).** Each tab names its libraries from its own
+  `item_types`: "Any library" for the list, the domain's own published
+  label for single-domain connectors. Muted dot, no semantic collision
+  (the ScorePicker rule); the accessible name grows to include it, which
+  is more information, not less.
+- **AC6 (phone fit).** DEC-137's spec passes with the badges present.
+- **AC7 (no domain branch).** The editor, checkbox and badges are all
+  declaration-driven; the conformance suite's neutrality check covers the
+  connector; review found no domain branch in the diff.
+
+**Walkthrough findings (fixed in-sprint).**
+
+1. The source strip inherited shadcn's `justify-center`: once the badges
+   widened the tabs past the strip's width, centered flex content
+   overflowed BOTH sides and the first tab painted left of the scroll box,
+   unreachable by any scroll — unclickable for a user, not just the
+   script. Left-anchored now (`justify-start`).
+2. The drop zone's `autoFocus` — harmless when Goodreads led — rendered on
+   first paint with the list leading and scrolled every visit to /import
+   mid-viewport, burying the strip under the fixed header. Removed (the
+   input is one Tab away).
+3. The no_creators flag mapped titles only but the row still carried the
+   `author missing` error a creator-expecting domain records, so the
+   commit gate counted 0 ready. The flag now opts the row out of the
+   requirement too.
+
+**Commands and actual results.**
+
+- `uv run pytest tests/` — **1601 passed**.
+- `npm run test -- --run` — **337 passed**.
+- `make check` — green (ruff, mypy, eslint, prettier, OpenAPI no-drift,
+  validator; OpenAPI regenerated for `flags` and the version bump).
+- `npm run test:e2e` — **137 passed, 2 skipped** (full parallel run).
+- Live walkthrough (`frontend/scripts/walkthrough-list-comforts.mjs`,
+  fresh /tmp/akasha-s085, real providers) — **CLEAN**: 3 typed film rows
+  committed with no file; the checkbox batch committed Rayuela with
+  `creators: []`; a dropped CSV filled the editor and an inline correction
+  re-sourced the batch; the strip shows the list first with its badges.
+
+**Commits.** c32fc12 (the creators checkbox), 2911354 (editor, order,
+badges), 033944a (the two walkthrough defects), 12d16b7 (script lint).
+
+**Deviations.** The plan's D1.3 resolved to the synthesized-File shape (no
+route surface added) — the option the plan preferred. The commit tags use
+CONTRIBUTING's `[TAG]` form rather than the plan's checkpoint wording.
+
+**Impact on future sprints.** `ImportInputSpec.flags` is a new declared
+channel available to any connector needing a boolean option. No open work;
+version surfaces at 2.2.1.

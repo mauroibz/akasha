@@ -5828,3 +5828,42 @@ progress on ecc0b61 when planning started.
 **Next.** Land v2.2.0 (wait for CI 34975458402, then merge/tag/verify/publish
 per the release recipe). Then Sprint 085 executes the four asks and ships as
 v2.2.1.
+
+---
+
+## 2026-09-15 (later still) — Sprint 085: list comforts (executed and closed)
+
+**Done.** All four owner asks, live-proven. A paste-or-type editor beside
+the file input (typed rows preview with no file — the bytes travel as the
+declared upload; a dropped file fills the editor via FileReader; editing
+re-sources). The creators column optional by checkbox through a new
+declared boolean channel (`ImportInputSpec.flags`, the route forwarding
+exactly what was declared); the reader honors it end to end — titles only,
+no positional fallback, no row error, the flag composing the fingerprint.
+The custom list leads the strip. Every tab names its library from its own
+`item_types` (Any library / Book / …).
+
+**Verified and how.** Backend 1601; Vitest 337; make check green (OpenAPI
+regenerated twice — flags, then the 2.2.1 bump); Playwright 137+2 skipped on
+the full parallel run; live walkthrough CLEAN on fresh /tmp/akasha-s085
+against real providers — 3 typed film rows committed, the checkbox batch
+committed Rayuela with creators [], a dropped CSV filled the editor, an
+inline correction re-sourced, strip order and badges verified.
+
+**The walkthrough's findings (all fixed, TDD'd where a suite could hold
+them).** (1) The strip's centered flex overflow made the first tab
+unclickable once the badges widened it — `justify-start`; a user-visible
+defect, not a script artifact. (2) The drop zone's autoFocus scrolled every
+/import visit mid-viewport once the list rendered on first paint —
+removed. (3) The no_creators flag initially skipped only the header mapping;
+the row still errored `author missing` and the gate counted 0 ready — the
+flag now opts the row out of the requirement.
+
+**Deviations.** None material; D1.3 resolved to the synthesized-File shape
+(no route surface). `previewImportWithOptions` now carries the library pick
+(a pre-existing gap: a mapping silently dropped the chosen domain).
+
+**Next.** Release v2.2.1 (tag, images, GitHub Release) — the version
+surfaces and notes are already bumped and committed; then the plan stands
+complete at 85/85 again. Owner-side: rebuild the dev container whenever
+wanted.
