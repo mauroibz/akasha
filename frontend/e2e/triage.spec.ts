@@ -1247,11 +1247,11 @@ test("the import screen reaches triage and comes back without leaving", async ({
   );
 
   await page.goto("/import");
-  await expect(page.getByRole("tab", { name: "Goodreads" })).toBeVisible();
+  await expect(page.getByRole("tab", { name: /goodreads/i })).toBeVisible();
   await page.getByRole("tab", { name: /triage/i }).click();
   await expect(page.getByText("2 unsorted")).toBeVisible();
   await page.getByRole("tab", { name: /import/i }).click();
-  await page.getByRole("tab", { name: "Calibre" }).click();
+  await page.getByRole("tab", { name: /calibre/i }).click();
   // Calibre leads with the folder chooser; the mount is its alternate (DEC-081).
   await expect(
     page.getByLabel("Calibre folder", { exact: true }),

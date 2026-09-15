@@ -182,9 +182,9 @@ describe("ImportPage", () => {
     renderImportPage();
 
     expect(
-      await screen.findByRole("tab", { name: "StoryGraph" }),
+      await screen.findByRole("tab", { name: /storygraph/i }),
     ).toBeVisible();
-    expect(screen.queryByRole("tab", { name: "Goodreads" })).toBeNull();
+    expect(screen.queryByRole("tab", { name: /goodreads/i })).toBeNull();
   });
 
   it("previews and commits a confined Calibre library without asking for a file", async () => {
@@ -1622,6 +1622,7 @@ const listImporter = {
     max_files: null,
     fields: ["title_column", "author_column"],
     single_domain_pick: true,
+    flags: ["no_creators"],
     alternates: [],
   },
 };
@@ -1756,6 +1757,170 @@ describe("the list connector's search-then-confirm surfaces", () => {
       await screen.findByRole("button", { name: /preview/i }),
     );
     expect(bodies).toEqual(["album"]);
+  });
+
+  it("takes typed entries with no file at all, and a dropped file fills the editor (Sprint 085)", async () => {
+    const bodies: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter]));
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
+      if (url.endsWith("/api/import/list/preview")) {
+        const form = init?.body as FormData;
+        const file = form.get("file");
+        // (jsdom's File has no .text() and its Response stringifies one;
+        // the FileReader is the one reader that works everywhere.)
+        if (!(file instanceof File)) {
+          bodies.push("(none)");
+        } else {
+          bodies.push(
+            await new Promise<string>((resolve) => {
+              const reader = new FileReader();
+              reader.onload = () => resolve(String(reader.result ?? ""));
+              reader.onerror = () => resolve("");
+              reader.readAsText(file);
+            }),
+          );
+        }
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f#book",
+            state: "matching",
+            summary: { total: 3, ready: 3, errors: 0, ambiguous: 0 },
+            search_progress: { searched: 0, total: 3, job_state: "running" },
+            records: [listRecord()],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    // A dropped file fills the editor with its text: check what was
+    // uploaded, correct it inline.
+    const editor = await screen.findByRole("textbox", {
+      name: /or type your list here/i,
+    });
+    const csv = "Título,Autor\r\nRayuela,Julio Cortázar";
+    const input = await screen.findByLabelText(/your list/i, {
+      selector: "input",
+    });
+    await userEvent.upload(
+      input,
+      new File([csv], "libros.csv", { type: "text/csv" }),
+    );
+    // The editor mirrors the file's rows (line endings may normalize; the
+    // content is what the owner needs to check and correct).
+    await waitFor(() =>
+      expect((editor as HTMLTextAreaElement).value.replace(/\r/g, "")).toBe(
+        csv.replace(/\r/g, ""),
+      ),
+    );
+
+    // Editing the editor re-types the list, and the typed rows are the
+    // bytes the reader gets — with no file chosen at all after the edit.
+    // (Re-queried: the upload's fill re-rendered the form and replaced the
+    // node the earlier query held.)
+    const freshEditor = await screen.findByRole("textbox", {
+      name: /or type your list here/i,
+    });
+    await userEvent.clear(freshEditor);
+    await userEvent.type(
+      freshEditor,
+      "Título,Autor\r\nRayuela,Julio Cortázar\r\nEl Hobbit,Tolkien",
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]).toContain("Rayuela,Julio Cortázar");
+    expect(bodies[0]).toContain("El Hobbit,Tolkien");
+  });
+
+  it("offers the declared no-creators checkbox and sends the flag (Sprint 085)", async () => {
+    const flags: (string | null)[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([listImporter, importers[0]]));
+      if (url.startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
+      if (url.endsWith("/api/import/list/preview")) {
+        const form = init?.body as FormData;
+        flags.push(form.get("no_creators") as string | null);
+        return new Response(
+          JSON.stringify({
+            batch_id: "list-1",
+            fingerprint: "f#book",
+            state: "matching",
+            summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+            search_progress: { searched: 0, total: 1, job_state: "running" },
+            records: [listRecord()],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    const editor = await screen.findByRole("textbox", {
+      name: /or type your list here/i,
+    });
+    await userEvent.type(editor, "Título,Autor\r\nRayuela,Julio Cortázar");
+
+    // Unchecked sends nothing — the flag rides only when the owner set it.
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+    await waitFor(() => expect(flags).toEqual([null]));
+
+    // The preview replaced the form; switching tabs is the reset path the
+    // screen itself offers. Come back and check the box.
+    await userEvent.click(
+      await screen.findByRole("tab", { name: /goodreads/i }),
+    );
+    await userEvent.click(await screen.findByRole("tab", { name: /custom list/i }));
+    await userEvent.type(
+      await screen.findByRole("textbox", { name: /or type your list here/i }),
+      "Título,Autor\r\nRayuela,Julio Cortázar",
+    );
+    await userEvent.click(
+      await screen.findByRole("checkbox", { name: /no creators column/i }),
+    );
+    await userEvent.click(
+      await screen.findByRole("button", { name: /preview/i }),
+    );
+    await waitFor(() => expect(flags).toEqual([null, "true"]));
+  });
+
+  it("renders a per-importer domain indicator from item_types (Sprint 085)", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/importers") {
+        const withStrip = {
+          ...listImporter,
+          item_types: ["book", "album"],
+        };
+        const goodreads = { ...importers[0], item_types: ["book"] };
+        return new Response(JSON.stringify([withStrip, goodreads]));
+      }
+      if (String(input).startsWith("/api/item-types"))
+        return new Response(JSON.stringify(listItemTypes));
+      return new Response(JSON.stringify([]), { status: 404 });
+    });
+    renderImportPage();
+
+    // A multi-domain connector says Any; a single-domain one names its
+    // domain — both from item_types, never a hardcoded list.
+    const strip = await screen.findByRole("tablist", {
+      name: /import source/i,
+    });
+    expect(await within(strip).findByText(/any library/i)).toBeInTheDocument();
+    expect(within(strip).getByText(/^books$/i)).toBeInTheDocument();
   });
 
   it("shows no mapping inputs for a connector that declares none", async () => {

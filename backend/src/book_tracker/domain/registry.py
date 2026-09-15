@@ -44,9 +44,13 @@ DOMAINS: dict[str, Domain] = {
 # rather than written out, because a hand-maintained index and a declaration
 # disagreeing is a connector reachable from a library it cannot fill.
 REGISTERED_IMPORTERS: tuple[Importer, ...] = (
+    # The list leads: a hand-written list is the source a person always has
+    # (the owner's 2026-09-15 ask), where every other connector needs a
+    # platform export first. Order is presentation only — the derived
+    # indexes and dispatch below are order-independent.
+    LIST_IMPORTER,
     GOODREADS_IMPORTER,
     CALIBRE_IMPORTER,
-    LIST_IMPORTER,
     MYANIMELIST_IMPORTER,
     LETTERBOXD_IMPORTER,
     IMDB_IMPORTER,

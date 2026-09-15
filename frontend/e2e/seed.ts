@@ -234,6 +234,37 @@ export async function stubImporters(page: Page) {
     route.fulfill({
       json: [
         {
+          id: "list",
+          label: "Custom list",
+          item_types: ["book", "album", "movie", "series", "anime"],
+          attachment_max_bytes: 25 * 1024 * 1024,
+          input: {
+            kind: "upload",
+            label: "Your list (CSV or text)",
+            field: "file",
+            accept: ".csv,.txt,.tsv,text/csv",
+            placeholder: null,
+            help: null,
+            guide: ["Save your list as CSV or plain text."],
+            empty_state: "Drop your list here, or choose a file.",
+            help_url: null,
+            browsable: false,
+            incremental: false,
+            accepts_files: false,
+            max_bytes: null,
+            max_files: null,
+            // Sprint 083: the connector declares its configurable mapping, and
+            // the screen renders the inputs from the declaration (DEC-080's
+            // rule exercised by the catalog's newest shape).
+            fields: ["title_column", "author_column"],
+            flags: ["no_creators"],
+            // Sprint 084: a list row carries no identity, so the library is a
+            // single-pick choice made before the file can be interpreted.
+            single_domain_pick: true,
+            alternates: [],
+          },
+        },
+        {
           id: "goodreads",
           label: "Goodreads",
           item_types: ["book"],
@@ -323,36 +354,6 @@ export async function stubImporters(page: Page) {
                 alternates: [],
               },
             ],
-          },
-        },
-        {
-          id: "list",
-          label: "Custom list",
-          item_types: ["book", "album", "movie", "series", "anime"],
-          attachment_max_bytes: 25 * 1024 * 1024,
-          input: {
-            kind: "upload",
-            label: "Your list (CSV or text)",
-            field: "file",
-            accept: ".csv,.txt,.tsv,text/csv",
-            placeholder: null,
-            help: null,
-            guide: ["Save your list as CSV or plain text."],
-            empty_state: "Drop your list here, or choose a file.",
-            help_url: null,
-            browsable: false,
-            incremental: false,
-            accepts_files: false,
-            max_bytes: null,
-            max_files: null,
-            // Sprint 083: the connector declares its configurable mapping, and
-            // the screen renders the inputs from the declaration (DEC-080's
-            // rule exercised by the catalog's newest shape).
-            fields: ["title_column", "author_column"],
-            // Sprint 084: a list row carries no identity, so the library is a
-            // single-pick choice made before the file can be interpreted.
-            single_domain_pick: true,
-            alternates: [],
           },
         },
       ],

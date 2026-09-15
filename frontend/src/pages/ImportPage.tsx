@@ -113,6 +113,15 @@ export function ImportPage() {
   const [importers, setImporters] = useState<ImporterDefinition[]>([]);
   const [fallbackSource, setFallbackSource] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  // The typed-or-pasted half of the list's source (Sprint 085): the editor is
+  // the owner's window into what he uploaded — a dropped file fills it, a
+  // correction re-types it, and three typed rows import with no file at all.
+  const [typedList, setTypedList] = useState("");
+  // The owners' 2026-09-15 ask: "most queries work without them." Keyed by
+  // connector so switching tabs never carries one source's answer.
+  const [noCreatorsByImporter, setNoCreatorsByImporter] = useState<
+    Record<string, boolean>
+  >({});
   const [libraryPath, setLibraryPath] = useState("");
   const [bundle, setBundle] = useState<CalibreBundle | null>(null);
   const [exportFiles, setExportFiles] = useState<File[]>([]);
@@ -144,7 +153,9 @@ export function ImportPage() {
    */
   const creatorWordFor = (importer: ImporterDefinition) => {
     const picked = domainPicks[importer.id] ?? importer.item_types[0];
-    const known = itemTypes.data?.find((type) => type.id === picked);
+    const known = Array.isArray(itemTypes.data)
+      ? itemTypes.data.find((type) => type.id === picked)
+      : undefined;
     const creators = known?.fields.find((field) => field.name === "creators");
     return creators?.label ?? "Creator";
   };
@@ -299,6 +310,9 @@ export function ImportPage() {
   const ready =
     (preview?.summary.ready ?? 0) + (preview?.summary.ambiguous ?? 0);
   const activeImporter = importers.find((importer) => importer.id === source);
+  // The list connector's owners' checkbox (2026-09-15), keyed by connector so
+  // switching tabs never carries one source's answer into another's request.
+  const noCreators = !!noCreatorsByImporter[activeImporter?.id ?? ""];
   // A connector that can fill more than one library needs their names for the
   // target checkboxes, and a failed preview row needs the domain's own field
   // labels to describe what went wrong (AC3) — fetched only once either is
@@ -337,7 +351,9 @@ export function ImportPage() {
 
   /** The library's own name for a domain, falling back to its id (DEC-080). */
   const libraryLabel = (itemType: string) =>
-    itemTypes.data?.find((type) => type.id === itemType)?.label ?? itemType;
+    (Array.isArray(itemTypes.data)
+      ? itemTypes.data.find((type) => type.id === itemType)?.label
+      : undefined) ?? itemType;
 
   /**
    * A checkbox per declared domain, and nothing at all for a connector with one.
@@ -419,6 +435,16 @@ export function ImportPage() {
       if (spec.kind === "export" && exportFiles.length > 0)
         return { spec, source: exportFiles };
       if (spec.kind === "upload" && file) return { spec, source: file };
+      if (spec.kind === "upload" && typedList.trim())
+        return {
+          spec,
+          // The typed rows travel as the upload the connector declared —
+          // same route, same reader, no new API surface. The name says
+          // what it is: not a file the owner chose.
+          source: new File([typedList], "pasted-list.csv", {
+            type: "text/csv",
+          }),
+        };
       if (spec.kind === "path" && libraryPath.trim())
         return { spec, source: libraryPath.trim() };
     }
@@ -531,9 +557,9 @@ export function ImportPage() {
                   }
                 >
                   {importer.item_types.map((itemType) => {
-                    const known = itemTypes.data?.find(
-                      (type) => type.id === itemType,
-                    );
+                    const known = Array.isArray(itemTypes.data)
+                      ? itemTypes.data.find((type) => type.id === itemType)
+                      : undefined;
                     return (
                       <option key={itemType} value={itemType}>
                         {known ? known.label : itemType}
@@ -548,8 +574,65 @@ export function ImportPage() {
             importer={importer}
             inputId={inputId}
             file={file}
-            onFile={setFile}
+            onFile={(next) => {
+              setFile(next);
+              // A dropped file lands in the editor too, so "check what I
+              // uploaded and make small corrections" is literal: the owner
+              // sees the bytes and can re-type them. The file stays the
+              // source until the editor is edited (last one edited wins).
+              // (A FileReader, not File.text(): jsdom's File carries no
+              // `text()`, and the editor must fill in the component tests
+              // exactly as it does in the browser.)
+              if (next && next.type.startsWith("text/")) {
+                const reader = new FileReader();
+                reader.onload = () => setTypedList(String(reader.result ?? ""));
+                reader.onerror = () => undefined;
+                reader.readAsText(next);
+              }
+            }}
           />
+          {spec.flags?.includes("no_creators") && (
+            <label className="flex items-center gap-2">
+              <Checkbox
+                checked={noCreators}
+                onCheckedChange={(checked) =>
+                  setNoCreatorsByImporter((current) => ({
+                    ...current,
+                    [importer.id]: checked === true,
+                  }))
+                }
+                aria-label="No creators column"
+              />
+              <span className="text-sm text-muted-foreground">
+                No creators column — search by title alone
+              </span>
+            </label>
+          )}
+          {spec.flags?.includes("no_creators") && (
+            <div>
+              <label htmlFor={`${importer.id}-typed`} className="block">
+                <span className="text-sm text-muted-foreground">
+                  Or type your list here
+                </span>
+                <textarea
+                  id={`${importer.id}-typed`}
+                  className="mt-1 min-h-32 w-full rounded-md border border-input bg-surface-raised px-3 py-2 font-mono text-sm focus-ring"
+                  value={typedList}
+                  placeholder={"Título,Autor\nRayuela,Julio Cortázar"}
+                  onChange={(event) => {
+                    setTypedList(event.target.value);
+                    // Editing the editor makes it the source; the file no
+                    // longer speaks for the batch.
+                    setFile(null);
+                  }}
+                />
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Editing here after dropping a file re-types the list — the
+                editor is what gets imported.
+              </p>
+            </div>
+          )}
           {/* The connector's declared fields, rendered from the declaration:
               a list asks which columns hold the title and the author (Sprint
               083), and every connector with no fields shows nothing — no
@@ -679,9 +762,28 @@ export function ImportPage() {
         <TabsTrigger
           key={importer.id}
           value={importer.id}
-          className="min-h-11 shrink-0"
+          className="min-h-11 shrink-0 gap-2"
         >
           {importer.label}
+          {/* The connector's own declaration names its libraries (the
+              owner's 2026-09-15 ask): a multi-domain source serves any
+              library, a single-domain one names its one — never a
+              hardcoded list. The dot is presentational colour, deliberately
+              not the accent (no semantic collision, the ScorePicker rule);
+              the text carries the meaning alone. */}
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+            <span
+              aria-hidden="true"
+              className="h-1.5 w-1.5 rounded-full bg-primary/70"
+            />
+            {importer.item_types.length > 1
+              ? "Any library"
+              : ((Array.isArray(itemTypes.data)
+                  ? itemTypes.data.find(
+                      (type) => type.id === importer.item_types[0],
+                    )?.label
+                  : undefined) ?? importer.item_types[0])}
+          </span>
         </TabsTrigger>
       ))}
     </TabsList>
@@ -736,26 +838,32 @@ export function ImportPage() {
                         // appended to the same upload, keyed by connector so
                         // switching tabs never carries one source's mapping
                         // into another's request.
-                        Object.keys(columnMapping).length > 0 &&
-                        submission.spec.fields &&
-                        submission.spec.fields.length > 0
+                        Object.keys(columnMapping).length > 0 ||
+                        (noCreators && !!submission.spec.flags?.length)
                           ? previewImportWithOptions(
                               importer,
                               submission.spec,
                               source,
-                              Object.fromEntries(
-                                Object.entries(columnMapping)
+                              Object.fromEntries([
+                                ...Object.entries(columnMapping)
                                   .filter(([name]) =>
                                     submission.spec.fields!.includes(name),
                                   )
-                                  // The screen speaks 1-based column numbers;
-                                  // the reader's contract is 0-based.
+                                  // The screen speaks 1-based column
+                                  // numbers; the reader's contract is
+                                  // 0-based.
                                   .map(([name, value]) => [
                                     name,
                                     String(Number(value) - 1),
                                   ])
                                   .filter(([, value]) => Number(value) >= 0),
-                              ),
+                                // The owner's checkbox rides the same
+                                // options channel the mapping does.
+                                ...(noCreators
+                                  ? ([["no_creators", "true"]] as const)
+                                  : []),
+                              ]),
+                              chosenFor(importer),
                             )
                           : previewImport(
                               importer,

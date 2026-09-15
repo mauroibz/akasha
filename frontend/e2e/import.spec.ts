@@ -159,7 +159,7 @@ test("Calibre preview and re-sync are keyboard-complete at mobile width", async 
     });
   });
   await page.goto("/import");
-  await page.getByRole("tab", { name: "Calibre" }).press("Enter");
+  await page.getByRole("tab", { name: /calibre/i }).press("Enter");
   // The mount is the alternate now; reaching it is part of the keyboard path.
   await page
     .getByRole("button", { name: /import from a mounted/i })
@@ -850,17 +850,19 @@ test("the import source strip fits a phone with seven connectors, and scrolls wi
   // about 205px. Out of that sprint's scope; fixed here at the owner's
   // direction, the same structural fix DEC-134 applied to the domain strip.
   const sevenImporters = [
+    // The list leads the strip now (Sprint 085), but this spec's concern is
+    // width: seven fat tabs must fit a 390px viewport by scrolling.
+    "list",
     "goodreads",
     "calibre",
     "myanimelist",
     "letterboxd",
     "imdb",
     "trakt",
-    "spotify",
   ].map((id) => ({
     id,
     label: id[0].toUpperCase() + id.slice(1),
-    item_types: ["book"],
+    item_types: id === "list" ? ["book", "album"] : ["book"],
     attachment_max_bytes: 25 * 1024 * 1024,
     input: {
       kind: "upload",
@@ -1168,6 +1170,56 @@ test("the list connector picks its library before the file, and the choice rides
   // dropdown's post-preview existence is a render race, not a contract. The
   // contract this spec pins is the choice riding the multipart body.
   expect(sent).toEqual(["album"]);
+});
+
+test("the list leads the strip, names its domains, and typed entries import with no file (Sprint 085)", async ({
+  page,
+}) => {
+  const sent: string[] = [];
+  await stubImporters(page);
+  await stubItemTypes(page, [bookItemType, albumItemType]);
+  await page.route("**/api/import/list/preview", async (route) => {
+    // Playwright exposes the multipart body as a Buffer; parse the parts.
+    const body = route.request().postDataBuffer()?.toString("latin1") ?? "";
+    const flag = /name="no_creators"\r\n\r\n([^\r]+)\r\n/.exec(body);
+    sent.push(flag ? flag[1] : "(none)");
+    await route.fulfill({
+      status: 201,
+      json: {
+        batch_id: "list-typed",
+        fingerprint: "csv#book",
+        state: "matching",
+        summary: { total: 1, ready: 1, errors: 0, ambiguous: 0 },
+        search_progress: { searched: 0, total: 1, job_state: "running" },
+        records: [],
+      },
+    });
+  });
+
+  await page.goto("/import");
+
+  // The custom list is the very first tab (the owner's ask), and every tab
+  // names the library it serves from its own declaration.
+  const firstTab = page
+    .getByRole("tablist", { name: "Import source" })
+    .getByRole("tab")
+    .first();
+  await expect(firstTab).toContainText(/custom list/i);
+  await expect(firstTab).toContainText(/any library/i);
+  await expect(page.getByRole("tab", { name: /goodreads/i })).toContainText(
+    /book/i,
+  );
+
+  // Type three entries straight into the editor; no file is chosen.
+  await page
+    .getByRole("textbox", { name: /or type your list here/i })
+    .fill("Título,Autor\r\nRayuela,Julio Cortázar\r\nEl Hobbit,Tolkien");
+  // The creators checkbox is the owner's opt-out; leave it unchecked first.
+  await page.getByRole("button", { name: /preview/i }).click();
+  // The typed rows previewed: the search-progress surface replaced the form
+  // and the request carried no no_creators flag.
+  await expect(page.getByText(/searching for matches/i)).toBeVisible();
+  await expect(sent).toEqual(["(none)"]);
 });
 
 test("the list connector unfolds deeper proposals behind Show more (2026-09-14 owner batch)", async ({

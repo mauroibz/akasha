@@ -120,7 +120,11 @@ async def test_available_importers_are_published_from_the_registry(tmp_path: Pat
 
     assert [row["id"] for row in published] == list(IMPORTERS)
 
-    goodreads, calibre = published[0], published[1]
+    # Keyed by id, not position: the strip's order is presentation (Sprint
+    # 085 moved the list first), and a positional read here is the same
+    # defect class the assert above already documents.
+    by_id = {row["id"]: row for row in published}
+    goodreads, calibre = by_id["goodreads"], by_id["calibre"]
     assert goodreads["input"]["kind"] == "upload"
     assert goodreads["input"]["accept"] == ".csv,text/csv"
     assert goodreads["input"]["browsable"] is False

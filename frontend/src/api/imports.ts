@@ -100,6 +100,8 @@ export interface ImportInputSpec {
    * row carries no identity, so the library is the batch's choice).
    */
   single_domain_pick?: boolean;
+  /** Boolean options the connector's reader reads; the route forwards them. */
+  flags?: string[];
   /** Other ways into the same connector, each rendered beneath the primary. One deep. */
   alternates: ImportInputSpec[];
 }
@@ -363,6 +365,7 @@ export function previewImportWithOptions(
   spec: ImportInputSpec,
   source: File | string | File[] | BundleMember[],
   options: Record<string, string>,
+  targets?: string[],
 ) {
   const url = `/api/import/${encodeURIComponent(importer.id)}/preview`;
   const form = new FormData();
@@ -372,6 +375,10 @@ export function previewImportWithOptions(
     throw new Error("Only an upload source carries connector fields");
   }
   for (const [name, value] of Object.entries(options)) form.append(name, value);
+  // The library pick rides every path (Sprint 084): a mapping or a flag must
+  // not silently drop the domain the owner chose before the file.
+  if (targets && targets.length)
+    form.append("targets", targets.join(","));
   return request(url, { method: "POST", body: form }).then((response) =>
     responseJson<ImportPreview>(response),
   );
