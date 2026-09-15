@@ -1439,10 +1439,6 @@ class TestAnyDomain20260914:
         parsed = read_all("Título\r\nBlade Runner", domain="book", options={"no_creators": "true"})
         assert parsed.records[0].item.title == "Blade Runner"
 
-    @pytest.fixture
-    def anyio_backend(self) -> str:
-        return "asyncio"
-
     @pytest.mark.anyio
     async def test_a_declared_delimiter_rides_the_upload_route(self, tmp_path) -> None:
         """A semicolon list read as semicolons because the owner said so."""
@@ -1461,7 +1457,7 @@ class TestAnyDomain20260914:
                 files={
                     "file": (
                         "libros.csv",
-                        "Título;Autor\r\nRayuela;Julio Cortázar".encode("utf-8"),
+                        "Título;Autor\r\nRayuela;Julio Cortázar".encode(),
                         "text/csv",
                     )
                 },
