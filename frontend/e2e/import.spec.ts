@@ -1,4 +1,5 @@
 import { fileURLToPath } from "node:url";
+import type { Page } from "@playwright/test";
 
 import { expect, test } from "./console";
 
@@ -32,6 +33,16 @@ const record = {
 test.beforeEach(async ({ page }) => {
   await stubImporters(page);
 });
+
+/**
+ * Goodreads is no longer the import screen's first paint (the custom list
+ * leads, Sprint 085), so every Goodreads flow opens its tab first.
+ */
+async function openGoodreads(page: Page) {
+  await page.goto("/import");
+  await page.getByRole("tab", { name: /goodreads/i }).click();
+  return page.getByLabel("Goodreads CSV", { exact: true });
+}
 
 test("Goodreads preview and commit stay keyboard-complete at mobile width", async ({
   page,
@@ -84,9 +95,9 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
       },
     });
   });
-  await page.goto("/import");
-  await expect(page.getByLabel("Goodreads CSV", { exact: true })).toBeFocused();
-  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
+  const upload = await openGoodreads(page);
+  await upload.focus();
+  await upload.setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -204,8 +215,8 @@ test("row errors and ambiguity require an explicit choice", async ({
       },
     }),
   );
-  await page.goto("/import");
-  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
+  const upload = await openGoodreads(page);
+  await upload.setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -245,8 +256,7 @@ test("malformed and oversized uploads remain recoverable", async ({ page }) => {
       },
     });
   });
-  await page.goto("/import");
-  const upload = page.getByLabel("Goodreads CSV", { exact: true });
+  const upload = await openGoodreads(page);
   await upload.setInputFiles({
     name: "bad.csv",
     mimeType: "text/csv",
@@ -305,8 +315,7 @@ test("undo flow from import history", async ({ page }) => {
       },
     }),
   );
-  await page.goto("/import");
-  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
+  (await openGoodreads(page)).setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),
@@ -374,8 +383,7 @@ test("undo expired batch shows error", async ({ page }) => {
       },
     }),
   );
-  await page.goto("/import");
-  await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
+  (await openGoodreads(page)).setInputFiles({
     name: "library.csv",
     mimeType: "text/csv",
     buffer: Buffer.from("csv"),

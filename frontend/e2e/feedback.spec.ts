@@ -248,6 +248,8 @@ for (const size of widths) {
       );
       await stubImporters(page);
       await page.goto("/import");
+      // The custom list leads the strip (Sprint 085); open Goodreads' tab.
+      await page.getByRole("tab", { name: /goodreads/i }).click();
       await page.getByLabel("Goodreads CSV", { exact: true }).setInputFiles({
         name: "goodreads.csv",
         mimeType: "text/csv",
