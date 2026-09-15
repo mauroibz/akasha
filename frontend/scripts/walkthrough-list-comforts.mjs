@@ -37,11 +37,13 @@ const strip = page.getByRole("tablist", { name: "Import source" });
 const tabs = strip.getByRole("tab");
 const first = await tabs.first().textContent();
 if (!/custom list/i.test(first ?? "")) problems.push(`first tab is ${first}`);
-if (!/any library/i.test(first ?? "")) problems.push("list tab lacks Any library badge");
+if (!/any library/i.test(first ?? ""))
+  problems.push("list tab lacks Any library badge");
 const goodreads = await page
   .getByRole("tab", { name: /goodreads/i })
   .textContent();
-if (!/book/i.test(goodreads ?? "")) problems.push("goodreads lacks Books badge");
+if (!/book/i.test(goodreads ?? ""))
+  problems.push("goodreads lacks Books badge");
 
 // 1. Typed entries, no file: three film rows by hand.
 await page.getByRole("tab", { name: /custom list/i }).click();
@@ -63,7 +65,8 @@ await page
   .waitFor({ timeout: 60_000 });
 const films = await api("/api/entries?status=unsorted&limit=200&type=movie");
 console.log(`typed film rows committed: ${films.total}`);
-if (films.total !== 3) problems.push(`expected 3 typed films, saw ${films.total}`);
+if (films.total !== 3)
+  problems.push(`expected 3 typed films, saw ${films.total}`);
 
 // 3. The checkbox: another batch, book domain, two-column list, no_creators.
 await page.goto(`${BASE}/import`);
@@ -74,16 +77,11 @@ await page
 await page
   .getByRole("textbox", { name: /or type your list here/i })
   .fill("Título,Autor\r\nRayuela,Julio Cortázar");
-await page
-  .getByRole("checkbox", { name: /no creators column/i })
-  .check();
+await page.getByRole("checkbox", { name: /no creators column/i }).check();
 await page.getByRole("button", { name: /preview/i }).click();
 await page
   .getByRole("button", { name: /import \d+ ready rows?/i })
   .waitFor({ timeout: 300_000 });
-const records = await api(
-  "/api/import/list/batches/x/records",
-).catch(() => null);
 console.log("checkbox batch: drained, committing");
 await page.getByRole("button", { name: /import \d+ ready rows?/i }).click();
 await page
@@ -98,7 +96,8 @@ else {
   const detail = await api(`/api/entries/${rayuela.id}`);
   const creators = detail.item.metadata?.creators ?? [];
   console.log(`Rayuela creators: ${JSON.stringify(creators)}`);
-  if (creators.length) problems.push("no_creators batch still carried creators");
+  if (creators.length)
+    problems.push("no_creators batch still carried creators");
 }
 
 // 2. The file-fills-editor path (fixture file through the real input).
@@ -107,7 +106,9 @@ await page
   .getByRole("combobox", { name: /which library is this list for\?/i })
   .selectOption("album");
 const editor = page.getByRole("textbox", { name: /or type your list here/i });
-const chooser = page.getByRole("button", { name: /your list \(csv or text\)/i });
+const chooser = page.getByRole("button", {
+  name: /your list \(csv or text\)/i,
+});
 await chooser.setInputFiles({
   name: "list_albums_es.csv",
   mimeType: "text/csv",
