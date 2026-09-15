@@ -6629,3 +6629,31 @@ an operator command in the house style.
   The AC5 wording in the sprint file is recorded as the plan's assumption, corrected in the
   Outcome (docs follow the measured reality; the product/technical spec paragraphs now name
   the confirm-stage channel). The discard-after-confirm sequence test covers the cover too.
+
+## DEC-162 — The plan reopens a third time: list comforts (Sprint 085)
+
+- Date: 2026-09-15
+- Status: accepted
+- Context: the owner validated the any-domain list importer (shipped v2.2.0)
+  and reported four usability asks, verbatim: (1) "add a text editor on the UI
+  so i can check what i uploaded, make small corrections to the file, or just
+  quickly type out 3 entries and send, without uploading a file." (2) "make
+  the creators column optional via a checkbox, in my experience most queries
+  work without them, + for series is hard to define or know." (3) "move
+  custom list to be the very first importer in the list." (4) "can we add a
+  colored inidicator above or below each importer saying what domain they are
+  for? Any for custom list, Books for goodreads/calibre, etc." He directed the
+  release split himself: v2.2.0 ships the sprint's work as tagged, v2.2.1
+  ships the feedback batch.
+- Decision: reopen the plan as Sprint 085 (the DEC-079/DEC-160 extension
+  shape a third time), `FINAL_SPRINT` 84 → 85, state `complete → ready` at
+  revision 43. The four asks are the sprint's four deliverables; the
+  declaration-driven rule governs them all (the editor is the list
+  connector's own input surface; the checkbox is the picked domain's creator
+  words declaring themselves optional; the indicator reads
+  `item_types` — no hardcoded domain list).
+- Consequences: v2.2.0 is tagged from the pre-feedback tree (the feedback is
+  not in it); v2.2.1 follows when Sprint 085 closes. The creators-checkbox
+  semantics are the owner's call and are recorded in the sprint's risks: a
+  query with no creator may be noisier for common titles; edit-and-re-search
+  is the designed answer.

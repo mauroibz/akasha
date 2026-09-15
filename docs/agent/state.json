@@ -1,10 +1,10 @@
 {
   "schema_version": 1,
-  "plan_revision": 42,
-  "project_status": "complete",
-  "active_sprint": null,
-  "active_sprint_file": null,
-  "active_sprint_status": null,
+  "plan_revision": 43,
+  "project_status": "ready",
+  "active_sprint": "085",
+  "active_sprint_file": "docs/sprints/085-list-comforts.md",
+  "active_sprint_status": "ready",
   "last_completed_sprint": "084",
   "completed_sprints": [
     "001",

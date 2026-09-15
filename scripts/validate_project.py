@@ -49,10 +49,10 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # sprints down to 70 and 71 to close the gap, rather than leaving one, and DEC-139's accepted
 # readability line to 74 — the library, insights and shelves redrawn, which extends the plan
 # after Sprint 071 had closed it — and DEC-156's hand-written-CSV importer as 083, which
-# reopens the plan after Sprint 082 had closed it at 82, and DEC-160's any-domain
+# reopens the plan after Sprint 082 had closed it at 82, and DEC-160's any-domain DEC-162 moves it to 85.
 # generalization of that importer as 084, which reopens the plan again after Sprint 083
 # had closed it at 83).
-FINAL_SPRINT = 84
+FINAL_SPRINT = 85
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")

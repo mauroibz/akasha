@@ -5802,3 +5802,29 @@ closed the last assumption). Owner-side, whenever wanted: release the batch as
 v2.2.0 (version surfaces still 2.1.0; the sprint owed no bump) and/or rebuild
 the dev container to validate the album flow by hand
 (`docker compose -f compose.yaml -f compose.build.yaml up -d --build`).
+
+---
+
+## 2026-09-15 (later) — Sprint 084 closed; v2.2.0 released; Sprint 085 planned (DEC-162)
+
+**Done.** Sprint 084 closed atomically (105ac7b) after fixing the HANDOFF
+trailing-newline the validator caught. Version surfaces bumped to 2.2.0
+(main.py, pyproject, package.json, OpenAPI regenerated, doc map + release
+notes v2.2 committed as ecc0b61; backend 1592+deselected green). The owner
+then reported four usability asks and directed the release split: v2.2.0
+ships as tagged, the feedback batch ships as v2.2.1. Planned Sprint 085
+"List comforts" (DEC-162): plan revision 43, state complete → ready at 085,
+FINAL_SPRINT 84 → 85, ROADMAP index + contract paragraph, sprint file at
+`ready`. Validator green.
+
+**Verified and how.** Version-surface tests green (test_validate_project 7
+passed); full backend re-run on the bumped tree (1592 passed, 3 deselected);
+validator green at every step. The release (push, PR, CI, merge, tag, images,
+GitHub Release) is the session's next step — CI run 34975458402 was in
+progress on ecc0b61 when planning started.
+
+**Deviations.** None this session beyond the release-split the owner directed.
+
+**Next.** Land v2.2.0 (wait for CI 34975458402, then merge/tag/verify/publish
+per the release recipe). Then Sprint 085 executes the four asks and ships as
+v2.2.1.

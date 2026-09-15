@@ -1,12 +1,14 @@
 # Implementation Roadmap
 
-**Plan revision:** 42
+**Plan revision:** 43
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the plan is complete. Sprints 001–084 are done: Sprint 082
+**Active sprint:** [085 — List comforts](085-list-comforts.md) (ready). Sprints 001–084 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
-to every domain and corrected the confirmed row's cover channel (DEC-161). Earlier
+to every domain and corrected the confirmed row's cover channel (DEC-161). The owner's
+2026-09-15 feedback on it reopens the plan once more as Sprint 085 (DEC-162), to ship
+as v2.2.1. Earlier
 lines: Sprint 071 closed
 the original v1 plan and the owner's 2026-09-05 readability feedback (DEC-139) extended it
 through 072–074, covered in the
@@ -199,6 +201,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 | [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
 | [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
+| [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | ready |
 
 ## Sprint contracts
 
@@ -1700,6 +1703,16 @@ choice rather than a birthright.
   fetches the chosen proposal's cover and stages it through the same
   `cover_stage` channel every connector uses (DEC-161); discard clears it.
   Gates: backend 1595, Vitest 334, make check green, Playwright 144+2 skipped.
+
+- **[085 — List comforts](085-list-comforts.md)** — the owner's 2026-09-15
+  validation feedback on the any-domain list, as four usability asks: a
+  paste-or-type editor beside the file input (check what was uploaded, correct
+  it, or type three entries without a file at all); the creators column made
+  optional by checkbox ("most queries work without them, and for series is
+  hard to define or know"); the custom list moved first in the importer strip;
+  and a colored per-importer domain indicator ("Any" for the list, "Books"
+  for goodreads/calibre) rendered from each connector's own `item_types`.
+  Ships as v2.2.1.
 
 ## Not scheduled
 
