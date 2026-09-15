@@ -2,11 +2,12 @@
 
 **Plan revision:** 42
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [084 — Any list, any domain](084-any-list-any-domain.md) (ready). Sprints 001–083
-are done and v2.1.0 is released: Sprint 082 shipped 2.0.0, Sprint 083 delivered the
-hand-written-CSV importer plus the owner's feedback batch (DEC-159), and the owner's
-2026-09-14 request to make it domain-selectable reopens the plan as Sprint 084 (DEC-160,
-the DEC-079 extension shape). Earlier lines: Sprint 071 closed
+**Active sprint:** none — the plan is complete. Sprints 001–084 are done: Sprint 082
+shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
+feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
+domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
+to every domain and corrected the confirmed row's cover channel (DEC-161). Earlier
+lines: Sprint 071 closed
 the original v1 plan and the owner's 2026-09-05 readability feedback (DEC-139) extended it
 through 072–074, covered in the
 "Covers first" section below. The owner's 2026-09-07 request for authentication and multiuser
@@ -197,7 +198,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [059](059-off-the-event-loop.md) | Nothing blocks the event loop **[GATED]** | 056 | planned |
 | [060](060-storage-housekeeping.md) | The disk stops filling quietly | 056 | planned |
 | [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
-| [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | ready |
+| [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
 
 ## Sprint contracts
 
@@ -1690,6 +1691,15 @@ choice rather than a birthright.
   unchanged and re-proven against a second domain's recorded provider fixtures.
   Acceptance includes a live non-book walkthrough (an album or film list end to
   end) and the no-domain-branching rule the conformance suite enforces.
+
+  **Delivered and closed 2026-09-15.** All of it, live: the album walkthrough
+  ran end to end against real MusicBrainz and surfaced the one assumption the
+  plan got wrong — a confirmed row's cover cannot depend on the
+  identifier-keyed enrichment backfill (album enrichment is Spotify-keyd per
+  DEC-052 and a MusicBrainz release-group offers no identifier). Confirm now
+  fetches the chosen proposal's cover and stages it through the same
+  `cover_stage` channel every connector uses (DEC-161); discard clears it.
+  Gates: backend 1595, Vitest 334, make check green, Playwright 144+2 skipped.
 
 ## Not scheduled
 

@@ -6599,3 +6599,33 @@ an operator command in the house style.
   — zero connector changes. Mixed-domain batches are explicitly out (one list, one
   domain); so is extra-column mapping (still the recorded "queda a futuro"). No release in
   the sprint; the version surfaces stay 2.1.0.
+
+## DEC-161 — A confirmed row's cover comes from the confirmed card, not the backfill's luck
+
+- Date: 2026-09-15
+- Status: accepted
+- Context: Sprint 084's AC5 assumed confirmed rows get "a cover through the enrichment
+  path" — true for books by accident, disproven live for albums. The album walkthrough
+  confirmed Kind of Blue from a real MusicBrainz proposal whose card showed a Cover Art
+  Archive cover, and the committed row had none. Measurement: album enrichment is
+  Spotify-keyd (`domains/album/__init__.py`, DEC-052) because a Spotify export's saved-album
+  id is the only identifier that case carries; the MusicBrainz release-group search offers
+  NO identifier at all (`domains/album/providers.py` `_candidate`, obs. 3 — a release
+  group has no global identifier), so `_backfillable_items` never queues a search-confirmed
+  album. Books only worked because the isbn-keyd backfill happened to match their confirmed
+  ISBNs (the Sprint 083 `isbn13 → isbn` normalization made that true). The proposal payload
+  has carried `cover_url` since Sprint 083 (`_proposal_payload`), and the card renders it —
+  the product showed the owner a cover the commit threw away.
+- Decision: confirming a proposal fetches its `cover_url` through the app's provider client
+  (allowlist, size/pixel bounds, `prepare_cover`) and stages it on the record's payload via
+  the existing `cover_stage` channel — the one the Calibre connector uses — so commit's
+  existing install loop installs it. The fetch runs after the answer is recorded, never
+  fatal (a failure stages nothing, refuses no confirmation — the add path's rule). Discard
+  clears the staged cover with the rest of the provider data, the same final-answer-governs
+  rule as the typed-item restore. Domain-neutral: no branch on any domain; a domain whose
+  providers offer covers gets them, one whose don't loses nothing.
+- Consequences: the import's cover path is the confirm-stage channel; enrichment remains
+  identifier-keyed and may still fill more later (books still get Google Books metadata).
+  The AC5 wording in the sprint file is recorded as the plan's assumption, corrected in the
+  Outcome (docs follow the measured reality; the product/technical spec paragraphs now name
+  the confirm-stage channel). The discard-after-confirm sequence test covers the cover too.

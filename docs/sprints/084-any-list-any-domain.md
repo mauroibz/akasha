@@ -1,6 +1,6 @@
 # Sprint 084 — Any list, any domain
 
-**Status:** in_progress
+**Status:** completed
 **Depends on:** 083
 **Roadmap revision:** 42
 
@@ -337,4 +337,95 @@ Measured in this worktree on 2026-09-14, after v2.1.0:
 
 ## Outcome
 
-_Planned. On completion record delivered behavior, commands and actual results, commit IDs, deviations/decisions, and impact on every future sprint._
+_Delivered 2026-09-15. All nine acceptance criteria verified; one plan assumption
+disproven and corrected (DEC-161); one e2e render race fixed in the spec, not the product._
+
+**Delivered behavior.**
+
+- **AC1 (any domain imports).** The reader lives in `domain/list.py` (out of
+  `domains/book/`) and serves exactly the five domains that declare
+  `Domain.list_columns: ListColumnSpec` — book, album, movie, series, anime. `None`
+  is the deliberate not-listable default (the `chooses_covers` pattern). Books keep
+  their Sprint 083 word lists verbatim; album adds artist words; movie/series/anime
+  declare title words only, and for them a one-column list is valid (a missing
+  creator is an empty fact, not an error — the film fixture proves it).
+- **AC2 (the choice rides the preview).** The target library reaches the reader
+  through the same options channel the column mapping rides (`targets` in
+  `ImportSource.options`, forwarded by the upload route). Required, exactly one
+  token, and it composes the fingerprint (`csv#<hash>#album`): one list, one
+  library per batch; a mixed batch is refused (`invalid_import_targets`). The
+  service trusts a reader that consumed the choice (`source_descriptor.item_type`)
+  instead of double-composing its subset suffix.
+- **AC3 (auto-detection follows the domain).** Header sniffing uses the chosen
+  domain's own word lists; per-domain CSV fixtures committed
+  (`fixtures/imports/list_albums_es.csv`, `list_films_es.csv`) and read honestly
+  by tests; a domain with no creator words never maps a creator column by
+  position.
+- **AC4 (the screen).** `ImportInputSpec.single_domain_pick` publishes the
+  single-pick contract; the ImportPage renders one native dropdown (DEC-086
+  style) from the declaration, defaults to the first declared domain, sends the
+  choice on the preview multipart, and labels the mapping fields in the picked
+  domain's own words (Author/Artists/Creators — the published FieldSpec label,
+  neutral `Creator` as fallback). The tick-many checkboxes stay for connectors
+  whose rows carry their own type.
+- **AC5 (confirm works on non-book rows) — corrected by DEC-161.** Confirm
+  re-stages a non-book row exactly as a book row (creators land in the domain's
+  `Artists` field; the metadata cross-walk is the domain declaration). The plan's
+  "cover through the enrichment path" was disproven live: album enrichment is
+  Spotify-keyd (DEC-052) and a MusicBrainz release-group offers no identifier,
+  so enrichment never fires for a search-confirmed album. Fixed domain-neutrally:
+  confirming fetches the chosen proposal's `cover_url` through the provider
+  client and stages it via the existing `cover_stage` channel; commit's install
+  loop installs it; discard clears it with the rest of the provider data. Proven
+  live (Kind of Blue: cover=yes via coverartarchive.org's redirect chain).
+- **AC6 (labels + honesty).** Vitest: the dropdown renders from the declaration,
+  sends the picked domain, the mapping label localizes (Author -> Artist on the
+  album pick). E2e: the dropdown renders, the tick-many checkboxes are absent,
+  the album word shows on the mapping label, the choice rides the multipart body
+  (parsed from the request). Counts stay honest: a single batch is single-domain
+  by construction.
+- **AC7 (no domain branch).** No `if domain ==` anywhere in the shared layers;
+  the conformance suite gained the `list_columns` registry check
+  (`list_columns_name_real_columns_or_none`, malformed-domain rejection included)
+  and covers the connector. The film replay proof runs through the recorded
+  fixture path; the album search replay proves a non-book row through the job
+  (`/ws/2/release-group` capture, DEC-025's recorded-response rule).
+- **AC8 (docs move together).** Product spec §5.4 generalized (the library pick
+  opens the flow; per-domain words; the confirm-stage cover channel); technical
+  spec §6 records ListColumnSpec, the options channel, fingerprint composition,
+  `single_domain_pick`, and the cover channel (DEC-161); the adding-a-domain
+  guide names `list_columns` and carries the custom-list note; OpenAPI
+  regenerated (`single_domain_pick` on the catalog, +5 lines).
+- **AC9 (live walkthrough).** `frontend/scripts/walkthrough-list-albums.mjs`
+  (committed): fresh `/tmp/akasha-s084`, live MusicBrainz. Observed: 4 rows
+  searched and drained, confirm Kind of Blue, commit -> 4 album entries (all
+  `type=album`, cover installed from the confirmed card's CAA URL), undo -> 0.
+  First run surfaced the AC5 defect (cover=no) — fixed and re-proven clean.
+
+**Commands and actual results.**
+
+- `uv run pytest tests/` — **1595 passed** (Sprint 084 added: 8 reader tests,
+  2 replay proofs, 2 conformance checks, confirm-stages-cover,
+  discard-drops-staged-cover; +1 net from 1594 after the fix landed).
+- `npm run test -- --run` — **334 passed** (Vitest, +1 dropdown spec).
+- `make check` — green (ruff, mypy 74 files, eslint, prettier, OpenAPI no-drift,
+  project validator).
+- `npm run test:e2e` — **144 passed, 2 skipped** (the full parallel run; the new
+  Sprint 084 spec included).
+- Live walkthrough — **CLEAN** (above).
+- Container: not owed (no deployment change).
+
+**Commits.** e9769ab (reader + declarations), 3c75fb7 (screen picks the
+library), db87d0f (docs: the generalized contract), 7923052 (the confirmed
+card's cover, DEC-161), d8274fd (e2e spec pins the contract, docs sync).
+
+**Deviations and decisions.** DEC-161 (the cover channel — AC5's enrichment
+assumption corrected, evidence in the entry). The commit checkpoints the plan
+named differ in tag wording from CONTRIBUTING's `[TAG]` convention; the actual
+commits use the house tags. The conformance contract-coverage suite demanded a
+check for the new `list_columns` field — added rather than exempted.
+
+**Impact on future sprints.** None pending: this was the final sprint
+(`FINAL_SPRINT` 84). A new domain becomes list-importable by declaring
+`list_columns` — zero connector changes (the guide's note says so). Release:
+not owed by this sprint; the version surfaces stay 2.1.0 (DEC-160).

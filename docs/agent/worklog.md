@@ -5758,3 +5758,47 @@ nothing observable, whose acceptance criterion is that the entire existing suite
 - Blocked/open: none. The board's upgrade (`AKASHA_VERSION=2.1.0`, compose pull + up -d)
   stays an owner action.
 - Next: execute Sprint 084 per its file when the owner says go.
+
+---
+
+## 2026-09-15 — Sprint 084: any list, any domain (executed and closed)
+
+**Done.** Sprint 084 executed end to end. The custom-list connector is
+domain-declared: `ListColumnSpec` on `Domain` (book/album/movie/series/anime
+declare it; `None` = not listable), the reader lives in `domain/list.py`, the
+library pick rides the preview's `targets` field and composes the fingerprint
+(one list, one domain per batch), the screen renders a single-pick dropdown
+(`ImportInputSpec.single_domain_pick`) and labels the mapping in the picked
+domain's own words. Recorded MusicBrainz replay proves a non-book row through
+the job; per-domain CSV fixtures committed; conformance covers `list_columns`;
+specs and guide generalized; OpenAPI regenerated.
+
+**Verified and how.** Backend 1595 passed (focused suites first, exhaustive
+last); Vitest 334; `make check` green (ruff, mypy, eslint, prettier, OpenAPI
+no-drift, validator); Playwright 144+2 skipped on the full parallel run; AC9
+live walkthrough CLEAN on fresh /tmp/akasha-s084 against live MusicBrainz —
+4 rows searched, Kind of Blue confirmed, commit -> 4 albums with the cover
+installed from the confirmed card (coverartarchive.org redirect chain in the
+log), undo -> 0.
+
+**The walkthrough's finding (DEC-161).** The first live run showed cover=no on
+the confirmed album: the plan assumed "a cover through the enrichment path",
+but album enrichment is Spotify-keyd (DEC-052) and a MusicBrainz
+release-group offers no identifier, so no enrichment ever fired. Books only
+ever got covers because the isbn-keyd backfill happened to match. Fixed
+domain-neutrally (confirm fetches the chosen proposal's cover_url through the
+provider client and stages it via the existing `cover_stage` channel; commit's
+install loop installs it; discard clears it). TDD'd (confirm-stages-cover,
+discard-drops-staged-cover), re-proven live CLEAN. AC5's wording recorded as
+the corrected assumption, not edited away.
+
+**Deviations.** The new Sprint 084 e2e spec's second dropdown assertion raced
+the screen's legitimate post-preview transition — dropped as a spec bug, not a
+product fix. Commit tags follow CONTRIBUTING's `[TAG]` form, not the plan
+checkpoint wording.
+
+**Next.** None — the plan is complete at 84/84 (DEC-160 reopened it; DEC-161
+closed the last assumption). Owner-side, whenever wanted: release the batch as
+v2.2.0 (version surfaces still 2.1.0; the sprint owed no bump) and/or rebuild
+the dev container to validate the album flow by hand
+(`docker compose -f compose.yaml -f compose.build.yaml up -d --build`).
