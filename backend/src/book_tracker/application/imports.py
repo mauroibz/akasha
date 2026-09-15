@@ -1,6 +1,6 @@
 import json
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Awaitable, Callable, Mapping, Sequence
 from dataclasses import replace
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
@@ -477,7 +477,7 @@ class ImportService:
             **({"search_progress": search_progress} if search_progress else {}),
         }
 
-    def answer_proposal(
+    async def answer_proposal(
         self,
         batch_id: str,
         record_id: int,
@@ -485,6 +485,7 @@ class ImportService:
         source: str | None = None,
         source_id: str | None = None,
         discard: bool = False,
+        fetch_cover: Callable[[str], Awaitable[str | None]] | None = None,
     ) -> dict[str, Any]:
         """Record the owner's answer to a row's proposals (Sprint 083 D4).
 
@@ -541,6 +542,10 @@ class ImportService:
                 typed = stored.pop("typed_item", None)
                 if typed is not None:
                     stored["item"] = typed
+                    # The staged cover belonged to the confirmation this
+                    # discard reverses — it drops with the rest of the
+                    # provider data, so no orphan cover rides a typed row.
+                    stored["cover_stage"] = None
                     record.normalized_payload = json.dumps(stored, ensure_ascii=False)
                     session.commit()
             if typed is not None:
@@ -598,6 +603,14 @@ class ImportService:
             chosen = self.imports.chosen_proposal(batch_id, record_id)
             assert chosen is not None
             payload = chosen["payload"]
+            # The cover the owner saw on the card: fetched here, after the
+            # answer is recorded, so a refused batch never spends the fetch.
+            # A failed fetch means no stage, never a refused confirmation —
+            # the same never-fatal rule the add path applies.
+            staged_cover: str | None = None
+            cover_url = str(payload.get("cover_url") or "")
+            if fetch_cover is not None and cover_url:
+                staged_cover = await fetch_cover(cover_url)
             with Session(self.engine) as session:
                 record = session.get(ImportRecordRow, record_id)
                 assert record is not None
@@ -637,6 +650,17 @@ class ImportService:
                     stored["item"]["metadata"]["creators"] = list(payload["creators"])
                 if payload.get("language"):
                     stored["item"]["metadata"]["language"] = payload["language"]
+                # The cover the owner saw on the confirmed card rides the same
+                # staged-cover channel every other connector uses (Sprint 084:
+                # books only got covers because the isbn-keyd backfill caught
+                # them; a MusicBrainz album carries no identifiers at all, so
+                # enrichment can never be the only cover channel). The route
+                # fetched it before this call — a failed fetch is a missing
+                # stage, never a refused confirmation.
+                if staged_cover is not None:
+                    stored["cover_stage"] = staged_cover
+                    # Undo's attachment sweep keys on the stage dir; the cover
+                    # stage lives beside the reader's staged bytes.
                 record.normalized_payload = json.dumps(stored, ensure_ascii=False)
                 session.commit()
 

@@ -826,12 +826,31 @@ async def answer_row_proposal(
     (Sprint 083 D4). Discarding keeps the row exactly as the spreadsheet typed
     it. Both require the batch's searches to have drained.
     """
-    result = service(request, importer_name, user.effective_user_id).answer_proposal(
+
+    async def stage_chosen_cover(url: str) -> str | None:
+        """Fetch the confirmed proposal's cover into the batch's stage dir.
+
+        The app's provider client is the one production fetches covers with
+        (host allowlist, size cap, prepare_cover). A failure returns None:
+        the confirmation itself must never be refused over a cover.
+        """
+        from book_tracker.infrastructure.covers import prepare_cover
+
+        try:
+            prepared = await prepare_cover(
+                request.app.state.provider_client, url, request.app.state.data_dir
+            )
+        except Exception:  # noqa: BLE001 — never fatal, by the add path's rule
+            return None
+        return str(prepared.relative_to(request.app.state.data_dir))
+
+    result = await service(request, importer_name, user.effective_user_id).answer_proposal(
         batch_id,
         record_id,
         source=body.source,
         source_id=body.source_id,
         discard=body.discard,
+        fetch_cover=stage_chosen_cover,
     )
     return PreviewResponse.model_validate(result)
 

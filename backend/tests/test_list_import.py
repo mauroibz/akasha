@@ -376,6 +376,35 @@ class TestExplicitMapping:
         assert refused.value.code == "column_not_mapped"
 
 
+class _CoverDouble:
+    """A book provider whose candidate carries a cover URL, the way
+    MusicBrainz's album candidates do (Sprint 084): the card shows a cover and
+    confirm must not throw it away."""
+
+    name = "openlibrary"
+    item_type = "book"
+
+    async def search(self, query: str, limit: int = 20):
+        from book_tracker.domain.providers import SearchCandidate, SourceRef
+
+        return [
+            SearchCandidate(
+                source="openlibrary",
+                source_id="OL1M",
+                source_refs=(SourceRef(source="openlibrary", source_id="OL1M"),),
+                title="Rayuela",
+                subtitle=None,
+                creators=("Julio Cortázar",),
+                year=1963,
+                # Cover Art Archive is on the production allowlist.
+                cover_url="https://coverartarchive.org/release-group/00000000-0000-0000-0000-000000000001/front",
+                identifiers={"isbn13": "9788437604572"},
+                language="es",
+                metadata={"publisher": "Sudamericana"},
+            )
+        ]
+
+
 class TestRoutes:
     """The connector through the real API: form fields, catalog, errors."""
 
@@ -505,7 +534,7 @@ class TestConfirmDiscard:
     def anyio_backend(self) -> str:
         return "asyncio"
 
-    async def _drain(self, app, batch_id: str) -> None:
+    async def _drain(self, app, batch_id: str, provider=None) -> None:
         """Run the batch's search job the way the runner would, against a
         provider double, so no network is spent and the proposals exist."""
         from sqlalchemy import text as sql_text
@@ -545,7 +574,7 @@ class TestConfirmDiscard:
                 ]
 
         handler = ImportSearchHandler(
-            app.state.engine, {"openlibrary": Double()}, rate_limiter=None
+            app.state.engine, {"openlibrary": provider or Double()}, rate_limiter=None
         )
         result = await handler.process(job_id, NOW)
         assert result["state"] == "succeeded"
@@ -633,6 +662,91 @@ class TestConfirmDiscard:
             assert all(proposal["chosen"] is False for proposal in refreshed["proposals"])
 
     @pytest.mark.anyio
+    async def test_confirming_stages_the_chosen_proposals_cover_for_commit(
+        self, tmp_path: Path
+    ) -> None:
+        """The owner confirmed a card that showed a cover; commit installs it.
+
+        Sprint 084: books only ever got covers because the isbn-keyd backfill
+        happened to catch them; a MusicBrainz album offers no identifiers at
+        all, so the enrichment path cannot be the only cover channel. Confirm
+        stages the chosen proposal's own cover_url through the same
+        `cover_stage` channel every other connector uses — domain-neutral,
+        never fatal.
+        """
+        import httpx
+
+        from book_tracker.config import Settings
+        from book_tracker.main import create_app
+
+        app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+
+        async with (
+            app.router.lifespan_context(app),
+            httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+        ):
+            # The provider client is replaced AFTER the lifespan built the real
+            # one — entering the lifespan re-creates it, so an earlier
+            # assignment would be silently overwritten. Its transport is the
+            # only seam: the fetch still goes through the same allowlist and
+            # prepare_cover path production uses.
+            # A real tiny JPEG: prepare_cover validates content-type AND opens
+            # the image with PIL, so a magic-prefix blob is refused.
+            import io
+
+            from PIL import Image as PILImage
+
+            buffer = io.BytesIO()
+            # 300x450 clears every provider-cover bound (MIN_PROVIDER_COVER_EDGE
+            # 200, MAX_COVER_ASPECT_RATIO 3.0) like a real CAA thumb does.
+            PILImage.new("RGB", (300, 450), (10, 30, 90)).save(buffer, format="JPEG")
+            cover_bytes = buffer.getvalue()
+
+            async def cover_handler(request: httpx.Request) -> httpx.Response:
+                assert "coverartarchive.org" in request.url.host
+                return httpx.Response(
+                    200, content=cover_bytes, headers={"Content-Type": "image/jpeg"}
+                )
+
+            app.state.provider_client = httpx.AsyncClient(
+                transport=httpx.MockTransport(cover_handler)
+            )
+            body = await self._preview(client)
+            batch_id = body["batch_id"]
+            await self._drain(app, batch_id, provider=_CoverDouble())
+            records = (await self._preview(client))["records"]
+            rayuela = next(record for record in records if record["title"] == "Rayuela")
+            proposal = rayuela["proposals"][0]
+            assert proposal["payload"]["cover_url"], "the double offered a cover"
+
+            confirm = await client.post(
+                f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
+                json={"source": proposal["source"], "source_id": proposal["source_id"]},
+            )
+            assert confirm.status_code == 200
+            staged = next(
+                record
+                for record in (await self._preview(client))["records"]
+                if record["record_id"] == rayuela["record_id"]
+            )
+            # The cover the owner saw on the card is staged for commit.
+            assert staged["cover_staged"] is True
+
+            commit = await client.post(
+                "/api/import/list/commit", json={"batch_id": batch_id, "choices": []}
+            )
+            assert commit.status_code == 200
+            entries = await client.get("/api/entries?status=unsorted&limit=200")
+            confirmed = next(
+                entry for entry in entries.json()["items"] if entry["item"]["title"] == "Rayuela"
+            )
+            # The installed cover is served by the item's cover route (the
+            # query suffix is the cache-buster, not part of the identity).
+            assert confirmed["item"]["cover_url"].startswith(
+                f"/api/items/{confirmed['item']['id']}/cover"
+            )
+
+    @pytest.mark.anyio
     async def test_discard_after_confirm_restores_the_typed_row(self, tmp_path: Path) -> None:
         """The undo half of D4: an owner who confirms and then reconsiders
         discards, and the row returns to exactly what the spreadsheet said —
@@ -647,9 +761,29 @@ class TestConfirmDiscard:
             app.router.lifespan_context(app),
             httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
         ):
+            # The confirm under test stages a cover; the fetch must hit the
+            # mock (a real fetch would fail offline and make the discard
+            # assertion vacuous).
+            import io
+
+            from PIL import Image as PILImage
+
+            buffer = io.BytesIO()
+            PILImage.new("RGB", (300, 450), (10, 30, 90)).save(buffer, format="JPEG")
+
+            async def cover_handler(request: httpx.Request) -> httpx.Response:
+                return httpx.Response(
+                    200,
+                    content=buffer.getvalue(),
+                    headers={"Content-Type": "image/jpeg"},
+                )
+
+            app.state.provider_client = httpx.AsyncClient(
+                transport=httpx.MockTransport(cover_handler)
+            )
             body = await self._preview(client)
             batch_id = body["batch_id"]
-            await self._drain(app, batch_id)
+            await self._drain(app, batch_id, provider=_CoverDouble())
             records = (await self._preview(client))["records"]
             rayuela = next(record for record in records if record["title"] == "Rayuela")
             proposal = rayuela["proposals"][0]
@@ -666,7 +800,11 @@ class TestConfirmDiscard:
             )
             assert staged["item"]["identifiers"] == {"isbn": "9788437604572"}
             assert staged["item"]["year"] == 1963
+            assert staged["cover_staged"] is True
 
+            # A cover the confirmed card showed rides the stage channel; the
+            # discard that reverses this confirmation must drop it with the
+            # rest of the provider data (no orphan cover on a typed row).
             discard = await client.post(
                 f"/api/import/list/batches/{batch_id}/records/{rayuela['record_id']}/proposal",
                 json={"discard": True},
@@ -686,6 +824,7 @@ class TestConfirmDiscard:
             assert refreshed["item"]["metadata"] == {"creators": ["Julio Cortázar"]}
             assert refreshed["planned_action"] == "create_item"
             assert refreshed["match_kind"] == "new"
+            assert refreshed["cover_staged"] is False
             assert all(proposal["chosen"] is False for proposal in refreshed["proposals"])
 
     @pytest.mark.anyio
