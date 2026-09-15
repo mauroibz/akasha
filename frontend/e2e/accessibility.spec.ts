@@ -660,7 +660,12 @@ test("the degraded provider notice has no serious accessibility violations", asy
 test("import has no serious accessibility violations", async ({ page }) => {
   await stubImporters(page);
   await page.goto("/import");
-  await expect(page.getByLabel("Goodreads CSV", { exact: true })).toBeVisible();
+  // The custom list leads the strip (Sprint 085), so the first paint is the
+  // list's own form — the editor, the checkbox and the library dropdown are
+  // the surface a screen reader meets first.
+  await expect(
+    page.getByRole("textbox", { name: /or type your list here/i }),
+  ).toBeVisible();
   await expectNoSeriousViolations(page, "import");
 });
 
