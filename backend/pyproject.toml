@@ -14,7 +14,7 @@ dependencies = [
   "pillow>=11,<12",
   "pydantic-settings>=2.7,<3",
   "python-multipart>=0.0.20,<1",
-  "sqlalchemy>=2.0,<3",
+  "sqlalchemy>=2.0.52,<3",
   "structlog>=25.1,<26",
   "uvicorn>=0.34,<1",
 ]
