@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 44,
-  "project_status": "in_progress",
-  "active_sprint": "086",
-  "active_sprint_file": "docs/sprints/086-drop-ebook-files.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "085",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "086",
   "completed_sprints": [
     "001",
     "002",
@@ -91,8 +91,9 @@
     "082",
     "083",
     "084",
-    "085"
+    "085",
+    "086"
   ],
-  "started_at": "2026-10-19T18:35:54-03:00",
-  "updated_at": "2026-10-19T18:35:54-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-19T18:58:43-03:00"
 }

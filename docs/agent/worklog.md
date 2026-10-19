@@ -5936,3 +5936,27 @@ the meaning alone.
 **Next.** Nothing owed. The plan stands complete at 85/85; v2.2.2 is the
 current release. Further owner feedback follows the DEC-159/DEC-163 hotfix
 shape: batch it, full gate, ship as a patch.
+
+---
+
+## 2026-10-19 — Sprint 086: drop ebook files on Add, v2.3.0
+
+**Done.** The owner's flow: Add → drop EPUBs → preview → commit → Triage. A book connector
+(`epub`) reads each file's OPF and cover and attaches the file through the export bundle's
+`attachment_source` channel; Add renders a drop zone per `quick_add` connector and hands the
+files to Import, which previews at once. Prerequisite fix: non-searching connectors no longer
+publish `proposals: []` (the "No results" panel had been on every Goodreads/Calibre preview row
+since Sprint 083). Spec §1 amended (DEC-164). Version 2.3.0.
+
+**Verified and how.** Backend 1617, Vitest 345, make check green, Playwright 146 + 2 skipped,
+smoke-container exit 0. Live walkthrough via `scripts/walkthrough.py` + vite and
+`frontend/e2e/scratchpad/walkthrough-drop-ebooks.mjs` (env-driven paths): three real EPUBs
+dropped with real bytes, 3 committed into Triage, covers and attachments present. All ten EPUBs
+in the owner's Downloads parse.
+
+**Deviations.** None material. The owner said "enough testing, just ship it" while the container
+smoke ran; it had already passed.
+
+**Next.** Release: tag v2.3.0, CI publishes images, GitHub Release from
+`docs/operations/release-notes-v2.3.md`. The ZimaBoard upgrade needs SSH access this session did
+not have (key refused at 192.168.100.240).

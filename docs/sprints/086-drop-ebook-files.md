@@ -1,7 +1,7 @@
 # Sprint 086 — Drop ebook files
 
 **Sprint:** 086
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 44
 **Depends on:** 085
 **Owner:** Mauro
@@ -151,4 +151,33 @@ Measured 2026-10-19 in this worktree:
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-19. All eight acceptance criteria met.
+
+- **D1** `cae7017` — `domains/book/epub.py` (`EpubImporter`, `epub`, "Ebook files") on the `export`
+  kind; `ImportInputSpec.quick_add` published on the catalog and OpenAPI. AC1–7 proven in
+  `tests/test_epub_import.py` (10 tests: the owner's DDIA metadata shape, EPUB 2/3 roles,
+  broken file → one row, entity DTD refused, title fallback, order-free fingerprint, preview →
+  commit → Triage with attachment and cover, ISBN match, replay, undeclared member refused).
+- **D2** `dbc3800` — Add renders a drop zone per `quick_add` connector; a drop hands the files
+  to `/import?tab=epub`, which previews at once. `ExportPicker` reads accept/testid/copy from the
+  declaration (AC8); Calibre's export declares `accept=".calibre-data"`.
+- **Prerequisite defect** `9e00ea0` — every connector's preview rows carried `proposals: []`
+  since Sprint 083, so Goodreads/Calibre/EPUB rows all said "No results. Fix the text and search
+  again". Only a `SearchingImporter` publishes proposals now. Found by the walkthrough.
+- **D3** `7e543e9` — product spec §1 amended (DEC-164), technical spec, README, release notes
+  v2.3.0, version surfaces 2.3.0.
+
+**Gate (frozen tree 7e543e9):** `make check` green; `make test` backend 1617 passed, Vitest 345
+passed; Playwright 146 passed + 2 skipped (full parallel); `make smoke-container` exit 0;
+validator green.
+
+**Walkthrough:** fresh data dir, real providers. The owner's DDIA EPUB plus *Matadero cinco*
+(ePubLibre) and *How Linux Works* (No Starch) dropped on Add as a real `drop` event with real
+bytes: preview in 0.8 s, 3 ready, commit, Triage "3 unsorted", each item with cover and its
+`.epub` attached, no console errors. All ten EPUBs in the owner's Downloads read with title,
+authors and cover. Noted, out of scope: Triage pre-selects the domain default "Read" for dropped
+books; ePubLibre's `dc:date` is the original year and lands as edition year; four of ten files
+carry no ISBN, so they are not enriched.
+
+**Deviations:** none from the plan beyond the prerequisite fix above. Future sprints: none
+planned; no roadmap impact.
