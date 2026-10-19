@@ -18,9 +18,12 @@ recency to remember what was good.
 Explicitly *not* a social network, not a library manager, not an ebook server.
 Kavita already handles files; this handles opinions.
 
-An importer may place an opaque file where the owner could already attach one by hand. That does
-not make the file surface an ebook server: there is still no reader, format parsing, reading
-progress, device sync or format-aware file UI.
+An importer may place an opaque file where the owner could already attach one by hand. An
+importer may also read the metadata a file carries about itself — an EPUB's package document and
+its declared cover — to describe the book it is importing (DEC-164): drop EPUB files on Add and
+each becomes a book in Triage with the file attached. That does not make the file surface an
+ebook server: there is still no reader, reading progress, device sync or format-aware file UI, and
+nothing parses a file's contents beyond its own catalogue card.
 
 ### Success criteria
 

@@ -93,6 +93,10 @@ is attached automatically on commit, with no second upload needed. Re-running a 
 is cheap and safe — Akasha uploads only what changed and never overwrites a value you've
 edited by hand — and a committed batch can be undone for 24 hours after commit.
 
+Loose EPUB files need no library at all: drop them on **Add** (or on the *Ebook files* import
+source) and each file's own metadata — title, authors, ISBN, publisher, cover — becomes a book in
+Triage, with the EPUB attached to it.
+
 MyAnimeList's gzipped XML export can be uploaded as downloaded or unpacked first. Status,
 score, dates, rewatches, watched-episode progress, notes and tags come across; imported anime
 then fills its cover, studio, year, season, genres and synopsis from AniList, with Kitsu as a
@@ -114,7 +118,7 @@ carry your email address — never opened at all. A show's watched-episode count
 episodes, rewatches counted once and specials left out, and a show with no watch history falls
 back to Trakt's play count and says so on its row.
 
-Connectors are domain-owned and registry-driven; Goodreads and Calibre ship for books,
+Connectors are domain-owned and registry-driven; Goodreads, Calibre and ebook files ship for books,
 MyAnimeList for anime, Letterboxd and IMDb for movies, Trakt for movies and series together. A
 new one can be added without touching the shared
 preview, commit, triage or undo pipeline. See
