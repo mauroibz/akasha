@@ -20,6 +20,7 @@ from book_tracker.domain.importers import (
     ImportSnapshot,
     ImportSource,
     NormalizedImportRecord,
+    SearchingImporter,
 )
 from book_tracker.domain.matching import MatchKind
 from book_tracker.domain.registry import DOMAINS
@@ -438,10 +439,17 @@ class ImportService:
                     "chosen": proposal["chosen"],
                 }
             )
+        # Only a connector that searches publishes a proposal list. An empty list
+        # is the screen's "searched and found nothing", so attaching one to every
+        # row of a connector that never searches told a Goodreads, Calibre or
+        # EPUB row to fix its text and search again (found in Sprint 086's
+        # walkthrough).
+        searches = isinstance(self.importer, SearchingImporter)
         records = []
         for row in rows:
             record = _preview_record(row)
-            record["proposals"] = proposals_by_record.get(record["record_id"], [])
+            if searches:
+                record["proposals"] = proposals_by_record.get(record["record_id"], [])
             records.append(record)
         summary = json.loads(batch.preview_summary)
         if proposals:

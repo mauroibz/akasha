@@ -246,6 +246,9 @@ async def test_three_dropped_epubs_land_in_triage_with_their_file_and_cover(
             "Rayuela",
         ]
         assert all(record["attachment_staged"] for record in records)
+        # Nothing searched these rows, so they carry no proposal list at all: an
+        # empty one reads on the screen as "searched and found nothing".
+        assert all("proposals" not in record for record in records)
         assert sum(record["cover_staged"] for record in records) == 2
 
         committed = await client.post(
