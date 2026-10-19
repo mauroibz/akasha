@@ -47,6 +47,7 @@ import { weightClass } from "@/features/library/insights";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
 import { ExportPanel } from "@/features/export/ExportPanel";
 import { ExportPicker } from "@/features/import/ExportPicker";
+import { takeHandedFiles } from "@/features/import/handoff";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
@@ -314,6 +315,26 @@ export function ImportPage() {
   const ready =
     (preview?.summary.ready ?? 0) + (preview?.summary.ambiguous ?? 0);
   const activeImporter = importers.find((importer) => importer.id === source);
+
+  // Files dropped on the Add screen arrive here already chosen, and preview at
+  // once (Sprint 086): the drop was the reader's whole intent, so asking for a
+  // second click to say "yes, those" would be a step with nothing to decide.
+  // Declared after the reset above on purpose — both run in the same commit
+  // when the registry arrives, and the handed files must win.
+  const importForm = useRef<HTMLFormElement>(null);
+  const [autoPreview, setAutoPreview] = useState(false);
+  useEffect(() => {
+    if (!activeImporter) return;
+    const handed = takeHandedFiles(activeImporter.id);
+    if (!handed) return;
+    setExportFiles(handed);
+    setAutoPreview(true);
+  }, [activeImporter]);
+  useEffect(() => {
+    if (!autoPreview || exportFiles.length === 0) return;
+    setAutoPreview(false);
+    importForm.current?.requestSubmit();
+  }, [autoPreview, exportFiles]);
   // The list connector's owners' checkbox (2026-09-15), keyed by connector so
   // switching tabs never carries one source's answer into another's request.
   const noCreators = !!noCreatorsByImporter[activeImporter?.id ?? ""];
@@ -565,6 +586,7 @@ export function ImportPage() {
     if (spec.kind === "export")
       return (
         <ExportPicker
+          importerId={importer.id}
           spec={spec}
           inputId={inputId}
           files={exportFiles}
@@ -915,6 +937,7 @@ export function ImportPage() {
               critical invalid attribute value and which leaves a screen reader
               unable to reach the fields the tab just switched to (DEC-038). */}
                 <form
+                  ref={importForm}
                   className="mt-8 space-y-5 rounded-xl border border-border bg-surface p-5"
                   onSubmit={(event) => {
                     event.preventDefault();

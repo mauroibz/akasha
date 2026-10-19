@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
+import type { ImporterDefinition } from "@/api/imports";
+import { getImporters } from "@/api/imports";
 import type { ItemType } from "@/api/library";
 import { getItemTypes } from "@/api/library";
 import { PageHeader } from "@/components/PageHeader";
@@ -14,9 +16,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { AddForm } from "@/features/add/AddForm";
+import { ExportPicker } from "@/features/import/ExportPicker";
+import { handFiles } from "@/features/import/handoff";
 import { domainsFrom, labelFor } from "@/features/library/labels";
 
 /**
+ * Adding something without a provider search: files dropped in, or typed by hand.
+ *
+ * The drop zones come first (Sprint 086): every connector whose input declares
+ * `quick_add` gets one, rendered from that declaration and never by name. A drop
+ * hands the files to the import screen on that connector, which previews them at
+ * once — Add is the door, Import is still the one place a batch is reviewed,
+ * committed and undone.
+ *
  * Manual entry: the thing no provider has.
  *
  * Searching moved to `/` in Sprint 029, so this screen is what is left of the old add
@@ -32,7 +44,25 @@ import { domainsFrom, labelFor } from "@/features/library/labels";
 export function AddPage() {
   const [itemTypes, setItemTypes] = useState<ItemType[]>([]);
   const [itemType, setItemType] = useState("");
+  const [droppable, setDroppable] = useState<ImporterDefinition[]>([]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    void getImporters()
+      .then((importers) =>
+        setDroppable(
+          Array.isArray(importers)
+            ? // A multi-file input only: one motion, several files, no
+              // mapping or choice to make before the preview.
+              importers.filter(
+                (importer) =>
+                  importer.input.quick_add && importer.input.kind === "export",
+              )
+            : [],
+        ),
+      )
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     void getItemTypes()
@@ -50,11 +80,41 @@ export function AddPage() {
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
       <PageHeader
         back
-        title="Enter by hand"
-        lede="For something no provider lists. To add from a provider, search from the library."
+        title="Add"
+        lede="Drop files in, or enter something no provider lists. To add from a provider, search from the library."
       />
+      {droppable.map((importer) => (
+        <section
+          key={importer.id}
+          aria-labelledby={`${importer.id}-quick-add`}
+          className="mt-7"
+        >
+          <h2 id={`${importer.id}-quick-add`} className="text-lg font-semibold">
+            {importer.label}
+          </h2>
+          {importer.input.help && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {importer.input.help}
+            </p>
+          )}
+          <div className="mt-3">
+            <ExportPicker
+              importerId={importer.id}
+              spec={importer.input}
+              inputId={`${importer.id}-quick-add-files`}
+              files={[]}
+              onFiles={(files) => {
+                if (files.length === 0) return;
+                handFiles(importer.id, files);
+                navigate(`/import?tab=${importer.id}`);
+              }}
+            />
+          </div>
+        </section>
+      ))}
+      <h2 className="mt-10 text-lg font-semibold">Enter by hand</h2>
       {itemTypes.length > 0 && (
-        <div className="mt-7 max-w-xs">
+        <div className="mt-4 max-w-xs">
           <Label htmlFor="manual-domain">Domain</Label>
           <Select value={itemType} onValueChange={setItemType}>
             <SelectTrigger

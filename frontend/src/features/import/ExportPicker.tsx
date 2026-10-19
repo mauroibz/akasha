@@ -7,21 +7,23 @@ import { cn } from "@/lib/utils";
 import { formatBytes } from "./bundle";
 
 /**
- * Drop the files a source's own "export everything" feature produced.
+ * Drop a flat set of files: a source's own export parts, or files that each
+ * describe themselves (Sprint 086's EPUBs).
  *
  * Unlike `DirectoryPicker`, this is a flat set of opaque files, not a tree to filter:
  * every file the reader offers travels exactly as named, with no relative-path
- * reshaping. Unlike `SourceDropZone`, it takes more than one file at once — the
- * export is incomplete without every part it produced. Nothing here inspects file
- * contents; only the server can tell whether what arrived is actually a complete,
- * readable export.
+ * reshaping. Unlike `SourceDropZone`, it takes more than one file at once. What it
+ * accepts is the connector's declaration, never a name this component knows — the
+ * server refuses an undeclared member anyway; this only says so before the upload.
  */
 export function ExportPicker({
+  importerId,
   spec,
   inputId,
   files,
   onFiles,
 }: {
+  importerId: string;
   spec: ImportInputSpec;
   inputId: string;
   files: File[];
@@ -30,9 +32,18 @@ export function ExportPicker({
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const totalBytes = files.reduce((sum, file) => sum + file.size, 0);
-  const unexpected = files.filter(
-    (file) => !file.name.toLowerCase().endsWith(".calibre-data"),
-  );
+  const extensions = (spec.accept ?? "")
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.startsWith("."));
+  const unexpected = extensions.length
+    ? files.filter(
+        (file) =>
+          !extensions.some((extension) =>
+            file.name.toLowerCase().endsWith(extension),
+          ),
+      )
+    : [];
 
   const choose = (list: FileList | null) => {
     onFiles(list ? Array.from(list) : []);
@@ -40,7 +51,7 @@ export function ExportPicker({
 
   return (
     <div
-      data-testid="calibre-export-drop-zone"
+      data-testid={`${importerId}-export-drop-zone`}
       onDragOver={(event) => {
         event.preventDefault();
         setOver(true);
@@ -67,14 +78,14 @@ export function ExportPicker({
         id={inputId}
         type="file"
         multiple
-        accept=".calibre-data"
+        accept={spec.accept ?? undefined}
         className="mt-3 block w-full text-sm file:mr-3 file:h-9 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:text-sm file:font-medium"
         onChange={(event) => choose(event.target.files)}
       />
       {unexpected.length > 0 && (
         <p className="mt-2 text-sm text-destructive" role="status">
-          {unexpected.length === 1 ? "This file doesn't" : "These files don't"}{" "}
-          look like part of a Calibre export:{" "}
+          {unexpected.length === 1 ? "This file isn't" : "These files aren't"}{" "}
+          one {spec.label} accepts:{" "}
           {unexpected.map((file) => file.name).join(", ")}.
         </p>
       )}

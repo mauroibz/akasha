@@ -1,10 +1,11 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Toaster } from "@/components/ui/sonner";
+import { takeHandedFiles } from "@/features/import/handoff";
 import { findToast } from "@/test/toast";
 import { AddPage } from "./AddPage";
 
@@ -29,6 +30,7 @@ function renderPage(initialEntry = "/add") {
           <Route path="/add" element={<AddPage />} />
           <Route path="/books/:id" element={<h1>Book detail</h1>} />
           <Route path="/" element={<h1>Library page</h1>} />
+          <Route path="/import" element={<ImportProbe />} />
         </Routes>
         <Toaster />
       </MemoryRouter>
@@ -37,6 +39,69 @@ function renderPage(initialEntry = "/add") {
 }
 
 afterEach(() => vi.restoreAllMocks());
+
+/** Where a drop lands: the import screen, holding the files it was handed. */
+function ImportProbe() {
+  const location = useLocation();
+  const files = takeHandedFiles("epub") ?? [];
+  return (
+    <h1>
+      Import {location.search} {files.map((file) => file.name).join(",")}
+    </h1>
+  );
+}
+
+/** One connector that declares itself droppable on Add, one that does not. */
+const importers = [
+  {
+    id: "goodreads",
+    label: "Goodreads",
+    item_types: ["book"],
+    attachment_max_bytes: 25 * 1024 * 1024,
+    input: {
+      kind: "upload",
+      label: "Goodreads CSV",
+      field: "file",
+      accept: ".csv",
+      placeholder: null,
+      help: null,
+      guide: [],
+      empty_state: null,
+      help_url: null,
+      browsable: false,
+      incremental: false,
+      accepts_files: false,
+      max_bytes: null,
+      max_files: null,
+      quick_add: false,
+      alternates: [],
+    },
+  },
+  {
+    id: "epub",
+    label: "Ebook files",
+    item_types: ["book"],
+    attachment_max_bytes: 25 * 1024 * 1024,
+    input: {
+      kind: "export",
+      label: "EPUB files",
+      field: "files",
+      accept: ".epub",
+      placeholder: null,
+      help: "Drop EPUB files and each one becomes a book.",
+      guide: [],
+      empty_state: "Drop .epub files here.",
+      help_url: null,
+      browsable: false,
+      incremental: false,
+      accepts_files: true,
+      max_bytes: null,
+      max_files: 100,
+      quick_add: true,
+      alternates: [],
+    },
+  },
+];
 
 /** The two domains `GET /api/item-types` publishes (DEC-052 seam 3). */
 const itemTypes = [
@@ -99,6 +164,8 @@ function stubApi(onCreate?: () => Response) {
       if (url === "/api/item-types")
         return new Response(JSON.stringify(itemTypes));
       if (url === "/api/shelves") return new Response("[]");
+      if (url === "/api/importers")
+        return new Response(JSON.stringify(importers));
       if (url === "/api/entries" && init?.method === "POST")
         return (
           onCreate?.() ??
@@ -262,5 +329,37 @@ describe("AddPage", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/year/i);
     expect(screen.getByLabelText(/^title$/i)).toHaveValue("Rayuela");
     expect(screen.getByLabelText(/^year$/i)).toHaveValue(10000);
+  });
+
+  it("offers a drop zone for each connector that declares quick add, and only those", async () => {
+    stubApi();
+    renderPage();
+
+    expect(await screen.findByLabelText("EPUB files")).toHaveAttribute(
+      "multiple",
+    );
+    expect(screen.getByText("Drop .epub files here.")).toBeVisible();
+    expect(screen.queryByLabelText("Goodreads CSV")).toBeNull();
+    // Manual entry is still the page's first focus.
+    await waitFor(() =>
+      expect(screen.getByLabelText(/^title$/i)).toHaveFocus(),
+    );
+  });
+
+  it("drops three files and opens the import screen on that connector, holding them", async () => {
+    stubApi();
+    renderPage();
+
+    const zone = await screen.findByTestId("epub-export-drop-zone");
+    const files = ["a.epub", "b.epub", "c.epub"].map(
+      (name) => new File([name], name),
+    );
+    fireEvent.drop(zone, { dataTransfer: { files } });
+
+    expect(
+      await screen.findByRole("heading", {
+        name: "Import ?tab=epub a.epub,b.epub,c.epub",
+      }),
+    ).toBeVisible();
   });
 });

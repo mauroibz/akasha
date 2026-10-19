@@ -339,7 +339,7 @@ export async function stubImporters(page: Page) {
                 kind: "export",
                 label: "Calibre export",
                 field: "parts",
-                accept: null,
+                accept: ".calibre-data",
                 placeholder: null,
                 help: "Or drop the files from Calibre's own export.",
                 guide: [],

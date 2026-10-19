@@ -513,6 +513,7 @@ class CalibreImporter:
                 kind="export",
                 label="Calibre export",
                 field="parts",
+                accept=".calibre-data",
                 accepts_files=True,
                 help="Or drop the files from Calibre's own export.",
                 guide=(

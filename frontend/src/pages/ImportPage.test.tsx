@@ -12,6 +12,7 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { handFiles, takeHandedFiles } from "@/features/import/handoff";
 import { ImportPage } from "./ImportPage";
 
 afterEach(() => {
@@ -2618,5 +2619,70 @@ describe("the list connector's search-then-confirm surfaces", () => {
     expect(
       await screen.findByRole("button", { name: /^confirm$/i }),
     ).toBeEnabled();
+  });
+});
+
+describe("files handed over from the Add screen (Sprint 086)", () => {
+  const epubImporter = {
+    id: "epub",
+    label: "Ebook files",
+    item_types: ["book"],
+    attachment_max_bytes: 25 * 1024 * 1024,
+    input: {
+      kind: "export",
+      label: "EPUB files",
+      field: "files",
+      accept: ".epub",
+      placeholder: null,
+      help: "Drop EPUB files and each one becomes a book.",
+      guide: [],
+      empty_state: "Drop .epub files here.",
+      help_url: null,
+      browsable: false,
+      incremental: false,
+      accepts_files: true,
+      max_bytes: null,
+      max_files: 100,
+      quick_add: true,
+      alternates: [],
+    },
+  };
+
+  it("previews them straight away, without a second click", async () => {
+    const posted: string[] = [];
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
+      const url = String(input);
+      if (url === "/api/importers")
+        return new Response(JSON.stringify([epubImporter]));
+      if (
+        url === "/api/import/epub/preview" &&
+        init?.body instanceof FormData
+      ) {
+        posted.push(
+          ...(init.body.getAll("files") as File[]).map((file) => file.name),
+        );
+        return new Response(
+          JSON.stringify({
+            batch_id: "epub-1",
+            fingerprint: "f",
+            state: "previewed",
+            summary: { total: 3, ready: 3, errors: 0, ambiguous: 0 },
+            records: [],
+          }),
+          { status: 201 },
+        );
+      }
+      return new Response("[]");
+    });
+    handFiles(
+      "epub",
+      ["a.epub", "b.epub", "c.epub"].map((name) => new File([name], name)),
+    );
+    renderImportPage("/import?tab=epub");
+
+    await screen.findByRole("heading", { name: /preview: 3 rows/i });
+    expect(posted).toEqual(["a.epub", "b.epub", "c.epub"]);
+    // Taken once: a later visit starts empty.
+    expect(takeHandedFiles("epub")).toBeNull();
   });
 });

@@ -102,6 +102,8 @@ export interface ImportInputSpec {
   single_domain_pick?: boolean;
   /** Boolean options the connector's reader reads; the route forwards them. */
   flags?: string[];
+  /** Whether the Add screen offers this input as a drop target (Sprint 086). */
+  quick_add?: boolean;
   /** Other ways into the same connector, each rendered beneath the primary. One deep. */
   alternates: ImportInputSpec[];
 }
