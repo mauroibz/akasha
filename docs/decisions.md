@@ -6684,3 +6684,25 @@ an operator command in the house style.
   the retries declaration, so the next person tuning it knows what the retries are
   for. If a *second* flake class ever appears, it gets its own named handling — not
   a silent global retry bump.
+
+## DEC-164 — An importer may read a file's own metadata: the ebook-files connector (Sprint 086)
+
+- Date: 2026-10-19
+- Status: accepted
+- Context: the owner, verbatim: "a simple UX flow i want and cannot do: open akasha, click Add,
+  drag 3 epub files from my downloads folder and have them proceesed and added to the
+  library/triage" — then "build it, test it with [the DDIA 2nd edition epub], ship it, and
+  install the update on my zimaboard." Product spec §1 forbade format parsing outright, and the
+  attachment roadmap named reading an EPUB's OPF as the natural next step, left out on purpose.
+- Decision: reopen the plan as Sprint 086 (the DEC-162 extension shape), `FINAL_SPRINT` 85 → 86,
+  revision 44. Amend §1: an **importer** may read the metadata a file carries about itself (an
+  EPUB's OPF and its declared cover) to describe the book it is importing. The file surface stays
+  opaque and format-agnostic — still no reader, progress, device sync or format-aware file UI.
+  The connector rides the existing `export` input kind, whose route already streams a flat set of
+  declared files to disk and whose `attachment_source` channel already attaches on commit, so no
+  route or schema changes. The Add screen offers it through a declared `quick_add` flag rather
+  than a branch on its name, and `ExportPicker` stops hardcoding Calibre.
+- Consequences: EPUB only; the other formats have no open metadata container worth trusting.
+  The connector's guesses (a `dcterms:title` meta over `dc:title`, one creator string split on
+  "and"/"&"/";") come from the owner's real file and are editable after import. Imported items
+  carry an ISBN when the file has one, so DEC-008 enrichment fills the rest. Ships as v2.3.0.

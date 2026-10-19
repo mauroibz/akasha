@@ -1,14 +1,15 @@
 # Implementation Roadmap
 
-**Plan revision:** 43
+**Plan revision:** 44
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the plan is complete. Sprints 001–085 are done: Sprint 082
+**Active sprint:** [086 — Drop ebook files](086-drop-ebook-files.md) (ready). Sprints 001–085 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
 to every domain and corrected the confirmed row's cover channel (DEC-161). The owner's
 2026-09-15 feedback on it reopens the plan once more as Sprint 085 (DEC-162), to ship
-as v2.2.1. Earlier
+as v2.2.1. The owner's 2026-10-19 request to drop EPUB files on Add reopens it again as
+Sprint 086 (DEC-164). Earlier
 lines: Sprint 071 closed
 the original v1 plan and the owner's 2026-09-05 readability feedback (DEC-139) extended it
 through 072–074, covered in the
@@ -202,6 +203,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
 | [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
 | [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | completed |
+| [086](086-drop-ebook-files.md) | Drop ebook files: EPUBs on Add, read, attached, in Triage | 085 | ready |
 
 ## Sprint contracts
 
@@ -1723,6 +1725,12 @@ choice rather than a birthright.
   while the row still errored `author missing`. Gates: backend 1601,
   Vitest 337, make check green, Playwright 137+2 skipped, walkthrough clean
   against real providers.
+
+- **[086 — Drop ebook files](086-drop-ebook-files.md)** — the owner's 2026-10-19 request: open
+  Akasha, click Add, drop three EPUBs and have them land in Triage. A book connector reads each
+  EPUB's embedded OPF metadata and cover and attaches the file, through the existing `export`
+  bundle pipeline; the Add screen offers every connector that declares `quick_add`. Amends
+  product spec §1 (DEC-164). Ships as v2.3.0.
 
 ## Not scheduled
 

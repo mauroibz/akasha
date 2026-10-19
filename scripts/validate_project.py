@@ -51,8 +51,8 @@ ACTIVE_STATUSES = {"ready", "in_progress", "blocked"}
 # after Sprint 071 had closed it — and DEC-156's hand-written-CSV importer as 083, which
 # reopens the plan after Sprint 082 had closed it at 82, and DEC-160's any-domain DEC-162 moves it to 85.
 # generalization of that importer as 084, which reopens the plan again after Sprint 083
-# had closed it at 83).
-FINAL_SPRINT = 85
+# had closed it at 83), and DEC-164's ebook-files connector as 086, which reopens it at 85).
+FINAL_SPRINT = 86
 GENERATED_DIRECTORIES = {".git", ".mypy_cache", ".pytest_cache", ".ruff_cache", ".venv", "dist", "node_modules"}
 RECORDINGS_DIRECTORY = ROOT / "backend" / "tests" / "fixtures" / "providers"
 LINK_RE = re.compile(r"(?<!!)\[[^]]*]\(([^)]+)\)")
