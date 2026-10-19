@@ -2,7 +2,7 @@
 
 **Plan revision:** 44
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [086 — Drop ebook files](086-drop-ebook-files.md) (ready). Sprints 001–085 are done: Sprint 082
+**Active sprint:** none — the plan is complete. Sprints 001–086 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -203,7 +203,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [083](083-a-list-you-wrote.md) | A list you wrote yourself: hand-written CSV, search-then-confirm | 082 | completed |
 | [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
 | [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | completed |
-| [086](086-drop-ebook-files.md) | Drop ebook files: EPUBs on Add, read, attached, in Triage | 085 | ready |
+| [086](086-drop-ebook-files.md) | Drop ebook files: EPUBs on Add, read, attached, in Triage | 085 | completed |
 
 ## Sprint contracts
 
