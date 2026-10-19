@@ -23,6 +23,7 @@ from book_tracker.domains.anime import DOMAIN as ANIME
 from book_tracker.domains.anime.myanimelist import IMPORTER as MYANIMELIST_IMPORTER
 from book_tracker.domains.book import DOMAIN as BOOK
 from book_tracker.domains.book.calibre import IMPORTER as CALIBRE_IMPORTER
+from book_tracker.domains.book.epub import IMPORTER as EPUB_IMPORTER
 from book_tracker.domains.book.goodreads import EXPORT as GOODREADS_EXPORT
 from book_tracker.domains.book.goodreads import IMPORTER as GOODREADS_IMPORTER
 from book_tracker.domains.movie import DOMAIN as MOVIE
@@ -51,6 +52,7 @@ REGISTERED_IMPORTERS: tuple[Importer, ...] = (
     LIST_IMPORTER,
     GOODREADS_IMPORTER,
     CALIBRE_IMPORTER,
+    EPUB_IMPORTER,
     MYANIMELIST_IMPORTER,
     LETTERBOXD_IMPORTER,
     IMDB_IMPORTER,

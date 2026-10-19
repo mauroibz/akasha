@@ -1535,6 +1535,11 @@
             ],
             "title": "Placeholder"
           },
+          "quick_add": {
+            "default": false,
+            "title": "Quick Add",
+            "type": "boolean"
+          },
           "single_domain_pick": {
             "default": false,
             "title": "Single Domain Pick",

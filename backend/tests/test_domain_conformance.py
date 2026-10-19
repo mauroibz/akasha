@@ -848,6 +848,7 @@ def test_importers_are_registered_under_every_domain_they_target() -> None:
     assert {importer.name for importer in IMPORTERS_BY_DOMAIN["book"]} == {
         "goodreads",
         "calibre",
+        "epub",
         "list",
     }
     # Indexing a two-domain connector twice must not publish it twice.

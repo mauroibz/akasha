@@ -118,6 +118,11 @@ class ImportInputSpec:
     #: same options channel a column mapping does; the reader decides what it
     #: means. Empty for every connector that reads no booleans.
     flags: tuple[str, ...] = ()
+    #: Whether the Add screen may offer this input as a drop target beside manual
+    #: entry (Sprint 086). For a source a person drops in one motion — files that
+    #: describe themselves — rather than one that needs an export, a mapping or a
+    #: choice first. The Add screen renders it from this declaration, never by name.
+    quick_add: bool = False
 
 
 def valid_member_pattern(pattern: str) -> bool:

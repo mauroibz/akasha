@@ -124,6 +124,8 @@ class ImportInputResponse(BaseModel):
     #: Boolean options this connector's reader reads, forwarded from the same
     #: upload request (Sprint 085's list: the creators column is optional).
     flags: list[str] = Field(default_factory=list)
+    #: Whether the Add screen offers this input as a drop target (Sprint 086).
+    quick_add: bool = False
     #: Other ways into the same connector, each rendered beneath the primary. One deep.
     alternates: "list[ImportInputResponse]" = Field(default_factory=list)
 
@@ -545,10 +547,10 @@ async def _export(
         if written == 0:
             raise LibraryError(
                 "invalid_import_source",
-                "At least one exported part file is required",
+                "At least one file is required",
                 status_code=422,
                 user_message="No files were offered to import.",
-                action="Drop every part file the export produced together.",
+                action=spec.empty_state or "Choose the files to import.",
             )
         extras = {name: value for name in form_extras if isinstance(value := form.get(name), str)}
         return ImportSource(export=export), extras

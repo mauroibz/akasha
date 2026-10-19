@@ -1,7 +1,7 @@
 # Sprint 086 — Drop ebook files
 
 **Sprint:** 086
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 44
 **Depends on:** 085
 **Owner:** Mauro
