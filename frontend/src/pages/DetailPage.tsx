@@ -46,6 +46,7 @@ import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
 import { MetadataDialog } from "@/features/detail/MetadataDialog";
 import { OpinionDialog } from "@/features/detail/OpinionDialog";
+import { RefileDialog } from "@/features/detail/RefileDialog";
 import { ShelfPicker } from "@/features/shelves/ShelfPicker";
 import { optionalInt, toMetadataPatch } from "@/features/detail/schemas";
 import {
@@ -235,7 +236,7 @@ export function DetailPage() {
   const backTo = from === "triage" ? "/inbox" : "/";
   const backLabel = from === "triage" ? "Inbox" : "Library";
   const [dialog, setDialog] = useState<
-    "opinion" | "metadata" | "refresh" | "delete" | "cover" | null
+    "opinion" | "metadata" | "refresh" | "delete" | "cover" | "refile" | null
   >(null);
   const [error, setError] = useState("");
   const [deleteError, setDeleteError] = useState("");
@@ -660,6 +661,13 @@ export function DetailPage() {
               >
                 Refresh from provider
               </Button>
+              <Button
+                variant="outline"
+                className="rounded-full px-5"
+                onClick={() => setDialog("refile")}
+              >
+                Move to another library…
+              </Button>
             </div>
           </Panel>
 
@@ -720,6 +728,22 @@ export function DetailPage() {
             .mutateAsync(() => chooseCover(item.id, coverUrl))
             .then(() => undefined)
         }
+      />
+
+      <RefileDialog
+        open={dialog === "refile"}
+        onOpenChange={(open) => setDialog(open ? "refile" : null)}
+        entryId={entry.id}
+        title={item.title}
+        itemType={item.type}
+        onMoved={(moved) => {
+          void cache.invalidateQueries({
+            queryKey: queryKeys.library.all,
+          });
+          cache.removeQueries({ queryKey: queryKeys.entry(entry.id) });
+          toast.success(`Moved ${moved.item.title}`);
+          navigate(`/books/${moved.id}`, { replace: true, state: { from } });
+        }}
       />
 
       <MetadataDialog

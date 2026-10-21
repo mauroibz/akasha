@@ -462,6 +462,28 @@ export async function searchLibrary(
   return response.json() as Promise<LibraryEntry[]>;
 }
 
+/**
+ * Move an entry into another library through that library's own record (Sprint 100).
+ * The answer is the new entry: the old one, and its item, are gone.
+ */
+export async function refileEntry(
+  entryId: number,
+  candidate: Pick<SearchCandidate, "source" | "source_id" | "source_refs">,
+): Promise<LibraryEntry> {
+  const response = await request(`/api/entries/${entryId}/refile`, {
+    method: "POST",
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: JSON.stringify({
+      source: candidate.source,
+      source_id: candidate.source_id,
+      source_refs: candidate.source_refs,
+    }),
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The entry could not be moved");
+  return response.json() as Promise<LibraryEntry>;
+}
+
 export async function getEntry(entryId: number): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {
     headers: { Accept: "application/json" },
@@ -759,3 +781,4 @@ import {
   readErrorFields,
   request,
 } from "./request";
+import type { SearchCandidate } from "./add";
