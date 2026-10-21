@@ -48,4 +48,19 @@ the library spec, and screenshots of Now and Diary on a copy of the owner's data
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `test_now_and_diary.py` and the route-structure tests
+(268), `NowStrip`, `DiaryPage` and Home tests, `vitest related`, `make check`, the library,
+accessibility, resilience and command-bar specs (57), and screenshots of Now and Diary on a copy
+of the owner's data (one book set to Reading for the look, then restored).
+
+- **AC1.** `StatusSpec.in_progress`, declared by book (reading), anime and series (watching);
+  `/api/now` asks the declarations, never a domain name. Films and albums have no such status.
+- **AC2.** `+1` (or `+10` for pages) advances progress optimistically and puts it back on
+  failure. Books declare no progress unit today, so a book in Now reads "In progress".
+- **AC3.** `/api/diary` groups `date_finished` by month with per-domain counts; tested.
+
+**Found:** the Now cache under `library` would have been rewritten by the library's optimistic
+update (the 096 lesson), so it has its own key; a sixth nav item overflowed tablet width (labels
+are screen-reader-only below 1024px); the strip's wrapper padding moved the first cover down when
+the strip was empty (moved inside the strip); a strip given a non-list response took the library
+page down (now ignored).

@@ -637,7 +637,7 @@ export function TriagePage() {
     <main className="mx-auto min-h-screen max-w-7xl px-5 py-7 sm:px-8">
       <PageHeader
         back
-        eyebrow="Triage"
+        eyebrow="Import"
         title="Inbox"
         count={firstPage?.total ? `${firstPage.total} unsorted` : undefined}
         lede={
@@ -664,7 +664,7 @@ export function TriagePage() {
         }
       />
       <section
-        aria-label="Triage filters"
+        aria-label="Inbox filters"
         className="mt-6 flex flex-wrap items-center gap-3"
       >
         <label className="relative min-w-60 flex-1">
@@ -881,7 +881,7 @@ export function TriagePage() {
             // cells, so `role="table"` promised a structure that was not there
             // and axe reported the missing children as critical (DEC-038).
             role="feed"
-            aria-label="Triage inbox"
+            aria-label="Inbox"
           >
             <div
               className="relative w-full"

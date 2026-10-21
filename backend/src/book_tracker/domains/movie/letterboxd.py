@@ -541,7 +541,7 @@ class LetterboxdImporter:
             "are looked up afterwards and fill only what is still empty.",
             "This is a snapshot, not a sync. Importing again later adds whatever is "
             "new and changes nothing it already holds.",
-            "Everything lands in Triage rather than in the library, so nothing appears "
+            "Everything lands in your Inbox rather than in the library, so nothing appears "
             "until you have looked at it.",
         ),
         empty_state="Drop your Letterboxd export .zip here, or choose a file.",

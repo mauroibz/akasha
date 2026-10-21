@@ -946,7 +946,7 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
   await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
-  const feed = page.getByRole("feed", { name: "Triage inbox" });
+  const feed = page.getByRole("feed", { name: "Inbox" });
   expect(
     await feed.evaluate((element) => getComputedStyle(element).overflowY),
   ).toBe("visible");

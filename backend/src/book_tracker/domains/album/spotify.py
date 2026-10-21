@@ -331,7 +331,7 @@ class SpotifyImporter:
             "minutes for a full library.",
             "This is a snapshot, not a sync. Importing again later adds "
             "whatever is new and changes nothing it already holds.",
-            "Everything lands in Triage rather than in the library, so nothing "
+            "Everything lands in your Inbox rather than in the library, so nothing "
             "appears until you have looked at it.",
         ),
         empty_state="Drop your Spotify account data export .zip here, or choose a file.",

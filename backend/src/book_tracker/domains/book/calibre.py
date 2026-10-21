@@ -462,7 +462,7 @@ class CalibreImporter:
             "it is safe to do while Calibre or calibre-web is running.",
             "Only empty fields are filled. Anything you have edited in Akasha wins, and "
             "a re-import of the same library changes nothing you have touched.",
-            "Everything lands in Triage rather than in the library, so nothing appears "
+            "Everything lands in your Inbox rather than in the library, so nothing appears "
             "until you have looked at it.",
         ),
         empty_state="Choose your Calibre library folder.",

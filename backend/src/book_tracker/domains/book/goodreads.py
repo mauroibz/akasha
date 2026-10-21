@@ -210,7 +210,7 @@ class GoodreadsImporter:
             "authoritative the moment it lands.",
             "Ratings are doubled onto Akasha's 1–10 scale and marked provisional, "
             "because a 3\u2605 is not a 6 you chose. Editing a score clears the mark.",
-            "Your shelves become tags, and every row lands in Triage rather than in "
+            "Your shelves become tags, and every row lands in your Inbox rather than in "
             "the library, so nothing appears until you have looked at it.",
         ),
         empty_state="Drop goodreads_library_export.csv here, or choose a file.",

@@ -342,6 +342,10 @@ class MyAnimeListImporter:
             "(myanimelist.net/panel.php?go=export). Pick Anime List, not Manga List.",
             "Download the file. It arrives gzipped; upload it exactly as it "
             "downloaded, or unpacked — either is read.",
+            # Sprint 099: AniList's own list export, in MyAnimeList's XML, is the
+            # same file shape (`<myanimelist>` root), so it needs no connector of its own.
+            "Coming from AniList? Export your anime list in MyAnimeList's XML format "
+            "and drop that file here; it reads the same way.",
             "Scores come across unchanged, because MyAnimeList already scores out of "
             "ten. Nothing is doubled and nothing is marked provisional.",
             "Watched-episode counts come across too, so a series you dropped halfway "
@@ -349,7 +353,7 @@ class MyAnimeListImporter:
             "This is a snapshot, not a sync. Importing again later adds whatever is "
             "new and changes nothing it already holds, so a count that has moved on "
             "stays as it was.",
-            "Everything lands in Triage rather than in the library, so nothing appears "
+            "Everything lands in your Inbox rather than in the library, so nothing appears "
             "until you have looked at it.",
         ),
         empty_state="Drop your MyAnimeList export here, or choose a file.",

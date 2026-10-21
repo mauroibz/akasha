@@ -847,6 +847,7 @@ def test_importers_are_registered_under_every_domain_they_target() -> None:
     assert_registration_matches_declaration(IMPORTERS_BY_DOMAIN, IMPORTERS)
     assert {importer.name for importer in IMPORTERS_BY_DOMAIN["book"]} == {
         "goodreads",
+        "storygraph",
         "calibre",
         "epub",
         "list",

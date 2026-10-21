@@ -293,7 +293,7 @@ class EpubImporter:
         guide=(
             "Drag one or more .epub files onto this box, or choose them.",
             "Each file's own title, authors, ISBN, publisher and cover are read from inside it.",
-            "Every book lands in Triage, and the file is attached to it.",
+            "Every book lands in your Inbox, and the file is attached to it.",
         ),
         empty_state="Drop .epub files here.",
         # A flat set of files, each its own book. Upper case too, because a file

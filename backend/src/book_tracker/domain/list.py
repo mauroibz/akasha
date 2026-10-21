@@ -311,7 +311,7 @@ class ListImporter:
             "two columns when there are no headers.",
             "Nothing is added until you look at it: Akasha searches for each row "
             "in the background, proposes the matches it found, and you confirm "
-            "or discard each one before the import lands in Triage.",
+            "or discard each one before the import lands in your Inbox.",
             "The other columns are kept exactly as you typed them, visible on "
             "each row, but are not read as data.",
         ),
