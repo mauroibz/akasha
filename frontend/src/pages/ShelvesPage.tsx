@@ -313,7 +313,7 @@ function TextToggle({
 /** What a shelf holds, by its domains' own names. */
 function kindOf(shelf: ShelfWithCount, types: ItemType[] | undefined): string {
   const ids = Object.keys(shelf.members_by_type ?? {});
-  if (ids.length === 0) return "Empty";
+  if (shelf.entry_count === 0) return "Empty";
   return ids
     .map((id) => types?.find((type) => type.id === id)?.plural_label ?? id)
     .join(" · ");

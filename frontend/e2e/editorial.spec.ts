@@ -239,11 +239,16 @@ test("shelf management creates, renames, and deletes shelves", async ({
   );
 
   await page.goto("/shelves");
-  await expect(page.getByText("Favorites")).toBeVisible();
-  await expect(page.getByText("5 items")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Favorites", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator('[data-shelf-row="favorites"]')).toContainText(
+    "5 things",
+  );
 
-  // Create a new shelf
-  await page.getByPlaceholder(/new shelf name/i).fill("Sci-fi");
+  // Create a new shelf: a button opens the field (Sprint 105).
+  await page.getByRole("button", { name: "+ New shelf" }).click();
+  await page.getByRole("textbox", { name: "New shelf name" }).fill("Sci-fi");
   await page.getByRole("button", { name: /create shelf/i }).click();
   await expect(page.getByRole("link", { name: /Sci-fi/ })).toBeVisible();
 
