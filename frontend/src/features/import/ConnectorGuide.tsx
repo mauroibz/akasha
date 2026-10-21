@@ -89,7 +89,9 @@ export function ConnectorGuide({
       headingId={headingId}
       heading={
         kind === "upload"
-          ? `How to get a ${label}`
+          ? // "your Goodreads CSV", "your list (CSV or text)": a label that already
+            // says "Your" is not read as "a Your list" (proposal I4).
+            `How to get your ${label.replace(/^your\s+/i, "")}`
           : `Before you import from ${importer.label}`
       }
       guide={guide}

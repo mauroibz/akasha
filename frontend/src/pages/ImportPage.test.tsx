@@ -692,7 +692,7 @@ describe("ImportPage", () => {
     renderImportPage();
 
     const steps = await screen.findByRole("list", {
-      name: /how to get a goodreads csv/i,
+      name: /how to get your goodreads csv/i,
     });
     expect(steps).toHaveTextContent(/goodreads.com\/review\/import/i);
     expect(steps).toHaveTextContent(/provisional/i);

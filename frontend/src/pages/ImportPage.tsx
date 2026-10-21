@@ -49,6 +49,8 @@ import { cn } from "@/lib/utils";
 import { TriagePage } from "@/pages/TriagePage";
 import { NativeSelect } from "@/components/ui/native-select";
 import { AmbiguityChoice } from "@/features/import/AmbiguityChoice";
+import { statusLabelFor } from "@/features/library/labels";
+import type { EntryStatus } from "@/api/library";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
 interface ImportFailure {
@@ -1252,7 +1254,18 @@ export function ImportPage() {
                         {record.suggested_status && (
                           <>
                             <span aria-hidden="true">·</span>
-                            <span>suggested {record.suggested_status}</span>
+                            <span>
+                              {/* The domain's word, never the stored value
+                                  (`to_read`; Sprint 095's walkthrough). */}
+                              suggests{" "}
+                              {statusLabelFor(
+                                activeImporter?.item_types[0] ?? "book",
+                                Array.isArray(itemTypes.data)
+                                  ? itemTypes.data
+                                  : undefined,
+                                record.suggested_status as EntryStatus,
+                              ).toLowerCase()}
+                            </span>
                           </>
                         )}
                       </p>
