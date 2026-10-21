@@ -471,6 +471,9 @@ class ImportService:
                     "running",
                 ):
                     progress = dict(job["progress"])
+                    # A queued job has written nothing yet: none of the rows are done.
+                    progress.setdefault("searched", 0)
+                    progress.setdefault("total", len(records))
                     progress["job_state"] = job["state"]
                     if job.get("error_code"):
                         progress["wait_reason"] = job["error_code"]

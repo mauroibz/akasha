@@ -1,7 +1,7 @@
 # Sprint 088 — One contract, generated
 
 **Sprint:** 088
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 087
 **Owner:** Mauro

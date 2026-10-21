@@ -222,12 +222,24 @@ class PreviewSummary(BaseModel):
     skipped_reasons: list[SkippedReason] = Field(default_factory=list)
 
 
+class SearchProgress(BaseModel):
+    """A matching batch's search job, so far (Sprint 083 D3.2)."""
+
+    searched: int
+    total: int
+    job_state: str
+    wait_reason: str | None = None
+
+
 class PreviewResponse(BaseModel):
     batch_id: str
     fingerprint: str
     state: str
     summary: PreviewSummary
     records: list[ImportRecordResponse]
+    #: Present only while a connector's search job runs. Undeclared until Sprint 088,
+    #: so the model dropped it and the screen's progress line never rendered.
+    search_progress: SearchProgress | None = None
 
 
 class AmbiguityChoice(BaseModel):

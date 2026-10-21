@@ -420,6 +420,32 @@ class TestTheJob:
         assert provider.queries == []
 
     @pytest.mark.anyio
+    async def test_progress_is_written_as_each_row_finishes(self, tmp_path: Path) -> None:
+        """The screen reads the job's progress while it runs (Sprint 088); written
+        only at completion, it said nothing until there was nothing left to say."""
+        engine = make_engine(tmp_path)
+        stage_preview(
+            engine, [{"title": f"Libro {index}", "author": "Autor"} for index in range(3)]
+        )
+        jobs = JobRepository(engine)
+        job_id = jobs.enqueue("b1", "search_import_rows", {"batch_id": "b1"}, user_id=1)
+        jobs.claim(datetime.now(UTC))  # as the runner does: progress is for a running job
+        seen: list[dict[str, Any]] = []
+
+        class Watching(FakeProvider):
+            async def search(self, query: str, limit: int = 20) -> list[SearchCandidate]:
+                seen.append((jobs.get_job(job_id) or {})["progress"])
+                return await super().search(query, limit)
+
+        handler = make_handler(engine, [Watching([candidate("X", "OL1M")])])
+        assert (await handler.process(job_id, NOW))["state"] == "succeeded"
+        assert seen == [
+            {"searched": 0, "total": 3},
+            {"searched": 1, "total": 3},
+            {"searched": 2, "total": 3},
+        ]
+
+    @pytest.mark.anyio
     async def test_the_limiter_gates_each_row(self, tmp_path: Path) -> None:
         engine = make_engine(tmp_path)
         stage_preview(

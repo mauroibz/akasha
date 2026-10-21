@@ -2393,6 +2393,16 @@
             "title": "Records",
             "type": "array"
           },
+          "search_progress": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/SearchProgress"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "state": {
             "title": "State",
             "type": "string"
@@ -2769,6 +2779,41 @@
           "metadata"
         ],
         "title": "SearchCandidateResponse",
+        "type": "object"
+      },
+      "SearchProgress": {
+        "description": "A matching batch's search job, so far (Sprint 083 D3.2).",
+        "properties": {
+          "job_state": {
+            "title": "Job State",
+            "type": "string"
+          },
+          "searched": {
+            "title": "Searched",
+            "type": "integer"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "wait_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wait Reason"
+          }
+        },
+        "required": [
+          "searched",
+          "total",
+          "job_state"
+        ],
+        "title": "SearchProgress",
         "type": "object"
       },
       "SessionResponse": {

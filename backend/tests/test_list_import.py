@@ -447,6 +447,12 @@ class TestRoutes:
         # This connector previews in `matching` (Sprint 083 D3): the background
         # search job owns the batch until its queue drains.
         assert body["state"] == "matching"
+        # The live search counts reach the screen (Sprint 088: the response model
+        # used to drop them, so "N of M rows searched" never rendered).
+        progress = body["search_progress"]
+        assert progress["job_state"] in {"queued", "running"}
+        assert progress["total"] == len(body["records"])
+        assert 0 <= progress["searched"] <= progress["total"]
         transposed = [record for record in body["records"] if record["title"] == "Iliada"]
         assert transposed[0]["creators"] == ["Homero"]
         # The mapping composes the fingerprint, so this is not the auto-detected

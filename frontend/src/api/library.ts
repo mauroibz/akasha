@@ -146,7 +146,6 @@ export interface LibraryItem {
   /** Set only when the owner corrected it; absent means the automatic value. */
   creator_sort_override?: string | null;
   cover_url?: string | null;
-  cover_path?: string | null;
   /** Opaque: what is in here is the domain's business, not this type's. */
   metadata: Record<string, unknown>;
   identifiers: Record<string, string>;

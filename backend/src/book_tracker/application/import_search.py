@@ -109,7 +109,12 @@ class ImportSearchHandler:
         searched = 0
         no_results = 0
         search_failed = 0
-        for row in rows:
+        for index, row in enumerate(rows):
+            # Rows finished so far, written before each row so the preview the
+            # screen polls can say "N of M rows searched" while the job runs.
+            await off_loop(
+                self.repo.record_progress, job_id, {"searched": index, "total": len(rows)}
+            )
             payload = json.loads(row.normalized_payload)
             title = str(payload.get("item", {}).get("title") or "").strip()
             creators = payload.get("item", {}).get("metadata", {}).get("creators") or []

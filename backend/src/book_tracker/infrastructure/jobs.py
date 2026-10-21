@@ -161,6 +161,14 @@ class JobRepository:
                 row.lease_expires_at = lease_iso
                 row.updated_at = now_iso
 
+    def record_progress(self, job_id: str, progress: Mapping[str, Any]) -> None:
+        """Write a running job's progress so far, for a screen polling it (Sprint 088)."""
+        with self._write() as session:
+            row = session.get(JobRow, job_id)
+            if row is not None and row.state == "running":
+                row.progress = json.dumps(dict(progress))
+                row.updated_at = _now()
+
     def complete(self, job_id: str, progress: Mapping[str, Any], now: datetime) -> None:
         now_iso = now.isoformat().replace("+00:00", "Z")
         with self._write() as session:
