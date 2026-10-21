@@ -6233,3 +6233,25 @@ was closed in the state; repaired in order.
 
 **Next.** No sprint is planned. The project state is `complete`, and a release is owed the full
 gate (HANDOFF).
+
+## 2026-10-21 — Release v2.4.0
+
+**Done.**
+
+- The full release gate DEC-167 deferred.
+- `AKASHA_METRICS` and `AKASHA_PROVIDER_DAILY_LIMITS` added to `compose.yaml`'s pass-through
+  list. Both were documented but never reached the container. `test_settings.py` now fails when a
+  setting is missing from that list.
+- The version surfaces moved to 2.4.0, release notes are in `docs/operations/release-notes-v2.4.md`,
+  and the tag was pushed.
+
+**Verified and how.**
+
+- `make test`: backend 1686 passed (90% coverage), Vitest 423 passed.
+- Playwright: 147 passed, 2 skipped (the live-metadata specs, by design).
+- `make check` and `make smoke-container` pass.
+- The new settings test failed before the compose change and passes after it.
+
+**Found.** The handoff said migrations 0021–0025 were new since v2.3.0; only 0023–0025 are.
+
+**Next.** No sprint is planned.

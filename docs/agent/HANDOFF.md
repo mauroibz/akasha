@@ -4,16 +4,14 @@
 
 On 2026-10-21 the owner accepted `docs/production-grade-proposal.md` (DEC-165). The plan reopened
 as Sprints 087–101 and ran autonomously, with per-sprint verification limited to what each sprint
-changed (DEC-167). **All fifteen are completed and the project state is `complete`.** Nothing has
-been tagged, released or pushed.
+changed (DEC-167). **All fifteen are completed and the project state is `complete`.** They
+shipped as **v2.4.0**, tagged and pushed on 2026-10-21 after the full release gate.
 
 Waiting on the owner:
 
 - Trust-stated-status on import (DEC-165 point 3).
 - A real Hardcover export and a real Simkl export (Sprint 099).
 - A real StoryGraph export, to confirm the connector built in 099.
-- The release decision. Sprint 101 added migrations 0024 and 0025, so the next release is a
-  minor version.
 
 ## What changed in the last two sprints
 
@@ -27,20 +25,11 @@ Waiting on the owner:
   - Searches are cached for 24 hours.
   - `AKASHA_METRICS=on` serves `/metrics`.
 
-## Verified (final tree)
+## Verified (v2.4.0)
 
-- Backend: the full suite, 1686 passed, at 852a6ca.
-- `make check` is green.
-- Vitest and Playwright have not been run in full since DEC-167. Only related tests and
-  changed-screen specs ran per sprint.
-- smoke-container last ran for v2.3.0.
-
-## Owed before a release (DEC-167)
-
-1. `make test`: the full Vitest run and the full Playwright run.
-2. `make smoke-container` on the new image, so migrations 0021–0025 run in the container.
-3. Release notes for 2.4 from the Outcomes of Sprints 087–101.
-4. The version bump across the five surfaces `validate_project.py` checks.
+- `make test`: backend 1686 passed, Vitest 423 passed.
+- Playwright: 147 passed, 2 skipped (the live-metadata specs, by design).
+- `make check` and `make smoke-container` pass.
 
 ## Known and left
 
@@ -55,6 +44,5 @@ Waiting on the owner:
 
 ## Next session
 
-There is no planned sprint. Ask the owner whether to cut the release (the list above) or to plan
-more work. The design mock the owner approved is the canvas artifact
+There is no planned sprint. Ask the owner what to plan next. The design mock the owner approved is the canvas artifact
 https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa.
