@@ -452,6 +452,37 @@ class BrowsableImporter(Protocol):
     def browse(self, path: str, context: ImportReadContext) -> ImportBrowseResult: ...
 
 
+@runtime_checkable
+class SniffingImporter(Protocol):
+    """A connector that can recognise its own source from the first bytes (Sprint 095).
+
+    Optional like `BrowsableImporter`: a connector that cannot tell its source from any
+    other simply does not implement it, and a dropped file is never routed to it by
+    guess. `head` is at most `SNIFF_BYTES` long; the answer is a confidence in 0..1.
+    """
+
+    def sniff(self, head: bytes, name: str) -> float: ...
+
+
+def detect_importers(head: bytes, name: str) -> list[tuple[str, float]]:
+    """Every connector that claims a file, most confident first (Sprint 095).
+
+    Only claims above 0.1 count. The custom list answers low for any table, so it
+    is offered exactly when nothing more specific recognised the file.
+    """
+    from book_tracker.domain.registry import IMPORTERS
+
+    claims = [
+        (importer.name, importer.sniff(head, name))
+        for importer in IMPORTERS.values()
+        if isinstance(importer, SniffingImporter)
+    ]
+    return sorted(
+        ((importer, confidence) for importer, confidence in claims if confidence > 0.1),
+        key=lambda claim: -claim[1],
+    )
+
+
 def declared_read_error(importer: Importer, error: ImportReadError) -> ImportReadError:
     """The error as the boundary may publish it.
 

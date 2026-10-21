@@ -57,6 +57,7 @@ from book_tracker.domain.importers import (
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchDecision
+from book_tracker.domain.sniffing import zip_member_names
 from book_tracker.domains.album import DOMAIN as ALBUM
 
 #: What the reader will expand the archive to before refusing it, the same shape
@@ -340,6 +341,11 @@ class SpotifyImporter:
     error_codes = frozenset(
         {"invalid_archive", "wrong_export", "unsafe_archive", "export_too_large"}
     )
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """Spotify's Account Data zip holds `YourLibrary.json` (Sprint 095)."""
+        names = {member.rsplit("/", 1)[-1] for member in zip_member_names(head)}
+        return 0.95 if LIBRARY_MEMBER in names else 0.0
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

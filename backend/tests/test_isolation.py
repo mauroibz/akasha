@@ -111,6 +111,9 @@ ROUTE_POLICY = {
     ("GET", "/api/search/library"): "private-collection",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
+    # Sprint 095: reads the posted bytes and answers which connector claims them;
+    # touches no stored data.
+    ("POST", "/api/import/detect"): "shared",
     ("POST", "/api/enrichment/backfill"): "shared-cache-write",
     ("GET", "/api/export"): "private-collection",
     ("GET", "/api/exports"): "shared",

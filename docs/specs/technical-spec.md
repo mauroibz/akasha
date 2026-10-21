@@ -650,6 +650,9 @@ The product-spec route list is authoritative, with these refinements:
 
 - `GET /api/events` streams the current person's job changes as Server-Sent Events, and
   `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
+- `POST /api/import/detect` (multipart `files`) reads the first 64 KiB of each file and returns the
+  connectors that claim it, most confident first, from each connector's optional `sniff`
+  (Sprint 095).
 - `GET /api/search/library?q=` returns the person's entries ranked by FTS5 bm25, title weighted
   highest, Inbox included: the command bar's library half (Sprint 094).
 

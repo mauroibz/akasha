@@ -32,6 +32,7 @@ from book_tracker.domain.importers import (
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchDecision
+from book_tracker.domain.sniffing import is_epub
 from book_tracker.domains.book import DOMAIN
 from book_tracker.infrastructure.covers import MAX_COVER_BYTES, CoverError, prepare_uploaded_cover
 
@@ -304,6 +305,10 @@ class EpubImporter:
     )
     identity_kinds = frozenset({"isbn"})
     error_codes = frozenset({"invalid_epub"})
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """An EPUB says so in its first member (Sprint 095)."""
+        return 1.0 if is_epub(head) else 0.0
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.export is None:

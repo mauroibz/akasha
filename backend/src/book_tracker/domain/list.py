@@ -34,6 +34,7 @@ from book_tracker.domain.importers import (
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchDecision, MatchKind
+from book_tracker.domain.sniffing import csv_header
 
 
 def listable_domains() -> tuple[str, ...]:
@@ -266,6 +267,12 @@ def _chosen_domain(options: Mapping[str, Any] | None) -> str:
 class ListImporter:
     name = "list"
     label = "Custom list"
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """Any table: offered when nothing more specific claims the file (Sprint 095)."""
+        if not name.lower().endswith((".csv", ".tsv", ".txt")):
+            return 0.0
+        return 0.3 if csv_header(head) else 0.0
 
     @property
     def item_types(self) -> tuple[str, ...]:

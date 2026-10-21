@@ -398,6 +398,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/import/detect": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Detect
+     * @description Which importer each dropped file belongs to, most confident first (Sprint 095).
+     *
+     *     Reads only the first `SNIFF_BYTES` of each file; nothing is staged or kept. A file
+     *     nobody claims answers an empty list, and the screen says it cannot use it.
+     */
+    post: operations["detect_api_import_detect_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/import/jobs/{job_id}": {
     parameters: {
       query?: never;
@@ -1123,6 +1146,11 @@ export interface components {
        */
       file: string;
     };
+    /** Body_detect_api_import_detect_post */
+    Body_detect_api_import_detect_post: {
+      /** Files */
+      files: string[];
+    };
     /** Body_replace_cover_api_items__item_id__cover_post */
     Body_replace_cover_api_items__item_id__cover_post: {
       /** Cover */
@@ -1257,6 +1285,25 @@ export interface components {
       action: "transfer" | "delete";
       /** Transfer To User Id */
       transfer_to_user_id?: number | null;
+    };
+    /** DetectResponse */
+    DetectResponse: {
+      /** Files */
+      files: components["schemas"]["DetectedFile"][];
+    };
+    /** DetectedFile */
+    DetectedFile: {
+      /** Matches */
+      matches: components["schemas"]["DetectedMatch"][];
+      /** Name */
+      name: string;
+    };
+    /** DetectedMatch */
+    DetectedMatch: {
+      /** Confidence */
+      confidence: number;
+      /** Importer */
+      importer: string;
     };
     /** EntryCreateBody */
     EntryCreateBody: {
@@ -3455,6 +3502,57 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["UndoEffectSummary"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  detect_api_import_detect_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "multipart/form-data": components["schemas"]["Body_detect_api_import_detect_post"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DetectResponse"];
         };
       };
       /** @description Unauthorized */

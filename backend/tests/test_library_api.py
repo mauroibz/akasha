@@ -668,6 +668,7 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("GET", "/api/search/library"),
         ("DELETE", "/api/import/batches/{batch_id}"),
         ("GET", "/api/importers"),
+        ("POST", "/api/import/detect"),
         ("POST", "/api/enrichment/backfill"),
         ("GET", "/api/export"),
         ("GET", "/api/exports"),

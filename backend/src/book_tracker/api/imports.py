@@ -3,9 +3,10 @@ import shutil
 import tempfile
 from collections.abc import Sequence
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Annotated, Any
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, File, Query, Request
+from fastapi import UploadFile as DroppedFile
 from pydantic import BaseModel, ConfigDict, Field
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
@@ -22,10 +23,12 @@ from book_tracker.domain.importers import (
     ImportSource,
     IncrementalImporter,
     declared_read_error,
+    detect_importers,
     member_allowed,
     planned_upload,
 )
 from book_tracker.domain.registry import IMPORTERS
+from book_tracker.domain.sniffing import SNIFF_BYTES
 from book_tracker.infrastructure.attachments import (
     AttachmentError,
     AttachmentTooLarge,
@@ -588,6 +591,44 @@ def _too_large(spec: ImportInputSpec) -> LibraryError:
         user_message=f"That library is larger than the {megabytes} MiB this accepts.",
         action=action,
     )
+
+
+class DetectedMatch(BaseModel):
+    importer: str
+    confidence: float
+
+
+class DetectedFile(BaseModel):
+    name: str
+    matches: list[DetectedMatch]
+
+
+class DetectResponse(BaseModel):
+    files: list[DetectedFile]
+
+
+@router.post("/detect", response_model=DetectResponse)
+async def detect(files: Annotated[list[DroppedFile], File()]) -> DetectResponse:
+    """Which importer each dropped file belongs to, most confident first (Sprint 095).
+
+    Reads only the first `SNIFF_BYTES` of each file; nothing is staged or kept. A file
+    nobody claims answers an empty list, and the screen says it cannot use it.
+    """
+    detected = []
+    for upload in files[:50]:
+        head = await upload.read(SNIFF_BYTES)
+        name = upload.filename or ""
+        matches = await off_loop(detect_importers, head, name)
+        detected.append(
+            DetectedFile(
+                name=name,
+                matches=[
+                    DetectedMatch(importer=importer, confidence=round(confidence, 2))
+                    for importer, confidence in matches
+                ],
+            )
+        )
+    return DetectResponse(files=detected)
 
 
 @router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)

@@ -59,6 +59,7 @@ from book_tracker.domain.importers import (
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchDecision
+from book_tracker.domain.sniffing import csv_header
 from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.series import DOMAIN as SERIES
 
@@ -416,6 +417,13 @@ class ImdbImporter:
     )
     identity_kinds = frozenset({"imdb"})
     error_codes = frozenset({"unknown_export_shape", "unreadable_export", "export_too_large"})
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """IMDb's ratings and list exports both carry `Const` and `Title Type` (Sprint 095)."""
+        header = set(csv_header(head) or ())
+        if {"Const", "Title Type"} <= header:
+            return 0.95 if "Your Rating" in header else 0.9
+        return 0.0
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

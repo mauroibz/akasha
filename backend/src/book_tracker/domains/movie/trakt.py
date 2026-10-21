@@ -61,6 +61,7 @@ from book_tracker.domain.importers import (
     NormalizedImportRecord,
 )
 from book_tracker.domain.matching import MatchDecision
+from book_tracker.domain.sniffing import zip_member_names
 from book_tracker.domains.movie import DOMAIN as MOVIE
 from book_tracker.domains.series import DOMAIN as SERIES
 
@@ -632,6 +633,11 @@ class TraktImporter:
     )
     identity_kinds = frozenset({"imdb"})
     error_codes = frozenset({"invalid_archive", "unsafe_archive", "export_too_large"})
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """Trakt's zip holds `watched-*.json` members (Sprint 095)."""
+        names = {member.rsplit("/", 1)[-1] for member in zip_member_names(head)}
+        return 0.95 if any(n.startswith("watched-") and n.endswith(".json") for n in names) else 0.0
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

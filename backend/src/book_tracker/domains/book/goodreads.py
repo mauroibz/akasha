@@ -22,6 +22,7 @@ from book_tracker.domain.importers import (
 )
 from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
+from book_tracker.domain.sniffing import csv_header
 from book_tracker.domains.book import DOMAIN as BOOK
 
 REQUIRED_COLUMNS = {
@@ -217,6 +218,11 @@ class GoodreadsImporter:
     )
     identity_kinds = frozenset({"isbn"})
     error_codes = frozenset({"invalid_csv", "missing_columns"})
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """Goodreads' export header starts `Book Id,Title,Author` (Sprint 095)."""
+        header = csv_header(head)
+        return 0.95 if header and header[:3] == ["Book Id", "Title", "Author"] else 0.0
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

@@ -139,6 +139,23 @@
         "title": "Body_add_attachment_api_items__item_id__attachments_post",
         "type": "object"
       },
+      "Body_detect_api_import_detect_post": {
+        "properties": {
+          "files": {
+            "items": {
+              "format": "binary",
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "Body_detect_api_import_detect_post",
+        "type": "object"
+      },
       "Body_replace_cover_api_items__item_id__cover_post": {
         "properties": {
           "cover": {
@@ -537,6 +554,61 @@
           "action"
         ],
         "title": "DeleteUserBody",
+        "type": "object"
+      },
+      "DetectResponse": {
+        "properties": {
+          "files": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedFile"
+            },
+            "title": "Files",
+            "type": "array"
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "title": "DetectResponse",
+        "type": "object"
+      },
+      "DetectedFile": {
+        "properties": {
+          "matches": {
+            "items": {
+              "$ref": "#/components/schemas/DetectedMatch"
+            },
+            "title": "Matches",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "matches"
+        ],
+        "title": "DetectedFile",
+        "type": "object"
+      },
+      "DetectedMatch": {
+        "properties": {
+          "confidence": {
+            "title": "Confidence",
+            "type": "number"
+          },
+          "importer": {
+            "title": "Importer",
+            "type": "string"
+          }
+        },
+        "required": [
+          "importer",
+          "confidence"
+        ],
+        "title": "DetectedMatch",
         "type": "object"
       },
       "EntryCreateBody": {
@@ -4841,6 +4913,68 @@
           }
         },
         "summary": "Undo Batch",
+        "tags": [
+          "imports"
+        ]
+      }
+    },
+    "/api/import/detect": {
+      "post": {
+        "description": "Which importer each dropped file belongs to, most confident first (Sprint 095).\n\nReads only the first `SNIFF_BYTES` of each file; nothing is staged or kept. A file\nnobody claims answers an empty list, and the screen says it cannot use it.",
+        "operationId": "detect_api_import_detect_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_detect_api_import_detect_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DetectResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Detect",
         "tags": [
           "imports"
         ]

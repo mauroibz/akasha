@@ -37,6 +37,7 @@ from book_tracker.domain.importers import (
 )
 from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
+from book_tracker.domain.sniffing import SNIFF_BYTES, text_of, xml_root
 from book_tracker.domains.anime import DOMAIN as ANIME
 
 DOMAIN = ANIME
@@ -360,6 +361,14 @@ class MyAnimeListImporter:
     )
     identity_kinds = frozenset({"mal"})
     error_codes = frozenset({"invalid_xml", "not_an_anime_export", "export_too_large"})
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """MAL's export is `<myanimelist>` XML, often gzipped (Sprint 095)."""
+        if xml_root(head) != "myanimelist":
+            return 0.0
+        # A manga export has the same root; it says which in the head, and this
+        # connector refuses manga by name (Sprint 041).
+        return 0.3 if "<manga>" in text_of(head)[:SNIFF_BYTES] else 0.95
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:

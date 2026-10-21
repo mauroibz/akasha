@@ -1,7 +1,7 @@
 # Sprint 095 — Paste and drop anywhere
 
 **Sprint:** 095
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 094
 **Owner:** Mauro

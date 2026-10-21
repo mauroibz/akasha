@@ -51,6 +51,7 @@ from book_tracker.domain.importers import (
 )
 from book_tracker.domain.matching import MatchDecision
 from book_tracker.domain.normalization import shelf_slug
+from book_tracker.domain.sniffing import zip_member_names
 from book_tracker.domains.movie import DOMAIN as MOVIE
 
 DOMAIN = MOVIE
@@ -550,6 +551,11 @@ class LetterboxdImporter:
     error_codes = frozenset(
         {"invalid_archive", "unsafe_archive", "missing_columns", "export_too_large"}
     )
+
+    def sniff(self, head: bytes, name: str) -> float:
+        """Letterboxd's zip holds `watched.csv` and `ratings.csv` (Sprint 095)."""
+        names = {member.rsplit("/", 1)[-1] for member in zip_member_names(head)}
+        return 0.95 if "watched.csv" in names else 0.0
 
     def read(self, source: ImportSource, _context: ImportReadContext) -> ImportSnapshot:
         if source.data is None:
