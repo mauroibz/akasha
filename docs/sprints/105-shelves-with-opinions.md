@@ -1,7 +1,7 @@
 # Sprint 105 — Shelves with opinions
 
 **Sprint:** 105
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 46
 **Depends on:** 104
 **Owner:** Mauro
@@ -62,4 +62,38 @@ hover animation seen.
 
 ## Outcome
 
-Not started.
+Delivered 2026-10-21. Verified per DEC-167: `test_shelf_room.py` and the shelf, library, export,
+bulk and isolation suites (105), `vitest related` (140), `make check`, a new `shelves.spec.ts`
+(hover and keyboard open a cover, reduced motion keeps it shut, nothing scrolls sideways at
+390px) with the accessibility spec (32), and both pages in the running app on the copy of the
+owner's library (eleven shelves) in Paper, Ink and at 390px, 640px, 800px, 1100px and 1440px,
+with a cover caught open.
+
+- **AC1.** `GET /api/shelves` adds `preview` (up to eight members, in the covers' order, those
+  without art included), `finished_count` and `mean_score`; tested.
+- **AC2.** The room: a sentence ("11 shelves, 33 things on them. Your best-loved is
+  *ciencia-ficcion*."), then a row per shelf: its domains, its name in a 4–6rem serif (the
+  largest shelf larger), its line ("11 books · 2 finished · you rate them 7.5"), and its covers
+  on a wooden ledge (darker in Ink). Covers without art are typeset from the title. An empty
+  shelf is a dashed place. *New shelf* is a button that opens a field; sort and domain are
+  text controls; *Find a shelf* appears past eight shelves.
+- **AC3.** `OpeningCover`: the front turns 115° on its spine in 0.4s on hover or keyboard focus,
+  past upright so the whole inside page (title, year, score) shows and the cover's inner side
+  hangs to the left; `prefers-reduced-motion` and pointers without hover keep it shut. Measured:
+  `matrix3d(-0.42, …)` open, `none` under reduced motion.
+- **AC4.** A shelf's page: the shelf as a sentence ("11 books, 2 finished. You rate them 7.5."),
+  covers in a two- to five-column grid with a spine shadow, title, creator and score beneath
+  and no chips over them; every cover loaded. The dark gradients seen while planning were the
+  old grid's chip overlay over covers its virtualizer had not loaded yet.
+- **AC5.** Axe passes on the room and on a shelf's page.
+
+**Deviations.**
+- The ledge does not scroll: a scrolling ledge clipped the opening cover, and the covers' 3D
+  layers still widened the page past it (1837px at 1440px). Each ledge stands as many covers as
+  fit its width (two on a phone, up to five large or six) and ends with *See all N*.
+- The first open angle, 68°, left the swung cover over the left third of the inside page and
+  cut the title; 115° shows it all.
+- Editing status and score from a shelf's page moved to the entry's page with the chips, as
+  the mock drew it.
+
+Commit: `e4b81c9`, `5e37e44`.

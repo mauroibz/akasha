@@ -692,6 +692,10 @@ The product-spec route list is authoritative, with these refinements:
   ("Fiction, general") joins its head; a value with no letters or digits is no group at all. The
   library's `key`/`value` filter matches the same way, so a folded row opens all its members
   (Sprint 102).
+- `GET /api/shelves` returns the person's shelves with `entry_count`, up to three `covers`,
+  `members_by_type`, and since Sprint 105 a `preview` of up to eight members (entry id, title,
+  year, score, cover URL; highest scored, then most recently added) plus `finished_count` (a
+  finish date) and `mean_score`: what the shelves room's ledge and each shelf's line read.
 - Goals (Sprint 103, migration 0026): `GET /api/goals`, `PUT /api/goals/{item_type}`
   (`{count 1–999, period month|year, suggest}`; setting again replaces) and
   `DELETE /api/goals/{item_type}`, one per person and domain. A domain whose `entry_fields` lack

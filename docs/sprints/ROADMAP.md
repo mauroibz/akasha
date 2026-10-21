@@ -2,9 +2,8 @@
 
 **Plan revision:** 46
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [105 — Shelves with opinions](105-shelves-with-opinions.md) (ready),
-the last of four from the owner's 2026-10-21 request for a 2.5 release (DEC-169); see "Character"
-below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
+**Active sprint:** none. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
+(DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -224,7 +223,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [102](102-insights-read-back.md) | Insights read back as prose: a lead sentence, numbered sections, compact charts | 101 | completed |
 | [103](103-gentle-goals-underneath.md) | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | completed |
 | [104](104-goals-on-the-diary.md) | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | completed |
-| [105](105-shelves-with-opinions.md) | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | ready |
+| [105](105-shelves-with-opinions.md) | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | completed |
 
 ## Sprint contracts
 
@@ -1800,7 +1799,7 @@ Asked for by the owner on 2026-10-21 after v2.4.0, reviewed as a design canvas
   item, unlit places neutral, never red), the goal dialog (domain, count, month or year, picks on
   or off), the month's picks with *Start reading* (the domain's in-progress status, hidden where
   a domain has none) and *Something else*, and the phone layout.
-- **[105 — Shelves with opinions](105-shelves-with-opinions.md).** The shelves page as a room of shelves: the name large, a line
+- **[105 — Shelves with opinions](105-shelves-with-opinions.md)** (**completed**). The shelves page as a room of shelves: the name large, a line
   of character, covers face-out on a ledge, the largest shelf drawn biggest, an empty shelf as a
   dashed place. A cover opens on hover like a front cover swinging back, showing its title, year
   and score inside; reduced motion and touch keep it closed. One shelf's page: covers without

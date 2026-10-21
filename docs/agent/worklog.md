@@ -6329,3 +6329,28 @@ in code. The owner's library has no 2026 finish dates, so goals start at zero th
 - Axe sampled the dialog mid-fade; the check waits for animations.
 
 **Next.** Sprint 105, Shelves.
+
+## 2026-10-21 — Sprint 105: shelves with opinions
+
+**Done.**
+
+- `GET /api/shelves` carries a preview and two figures.
+- The shelves room, with covers on a ledge that open on hover or keyboard focus.
+- A shelf's page as a sentence over a chip-free cover grid.
+- ShelfCard and ShelfRail deleted.
+
+**Verified and how.**
+
+- Shelf and library backend suites (105); `vitest related` (140); `make check`.
+- `shelves.spec.ts` (new) and the accessibility spec (32).
+- Both pages in the running app on the copy of the owner's library, at five widths and in both
+  themes, with a cover caught open and its transform read.
+
+**Found.**
+
+- A scrolling ledge let the covers' 3D layers widen the document (1837px at 1440px); ledges now
+  stand only what fits.
+- A 68° opening hid the left of the inside page; it opens 115°.
+
+**Next.** No sprint is planned. 2.5 needs the release gate, a version bump and notes, and the
+owner's word to push, tag and deploy.
