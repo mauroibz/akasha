@@ -104,6 +104,11 @@ ROUTE_POLICY = {
     ("GET", "/api/import/{importer_name}/browse"): "shared-source",
     ("POST", "/api/import/{importer_name}/commit"): "private-id",
     ("GET", "/api/import/jobs/{job_id}"): "private-id",
+    ("POST", "/api/import/jobs/{job_id}/retry"): "private-id",
+    # Sprint 089: streams only the requester's own jobs.
+    ("GET", "/api/events"): "private-collection",
+    # Sprint 094: ranks only the requester's own entries.
+    ("GET", "/api/search/library"): "private-collection",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     ("POST", "/api/enrichment/backfill"): "shared-cache-write",
@@ -343,6 +348,7 @@ PRIVATE_PROBES = (
         {"path": (None, "Author/Book/book.epub"), "file": ("book.epub", b"probe")},
     ),
     ("GET", "/api/import/jobs/{job_id}", None, None),
+    ("POST", "/api/import/jobs/{job_id}/retry", None, None),
     ("DELETE", "/api/import/batches/{batch_id}", None, None),
 )
 

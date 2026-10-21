@@ -648,6 +648,11 @@ Never expose tracebacks, host filesystem paths, provider keys, or raw SQL.
 
 The product-spec route list is authoritative, with these refinements:
 
+- `GET /api/events` streams the current person's job changes as Server-Sent Events, and
+  `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
+- `GET /api/search/library?q=` returns the person's entries ranked by FTS5 bm25, title weighted
+  highest, Inbox included: the command bar's library half (Sprint 094).
+
 - Authentication adds `POST /api/auth/login`, `DELETE /api/auth/session`, `GET /api/auth/me`
   first-run-only `POST /api/auth/setup`, and admin-only `POST /api/auth/act-as/{user_id}` plus
   `DELETE /api/auth/act-as`. `GET /api/auth/me` returns the actual signed-in user and the optional
