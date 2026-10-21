@@ -1,7 +1,7 @@
 # Sprint 095 — Paste and drop anywhere
 
 **Sprint:** 095
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 094
 **Owner:** Mauro
@@ -53,4 +53,22 @@ The import screen's redraw (096); the phone share target (097).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `test_import_detect.py` (11), `test_link_resolution.py`
+(6), the route-structure tests and every connector's import tests (411), `vitest related` (132)
+plus 6 command-bar tests, `make check`, the import, add-ebooks, command-bar and library specs (49),
+and a live run: a scheme-less IMDb link pasted on the Library opened the bar on *The Shawshank
+Redemption*, and a real Goodreads CSV dropped on the Library landed on Import with its preview
+loaded.
+
+- **AC1.** `SniffingImporter` (optional, like `BrowsableImporter`) on all eight file connectors
+  and the list; `POST /api/import/detect`. An unknown table goes to the custom list; a PNG to
+  nobody. A MAL manga export is claimed weakly, so the connector's own refusal explains it.
+- **AC2.** The drop veil routes un-handled drops; upload connectors now take a hand-off too.
+- **AC3.** Paste outside a field opens the bar; scheme-less links resolve on both ends.
+- **AC4.** Spotify album links resolve through MusicBrainz's stored relation, else by the title
+  Spotify's oEmbed gives (a recorded real response). Goodreads links search their slug's title.
+
+**Deviation.** The generic OpenGraph "read the page's title" resolver for other sites (§4.3's
+third row) is not built; the not-recognised message now names every source that resolves.
+**Found:** the bar's Esc hint sat under the dialog's close button (removed); the import preview
+prints raw status values ("suggested to_read"), recorded for 096.

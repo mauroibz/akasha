@@ -6099,3 +6099,18 @@ route-structure tests had been red since 089 (not in its covering set). From now
 that adds a route runs `test_library_api.py`, `test_isolation.py` and `test_app_shape.py`.
 
 **Next.** Sprint 095 — paste and drop anywhere.
+
+---
+
+## 2026-10-21 — Sprint 095: paste and drop anywhere
+
+**Done.** File detection (`sniff`, `/api/import/detect`); a shell drop veil; global paste opening
+the bar; scheme-less, Spotify and Goodreads links resolve.
+
+**Verified and how.** Detection and resolution tests, route-structure and connector suites,
+`vitest related`, `make check`, four browser specs; live paste of a real link and a live drop of a
+real Goodreads CSV.
+
+**Found.** The import preview prints raw status values; the bar's Esc hint overlapped the close.
+
+**Next.** Sprint 096 — import redrawn.
