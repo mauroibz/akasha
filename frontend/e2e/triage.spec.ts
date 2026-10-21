@@ -67,7 +67,7 @@ test("a provisional score is marked and the marker is explained", async ({
       },
     }),
   );
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
 
   const marked = page.locator("[data-entry-id='1'][data-provisional='true']");
@@ -118,7 +118,7 @@ test("triage page renders and bulk-accepts suggested statuses", async ({
     route.fulfill({ json: { affected: 20 } }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
   await expect(page.getByText("30 unsorted")).toBeVisible();
 
@@ -226,7 +226,7 @@ test("each row presents one target and can apply it in one click", async ({
     return route.fulfill({ json: { affected: body.entry_ids.length } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
 
   const anime = page.locator('[data-entry-id="1"]');
   const book = page.locator('[data-entry-id="2"]');
@@ -306,7 +306,7 @@ test("triage keyboard shortcuts stage status on a focused row until apply", asyn
     return route.fulfill({ json: { affected: 1 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Row 1 already targets its imported Read suggestion, so a different hotkey
@@ -365,7 +365,7 @@ test("row controls edit one entry while only checkboxes select for bulk", async 
     return route.fulfill({ json: { affected: 1 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   const row = page.locator('[data-entry-id="1"]');
   await expect(row).toBeVisible();
   expect(
@@ -454,7 +454,7 @@ test("row status actions apply independently and keep failed drafts", async ({
     return route.fulfill({ json: { affected: body.entry_ids.length } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await page
     .locator('[data-entry-id="1"]')
     .getByRole("combobox", { name: "Status for Book 1" })
@@ -548,7 +548,7 @@ test("a failed row apply keeps its target ready to retry", async ({ page }) => {
     return route.fulfill({ json: { affected: body.entry_ids.length } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   const row = page.locator('[data-entry-id="1"]');
   const target = row.getByRole("combobox", { name: "Status for Book 1" });
   await target.selectOption("reading");
@@ -587,7 +587,7 @@ test("a failed row edit restores the previous score once", async ({ page }) => {
     route.fulfill({ status: 500, json: { detail: "write failed" } }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   const score = page
     .locator('[data-entry-id="1"]')
     .getByRole("combobox", { name: /score for book 1/i });
@@ -618,7 +618,7 @@ test("clicking a triage row opens it instead of selecting it", async ({
     }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await page.getByText("Book 1", { exact: true }).click();
 
   await expect(page).toHaveURL(/\/books\/1$/);
@@ -646,7 +646,7 @@ test("a row status draft survives navigation away from triage", async ({
     }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   const target = page
     .locator('[data-entry-id="1"]')
     .getByRole("combobox", { name: "Status for Book 1" });
@@ -657,7 +657,7 @@ test("a row status draft survives navigation away from triage", async ({
   await expect(page).toHaveURL(/\/books\/1$/);
   await page.goBack();
 
-  await expect(page).toHaveURL(/\/import\?tab=triage$/);
+  await expect(page).toHaveURL(/\/inbox$/);
   await expect(
     page
       .locator('[data-entry-id="1"]')
@@ -694,7 +694,7 @@ test("triage bulk status update with selection", async ({ page }) => {
     return route.fulfill({ json: { affected: 3 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Select rows 1-3 via checkboxes
@@ -748,7 +748,7 @@ test("triage discards a selection in one confirmed request", async ({
     return route.fulfill({ json: { affected: 2 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
   await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
   await expect(page.getByText("2 selected")).toBeVisible();
@@ -808,7 +808,7 @@ test("triage Ctrl+A discards through the filter with exclusions", async ({
     return route.fulfill({ json: { affected: 199 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   await page.keyboard.press("Control+a");
   await expect(page.getByText("200 selected")).toBeVisible();
@@ -852,7 +852,7 @@ test("triage Ctrl+A selects all matching with server-side exclusions", async ({
     return route.fulfill({ json: { affected: 199 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Ctrl/Cmd+A selects all matching
@@ -901,7 +901,7 @@ test("triage j/k navigation moves focus between rows", async ({ page }) => {
     }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   // Focus first row and press j to move down
@@ -943,7 +943,7 @@ test("triage hundreds of rows without per-row requests", async ({ page }) => {
     return route.fulfill({ json: { affected: 200 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   const feed = page.getByRole("feed", { name: "Triage inbox" });
@@ -987,7 +987,7 @@ test("the bulk action bar enters without animating a single row", async ({
       },
     }),
   );
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
 
   const samples = await sampleAnimations(page, async () => {
@@ -1032,7 +1032,7 @@ test("digits score the focused row and Enter opens it", async ({ page }) => {
     route.fulfill({ json: { ...entries[1], item: entries[1].item } }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   await page.locator('[data-entry-id="1"]').focus();
 
@@ -1074,7 +1074,7 @@ test("triage animates its action bar but not under reduced motion", async ({
     }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   const moving = await sampleAnimations(page, async () => {
     await page.locator('[data-entry-id="1"]').getByRole("checkbox").click();
@@ -1133,7 +1133,7 @@ test("triage puts a selection on a shelf in bulk", async ({ page }) => {
     return route.fulfill({ json: { affected: 2 } });
   });
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByText("Book 1", { exact: true })).toBeVisible();
   await page.locator('[data-entry-id="1"] [role="checkbox"]').click();
   await page.locator('[data-entry-id="2"] [role="checkbox"]').click();
@@ -1184,14 +1184,14 @@ test("the detail page a triage row opens returns to triage", async ({
     route.fulfill({ json: { attachments: [] } }),
   );
 
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await page.getByText("Book 1", { exact: true }).click();
   await expect(page).toHaveURL(/\/books\/1$/);
 
   // Back returns to the inbox it was opened from, not the library.
-  await expect(page.getByRole("link", { name: /← triage/i })).toBeVisible();
-  await page.getByRole("link", { name: /← triage/i }).click();
-  await expect(page).toHaveURL(/\/import\?tab=triage$/);
+  await expect(page.getByRole("link", { name: /← inbox/i })).toBeVisible();
+  await page.getByRole("link", { name: /← inbox/i }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
 
   // A deep link with no triage behind it still offers the library, the only
@@ -1200,9 +1200,7 @@ test("the detail page a triage row opens returns to triage", async ({
   await expect(page.getByRole("link", { name: /← library/i })).toBeVisible();
 });
 
-test("the retired /triage address still lands on the folded tab", async ({
-  page,
-}) => {
+test("the retired /triage address lands on the Inbox", async ({ page }) => {
   // It was a top-level nav item for thirty sprints, so it is in bookmarks and
   // in history. Folding the screen is not a reason to break those (DEC-079).
   await page.route("**/api/entries?**", (route) =>
@@ -1222,15 +1220,14 @@ test("the retired /triage address still lands on the folded tab", async ({
 
   await page.goto("/triage");
 
-  await expect(page).toHaveURL(/\/import\?tab=triage/);
-  await expect(page.getByRole("tab", { name: /triage/i })).toHaveAttribute(
-    "aria-selected",
-    "true",
-  );
+  await expect(page).toHaveURL(/\/inbox/);
+  await expect(
+    page.getByRole("heading", { level: 1, name: /inbox/i }),
+  ).toBeVisible();
   await expect(page.getByText("3 unsorted")).toBeVisible();
 });
 
-test("the import screen reaches triage and comes back without leaving", async ({
+test("the import screen says what waits in the Inbox, one click away", async ({
   page,
 }) => {
   await page.route("**/api/entries?**", (route) =>
@@ -1250,9 +1247,10 @@ test("the import screen reaches triage and comes back without leaving", async ({
 
   await page.goto("/import");
   await expect(page.getByRole("tab", { name: /goodreads/i })).toBeVisible();
-  await page.getByRole("tab", { name: /triage/i }).click();
+  await page.getByRole("link", { name: /2 waiting in your inbox/i }).click();
+  await expect(page).toHaveURL(/\/inbox$/);
   await expect(page.getByText("2 unsorted")).toBeVisible();
-  await page.getByRole("tab", { name: /import/i }).click();
+  await page.goBack();
   await page.getByRole("tab", { name: /calibre/i }).click();
   // Calibre leads with the folder chooser; the mount is its alternate (DEC-081).
   await expect(

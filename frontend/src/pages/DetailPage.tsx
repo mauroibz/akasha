@@ -232,8 +232,8 @@ export function DetailPage() {
   // working through, instead of the library. Absent (a deep link, the library)
   // means the library — the only place left to go back to.
   const from = (useLocation().state as { from?: string } | null)?.from;
-  const backTo = from === "triage" ? "/import?tab=triage" : "/";
-  const backLabel = from === "triage" ? "Triage" : "Library";
+  const backTo = from === "triage" ? "/inbox" : "/";
+  const backLabel = from === "triage" ? "Inbox" : "Library";
   const [dialog, setDialog] = useState<
     "opinion" | "metadata" | "refresh" | "delete" | "cover" | null
   >(null);

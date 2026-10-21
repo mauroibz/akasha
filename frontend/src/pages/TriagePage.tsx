@@ -214,6 +214,7 @@ export function TriagePage() {
       setAllMatching(false);
       setExcludedIds(new Set());
       void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
       void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: () => toast.error("Bulk update failed"),
@@ -223,6 +224,7 @@ export function TriagePage() {
     key: queryKeys.triage.list(filters),
     onSaved: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
       void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
   });
@@ -280,6 +282,7 @@ export function TriagePage() {
         );
       }
       void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
       void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
   });
@@ -289,6 +292,7 @@ export function TriagePage() {
     onSuccess: (affected) => {
       toast.success(`${affected} suggested statuses accepted`);
       void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
       void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: () => toast.error("Could not accept suggested statuses"),
@@ -309,6 +313,7 @@ export function TriagePage() {
       setExcludedIds(new Set());
       setConfirmDiscard(false);
       void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.count });
       void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: () => {

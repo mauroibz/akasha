@@ -836,7 +836,7 @@ export function HomePage() {
               variant="outline"
               className="min-h-11 rounded-full px-4 aria-pressed:border-primary aria-pressed:text-primary"
               aria-pressed={filters.statuses.includes("unsorted")}
-              onClick={() => void navigate("/import?tab=triage")}
+              onClick={() => void navigate("/inbox")}
             >
               Inbox {inboxCount}
             </Button>
@@ -960,7 +960,7 @@ export function HomePage() {
               <EmptyState
                 title={`${inboxCount} waiting in your Inbox`}
                 action={
-                  <Button onClick={() => void navigate("/triage")}>
+                  <Button onClick={() => void navigate("/inbox")}>
                     Sort them into your library
                   </Button>
                 }

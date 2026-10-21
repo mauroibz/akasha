@@ -20,6 +20,7 @@ function renderPage(initialEntry = "/", client = makeClient()) {
           <Route path="/" element={<HomePage />} />
           <Route path="/books/:entryId" element={<h1>Book detail</h1>} />
           <Route path="/import" element={<h1>Import</h1>} />
+          <Route path="/inbox" element={<h1>Inbox page</h1>} />
           <Route path="/add" element={<h1>Add page</h1>} />
         </Routes>
         <Toaster />
@@ -371,8 +372,8 @@ test("Inbox count applies the unsorted filter", async () => {
   await screen.findByText("Rayuela");
   const inboxButtons = screen.getAllByRole("button", { name: /inbox 12/i });
   await user.click(inboxButtons[0]);
-  // Triage is a tab on Import now, not a destination of its own (DEC-079).
-  await screen.findByText("Import");
+  // The Inbox is its own page again since Sprint 096 (proposal I3).
+  await screen.findByText("Inbox page");
 });
 
 test("the shelf filter lists every shelf, not only those on loaded pages", async () => {

@@ -38,7 +38,7 @@ const titles = [
   "Rayuela",
 ];
 
-test("three EPUBs dropped on Add are previewed, committed and waiting in Triage", async ({
+test("three EPUBs dropped on Add are previewed, committed and waiting in the Inbox", async ({
   page,
 }) => {
   await stubItemTypes(page);
@@ -139,7 +139,7 @@ test("three EPUBs dropped on Add are previewed, committed and waiting in Triage"
     "3 entries added",
   );
   expect(committed).toEqual({ batch_id: "epub-1", choices: [] });
-  await page.getByRole("link", { name: /open triage/i }).click();
+  await page.getByRole("link", { name: /review in inbox/i }).click();
   await expect(
     page.getByRole("heading", { level: 1, name: /inbox/i }),
   ).toContainText("3 unsorted");

@@ -384,6 +384,18 @@ export async function patchEntry(
   return (await response.json()) as LibraryEntry;
 }
 
+/** How many entries wait in the Inbox: the nav's Import badge (Sprint 096). */
+export async function getInboxCount(signal?: AbortSignal): Promise<number> {
+  const response = await request("/api/entries?status=unsorted&limit=1", {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "The Inbox could not be counted");
+  const page = (await response.json()) as { total?: number };
+  return page.total ?? 0;
+}
+
 /** One item, as the import check shows an existing copy (Sprint 096). */
 export async function getItem(itemId: number): Promise<LibraryItem> {
   const response = await request(`/api/items/${itemId}`, {

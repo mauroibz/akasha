@@ -140,7 +140,11 @@ function ExportRowPanel({
  * first and marked as such (deliverable 7). Everything else renders from the
  * declaration alone: no view's id, label or domain is named in this file's logic.
  */
-export function ExportPanel() {
+/**
+ * `embedded`: the Your data section of Settings (Sprint 096), where export moved from
+ * the import screen; otherwise a page of its own.
+ */
+export function ExportPanel({ embedded = false }: { embedded?: boolean } = {}) {
   const [views, setViews] = useState<ExportViewDefinition[] | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [downloads, setDownloads] = useState<Record<string, DownloadState>>({});
@@ -187,10 +191,20 @@ export function ExportPanel() {
   };
 
   return (
-    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <h1 className="font-display text-4xl font-medium tracking-tight sm:text-5xl">
-        Export
-      </h1>
+    <Shell
+      embedded={embedded}
+      heading={
+        embedded ? (
+          <h2 className="font-display text-3xl font-medium tracking-tight">
+            Your data
+          </h2>
+        ) : (
+          <h1 className="font-display text-4xl font-medium tracking-tight sm:text-5xl">
+            Export
+          </h1>
+        )
+      }
+    >
       <p className="mt-2 text-muted-foreground">
         Take your library elsewhere. Every file below is generated from your
         library as it stands right now.
@@ -260,6 +274,32 @@ export function ExportPanel() {
           ))}
         </div>
       )}
+    </Shell>
+  );
+}
+
+function Shell({
+  embedded,
+  heading,
+  children,
+}: {
+  embedded: boolean;
+  heading: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return embedded ? (
+    <section
+      id="your-data"
+      aria-label="Your data"
+      className="mt-12 border-t border-border pt-8"
+    >
+      {heading}
+      {children}
+    </section>
+  ) : (
+    <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+      {heading}
+      {children}
     </main>
   );
 }

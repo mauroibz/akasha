@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, Navigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { useJobEvent } from "@/features/activity/jobEvents";
 
@@ -39,18 +39,20 @@ import { describeRowError } from "@/features/import/errors";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { weightClass } from "@/features/library/insights";
 import { DirectoryPicker } from "@/features/import/DirectoryPicker";
-import { ExportPanel } from "@/features/export/ExportPanel";
 import { ExportPicker } from "@/features/import/ExportPicker";
 import { takeHandedFiles } from "@/features/import/handoff";
 import { FolderPicker } from "@/features/import/FolderPicker";
 import { SourceDropZone } from "@/features/import/SourceDropZone";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
-import { TriagePage } from "@/pages/TriagePage";
 import { NativeSelect } from "@/components/ui/native-select";
 import { AmbiguityChoice } from "@/features/import/AmbiguityChoice";
 import { statusLabelFor } from "@/features/library/labels";
 import type { EntryStatus } from "@/api/library";
+import { SourceDetectDrop } from "@/features/import/SourceDetectDrop";
+import { queryKeys } from "@/api/keys";
+import { getInboxCount } from "@/api/library";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
 interface ImportFailure {
@@ -94,7 +96,6 @@ export const TRIAGE_TAB = "triage";
  * other direction (`docs/export-proposal.md` §3).
  */
 export const EXPORT_TAB = "export";
-const IMPORT_STEP = "import";
 
 /** The importer used last, so a second Calibre re-sync opens where you left. */
 export const importSourcePreferenceKey = "akasha.import.source";
@@ -110,7 +111,17 @@ function rememberedSource(): string {
 export function ImportPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [importers, setImporters] = useState<ImporterDefinition[]>([]);
-  const [fallbackSource, setFallbackSource] = useState("");
+  // The connector used last: no longer opened unasked, but marked on its card so
+  // a habit is still one click (Sprint 096).
+  const [lastUsed, setLastUsed] = useState("");
+  const queryClient = useQueryClient();
+  // The shell's Inbox badge already asks; this reads that answer rather than
+  // sending a second request of its own.
+  const inboxCount = useQuery({
+    queryKey: queryKeys.triage.count,
+    queryFn: ({ signal }) => getInboxCount(signal),
+    enabled: false,
+  });
   const [file, setFile] = useState<File | null>(null);
   // The typed-or-pasted half of the list's source (Sprint 085): the editor is
   // the owner's window into what he uploaded — a dropped file fills it, a
@@ -189,14 +200,11 @@ export function ImportPage() {
     void getImporters()
       .then((available) => {
         setImporters(available);
-        // What the URL does not name: the connector used last, else the first
-        // one declared. Same order the library's domain tab follows (DEC-062) —
-        // a link stays shareable, and a habit costs no click.
         const remembered = rememberedSource();
-        setFallbackSource(
+        setLastUsed(
           available.some((importer) => importer.id === remembered)
             ? remembered
-            : (available[0]?.id ?? ""),
+            : "",
         );
       })
       .catch((reason: Error) => setError(asFailure(reason)));
@@ -221,14 +229,11 @@ export function ImportPage() {
   // address both land where they say they do; local state only covers the
   // moment before the registry has arrived.
   const asked = searchParams.get("tab") ?? "";
-  const source =
-    asked === TRIAGE_TAB ||
-    asked === EXPORT_TAB ||
-    importers.some((importer) => importer.id === asked)
-      ? asked
-      : fallbackSource;
-  const triageActive = source === TRIAGE_TAB;
-  const exportActive = source === EXPORT_TAB;
+  // Nothing named: the grid of sources (Sprint 096). Triage and Export are no
+  // longer tabs here; their old addresses redirect below.
+  const source = importers.some((importer) => importer.id === asked)
+    ? asked
+    : "";
 
   useEffect(() => setError(null), [source]);
 
@@ -240,13 +245,7 @@ export function ImportPage() {
   // the Calibre tab showed the Goodreads result and no Calibre form at all.
   const belongsTo = useRef("");
   useEffect(() => {
-    if (
-      !source ||
-      source === TRIAGE_TAB ||
-      source === EXPORT_TAB ||
-      belongsTo.current === source
-    )
-      return;
+    if (!source || belongsTo.current === source) return;
     belongsTo.current = source;
     setFile(null);
     setLibraryPath("");
@@ -277,15 +276,8 @@ export function ImportPage() {
         next.set("tab", value);
         return next;
       },
-      { replace: true },
-    );
-  };
-
-  const selectStep = (value: string) => {
-    selectTab(
-      value === TRIAGE_TAB || value === EXPORT_TAB
-        ? value
-        : fallbackSource || importers[0]?.id || "",
+      // From the grid, a step Back returns to; between sources, a swap.
+      { replace: Boolean(source) },
     );
   };
 
@@ -808,56 +800,6 @@ export function ImportPage() {
     );
   };
 
-  const workflowStrip = (
-    <TabsList
-      aria-label="Import workflow"
-      className="grid h-auto w-full grid-cols-3 gap-2 rounded-2xl bg-surface p-2"
-    >
-      <TabsTrigger
-        value={IMPORT_STEP}
-        className="h-auto min-w-0 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left"
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-          1
-        </span>
-        <span className="min-w-0">
-          <span className="block font-semibold">Import</span>
-          <span className="block text-xs font-normal text-muted-foreground">
-            Choose and preview a source
-          </span>
-        </span>
-      </TabsTrigger>
-      <TabsTrigger
-        value={TRIAGE_TAB}
-        className="h-auto min-w-0 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left"
-      >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-sm font-semibold text-primary">
-          2
-        </span>
-        <span className="min-w-0">
-          <span className="block font-semibold">Triage</span>
-          <span className="block text-xs font-normal text-muted-foreground">
-            Review entries individually or in bulk
-          </span>
-        </span>
-      </TabsTrigger>
-      {/* Unnumbered on purpose: Import and Triage are steps of one flow, and
-      Export is not a step of importing — it is the same screen's other
-      direction (docs/export-proposal.md §3, Sprint 069 deliverable 1). */}
-      <TabsTrigger
-        value={EXPORT_TAB}
-        className="h-auto min-w-0 justify-start gap-3 whitespace-normal rounded-xl px-4 py-3 text-left"
-      >
-        <span className="min-w-0">
-          <span className="block font-semibold">Export</span>
-          <span className="block text-xs font-normal text-muted-foreground">
-            Take your library elsewhere
-          </span>
-        </span>
-      </TabsTrigger>
-    </TabsList>
-  );
-
   const sourceStrip = (
     // Scrolls within its own box below its breakpoint instead of pushing the
     // document sideways — DomainStrip's own fix for the same class of defect
@@ -874,14 +816,29 @@ export function ImportPage() {
       // the connector's name in the reading voice, the library it serves as
       // a caption beneath — and the active card is shown by the ring, not by
       // a filled well (the owner's 2026-09-15 "ugly" report).
-      className="flex h-auto min-w-0 max-w-full justify-start gap-2 overflow-x-auto bg-transparent p-0"
+      // With no source chosen the same triggers are a grid of cards (Sprint 096,
+      // proposal §5.1); once one is chosen they are this quiet switcher.
+      className={
+        source
+          ? "flex h-auto min-w-0 max-w-full justify-start gap-2 overflow-x-auto bg-transparent p-0"
+          : "grid h-auto w-full grid-cols-2 gap-3 bg-transparent p-0 sm:grid-cols-3"
+      }
     >
       {importers.map((importer) => (
         <TabsTrigger
           key={importer.id}
           value={importer.id}
-          className="min-h-11 shrink-0 items-start gap-0 rounded-lg border border-transparent px-3 py-2 text-left data-[state=active]:border-border data-[state=active]:bg-surface-raised data-[state=active]:shadow-sm"
+          className={
+            source
+              ? "min-h-11 shrink-0 items-start gap-0 rounded-lg border border-transparent px-3 py-2 text-left data-[state=active]:border-border data-[state=active]:bg-surface-raised data-[state=active]:shadow-sm"
+              : "relative flex min-h-24 flex-col items-start justify-start gap-1 whitespace-normal rounded-xl border border-border bg-surface-raised p-4 text-left transition-colors hover:border-primary hover:bg-surface"
+          }
         >
+          {!source && lastUsed === importer.id && (
+            <span className="absolute right-3 top-3 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+              Last used
+            </span>
+          )}
           {/* Two lines: the name is the anchor, the library caption reads
               beneath it — from the connector's own `item_types`, never a
               hardcoded list. The caption is plain text, deliberately not a
@@ -903,649 +860,645 @@ export function ImportPage() {
     </TabsList>
   );
 
+  // The Inbox and Export were tabs of this screen until Sprint 096 (proposal I3);
+  // an old link still lands where it meant.
+  if (asked === TRIAGE_TAB) return <Navigate to="/inbox" replace />;
+  if (asked === EXPORT_TAB)
+    return <Navigate to="/settings#your-data" replace />;
+
   return (
-    <Tabs
-      value={
-        exportActive ? EXPORT_TAB : triageActive ? TRIAGE_TAB : IMPORT_STEP
-      }
-      onValueChange={selectStep}
-    >
-      <div className="mx-auto max-w-7xl px-5 pt-7 sm:px-8">{workflowStrip}</div>
-      <TabsContent value={IMPORT_STEP} className="mt-0">
-        <Tabs value={source} onValueChange={selectTab} asChild>
-          <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-            <PageHeader
-              back
-              title="Import"
-              lede="Preview a source before anything enters your library. Existing values are preserved when a re-sync only supplies missing metadata."
-            />
-            {importers.length > 0 && (
-              <section className="mt-7" aria-labelledby="import-source-heading">
-                <h2
-                  id="import-source-heading"
-                  className="mb-3 text-sm font-semibold text-foreground"
+    <>
+      <Tabs value={source} onValueChange={selectTab} asChild>
+        <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
+          <PageHeader
+            back
+            title="Import"
+            lede="Preview a source before anything enters your library. Existing values are preserved when a re-sync only supplies missing metadata."
+            actions={
+              inboxCount.data ? (
+                // The Inbox is its own page since Sprint 096; from here it is
+                // one click, and says how much is waiting.
+                <Link
+                  to="/inbox"
+                  className="focus-ring rounded-full border border-border px-4 py-2 text-sm font-medium hover:bg-accent"
                 >
-                  Choose an import source
-                </h2>
-                {sourceStrip}
-              </section>
-            )}
-            {!preview && importers.length > 0 && (
-              <>
-                {/* The panel each trigger names has to exist. Without it Radix still
+                  {inboxCount.data} waiting in your Inbox →
+                </Link>
+              ) : undefined
+            }
+          />
+          {importers.length > 0 && (
+            <section className="mt-7" aria-labelledby="import-source-heading">
+              {!source && <SourceDetectDrop onSource={selectTab} />}
+              <h2
+                id="import-source-heading"
+                className={cn(
+                  "mb-3 text-sm font-semibold text-foreground",
+                  !source && "mt-8",
+                )}
+              >
+                {source ? "Import source" : "Or choose where it comes from"}
+              </h2>
+              {sourceStrip}
+            </section>
+          )}
+          {!preview && importers.length > 0 && source && (
+            <>
+              {/* The panel each trigger names has to exist. Without it Radix still
               writes `aria-controls` pointing at nothing, which axe reports as a
               critical invalid attribute value and which leaves a screen reader
               unable to reach the fields the tab just switched to (DEC-038). */}
-                <form
-                  ref={importForm}
-                  className="mt-8 space-y-5 rounded-xl border border-border bg-surface p-5"
-                  onSubmit={(event) => {
-                    event.preventDefault();
-                    const submission = readyInput(activeImporter);
-                    if (!submission) return;
-                    setPending(true);
-                    setError(null);
-                    setSkipped(null);
-                    const importer = activeImporter as ImporterDefinition;
-                    void sendable(importer, submission)
-                      .then((source) =>
-                        // A connector that declared extra fields gets them
-                        // appended to the same upload, keyed by connector so
-                        // switching tabs never carries one source's mapping
-                        // into another's request.
-                        Object.keys(columnMapping).length > 0 ||
-                        (noCreators && !!submission.spec.flags?.length) ||
-                        (!!chosenDelimiter &&
-                          !!submission.spec.fields?.includes("delimiter"))
-                          ? previewImportWithOptions(
-                              importer,
-                              submission.spec,
-                              source,
-                              Object.fromEntries([
-                                ...Object.entries(columnMapping)
-                                  .filter(([name]) =>
-                                    submission.spec.fields!.includes(name),
-                                  )
-                                  // The screen speaks 1-based column
-                                  // numbers; the reader's contract is
-                                  // 0-based.
-                                  .map(([name, value]) => [
-                                    name,
-                                    String(Number(value) - 1),
-                                  ])
-                                  .filter(([, value]) => Number(value) >= 0),
-                                // The owner's checkbox and separator ride
-                                // the same options channel the mapping does.
-                                ...(noCreators
-                                  ? ([["no_creators", "true"]] as const)
-                                  : []),
-                                ...(chosenDelimiter
-                                  ? ([["delimiter", chosenDelimiter]] as const)
-                                  : []),
-                              ]),
-                              chosenFor(importer),
-                            )
-                          : previewImport(
-                              importer,
-                              submission.spec,
-                              source,
-                              chosenFor(importer),
-                            ),
-                      )
-                      .then(setPreview)
-                      .catch((reason: Error) => setError(asFailure(reason)))
-                      .finally(() => setPending(false));
-                  }}
-                >
-                  {importers.map((importer) => (
-                    <TabsContent
-                      key={importer.id}
-                      value={importer.id}
-                      className="mt-0 space-y-5"
-                    >
-                      <ConnectorGuide importer={importer} />
-                      {renderTargets(importer)}
-                      {/* A short, distinct lead for the primary, the same role an
+              <form
+                ref={importForm}
+                className="mt-8 space-y-5 rounded-xl border border-border bg-surface p-5"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  const submission = readyInput(activeImporter);
+                  if (!submission) return;
+                  setPending(true);
+                  setError(null);
+                  setSkipped(null);
+                  const importer = activeImporter as ImporterDefinition;
+                  void sendable(importer, submission)
+                    .then((source) =>
+                      // A connector that declared extra fields gets them
+                      // appended to the same upload, keyed by connector so
+                      // switching tabs never carries one source's mapping
+                      // into another's request.
+                      Object.keys(columnMapping).length > 0 ||
+                      (noCreators && !!submission.spec.flags?.length) ||
+                      (!!chosenDelimiter &&
+                        !!submission.spec.fields?.includes("delimiter"))
+                        ? previewImportWithOptions(
+                            importer,
+                            submission.spec,
+                            source,
+                            Object.fromEntries([
+                              ...Object.entries(columnMapping)
+                                .filter(([name]) =>
+                                  submission.spec.fields!.includes(name),
+                                )
+                                // The screen speaks 1-based column
+                                // numbers; the reader's contract is
+                                // 0-based.
+                                .map(([name, value]) => [
+                                  name,
+                                  String(Number(value) - 1),
+                                ])
+                                .filter(([, value]) => Number(value) >= 0),
+                              // The owner's checkbox and separator ride
+                              // the same options channel the mapping does.
+                              ...(noCreators
+                                ? ([["no_creators", "true"]] as const)
+                                : []),
+                              ...(chosenDelimiter
+                                ? ([["delimiter", chosenDelimiter]] as const)
+                                : []),
+                            ]),
+                            chosenFor(importer),
+                          )
+                        : previewImport(
+                            importer,
+                            submission.spec,
+                            source,
+                            chosenFor(importer),
+                          ),
+                    )
+                    .then(setPreview)
+                    .catch((reason: Error) => setError(asFailure(reason)))
+                    .finally(() => setPending(false));
+                }}
+              >
+                {importers.map((importer) => (
+                  <TabsContent
+                    key={importer.id}
+                    value={importer.id}
+                    className="mt-0 space-y-5"
+                  >
+                    <ConnectorGuide importer={importer} />
+                    {renderTargets(importer)}
+                    {/* A short, distinct lead for the primary, the same role an
                       alternate's own toggle text plays below it. Shown only
                       alongside a guide — `ConnectorGuide` already renders `help`
                       itself when there is no guide to show instead, so the two
                       never duplicate. */}
-                      {importer.input.guide.length > 0 &&
-                        importer.input.help && (
-                          <p className="text-sm font-medium text-foreground">
-                            {importer.input.help}
-                          </p>
-                        )}
-                      {renderInput(importer, importer.input, "")}
-                      {/* Other ways in, each beneath the primary. One deep by
+                    {importer.input.guide.length > 0 && importer.input.help && (
+                      <p className="text-sm font-medium text-foreground">
+                        {importer.input.help}
+                      </p>
+                    )}
+                    {renderInput(importer, importer.input, "")}
+                    {/* Other ways in, each beneath the primary. One deep by
                       contract, so this never recurses further (DEC-081,
                       generalized). */}
-                      {importer.input.alternates.map((alternate, index) => {
-                        const open = openAlternates[alternate.field] ?? false;
-                        const panelId = `${importer.id}-alternate-${alternate.field}`;
-                        return (
-                          // A controlled disclosure rather than `<details>`: this is
-                          // another way in, so it needs an explicit expanded state
-                          // that a screen reader announces and a test can drive.
-                          <div
-                            key={alternate.field}
-                            className="rounded-2xl border border-border px-4 py-3"
+                    {importer.input.alternates.map((alternate, index) => {
+                      const open = openAlternates[alternate.field] ?? false;
+                      const panelId = `${importer.id}-alternate-${alternate.field}`;
+                      return (
+                        // A controlled disclosure rather than `<details>`: this is
+                        // another way in, so it needs an explicit expanded state
+                        // that a screen reader announces and a test can drive.
+                        <div
+                          key={alternate.field}
+                          className="rounded-2xl border border-border px-4 py-3"
+                        >
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            aria-expanded={open}
+                            aria-controls={panelId}
+                            className="h-auto min-h-8 w-full justify-start whitespace-normal rounded-lg px-2 py-1.5 text-left text-sm font-normal text-muted-foreground"
+                            onClick={() =>
+                              setOpenAlternates((current) => ({
+                                ...current,
+                                [alternate.field]: !open,
+                              }))
+                            }
                           >
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              aria-expanded={open}
-                              aria-controls={panelId}
-                              className="h-auto min-h-8 w-full justify-start whitespace-normal rounded-lg px-2 py-1.5 text-left text-sm font-normal text-muted-foreground"
-                              onClick={() =>
-                                setOpenAlternates((current) => ({
-                                  ...current,
-                                  [alternate.field]: !open,
-                                }))
-                              }
-                            >
-                              {alternate.help ??
-                                `Or use another way to import ${importer.label}`}
-                            </Button>
-                            {open && (
-                              <div id={panelId} className="mt-4 space-y-4">
-                                {alternate.guide.length > 0 && (
-                                  <ConnectorGuide
-                                    importer={importer}
-                                    spec={alternate}
-                                    headingId={`${panelId}-guide-heading`}
-                                  />
-                                )}
-                                {renderInput(
-                                  importer,
-                                  alternate,
-                                  `-alt-${index}`,
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </TabsContent>
-                  ))}
-                  <Button
-                    className="rounded-full px-5"
-                    disabled={pending || readyInput(activeImporter) === null}
-                  >
-                    {pending
-                      ? "Reading source…"
-                      : activeImporter && activeImporter.input.kind !== "upload"
-                        ? `Preview ${activeImporter.label} library`
-                        : "Preview import"}
-                  </Button>
-                </form>
-              </>
-            )}
-            {skipped && (
-              <p className="mt-4 text-sm text-muted-foreground" role="status">
-                {skipped.held > 0
-                  ? `Skipped ${skipped.held} ${skipped.held === 1 ? "file" : "files"} — ${skipped.reason}.`
-                  : skipped.reason}
-              </p>
-            )}
-            {error && (
-              // The action is the connector's, not this screen's: only Calibre knows
-              // that a locked database means "close Calibre and try again" (DEC-080).
-              <div
-                className="mt-4 rounded-xl bg-destructive/10 p-4"
-                role="alert"
+                            {alternate.help ??
+                              `Or use another way to import ${importer.label}`}
+                          </Button>
+                          {open && (
+                            <div id={panelId} className="mt-4 space-y-4">
+                              {alternate.guide.length > 0 && (
+                                <ConnectorGuide
+                                  importer={importer}
+                                  spec={alternate}
+                                  headingId={`${panelId}-guide-heading`}
+                                />
+                              )}
+                              {renderInput(
+                                importer,
+                                alternate,
+                                `-alt-${index}`,
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </TabsContent>
+                ))}
+                <Button
+                  className="rounded-full px-5"
+                  disabled={pending || readyInput(activeImporter) === null}
+                >
+                  {pending
+                    ? "Reading source…"
+                    : activeImporter && activeImporter.input.kind !== "upload"
+                      ? `Preview ${activeImporter.label} library`
+                      : "Preview import"}
+                </Button>
+              </form>
+            </>
+          )}
+          {skipped && (
+            <p className="mt-4 text-sm text-muted-foreground" role="status">
+              {skipped.held > 0
+                ? `Skipped ${skipped.held} ${skipped.held === 1 ? "file" : "files"} — ${skipped.reason}.`
+                : skipped.reason}
+            </p>
+          )}
+          {error && (
+            // The action is the connector's, not this screen's: only Calibre knows
+            // that a locked database means "close Calibre and try again" (DEC-080).
+            <div className="mt-4 rounded-xl bg-destructive/10 p-4" role="alert">
+              <p className="text-destructive">{error.message}</p>
+              {error.action && (
+                <p className="mt-1 text-sm text-foreground">{error.action}</p>
+              )}
+            </div>
+          )}
+          {preview && !result && (
+            <section className="mt-8">
+              <h2
+                ref={heading}
+                tabIndex={-1}
+                className="text-2xl font-semibold"
               >
-                <p className="text-destructive">{error.message}</p>
-                {error.action && (
-                  <p className="mt-1 text-sm text-foreground">{error.action}</p>
-                )}
-              </div>
-            )}
-            {preview && !result && (
-              <section className="mt-8">
-                <h2
-                  ref={heading}
-                  tabIndex={-1}
-                  className="text-2xl font-semibold"
-                >
-                  Preview: {preview.summary.total} rows
-                </h2>
-                <p
-                  className="mt-2 flex flex-wrap items-baseline gap-x-1"
-                  role="status"
-                >
-                  {/* Three counts describing one whole — the same rule the
+                Preview: {preview.summary.total} rows
+              </h2>
+              <p
+                className="mt-2 flex flex-wrap items-baseline gap-x-1"
+                role="status"
+              >
+                {/* Three counts describing one whole — the same rule the
                       shelves list and the status facets apply to theirs
                       (deliverable 5) — so the number that dominates the batch
                       reads as dominant, not identical in weight to the two
                       that don't. */}
-                  {(() => {
-                    const max = Math.max(
-                      preview.summary.ready,
-                      preview.summary.ambiguous,
-                      preview.summary.errors,
-                      1,
-                    );
-                    return (
-                      <>
-                        <span
-                          className={weightClass(preview.summary.ready, max)}
-                        >
-                          {preview.summary.ready} ready
-                        </span>
-                        <span>·</span>
-                        <span
-                          className={weightClass(
-                            preview.summary.ambiguous,
-                            max,
-                          )}
-                        >
-                          {preview.summary.ambiguous} need a choice
-                        </span>
-                        <span>·</span>
-                        <span
-                          className={weightClass(preview.summary.errors, max)}
-                        >
-                          {preview.summary.errors} have errors
-                        </span>
-                      </>
-                    );
-                  })()}
+                {(() => {
+                  const max = Math.max(
+                    preview.summary.ready,
+                    preview.summary.ambiguous,
+                    preview.summary.errors,
+                    1,
+                  );
+                  return (
+                    <>
+                      <span className={weightClass(preview.summary.ready, max)}>
+                        {preview.summary.ready} ready
+                      </span>
+                      <span>·</span>
+                      <span
+                        className={weightClass(preview.summary.ambiguous, max)}
+                      >
+                        {preview.summary.ambiguous} need a choice
+                      </span>
+                      <span>·</span>
+                      <span
+                        className={weightClass(preview.summary.errors, max)}
+                      >
+                        {preview.summary.errors} have errors
+                      </span>
+                    </>
+                  );
+                })()}
+              </p>
+              {matching && preview.search_progress && (
+                <p
+                  className="mt-2 text-sm text-muted-foreground"
+                  role="status"
+                  data-testid="search-progress"
+                >
+                  {preview.search_progress.wait_reason ===
+                  "provider_quota_exhausted"
+                    ? `Searching paused for today's provider budget; it resumes automatically. ${
+                        preview.search_progress.searched
+                      } of ${preview.search_progress.total} rows searched.`
+                    : `Searching for matches: ${
+                        preview.search_progress.searched
+                      } of ${preview.search_progress.total} rows searched.`}
                 </p>
-                {matching && preview.search_progress && (
-                  <p
-                    className="mt-2 text-sm text-muted-foreground"
-                    role="status"
-                    data-testid="search-progress"
-                  >
-                    {preview.search_progress.wait_reason ===
-                    "provider_quota_exhausted"
-                      ? `Searching paused for today's provider budget; it resumes automatically. ${
-                          preview.search_progress.searched
-                        } of ${preview.search_progress.total} rows searched.`
-                      : `Searching for matches: ${
-                          preview.search_progress.searched
-                        } of ${preview.search_progress.total} rows searched.`}
-                  </p>
-                )}
-                {/* What the import left behind, on its own line and never counted
+              )}
+              {/* What the import left behind, on its own line and never counted
                 as an error. The two are kept apart because they are different
                 answers: one is a library you did not choose, the other is a kind
                 of thing no library here holds (DEC-106). */}
-                {(preview.summary.skipped_not_requested > 0 ||
-                  preview.summary.skipped_unsupported > 0) && (
-                  <p
-                    className="mt-1 text-sm text-muted-foreground"
-                    data-testid="import-skipped"
-                  >
-                    {[
-                      preview.summary.skipped_not_requested > 0
-                        ? `${preview.summary.skipped_not_requested} ${preview.summary.skipped_not_requested === 1 ? "row is" : "rows are"} for libraries you did not choose`
+              {(preview.summary.skipped_not_requested > 0 ||
+                preview.summary.skipped_unsupported > 0) && (
+                <p
+                  className="mt-1 text-sm text-muted-foreground"
+                  data-testid="import-skipped"
+                >
+                  {[
+                    preview.summary.skipped_not_requested > 0
+                      ? `${preview.summary.skipped_not_requested} ${preview.summary.skipped_not_requested === 1 ? "row is" : "rows are"} for libraries you did not choose`
+                      : null,
+                    preview.summary.skipped_reasons.length > 0
+                      ? `${preview.summary.skipped_reasons
+                          .map((row) => `${row.count} ${row.reason}`)
+                          .join(", ")} — not a kind this tracks`
+                      : preview.summary.skipped_unsupported > 0
+                        ? `${preview.summary.skipped_unsupported} rows are not a kind this tracks`
                         : null,
-                      preview.summary.skipped_reasons.length > 0
-                        ? `${preview.summary.skipped_reasons
-                            .map((row) => `${row.count} ${row.reason}`)
-                            .join(", ")} — not a kind this tracks`
-                        : preview.summary.skipped_unsupported > 0
-                          ? `${preview.summary.skipped_unsupported} rows are not a kind this tracks`
-                          : null,
-                    ]
-                      .filter(Boolean)
-                      .join(" · ")}
-                  </p>
-                )}
-                <div className="mt-5 space-y-3">
-                  {preview.records.map((record) => (
-                    <article
-                      key={record.record_id}
-                      className={cn(
-                        "rounded-xl border border-border bg-surface p-4",
-                        record.planned_action === "excluded" && "opacity-60",
-                      )}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <h3 className="font-semibold">
-                          {record.title || `Row ${record.row_number}`}
-                        </h3>
-                        {!result && !matching && (
-                          // The owner's 2026-09-14 decision: a row the owner
-                          // does not want can leave the import entirely, not
-                          // only land as typed. Placed on the row itself so it
-                          // reads as a decision about THIS row, next to the
-                          // title it is a decision about.
-                          <RowExcludeControl
-                            recordId={record.record_id}
-                            excluded={record.planned_action === "excluded"}
-                            batchId={preview.batch_id}
-                            importerId={source}
-                            onChanged={() => {
-                              void getPreview(source, preview.batch_id)
-                                .then((fresh) => setPreview(fresh))
-                                .catch(() => {
-                                  /* the next poll or action reads fresh */
-                                });
-                            }}
-                          />
-                        )}
-                      </div>
-                      <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
-                        <span>
-                          {record.creators.join(", ") || "Creator missing"}
-                        </span>
-                        {/* The score every other surface paints — the same
-                            band the library card and the detail page use for
-                            this score, not prose (finding 2, AC2). */}
-                        {record.score !== null && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span
-                              className={cn(
-                                scoreChipShape,
-                                scoreChipClass(record.score),
-                              )}
-                            >
-                              {record.score}
-                            </span>
-                            {record.score_provisional && (
-                              <span className="text-xs">(provisional)</span>
-                            )}
-                          </>
-                        )}
-                        {record.suggested_status && (
-                          <>
-                            <span aria-hidden="true">·</span>
-                            <span>
-                              {/* The domain's word, never the stored value
-                                  (`to_read`; Sprint 095's walkthrough). */}
-                              suggests{" "}
-                              {statusLabelFor(
-                                activeImporter?.item_types[0] ?? "book",
-                                Array.isArray(itemTypes.data)
-                                  ? itemTypes.data
-                                  : undefined,
-                                record.suggested_status as EntryStatus,
-                              ).toLowerCase()}
-                            </span>
-                          </>
-                        )}
-                      </p>
-                      {record.cover_staged && (
-                        // A fact about where the cover came from, not a score
-                        // — it stops borrowing the emerald that means a 9 or a
-                        // 10 everywhere else (finding 1, AC1).
-                        <span className="mt-1 inline-block rounded-full bg-surface-raised px-2 py-0.5 text-xs text-muted-foreground">
-                          Local cover staged
-                        </span>
-                      )}
-                      {record.errors.map((row, index) => (
-                        <p
-                          key={`${row.field}-${index}`}
-                          className="text-sm text-destructive"
-                        >
-                          {describeRowError(row, recordDomain)}
-                        </p>
-                      ))}
-                      {(record.proposals?.length ?? 0) > 0 && !result && (
-                        <ProposalList
+                  ]
+                    .filter(Boolean)
+                    .join(" · ")}
+                </p>
+              )}
+              <div className="mt-5 space-y-3">
+                {preview.records.map((record) => (
+                  <article
+                    key={record.record_id}
+                    className={cn(
+                      "rounded-xl border border-border bg-surface p-4",
+                      record.planned_action === "excluded" && "opacity-60",
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="font-semibold">
+                        {record.title || `Row ${record.row_number}`}
+                      </h3>
+                      {!result && !matching && (
+                        // The owner's 2026-09-14 decision: a row the owner
+                        // does not want can leave the import entirely, not
+                        // only land as typed. Placed on the row itself so it
+                        // reads as a decision about THIS row, next to the
+                        // title it is a decision about.
+                        <RowExcludeControl
                           recordId={record.record_id}
-                          title={record.title}
-                          author={record.creators.join(", ")}
-                          proposals={record.proposals}
+                          excluded={record.planned_action === "excluded"}
                           batchId={preview.batch_id}
                           importerId={source}
-                          matching={matching}
-                          onAnswered={() => {
+                          onChanged={() => {
                             void getPreview(source, preview.batch_id)
                               .then((fresh) => setPreview(fresh))
                               .catch(() => {
-                                /* answered; the next poll or action reads fresh */
+                                /* the next poll or action reads fresh */
                               });
                           }}
                         />
                       )}
-                      {record.proposals?.length === 0 &&
-                        !result &&
-                        !matching && (
-                          // A row the search finished on with nothing to show
-                          // still owns its affordances: the edit-and-re-search
-                          // form, and the way out of the import entirely.
-                          <NoResultRow
-                            recordId={record.record_id}
-                            title={record.title}
-                            author={record.creators.join(", ")}
-                            batchId={preview.batch_id}
-                            importerId={source}
-                            onAnswered={() => {
-                              void getPreview(source, preview.batch_id)
-                                .then((fresh) => setPreview(fresh))
-                                .catch(() => {
-                                  /* answered; the next poll or action reads fresh */
-                                });
-                            }}
-                          />
-                        )}
-                      {record.planned_action === "ambiguous" && (
-                        <AmbiguityChoice
-                          recordId={record.record_id}
-                          title={record.title}
-                          candidates={record.candidates}
-                          value={choices[record.record_id]}
-                          onChange={(value) =>
-                            setChoices((old) => ({
-                              ...old,
-                              [record.record_id]: value,
-                            }))
-                          }
-                        />
+                    </div>
+                    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+                      <span>
+                        {record.creators.join(", ") || "Creator missing"}
+                      </span>
+                      {/* The score every other surface paints — the same
+                            band the library card and the detail page use for
+                            this score, not prose (finding 2, AC2). */}
+                      {record.score !== null && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span
+                            className={cn(
+                              scoreChipShape,
+                              scoreChipClass(record.score),
+                            )}
+                          >
+                            {record.score}
+                          </span>
+                          {record.score_provisional && (
+                            <span className="text-xs">(provisional)</span>
+                          )}
+                        </>
                       )}
-                    </article>
-                  ))}
-                </div>
-                <Button
-                  className="mt-6 rounded-full px-5"
-                  disabled={
-                    pending || matching || unresolved > 0 || ready === 0
-                  }
-                  onClick={() => {
-                    setPending(true);
-                    setError(null);
-                    void (async () => {
-                      const committed = await commitImport(
-                        source,
-                        preview.batch_id,
-                        Object.entries(choices).map(([recordId, value]) => ({
-                          record_id: Number(recordId),
-                          item_id: value === "new" ? null : value,
-                        })),
-                      );
-                      setResult(committed);
-                      if (filesToAttach.length > 0) {
-                        const failures: AttachmentFailure[] = [];
+                      {record.suggested_status && (
+                        <>
+                          <span aria-hidden="true">·</span>
+                          <span>
+                            {/* The domain's word, never the stored value
+                                  (`to_read`; Sprint 095's walkthrough). */}
+                            suggests{" "}
+                            {statusLabelFor(
+                              activeImporter?.item_types[0] ?? "book",
+                              Array.isArray(itemTypes.data)
+                                ? itemTypes.data
+                                : undefined,
+                              record.suggested_status as EntryStatus,
+                            ).toLowerCase()}
+                          </span>
+                        </>
+                      )}
+                    </p>
+                    {record.cover_staged && (
+                      // A fact about where the cover came from, not a score
+                      // — it stops borrowing the emerald that means a 9 or a
+                      // 10 everywhere else (finding 1, AC1).
+                      <span className="mt-1 inline-block rounded-full bg-surface-raised px-2 py-0.5 text-xs text-muted-foreground">
+                        Local cover staged
+                      </span>
+                    )}
+                    {record.errors.map((row, index) => (
+                      <p
+                        key={`${row.field}-${index}`}
+                        className="text-sm text-destructive"
+                      >
+                        {describeRowError(row, recordDomain)}
+                      </p>
+                    ))}
+                    {(record.proposals?.length ?? 0) > 0 && !result && (
+                      <ProposalList
+                        recordId={record.record_id}
+                        title={record.title}
+                        author={record.creators.join(", ")}
+                        proposals={record.proposals}
+                        batchId={preview.batch_id}
+                        importerId={source}
+                        matching={matching}
+                        onAnswered={() => {
+                          void getPreview(source, preview.batch_id)
+                            .then((fresh) => setPreview(fresh))
+                            .catch(() => {
+                              /* answered; the next poll or action reads fresh */
+                            });
+                        }}
+                      />
+                    )}
+                    {record.proposals?.length === 0 && !result && !matching && (
+                      // A row the search finished on with nothing to show
+                      // still owns its affordances: the edit-and-re-search
+                      // form, and the way out of the import entirely.
+                      <NoResultRow
+                        recordId={record.record_id}
+                        title={record.title}
+                        author={record.creators.join(", ")}
+                        batchId={preview.batch_id}
+                        importerId={source}
+                        onAnswered={() => {
+                          void getPreview(source, preview.batch_id)
+                            .then((fresh) => setPreview(fresh))
+                            .catch(() => {
+                              /* answered; the next poll or action reads fresh */
+                            });
+                        }}
+                      />
+                    )}
+                    {record.planned_action === "ambiguous" && (
+                      <AmbiguityChoice
+                        recordId={record.record_id}
+                        title={record.title}
+                        candidates={record.candidates}
+                        value={choices[record.record_id]}
+                        onChange={(value) =>
+                          setChoices((old) => ({
+                            ...old,
+                            [record.record_id]: value,
+                          }))
+                        }
+                      />
+                    )}
+                  </article>
+                ))}
+              </div>
+              <Button
+                className="mt-6 rounded-full px-5"
+                disabled={pending || matching || unresolved > 0 || ready === 0}
+                onClick={() => {
+                  setPending(true);
+                  setError(null);
+                  void (async () => {
+                    const committed = await commitImport(
+                      source,
+                      preview.batch_id,
+                      Object.entries(choices).map(([recordId, value]) => ({
+                        record_id: Number(recordId),
+                        item_id: value === "new" ? null : value,
+                      })),
+                    );
+                    setResult(committed);
+                    // The Inbox just filled: its count on the nav and here.
+                    void queryClient.invalidateQueries({
+                      queryKey: queryKeys.triage.count,
+                    });
+                    if (filesToAttach.length > 0) {
+                      const failures: AttachmentFailure[] = [];
+                      setAttachmentProgress({
+                        total: filesToAttach.length,
+                        completed: 0,
+                        current: filesToAttach[0].path,
+                        failures,
+                      });
+                      for (const [index, member] of filesToAttach.entries()) {
                         setAttachmentProgress({
                           total: filesToAttach.length,
-                          completed: 0,
-                          current: filesToAttach[0].path,
-                          failures,
+                          completed: index,
+                          current: member.path,
+                          failures: [...failures],
                         });
-                        for (const [index, member] of filesToAttach.entries()) {
-                          setAttachmentProgress({
-                            total: filesToAttach.length,
-                            completed: index,
-                            current: member.path,
-                            failures: [...failures],
-                          });
-                          try {
-                            await uploadImportFile(
-                              source,
-                              committed.batch_id,
-                              member,
-                            );
-                          } catch (reason) {
-                            failures.push({
-                              path: member.path,
-                              message:
-                                reason instanceof Error
-                                  ? reason.message
-                                  : "That file could not be stored.",
-                            });
-                          }
-                          setAttachmentProgress({
-                            total: filesToAttach.length,
-                            completed: index + 1,
-                            current: null,
-                            failures: [...failures],
+                        try {
+                          await uploadImportFile(
+                            source,
+                            committed.batch_id,
+                            member,
+                          );
+                        } catch (reason) {
+                          failures.push({
+                            path: member.path,
+                            message:
+                              reason instanceof Error
+                                ? reason.message
+                                : "That file could not be stored.",
                           });
                         }
+                        setAttachmentProgress({
+                          total: filesToAttach.length,
+                          completed: index + 1,
+                          current: null,
+                          failures: [...failures],
+                        });
                       }
-                      toast.success(
-                        `Import complete: ${committed.created_entries} ${
-                          committed.created_entries === 1 ? "entry" : "entries"
-                        } added`,
-                        {
-                          description: committed.unsorted_entries
-                            ? `${committed.unsorted_entries} waiting in Triage. Undo stays available for 24 hours.`
-                            : "Undo stays available for 24 hours.",
-                        },
-                      );
-                    })()
-                      .catch((reason: Error) => setError(asFailure(reason)))
-                      .finally(() => setPending(false));
-                  }}
-                >
-                  {pending
-                    ? "Importing…"
-                    : matching
-                      ? "Waiting for the search to finish…"
-                      : `Import ${ready} ready ${ready === 1 ? "row" : "rows"}`}
-                </Button>
-              </section>
-            )}
-            {result && (
-              <div ref={resultRef} tabIndex={-1} className="mt-8" role="status">
-                <p className="text-xl">
-                  Import complete: {result.created_entries}{" "}
-                  {result.created_entries === 1 ? "entry" : "entries"} added;{" "}
-                  {result.unchanged_entries} already present.
-                </p>
-                {attachmentProgress && (
-                  <div className="mt-3 text-sm" aria-live="polite">
-                    <p>
-                      {attachmentProgress.current
-                        ? `Attaching ebook ${attachmentProgress.completed + 1} of ${attachmentProgress.total}: ${attachmentProgress.current}`
-                        : `Attached ${attachmentProgress.total - attachmentProgress.failures.length} of ${attachmentProgress.total} ${attachmentProgress.total === 1 ? "ebook" : "ebooks"}.`}
-                    </p>
-                    {attachmentProgress.failures.length > 0 && (
-                      <div className="mt-2 text-destructive">
-                        <p>These files could not be attached:</p>
-                        <ul className="mt-1 list-disc pl-5">
-                          {attachmentProgress.failures.map((failure) => (
-                            <li key={failure.path}>
-                              {failure.path} — {failure.message}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                )}
-                {/* Imported rows land `unsorted`, and the library's default view
+                    }
+                    toast.success(
+                      `Import complete: ${committed.created_entries} ${
+                        committed.created_entries === 1 ? "entry" : "entries"
+                      } added`,
+                      {
+                        description: committed.unsorted_entries
+                          ? `${committed.unsorted_entries} waiting in Triage. Undo stays available for 24 hours.`
+                          : "Undo stays available for 24 hours.",
+                      },
+                    );
+                  })()
+                    .catch((reason: Error) => setError(asFailure(reason)))
+                    .finally(() => setPending(false));
+                }}
+              >
+                {pending
+                  ? "Importing…"
+                  : matching
+                    ? "Waiting for the search to finish…"
+                    : `Import ${ready} ready ${ready === 1 ? "row" : "rows"}`}
+              </Button>
+            </section>
+          )}
+          {result && (
+            <div ref={resultRef} tabIndex={-1} className="mt-8" role="status">
+              <p className="text-xl">
+                Import complete: {result.created_entries}{" "}
+                {result.created_entries === 1 ? "entry" : "entries"} added;{" "}
+                {result.unchanged_entries} already present.
+              </p>
+              {attachmentProgress && (
+                <div className="mt-3 text-sm" aria-live="polite">
+                  <p>
+                    {attachmentProgress.current
+                      ? `Attaching ebook ${attachmentProgress.completed + 1} of ${attachmentProgress.total}: ${attachmentProgress.current}`
+                      : `Attached ${attachmentProgress.total - attachmentProgress.failures.length} of ${attachmentProgress.total} ${attachmentProgress.total === 1 ? "ebook" : "ebooks"}.`}
+                  </p>
+                  {attachmentProgress.failures.length > 0 && (
+                    <div className="mt-2 text-destructive">
+                      <p>These files could not be attached:</p>
+                      <ul className="mt-1 list-disc pl-5">
+                        {attachmentProgress.failures.map((failure) => (
+                          <li key={failure.path}>
+                            {failure.path} — {failure.message}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
+              {/* Imported rows land `unsorted`, and the library's default view
               excludes `unsorted`, so a successful import used to look like a
               no-op: the count went up and the shelf stayed empty. Say where the
               rows went and offer the one click that gets there. The count is
               everything waiting, which can exceed what this batch added. */}
-                {result.unsorted_entries > 0 && (
-                  <p className="mt-2 text-muted-foreground">
-                    {result.unsorted_entries}{" "}
-                    {result.unsorted_entries === 1 ? "entry is" : "entries are"}{" "}
-                    waiting in Triage. Your library hides unsorted entries until
-                    you sort them, so this is where the import went.{" "}
-                    <Link
-                      className="focus-ring text-primary"
-                      to={`/import?tab=${TRIAGE_TAB}`}
-                    >
-                      Open Triage →
-                    </Link>
-                  </p>
-                )}
-              </div>
-            )}
-            {result && !undoResult && !pending && (
-              <div className="mt-5 rounded-xl border border-border bg-surface p-4">
-                <p className="text-sm text-muted-foreground">
-                  You can undo this import for 24 hours after commit. The undo
-                  reverses only fields that still match the imported values —
-                  your later edits are preserved.
+              {result.unsorted_entries > 0 && (
+                <p className="mt-2 text-muted-foreground">
+                  {result.unsorted_entries}{" "}
+                  {result.unsorted_entries === 1 ? "entry is" : "entries are"}{" "}
+                  waiting in your Inbox. Your library hides unsorted entries
+                  until you sort them, so this is where the import went.{" "}
+                  <Link className="focus-ring text-primary" to="/inbox">
+                    Review in Inbox →
+                  </Link>
                 </p>
-                {!confirmUndo ? (
+              )}
+            </div>
+          )}
+          {result && !undoResult && !pending && (
+            <div className="mt-5 rounded-xl border border-border bg-surface p-4">
+              <p className="text-sm text-muted-foreground">
+                You can undo this import for 24 hours after commit. The undo
+                reverses only fields that still match the imported values — your
+                later edits are preserved.
+              </p>
+              {!confirmUndo ? (
+                <Button
+                  variant="outline"
+                  className="mt-3 rounded-full border-destructive/60 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+                  onClick={() => setConfirmUndo(true)}
+                >
+                  Undo this import
+                </Button>
+              ) : (
+                <div className="mt-3 flex gap-2">
                   <Button
-                    variant="outline"
-                    className="mt-3 rounded-full border-destructive/60 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
-                    onClick={() => setConfirmUndo(true)}
+                    variant="destructive"
+                    className="rounded-full text-sm"
+                    disabled={undoPending}
+                    onClick={() => {
+                      setUndoPending(true);
+                      setError(null);
+                      void undoBatch(result.batch_id)
+                        .then((res) => {
+                          setUndoResult(res);
+                          setConfirmUndo(false);
+                          toast.success(
+                            `Import undone: ${res.reverted} ${
+                              res.reverted === 1 ? "change" : "changes"
+                            } reverted`,
+                          );
+                        })
+                        .catch((reason: Error) => setError(asFailure(reason)))
+                        .finally(() => setUndoPending(false));
+                    }}
                   >
-                    Undo this import
+                    {undoPending ? "Undoing…" : "Confirm undo"}
                   </Button>
-                ) : (
-                  <div className="mt-3 flex gap-2">
-                    <Button
-                      variant="destructive"
-                      className="rounded-full text-sm"
-                      disabled={undoPending}
-                      onClick={() => {
-                        setUndoPending(true);
-                        setError(null);
-                        void undoBatch(result.batch_id)
-                          .then((res) => {
-                            setUndoResult(res);
-                            setConfirmUndo(false);
-                            toast.success(
-                              `Import undone: ${res.reverted} ${
-                                res.reverted === 1 ? "change" : "changes"
-                              } reverted`,
-                            );
-                          })
-                          .catch((reason: Error) => setError(asFailure(reason)))
-                          .finally(() => setUndoPending(false));
-                      }}
-                    >
-                      {undoPending ? "Undoing…" : "Confirm undo"}
-                    </Button>
-                    <Button
-                      variant="secondary"
-                      className="rounded-full text-sm"
-                      onClick={() => setConfirmUndo(false)}
-                    >
-                      Cancel
-                    </Button>
-                  </div>
-                )}
-              </div>
-            )}
-            {undoResult && (
-              <div
-                ref={undoRef}
-                tabIndex={-1}
-                className="mt-5 rounded-xl border border-border bg-surface p-4"
-                role="status"
-              >
-                <h2 className="text-lg font-semibold">Import undone</h2>
-                <p className="mt-1 text-sm text-foreground">
-                  {undoResult.reverted}{" "}
-                  {undoResult.reverted === 1 ? "change" : "changes"} reverted
-                  {undoResult.retained > 0 &&
-                    ` · ${undoResult.retained} retained (edited after import)`}
-                </p>
-                <BackToLibrary className="mt-3" />
-              </div>
-            )}
-          </main>
-        </Tabs>
-      </TabsContent>
-      <TabsContent value={TRIAGE_TAB} className="mt-0">
-        <TriagePage />
-      </TabsContent>
-      <TabsContent value={EXPORT_TAB} className="mt-0">
-        <ExportPanel />
-      </TabsContent>
-    </Tabs>
+                  <Button
+                    variant="secondary"
+                    className="rounded-full text-sm"
+                    onClick={() => setConfirmUndo(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              )}
+            </div>
+          )}
+          {undoResult && (
+            <div
+              ref={undoRef}
+              tabIndex={-1}
+              className="mt-5 rounded-xl border border-border bg-surface p-4"
+              role="status"
+            >
+              <h2 className="text-lg font-semibold">Import undone</h2>
+              <p className="mt-1 text-sm text-foreground">
+                {undoResult.reverted}{" "}
+                {undoResult.reverted === 1 ? "change" : "changes"} reverted
+                {undoResult.retained > 0 &&
+                  ` · ${undoResult.retained} retained (edited after import)`}
+              </p>
+              <BackToLibrary className="mt-3" />
+            </div>
+          )}
+        </main>
+      </Tabs>
+    </>
   );
 }

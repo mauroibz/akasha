@@ -457,7 +457,7 @@ test("triage has no serious accessibility violations", async ({ page }) => {
   await stubItemTypes(page);
   await stubTriage(page);
   await stubShelves(page);
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
   await expectNoSeriousViolations(page, "triage");
 });
@@ -469,7 +469,7 @@ test("triage row status action with bulk selection has no serious accessibility 
   await stubItemTypes(page);
   await stubTriage(page);
   await stubShelves(page);
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await page
     .locator('[data-entry-id="1"]')
     .getByRole("combobox", { name: "Status for Book 1" })
@@ -496,7 +496,7 @@ test("triage with a selection and its action bar has no serious violations", asy
   await stubItemTypes(page);
   await stubTriage(page);
   await stubShelves(page);
-  await page.goto("/import?tab=triage");
+  await page.goto("/inbox");
   await expect(page.getByRole("heading", { name: /inbox/i })).toBeVisible();
   await page.getByRole("checkbox").nth(1).click();
   await expect(
@@ -659,10 +659,13 @@ test("the degraded provider notice has no serious accessibility violations", asy
 
 test("import has no serious accessibility violations", async ({ page }) => {
   await stubImporters(page);
+  // Since Sprint 096 /import opens on the drop area and the grid of sources.
   await page.goto("/import");
-  // The custom list leads the strip (Sprint 085), so the first paint is the
-  // list's own form — the editor, the checkbox and the library dropdown are
-  // the surface a screen reader meets first.
+  await expect(page.getByTestId("source-detect-drop")).toBeVisible();
+  await expectNoSeriousViolations(page, "import sources");
+  // And the list's own form, one card away: the editor, the checkbox and the
+  // library dropdown.
+  await page.goto("/import?tab=list");
   await expect(
     page.getByRole("textbox", { name: /or type your list here/i }),
   ).toBeVisible();
@@ -671,8 +674,8 @@ test("import has no serious accessibility violations", async ({ page }) => {
 
 test("export has no serious accessibility violations", async ({ page }) => {
   await stubExports(page);
-  await page.goto("/import?tab=export");
-  await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+  await page.goto("/settings#your-data");
+  await expect(page.getByRole("heading", { name: "Your data" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Goodreads" })).toBeVisible();
   await expectNoSeriousViolations(page, "export");
 });

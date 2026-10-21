@@ -105,7 +105,7 @@ test("Inbox button opens the triage tab on Import", async ({ page }) => {
     .getByText(/Inbox 5/)
     .first()
     .click();
-  await expect(page).toHaveURL(/\/import\?tab=triage/);
+  await expect(page).toHaveURL(/\/inbox/);
 });
 
 test("detail renders all metadata regions", async ({ page }) => {
@@ -301,7 +301,10 @@ test("navigation shell exposes every destination at desktop width", async ({
     .first()
     .click();
   await expect(page).toHaveURL("/shelves");
-  await page.getByRole("link", { name: /data/i }).first().click();
+  await page
+    .getByRole("link", { name: /^import/i })
+    .first()
+    .click();
   await expect(page).toHaveURL("/import");
   await page.getByRole("link", { name: /add/i }).first().click();
   await expect(page).toHaveURL("/add");

@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
@@ -7,17 +8,24 @@ import { AppShell } from "@/components/AppShell";
 import { NotFoundPage } from "@/pages/NotFoundPage";
 
 function renderShell(routes: React.ReactNode) {
+  // The shell reads the Inbox count since Sprint 096, as the app always provides.
+  if (!vi.isMockFunction(globalThis.fetch))
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response(JSON.stringify({ items: [], total: 0 })),
+    );
   return render(
-    <MemoryRouter initialEntries={["/"]}>
-      <AppShell>{routes}</AppShell>
-    </MemoryRouter>,
+    <QueryClientProvider client={new QueryClient()}>
+      <MemoryRouter initialEntries={["/"]}>
+        <AppShell>{routes}</AppShell>
+      </MemoryRouter>
+    </QueryClientProvider>,
   );
 }
 
 afterEach(() => vi.restoreAllMocks());
 
 describe("AppShell", () => {
-  it("renders Library, Add, Data, and Shelves navigation links", () => {
+  it("renders Library, Add, Import, and Shelves navigation links", () => {
     renderShell(
       <Routes>
         <Route path="/" element={<div>Library page</div>} />
@@ -28,7 +36,7 @@ describe("AppShell", () => {
     );
     // Both desktop and mobile navs exist in the DOM; in jsdom the hidden class
     // removes the desktop nav from the accessibility tree, so check all links.
-    for (const label of ["Library", "Add", "Data", "Shelves"]) {
+    for (const label of ["Library", "Add", "Import", "Shelves"]) {
       const links = screen.getAllByRole("link", {
         name: new RegExp(label, "i"),
       });
@@ -76,22 +84,24 @@ describe("AppShell", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter initialEntries={["/"]}>
-        <AppShell
-          user={{
-            id: 1,
-            username: "mauro",
-            display_name: "Mauro",
-            is_admin: true,
-          }}
-          onSignedOut={onSignedOut}
-        >
-          <Routes>
-            <Route path="/" element={<div>Library page</div>} />
-            <Route path="/login" element={<h1>Sign-in destination</h1>} />
-          </Routes>
-        </AppShell>
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/"]}>
+          <AppShell
+            user={{
+              id: 1,
+              username: "mauro",
+              display_name: "Mauro",
+              is_admin: true,
+            }}
+            onSignedOut={onSignedOut}
+          >
+            <Routes>
+              <Route path="/" element={<div>Library page</div>} />
+              <Route path="/login" element={<h1>Sign-in destination</h1>} />
+            </Routes>
+          </AppShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     await user.click(screen.getAllByRole("button", { name: "Mauro" })[0]);
@@ -113,32 +123,34 @@ describe("AppShell", () => {
     const user = userEvent.setup();
 
     render(
-      <MemoryRouter initialEntries={["/books/7"]}>
-        <AppShell
-          user={{
-            id: 1,
-            username: "mauro",
-            display_name: "Mauro",
-            is_admin: true,
-          }}
-          actingAs={{
-            id: 2,
-            username: "bruno",
-            display_name: "Bruno",
-            is_admin: false,
-          }}
-          onActingAsChanged={onActingAsChanged}
-          onSignedOut={vi.fn()}
-        >
-          <Routes>
-            <Route path="/" element={<h1>Own library</h1>} />
-            <Route
-              path="/books/7"
-              element={<div role="dialog">Edit entry</div>}
-            />
-          </Routes>
-        </AppShell>
-      </MemoryRouter>,
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/books/7"]}>
+          <AppShell
+            user={{
+              id: 1,
+              username: "mauro",
+              display_name: "Mauro",
+              is_admin: true,
+            }}
+            actingAs={{
+              id: 2,
+              username: "bruno",
+              display_name: "Bruno",
+              is_admin: false,
+            }}
+            onActingAsChanged={onActingAsChanged}
+            onSignedOut={vi.fn()}
+          >
+            <Routes>
+              <Route path="/" element={<h1>Own library</h1>} />
+              <Route
+                path="/books/7"
+                element={<div role="dialog">Edit entry</div>}
+              />
+            </Routes>
+          </AppShell>
+        </MemoryRouter>
+      </QueryClientProvider>,
     );
 
     const banner = screen.getByRole("status", {

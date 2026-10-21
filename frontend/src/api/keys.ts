@@ -9,11 +9,18 @@
 export const queryKeys = {
   library: {
     all: ["library"] as const,
+
     list: <F>(filters: F) => ["library", filters] as const,
   },
   libraryWhole: (domain: string) => ["library-whole", domain] as const,
   triage: {
     all: ["triage"] as const,
+    /**
+     * Its own root, deliberately not under `library` or `triage`: those caches are
+     * pages of entries that optimistic updates rewrite by prefix, and a bare
+     * number in among them broke the first one that tried (Sprint 096).
+     */
+    count: ["inbox-count"] as const,
     list: <F>(filters: F) => ["triage", filters] as const,
   },
   entry: (entryId: number) => ["entry", entryId] as const,

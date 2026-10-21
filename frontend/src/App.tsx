@@ -48,6 +48,9 @@ const ShelfPage = lazy(async () => ({
 const InsightsPage = lazy(async () => ({
   default: (await import("@/pages/InsightsPage")).InsightsPage,
 }));
+const TriagePage = lazy(async () => ({
+  default: (await import("@/pages/TriagePage")).TriagePage,
+}));
 const SettingsPage = lazy(async () => ({
   default: (await import("@/pages/SettingsPage")).SettingsPage,
 }));
@@ -137,6 +140,9 @@ function PrivateRoutes({
             <Route path="/shelves/:slug" element={<ShelfPage />} />
             <Route path="/insights" element={<InsightsPage />} />
             <Route path="/settings" element={<SettingsPage />} />
+            {/* The Inbox is its own page since Sprint 096 (proposal I3), no longer
+                a tab of the import screen. */}
+            <Route path="/inbox" element={<TriagePage />} />
             <Route
               path="/people"
               element={
@@ -156,15 +162,12 @@ function PrivateRoutes({
                 address stays live rather than 404ing: it was a top-level
                 nav item for thirty sprints, so it is in bookmarks and in
                 the history of anyone who used it. */}
-            <Route
-              path="/triage"
-              element={<Navigate to="/import?tab=triage" replace />}
-            />
+            <Route path="/triage" element={<Navigate to="/inbox" replace />} />
             {/* A real address for the export tab, the same shape as
                 /triage above (Sprint 069 deliverable 2). */}
             <Route
               path="/export"
-              element={<Navigate to="/import?tab=export" replace />}
+              element={<Navigate to="/settings#your-data" replace />}
             />
             <Route path="/login" element={<Navigate to="/" replace />} />
             <Route path="/setup" element={<Navigate to="/" replace />} />

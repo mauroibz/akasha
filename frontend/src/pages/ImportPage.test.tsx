@@ -10,11 +10,13 @@ import {
 import { Toaster } from "@/components/ui/sonner";
 import { findToast } from "@/test/toast";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JobEventsProvider } from "@/features/activity/JobEvents";
 import { handFiles, takeHandedFiles } from "@/features/import/handoff";
+import { ExportPanel } from "@/features/export/ExportPanel";
+
 import { ImportPage } from "./ImportPage";
 
 afterEach(() => {
@@ -56,7 +58,14 @@ function emitJob(batchId: string) {
   );
 }
 
-function renderImportPage(path = "/import") {
+/**
+ * The source a test is about. With nothing named, /import is a grid of sources
+ * since Sprint 096, so a test of one connector's form opens that connector, as a
+ * click on its card would. Each describe block names its own.
+ */
+let defaultSource = "goodreads";
+
+function renderImportPage(path = `/import?tab=${defaultSource}`) {
   vi.stubGlobal("EventSource", FakeEventSource);
   return render(
     <QueryClientProvider client={new QueryClient()}>
@@ -592,95 +601,65 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /import 1 ready row/i }),
     );
     const result = await screen.findByRole("status");
-    expect(result).toHaveTextContent(/7 entries are waiting in triage/i);
-    expect(screen.getByRole("link", { name: /triage/i })).toHaveAttribute(
-      "href",
-      "/import?tab=triage",
-    );
+    expect(result).toHaveTextContent(/7 entries are waiting in your inbox/i);
+    expect(
+      screen.getByRole("link", { name: /review in inbox/i }),
+    ).toHaveAttribute("href", "/inbox");
   });
 
-  it("folds triage into the import screen as a tab", async () => {
-    // Triage was a top-level destination that is empty unless an import just
-    // ran, so most visits met a dead page. It is the tail of this flow, and it
-    // lives here now (DEC-079).
+  it("opens on a grid of sources when none is named, with no workflow tabs", async () => {
+    // Sprint 096 (proposal §5.1): the Import/Triage/Export strip and the
+    // scrolling strip of nine sources became one grid of cards; the Inbox and
+    // Export live elsewhere now.
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
       String(input) === "/api/importers"
         ? new Response(JSON.stringify(importers))
-        : String(input).startsWith("/api/item-types")
-          ? new Response(JSON.stringify({ item_types: [] }))
-          : String(input).startsWith("/api/shelves")
-            ? new Response(JSON.stringify({ shelves: [] }))
-            : new Response(
-                JSON.stringify({
-                  items: [],
-                  next_cursor: null,
-                  total: 0,
-                  facets: {
-                    status_counts: {},
-                    status_counts_by_type: {},
-                    format_counts: {},
-                  },
-                }),
-              ),
+        : new Response("[]"),
     );
-    renderImportPage();
+    renderImportPage("/import");
 
-    const workflow = await screen.findByRole("tablist", {
-      name: /import workflow/i,
+    const sources = await screen.findByRole("tablist", {
+      name: /import source/i,
     });
-    expect(
-      within(workflow).getByRole("tab", { name: /1 import/i }),
-    ).toBeVisible();
-    expect(
-      within(workflow).getByRole("tab", { name: /2 triage/i }),
-    ).toBeVisible();
-    const sources = screen.getByRole("tablist", { name: /import source/i });
     expect(
       within(sources).getByRole("tab", { name: /goodreads/i }),
     ).toBeVisible();
     expect(
       within(sources).getByRole("tab", { name: /calibre/i }),
     ).toBeVisible();
-    expect(within(sources).queryByRole("tab", { name: /triage/i })).toBeNull();
+    expect(
+      screen.queryByRole("tablist", { name: /import workflow/i }),
+    ).toBeNull();
+    expect(screen.queryByLabelText("Goodreads CSV")).toBeNull();
 
     await userEvent.click(
-      within(workflow).getByRole("tab", { name: /2 triage/i }),
+      within(sources).getByRole("tab", { name: /goodreads/i }),
     );
-    expect(
-      await screen.findByRole("heading", { level: 1, name: /inbox/i }),
-    ).toBeVisible();
-    // One landmark, still: the triage surface brings its own <main> and the
-    // import one is not rendered beside it.
-    expect(screen.getAllByRole("main")).toHaveLength(1);
+    expect(await screen.findByLabelText("Goodreads CSV")).toBeVisible();
   });
 
-  it("opens on the triage tab when the URL asks for it", async () => {
-    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
-      String(input) === "/api/importers"
-        ? new Response(JSON.stringify(importers))
-        : String(input).startsWith("/api/item-types")
-          ? new Response(JSON.stringify({ item_types: [] }))
-          : String(input).startsWith("/api/shelves")
-            ? new Response(JSON.stringify({ shelves: [] }))
-            : new Response(
-                JSON.stringify({
-                  items: [],
-                  next_cursor: null,
-                  total: 0,
-                  facets: {
-                    status_counts: {},
-                    status_counts_by_type: {},
-                    format_counts: {},
-                  },
-                }),
-              ),
+  it("sends an old Triage or Export link where it now lives", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response("[]"),
     );
-    renderImportPage("/import?tab=triage");
-
-    expect(
-      await screen.findByRole("heading", { level: 1, name: /inbox/i }),
-    ).toBeVisible();
-    expect(screen.queryByLabelText("Goodreads CSV")).toBeNull();
+    for (const [tab, landing] of [
+      ["triage", "Inbox page"],
+      ["export", "Settings page"],
+    ]) {
+      const view = render(
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter initialEntries={[`/import?tab=${tab}`]}>
+            <Routes>
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/inbox" element={<p>Inbox page</p>} />
+              <Route path="/settings" element={<p>Settings page</p>} />
+            </Routes>
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+      expect(await screen.findByText(landing)).toBeVisible();
+      view.unmount();
+    }
   });
 
   it("renders the guidance the connector publishes, not copy of its own", async () => {
@@ -824,7 +803,7 @@ describe("ImportPage", () => {
     expect(alert).toHaveTextContent(/close calibre and try again/i);
   });
 
-  it("keeps a preview with its connector, and through Triage", async () => {
+  it("keeps a preview with its connector", async () => {
     // Found in the walkthrough: after a Goodreads commit, switching to the
     // Calibre tab showed the Goodreads result and no Calibre form. A staged
     // source belongs to the connector that produced it — but Triage is not a
@@ -879,15 +858,6 @@ describe("ImportPage", () => {
       screen.getByRole("button", { name: /preview import/i }),
     );
     await screen.findByRole("heading", { name: /preview: 1 row/i });
-
-    // Through Triage and back: the preview survives.
-    await userEvent.click(screen.getByRole("tab", { name: /triage/i }));
-    await screen.findByRole("heading", { level: 1, name: /inbox/i });
-    await userEvent.click(screen.getByRole("tab", { name: /import/i }));
-    await userEvent.click(screen.getByRole("tab", { name: /goodreads/i }));
-    expect(
-      await screen.findByRole("heading", { name: /preview: 1 row/i }),
-    ).toBeVisible();
 
     // Another connector: a clean form, not somebody else's preview.
     await userEvent.click(screen.getByRole("tab", { name: /calibre/i }));
@@ -1311,17 +1281,18 @@ describe("ImportPage", () => {
     ).toBeVisible();
   });
 
-  it("opens on the importer used last", async () => {
-    // The same rule the library tab follows (DEC-062): the default is what you
-    // did last, because a person importing a Calibre library does it more than
-    // once and the wrong default costs a click every time.
+  it("marks the importer used last on its card", async () => {
+    // DEC-062's rule, kept as a one-click habit: since Sprint 096 the grid opens
+    // first, and the source used last says so rather than opening unasked.
     localStorage.setItem("akasha.import.source", "calibre");
     vi.spyOn(globalThis, "fetch").mockResolvedValue(
       new Response(JSON.stringify(importers)),
     );
-    renderImportPage();
+    renderImportPage("/import");
 
-    expect(await screen.findByLabelText("Calibre folder")).toBeVisible();
+    const card = await screen.findByRole("tab", { name: /calibre/i });
+    expect(within(card).getByText("Last used")).toBeVisible();
+    expect(screen.queryByLabelText("Calibre folder")).toBeNull();
   });
 
   /**
@@ -1332,6 +1303,12 @@ describe("ImportPage", () => {
    * so these tests assert what the screen *sends*, never what it filters.
    */
   describe("choosing what an import brings in", () => {
+    beforeEach(() => {
+      defaultSource = "imdb";
+    });
+    afterEach(() => {
+      defaultSource = "goodreads";
+    });
     const twoDomains = {
       id: "imdb",
       label: "IMDb",
@@ -1399,7 +1376,7 @@ describe("ImportPage", () => {
           ? new Response(JSON.stringify(itemTypes))
           : undefined,
       );
-      renderImportPage();
+      renderImportPage("/import?tab=goodreads");
 
       expect(await screen.findByLabelText("Goodreads CSV")).toBeVisible();
       expect(
@@ -1519,7 +1496,16 @@ describe("ImportPage", () => {
     });
   });
 
-  describe("the export tab (Sprint 069)", () => {
+  describe("the export panel (Sprint 069; in Settings since Sprint 096)", () => {
+    function renderExport(embedded = false) {
+      return render(
+        <QueryClientProvider client={new QueryClient()}>
+          <MemoryRouter>
+            <ExportPanel embedded={embedded} />
+          </MemoryRouter>
+        </QueryClientProvider>,
+      );
+    }
     const itemTypes = [
       { id: "book", label: "Books" },
       { id: "album", label: "Albums" },
@@ -1580,7 +1566,7 @@ describe("ImportPage", () => {
 
     it("renders a row entirely from the declaration, an invented view included", async () => {
       stubExports();
-      renderImportPage("/import?tab=export");
+      renderExport();
 
       expect(
         await screen.findByRole("heading", { level: 1, name: "Export" }),
@@ -1597,7 +1583,7 @@ describe("ImportPage", () => {
 
     it("renders guide steps as the literal text they are, not as markdown", async () => {
       stubExports();
-      renderImportPage("/import?tab=export");
+      renderExport();
 
       await screen.findByText("Fake Format");
       expect(
@@ -1608,7 +1594,7 @@ describe("ImportPage", () => {
 
     it("shows a zero-entry domain as a zero with a disabled, explained control", async () => {
       stubExports();
-      renderImportPage("/import?tab=export");
+      renderExport();
 
       const row = (await screen.findByText("Table (Anime)")).closest(
         "article",
@@ -1630,7 +1616,7 @@ describe("ImportPage", () => {
             )
           : undefined,
       );
-      renderImportPage("/import?tab=export");
+      renderExport();
 
       const row = (await screen.findByText("Table (Books)")).closest(
         "article",
@@ -1648,17 +1634,13 @@ describe("ImportPage", () => {
       ).toBeEnabled();
     });
 
-    it("opens on the export tab when the URL asks for it, with no click needed", async () => {
+    it("is the Your data section when embedded in Settings", async () => {
       stubExports();
-      renderImportPage("/import?tab=export");
+      renderExport(true);
 
       expect(
-        await screen.findByRole("heading", { level: 1, name: "Export" }),
+        await screen.findByRole("heading", { level: 2, name: "Your data" }),
       ).toBeVisible();
-      expect(screen.queryByLabelText("Goodreads CSV")).toBeNull();
-      expect(
-        screen.queryByRole("heading", { level: 1, name: "Inbox" }),
-      ).toBeNull();
     });
   });
 });
@@ -1741,6 +1723,12 @@ const listRecord = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe("the list connector's search-then-confirm surfaces", () => {
+  beforeEach(() => {
+    defaultSource = "list";
+  });
+  afterEach(() => {
+    defaultSource = "goodreads";
+  });
   it("renders the declared column mapping inputs, in the picked library's words", async () => {
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/importers")

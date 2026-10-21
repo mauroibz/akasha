@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { PageHeader } from "@/components/PageHeader";
+import { ExportPanel } from "@/features/export/ExportPanel";
 import {
   readThemeChoice,
   saveThemeChoice,
@@ -42,8 +43,8 @@ const OPTIONS: Option[] = [
 ];
 
 /**
- * Settings (Sprint 090). Appearance is its first section; export moves here when the
- * import screen is redrawn (proposal §5).
+ * Settings (Sprint 090): Appearance, then Your data, the export that moved here from
+ * the import screen in Sprint 096 (proposal §5.1).
  */
 export function SettingsPage() {
   const [choice, setChoice] = useState<ThemeChoice>(readThemeChoice);
@@ -55,8 +56,11 @@ export function SettingsPage() {
 
   return (
     <main className="mx-auto w-full max-w-4xl px-4 py-8 sm:px-6">
-      <PageHeader eyebrow="Settings" title="Appearance" />
-      <fieldset className="mt-8">
+      <PageHeader title="Settings" />
+      <h2 className="mt-8 font-display text-3xl font-medium tracking-tight">
+        Appearance
+      </h2>
+      <fieldset className="mt-6">
         <legend className="mb-4 font-semibold">Theme</legend>
         <div className="grid gap-4 sm:grid-cols-3">
           {OPTIONS.map((option) => (
@@ -117,6 +121,7 @@ export function SettingsPage() {
         Kept in this browser, so a phone and a laptop can differ. Covers, scores
         and the amber dot look the same in both.
       </p>
+      <ExportPanel embedded />
     </main>
   );
 }

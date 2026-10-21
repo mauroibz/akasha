@@ -182,7 +182,7 @@ export function CommandBar({
         label: "Go to Inbox",
         words: "inbox triage unsorted sort",
         icon: <Inbox />,
-        run: () => go("/import?tab=triage"),
+        run: () => go("/inbox"),
       },
       {
         id: "shelves",
@@ -210,7 +210,7 @@ export function CommandBar({
         label: "Export your library…",
         words: "export download backup data",
         icon: <Download />,
-        run: () => go("/import?tab=export"),
+        run: () => go("/settings#your-data"),
       },
       {
         id: "manual",

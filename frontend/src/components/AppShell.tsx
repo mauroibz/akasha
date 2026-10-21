@@ -29,6 +29,9 @@ import { cn } from "@/lib/utils";
 import { CommandBarProvider } from "@/features/command/CommandBarProvider";
 import { useCommandBar } from "@/features/command/commandBar";
 import { Kbd } from "@/components/ui/kbd";
+import { queryKeys } from "@/api/keys";
+import { getInboxCount } from "@/api/library";
+import { useQuery } from "@tanstack/react-query";
 
 interface NavItem {
   readonly to: string;
@@ -50,10 +53,34 @@ interface NavItem {
 const navItems: readonly NavItem[] = [
   { to: "/", label: "Library", icon: <LibraryBig aria-hidden="true" /> },
   { to: "/add", label: "Add", icon: <Plus aria-hidden="true" /> },
-  { to: "/import", label: "Data", icon: <Upload aria-hidden="true" /> },
+  // One name for one place (Sprint 096, proposal I3): it was "Data", the page
+  // "Import", its step "Triage" and that step's title "Inbox".
+  { to: "/import", label: "Import", icon: <Upload aria-hidden="true" /> },
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];
+
+/**
+ * How many entries wait in the Inbox, on the Import entry (Sprint 096, §5.1): an
+ * import's results are one click from anywhere, and an empty Inbox says nothing.
+ */
+function InboxBadge() {
+  const count = useQuery({
+    queryKey: queryKeys.triage.count,
+    queryFn: ({ signal }) => getInboxCount(signal),
+    staleTime: 15_000,
+    retry: false,
+  });
+  if (!count.data) return null;
+  return (
+    <span
+      className="ml-0.5 rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground"
+      aria-label={`${count.data} waiting in the Inbox`}
+    >
+      {count.data > 99 ? "99+" : count.data}
+    </span>
+  );
+}
 
 /** The command bar's visible door (Sprint 094); ⌘K is the other. */
 function SearchButton({ compact = false }: { compact?: boolean }) {
@@ -262,7 +289,9 @@ export function AppShell({
                   end={item.to === "/"}
                   className={({ isActive }) =>
                     cn(
-                      "flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-ring",
+                      // Tighter below 1024px: with the Inbox badge the nav must still
+                      // fit a tablet (the library spec's no-overflow rule).
+                      "flex min-h-11 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-ring lg:px-4",
                       isActive
                         ? "bg-primary/15 text-primary"
                         : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -271,6 +300,7 @@ export function AppShell({
                 >
                   <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
                   <span>{item.label}</span>
+                  {item.to === "/import" ? <InboxBadge /> : null}
                 </NavLink>
               ))}
               <div className="ml-auto flex items-center gap-1">

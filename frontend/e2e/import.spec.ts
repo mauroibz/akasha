@@ -112,10 +112,10 @@ test("Goodreads preview and commit stay keyboard-complete at mobile width", asyn
   // Imports land `unsorted` and the default library view hides `unsorted`, so
   // the result panel names the pile and offers the click that reaches it.
   await expect(page.getByRole("status")).toContainText(
-    "3 entries are waiting in Triage",
+    "3 entries are waiting in your Inbox",
   );
-  await page.getByRole("link", { name: /open triage/i }).click();
-  await expect(page).toHaveURL(/\/import\?tab=triage/);
+  await page.getByRole("link", { name: /review in inbox/i }).click();
+  await expect(page).toHaveURL(/\/inbox/);
   await expect(
     page.getByRole("heading", { level: 1, name: /inbox/i }),
   ).toContainText("3 unsorted");
@@ -774,23 +774,29 @@ test.describe("the export tab (Sprint 069)", () => {
     await stubExports(page);
   });
 
-  test("/export reaches the tab, and it survives a reload", async ({
+  test("/export reaches Your data in Settings, and it survives a reload", async ({
     page,
   }) => {
     await page.goto("/export");
-    await expect(page).toHaveURL(/\/import\?tab=export/);
-    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+    await expect(page).toHaveURL(/\/settings#your-data/);
+    await expect(
+      page.getByRole("heading", { name: "Your data" }),
+    ).toBeVisible();
 
     await page.reload();
-    await expect(page).toHaveURL(/\/import\?tab=export/);
-    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+    await expect(page).toHaveURL(/\/settings#your-data/);
+    await expect(
+      page.getByRole("heading", { name: "Your data" }),
+    ).toBeVisible();
   });
 
   test("downloads a real file end to end, for the lossless row and a declared view", async ({
     page,
   }) => {
-    await page.goto("/import?tab=export");
-    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+    await page.goto("/settings#your-data");
+    await expect(
+      page.getByRole("heading", { name: "Your data" }),
+    ).toBeVisible();
 
     const losslessRow = page.locator('[data-export-row="lossless"]');
     const [lossless] = await Promise.all([
@@ -812,7 +818,7 @@ test.describe("the export tab (Sprint 069)", () => {
   test("a zero-entry domain offers no download and says why", async ({
     page,
   }) => {
-    await page.goto("/import?tab=export");
+    await page.goto("/settings#your-data");
     const albumRow = page.locator("article", { hasText: "Table (Albums)" });
     await expect(albumRow.getByText("0 entries")).toBeVisible();
     await expect(
@@ -825,8 +831,10 @@ test.describe("the export tab (Sprint 069)", () => {
     page,
   }) => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto("/import?tab=export");
-    await expect(page.getByRole("heading", { name: "Export" })).toBeVisible();
+    await page.goto("/settings#your-data");
+    await expect(
+      page.getByRole("heading", { name: "Your data" }),
+    ).toBeVisible();
 
     const overflow = await page.evaluate(
       () =>
@@ -893,7 +901,8 @@ test("the import source strip fits a phone with seven connectors, and scrolls wi
     route.fulfill({ json: sevenImporters }),
   );
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto("/import");
+  // With a source chosen the cards are the scrolling switcher (Sprint 096).
+  await page.goto("/import?tab=list");
 
   const strip = page.getByRole("tablist", { name: "Import source" });
   await expect(strip.getByRole("tab")).toHaveCount(7);
@@ -1241,6 +1250,8 @@ test("the list leads the strip, names its domains, and typed entries import with
   await expect(page.getByRole("tab", { name: /goodreads/i })).toContainText(
     /book/i,
   );
+  // The grid opens first since Sprint 096; the list is its first card.
+  await firstTab.click();
 
   // Type three entries straight into the editor; no file is chosen.
   await page
