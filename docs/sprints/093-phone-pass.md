@@ -1,7 +1,7 @@
 # Sprint 093 — The phone pass
 
 **Sprint:** 093
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 092
 **Owner:** Mauro
@@ -52,4 +52,18 @@ The command bar (094) and the share target (097).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `vitest related` (174), `make check`, and the library,
+accessibility, triage, add/detail, auth and editorial specs; 390px screenshots of Library (before
+and after), Detail and the opinion dialog as a bottom sheet, on a copy of the owner's data.
+
+- **AC1.** First cover at 243px with two columns (was 280px of header, one column; with a top
+  bar and no other change it would have been 351px). Library spec's 300px bound passes.
+- **AC2.** Phone top bar: the mark (activity) and Settings always, account when signed in. Add
+  moves to the bottom bar's Add; the header Search button gives way to the keyboard's search key.
+  View and Filters keep their accessible names as icons (`sr-only sm:not-sr-only`).
+- **AC3.** Desktop column counts unchanged.
+
+Two specs changed meaning on purpose: the column contract is now 2/5/6 at 390/1440/2560 and the
+375px reflow expects two columns. **Found:** the expanded score picker was 156px in a 153px
+phone card; on-cover segments step down to `w-6` below 640px. The phone wall has its own fixed
+geometry (`phoneGridLayout`), and the virtualizer remeasures when the row height changes.

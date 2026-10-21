@@ -6068,3 +6068,17 @@ count of view transitions (1 open, 1 back) with a mid-morph frame; Detail in bot
 with a fill mode never leaves `getAnimations()`; 091's empty-state title was not a heading.
 
 **Next.** Sprint 093 — the phone pass.
+
+---
+
+## 2026-10-21 — Sprint 093: the phone pass
+
+**Done.** Phone top bar (mark, Settings); three-row library header; two covers a row; bottom
+sheets under 640px.
+
+**Verified and how.** `vitest related`, `make check`, six browser specs; 390px screenshots before
+and after on a copy of the owner's data. First cover 243px, two columns.
+
+**Found.** The on-cover score picker overflowed a 150px card; fixed.
+
+**Next.** Sprint 094 — the command bar.
