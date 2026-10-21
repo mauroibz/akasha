@@ -122,7 +122,7 @@ test("the wall starts near the top and gives at least seventy percent of each ca
   }
 });
 
-test("the wall reaches one, five, and six columns at its acceptance widths", async ({
+test("the wall reaches two, five, and six columns at its acceptance widths", async ({
   page,
 }) => {
   await seedLibrary(page, 100);
@@ -134,7 +134,8 @@ test("the wall reaches one, five, and six columns at its acceptance widths", asy
     seriesItemType,
   ]);
   for (const viewport of [
-    { width: 390, height: 844, minimum: 1, exact: 1 },
+    // Two covers a row on a phone since Sprint 093 (proposal A6).
+    { width: 390, height: 844, minimum: 2, exact: 2 },
     { width: 1440, height: 900, minimum: 5 },
     { width: 2560, height: 1400, minimum: 6 },
   ]) {
@@ -884,7 +885,8 @@ test("grid view is multi-column where space permits and reflows on resize", asyn
   expect(await columnsAt(), "desktop columns").toBeGreaterThanOrEqual(2);
 
   await page.setViewportSize({ width: 375, height: 812 });
-  await expect.poll(columnsAt, { message: "mobile columns" }).toBe(1);
+  // Two covers a row on a phone since Sprint 093.
+  await expect.poll(columnsAt, { message: "mobile columns" }).toBe(2);
   // Reflow must not leave stale virtual offsets behind.
   const cards = await readCards(page);
   for (let i = 0; i < cards.length; i += 1)

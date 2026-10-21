@@ -1,3 +1,4 @@
+import { LayoutGrid, List, SlidersHorizontal } from "lucide-react";
 import {
   useInfiniteQuery,
   useQuery,
@@ -571,11 +572,15 @@ export function HomePage() {
           the risk-note's rule: its height never changes on scroll, so the
           virtualizer's `scrollMargin` measurement stays valid. */}
       <div className="sticky top-0 z-40 -mx-5 -mt-7 border-b border-border/70 bg-background/95 px-5 pb-1.5 pt-2 backdrop-blur sm:-mx-8 sm:px-8">
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-          <h1 className="flex items-center gap-2.5 font-display text-2xl font-medium tracking-tight">
+        {/* On a phone (Sprint 093) the same controls reorder into three short
+            rows: the lockup, count and Inbox; the domain chips, scrolling
+            sideways; search with the view and filter controls as icons. The
+            phone's top bar carries the mark, and its bottom bar carries Add. */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 sm:gap-x-4 sm:gap-y-2.5">
+          <h1 className="order-1 flex items-center gap-2.5 font-display text-2xl font-medium tracking-tight sm:order-none">
             <AkashaMark
               size={24}
-              className="shrink-0 text-foreground"
+              className="hidden shrink-0 text-foreground sm:block"
               aria-hidden="true"
             />
             Akasha
@@ -585,7 +590,7 @@ export function HomePage() {
               (D6's very small deviation from the proposal's "342 books", noted in
               the Outcome). */}
           {!libraryMissedQuery && firstPage && (
-            <p className="text-3xl font-semibold leading-none tabular-nums">
+            <p className="order-2 text-2xl font-semibold leading-none tabular-nums sm:order-none sm:text-3xl">
               {filterActive
                 ? libraryWhole === undefined
                   ? firstPage.total
@@ -599,13 +604,15 @@ export function HomePage() {
             </p>
           )}
           {domains.length > 1 && (
-            <DomainStrip
-              domains={domains}
-              value={selectedDomain}
-              onChange={chooseDomain}
-            />
+            <div className="order-4 -mx-5 w-[calc(100%+2.5rem)] overflow-x-auto px-5 sm:order-none sm:mx-0 sm:w-auto sm:overflow-visible sm:px-0">
+              <DomainStrip
+                domains={domains}
+                value={selectedDomain}
+                onChange={chooseDomain}
+              />
+            </div>
           )}
-          <label className="relative min-w-60 flex-1">
+          <label className="relative order-5 min-w-0 flex-1 sm:order-none sm:min-w-60">
             <span className="sr-only">
               Search your library, or add something new
             </span>
@@ -644,19 +651,42 @@ export function HomePage() {
               </button>
             )}
           </label>
+          {/* The phone's keyboard has a search key that does this (Enter). */}
           <Button
-            className="h-11 shrink-0 rounded-full px-6"
+            className="hidden h-11 shrink-0 rounded-full px-6 sm:inline-flex"
             onClick={searchTheWeb}
           >
             Search
           </Button>
           <SegmentedControl
+            className="order-6 sm:order-none"
             ariaLabel="Library view"
             value={view}
             onChange={setLibraryView}
             options={[
-              { value: "grid", label: "Grid", ariaLabel: "Grid view" },
-              { value: "table", label: "Table", ariaLabel: "Table view" },
+              {
+                value: "grid",
+                label: (
+                  <>
+                    <LayoutGrid
+                      className="h-4 w-4 sm:hidden"
+                      aria-hidden="true"
+                    />
+                    <span className="hidden sm:inline">Grid</span>
+                  </>
+                ),
+                ariaLabel: "Grid view",
+              },
+              {
+                value: "table",
+                label: (
+                  <>
+                    <List className="h-4 w-4 sm:hidden" aria-hidden="true" />
+                    <span className="hidden sm:inline">Table</span>
+                  </>
+                ),
+                ariaLabel: "Table view",
+              },
             ]}
           />
           {!libraryMissedQuery && (
@@ -664,9 +694,13 @@ export function HomePage() {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
-                  className="h-11 rounded-full bg-surface font-normal"
+                  className="order-7 h-11 rounded-full bg-surface px-3 font-normal sm:order-none sm:px-4"
                 >
-                  Filters
+                  <SlidersHorizontal
+                    className="h-4 w-4 sm:hidden"
+                    aria-hidden="true"
+                  />
+                  <span className="sr-only sm:not-sr-only">Filters</span>
                   {activeFilterCount > 0 && (
                     <span className="ml-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-semibold tabular-nums text-primary">
                       {activeFilterCount}
@@ -766,7 +800,7 @@ export function HomePage() {
               </PopoverContent>
             </Popover>
           )}
-          <div className="ml-auto flex items-center gap-3">
+          <div className="order-3 ml-auto flex items-center gap-3 sm:order-none">
             {pinnedShelf && (
               <div className="flex min-h-11 items-center rounded-full border border-border">
                 <button
@@ -805,7 +839,7 @@ export function HomePage() {
               Inbox {inboxCount}
             </Button>
             <Button
-              className="min-h-11 rounded-full px-4"
+              className="hidden min-h-11 rounded-full px-4 sm:inline-flex"
               aria-label="Add to library"
               onClick={() => searchRef.current?.focus()}
             >

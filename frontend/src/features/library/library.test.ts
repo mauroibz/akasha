@@ -48,7 +48,8 @@ test("grid columns follow the measured width and never starve a card", () => {
   // the viewport — which is what `containerWidthFor` derives and what
   // VirtualLibrary measures at runtime. The three viewports below are the
   // acceptance trio (AC3): one column on a phone, five+ at 1440, six+ at 2560.
-  expect(gridColumnCount(containerWidthFor(390))).toBe(1);
+  // Two covers a row on a phone since Sprint 093 (proposal A6), one before.
+  expect(gridColumnCount(containerWidthFor(390))).toBe(2);
   expect(gridColumnCount(containerWidthFor(1440))).toBeGreaterThanOrEqual(5);
   expect(gridColumnCount(containerWidthFor(2560))).toBeGreaterThanOrEqual(6);
   // Pin the exact answers so a constant change gets reviewed, not discovered:

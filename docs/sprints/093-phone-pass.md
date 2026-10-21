@@ -1,7 +1,7 @@
 # Sprint 093 — The phone pass
 
 **Sprint:** 093
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 092
 **Owner:** Mauro

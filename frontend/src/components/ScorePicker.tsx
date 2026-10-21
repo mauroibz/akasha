@@ -166,8 +166,9 @@ export function ScorePicker({
             className={cn(
               "w-8 rounded-md text-sm font-medium transition-colors focus-ring",
               // Wall cards can be 190px: five full-width segments would make
-              // the panel wider than the card, so they step down half a size.
-              onCover && "w-7",
+              // the panel wider than the card, so they step down half a size;
+              // a phone's two-column card is ~150px, so one more (Sprint 093).
+              onCover && "w-6 sm:w-7",
               compact ? "h-9" : "h-11",
               n === shown
                 ? scoreFillClass[scoreBand(n)]

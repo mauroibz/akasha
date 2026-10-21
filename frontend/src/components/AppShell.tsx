@@ -246,15 +246,19 @@ export function AppShell({
               ) : null}
             </div>
           </nav>
-          {/* Only with an account to show: on a phone every pixel above the first
-            cover counts (the library spec holds it under 300px). The phone's own
-            way to Settings arrives with Sprint 093's phone pass. */}
-          {user && onSignedOut ? (
-            <header className="flex min-h-14 items-center justify-end gap-1 border-b border-border/80 px-4 sm:hidden">
+          {/* The phone's top bar (Sprint 093): the mark, which is the
+            background-work control as on desktop, and Settings; the account
+            control when signed in. Short, because on a phone every pixel above
+            the first cover counts (the library spec holds it under 300px). */}
+          <header className="flex h-12 items-center justify-between gap-1 border-b border-border/80 px-2 sm:hidden">
+            <ActivityIndicator />
+            <div className="flex items-center gap-1">
               <SettingsLink />
-              <AccountControl user={user} onSignedOut={onSignedOut} />
-            </header>
-          ) : null}
+              {user && onSignedOut ? (
+                <AccountControl user={user} onSignedOut={onSignedOut} />
+              ) : null}
+            </div>
+          </header>
           <nav
             aria-label="Primary"
             className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"

@@ -170,6 +170,42 @@ export const gridLayout = {
 } as const;
 
 export const gridRowHeight = gridLayout.cardHeight + gridLayout.gap;
+
+export type GridLayout = {
+  gap: number;
+  paddingX: number;
+  cardMinWidth: number;
+  coverHeight: number;
+  textHeight: number;
+  cardHeight: number;
+  maxColumns: number;
+};
+
+/**
+ * The phone's wall (Sprint 093, proposal A6): two covers a row instead of one
+ * cover the width of the screen. Same contract as `gridLayout` (fixed card height,
+ * so the virtualizer keeps cheap fixed rows); only the numbers are a phone's. The
+ * cover keeps a 2:3 shape at a ~150px card, and the text band is the desktop's,
+ * because the title, creator and year lines are the same lines.
+ */
+export const phoneGridLayout: GridLayout = {
+  gap: 12,
+  paddingX: gridLayout.paddingX,
+  cardMinWidth: 140,
+  coverHeight: 225,
+  textHeight,
+  cardHeight: 225 + textHeight,
+  maxColumns: 2,
+};
+
+/** Below this container width the wall is a phone's. */
+export const PHONE_GRID_BELOW = 600;
+
+export function gridLayoutFor(containerWidth: number): GridLayout {
+  return containerWidth > 0 && containerWidth < PHONE_GRID_BELOW
+    ? phoneGridLayout
+    : gridLayout;
+}
 // Sprint 072 D7: the list density is a genuinely tighter second density now —
 // one ~56px band holding the 32×48 cover, title, creator, year, formats, status
 // pill and score chip, about 16 rows under a 900px viewport against the 9 the
@@ -178,15 +214,14 @@ export const tableRowHeight = 52;
 
 /** Columns that fit `containerWidth` without any card dropping below its minimum. */
 export function gridColumnCount(containerWidth: number): number {
-  const usable = containerWidth - gridLayout.paddingX;
+  const layout = gridLayoutFor(containerWidth);
+  const usable = containerWidth - layout.paddingX;
   if (!Number.isFinite(usable) || usable <= 0) return 1;
   return Math.max(
     1,
     Math.min(
-      gridLayout.maxColumns,
-      Math.floor(
-        (usable + gridLayout.gap) / (gridLayout.cardMinWidth + gridLayout.gap),
-      ),
+      layout.maxColumns,
+      Math.floor((usable + layout.gap) / (layout.cardMinWidth + layout.gap)),
     ),
   );
 }
@@ -195,7 +230,7 @@ export function gridColumnCount(containerWidth: number): number {
  * The container width HomePage's main row hands the wall at a given viewport
  * width — the same `px-5` / `sm:px-8` paddings, the `max-w-[1600px]` ceiling
  * and the 640px `sm:` breakpoint. Kept here so the wall's column contract
- * (1 / ≥5 / ≥6 columns at 390 / 1440 / 2560, AC3) is asserted against the same
+ * (2 / ≥5 / ≥6 columns at 390 / 1440 / 2560; 2 since Sprint 093) is asserted against the same
  * constants VirtualLibrary measures, instead of drifting from them.
  */
 export function containerWidthFor(viewportWidth: number): number {

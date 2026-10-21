@@ -10,8 +10,7 @@ import { formatLabels, statusesFor } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import {
   gridColumnCount,
-  gridLayout,
-  gridRowHeight,
+  gridLayoutFor,
   tableRowHeight,
   type LibraryView,
 } from "./library";
@@ -269,7 +268,8 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
   }, []);
 
   const columns = isGrid ? gridColumnCount(containerWidth) : 1;
-  const rowHeight = isGrid ? gridRowHeight : tableRowHeight;
+  const layout = gridLayoutFor(containerWidth);
+  const rowHeight = isGrid ? layout.cardHeight + layout.gap : tableRowHeight;
   const rowCount = Math.ceil(props.entries.length / columns);
   const virtualizer = useWindowVirtualizer({
     count: rowCount,
@@ -284,6 +284,11 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
     scrollMargin,
     initialRect: { width: 1000, height: 640 },
   });
+  // The phone and desktop walls have different row heights (Sprint 093); a
+  // resize across the boundary must not leave rows measured at the old one.
+  useEffect(() => {
+    virtualizer.measure();
+  }, [rowHeight, virtualizer]);
   const virtualItems = virtualizer.getVirtualItems();
   const mountedRows = virtualItems.length
     ? virtualItems
@@ -398,7 +403,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
             <div
               className="pointer-events-none absolute inset-x-0 top-0"
               style={{
-                height: gridLayout.coverHeight,
+                height: layout.coverHeight,
                 // Shared with the detail page's cover: the browser's view
                 // transition grows one into the other (Sprint 092).
                 viewTransitionName: coverTransitionName(entry.id),
@@ -431,7 +436,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               type="button"
               aria-label={`Open ${entry.item.title}`}
               className="absolute inset-x-0 bottom-0 z-[1] block overflow-hidden rounded-b-2xl text-left transition-colors hover:bg-surface focus-visible:bg-surface focus-visible:outline-none"
-              style={{ height: gridLayout.textHeight }}
+              style={{ height: layout.textHeight }}
               onClick={() =>
                 navigateWithTransition(navigate, `/books/${entry.id}`)
               }
@@ -447,7 +452,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 hit a control, not the card. */}
             <div
               className="absolute inset-x-0 z-10 px-2"
-              style={{ bottom: gridLayout.textHeight + 8 }}
+              style={{ bottom: layout.textHeight + 8 }}
             >
               <EntryControls
                 entry={entry}
@@ -535,9 +540,9 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 style={
                   isGrid
                     ? {
-                        gap: gridLayout.gap,
+                        gap: layout.gap,
                         gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
-                        height: gridLayout.cardHeight,
+                        height: layout.cardHeight,
                       }
                     : { height: row.size }
                 }
