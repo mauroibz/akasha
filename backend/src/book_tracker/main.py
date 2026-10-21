@@ -1,13 +1,17 @@
 import asyncio
 import contextlib
 import logging
+import re
 import sqlite3
+import time
+import uuid
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
+import structlog
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
@@ -152,6 +156,10 @@ def _back_up_before_migrating(configured: Settings) -> None:
         extra={"path": str(result.path), "pending": pending},
     )
 
+
+#: What an incoming `X-Request-Id` must look like to be kept: a proxy's own id
+#: joins its logs to ours, but anything else is replaced rather than echoed.
+_REQUEST_ID = re.compile(r"[A-Za-z0-9._-]{8,64}")
 
 #: The catch-all's answer and auth-off's, in the one error envelope (Sprint 087).
 _NOT_FOUND = {"error": {"code": "not_found", "message": "Not Found", "details": {}}}
@@ -464,6 +472,41 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         assert principal is not None
         request.state.principal = principal
         return await dispatch_with_cookie()
+
+    # Registered last, so it is the outermost middleware: the id is bound before the
+    # authentication boundary runs and covers every line logged under it (Sprint 087).
+    @app.middleware("http")
+    async def request_identity(
+        request: Request, call_next: Callable[[Request], Awaitable[Response]]
+    ) -> Response:
+        incoming = request.headers.get("x-request-id", "")
+        request_id = incoming if _REQUEST_ID.fullmatch(incoming) else uuid.uuid4().hex
+        path = request.url.path
+        # One line per API request. Health checks run every few seconds from the
+        # container's own probe, and shell assets are not requests anyone debugs.
+        logged = path.startswith("/api/") and not path.startswith("/api/health/")
+        started = time.perf_counter()
+        status = 500
+        with structlog.contextvars.bound_contextvars(request_id=request_id):
+            try:
+                response = await call_next(request)
+                status = response.status_code
+            finally:
+                if logged:
+                    route = request.scope.get("route")
+                    logging.getLogger("book_tracker.requests").info(
+                        "request_finished",
+                        extra={
+                            "method": request.method,
+                            # The template, never the concrete path or its query:
+                            # `/api/entries/{entry_id}`, not what was asked for.
+                            "route": getattr(route, "path", "unmatched"),
+                            "status": status,
+                            "duration_ms": round((time.perf_counter() - started) * 1000, 1),
+                        },
+                    )
+        response.headers["X-Request-Id"] = request_id
+        return response
 
     @app.exception_handler(StarletteHTTPException)
     async def http_error(_request: Request, error: StarletteHTTPException) -> Response:

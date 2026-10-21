@@ -14,6 +14,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+import structlog
 from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
@@ -419,6 +420,11 @@ class JobRunner:
                 code="no_handler",
             )
             return True
+        # Every line a handler logs names the job it belongs to (Sprint 087).
+        with structlog.contextvars.bound_contextvars(job_id=claimed.id, job_kind=claimed.kind):
+            return await self._process(handler, claimed, now)
+
+    async def _process(self, handler: Any, claimed: ClaimedJob, now: datetime) -> bool:
         try:
             result = await handler.process(claimed.id, now)
             if result["state"] == "succeeded":
