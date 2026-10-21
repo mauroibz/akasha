@@ -1,50 +1,57 @@
 import { useQuery } from "@tanstack/react-query";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 
-import { DomainStrip } from "@/components/DomainStrip";
-import { SegmentedControl } from "@/components/SegmentedControl";
-import { Input } from "@/components/ui/input";
 import {
+  getInsightSummary,
+  type InsightRow,
+  type ItemType,
+} from "@/api/library";
+import { queryKeys } from "@/api/keys";
+import { getShelves } from "@/api/shelves";
+import { Loading } from "@/components/ui/skeleton";
+import { leadSentence, readsAsShares } from "@/features/insights/prose";
+import {
+  ChronologySection,
+  Prose,
+  RankedSection,
+  RatingSection,
+  RestSection,
+  SharesSection,
+  TermsSection,
+} from "@/features/insights/sections";
+import {
+  orderKeys,
+  resolveAnsweredKeys,
+  type AnsweredInsightKey,
+} from "@/features/library/insights";
+import {
+  countLabel,
   domainsFrom,
   formatLabels,
   insightFetchKeys,
   insightKeyOptions,
   statusLabelFor,
 } from "@/features/library/labels";
-import { ChronologyCard } from "@/features/library/ChronologyCard";
-import { InsightsCard } from "@/features/library/InsightsCard";
-import { LongTailCard } from "@/features/library/LongTailCard";
-import { ScoreDistributionCard } from "@/features/library/ScoreDistributionCard";
-import {
-  insightGridSpan,
-  orderKeys,
-  resolveAnsweredKeys,
-  type InsightSort,
-} from "@/features/library/insights";
 import {
   hasRememberedFilters,
   readLibraryFiltersPreference,
   type RememberedLibraryFilters,
 } from "@/features/library/library";
 import { useInsights } from "@/features/library/useInsights";
-import { useScoreDistribution } from "@/features/library/useScoreDistribution";
-import { getShelves } from "@/api/shelves";
-import type { ItemType, InsightRow } from "@/api/library";
 import { useItemTypes } from "@/features/library/useItemTypes";
-import { queryKeys } from "@/api/keys";
+import { useScoreDistribution } from "@/features/library/useScoreDistribution";
+import { cn } from "@/lib/utils";
 
 /**
- * Ask the library a question it already has the answer to — which authors you rate
- * highest, which bands you own most of — from the fields items already declare
- * (Sprint 065). Never crosses domains: DEC-052 and DEC-077 twice declined to create
- * the cross-domain creator identity that would need, and this feature exists to keep
- * it that way. A ranking row links into the filtered library, not to a new entity
- * screen of its own.
+ * Ask the library a question it already has the answer to, from the fields items
+ * already declare (Sprint 065). Never crosses domains (DEC-052, DEC-077).
  *
- * Redrawn in Sprint 066 (DEC-132). It was a query builder — four controls above one
- * table, one question per visit, and the only interaction navigated away. It answers
- * on arrival now: one card per key, both numbers on every row, and the accent
- * spent on encoding a quantity rather than on colouring every label alike.
+ * Read back as prose since Sprint 102 (DEC-169). The owner on the card grid that
+ * Sprints 066–073 built: "a bunch of boxes with floating text, charts too large".
+ * The page now opens on one sentence carrying the figures that matter, then
+ * numbered sections divided by rules: a sentence each, and a chart no bigger
+ * than its data. Which key earns which form is still a judgement about this
+ * library (`orderKeys`), never a domain name.
  */
 export function InsightsPage() {
   const headingRef = useRef<HTMLHeadingElement>(null);
@@ -54,15 +61,10 @@ export function InsightsPage() {
 
   const itemTypes = useItemTypes();
   const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
-
   const [type, setType] = useState("");
-  const [sort, setSort] = useState<InsightSort>("count");
-  const [minRated, setMinRated] = useState(2);
   const [includeSuppressed, setIncludeSuppressed] = useState(false);
-  // Off by default (proposal §3): most of a library view mode's value at none
-  // of its cost, without giving the library page a fourth responsibility.
-  // Read once, the way the remembered domain is: the library page keeps it
-  // current in `localStorage` on every filter change it makes.
+  // Off by default: the library page keeps the remembered filters current in
+  // `localStorage`, and this reads them once (Sprint 067 deliverable 5).
   const [withinFilters, setWithinFilters] = useState(false);
   const [remembered] = useState<RememberedLibraryFilters>(
     readLibraryFiltersPreference,
@@ -72,8 +74,6 @@ export function InsightsPage() {
     queryFn: getShelves,
   });
 
-  // The registry loads after this component mounts, so the first domain is chosen
-  // once it arrives rather than assumed up front.
   useEffect(() => {
     if (type || domains.length === 0) return;
     setType(domains[0].id);
@@ -84,249 +84,248 @@ export function InsightsPage() {
     () => (selectedDomain ? insightKeyOptions(selectedDomain.fields) : []),
     [selectedDomain],
   );
-
-  const activeFilters = withinFilters ? remembered : undefined;
-  // A grain group (Decade+Year) fetches both of its keys; `resolveAnsweredKeys`
-  // is what turns the flat response array back into one answered entry per
-  // *option* (Sprint 073 deliverable 2), not one per request.
+  const filters = withinFilters ? remembered : undefined;
+  const filterParams = {
+    statuses: filters?.statuses,
+    shelves: filters?.shelves,
+    formats: filters?.formats,
+    q: filters?.query,
+  };
   const fetchKeys = useMemo(() => insightFetchKeys(keyOptions), [keyOptions]);
   const rankings = useInsights({
     type,
     keys: fetchKeys,
     includeSuppressed,
-    statuses: activeFilters?.statuses,
-    shelves: activeFilters?.shelves,
-    formats: activeFilters?.formats,
-    q: activeFilters?.query,
+    ...filterParams,
   });
   const insightByKey = new Map(
     fetchKeys.map((key, index) => [key, rankings[index]?.data]),
   );
-  const distribution = useScoreDistribution({
-    type,
-    statuses: activeFilters?.statuses,
-    shelves: activeFilters?.shelves,
-    formats: activeFilters?.formats,
-    q: activeFilters?.query,
+  const distribution = useScoreDistribution({ type, ...filterParams });
+  const summary = useQuery({
+    queryKey: ["insights-summary", type, filterParams],
+    queryFn: () => getInsightSummary({ type, ...filterParams }),
+    enabled: Boolean(type),
   });
 
-  // Which keys are worth a card, and in what order, is a judgement about this
-  // library rather than the order a domain happens to declare its fields
-  // (DEC-132). The rest are stated in a line rather than hidden.
-  const answered = resolveAnsweredKeys(keyOptions, insightByKey);
-  const { carded, quiet } = orderKeys(answered, (entry) => entry.insight.rows);
-
-  const pending = rankings.some((query) => query.isPending);
-  const failed =
-    rankings.length > 0 && rankings.every((query) => query.isError);
-
-  // Every card's link into the filtered library — `key` is explicit rather than
-  // read off `option.name` so a grain card (Sprint 073) can link either of its
-  // two grains from the one function.
+  const noun = (count: number) => countLabel(count, type, itemTypes.data);
   const linkTo = (key: string, row: Pick<InsightRow, "key" | "label">) =>
     `/?type=${encodeURIComponent(type)}&key=${encodeURIComponent(
       key,
-    )}&value=${encodeURIComponent(row.key)}&label=${encodeURIComponent(
-      row.label,
-    )}`;
+    )}&value=${encodeURIComponent(row.key)}&label=${encodeURIComponent(row.label)}`;
 
-  const [heroEntry, ...restEntries] = carded;
+  const answered = resolveAnsweredKeys(keyOptions, insightByKey);
+  const chronology = answered.find((entry) => entry.option.grain);
+  const { carded, quiet } = orderKeys(
+    answered.filter((entry) => !entry.option.grain),
+    (entry) => entry.insight.rows,
+  );
+  // The ranked list goes to the first key, in the domain's own declared order,
+  // that leads by the `keyLead` measure: a domain declares its creators first,
+  // and "who you return to" is the question this list answers best. A small
+  // library may have no leading key; then the one with the most values takes
+  // it, so the page still has a face.
+  const unpinned = answered.filter((entry) => !entry.option.grain);
+  const ranked: AnsweredInsightKey | undefined =
+    unpinned.find((entry) => carded.includes(entry)) ??
+    [...quiet]
+      .filter((entry) => entry.insight.rows.length >= 3)
+      .sort((a, b) => b.insight.rows.length - a.insight.rows.length)[0];
+  const others = [...carded, ...quiet].filter((entry) => entry !== ranked);
+  const shares = others.filter((entry) => readsAsShares(entry.insight.rows));
+  const terms = carded.filter(
+    (entry) => entry !== ranked && !readsAsShares(entry.insight.rows),
+  );
+  const rest = quiet.filter(
+    (entry) => entry !== ranked && !readsAsShares(entry.insight.rows),
+  );
 
-  const renderRankedCard = (
-    entry: (typeof carded)[number],
-    cardOptions: { hero?: boolean } = {},
-  ) => {
-    const { option, insight, grainInsight } = entry;
-    if (option.grain) {
-      return (
-        <ChronologyCard
-          title={option.label}
-          type={type}
-          decadeKey={option.name}
-          yearKey={option.grain.name}
-          yearLabel={option.grain.label}
-          decadeInsight={insight}
-          yearInsight={grainInsight}
-          sort={sort}
-          minRated={minRated}
-          showSuppressed={includeSuppressed}
-          onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
-          hero={cardOptions.hero}
-          hrefFor={linkTo}
-        />
-      );
-    }
-    return (
-      <InsightsCard
-        title={option.label}
+  const pending =
+    rankings.some((query) => query.isPending) || summary.isPending;
+  const failed =
+    summary.isError ||
+    (rankings.length > 0 && rankings.every((query) => query.isError));
+  const leader = ranked
+    ? [...ranked.insight.rows].sort((a, b) => b.count - a.count)[0]
+    : undefined;
+
+  const sections: Array<(number: number) => ReactNode> = [];
+  if (distribution.data) {
+    const data = distribution.data;
+    sections.push((number) => (
+      <RatingSection
+        key="rating"
+        number={number}
+        counts={data.counts}
+        unrated={data.unrated_count}
+      />
+    ));
+  }
+  if (ranked) {
+    sections.push((number) => (
+      <RankedSection
+        key={`ranked-${type}-${ranked.option.name}`}
+        number={number}
+        title={ranked.option.label}
         type={type}
-        insightKey={option.name}
-        insight={insight}
-        sort={sort}
-        minRated={minRated}
+        insightKey={ranked.option.name}
+        rows={ranked.insight.rows}
+        suppressed={ranked.insight.suppressed}
         showSuppressed={includeSuppressed}
         onToggleSuppressed={() => setIncludeSuppressed((shown) => !shown)}
-        hero={cardOptions.hero}
-        // `label` is display only, so the library can name the filter rather
-        // than echo the normalized value that groups it.
-        hrefFor={(row) => linkTo(option.name, row)}
+        noun={noun}
+        hrefFor={(row) => linkTo(ranked.option.name, row)}
       />
-    );
-  };
+    ));
+  }
+  for (const entry of terms) {
+    sections.push((number) => (
+      <TermsSection
+        key={`terms-${entry.option.name}`}
+        number={number}
+        title={entry.option.label}
+        rows={entry.insight.rows}
+        hrefFor={(row) => linkTo(entry.option.name, row)}
+      />
+    ));
+  }
+  if (chronology && chronology.insight.rows.length > 0) {
+    sections.push((number) => (
+      <ChronologySection
+        key={`chronology-${type}`}
+        number={number}
+        title={chronology.option.label}
+        coarse={{ key: chronology.option.name, rows: chronology.insight.rows }}
+        fine={
+          chronology.option.grain && chronology.grainInsight
+            ? {
+                key: chronology.option.grain.name,
+                rows: chronology.grainInsight.rows,
+              }
+            : undefined
+        }
+        fineLabel={chronology.option.grain?.label ?? ""}
+        earliest={summary.data?.earliest ?? null}
+        noun={noun}
+        hrefFor={linkTo}
+      />
+    ));
+  }
+  for (const entry of shares) {
+    sections.push((number) => (
+      <SharesSection
+        key={`shares-${entry.option.name}`}
+        number={number}
+        title={entry.option.label}
+        rows={entry.insight.rows}
+        hrefFor={(row) => linkTo(entry.option.name, row)}
+      />
+    ));
+  }
+  if (rest.length > 0) {
+    sections.push((number) => (
+      <RestSection
+        key="rest"
+        number={number}
+        keys={rest.map((entry) => ({
+          name: entry.option.name,
+          label: entry.option.label,
+          rows: entry.insight.rows,
+        }))}
+        hrefFor={linkTo}
+      />
+    ));
+  }
 
   return (
-    <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1
-            ref={headingRef}
-            tabIndex={-1}
-            className="font-display text-4xl font-medium tracking-tight focus:outline-none sm:text-5xl"
+    <main className="mx-auto min-h-screen w-full max-w-5xl px-5 pb-24 pt-8 md:pt-12">
+      <h1
+        ref={headingRef}
+        tabIndex={-1}
+        className="font-display text-5xl font-medium tracking-tight focus:outline-none md:text-6xl"
+      >
+        Insights
+      </h1>
+
+      <div className="mt-6 flex flex-wrap items-end justify-between gap-x-6 border-b border-border">
+        {domains.length > 1 && (
+          <div
+            role="radiogroup"
+            aria-label="Choose a domain"
+            className="-mb-px flex min-w-0 max-w-full gap-6 overflow-x-auto"
           >
-            Insights
-          </h1>
-          <p className="mt-2 text-muted-foreground">
-            What your library already declares, ranked — one domain at a time.
-          </p>
-        </div>
-
-        {/* A group, not a region: the landmark belongs to the rankings, and a
-            toolbar of two toggles is not a significant content area. */}
-        <div
-          role="group"
-          aria-label="Ranking controls"
-          className="flex min-w-0 max-w-full flex-wrap items-center gap-3"
-        >
-          {domains.length > 1 && (
-            <DomainStrip domains={domains} value={type} onChange={setType} />
-          )}
-
-          {/* A sort order, not a choice of which numbers arrive: every row carries
-              both under either one. */}
-          <SegmentedControl
-            ariaLabel="Sort by"
-            value={sort}
-            onChange={setSort}
-            options={[
-              { value: "count", label: "Most collected" },
-              { value: "score", label: "Best rated" },
-            ]}
-          />
-        </div>
-      </div>
-
-      <ScoreLegend />
-
-      <div className="mt-4 flex flex-wrap items-center gap-2 text-sm">
-        <label className="flex min-h-11 items-center gap-2 text-muted-foreground">
+            {domains.map((domain) => (
+              <button
+                key={domain.id}
+                type="button"
+                role="radio"
+                aria-checked={domain.id === type}
+                onClick={() => setType(domain.id)}
+                className={cn(
+                  "min-h-11 shrink-0 border-b-2 px-0.5 text-[15px] font-medium transition-colors focus-ring",
+                  domain.id === type
+                    ? "border-primary text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {domain.plural_label ?? domain.label}
+              </button>
+            ))}
+          </div>
+        )}
+        <label className="flex min-h-11 items-center gap-2 text-sm text-muted-foreground">
           <input
             type="checkbox"
             checked={withinFilters}
             onChange={(event) => setWithinFilters(event.target.checked)}
-            className="h-4 w-4 rounded border-border"
+            className="h-4 w-4 rounded border-border accent-[hsl(var(--primary-text))]"
           />
-          Within my current filters
+          Only what the library is filtered to
         </label>
-        {withinFilters && (
-          <span className="text-muted-foreground">
-            {hasRememberedFilters(remembered)
-              ? `Ranking only entries matching ${describeRememberedFilters(
-                  remembered,
-                  type,
-                  itemTypes.data,
-                  shelfQuery.data,
-                )}.`
-              : "Your library has no filters set right now."}
-          </span>
-        )}
       </div>
-
-      {pending && carded.length === 0 && (
-        <p role="status" className="mt-8 text-muted-foreground">
-          Ranking…
+      {withinFilters && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          {hasRememberedFilters(remembered)
+            ? `Reading only entries matching ${describeRememberedFilters(
+                remembered,
+                type,
+                itemTypes.data,
+                shelfQuery.data,
+              )}.`
+            : "Your library has no filters set right now."}
         </p>
       )}
+
       {failed && (
-        <p role="alert" className="mt-8 text-destructive">
+        <p role="alert" className="mt-10 text-destructive">
           Insights could not be loaded
         </p>
       )}
-
-      {(carded.length > 0 || quiet.length > 0 || distribution.data) && (
-        <div className="mt-6 grid grid-cols-1 gap-4 xl:grid-cols-12">
-          {/* The hero (deliverable 1) always spans the grid, so the leading
-              key never competes for width with the cards its own lead earned
-              it (AC6). Its superlatives live inside it now (AC3) — this is
-              the only card the page draws them on. */}
-          {heroEntry && (
-            <div className="xl:col-span-12">
-              {renderRankedCard(heroEntry, { hero: true })}
-            </div>
-          )}
-
-          {/* One new number (deliverable 4), domain-wide rather than per key,
-              so it sits with the hero rather than competing with a ranking
-              for a rank tier it does not have. */}
-          {distribution.data && (
-            <div className="xl:col-span-12">
-              <ScoreDistributionCard distribution={distribution.data} />
-            </div>
-          )}
-
-          {/* 8/4, then 4/4/4, by `orderKeys`' own rank (deliverable 5) — a
-              fifteen-value ranking is not drawn the same size as a
-              three-value one, and the pattern repeats past five cards
-              because the proposal is silent past five. */}
-          {restEntries.map((entry, index) => (
-            <div
-              key={entry.option.name}
-              className={
-                insightGridSpan(index) === 8 ? "xl:col-span-8" : "xl:col-span-4"
-              }
-            >
-              {renderRankedCard(entry)}
-            </div>
-          ))}
-
-          {/* The long tail, as cards instead of a grey footnote (deliverable
-              6, finding 12) — each value opens the library filtered to it. */}
-          {quiet.map(({ option, insight }) => (
-            <div key={option.name} className="xl:col-span-4">
-              <LongTailCard
-                title={option.label}
-                insight={insight}
-                hrefFor={(row) => linkTo(option.name, row)}
-              />
-            </div>
-          ))}
-        </div>
+      {!failed && pending && !summary.data && (
+        <Loading label="Reading your library" className="mt-12" />
       )}
 
-      {sort === "score" && carded.length > 0 && (
-        <label className="mt-5 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          A value is placed in the score order from
-          <Input
-            type="number"
-            min={1}
-            aria-label="Ratings needed to place in the score order"
-            value={minRated}
-            onChange={(event) =>
-              setMinRated(Math.max(1, Number(event.target.value) || 1))
-            }
-            className="h-9 w-16 rounded-full text-center"
+      {summary.data && summary.data.held === 0 && (
+        <p className="mt-12 max-w-[30ch] font-display text-3xl leading-tight text-muted-foreground">
+          Nothing here yet. Insights read what you keep, so add a few and come
+          back.
+        </p>
+      )}
+
+      {summary.data && summary.data.held > 0 && (
+        <>
+          <Prose
+            segments={leadSentence({ summary: summary.data, noun, leader })}
+            className="mb-14 mt-12 max-w-[26ch] font-display text-[2rem] leading-[1.18] tracking-[-0.01em] md:text-5xl"
           />
-          ratings up.
-        </label>
+          {sections.map((render, index) => render(index + 1))}
+        </>
       )}
     </main>
   );
 }
 
-/**
- * What "within my current filters" actually means, in words (Sprint 067
- * deliverable 6) — drawn instead of left for the reader to infer from a
- * narrower ranking they cannot otherwise account for.
- */
+/** What "only what the library is filtered to" means, in words (Sprint 067). */
 function describeRememberedFilters(
   filters: RememberedLibraryFilters,
   type: string,
@@ -357,32 +356,4 @@ function describeRememberedFilters(
   }
   if (filters.query.trim()) parts.push(`"${filters.query.trim()}"`);
   return parts.join(" · ");
-}
-
-/** The ramp, explained once, because every card leans on it. */
-function ScoreLegend() {
-  const bands: Array<[string, string]> = [
-    ["bg-score-low", "1–3"],
-    ["bg-score-mid", "4–6"],
-    ["bg-score-high", "7–8"],
-    ["bg-score-top", "9–10"],
-  ];
-  return (
-    <p className="mt-6 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-      <span>
-        Bar length is how many you hold; the chip is how you rate them.
-      </span>
-      <span className="flex items-center gap-2">
-        {bands.map(([background, range]) => (
-          <span key={range} className="flex items-center gap-1">
-            <span
-              aria-hidden="true"
-              className={`inline-block h-2 w-3.5 rounded-sm ${background}`}
-            />
-            {range}
-          </span>
-        ))}
-      </span>
-    </p>
-  );
 }

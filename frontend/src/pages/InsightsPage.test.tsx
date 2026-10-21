@@ -18,6 +18,13 @@ const bookType = {
       groupable: true,
     },
     {
+      name: "subjects",
+      label: "Subjects",
+      type: "text",
+      multiplicity: "many",
+      groupable: true,
+    },
+    {
       name: "publisher",
       label: "Publisher",
       type: "text",
@@ -46,6 +53,7 @@ const bookType = {
   progress: null,
   formats: [],
   entry_panel_label: "Your reading data",
+  plural_label: "Books",
   chooses_covers: false,
 };
 
@@ -64,6 +72,7 @@ const albumType = {
     },
   ],
   entry_panel_label: "Your listening data",
+  plural_label: "Albums",
 };
 
 const itemTypes = [bookType, albumType];
@@ -170,7 +179,18 @@ const defaultRankings: Record<string, Rows> = {
     decadeRow(1970, 3, 2, 8.2),
     decadeRow(2000, 2, 1, 6.0),
   ],
-  // Two values, each appearing once: a fact, not a ranking. A long-tail card.
+  // Many values, several held more than once: typeset by weight.
+  subjects: [
+    row("Fiction", 12, 9, 8.1),
+    row("Magic realism", 6, 5, 8.6),
+    row("Short stories", 4, 3, 8.0),
+    row("Fantasy", 3, 2, 7.0),
+    row("History", 2, 1, 6.0),
+    row("Poetry", 2, 2, 9.0),
+    row("Memoir", 1, 0, null),
+    row("Essays", 1, 0, null),
+  ],
+  // Two values, each appearing once: a share, drawn as one bar.
   language: [row("Spanish", 1, 0, null), row("English", 1, 0, null)],
 };
 
@@ -227,10 +247,25 @@ function distribution(counts = [0, 0, 1, 0, 0, 1, 0, 2, 1, 0]) {
   };
 }
 
+/** The lead sentence's figures (Sprint 102). */
+function summary(overrides: Record<string, unknown> = {}) {
+  return {
+    type: "book",
+    held: 20,
+    finished: 9,
+    rated: 17,
+    unrated: 3,
+    modal_score: 8,
+    earliest: { entry_id: 2, title: "Bestiario", year: 1951 },
+    ...overrides,
+  };
+}
+
 /** Every screen request, with the rankings swappable per key. */
 function stubApi(
   rankings: Record<string, Rows> = defaultRankings,
   scoreDistribution = distribution(),
+  leadFigures = summary(),
 ) {
   const calls: string[] = [];
   vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
@@ -240,6 +275,8 @@ function stubApi(
       return new Response(JSON.stringify(itemTypes));
     if (url.startsWith("/api/insights/scores"))
       return new Response(JSON.stringify(scoreDistribution));
+    if (url.startsWith("/api/insights/summary"))
+      return new Response(JSON.stringify(leadFigures));
     if (url.startsWith("/api/insights")) {
       const key = new URL(url, "http://library.test").searchParams.get("key");
       return new Response(JSON.stringify(ranking(rankings[key ?? ""] ?? [])));
@@ -251,9 +288,9 @@ function stubApi(
   return calls;
 }
 
-/** One card, by the name its own domain gives the key. */
-function card(name: string) {
-  return within(screen.getByRole("region", { name: new RegExp(`^${name}`) }));
+/** One section, by its heading. */
+function section(name: string) {
+  return within(screen.getByRole("region", { name }));
 }
 
 /** Renders where an insights row's link lands, so a click's URL is observable. */
@@ -284,310 +321,135 @@ afterEach(() => {
 });
 
 describe("InsightsPage", () => {
-  it("answers on arrival, best key first, and says so about the rest", async () => {
-    // Sprint 065 asked one question per visit -- a popover, a refetch, and no
-    // way to see two answers beside each other -- and opened on whichever key
-    // the domain happened to declare first. Cards are ordered by how far each
-    // ranking's leader stands above its own middle, and a key with nothing to
-    // rank gets a card of its own long-tail values instead of a footnote line
-    // (Sprint 073 deliverable 6).
+  it("opens on one sentence carrying the figures that matter", async () => {
     stubApi();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
+    expect(
+      await screen.findByText(
+        (_, node) =>
+          node?.tagName === "P" &&
+          node.textContent ===
+            "You keep 20 books and have finished 9. You rate generously. You return most to Julio Cortázar.",
+      ),
+    ).toBeInTheDocument();
+  });
 
-    expect(cardTitles()).toEqual([
+  it("numbers its sections, rating first, each titled the way the domain names it", async () => {
+    stubApi();
+    renderPage();
+    await screen.findByRole("region", { name: "Authors" });
+    const headings = screen
+      .getAllByRole("heading", { level: 2 })
+      .map((heading) => heading.textContent);
+    expect(headings).toEqual([
+      "How you rate",
       "Authors",
-      "Publisher",
+      "Subjects",
       "Decade",
+      "Publisher",
       "Language",
     ]);
-    expect(screen.queryByText("Nothing much to rank yet")).toBeNull();
-    expect(screen.getByText("2 values, each appearing once")).toBeVisible();
-    expect(screen.getByRole("link", { name: "Spanish 1" })).toBeVisible();
-    // Year is a grain of Decade's card now (deliverable 2), not a card of its
-    // own -- so it never earns its own heading, whether it would have carded
-    // on its own concentration or not.
-    expect(screen.queryByRole("heading", { name: "Year" })).toBeNull();
+    expect(document.querySelectorAll("[data-insight-section]")).toHaveLength(6);
   });
 
-  it("titles a card the way the domain itself names that key", async () => {
-    // <th>{key}</th> printed the raw field name, lowercased, for every domain
-    // alike. The same field is Authors for books and Artists for albums.
+  it("names the album's key as albums name it", async () => {
     stubApi();
-    const user = userEvent.setup();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-    expect(screen.getByRole("heading", { name: "Authors" })).toBeVisible();
-
-    await user.click(screen.getByRole("radio", { name: "Album" }));
-
+    await screen.findByRole("region", { name: "Authors" });
+    await userEvent.click(screen.getByRole("radio", { name: "Albums" }));
     expect(
-      await screen.findByRole("heading", { name: "Artists" }),
-    ).toBeVisible();
-    expect(screen.queryByRole("heading", { name: "Authors" })).toBeNull();
+      await screen.findByRole("region", { name: "Artists" }),
+    ).toBeInTheDocument();
   });
 
-  it("paints a mean score with the band the ramp gives it", async () => {
-    // DEC-026's whole point is that the colour means the same thing wherever the
-    // eye lands, and this was the one screen showing a score that opted out.
-    // Asserted through the class the shared helper returns, the way ScorePicker
-    // and the detail page already assert theirs.
+  it("draws how you rate small, beside the usual score drawn large", async () => {
     stubApi();
     renderPage();
-
-    await screen.findByRole("heading", { name: "Authors" });
-
-    // 8.8 is nearly a 9 and reads as one; 7.7 is an 8; 3.0 is a 3. Cortázar's
-    // mean appears twice now -- once promoted in the hero (Sprint 073
-    // deliverable 1), once still on his own row in the list below -- so every
-    // instance is checked rather than just the one `getByText` used to find.
-    const authors = card("Authors");
-    for (const chip of authors.getAllByText("8.8"))
-      expect(chip.className).toContain("bg-score-top");
-    expect(authors.getByText("7.7").className).toContain("bg-score-high");
-    expect(authors.getByText("3.0").className).toContain("bg-score-low");
+    const rating = await screen.findByRole("region", { name: "How you rate" });
+    expect(rating).toHaveTextContent("Most of what you rate lands at 8.");
+    expect(rating.querySelectorAll("[data-score-bar]")).toHaveLength(10);
+    expect(rating).toHaveTextContent("1 unrated, counted everywhere but here.");
   });
 
-  it("sizes each row's bar to its share of the ranking's leader", async () => {
-    // A bare numeral carries no proportion: the shipped table drew 7 and 3 the
-    // same size. The bar is the row, so the leader fills it and everyone else is
-    // measured against them.
+  it("ranks the leading key, and reorders it by average on request", async () => {
     stubApi();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    const bars = screen
-      .getByRole("region", { name: /^Authors/ })
-      .querySelectorAll<HTMLElement>("[data-magnitude]");
-    expect([...bars].map((bar) => bar.dataset.magnitude)).toEqual([
-      "1",
-      "0.714",
-      "0.429",
-      "0.286",
-      "0.286",
-      "0.286",
-    ]);
-    expect(bars[0].style.width).toBe("100%");
-  });
-
-  it("shows how many and how good on every row, under both orders", async () => {
-    // The toggle is a sort order, not a choice of which half of the response is
-    // rendered. The shipped screen dropped rated_count and mean_score entirely
-    // under `count`, which is half of every payload thrown away.
-    const calls = stubApi();
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    // Sorted by how many: the leader is first, and its score is on the row.
-    expect(rowOrder("Authors")).toEqual([
-      "Julio Cortázar",
-      "Ursula K. Le Guin",
-      "Italo Calvino",
-      "Gene Wolfe",
-      "Mariana Enríquez",
-      "Samanta Schweblin",
-    ]);
-    // Cortázar is the hero's promoted top row now (Sprint 073), so his mean
-    // is drawn twice: once above the list, once still on his own row in it.
-    expect(card("Authors").getAllByText("8.8").length).toBeGreaterThan(0);
-
-    await user.click(screen.getByRole("button", { name: "Best rated" }));
-
-    // Sorted by score: the counts are still on every row.
-    expect(rowOrder("Authors").slice(0, 4)).toEqual([
-      "Ursula K. Le Guin",
-      "Julio Cortázar",
-      "Italo Calvino",
-      "Mariana Enríquez",
-    ]);
-    expect(card("Authors").getAllByText("5").length).toBeGreaterThan(0);
-
-    // And the order costs no second request: one ranking per fetch key
-    // answers both (creators, publisher, language, decade, year), plus the
-    // one score-distribution request the page also makes.
-    expect(calls.filter((url) => url.startsWith("/api/insights"))).toHaveLength(
-      6,
+    const authors = await screen.findByRole("region", { name: "Authors" });
+    const rows = () =>
+      within(authors)
+        .getAllByRole("button", { name: /entries|books|book,/ })
+        .map((button) => button.getAttribute("aria-label")?.split(":")[0]);
+    expect(rows()[0]).toBe("Julio Cortázar");
+    await userEvent.click(
+      within(authors).getByRole("button", { name: "Best rated" }),
     );
-  });
-
-  it("keeps a group that cannot be placed by score, below a divider", async () => {
-    // The threshold is what min_rated means, drawn instead of configured. The
-    // shipped screen asked the server to drop these rows, so a group with one
-    // rating vanished with no explanation.
-    stubApi();
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    await user.click(screen.getByRole("button", { name: "Best rated" }));
-
-    const authors = card("Authors");
-    expect(authors.getByText(/2 not rated enough to place/)).toBeVisible();
-    expect(rowOrder("Authors").slice(4)).toEqual([
-      "Gene Wolfe",
-      "Samanta Schweblin",
-    ]);
-  });
-
-  it("says plainly when nothing is rated enough to sort by score", async () => {
-    stubApi({
-      creators: [
-        row("Gene Wolfe", 3, 1, 5.0),
-        row("Kazuo Ishiguro", 2, 1, 7.0),
-        row("Samanta Schweblin", 2, 0, null),
-      ],
-    });
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    await user.click(screen.getByRole("button", { name: "Best rated" }));
-
-    expect(
-      card("Authors").getByText(/Nothing is rated enough to sort by score/),
-    ).toBeVisible();
+    expect(rows()[0]).toBe("Ursula K. Le Guin");
+    expect(authors).toHaveTextContent(
+      "Ursula K. Le Guin has your best average: 9.2 over 5 books.",
+    );
+    expect(authors).toHaveTextContent("2 not rated enough to place");
   });
 
   it("opens the entries behind a row in place, and still links out", async () => {
-    // Sprint 065's only interaction navigated away, so reading a ranking was
-    // back-button ping-pong. The row is a disclosure now; the library link is
-    // the end of what it opens rather than the whole of what it does.
-    const calls = stubApi();
-    const user = userEvent.setup();
+    stubApi();
     renderPage();
-    const authorRow = await screen.findByRole("button", {
-      name: "Julio Cortázar: 7 entries, mean score 8.8 from 6 rated",
+    await screen.findByRole("region", { name: "Authors" });
+    const row = await section("Authors").findByRole("button", {
+      name: /^Julio Cortázar: 7 books/,
     });
-    expect(authorRow).toHaveAttribute("aria-expanded", "false");
-
-    await user.click(authorRow);
-
-    expect(authorRow).toHaveAttribute("aria-expanded", "true");
-    expect(await screen.findByText("Rayuela")).toBeVisible();
-    expect(screen.getByText("Bestiario")).toBeVisible();
-    // Exactly the filter the row's own link carries, asked for a handful of rows.
-    const entries = calls.find((url) => url.startsWith("/api/entries")) ?? "";
-    expect(entries).toContain("type=book");
-    expect(entries).toContain("key=creators");
-    expect(entries).toContain("value=julio+cort");
-    expect(entries).toContain("limit=4");
-    // Still on the insights page.
-    expect(screen.queryByText(/^Library:/)).toBeNull();
-
-    await user.click(
+    await userEvent.click(row);
+    expect(row).toHaveAttribute("aria-expanded", "true");
+    expect(await screen.findByText("Rayuela")).toBeInTheDocument();
+    await userEvent.click(
       screen.getByRole("link", { name: /Open all 7 in the library/ }),
     );
-
-    await waitFor(() => {
-      const text = screen.getByText(/Library:/).textContent ?? "";
-      expect(text).toContain("type=book");
-      expect(text).toContain("key=creators");
-      expect(text).toContain("value=julio+cort");
-    });
+    expect(
+      await screen.findByText(/Library: type=book&key=creators&value=julio/),
+    ).toBeInTheDocument();
   });
 
-  it("opens one row at a time, so a card cannot become a scroll", async () => {
-    stubApi();
-    const user = userEvent.setup();
-    renderPage();
-    const first = await screen.findByRole("button", {
-      name: "Julio Cortázar: 7 entries, mean score 8.8 from 6 rated",
-    });
-    const second = screen.getByRole("button", {
-      name: "Ursula K. Le Guin: 5 entries, mean score 9.2 from 5 rated",
-    });
-
-    await user.click(first);
-    await user.click(second);
-
-    expect(first).toHaveAttribute("aria-expanded", "false");
-    expect(second).toHaveAttribute("aria-expanded", "true");
-  });
-
-  it("names three superlatives from the leading key, and fewer when it must", async () => {
+  it("typesets a many-valued key by weight, each term a way into the library", async () => {
     stubApi();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    // Leading key is Authors (the widest lead); most collected is its count
-    // leader, highest rated its best mean, steadiest its tightest spread --
-    // three different rows, drawn above the cards.
-    expect(screen.getByText("Holds the most")).toBeVisible();
-    expect(screen.getByText("Highest rated")).toBeVisible();
-    expect(screen.getByText("Steadiest")).toBeVisible();
+    const subjects = await screen.findByRole("region", { name: "Subjects" });
+    expect(subjects).toHaveTextContent(
+      "Mostly Fiction, Magic realism and Short stories.",
+    );
+    const fiction = within(subjects).getByRole("link", { name: "Fiction: 12" });
+    expect(fiction).toHaveClass("text-4xl");
+    expect(
+      within(subjects).getByRole("link", { name: "Memoir: 1" }),
+    ).toHaveClass("text-lg");
+    await userEvent.click(fiction);
+    expect(
+      await screen.findByText(/Library: type=book&key=subjects&value=fiction/),
+    ).toBeInTheDocument();
   });
 
-  it("promotes the leading key into a hero, superlatives folded inside it", async () => {
-    // Sprint 073 deliverable 1: the leading key's card carries its own top
-    // row (cover, label, count, mean) large above its list, and the three
-    // superlatives that used to sit in a page-level strip above every card
-    // (finding 9's repetition) live inside this one card now -- and only
-    // this one (AC3).
+  it("draws a key of few values as one share", async () => {
     stubApi();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    const hero = screen
-      .getByRole("heading", { name: "Authors" })
-      .closest("[data-insight-hero]");
-    expect(hero).not.toBeNull();
-    const heroRegion = within(hero as HTMLElement);
-    // The promoted top row: Cortázar is the count leader, and also names
-    // "Holds the most" among the superlatives below -- the same fact drawn
-    // twice inside one card rather than repeated across two page sections
-    // (finding 9).
-    expect(heroRegion.getAllByText("Julio Cortázar").length).toBeGreaterThan(0);
-    expect(heroRegion.getAllByText("8.8").length).toBeGreaterThan(0);
-    // The superlatives are inside the hero...
-    expect(heroRegion.getByText("Holds the most")).toBeVisible();
-    // ...and appear nowhere else on the page.
-    expect(screen.getAllByText("Holds the most")).toHaveLength(1);
-    expect(screen.getAllByText("Highest rated")).toHaveLength(1);
-    expect(screen.getAllByText("Steadiest")).toHaveLength(1);
-    // No other card is a hero.
-    expect(document.querySelectorAll("[data-insight-hero]")).toHaveLength(1);
+    const publisher = await screen.findByRole("region", { name: "Publisher" });
+    expect(publisher).toHaveTextContent("Alfaguara for 40%, then Minotauro.");
+    expect(within(publisher).getByRole("img")).toHaveAccessibleName(
+      "Alfaguara 40%, Minotauro 30%, Anagrama 20%, Gollancz 10%",
+    );
   });
 
-  it("leaves out a superlative with no honest answer", async () => {
-    // Nothing meets min_rated=2, so neither a highest-rated nor a steadiest
-    // row exists to name -- only "most collected" survives.
-    stubApi({
-      creators: [
-        row("Gene Wolfe", 3, 1, 5.0),
-        row("Kazuo Ishiguro", 2, 1, 7.0),
-        row("Samanta Schweblin", 2, 0, null),
-      ],
-    });
+  it("switches Decade and Year in one section, costing no second request", async () => {
+    const calls = stubApi();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    expect(screen.getByText("Holds the most")).toBeVisible();
-    expect(screen.queryByText("Highest rated")).toBeNull();
-    expect(screen.queryByText("Steadiest")).toBeNull();
+    const decade = await screen.findByRole("region", { name: "Decade" });
+    expect(decade).toHaveTextContent("The oldest is Bestiario, from 1951.");
+    const before = calls.length;
+    await userEvent.click(within(decade).getByRole("button", { name: "Year" }));
+    expect(
+      within(decade).getByRole("link", { name: "1963: 2 books" }),
+    ).toBeInTheDocument();
+    expect(calls.length).toBe(before);
   });
 
-  it("renders a row's numbers before its cover has loaded", async () => {
-    // The covers arrive on the very same ranking response; nothing about them
-    // should hold up the numbers a row exists to show.
-    stubApi();
-    renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    const authors = card("Authors");
-    // Cortázar is the hero's promoted top row (Sprint 073), so his numbers
-    // are drawn twice -- once above the list, once still on his own row.
-    expect(authors.getAllByText("7").length).toBeGreaterThan(0);
-    expect(authors.getAllByText("8.8").length).toBeGreaterThan(0);
-    // jsdom never fires the cover's `load` event, so if this is visible the
-    // row rendered its numbers without waiting for it.
-    const authorsRegion = screen.getByRole("region", { name: /^Authors/ });
-    const cover = authorsRegion.querySelector("img");
-    expect(cover).not.toBeNull();
-    expect(cover?.className).toContain("opacity-0");
-  });
-
-  it("offers to rank within the library's remembered filters, off by default", async () => {
+  it("offers to read within the library's remembered filters, off by default", async () => {
     localStorage.setItem(
       "akasha.library.filters",
       JSON.stringify({
@@ -598,135 +460,38 @@ describe("InsightsPage", () => {
       }),
     );
     const calls = stubApi();
-    const user = userEvent.setup();
     renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    // Off by default: nothing has narrowed the request yet.
-    expect(
-      calls.some(
-        (url) => url.startsWith("/api/insights") && url.includes("status="),
-      ),
-    ).toBe(false);
-
-    await user.click(
-      screen.getByRole("checkbox", { name: "Within my current filters" }),
-    );
-
-    expect(
-      await screen.findByText(/Ranking only entries matching Read\./),
-    ).toBeVisible();
-    await waitFor(() => {
+    await screen.findByRole("region", { name: "Authors" });
+    const box = screen.getByRole("checkbox", {
+      name: "Only what the library is filtered to",
+    });
+    expect(box).not.toBeChecked();
+    await userEvent.click(box);
+    await waitFor(() =>
       expect(
         calls.some(
           (url) =>
-            url.startsWith("/api/insights") && url.includes("status=read"),
+            url.startsWith("/api/insights/summary") && url.includes("status="),
         ),
-      ).toBe(true);
-    });
-  });
-
-  it("says plainly when the library has no filters set to rank within", async () => {
-    localStorage.setItem(
-      "akasha.library.filters",
-      JSON.stringify({ statuses: [], shelves: [], formats: [], query: "" }),
-    );
-    stubApi();
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("heading", { name: "Authors" });
-
-    await user.click(
-      screen.getByRole("checkbox", { name: "Within my current filters" }),
-    );
-
-    expect(await screen.findByText(/no filters set right now/)).toBeVisible();
-  });
-
-  it("switches Decade and Year in one card, costing no second request", async () => {
-    // Sprint 073 deliverable 2: Decade and Year are one card with a grain
-    // toggle now, not two cards repeating one fact (finding 8). Both grains
-    // are already on the page (AC1), so switching is client-side only.
-    const calls = stubApi();
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("heading", { name: "Decade" });
-
-    const decadeCard = screen
-      .getByRole("heading", { name: "Decade" })
-      .closest("[data-chronology-card]") as HTMLElement;
-    expect(
-      within(decadeCard).getByRole("link", { name: /1960s/ }),
-    ).toBeVisible();
-    expect(within(decadeCard).queryByText("1963")).toBeNull();
-
-    await user.click(within(decadeCard).getByRole("button", { name: "Year" }));
-
-    expect(within(decadeCard).getByText("1963")).toBeVisible();
-    expect(within(decadeCard).queryByText(/1960s/)).toBeNull();
-    expect(calls.filter((url) => url.startsWith("/api/insights"))).toHaveLength(
-      6,
+      ).toBe(true),
     );
   });
 
-  it("draws the score distribution, sums to the rated count, and states the unrated tail", async () => {
-    // Sprint 073 deliverable 4: the one new number, ten bars in the ramp,
-    // with the unrated tail stated in words rather than drawn as an eleventh
-    // bar (it is not a score).
-    stubApi(defaultRankings, distribution([0, 0, 1, 0, 0, 1, 0, 2, 1, 0]));
+  it("says so when a domain holds nothing yet", async () => {
+    stubApi(
+      defaultRankings,
+      distribution([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+      summary({
+        held: 0,
+        finished: 0,
+        rated: 0,
+        unrated: 0,
+        modal_score: null,
+        earliest: null,
+      }),
+    );
     renderPage();
-    await screen.findByRole("heading", { name: "How you rate" });
-
-    const bars = document.querySelectorAll<HTMLElement>("[data-score-bar]");
-    expect(bars).toHaveLength(10);
-    const counts = [...bars].map((bar) => bar.dataset.count);
-    expect(counts).toEqual(["0", "0", "1", "0", "0", "1", "0", "2", "1", "0"]);
-    expect(screen.getByText("5 rated")).toBeVisible();
-    expect(screen.getByText("1 entry is unrated.")).toBeVisible();
-  });
-
-  it("states a stated zero rather than an empty box when nothing is rated", async () => {
-    stubApi(defaultRankings, distribution([0, 0, 0, 0, 0, 0, 0, 0, 0, 0]));
-    renderPage();
-    await screen.findByRole("heading", { name: "How you rate" });
-
-    expect(screen.getByText("0 rated")).toBeVisible();
-    expect(document.querySelectorAll("[data-score-bar]")).toHaveLength(10);
-  });
-
-  it("opens a long-tail value in the filtered library, arriving with its chip", async () => {
-    // Sprint 073 deliverable 6: "16 subjects appear once" is a clickable tag
-    // row into the filtered library now, not a grey sentence (finding 12).
-    stubApi();
-    const user = userEvent.setup();
-    renderPage();
-    await screen.findByRole("heading", { name: "Language" });
-
-    await user.click(screen.getByRole("link", { name: "Spanish 1" }));
-
-    await waitFor(() => {
-      const text = screen.getByText(/Library:/).textContent ?? "";
-      expect(text).toContain("type=book");
-      expect(text).toContain("key=language");
-      expect(text).toContain("value=spanish");
-      expect(text).toContain("label=Spanish");
-    });
+    expect(await screen.findByText(/Nothing here yet/)).toBeInTheDocument();
+    expect(document.querySelectorAll("[data-insight-section]")).toHaveLength(0);
   });
 });
-
-/** The cards on the page, in the order they are drawn. */
-function cardTitles(): string[] {
-  return screen
-    .getAllByRole("region")
-    .map((node) => within(node).getByRole("heading").textContent ?? "")
-    .filter((title) => title !== "Nothing much to rank yet");
-}
-
-/** One card's row labels, in the order they are drawn. */
-function rowOrder(name: string): string[] {
-  return [
-    ...screen
-      .getByRole("region", { name: new RegExp(`^${name}`) })
-      .querySelectorAll("[data-row-label]"),
-  ].map((node) => node.textContent ?? "");
-}

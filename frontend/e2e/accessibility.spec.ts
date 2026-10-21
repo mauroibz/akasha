@@ -849,6 +849,20 @@ async function stubInsightsScreen(page: Page) {
       },
     }),
   );
+  // The lead sentence's figures (Sprint 102), registered last so it wins.
+  await page.route("**/api/insights/summary**", (route) =>
+    route.fulfill({
+      json: {
+        type: "book",
+        held: 60,
+        finished: 41,
+        rated: 46,
+        unrated: 14,
+        modal_score: 8,
+        earliest: { entry_id: 9, title: "Bestiario", year: 1951 },
+      },
+    }),
+  );
   // Registered after the broader `**/api/insights**` route above, so
   // Playwright's most-recently-registered-wins rule gives this the match.
   await page.route("**/api/insights/scores**", (route) =>
@@ -910,9 +924,7 @@ test("insights has no serious accessibility violations with a row open", async (
 }) => {
   await stubInsightsScreen(page);
   await page.goto("/insights");
-  await page
-    .getByRole("button", { name: /^Julio Cortázar: 7 entries/ })
-    .click();
+  await page.getByRole("button", { name: /^Julio Cortázar: 7 books/ }).click();
   await expect(page.getByText("Rayuela")).toBeVisible();
   await expectNoSeriousViolations(page, "insights (row open)");
 });

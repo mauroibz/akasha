@@ -366,6 +366,29 @@ export async function getScoreDistribution(params: {
   return (await response.json()) as ScoreDistribution;
 }
 
+/** The figures the insights page's lead sentence reads (Sprint 102). */
+export type InsightSummary = components["schemas"]["InsightSummaryResponse"];
+
+export async function getInsightSummary(params: {
+  type: string;
+  statuses?: EntryStatus[];
+  shelves?: string[];
+  formats?: EntryFormat[];
+  q?: string;
+}): Promise<InsightSummary> {
+  const query = new URLSearchParams({ type: params.type });
+  params.statuses?.forEach((status) => query.append("status", status));
+  params.shelves?.forEach((shelf) => query.append("shelf", shelf));
+  params.formats?.forEach((format) => query.append("format", format));
+  if (params.q?.trim()) query.set("q", params.q.trim());
+  const response = await request(`/api/insights/summary?${query.toString()}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "Insights could not be loaded");
+  return (await response.json()) as InsightSummary;
+}
+
 export async function patchEntry(
   entryId: number,
   changes: Partial<
@@ -787,3 +810,4 @@ import {
   request,
 } from "./request";
 import type { SearchCandidate } from "./add";
+import type { components } from "./schema";

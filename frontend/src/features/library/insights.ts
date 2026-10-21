@@ -133,62 +133,6 @@ export function orderKeys<T>(
   };
 }
 
-/** One of the three superlatives a leading key's ranking can answer. */
-export interface Superlative {
-  kind: "most_collected" | "highest_rated" | "steadiest";
-  row: InsightRow;
-}
-
-/**
- * Up to three answers about the leading key's ranking, above the fold (Sprint 067).
- *
- * Drawn from one key rather than pooled across all of them, on purpose: pooling
- * found "most collected" answered with a subject tag like `Fiction` in practice,
- * which is true and useless — the superlatives should name things you collect, and
- * a leading key already is the library's own most concentrated answer to "collect
- * what".
- *
- * A superlative with no honest answer is left out rather than guessed at: "highest
- * rated" needs at least one row meeting `minRated` with a mean at all, and
- * "steadiest" needs one of those with a spread — which the server only computes
- * from two or more ratings, so a library with one rating per creator answers
- * neither.
- */
-export function computeSuperlatives(
-  rows: InsightRow[],
-  minRated: number,
-): Superlative[] {
-  if (rows.length === 0) return [];
-  const superlatives: Superlative[] = [];
-
-  const byCount = (a: InsightRow, b: InsightRow) =>
-    b.count - a.count || byKey(a, b);
-  superlatives.push({
-    kind: "most_collected",
-    row: [...rows].sort(byCount)[0],
-  });
-
-  const rated = rows.filter(
-    (row) => row.mean_score !== null && row.rated_count >= minRated,
-  );
-  if (rated.length > 0) {
-    const highestRated = [...rated].sort(
-      (a, b) => (b.mean_score ?? 0) - (a.mean_score ?? 0) || byKey(a, b),
-    )[0];
-    superlatives.push({ kind: "highest_rated", row: highestRated });
-  }
-
-  const steady = rated.filter((row) => row.score_spread !== null);
-  if (steady.length > 0) {
-    const steadiest = [...steady].sort(
-      (a, b) => (a.score_spread ?? 0) - (b.score_spread ?? 0) || byKey(a, b),
-    )[0];
-    superlatives.push({ kind: "steadiest", row: steadiest });
-  }
-
-  return superlatives;
-}
-
 /** One decade's place in a chronology strip (Sprint 073 deliverable 3). */
 export interface ChronologyBucket {
   /** The decade's start year, e.g. `2000`. */
@@ -256,33 +200,4 @@ export function resolveAnsweredKeys(
     answered.push({ option, insight, grainInsight });
   }
   return answered;
-}
-
-/**
- * How much of the 12-column grid a ranked card earns, by its rank among the cards
- * below the hero (deliverable 5): the first is worth two of the next three, so a
- * ranking with fifteen values is not drawn the same size as one with three. Past
- * the first row the pattern repeats — the proposal specifies 8/4 then 4/4/4 and is
- * silent past five cards, and repeating 4s is the same "not the same size as the
- * hero" statement for however many keys a domain happens to declare.
- */
-export function insightGridSpan(rankIndex: number): 8 | 4 {
-  return rankIndex === 0 ? 8 : 4;
-}
-
-/**
- * The whole truth about a key that did not earn a card, in one clause.
- *
- * Not hidden, and not padded out into a two-row table: "Spanish 31, English 16" is
- * everything that key has to say, and it fits in less space than the card would
- * have taken.
- */
-export function quietSummary(rows: InsightRow[]): string {
-  if (rows.length === 0) return "nothing recorded yet";
-  if (rows.every((row) => row.count === 1))
-    return `${rows.length} ${rows.length === 1 ? "value" : "values"}, each appearing once`;
-  return rows
-    .slice(0, 3)
-    .map((row) => `${row.label} ${row.count}`)
-    .join(", ");
 }

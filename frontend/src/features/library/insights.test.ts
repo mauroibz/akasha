@@ -2,13 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   chronologyBuckets,
-  computeSuperlatives,
-  insightGridSpan,
   keyLead,
   magnitude,
   orderKeys,
   orderRows,
-  quietSummary,
   resolveAnsweredKeys,
   weightClass,
 } from "@/features/library/insights";
@@ -153,23 +150,6 @@ describe("orderKeys", () => {
   });
 });
 
-describe("quietSummary", () => {
-  it("states a two-value key in full, because that is all of it", () => {
-    expect(
-      quietSummary([row("Spanish", 31, 0, null), row("English", 16, 0, null)]),
-    ).toBe("Spanish 31, English 16");
-  });
-
-  it("says so when everything appears once, rather than listing three", () => {
-    const ones = ["a", "b", "c"].map((k) => row(k, 1, 0, null));
-    expect(quietSummary(ones)).toBe("3 values, each appearing once");
-  });
-
-  it("has an honest sentence for a key with nothing in it", () => {
-    expect(quietSummary([])).toBe("nothing recorded yet");
-  });
-});
-
 describe("magnitude", () => {
   it("is a share of the leader, not of the whole", () => {
     expect(magnitude(7, 7)).toBe(1);
@@ -195,53 +175,6 @@ describe("weightClass", () => {
     expect(weightClass(0, 0)).toBe(
       "text-sm text-muted-foreground tabular-nums",
     );
-  });
-});
-
-describe("computeSuperlatives", () => {
-  it("names most collected, highest rated and steadiest, drawn from one key", () => {
-    const withSpread = [
-      row("cortazar", 7, 6, 8.8, 0.9),
-      row("le guin", 5, 5, 9.2, 0.3),
-      row("calvino", 3, 3, 7.7, 1.2),
-    ];
-    const superlatives = computeSuperlatives(withSpread, 2);
-    expect(superlatives).toEqual([
-      { kind: "most_collected", row: withSpread[0] },
-      { kind: "highest_rated", row: withSpread[1] },
-      { kind: "steadiest", row: withSpread[1] },
-    ]);
-  });
-
-  it("leaves out highest rated and steadiest when nothing meets minRated", () => {
-    const oneRatingEach = [
-      row("cortazar", 3, 1, 9.0, null),
-      row("le guin", 2, 1, 8.0, null),
-    ];
-    expect(computeSuperlatives(oneRatingEach, 2)).toEqual([
-      { kind: "most_collected", row: oneRatingEach[0] },
-    ]);
-  });
-
-  it("can name a different row for highest rated than for steadiest", () => {
-    // A single rating gives a mean but never a spread (the server needs two), so
-    // the best mean and the best spread need not belong to the same row.
-    const rows = [
-      row("cortazar", 3, 2, 9.0, 0.5),
-      row("le guin", 2, 1, 10, null),
-    ];
-    const superlatives = computeSuperlatives(rows, 1);
-    expect(superlatives.map((s) => s.kind)).toEqual([
-      "most_collected",
-      "highest_rated",
-      "steadiest",
-    ]);
-    expect(superlatives[1].row.key).toBe("le guin");
-    expect(superlatives[2].row.key).toBe("cortazar");
-  });
-
-  it("answers nothing for an empty ranking", () => {
-    expect(computeSuperlatives([], 2)).toEqual([]);
   });
 });
 
@@ -331,14 +264,5 @@ describe("resolveAnsweredKeys", () => {
     );
     expect(answered).toHaveLength(1);
     expect(answered[0].grainInsight).toBeUndefined();
-  });
-});
-
-describe("insightGridSpan", () => {
-  it("gives the first card after the hero two of the next three's width", () => {
-    expect(insightGridSpan(0)).toBe(8);
-    expect(insightGridSpan(1)).toBe(4);
-    expect(insightGridSpan(2)).toBe(4);
-    expect(insightGridSpan(3)).toBe(4);
   });
 });

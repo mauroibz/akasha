@@ -25,6 +25,12 @@ export default {
       ringColor: {
         primary: "hsl(var(--primary-text))",
       },
+      // The readable amber as a fill, for the one mark in a chart that leads
+      // (Sprint 102): deeper than `bg-primary`, and the same in both themes'
+      // sense of "the strongest amber on this page".
+      backgroundColor: {
+        "primary-deep": "hsl(var(--primary-text))",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

@@ -126,6 +126,20 @@ async function stubInsights(
       },
     }),
   );
+  // The lead sentence's figures (Sprint 102), registered last so it wins.
+  await page.route("**/api/insights/summary**", (route) =>
+    route.fulfill({
+      json: {
+        type: "book",
+        held: 60,
+        finished: 41,
+        rated: 46,
+        unrated: 14,
+        modal_score: 8,
+        earliest: { entry_id: 9, title: "Bestiario", year: 1951 },
+      },
+    }),
+  );
   await page.route("**/api/entries?**", (route) =>
     route.fulfill({
       json: {
@@ -201,20 +215,20 @@ test("the page fits a phone, and nothing makes the body scroll sideways — five
   );
   expect(overflow).toBeLessThanOrEqual(0);
 
-  // The strip itself scrolls within its own box instead of overflowing it
-  // (DEC-134's fix): its scrollable content is wider than the box, and the
-  // box itself never grows past the viewport.
+  // The strip scrolls within its own box instead of overflowing it (DEC-134's
+  // fix), and the box never grows past the viewport. Sprint 102's text tabs
+  // fit five domains at 390px, so the content no longer has to overflow for
+  // this to hold; what is checked is that it would scroll in place if it did.
   const stripBox = await strip.evaluate((node) => ({
-    scrollWidth: node.scrollWidth,
-    clientWidth: node.clientWidth,
+    overflowX: getComputedStyle(node).overflowX,
     boundingWidth: node.getBoundingClientRect().width,
   }));
-  expect(stripBox.scrollWidth).toBeGreaterThan(stripBox.clientWidth);
+  expect(stripBox.overflowX).toBe("auto");
   expect(stripBox.boundingWidth).toBeLessThanOrEqual(390);
 
-  // Cards stack rather than sit two abreast at this width.
+  // Sections stack, label above content, at this width.
   const boxes = await page
-    .locator("[data-insight-card]")
+    .locator("[data-insight-section]")
     .evaluateAll((nodes) =>
       nodes.map((node) => node.getBoundingClientRect().x),
     );
@@ -235,14 +249,12 @@ test("the page fits a phone, and nothing makes the body scroll sideways — five
   );
   expect(short).toEqual([]);
 
-  // The Decade/Year grain toggle (Sprint 073 deliverable 2) is one of the
-  // controls just checked for a 44px target; exercising it here proves it
-  // also holds the 390px body-overflow contract once its content swaps.
-  const decadeCard = page
-    .getByRole("heading", { name: "Decade" })
-    .locator("xpath=ancestor::*[@data-chronology-card]");
-  await decadeCard.getByRole("button", { name: "Year" }).click();
-  await expect(decadeCard.getByText("1963")).toBeVisible();
+  // The Decade/Year grain toggle is one of the controls just checked for a
+  // 44px target; exercising it here proves it also holds the 390px
+  // body-overflow contract once its content swaps.
+  const decade = page.getByRole("region", { name: "Decade" });
+  await decade.getByRole("button", { name: "Year" }).click();
+  await expect(decade.getByText("1963")).toBeVisible();
 
   const overflowAfterToggle = await page.evaluate(
     () =>
@@ -258,7 +270,7 @@ test("a row opens in place, and the library says what it was opened into", async
   await stubInsights(page);
   await page.goto("/insights");
 
-  const row = page.getByRole("button", { name: /^Julio Cortázar: 7 entries/ });
+  const row = page.getByRole("button", { name: /^Julio Cortázar: 7 books/ });
   await row.click();
   await expect(page.getByText("Rayuela")).toBeVisible();
   await expect(page).toHaveURL(/\/insights$/);
