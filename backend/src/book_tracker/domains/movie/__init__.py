@@ -181,6 +181,7 @@ def recognize_movie_url(value: str) -> UrlMatch | None:
 DOMAIN = Domain(
     item_type="movie",
     label="Movie",
+    plural_label="Movies",
     identity=MOVIE_IDENTITY,
     fields=MOVIE_FIELDS,
     statuses=MOVIE_STATUSES,

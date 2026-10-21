@@ -115,6 +115,11 @@ export interface ItemType {
   /** The heading over the personal region of the detail page. */
   entry_panel_label: string;
   /**
+   * The label counted: "Books", "Anime" (Sprint 102). Optional on the client so a
+   * stub written before it existed still renders; `countLabel` falls back.
+   */
+  plural_label?: string;
+  /**
    * Whether to offer the cover chooser (DEC-067 row 7). The shared chooser is Open
    * Library's work-editions path, so a domain it does not serve declares `false` and
    * the control is not rendered rather than rendered and unable to answer.

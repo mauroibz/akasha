@@ -165,6 +165,8 @@ class ItemTypeResponse(BaseModel):
     progress: ProgressSpecResponse | None
     formats: list[FormatSpecResponse]
     entry_panel_label: str
+    #: The label counted: "Books", "Anime" (Sprint 102).
+    plural_label: str
     #: Whether to offer the cover chooser at all (DEC-067 row 7).
     chooses_covers: bool
 
@@ -816,6 +818,7 @@ def list_item_types() -> list[ItemTypeResponse]:
             ),
             formats=[FormatSpecResponse(**vars(row)) for row in domain.formats],
             entry_panel_label=domain.entry_panel_label,
+            plural_label=domain.plural_label,
             chooses_covers=domain.chooses_covers,
         )
         for domain in DOMAINS.values()

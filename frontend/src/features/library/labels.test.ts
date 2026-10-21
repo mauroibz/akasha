@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { entryFormats, entryStatuses, type ItemType } from "@/api/library";
 import {
+  countLabel,
   entryFieldLabel,
   progressFor,
   fallbackStatuses,
@@ -188,5 +189,22 @@ describe("progressFor", () => {
     // than no box for the moment before `/api/item-types` lands.
     expect(progressFor("anime", undefined)).toBeNull();
     expect(progressFor("nonesuch", registry)).toBeNull();
+  });
+});
+
+describe("countLabel", () => {
+  const types = [
+    { id: "anime", label: "Anime", plural_label: "Anime" },
+    { id: "book", label: "Book", plural_label: "Books" },
+  ] as unknown as ItemType[];
+
+  it("counts with the domain's declared plural", () => {
+    expect(countLabel(1, "book", types)).toBe("1 book");
+    expect(countLabel(142, "book", types)).toBe("142 books");
+    expect(countLabel(3, "anime", types)).toBe("3 anime");
+  });
+
+  it("says items for a domain it does not know", () => {
+    expect(countLabel(2, "game", types)).toBe("2 items");
   });
 });

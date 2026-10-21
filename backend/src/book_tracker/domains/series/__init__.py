@@ -188,6 +188,7 @@ def recognize_series_url(value: str) -> UrlMatch | None:
 DOMAIN = Domain(
     item_type="series",
     label="Series",
+    plural_label="Series",
     identity=SERIES_IDENTITY,
     fields=SERIES_FIELDS,
     statuses=SERIES_STATUSES,

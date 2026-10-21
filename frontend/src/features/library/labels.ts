@@ -226,6 +226,25 @@ export function labelFor(
   return declared ?? "Item";
 }
 
+/**
+ * "142 books", "1 anime", "3 series": a count with the domain's own noun, lower
+ * case for running prose (Sprint 102). The plural is declared by the domain,
+ * because an added "s" is wrong for anime and series; a domain the client does
+ * not know yet reads as "items".
+ */
+export function countLabel(
+  count: number,
+  itemType: string,
+  types: ItemType[] | undefined,
+): string {
+  const declared = Array.isArray(types)
+    ? types.find((type) => type.id === itemType)
+    : undefined;
+  const singular = (declared?.label ?? "Item").toLowerCase();
+  const plural = (declared?.plural_label ?? `${singular}s`).toLowerCase();
+  return `${count.toLocaleString()} ${count === 1 ? singular : plural}`;
+}
+
 export function entryPanelLabel(
   itemType: string,
   types: ItemType[] | undefined,

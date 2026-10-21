@@ -261,3 +261,22 @@ async def test_only_the_domains_that_count_progress_publish_a_spec(tmp_path: Pat
     }
     assert published["book"]["progress"] is None
     assert published["album"]["progress"] is None
+
+
+@pytest.mark.anyio
+async def test_each_domain_names_its_own_plural(tmp_path: Path) -> None:
+    """Sprint 102: copy that counts ("142 books") asks the domain, never adds an "s"."""
+    app = create_app(settings(tmp_path))
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        published = {row["id"]: row for row in (await client.get("/api/item-types")).json()}
+
+    assert {key: row["plural_label"] for key, row in published.items()} == {
+        "book": "Books",
+        "album": "Albums",
+        "anime": "Anime",
+        "movie": "Movies",
+        "series": "Series",
+    }

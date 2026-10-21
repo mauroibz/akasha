@@ -237,6 +237,8 @@ def the_domain_names_itself(domain: Domain) -> None:
     # forgets this inherits the wrong one silently, so it is required rather than
     # defaulted-and-hoped.
     assert domain.entry_panel_label, f"{domain.item_type} declares no entry panel label"
+    # Copy that counts asks for this rather than adding an "s" (Sprint 102).
+    assert domain.plural_label, f"{domain.item_type} declares no plural label"
 
 
 @registry_check
@@ -1253,6 +1255,7 @@ def test_the_suite_covers_every_field_of_the_contract() -> None:
         "item_type": "the_domain_names_itself",
         "label": "the_domain_names_itself",
         "entry_panel_label": "the_domain_names_itself",
+        "plural_label": "the_domain_names_itself",
         "statuses": "statuses_are_a_usable_vocabulary",
         "default_status": "statuses_are_a_usable_vocabulary",
         "formats": "formats_are_a_usable_vocabulary",
@@ -1300,6 +1303,7 @@ def a_third_domain(**overrides: object) -> Domain:
     base: dict[str, object] = {
         "item_type": "game",
         "label": "Game",
+        "plural_label": "Games",
         "identity": IdentityStrategy(lambda _candidate: None, ("igdb",)),
         "fields": (
             FieldSpec("creators", "Studios", multiplicity="many", groupable=True),

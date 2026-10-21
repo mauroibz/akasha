@@ -278,6 +278,9 @@ class Domain:
 
     item_type: str
     label: str
+    #: The label counted: "142 Books", "3 Anime" (Sprint 102). Declared, since an
+    #: added "s" is wrong for anime and series.
+    plural_label: str
     identity: IdentityStrategy
     fields: tuple[FieldSpec, ...]
     #: The statuses an entry on this domain can hold, in the order a control offers

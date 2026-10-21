@@ -2016,6 +2016,8 @@ export interface components {
       id: string;
       /** Label */
       label: string;
+      /** Plural Label */
+      plural_label: string;
       progress: components["schemas"]["ProgressSpecResponse"] | null;
       /** Statuses */
       statuses: components["schemas"]["StatusSpecResponse"][];

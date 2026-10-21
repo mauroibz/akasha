@@ -199,6 +199,7 @@ silently rendering as a book.
 DOMAIN = Domain(
     item_type="album",              # stored in items.type — PERMANENT, never renamed
     label="Album",                  # user-facing copy — free to change
+    plural_label="Albums",          # the label counted: "3 Albums" (anime: "Anime")
     identity=ALBUM_IDENTITY,        # how two candidates are judged the same record
     fields=ALBUM_FIELDS,            # your metadata, described (not modelled)
     statuses=ALBUM_STATUSES,        # your vocabulary, in the order a control offers it

@@ -148,6 +148,7 @@ def recognize_album_url(value: str) -> UrlMatch | None:
 DOMAIN = Domain(
     item_type="album",
     label="Album",
+    plural_label="Albums",
     identity=ALBUM_IDENTITY,
     fields=ALBUM_FIELDS,
     statuses=ALBUM_STATUSES,

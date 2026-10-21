@@ -143,6 +143,7 @@ def recognize_anime_url(value: str) -> UrlMatch | None:
 DOMAIN = Domain(
     item_type="anime",
     label="Anime",
+    plural_label="Anime",
     identity=ANIME_IDENTITY,
     fields=ANIME_FIELDS,
     statuses=ANIME_STATUSES,

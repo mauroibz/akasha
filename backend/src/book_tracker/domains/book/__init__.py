@@ -118,6 +118,7 @@ def recognize_book_input(value: str) -> UrlMatch | None:
 DOMAIN = Domain(
     item_type="book",
     label="Book",
+    plural_label="Books",
     identity=BOOK_IDENTITY,
     fields=BOOK_FIELDS,
     statuses=BOOK_STATUSES,

@@ -8,6 +8,7 @@ import { CoverImage } from "@/components/CoverImage";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Loading } from "@/components/ui/skeleton";
+import { countLabel } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { cn } from "@/lib/utils";
 import { navigateWithTransition } from "@/lib/viewTransition";
@@ -32,12 +33,7 @@ export function DiaryPage() {
     queryFn: ({ signal }) => getDiary(year, signal),
   });
   const types = Array.isArray(itemTypes.data) ? itemTypes.data : [];
-  const labelFor = (id: string, count: number) => {
-    const label = (
-      types.find((type) => type.id === id)?.label ?? id
-    ).toLowerCase();
-    return `${count} ${label}${count === 1 ? "" : label.endsWith("s") ? "" : "s"}`;
-  };
+  const labelFor = (id: string, count: number) => countLabel(count, id, types);
   const shown = diary.data?.year ?? year;
   const years = diary.data?.years ?? [];
 
