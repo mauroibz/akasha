@@ -57,7 +57,7 @@ ANIME_STATUSES = (
     StatusSpec("completed", "Completed", hotkey="c"),
     StatusSpec("on_hold", "On hold", hotkey="h"),
     StatusSpec("dropped", "Dropped", hotkey="d"),
-    StatusSpec("plan_to_watch", "Plan to watch", hotkey="p"),
+    StatusSpec("plan_to_watch", "Plan to watch", hotkey="p", planned=True),
 )
 
 # How a copy is held, which is not how it was watched: subbed and dubbed are properties

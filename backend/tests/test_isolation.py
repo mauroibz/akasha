@@ -118,6 +118,13 @@ ROUTE_POLICY = {
     ("GET", "/api/views"): "private-collection",
     ("POST", "/api/views"): "private-write",
     ("DELETE", "/api/views/{view_id}"): "private-id",
+    # Sprint 103: keyed by domain within the requester's own rows, so another
+    # person's goal is never addressed at all.
+    ("GET", "/api/goals"): "private-collection",
+    ("PUT", "/api/goals/{item_type}"): "private-write",
+    ("DELETE", "/api/goals/{item_type}"): "private-write",
+    ("GET", "/api/goals/{item_type}/progress"): "private-collection",
+    ("GET", "/api/goals/{item_type}/picks"): "private-collection",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     # Sprint 095: reads the posted bytes and answers which connector claims them;
@@ -537,6 +544,7 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
             assert (await second.get("/api/insights/summary", params={"type": "book"})).json()[
                 "held"
             ] == 0
+            assert (await second.get("/api/goals")).json() == []
             export = await second.get("/api/export")
             assert export.json()["entries"] == []
             second_preview = await second.post(

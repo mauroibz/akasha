@@ -341,6 +341,36 @@
    ]
   ],
   [
+   "/api/goals",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/goals/{item_type}",
+   [
+    "PUT"
+   ]
+  ],
+  [
+   "/api/goals/{item_type}",
+   [
+    "DELETE"
+   ]
+  ],
+  [
+   "/api/goals/{item_type}/progress",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/goals/{item_type}/picks",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/search/resolve",
    [
     "GET"

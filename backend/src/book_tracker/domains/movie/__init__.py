@@ -61,7 +61,7 @@ MOVIE_FIELDS = (
 # list. The hotkey lives on the status it sets, not in a second table.
 MOVIE_STATUSES = (
     UNSORTED,
-    StatusSpec("watchlist", "Watchlist", hotkey="l"),
+    StatusSpec("watchlist", "Watchlist", hotkey="l", planned=True),
     StatusSpec("watched", "Watched", hotkey="w"),
 )
 

@@ -65,7 +65,7 @@ SERIES_STATUSES = (
     StatusSpec("completed", "Completed", hotkey="c"),
     StatusSpec("on_hold", "On hold", hotkey="h"),
     StatusSpec("dropped", "Dropped", hotkey="d"),
-    StatusSpec("plan_to_watch", "Plan to watch", hotkey="p"),
+    StatusSpec("plan_to_watch", "Plan to watch", hotkey="p", planned=True),
 )
 
 # The movie four: how a copy is held, not how it was watched (DEC-059).

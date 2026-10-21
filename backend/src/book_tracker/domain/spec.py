@@ -86,6 +86,9 @@ class StatusSpec:
     #: Whether an entry in this status is under way: what the library's *Now* strip
     #: shows (Sprint 098). Declared, so the shared layer never names "reading".
     in_progress: bool = False
+    #: Whether an entry in this status is waiting to be started: where a goal's picks
+    #: come from (Sprint 103). Declared for the same reason as `in_progress`.
+    planned: bool = False
 
 
 @dataclass(frozen=True)

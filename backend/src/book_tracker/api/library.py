@@ -127,6 +127,7 @@ class StatusSpecResponse(BaseModel):
     choosable: bool
     hotkey: str | None = None
     in_progress: bool = False
+    planned: bool = False
 
 
 class FormatSpecResponse(BaseModel):

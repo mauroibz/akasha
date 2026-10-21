@@ -1,7 +1,7 @@
 # Sprint 103 — Gentle goals, underneath
 
 **Sprint:** 103
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 46
 **Depends on:** 102
 **Owner:** Mauro

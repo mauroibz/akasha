@@ -367,6 +367,75 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/goals": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Goals */
+    get: operations["list_goals_api_goals_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/goals/{item_type}": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set Goal */
+    put: operations["set_goal_api_goals__item_type__put"];
+    post?: never;
+    /** Delete Goal */
+    delete: operations["delete_goal_api_goals__item_type__delete"];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/goals/{item_type}/picks": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Goal Picks */
+    get: operations["goal_picks_api_goals__item_type__picks_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  "/api/goals/{item_type}/progress": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Goal Progress */
+    get: operations["goal_progress_api_goals__item_type__progress_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/health/live": {
     parameters: {
       query?: never;
@@ -1684,6 +1753,63 @@ export interface components {
       /** Value */
       value: string;
     };
+    /** GoalBody */
+    GoalBody: {
+      /** Count */
+      count: number;
+      /**
+       * Period
+       * @enum {string}
+       */
+      period: "month" | "year";
+      /**
+       * Suggest
+       * @default true
+       */
+      suggest: boolean;
+    };
+    /** GoalPickResponse */
+    GoalPickResponse: {
+      /** Creator */
+      creator?: string | null;
+      entry: components["schemas"]["EntryResponse"];
+      /** Mean Score */
+      mean_score?: number | null;
+      /**
+       * Reason
+       * @enum {string}
+       */
+      reason: "creator" | "waiting";
+      /** Since */
+      since?: string | null;
+    };
+    /** GoalProgressResponse */
+    GoalProgressResponse: {
+      /** Item Type */
+      item_type: string;
+      /** Months */
+      months: number[];
+      /** Target */
+      target: number | null;
+      /** Total */
+      total: number;
+      /** Year */
+      year: number;
+    };
+    /** GoalResponse */
+    GoalResponse: {
+      /** Count */
+      count: number;
+      /** Item Type */
+      item_type: string;
+      /**
+       * Period
+       * @enum {string}
+       */
+      period: "month" | "year";
+      /** Suggest */
+      suggest: boolean;
+    };
     /**
      * ImportBrowseResponse
      * @description One level of a browsable connector's source. Relative names only.
@@ -2387,6 +2513,11 @@ export interface components {
       in_progress: boolean;
       /** Label */
       label: string;
+      /**
+       * Planned
+       * @default false
+       */
+      planned: boolean;
       /** Value */
       value: string;
     };
@@ -3712,6 +3843,291 @@ export interface operations {
         };
       };
       /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  list_goals_api_goals_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GoalResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  set_goal_api_goals__item_type__put: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        item_type: components["schemas"]["ItemTypeName"];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["GoalBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GoalResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description This library records no finish date */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  delete_goal_api_goals__item_type__delete: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        item_type: components["schemas"]["ItemTypeName"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      204: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content?: never;
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description This library records no finish date */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  goal_picks_api_goals__item_type__picks_get: {
+    parameters: {
+      query?: {
+        limit?: number;
+      };
+      header?: never;
+      path: {
+        item_type: components["schemas"]["ItemTypeName"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GoalPickResponse"][];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description This library records no finish date */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  goal_progress_api_goals__item_type__progress_get: {
+    parameters: {
+      query: {
+        year: number;
+      };
+      header?: never;
+      path: {
+        item_type: components["schemas"]["ItemTypeName"];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["GoalProgressResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description This library records no finish date */
       422: {
         headers: {
           [name: string]: unknown;
