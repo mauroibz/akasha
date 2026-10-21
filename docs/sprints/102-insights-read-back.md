@@ -1,7 +1,7 @@
 # Sprint 102 — Insights, read back to you
 
 **Sprint:** 102
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 46
 **Depends on:** 101
 **Owner:** Mauro

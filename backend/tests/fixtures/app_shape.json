@@ -149,6 +149,12 @@
    ]
   ],
   [
+   "/api/insights/summary",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/entries",
    [
     "POST"

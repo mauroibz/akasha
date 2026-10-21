@@ -11,6 +11,24 @@ def normalize_text(value: str) -> str:
     return " ".join(words.split())
 
 
+# A provider's catch-all second level: "Fiction, general", "FICTION / General".
+_GENERIC_QUALIFIER = " general"
+
+
+def insight_group(value: str) -> str:
+    """The value an insight ranking groups on (Sprint 102).
+
+    `normalize_text`, plus one fold: a trailing generic qualifier joins its head, so
+    "Fiction, general" counts as "Fiction". A real second level ("Fiction / Literary")
+    stays its own subject. A value with no letters or digits comes back empty, and an
+    empty group is never a row.
+    """
+    norm = normalize_text(value)
+    if norm.endswith(_GENERIC_QUALIFIER) and len(norm) > len(_GENERIC_QUALIFIER):
+        return norm[: -len(_GENERIC_QUALIFIER)]
+    return norm
+
+
 # A single word character followed by a period: "K.", "J.", the pieces of "J. R. R.".
 _INITIAL = re.compile(r"^\w\.$", re.UNICODE)
 

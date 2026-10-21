@@ -28,7 +28,7 @@ from sqlalchemy import (
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from book_tracker.domain.normalization import normalize_text, shelf_slug
+from book_tracker.domain.normalization import insight_group, normalize_text, shelf_slug
 from book_tracker.domain.pagination import (
     CursorError,
     CursorState,
@@ -961,17 +961,19 @@ class LibraryService:
             return select(ItemRow.id).where(ItemRow.type == item_type, raw == target)
 
         assert field is not None  # BUILTIN_INSIGHT_KEYS handled above
-        norm = normalize_text(value)
+        # The grouping an insight row was ranked under (Sprint 102), so a folded row
+        # ("Fiction" holding "Fiction, general") opens every one of its members.
+        norm = insight_group(value)
         if field.multiplicity == "many":
             each = func.json_each(ItemRow.metadata_json, f"$.{key}").table_valued("value")
             return (
                 select(ItemRow.id)
                 .select_from(ItemRow)
                 .join(each, true())
-                .where(ItemRow.type == item_type, func.normalize_text(each.c.value) == norm)
+                .where(ItemRow.type == item_type, func.insight_group(each.c.value) == norm)
             )
         raw = func.json_extract(ItemRow.metadata_json, f"$.{key}")
-        return select(ItemRow.id).where(ItemRow.type == item_type, func.normalize_text(raw) == norm)
+        return select(ItemRow.id).where(ItemRow.type == item_type, func.insight_group(raw) == norm)
 
     def _filtered_entries(
         self,
@@ -1209,7 +1211,8 @@ class LibraryService:
         `items.metadata` through `json_extract` (`multiplicity="one"`) or `json_each`
         (`multiplicity="many"`), normalized through the SQLite `normalize_text` UDF
         registered in `database.py` so a ranking groups exactly the way search and sort
-        already do.
+        already do — through `insight_group`, which also folds a trailing ", general"
+        and drops a value with no letters or digits (Sprint 102).
         """
         joined = base.join(ItemRow, ItemRow.id == base.c.item_id)
         if key in BUILTIN_INSIGHT_KEYS:
@@ -1243,11 +1246,15 @@ class LibraryService:
                     base.c.id.label("entry_id"),
                     base.c.score.label("score"),
                     each.c.value.label("raw"),
-                    func.normalize_text(each.c.value).label("norm"),
+                    func.insight_group(each.c.value).label("norm"),
                 )
                 .select_from(joined)
                 .join(each, true())
-                .where(each.c.value.isnot(None), each.c.value != "")
+                .where(
+                    each.c.value.isnot(None),
+                    each.c.value != "",
+                    func.insight_group(each.c.value) != "",
+                )
             )
             # Every downstream query below (the count/mean aggregate, the best-spelling
             # window function, and the suppressed-row lookup) references `exploded`
@@ -1266,10 +1273,10 @@ class LibraryService:
                 base.c.id.label("entry_id"),
                 base.c.score.label("score"),
                 raw.label("raw"),
-                func.normalize_text(raw).label("norm"),
+                func.insight_group(raw).label("norm"),
             )
             .select_from(joined)
-            .where(raw.isnot(None), raw != "")
+            .where(raw.isnot(None), raw != "", func.insight_group(raw) != "")
         ).subquery()
         return exploded, 0
 
@@ -1307,12 +1314,19 @@ class LibraryService:
 
         Grouping already folds case and diacritics through `norm`; this answers the
         separate question of what to show for a group whose members disagree on
-        spelling. Ties break lexicographically — arbitrary but deterministic.
+        spelling. A spelling without a folded qualifier wins over one with it
+        (Sprint 102: "Fiction", not "Fiction, general"); then the commonest; ties break
+        lexicographically — arbitrary but deterministic.
         """
         if not norms:
             return {}
         spellings = (
-            select(exploded.c.norm, exploded.c.raw, func.count().label("n"))
+            select(
+                exploded.c.norm,
+                exploded.c.raw,
+                func.count().label("n"),
+                (func.normalize_text(exploded.c.raw) == exploded.c.norm).label("plain"),
+            )
             .where(exploded.c.norm.in_(norms))
             .group_by(exploded.c.norm, exploded.c.raw)
         ).subquery()
@@ -1322,7 +1336,7 @@ class LibraryService:
             func.row_number()
             .over(
                 partition_by=spellings.c.norm,
-                order_by=(spellings.c.n.desc(), spellings.c.raw.asc()),
+                order_by=(spellings.c.plain.desc(), spellings.c.n.desc(), spellings.c.raw.asc()),
             )
             .label("rn"),
         ).subquery()
@@ -1624,6 +1638,69 @@ class LibraryService:
                 "counts": counts,
                 "rated_count": sum(counts),
                 "unrated_count": unrated_count,
+            }
+
+    def insight_summary(
+        self,
+        *,
+        item_type: str,
+        statuses: Sequence[str] | None = None,
+        shelves: Sequence[str] = (),
+        q: str | None = None,
+        formats: Sequence[str] = (),
+    ) -> dict[str, Any]:
+        """The figures the insights page's lead sentence reads (Sprint 102).
+
+        Over the same `_filtered_entries` set every ranking uses. `finished` counts a
+        finish date, not a status, because the Diary does and the two must agree. The
+        modal score breaks a tie upward; the earliest item breaks one by title.
+        """
+        with Session(self.engine) as session:
+            base = self._filtered_entries(statuses, shelves, q, formats, [item_type]).subquery()
+            held = session.scalar(select(func.count()).select_from(base)) or 0
+            finished = (
+                session.scalar(
+                    select(func.count()).select_from(base).where(base.c.date_finished.isnot(None))
+                )
+                or 0
+            )
+            rated = (
+                session.scalar(
+                    select(func.count()).select_from(base).where(base.c.score.isnot(None))
+                )
+                or 0
+            )
+            modal_score = session.scalar(
+                select(base.c.score)
+                .where(base.c.score.isnot(None))
+                .group_by(base.c.score)
+                .order_by(func.count().desc(), base.c.score.desc())
+                .limit(1)
+            )
+            earliest_row = session.execute(
+                select(base.c.id, ItemRow.title, ItemRow.year)
+                .join(ItemRow, ItemRow.id == base.c.item_id)
+                .where(ItemRow.year.isnot(None))
+                .order_by(ItemRow.year.asc(), ItemRow.title.asc())
+                .limit(1)
+            ).first()
+            earliest = (
+                {
+                    "entry_id": earliest_row.id,
+                    "title": earliest_row.title,
+                    "year": earliest_row.year,
+                }
+                if earliest_row is not None
+                else None
+            )
+            return {
+                "type": item_type,
+                "held": held,
+                "finished": finished,
+                "rated": rated,
+                "unrated": held - rated,
+                "modal_score": modal_score,
+                "earliest": earliest,
             }
 
     def _selection(

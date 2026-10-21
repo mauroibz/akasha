@@ -58,6 +58,7 @@ ROUTE_POLICY = {
     ("GET", "/api/entries"): "private-collection",
     ("GET", "/api/insights"): "private-collection",
     ("GET", "/api/insights/scores"): "private-collection",
+    ("GET", "/api/insights/summary"): "private-collection",
     ("POST", "/api/entries"): "private-write",
     ("PATCH", "/api/entries/bulk"): "private-id",
     ("DELETE", "/api/entries/bulk"): "private-id",
@@ -533,6 +534,9 @@ async def test_collections_and_the_same_import_are_scoped_to_each_user(tmp_path:
             assert (
                 await second.get("/api/insights", params={"type": "book", "key": "creators"})
             ).json()["total_entries"] == 0
+            assert (await second.get("/api/insights/summary", params={"type": "book"})).json()[
+                "held"
+            ] == 0
             export = await second.get("/api/export")
             assert export.json()["entries"] == []
             second_preview = await second.post(

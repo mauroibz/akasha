@@ -278,6 +278,25 @@ class ScoreDistributionResponse(BaseModel):
     unrated_count: int
 
 
+class InsightEarliestResponse(BaseModel):
+    entry_id: int
+    title: str
+    year: int
+
+
+class InsightSummaryResponse(BaseModel):
+    """The figures the insights page's lead sentence reads (Sprint 102)."""
+
+    type: str
+    held: int
+    #: Entries with a finish date — the Diary's measure, so the two agree.
+    finished: int
+    rated: int
+    unrated: int
+    modal_score: int | None
+    earliest: InsightEarliestResponse | None
+
+
 class AffectedResponse(BaseModel):
     affected: int
 
@@ -536,6 +555,31 @@ def get_score_distribution(
     """Per-score counts for one domain (Sprint 073 deliverable 4)."""
     return ScoreDistributionResponse.model_validate(
         library.score_distribution(
+            item_type=type.value,
+            statuses=[item.value for item in status] if status is not None else None,
+            shelves=shelf or [],
+            q=q,
+            formats=[item.value for item in format or []],
+        )
+    )
+
+
+@router.get(
+    "/insights/summary",
+    response_model=InsightSummaryResponse,
+    responses={422: {"model": ErrorResponse}},
+)
+def get_insight_summary(
+    library: Library,
+    type: ItemTypeName,
+    status: Annotated[list[EntryStatus] | None, Query()] = None,
+    shelf: Annotated[list[str] | None, Query()] = None,
+    format: Annotated[list[EntryFormat] | None, Query()] = None,
+    q: str | None = None,
+) -> InsightSummaryResponse:
+    """The lead sentence's figures for one domain (Sprint 102)."""
+    return InsightSummaryResponse.model_validate(
+        library.insight_summary(
             item_type=type.value,
             statuses=[item.value for item in status] if status is not None else None,
             shelves=shelf or [],

@@ -1856,6 +1856,29 @@
         "title": "ImporterResponse",
         "type": "object"
       },
+      "InsightEarliestResponse": {
+        "properties": {
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "title": "Year",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_id",
+          "title",
+          "year"
+        ],
+        "title": "InsightEarliestResponse",
+        "type": "object"
+      },
       "InsightResponse": {
         "properties": {
           "key": {
@@ -1994,6 +2017,63 @@
           "covers"
         ],
         "title": "InsightRowResponse",
+        "type": "object"
+      },
+      "InsightSummaryResponse": {
+        "description": "The figures the insights page's lead sentence reads (Sprint 102).",
+        "properties": {
+          "earliest": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InsightEarliestResponse"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "finished": {
+            "title": "Finished",
+            "type": "integer"
+          },
+          "held": {
+            "title": "Held",
+            "type": "integer"
+          },
+          "modal_score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Modal Score"
+          },
+          "rated": {
+            "title": "Rated",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "unrated": {
+            "title": "Unrated",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "type",
+          "held",
+          "finished",
+          "rated",
+          "unrated",
+          "modal_score",
+          "earliest"
+        ],
+        "title": "InsightSummaryResponse",
         "type": "object"
       },
       "InsightSuppressedResponse": {
@@ -6557,6 +6637,138 @@
           }
         },
         "summary": "Get Score Distribution"
+      }
+    },
+    "/api/insights/summary": {
+      "get": {
+        "description": "The lead sentence's figures for one domain (Sprint 102).",
+        "operationId": "get_insight_summary_api_insights_summary_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ItemTypeName"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryStatus"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Status"
+            }
+          },
+          {
+            "in": "query",
+            "name": "shelf",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Shelf"
+            }
+          },
+          {
+            "in": "query",
+            "name": "format",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryFormat"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Format"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InsightSummaryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Get Insight Summary"
       }
     },
     "/api/item-types": {

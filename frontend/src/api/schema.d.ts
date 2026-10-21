@@ -790,6 +790,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/insights/summary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Get Insight Summary
+     * @description The lead sentence's figures for one domain (Sprint 102).
+     */
+    get: operations["get_insight_summary_api_insights_summary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/item-types": {
     parameters: {
       query?: never;
@@ -1833,6 +1853,15 @@ export interface components {
       /** Label */
       label: string;
     };
+    /** InsightEarliestResponse */
+    InsightEarliestResponse: {
+      /** Entry Id */
+      entry_id: number;
+      /** Title */
+      title: string;
+      /** Year */
+      year: number;
+    };
     /** InsightResponse */
     InsightResponse: {
       /** Key */
@@ -1877,6 +1906,25 @@ export interface components {
       rated_count: number;
       /** Score Spread */
       score_spread: number | null;
+    };
+    /**
+     * InsightSummaryResponse
+     * @description The figures the insights page's lead sentence reads (Sprint 102).
+     */
+    InsightSummaryResponse: {
+      earliest: components["schemas"]["InsightEarliestResponse"] | null;
+      /** Finished */
+      finished: number;
+      /** Held */
+      held: number;
+      /** Modal Score */
+      modal_score: number | null;
+      /** Rated */
+      rated: number;
+      /** Type */
+      type: string;
+      /** Unrated */
+      unrated: number;
     };
     /** InsightSuppressedResponse */
     InsightSuppressedResponse: {
@@ -4601,6 +4649,59 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ScoreDistributionResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  get_insight_summary_api_insights_summary_get: {
+    parameters: {
+      query: {
+        type: components["schemas"]["ItemTypeName"];
+        status?: components["schemas"]["EntryStatus"][] | null;
+        shelf?: string[] | null;
+        format?: components["schemas"]["EntryFormat"][] | null;
+        q?: string | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["InsightSummaryResponse"];
         };
       };
       /** @description Unauthorized */

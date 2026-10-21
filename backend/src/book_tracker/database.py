@@ -6,7 +6,7 @@ from sqlalchemy import create_engine as sqlalchemy_create_engine
 from sqlalchemy.engine import Connection
 
 from book_tracker.config import Settings
-from book_tracker.domain.normalization import normalize_text
+from book_tracker.domain.normalization import insight_group, normalize_text
 
 
 def create_engine(settings: Settings) -> Engine:
@@ -27,6 +27,9 @@ def create_engine(settings: Settings) -> Engine:
         # given request ranks anything.
         dbapi_connection.create_function(
             "normalize_text", 1, lambda value: normalize_text(value) if value is not None else None
+        )
+        dbapi_connection.create_function(
+            "insight_group", 1, lambda value: insight_group(value) if value is not None else None
         )
 
     return engine

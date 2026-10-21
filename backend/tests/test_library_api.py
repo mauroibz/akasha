@@ -613,6 +613,7 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("GET", "/api/entries"),
         ("GET", "/api/insights"),
         ("GET", "/api/insights/scores"),
+        ("GET", "/api/insights/summary"),
         ("POST", "/api/entries"),
         ("PATCH", "/api/entries/bulk"),
         ("POST", "/api/entries/accept-suggested"),
