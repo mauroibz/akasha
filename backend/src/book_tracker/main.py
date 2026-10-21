@@ -4,14 +4,17 @@ import logging
 import sqlite3
 from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
+from http import HTTPStatus
 from pathlib import Path
 from typing import Any
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError, SQLAlchemyError
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from book_tracker.api.auth import (
     LoginRateLimiter,
@@ -148,6 +151,10 @@ def _back_up_before_migrating(configured: Settings) -> None:
         "pre_migration_backup_written",
         extra={"path": str(result.path), "pending": pending},
     )
+
+
+#: The catch-all's answer and auth-off's, in the one error envelope (Sprint 087).
+_NOT_FOUND = {"error": {"code": "not_found", "message": "Not Found", "details": {}}}
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -320,7 +327,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             await provider_client.aclose()
             app.state.engine.dispose()
 
-    app = FastAPI(title="Akasha", version="2.3.0", lifespan=lifespan)
+    # Every route that takes input documents the envelope for its 422, which is what
+    # `request_validation_failed` below returns, instead of FastAPI's own body.
+    app = FastAPI(
+        title="Akasha",
+        version="2.3.0",
+        lifespan=lifespan,
+        responses={422: {"model": ErrorResponse}},
+    )
     # Available before lifespan for route inspection; requests still run only
     # after lifespan has installed the engine and session store dependencies.
     app.state.auth = configured.auth
@@ -357,7 +371,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         if configured.auth == "off":
             if request.url.path.startswith("/api/auth/"):
-                return JSONResponse(status_code=404, content={"detail": "Not Found"})
+                return JSONResponse(status_code=404, content=_NOT_FOUND)
             return await call_next(request)
         strip_untrusted_identity_header(
             request, configured.trusted_proxy_header, configured.trusted_proxy_peers
@@ -450,6 +464,43 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         assert principal is not None
         request.state.principal = principal
         return await dispatch_with_cookie()
+
+    @app.exception_handler(StarletteHTTPException)
+    async def http_error(_request: Request, error: StarletteHTTPException) -> Response:
+        """Starlette's own errors (an `HTTPException` a route raises, a 405) in the
+        envelope every other error uses, so a client parses one shape (Sprint 087)."""
+        try:
+            phrase = HTTPStatus(error.status_code).phrase
+        except ValueError:
+            phrase = "Error"
+        code = phrase.lower().replace(" ", "_").replace("-", "_")
+        message = error.detail if isinstance(error.detail, str) and error.detail else phrase
+        response = error_response(error.status_code, code, message)
+        if error.headers:
+            response.headers.update(error.headers)
+        return response
+
+    @app.exception_handler(RequestValidationError)
+    async def request_validation_failed(
+        _request: Request, error: RequestValidationError
+    ) -> JSONResponse:
+        """A body or query FastAPI refused, named field by field in the envelope."""
+        fields = []
+        for problem in error.errors():
+            location = [str(part) for part in problem.get("loc", ())]
+            if location and location[0] in {"body", "query", "path", "header", "cookie"}:
+                location = location[1:] or location
+            fields.append({"field": ".".join(location), "message": str(problem.get("msg", ""))})
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": "validation_error",
+                    "message": "The request is not valid",
+                    "details": {"fields": fields},
+                }
+            },
+        )
 
     @app.exception_handler(LibraryError)
     async def library_error(_request: object, error: LibraryError) -> JSONResponse:
@@ -587,7 +638,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         include_in_schema=False,
     )
     def missing_api(path: str) -> JSONResponse:
-        return JSONResponse(status_code=404, content={"detail": "Not Found"})
+        return JSONResponse(status_code=404, content=_NOT_FOUND)
 
     static_dir = configured.static_dir
     if static_dir is not None:
