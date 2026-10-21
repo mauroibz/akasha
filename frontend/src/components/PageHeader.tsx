@@ -54,7 +54,7 @@ export function PageHeader({
               ref={headingRef}
               tabIndex={headingRef ? -1 : undefined}
               className={cn(
-                "text-4xl font-semibold tracking-tight",
+                "font-display text-4xl font-medium tracking-tight sm:text-5xl",
                 headingRef && "focus:outline-none",
                 eyebrow !== undefined && "mt-2",
               )}

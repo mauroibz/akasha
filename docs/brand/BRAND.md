@@ -48,11 +48,18 @@ its neighbours.
 
 ## Colour
 
-| Element | Hex | Token |
+Two themes since Sprint 090 (DEC-165): *Ink* and *Paper*. The arch takes the theme's
+text colour; the dot is amber in both.
+
+| Element | Ink | Paper |
 |---|---|---|
-| Arch | `#fafafa` | zinc-50 |
-| Dot | `#fbbf24` | amber-400 |
-| Ground | `#09090b` | zinc-950 |
+| Arch | `#f3efe6` | `#1c1917` |
+| Dot | `#fbbf24` | `#fbbf24` |
+| Ground | `#0d0c0a` | `#f4f0e6` |
+
+Titles are set in **Newsreader** (bundled, `--font-display`); everything else stays
+Inter. The full token sets live in `frontend/src/index.css` and are held to WCAG AA by
+`frontend/src/lib/contrast.test.ts`.
 
 In code the arch inherits `currentColor`; only the dot is hardcoded. The mark needs no
 second brand colour, and must not acquire one.

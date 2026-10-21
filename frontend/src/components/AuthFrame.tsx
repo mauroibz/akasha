@@ -9,7 +9,9 @@ export function AuthFrame({ children }: { children: ReactNode }) {
       <div className="w-full max-w-sm">
         <div className="flex flex-col items-center text-center">
           <AkashaMark size={56} className="text-foreground" />
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight">Akasha</h1>
+          <h1 className="mt-4 font-display text-5xl font-medium tracking-tight">
+            Akasha
+          </h1>
         </div>
         <Panel className="mt-8" bodyClassName="p-5 sm:p-6">
           {children}

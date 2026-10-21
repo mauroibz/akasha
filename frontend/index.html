@@ -3,7 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#09090b" />
+    <meta name="theme-color" content="#0d0c0a" />
+    <!-- The theme is set before the first paint so a Paper reader never sees a
+         flash of Ink (Sprint 090). The same key and rules as src/lib/theme.ts. -->
+    <script>
+      (function () {
+        var choice = "system";
+        try {
+          choice = localStorage.getItem("akasha:theme") || "system";
+        } catch (error) {}
+        var theme =
+          choice === "paper" || choice === "ink"
+            ? choice
+            : window.matchMedia("(prefers-color-scheme: light)").matches
+              ? "paper"
+              : "ink";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
     <meta
       name="description"
       content="A self-hosted personal library of the books, music, anime, films and series you have, and what you thought of them."

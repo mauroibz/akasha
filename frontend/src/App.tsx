@@ -48,6 +48,9 @@ const ShelfPage = lazy(async () => ({
 const InsightsPage = lazy(async () => ({
   default: (await import("@/pages/InsightsPage")).InsightsPage,
 }));
+const SettingsPage = lazy(async () => ({
+  default: (await import("@/pages/SettingsPage")).SettingsPage,
+}));
 const LoginPage = lazy(async () => ({
   default: (await import("@/pages/LoginPage")).LoginPage,
 }));
@@ -133,6 +136,7 @@ function PrivateRoutes({
             <Route path="/shelves" element={<ShelvesPage />} />
             <Route path="/shelves/:slug" element={<ShelfPage />} />
             <Route path="/insights" element={<InsightsPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route
               path="/people"
               element={

@@ -181,7 +181,7 @@ export function InsightsPage() {
           <h1
             ref={headingRef}
             tabIndex={-1}
-            className="text-4xl font-semibold focus:outline-none"
+            className="font-display text-4xl font-medium tracking-tight focus:outline-none sm:text-5xl"
           >
             Insights
           </h1>

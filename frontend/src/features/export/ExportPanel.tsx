@@ -188,7 +188,9 @@ export function ExportPanel() {
 
   return (
     <main className="mx-auto min-h-screen max-w-5xl px-5 py-8">
-      <h1 className="text-4xl font-semibold">Export</h1>
+      <h1 className="font-display text-4xl font-medium tracking-tight sm:text-5xl">
+        Export
+      </h1>
       <p className="mt-2 text-muted-foreground">
         Take your library elsewhere. Every file below is generated from your
         library as it stands right now.

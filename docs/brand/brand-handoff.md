@@ -37,6 +37,10 @@ warmth by being sparing.
 
 ## Environment: dark only
 
+> **Superseded by DEC-165 (Sprint 090).** Akasha now has two themes, *Ink* and *Paper*,
+> chosen in Settings and defaulting to the device. The current colours are in
+> [`BRAND.md`](BRAND.md). This section is kept as the record of the original handoff.
+
 The application declares `color-scheme: dark` and has **no light mode**. There is no
 light-background context to design for, now or planned.
 

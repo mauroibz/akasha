@@ -51,6 +51,26 @@ const navItems: readonly NavItem[] = [
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];
 
+/** Settings sits apart from the five destinations: visited rarely, found easily. */
+function SettingsLink() {
+  return (
+    <NavLink
+      to="/settings"
+      aria-label="Settings"
+      className={({ isActive }) =>
+        cn(
+          "flex h-11 w-11 items-center justify-center rounded-lg transition-colors focus-ring [&_svg]:h-5 [&_svg]:w-5",
+          isActive
+            ? "bg-primary/15 text-primary"
+            : "text-muted-foreground hover:bg-accent hover:text-foreground",
+        )
+      }
+    >
+      <Settings aria-hidden="true" />
+    </NavLink>
+  );
+}
+
 function AccountControl({
   user,
   onSignedOut,
@@ -95,8 +115,8 @@ function AccountControl({
           className="min-h-11 w-full justify-start gap-2"
           onClick={() => void navigate("/people")}
         >
-          <Settings className="h-4 w-4" aria-hidden="true" />
-          {user.is_admin ? "People" : "Settings"}
+          <UserRound className="h-4 w-4" aria-hidden="true" />
+          {user.is_admin ? "People" : "Account"}
         </Button>
         <Button
           variant="ghost"
@@ -219,14 +239,19 @@ export function AppShell({
                 <span>{item.label}</span>
               </NavLink>
             ))}
-            {user && onSignedOut ? (
-              <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <SettingsLink />
+              {user && onSignedOut ? (
                 <AccountControl user={user} onSignedOut={onSignedOut} />
-              </div>
-            ) : null}
+              ) : null}
+            </div>
           </nav>
+          {/* Only with an account to show: on a phone every pixel above the first
+            cover counts (the library spec holds it under 300px). The phone's own
+            way to Settings arrives with Sprint 093's phone pass. */}
           {user && onSignedOut ? (
-            <header className="flex min-h-14 items-center justify-end border-b border-border/80 px-4 sm:hidden">
+            <header className="flex min-h-14 items-center justify-end gap-1 border-b border-border/80 px-4 sm:hidden">
+              <SettingsLink />
               <AccountControl user={user} onSignedOut={onSignedOut} />
             </header>
           ) : null}

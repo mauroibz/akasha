@@ -7,10 +7,24 @@ import animate from "tailwindcss-animate";
  * components are a defect; a theme change is one edit here.
  */
 export default {
-  darkMode: ["class"],
+  darkMode: ["selector", '[data-theme="ink"]'],
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // `text-primary`, `border-primary` and the focus ring read the amber that is
+      // legible on the page; `bg-primary` keeps the fill (Sprint 090).
+      textColor: {
+        primary: {
+          DEFAULT: "hsl(var(--primary-text))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+      },
+      borderColor: {
+        primary: "hsl(var(--primary-text))",
+      },
+      ringColor: {
+        primary: "hsl(var(--primary-text))",
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
@@ -68,6 +82,7 @@ export default {
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
+        display: ["var(--font-display)"],
       },
       keyframes: {
         // A rejected write, said in the only language a row has. Four pixels

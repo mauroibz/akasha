@@ -570,7 +570,7 @@ export function HomePage() {
           virtualizer's `scrollMargin` measurement stays valid. */}
       <div className="sticky top-0 z-40 -mx-5 -mt-7 border-b border-border/70 bg-background/95 px-5 pb-1.5 pt-2 backdrop-blur sm:-mx-8 sm:px-8">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-2.5">
-          <h1 className="flex items-center gap-2.5 text-xl font-semibold tracking-tight">
+          <h1 className="flex items-center gap-2.5 font-display text-2xl font-medium tracking-tight">
             <AkashaMark
               size={24}
               className="shrink-0 text-foreground"

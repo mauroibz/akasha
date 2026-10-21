@@ -5,7 +5,7 @@ export function NotFoundPage() {
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 text-center">
       <p className="text-6xl font-bold text-primary/30">404</p>
-      <h1 className="mt-4 text-2xl font-semibold">Page not found</h1>
+      <h1 className="mt-4 font-display text-3xl font-medium">Page not found</h1>
       <p className="mt-2 text-muted-foreground">
         This page doesn&apos;t exist. Your library is still safe.
       </p>
@@ -36,7 +36,9 @@ export function RouteErrorPage({
 }) {
   return (
     <main className="mx-auto flex min-h-[70vh] max-w-xl flex-col items-center justify-center px-6 text-center">
-      <h1 className="text-2xl font-semibold">Something went wrong</h1>
+      <h1 className="font-display text-3xl font-medium">
+        Something went wrong
+      </h1>
       <p className="mt-2 text-muted-foreground">
         {error.message ?? "The page could not be loaded."}
       </p>
