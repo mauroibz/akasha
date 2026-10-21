@@ -4,7 +4,7 @@
 
 On 2026-10-21 the owner accepted `docs/production-grade-proposal.md` (DEC-165) and the plan
 reopened as Sprints 087–101, to run autonomously with per-sprint verification limited to what
-each sprint changed (DEC-167). 087–096 are completed. **Sprint 097 — Arrivals and the share target** is `ready`.
+each sprint changed (DEC-167). 087–097 are completed. **Sprint 098 — Now and Diary** is `ready`. Waiting on the owner: trust-stated-status on import (DEC-165 point 3).
 
 The last user-visible change: Add has an *Ebook files* drop zone. Dropped EPUBs open the import
 preview already filled from each file's own metadata and cover; one click commits them into
@@ -25,7 +25,7 @@ for v2.3.0; 087 changed no deployment files.
 
 ## Next session
 
-Run Sprint 097 (`docs/sprints/097-arrivals-and-share.md`). A sprint that adds a route also runs `test_library_api.py`, `test_isolation.py` and `test_app_shape.py`. Full suites are owed once before the
+Run Sprint 098 (`docs/sprints/098-now-and-diary.md`). A sprint that adds a route also runs `test_library_api.py`, `test_isolation.py` and `test_app_shape.py`. Full suites are owed once before the
 next release (DEC-167). The design mock the owner
 approved is the canvas artifact https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa; Sprints
 090–093 build from it.

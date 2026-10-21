@@ -2,9 +2,9 @@
 
 **Plan revision:** 45
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [097 — Arrivals and the share target](097-arrivals-and-share.md) (ready),
-the eleventh of fifteen from the owner's accepted production-grade proposal (DEC-165); see
-"Production grade" below. Sprints 001–096 are done: Sprint 082
+**Active sprint:** [098 — Now and Diary](098-now-and-diary.md) (ready),
+the twelfth of fifteen from the owner's accepted production-grade proposal (DEC-165); see
+"Production grade" below. Sprints 001–097 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -216,8 +216,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [094](094-command-bar.md) | The command bar: library, web, resolve and navigate in one place | 093 | completed |
 | [095](095-paste-and-drop.md) | Paste and drop anywhere: file detection, scheme-less links, OpenGraph and Spotify oEmbed | 094 | completed |
 | [096](096-import-redrawn.md) | Import as three steps: source, check, done | 095 | completed |
-| [097](097-arrivals-and-share.md) | Arrivals, the PWA share target, and trust-stated-status if the owner accepts it | 096 | ready |
-| 098 | The Now strip and the Diary | 097 | planned |
+| [097](097-arrivals-and-share.md) | Arrivals, the PWA share target, and trust-stated-status if the owner accepts it | 096 | completed |
+| [098](098-now-and-diary.md) | The Now strip and the Diary | 097 | ready |
 | 099 | StoryGraph, Hardcover, AniList and Simkl importers | 098 | planned |
 | 100 | Re-file into another domain, and saved views | 099 | planned |
 | 101 | Metrics, provider health from real calls, the response cache | 100 | planned |

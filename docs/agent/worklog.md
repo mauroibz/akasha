@@ -6130,3 +6130,18 @@ screenshots of the grid and Settings.
 moved. `ImportPage.tsx` is still one large file (partial split).
 
 **Next.** Sprint 097 — arrivals and the share target; trust-stated-status waits for the owner.
+
+---
+
+## 2026-10-21 — Sprint 097: arrivals and the share target
+
+**Done.** The arrivals strip; `/share` and a manifest `share_target`; a production-only service
+worker. Trust-stated-status is not built: it waits for the owner (DEC-165 point 3).
+
+**Verified and how.** Unit tests, `vitest related`, `make check`, three specs, a production build,
+a live share and a live 30-book import watched filling in.
+
+**Found.** The strip first showed the batch's last rows (covers empty while the count rose); a
+nested live region announced the count twice.
+
+**Next.** Sprint 098 — Now and Diary.

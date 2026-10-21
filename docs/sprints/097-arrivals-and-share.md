@@ -1,7 +1,7 @@
 # Sprint 097 — Arrivals and the share target
 
 **Sprint:** 097
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 096
 **Owner:** Mauro
@@ -51,4 +51,18 @@ Trust stated status (awaiting the owner); offline data (the shell only).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `Arrivals.test.tsx`, `SharePage.test.tsx`, `vitest
+related`, `make check`, the import, command-bar and production-bundle specs, a production build
+(contains `sw.js`, registers it, manifest carries `share_target`), and two live runs: a shared
+IMDb link (in `text`, among other words) opened the bar on its film; a 30-book Goodreads CSV
+dropped on Import and committed filled in "7 of 30" with seven covers after 40 s.
+
+- **AC1.** The result panel shows *Arriving*: the batch's first twelve entries and "N of M
+  filled in", advanced by each finished enrichment job. First seen live with the count rising
+  over empty covers: the strip had shown the newest twelve, which enrichment reaches last; fixed.
+- **AC2.** `/share` opens the bar on the shared url, else the first link in the text.
+- **AC3.** The worker registers in production over a secure context only.
+
+**Not built, awaiting the owner:** trust stated status on import (§5.3, I7; DEC-165 point 3).
+**Found:** the count's own live region nested inside the result panel's announced twice; removed
+(caught by the import spec after a commit had gone in).

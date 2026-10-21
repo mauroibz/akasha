@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 45,
-  "project_status": "in_progress",
-  "active_sprint": "097",
-  "active_sprint_file": "docs/sprints/097-arrivals-and-share.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "096",
+  "project_status": "ready",
+  "active_sprint": "098",
+  "active_sprint_file": "docs/sprints/098-now-and-diary.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "097",
   "completed_sprints": [
     "001",
     "002",
@@ -102,8 +102,9 @@
     "093",
     "094",
     "095",
-    "096"
+    "096",
+    "097"
   ],
-  "started_at": "2026-10-21T17:22:45-03:00",
-  "updated_at": "2026-10-21T17:22:45-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T17:28:45-03:00"
 }
