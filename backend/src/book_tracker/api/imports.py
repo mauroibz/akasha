@@ -1002,6 +1002,20 @@ def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobPro
     return JobProgressResponse.model_validate(job)
 
 
+@router.post("/jobs/{job_id}/retry", response_model=JobProgressResponse)
+def retry_job(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
+    """Queue a failed job again, from the shell's activity list (Sprint 089)."""
+    from book_tracker.infrastructure.jobs import JobRepository
+
+    repo = JobRepository(request.app.state.engine)
+    job = repo.get_job(job_id)
+    if job is None or (job["user_id"] is not None and job["user_id"] != user.effective_user_id):
+        raise LibraryError("job_not_found", "Job was not found", status_code=404)
+    if not repo.retry(job_id):
+        raise LibraryError("job_not_failed", "Only a failed job can be retried", status_code=409)
+    return JobProgressResponse.model_validate(repo.get_job(job_id))
+
+
 @enrichment_router.post("/backfill", status_code=202, response_model=BackfillResponse)
 def backfill_enrichment(request: Request) -> BackfillResponse:
     """Queue enrichment for persisted items a provider lookup could still improve.

@@ -8,6 +8,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from book_tracker.api.auth import router as auth_router
 from book_tracker.api.auth import users_router
+from book_tracker.api.events import router as events_router
 from book_tracker.api.export import router as export_router
 from book_tracker.api.imports import catalog_router, enrichment_router
 from book_tracker.api.imports import router as imports_router
@@ -58,6 +59,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(catalog_router, responses=auth_responses)
     app.include_router(enrichment_router, responses=auth_responses)
     app.include_router(export_router, responses=auth_responses)
+    app.include_router(events_router, responses=auth_responses)
 
     @app.api_route(
         "/api/{path:path}",

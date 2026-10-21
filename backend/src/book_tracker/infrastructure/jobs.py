@@ -179,7 +179,10 @@ class JobRepository:
             row.progress = json.dumps(dict(progress))
             row.finished_at = now_iso
             row.lease_expires_at = None
-            row.updated_at = now_iso
+            # The wall clock, not the runner's `now`: that is the claim's moment,
+            # and a change stamped with it would look no newer than the claim
+            # to anything reading changes in order (Sprint 089's event stream).
+            row.updated_at = _now()
 
     def fail(
         self,
@@ -208,7 +211,10 @@ class JobRepository:
                 row.available_at = (
                     (now + _retry_backoff(row.attempts)).isoformat().replace("+00:00", "Z")
                 )
-            row.updated_at = now_iso
+            # The wall clock, not the runner's `now`: that is the claim's moment,
+            # and a change stamped with it would look no newer than the claim
+            # to anything reading changes in order (Sprint 089's event stream).
+            row.updated_at = _now()
 
     def defer(self, job_id: str, until: datetime, *, reason: str) -> None:
         """Return a job to the queue for later **without spending an attempt**.
@@ -287,6 +293,61 @@ class JobRepository:
                 row.heartbeat_at = None
                 row.updated_at = now_iso
             return [row.id for row in rows]
+
+    def changes_for_user(self, user_id: int, *, since: str | None) -> list[dict[str, Any]]:
+        """One person's jobs changed at or after `since`, oldest first (Sprint 089).
+
+        A person's jobs are the ones they own and the owner-less jobs chained to their
+        import batches (enrichment is queued without an owner, technical spec 5.1).
+        With no `since`, what is still running plus what finished in the last ten
+        minutes: enough for a page opened mid-import to show where things stand.
+        """
+        from book_tracker.infrastructure.models import ImportBatchRow
+
+        mine = select(ImportBatchRow.id).where(ImportBatchRow.user_id == user_id)
+        query = select(JobRow).where(
+            (JobRow.user_id == user_id) | (JobRow.user_id.is_(None) & JobRow.batch_id.in_(mine))
+        )
+        if since is None:
+            recent = (datetime.now(UTC) - timedelta(minutes=10)).isoformat()
+            query = query.where(
+                JobRow.state.in_(("queued", "running"))
+                | (JobRow.updated_at >= recent.replace("+00:00", "Z"))
+            )
+        else:
+            query = query.where(JobRow.updated_at >= since.replace("+00:00", "Z"))
+        with Session(self.engine) as session:
+            rows = list(session.scalars(query.order_by(JobRow.updated_at, JobRow.id)))
+            return [
+                {
+                    "id": row.id,
+                    "batch_id": row.batch_id,
+                    "kind": row.kind,
+                    "state": row.state,
+                    "progress": json.loads(row.progress),
+                    "error": row.error,
+                    "error_code": row.error_code,
+                    "attempts": row.attempts,
+                    "updated_at": row.updated_at,
+                }
+                for row in rows
+            ]
+
+    def retry(self, job_id: str) -> bool:
+        """Queue a dead-lettered job again with its attempts reset. False if not failed."""
+        now_iso = _now()
+        with self._write() as session:
+            row = session.get(JobRow, job_id)
+            if row is None or row.state != "failed":
+                return False
+            row.state = "queued"
+            row.attempts = 0
+            row.error = None
+            row.error_code = None
+            row.available_at = now_iso
+            row.finished_at = None
+            row.updated_at = now_iso
+            return True
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
         with Session(self.engine) as session:

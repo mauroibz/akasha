@@ -377,6 +377,12 @@
    ]
   ],
   [
+   "/api/import/jobs/{job_id}/retry",
+   [
+    "POST"
+   ]
+  ],
+  [
    "/api/import/batches/{batch_id}",
    [
     "DELETE"
@@ -408,6 +414,12 @@
   ],
   [
    "/api/export/{view}",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/events",
    [
     "GET"
    ]
