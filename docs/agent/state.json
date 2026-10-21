@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 46,
-  "project_status": "in_progress",
-  "active_sprint": "104",
-  "active_sprint_file": "docs/sprints/104-goals-on-the-diary.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "103",
+  "project_status": "ready",
+  "active_sprint": "105",
+  "active_sprint_file": "docs/sprints/105-shelves-with-opinions.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "104",
   "completed_sprints": [
     "001",
     "002",
@@ -109,8 +109,9 @@
     "100",
     "101",
     "102",
-    "103"
+    "103",
+    "104"
   ],
-  "started_at": "2026-10-21T20:18:07-03:00",
-  "updated_at": "2026-10-21T20:18:07-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T20:25:52-03:00"
 }

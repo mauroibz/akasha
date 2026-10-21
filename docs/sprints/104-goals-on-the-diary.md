@@ -1,7 +1,7 @@
 # Sprint 104 — Goals on the Diary
 
 **Sprint:** 104
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 46
 **Depends on:** 103
 **Owner:** Mauro
@@ -52,4 +52,32 @@ running app in Paper, Ink and at 390px.
 
 ## Outcome
 
-Not started.
+Delivered 2026-10-21. Verified per DEC-167: `goals.test.ts` (6) and the Diary page tests (4),
+`vitest related` (247), `make check`, the library spec and the accessibility spec with two new
+checks (the Diary with a goal and the goal dialog, Paper and Ink; 55), and the Diary in the
+running app on the copy of the owner's library (a goal set and twelve finish dates spread over
+2026 on the scratch copy only, since the real library has none this year), in Paper, Ink and at
+390px.
+
+- **AC1.** The dialog sets a goal (`PUT`, tested), *Change goal* reopens it filled, *Remove goal*
+  deletes it; without a goal one quiet line offers it, with one an *Add a goal for another
+  library* line.
+- **AC2.** `calendarPlaces`: a lit place per finished entry in its month (beyond the goal too,
+  capped at six with "+N"), `open` for a past month's unlit places, dashed `now` and `ahead`;
+  there is no missed state. The sentence: "Two a month, at your own pace. October has one so far."
+- **AC3.** Two picks with their reasons ("By Julio Cortázar, whose books you rate 9.0 on
+  average.", "Waiting since March 2024."); *Something else* swaps one; *Start* patches the entry
+  to the domain's declared in-progress status and is absent where there is none.
+- **AC4.** Axe passes on the Diary with a goal and on the dialog, in both themes.
+
+Also, from the owner's note on cover sizing: the Diary's month covers are larger, a month's only
+cover largest (up to 13rem wide), the rest two to five a row, with a spine shadow.
+
+**Deviations.**
+- *Hide goal* in the mock is *Remove goal*: hiding while keeping would need a stored flag for
+  little gain, and setting the goal again is one dialog.
+- A waiting pick's month is read in UTC, as stored; read locally, a midnight addition fell into
+  the month before (caught by the page test, west of Greenwich).
+- The accessibility check waits for the dialog's fade-in to finish before sampling colour.
+
+Commit: `a2758d3`.

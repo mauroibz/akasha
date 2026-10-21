@@ -6303,3 +6303,29 @@ gate (HANDOFF).
 in code. The owner's library has no 2026 finish dates, so goals start at zero there.
 
 **Next.** Sprint 104, the screens.
+
+## 2026-10-21 — Sprint 104: goals on the Diary
+
+**Done.**
+
+- The goal band with the calendar of lights.
+- The goal dialog.
+- Picks with Start and Something else.
+- A quiet invitation when no goal is set.
+- Larger Diary covers.
+
+**Verified and how.**
+
+- `goals.test.ts` and the Diary page tests; `vitest related` (247); `make check`.
+- The library spec and the accessibility spec, with new checks for the Diary with a goal and the
+  dialog in both themes (55).
+- The Diary in the running app on the scratch copy, where a goal and twelve finish dates were
+  set: Paper, Ink and 390px.
+
+**Found.**
+
+- A waiting pick's month was read in local time, putting a midnight UTC addition in the month
+  before; it is read in UTC now.
+- Axe sampled the dialog mid-fade; the check waits for animations.
+
+**Next.** Sprint 105, Shelves.
