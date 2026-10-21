@@ -6005,3 +6005,20 @@ library and triage Playwright specs (49). No screen changed visibly, so no scree
 dropped `search_progress`, and the job wrote no progress until it finished. Fixed here.
 
 **Next.** Sprint 089 — FTS5 search, the event stream, the activity indicator.
+
+---
+
+## 2026-10-21 — Sprint 089: search and activity
+
+**Done.** FTS5 library search (migration 0023) over creators, series, subjects, genres and notes;
+`GET /api/events`; job retry; the shell's mark as a background-work control; the import page
+follows its job by event.
+
+**Verified and how.** Covering tests (search 8, events 3, plus job/migration/library suites),
+`vitest related`, `make check`, import/library/accessibility specs (74). Live: a 30-book and a
+220-book import with the activity list open.
+
+**Felt wrong.** The first activity list showed one row per job ("Waiting" thirty times); grouped
+by batch before closing. No relevance ranking yet (094).
+
+**Next.** Sprint 090 — two themes.

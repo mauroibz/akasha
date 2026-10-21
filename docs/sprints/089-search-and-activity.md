@@ -1,7 +1,7 @@
 # Sprint 089 — Search and activity
 
 **Sprint:** 089
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 088
 **Owner:** Mauro
@@ -68,4 +68,25 @@ Playwright specs, and a screenshot of the indicator with a job running.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `test_library_search.py` (8), `test_events.py` (3),
+the job, migration and library suites they touch, `vitest related`, `make check`, and the import,
+library and accessibility browser specs (74 passed); a look at the running app with real imports.
+
+- **AC1.** Migration `0023`: FTS5 over title and original title, creators and cast, series,
+  subjects and genres, and the entry's note; triggers on entries and items; `unicode61
+  remove_diacritics 2` folds accents. Values are read through `json_each`, because
+  `json_extract` returns an array as stored JSON text, where `json.dumps` escapes "á". ORed with
+  the old substring match. **Deviation:** no relevance ranking; the library keeps its chosen sort
+  and keyset pagination. Ranked search moves to the command bar (094).
+- **AC2.** Migrates and reverses on a copy of the owner's database (16 entries indexed).
+- **AC3.** `GET /api/events` streams each change to a person's jobs (their own plus owner-less jobs
+  chained to their batches), with a bounded connection lifetime. Job writes stamp `updated_at`
+  with the wall clock; the runner's claim-time `now` had made a failure look no newer than its
+  claim. The import page follows its job by event instead of a two-second poll.
+- **AC4.** The desktop mark is the activity control: breathing dot while jobs run, a grouped list
+  ("15 of 30 done"), failures with Retry (`POST /api/import/jobs/{id}/retry`). Seen with a
+  30-book and a 220-book import running. The first version listed every job as its own row
+  ("Waiting" thirty times); grouping by batch came from looking at it. The phone shell has no mark
+  yet; that is 093's.
+
+Commits: `1cd1d5d`, `8d2adcc`, `31021eb`.

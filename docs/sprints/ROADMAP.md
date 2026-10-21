@@ -2,9 +2,9 @@
 
 **Plan revision:** 45
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [089 — Search and activity](089-search-and-activity.md) (ready),
-the third of fifteen from the owner's accepted production-grade proposal (DEC-165); see
-"Production grade" below. Sprints 001–088 are done: Sprint 082
+**Active sprint:** [090 — Two themes](090-two-themes.md) (ready),
+the fourth of fifteen from the owner's accepted production-grade proposal (DEC-165); see
+"Production grade" below. Sprints 001–089 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -208,8 +208,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [086](086-drop-ebook-files.md) | Drop ebook files: EPUBs on Add, read, attached, in Triage | 085 | completed |
 | [087](087-jobs-that-keep-their-word.md) | Jobs that keep their word: a waiting rate gate, off-loop routes, one error envelope, request ids | 086 | completed |
 | [088](088-one-contract-generated.md) | One contract, generated: typed client, `ApiError`, query keys, `usePatchEntry`, `create_app` split | 087 | completed |
-| [089](089-search-and-activity.md) | Search and activity: FTS5 library search, the event stream, the shell activity indicator | 088 | ready |
-| 090 | Two themes: tokens, *Paper* and *Ink*, the theme setting, Newsreader and the type scale | 089 | planned |
+| [089](089-search-and-activity.md) | Search and activity: FTS5 library search, the event stream, the shell activity indicator | 088 | completed |
+| [090](090-two-themes.md) | Two themes: tokens, *Paper* and *Ink*, the theme setting, Newsreader and the type scale | 089 | ready |
 | 091 | Primitives: one set of controls, skeletons on every loading state | 090 | planned |
 | 092 | Motion: shared-element covers, transitions, the arch motif, the detail page as property rows | 091 | planned |
 | 093 | The phone pass: compact header, two-column grid, bottom sheets | 092 | planned |
