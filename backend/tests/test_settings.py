@@ -145,3 +145,23 @@ def test_no_setting_is_missing_from_env_example() -> None:
     assert not undocumented, (
         f"Settings accepts variables .env.example never mentions: {undocumented}"
     )
+
+
+def _compose_environment_names() -> set[str]:
+    """Every variable compose.yaml's explicit pass-through list hands the container."""
+    import re
+    from pathlib import Path
+
+    text = (Path(__file__).resolve().parents[2] / "compose.yaml").read_text(encoding="utf-8")
+    return set(re.findall(r"^\s+- ([A-Z][A-Z0-9_]*)(?:=|\s*$)", text, flags=re.MULTILINE))
+
+
+def test_every_setting_reaches_the_container() -> None:
+    """A setting compose does not pass through is a setting a deployment cannot set.
+
+    compose.yaml lists what the container receives instead of using env_file, so
+    a new setting documented in .env.example does nothing in a container until
+    it is added there too (AKASHA_METRICS, Sprint 101, was missed this way).
+    """
+    missing = sorted(_settings_env_names() - _compose_environment_names() - IMAGE_FIXED)
+    assert not missing, f"compose.yaml never passes these settings to the container: {missing}"
