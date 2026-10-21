@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 45,
-  "project_status": "in_progress",
-  "active_sprint": "087",
-  "active_sprint_file": "docs/sprints/087-jobs-that-keep-their-word.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "086",
+  "project_status": "ready",
+  "active_sprint": "088",
+  "active_sprint_file": "docs/sprints/088-one-contract-generated.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "087",
   "completed_sprints": [
     "001",
     "002",
@@ -92,8 +92,9 @@
     "083",
     "084",
     "085",
-    "086"
+    "086",
+    "087"
   ],
-  "started_at": "2026-10-21T14:07:21-03:00",
-  "updated_at": "2026-10-21T14:07:21-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T14:41:09-03:00"
 }

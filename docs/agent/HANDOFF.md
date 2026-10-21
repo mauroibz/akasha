@@ -2,9 +2,10 @@
 
 ## Where the project stands
 
-Sprint 086 ("drop ebook files") is **completed and closed**. On 2026-10-21 the owner accepted
-`docs/production-grade-proposal.md` (DEC-165) and the plan reopened as Sprints 087–101.
-**Sprint 087 — Jobs that keep their word** is `ready`.
+On 2026-10-21 the owner accepted `docs/production-grade-proposal.md` (DEC-165) and the plan
+reopened as Sprints 087–101. **Sprint 087 — Jobs that keep their word** is completed (no
+user-visible change; background work and the request path are sturdier, see DEC-166).
+**Sprint 088 — One contract, generated** is `ready`.
 
 The last user-visible change: Add has an *Ebook files* drop zone. Dropped EPUBs open the import
 preview already filled from each file's own metadata and cover; one click commits them into
@@ -24,7 +25,7 @@ green · live walkthrough clean (three real EPUBs, fresh data dir).
 
 ## Next session
 
-Run Sprint 087 (`docs/sprints/087-jobs-that-keep-their-word.md`). The design mock the owner
+Run Sprint 088 (`docs/sprints/088-one-contract-generated.md`). The design mock the owner
 approved is the canvas artifact https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa; Sprints
 090–093 build from it.
 

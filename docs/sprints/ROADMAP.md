@@ -2,9 +2,9 @@
 
 **Plan revision:** 45
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [087 — Jobs that keep their word](087-jobs-that-keep-their-word.md) (ready),
-the first of fifteen from the owner's accepted production-grade proposal (DEC-165); see
-"Production grade" below. Sprints 001–086 are done: Sprint 082
+**Active sprint:** [088 — One contract, generated](088-one-contract-generated.md) (ready),
+the second of fifteen from the owner's accepted production-grade proposal (DEC-165); see
+"Production grade" below. Sprints 001–087 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -206,8 +206,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
 | [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | completed |
 | [086](086-drop-ebook-files.md) | Drop ebook files: EPUBs on Add, read, attached, in Triage | 085 | completed |
-| [087](087-jobs-that-keep-their-word.md) | Jobs that keep their word: heartbeats, a waiting rate gate, off-loop routes, one error envelope, request ids | 086 | ready |
-| 088 | One contract, generated: typed client, `ApiError`, query keys, `usePatchEntry`, `create_app` split | 087 | planned |
+| [087](087-jobs-that-keep-their-word.md) | Jobs that keep their word: a waiting rate gate, off-loop routes, one error envelope, request ids | 086 | completed |
+| [088](088-one-contract-generated.md) | One contract, generated: typed client, `ApiError`, query keys, `usePatchEntry`, `create_app` split | 087 | ready |
 | 089 | Search and activity: FTS5 library search, the event stream, the shell activity indicator | 088 | planned |
 | 090 | Two themes: tokens, *Paper* and *Ink*, the theme setting, Newsreader and the type scale | 089 | planned |
 | 091 | Primitives: one set of controls, skeletons on every loading state | 090 | planned |
@@ -1759,8 +1759,13 @@ sprint file is expanded from it, against the code as it then stands, when the sp
 active.
 
 - **2.4 Foundations.** **[087 — Jobs that keep their word](087-jobs-that-keep-their-word.md)**
-  (R1–R3, R5 server half, R7); 088 one generated contract (R5, R8); 089 FTS5 search, the event
+  (R1–R3, R5 server half, R7; **completed** 2026-10-21); [088 — One contract, generated](088-one-contract-generated.md) (R5, R8); 089 FTS5 search, the event
   stream and the activity indicator (R4, I6).
+
+  087 found R1 not live and built no per-provider limiter (DEC-166). For 088: the OpenAPI document
+  already declares the error envelope for every 422, and every error the server sends is that
+  envelope, so `ApiError` has one shape to parse. For 089: there is no heartbeat; the activity
+  indicator reads job state.
 - **2.5 Look and feel.** 090 two themes and the display serif (D1, D2; amends the brand's "dark
   only"); 091 primitives and skeletons (D5–D9); 092 motion and the detail page as property rows
   (D3, D4; the lined index card was mocked and rejected); 093 the phone pass (A6).

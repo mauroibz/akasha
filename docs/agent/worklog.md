@@ -5960,3 +5960,31 @@ smoke ran; it had already passed.
 **Next.** Release: tag v2.3.0, CI publishes images, GitHub Release from
 `docs/operations/release-notes-v2.3.md`. The ZimaBoard upgrade needs SSH access this session did
 not have (key refused at 192.168.100.240).
+
+---
+
+## 2026-10-21 — Plan 087–101 (DEC-165); Sprint 087: jobs that keep their word
+
+**Done.** The owner accepted the production-grade proposal after reviewing the design mock
+("much better, go ahead!"); the plan reopened as 087–101. Sprint 087: enrichment waits on a busy
+rate gate instead of failing; 45 never-awaiting routes became `def` under a route-table test;
+the auth middleware, job runner, both handlers, provider cover normalization and the awaiting
+routes' synchronous work moved to `off_loop`; every API error is the one envelope (OpenAPI
+declares it for 422); `X-Request-Id` plus `request_finished` lines, and `job_id` on job log lines.
+
+**Verified and how.** Backend 1630, Vitest 345, make check green, Playwright 146 + 2 skipped.
+Walkthrough on a fresh data dir with live providers: a 220-row Goodreads CSV built from real
+Open Library records previewed and committed; all 220 enrichment jobs succeeded on the first
+attempt, none `rate_limited`, 201 covers installed. `GET /api/entries` sampled 305 times during
+enrichment: median 3.4 ms, max 20.7 ms. A 422 was traced by request id to its log line. In the
+browser every API response carried an id; Library and Inbox (220) rendered normally.
+
+**Deviations.** R1 (lease reclaim mid-run) is not live and no heartbeat was built; no
+per-provider limiter; two import row actions keep short reads on the loop (all DEC-166). No real
+Goodreads export exists on this machine, hence the Open Library-derived CSV.
+
+**Felt wrong, out of scope.** The library shows "Your library is waiting" with 220 books in the
+Inbox; an import's results are one click away but the empty state does not say so. That is
+§5's "arrivals" (Sprint 097).
+
+**Next.** Sprint 088 — one generated contract.

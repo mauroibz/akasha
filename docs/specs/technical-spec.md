@@ -68,7 +68,7 @@ Use Python 3.12 with:
 
 - FastAPI and Pydantic v2 / pydantic-settings;
 - SQLAlchemy 2 declarative mappings and Alembic;
-- SQLite through a single configured engine; application services may remain synchronous unless measured load justifies async DB access;
+- SQLite through a single configured engine; application services may remain synchronous unless measured load justifies async DB access. Synchronous work never runs on the event loop (Sprint 087): a route that awaits nothing is a plain `def`, which Starlette runs on its threadpool, and a route, middleware or job handler that awaits puts its synchronous database, disk and image work through `off_loop` (`infrastructure/offload.py`, four threads). A test walks the route table and refuses an `async def` endpoint that never awaits;
 - `httpx.AsyncClient` for metadata providers;
 - Pillow for cover validation and JPEG conversion;
 - pytest, pytest-cov, respx, and time/path injection for deterministic tests;
@@ -228,6 +228,8 @@ This ledger makes undo safe: reverse only effects recorded for the batch; delete
 - `user_id` foreign key to `users`, and **nullable by design** (migration `0019`): an enrichment job acts on a shared cached item and belongs to nobody, while a job chained to an import batch belongs to whoever ran it. The column is how the two are told apart; migration `0019` attributes a `0016` database's rows by `batch_id` (chained to the seeded user, batchless stays `NULL`), and enforcement of the ledger's ownership moves to the resolver in Sprint 076
 
 Jobs survive restart. Handlers are idempotent. The lifespan runner claims one queued job in a short transaction, processes network/file work outside that transaction, and persists progress. On startup, expired `running` jobs return to `queued` with incremented attempts. Cap retries and expose terminal failure.
+
+The runner is one sequential loop: it reclaims expired leases only on an idle pass, so a job in hand is never reclaimed however long it runs, and the lease matters only after a crash (Sprint 087). A provider pacing gate that is not ready makes a handler wait; it is never a failure and never spends an attempt. Every database call the runner and its handlers make goes through `off_loop`, as the request path's does (§3).
 
 `provider_usage`
 
@@ -621,11 +623,20 @@ The suite is required to be able to fail. Malformed domains declared inside the 
 
 ## 7. HTTP API contract
 
-All routes are under `/api`. JSON uses snake_case. Validation errors follow FastAPI's standard 422 shape; domain failures use:
+All routes are under `/api`. JSON uses snake_case. Every error uses one envelope (Sprint 087):
 
 ```json
 {"error":{"code":"stable_machine_code","message":"human readable","details":{}}}
 ```
+
+That includes the errors FastAPI and Starlette raise themselves. A refused request body or query
+is `422` with code `validation_error` and `details.fields`, a list of `{field, message}` naming
+each refused field without its `body`/`query` prefix. An unknown `/api` path, a route that does not
+exist in the current auth mode, and a Starlette `HTTPException` use the status phrase as the code
+(`not_found`). The OpenAPI document declares this envelope as every route's 422 response.
+
+Every response carries `X-Request-Id`. A well-formed incoming value (8–64 characters from
+`[A-Za-z0-9._-]`) is kept so a proxy's id joins its logs to ours; anything else is replaced.
 
 An import connector may add `user_message` and `action` to that object; both are omitted when it
 did not supply them, so every other refusal keeps exactly the shape above (§6.5, §7.1).
@@ -860,7 +871,7 @@ Coverage is a diagnostic, not a target to game. Critical domain and import code 
 
 ## 11. Observability and operations
 
-Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes, and do not rely on call sites to remember: `logging.py` redacts a denylist of keys (notes, review, description, payload, row/record, api_key, token and kin), scrubs configured secret values out of any string so a key embedded in a logged URL cannot escape, truncates oversized values under innocent keys, and recurses into nested structures. Standard-library records are routed through the same chain, so a `logger.warning(..., extra={...})` is rendered and redacted rather than having its structured fields silently dropped.
+Emit structured logs with timestamp, level, event name, request/job correlation ID, duration, and safe counters. Every line logged while handling a request carries its `request_id` (the `X-Request-Id` the response returns), and each API request outside `/api/health/` ends with one `request_finished` line: `method`, the router's templated `route`, `status` and `duration_ms`, never the concrete path or query. Every line logged while a job runs carries `job_id` and `job_kind`. Provider failures and job retries are warnings; exhausted jobs are errors. Never log secrets or personal notes, and do not rely on call sites to remember: `logging.py` redacts a denylist of keys (notes, review, description, payload, row/record, api_key, token and kin), scrubs configured secret values out of any string so a key embedded in a logged URL cannot escape, truncates oversized values under innocent keys, and recurses into nested structures. Standard-library records are routed through the same chain, so a `logger.warning(..., extra={...})` is rendered and redacted rather than having its structured fields silently dropped.
 
 An admin acting in another library produces exactly one `admin_acting_request` event after each
 handled request. Its only request-specific fields are `admin_user_id`, `acting_as_user_id`,

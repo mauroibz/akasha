@@ -1,7 +1,7 @@
 # Sprint 087 — Jobs that keep their word
 
 **Sprint:** 087
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 086
 **Owner:** Mauro
@@ -145,4 +145,36 @@ Measured 2026-10-21 at `e8127f6`:
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21.
+
+- **AC1 (lease).** Withdrawn as a defect on evidence (DEC-166): reclaim runs only on the idle
+  pass of a sequential runner. `test_a_job_outliving_its_lease_is_not_reclaimed_while_it_runs`
+  pins it with an already-expired lease. No heartbeat was built.
+- **AC2 (rate gate).** Enrichment waits on a busy gate. The new test failed before the change
+  (`['succeeded', 'failed']`) and passes after. Walkthrough: 220 enrichment jobs back to back,
+  220 succeeded, 0 attempts spent, 0 `rate_limited`.
+- **AC3 (event loop).** 45 never-awaiting routes are `def`; the route-table test enforces it.
+  The middleware lookups, the job runner, both handlers, provider cover normalization and the
+  awaiting routes' synchronous work go through `off_loop`. Two latency-sampling tests (health
+  while a session lookup or a job claim is held slow) failed at 0.48 s before and pass after.
+  Walkthrough: `GET /api/entries` sampled 305 times while 220 enrichments ran: median 3.4 ms,
+  p99 14.6 ms, max 20.7 ms.
+- **AC4 (envelope).** `test_error_envelope.py`: unknown path, auth-off route, route-raised
+  `HTTPException`, malformed body (field named), and the OpenAPI 422 schema. `openapi.json`
+  regenerated.
+- **AC5 (request ids).** Three tests in `test_logging.py`. Walkthrough: a 422 traced by its
+  `X-Request-Id` to its `request_finished` line; a proxy's id echoed; every API response the
+  browser received carried an id.
+- **AC6.** Library rendered, Inbox showed the 220 imported books; no user-visible change.
+
+Gates: backend 1630 passed (coverage 90%), Vitest 345, `make check` green, Playwright 146 + 2
+skipped. The 3 pytest warnings are pre-existing (deliberately duplicated zip members).
+
+Deviations (DEC-166): no per-provider limiter; password-hashing auth routes stay `async` so
+hashing keeps the four-thread bound; `answer_proposal` and `research_row` keep their short
+single-row reads on the loop. The walkthrough used a 220-row Goodreads CSV built from real Open
+Library records, because no real Goodreads export exists on this machine. The event-loop
+harness (`scripts/measure_event_loop.sh`) was not run; the in-process latency sampling above
+stands in for it.
+
+Commits: `023eabb`, `87b8d4a`, `5adcda2`, `572d20b`, `6b0e08a`.

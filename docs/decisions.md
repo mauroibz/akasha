@@ -6736,3 +6736,32 @@ an operator command in the house style.
   that need pacing (MusicBrainz, AniList, Kitsu, both Wikidata clients) already pace themselves in
   their own clients, so R2's "one limiter per provider" is narrower than written; 087 records what
   remains instead of building a second pacing layer.
+
+## DEC-166 — What Sprint 087 found the proposal's reliability findings to be
+
+- Date: 2026-10-21
+- Status: accepted
+- Context: Sprint 087 set out to fix the production-grade proposal's R1, R2, R3, R5 (server half)
+  and R7 as written. Two of those claims did not survive contact with the code.
+- Decision:
+  1. **R1 is withdrawn.** `reclaim_expired` runs only on the runner's idle pass and at startup, and
+     the runner is one sequential loop in one uvicorn worker, so a job in hand is never reclaimed
+     however long it runs. No heartbeat is built; a test pins the property with a lease that has
+     already expired when the job starts.
+  2. **R2's per-provider limiter is not built.** MusicBrainz, AniList, Kitsu and both Wikidata
+     clients already pace themselves; the shared 0.5 s gate stays as the floor for the rest.
+     The real defect, enrichment returning `failed/rate_limited` from a busy gate, is fixed:
+     it waits, as import search already did.
+  3. **R3 is fixed with one rule.** The 45 routes that never awaited are plain `def` and run on
+     Starlette's threadpool. The 20 that await put their synchronous work through `off_loop`, as
+     do the authentication middleware, the job runner and both handlers. Provider cover
+     normalization (a Pillow decode and LANCZOS resize every add, import and enrichment paid on
+     the loop) moves into `off_loop` inside `prepare_cover` itself.
+  4. The auth routes that hash passwords stay `async` so hashing keeps `off_loop`'s four-thread
+     bound; Starlette's threadpool allows 40, and a burst of logins should not get 40 hashes.
+  5. `answer_proposal` and `research_row` keep their short single-row reads on the loop around a
+     provider call. Restructuring those two long service methods costs more risk than the few
+     milliseconds it would move.
+- Consequences: the proposal's §2.4 table is left as written, as the record of what was believed
+  on 2026-10-21; this entry is the correction. Sprint 089's activity indicator does not have a
+  heartbeat to read and must be designed from job state and the event stream alone.
