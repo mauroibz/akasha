@@ -1,7 +1,7 @@
 # Sprint 091 — Primitives
 
 **Sprint:** 091
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 090
 **Owner:** Mauro
@@ -53,4 +53,24 @@ Motion and the property-row detail page (092); the phone layout (093).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `primitives.test.tsx` (5), `vitest related` on every
+touched file (220, then 219, then 67), `make check`, and the add/detail, import, triage, library,
+accessibility and ebook browser specs (105). Screenshots: the file picker on Detail (Paper), the
+select on Import (Ink), Shelves (Paper).
+
+- **AC1.** `Skeleton`/`Loading`, `EmptyState`, `Kbd`, `Tooltip`, `NativeSelect`, `FilePicker` in
+  `components/ui/`. No `<select` and no visible native file input outside `ui/`; the attachments
+  input was already hidden behind its own button and stays. The add form's "Loading…" is a
+  button's busy label, not a loading state, and stays.
+- **AC2.** `FilePicker` keeps the real input focusable and labelled; the drawn button opens it.
+- **AC3.** One test changed meaning on purpose: an empty library with books in the Inbox now says
+  "3 waiting in your Inbox" with a way there (the 087 walkthrough's complaint).
+
+**Deviation.** `NativeSelect` rather than Radix Select: the phone's own picker is the better
+control, and Triage renders dozens per page. **Found:** an `aria-live` region anywhere on the page
+stops a Radix modal hiding the rest of the page from assistive technology (the `aria-hidden`
+library keeps live regions and their ancestors); `Loading` and `FilePicker` carry none. Two triage
+specs pinned Ink-era colours and now run on Paper (Playwright's light default); 090 had not run
+that spec. Tooltip and Kbd are built for the command bar (094) and not yet used.
+
+Commit: `9e2853e`.

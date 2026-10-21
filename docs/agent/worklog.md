@@ -6038,3 +6038,18 @@ both themes on a copy of the owner's data.
 entry without auth yet (093).
 
 **Next.** Sprint 091 — primitives.
+
+---
+
+## 2026-10-21 — Sprint 091: primitives
+
+**Done.** Skeleton/Loading, EmptyState, Kbd, Tooltip, NativeSelect, FilePicker; native selects,
+file inputs and loading sentences replaced; the empty library points at a waiting Inbox.
+
+**Verified and how.** Primitive tests, `vitest related`, `make check`, six browser specs (105).
+Screenshots in both themes.
+
+**Felt wrong / found.** An `aria-live` region kept the Detail page readable behind its dialogs;
+removed from the new primitives. Two triage specs pinned Ink-era colours.
+
+**Next.** Sprint 092 — motion and the property-row detail page.
