@@ -129,7 +129,8 @@ export async function getItemTypes(): Promise<ItemType[]> {
   const response = await request("/api/item-types", {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Item types could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Item types could not be loaded");
   return response.json() as Promise<ItemType[]>;
 }
 
@@ -251,7 +252,8 @@ export async function getLibraryPage(
     `/api/entries?${libraryQueryString(filters, cursor, limit)}`,
     { headers: { Accept: "application/json" }, signal },
   );
-  if (!response.ok) throw new Error("Your library could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Your library could not be loaded");
   return (await response.json()) as LibraryPage;
 }
 
@@ -323,7 +325,8 @@ export async function getInsights(params: {
   const response = await request(`/api/insights?${query.toString()}`, {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Insights could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Insights could not be loaded");
   return (await response.json()) as Insight;
 }
 
@@ -351,7 +354,8 @@ export async function getScoreDistribution(params: {
   const response = await request(`/api/insights/scores?${query.toString()}`, {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Insights could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Insights could not be loaded");
   return (await response.json()) as ScoreDistribution;
 }
 
@@ -375,7 +379,8 @@ export async function patchEntry(
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(changes),
   });
-  if (!response.ok) throw new Error("Your change could not be saved");
+  if (!response.ok)
+    throw await apiFailure(response, "Your change could not be saved");
   return (await response.json()) as LibraryEntry;
 }
 
@@ -383,7 +388,8 @@ export async function getEntry(entryId: number): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Detail could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Detail could not be loaded");
   return response.json() as Promise<LibraryEntry>;
 }
 
@@ -403,25 +409,16 @@ export async function patchItem(
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(changes),
   });
-  if (!response.ok) throw new Error("Metadata could not be saved");
+  if (!response.ok)
+    throw await apiFailure(response, "Metadata could not be saved");
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
 /**
- * The server's own refusal, so the owner reads why rather than one canned
- * sentence for every cause — a provider outage, a disabled provider, and an
- * item with no provider source all want a different next step.
+ * Refresh and cover fetch surface the server's own refusal, so the owner reads why
+ * rather than one canned sentence for every cause — a provider outage, a disabled
+ * provider, and an item with no provider source all want a different next step.
  */
-async function providerErrorMessage(
-  response: Response,
-  fallback: string,
-): Promise<string> {
-  const detail = (await response.json().catch(() => null)) as {
-    error?: { message?: string; user_message?: string };
-  } | null;
-  return detail?.error?.user_message ?? detail?.error?.message ?? fallback;
-}
-
 export async function refreshItem(
   itemId: number,
 ): Promise<LibraryEntry["item"]> {
@@ -431,11 +428,9 @@ export async function refreshItem(
     body: JSON.stringify({ overwrite: true }),
   });
   if (!response.ok)
-    throw new Error(
-      await providerErrorMessage(
-        response,
-        "Provider refresh failed; your metadata was not changed",
-      ),
+    throw await readApiError(
+      response,
+      "Provider refresh failed; your metadata was not changed",
     );
   return response.json() as Promise<LibraryEntry["item"]>;
 }
@@ -456,9 +451,7 @@ export async function fetchProviderCover(
     headers: { Accept: "application/json" },
   });
   if (!response.ok)
-    throw new Error(
-      await providerErrorMessage(response, "Cover could not be fetched"),
-    );
+    throw await readApiError(response, "Cover could not be fetched");
   return response.json() as Promise<LibraryEntry["item"]>;
 }
 
@@ -474,7 +467,8 @@ export async function replaceCover(
     body,
   });
   if (!response.ok)
-    throw new Error(
+    throw await apiFailure(
+      response,
       "Cover could not be replaced; the previous cover is unchanged",
     );
   return response.json() as Promise<LibraryEntry["item"]>;
@@ -497,7 +491,8 @@ export async function fetchCoverCandidates(
   itemId: number,
 ): Promise<CoverCandidates> {
   const response = await request(`/api/items/${itemId}/cover-candidates`);
-  if (!response.ok) throw new Error("Cover options could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Cover options could not be loaded");
   return response.json() as Promise<CoverCandidates>;
 }
 
@@ -511,7 +506,8 @@ export async function chooseCover(
     body: JSON.stringify({ cover_url: coverUrl }),
   });
   if (!response.ok)
-    throw new Error(
+    throw await apiFailure(
+      response,
       "Cover could not be changed; the previous cover is unchanged",
     );
   return response.json() as Promise<LibraryEntry["item"]>;
@@ -521,7 +517,8 @@ export async function deleteEntry(entryId: number): Promise<void> {
   const response = await request(`/api/entries/${entryId}`, {
     method: "DELETE",
   });
-  if (!response.ok) throw new Error("Entry could not be deleted");
+  if (!response.ok)
+    throw await apiFailure(response, "Entry could not be deleted");
 }
 
 export interface BulkSet {
@@ -554,7 +551,7 @@ export async function bulkUpdateEntries(body: BulkBody): Promise<number> {
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("Bulk update failed");
+  if (!response.ok) throw await apiFailure(response, "Bulk update failed");
   const data = (await response.json()) as { affected: number };
   return data.affected;
 }
@@ -565,7 +562,7 @@ export async function bulkDeleteEntries(body: BulkSelection): Promise<number> {
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error("Bulk delete failed");
+  if (!response.ok) throw await apiFailure(response, "Bulk delete failed");
   const data = (await response.json()) as { affected: number };
   return data.affected;
 }
@@ -580,7 +577,8 @@ export async function acceptSuggestedStatuses(filter: {
     headers: { Accept: "application/json", "Content-Type": "application/json" },
     body: JSON.stringify({ filter }),
   });
-  if (!response.ok) throw new Error("Could not accept suggested statuses");
+  if (!response.ok)
+    throw await apiFailure(response, "Could not accept suggested statuses");
   const data = (await response.json()) as { affected: number };
   return data.affected;
 }
@@ -595,7 +593,8 @@ export interface Attachment {
 
 export async function fetchAttachments(itemId: number): Promise<Attachment[]> {
   const response = await request(`/api/items/${itemId}/attachments`);
-  if (!response.ok) throw new Error("Files could not be loaded");
+  if (!response.ok)
+    throw await apiFailure(response, "Files could not be loaded");
   const body = (await response.json()) as { attachments: Attachment[] };
   return body.attachments;
 }
@@ -619,13 +618,16 @@ export async function uploadAttachment(
     body,
   });
   if (!response.ok) {
-    const detail = (await response.json().catch(() => null)) as {
-      error?: { code?: string };
-    } | null;
-    throw new Error(
-      detail?.error?.code === "attachment_too_large"
+    const fields = await readErrorFields(
+      response,
+      "The file could not be attached",
+    );
+    throw new ApiError(
+      fields.code === "attachment_too_large"
         ? "That file is larger than the limit for attachments"
         : "The file could not be attached",
+      fields.code,
+      fields,
     );
   }
   return response.json() as Promise<Attachment>;
@@ -651,7 +653,8 @@ export async function renameAttachment(
       body: JSON.stringify({ filename }),
     },
   );
-  if (!response.ok) throw new Error("The file could not be renamed");
+  if (!response.ok)
+    throw await apiFailure(response, "The file could not be renamed");
   return response.json() as Promise<Attachment>;
 }
 
@@ -663,11 +666,18 @@ export async function deleteAttachment(
     `/api/items/${itemId}/attachments/${attachmentId}`,
     { method: "DELETE" },
   );
-  if (!response.ok) throw new Error("The file could not be removed");
+  if (!response.ok)
+    throw await apiFailure(response, "The file could not be removed");
 }
 
 /** Where a browser fetches the bytes. Served as a forced download, never inline. */
 export function attachmentHref(itemId: number, attachmentId: number): string {
   return `/api/items/${itemId}/attachments/${attachmentId}`;
 }
-import { request } from "./request";
+import {
+  ApiError,
+  apiFailure,
+  readApiError,
+  readErrorFields,
+  request,
+} from "./request";

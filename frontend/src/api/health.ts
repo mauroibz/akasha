@@ -16,7 +16,8 @@ export async function getProviderHealth(): Promise<ProviderHealth> {
   const response = await request("/api/health/providers", {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Provider status is unavailable");
+  if (!response.ok)
+    throw await apiFailure(response, "Provider status is unavailable");
   return (await response.json()) as ProviderHealth;
 }
 
@@ -24,7 +25,7 @@ export async function getReadiness(): Promise<ReadyHealth> {
   const response = await request("/api/health/ready", {
     headers: { Accept: "application/json" },
   });
-  if (!response.ok) throw new Error("Akasha is unavailable");
+  if (!response.ok) throw await apiFailure(response, "Akasha is unavailable");
   return (await response.json()) as ReadyHealth;
 }
-import { request } from "./request";
+import { apiFailure, request } from "./request";

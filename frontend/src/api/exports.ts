@@ -1,5 +1,5 @@
 import { ImportRequestError, responseJson } from "@/api/imports";
-import { request } from "@/api/request";
+import { readErrorFields, request } from "./request";
 
 /**
  * One declared export view, shaped like `ImporterDefinition` pointed the other way
@@ -54,17 +54,12 @@ function filenameFrom(response: Response): string {
 export async function downloadExport(url: string): Promise<void> {
   const response = await request(url);
   if (!response.ok) {
-    const value = (await response.json().catch(() => null)) as {
-      error?: { code?: string; message?: string; user_message?: string };
-    } | null;
-    const error = value?.error;
-    throw new ImportRequestError(
-      error?.user_message ??
-        error?.message ??
-        "The file could not be downloaded.",
-      error?.code ?? "export_failed",
-      null,
+    const fields = await readErrorFields(
+      response,
+      "The file could not be downloaded.",
+      "export_failed",
     );
+    throw new ImportRequestError(fields.message, fields.code, null, fields);
   }
   const blob = await response.blob();
   const objectUrl = URL.createObjectURL(blob);

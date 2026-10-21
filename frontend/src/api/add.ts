@@ -1,5 +1,5 @@
 import type { EntryStatus, LibraryEntry } from "./library";
-import { request } from "./request";
+import { apiFailure, request } from "./request";
 
 export interface SourceRef {
   source: string;
@@ -41,7 +41,10 @@ export async function previewCandidate(
     signal,
   });
   if (!response.ok)
-    throw new Error("The full record could not be loaded from the provider");
+    throw await apiFailure(
+      response,
+      "The full record could not be loaded from the provider",
+    );
   return (await response.json()) as SearchCandidate;
 }
 
@@ -65,7 +68,7 @@ export class NearMatchError extends Error {
 }
 
 async function json<T>(response: Response, message: string): Promise<T> {
-  if (!response.ok) throw new Error(message);
+  if (!response.ok) throw await apiFailure(response, message);
   return response.json() as Promise<T>;
 }
 /**

@@ -1,5 +1,5 @@
 import type { BundleMember } from "@/features/import/bundle";
-import { request } from "@/api/request";
+import { ApiError, readErrorFields, request } from "./request";
 
 /**
  * One provider result offered for one row of a list import (Sprint 083).
@@ -138,15 +138,15 @@ export interface ImportBrowseListing {
  * The connector owns the sentence: it knows that a locked Calibre database means
  * "close Calibre and try again", and the shared screen cannot (DEC-080).
  */
-export class ImportRequestError extends Error {
-  readonly code: string;
-  readonly action: string | null;
-
-  constructor(message: string, code: string, action: string | null) {
-    super(message);
+export class ImportRequestError extends ApiError {
+  constructor(
+    message: string,
+    code: string,
+    action: string | null,
+    fields: ConstructorParameters<typeof ApiError>[2] = {},
+  ) {
+    super(message, code, { ...fields, action });
     this.name = "ImportRequestError";
-    this.code = code;
-    this.action = action;
   }
 }
 export interface ImportPreview {
@@ -224,21 +224,16 @@ export interface UndoResult {
  */
 export async function responseJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const value = (await response.json().catch(() => null)) as {
-      error?: {
-        code?: string;
-        message?: string;
-        user_message?: string;
-        action?: string;
-      };
-    } | null;
-    const error = value?.error;
-    // `user_message` is written for a person and `message` for a log; prefer the
-    // first when the connector supplied one.
+    const fields = await readErrorFields(
+      response,
+      "Import request failed",
+      "import_failed",
+    );
     throw new ImportRequestError(
-      error?.user_message ?? error?.message ?? "Import request failed",
-      error?.code ?? "import_failed",
-      error?.action ?? null,
+      fields.message,
+      fields.code,
+      fields.action,
+      fields,
     );
   }
   return response.json() as Promise<T>;

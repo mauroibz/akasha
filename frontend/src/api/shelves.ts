@@ -1,5 +1,5 @@
 import type { Shelf } from "./library";
-import { request } from "./request";
+import { apiFailure, jsonOrApiError, request } from "./request";
 
 export interface ShelfWithCount extends Shelf {
   entry_count: number;
@@ -22,13 +22,7 @@ async function jsonOrThrow<T>(
   response: Response,
   fallback: string,
 ): Promise<T> {
-  if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { message?: string };
-    } | null;
-    throw new Error(body?.error?.message ?? fallback);
-  }
-  return response.json() as Promise<T>;
+  return jsonOrApiError<T>(response, fallback);
 }
 
 export function getShelves() {
@@ -56,7 +50,7 @@ export function renameShelf(id: number, name: string) {
 export function deleteShelf(id: number) {
   return request(`/api/shelves/${id}`, {
     method: "DELETE",
-  }).then((r) => {
-    if (!r.ok) throw new Error("Shelf could not be deleted");
+  }).then(async (r) => {
+    if (!r.ok) throw await apiFailure(r, "Shelf could not be deleted");
   });
 }

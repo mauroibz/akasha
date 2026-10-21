@@ -1,3 +1,4 @@
+import { ApiError, apiFailure, readErrorFields } from "./request";
 export interface AuthUser {
   id: number;
   username: string;
@@ -28,25 +29,25 @@ export interface AuthSession {
 
 export const AUTH_STATE_QUERY_KEY = ["auth", "me"] as const;
 
-export class AuthRequestError extends Error {
+export class AuthRequestError extends ApiError {
   constructor(
-    public readonly code: string,
+    code: string,
     message: string,
+    fields: ConstructorParameters<typeof ApiError>[2] = {},
   ) {
-    super(message);
+    super(message, code, fields);
     this.name = "AuthRequestError";
   }
 }
 
 async function authJson<T>(response: Response): Promise<T> {
   if (!response.ok) {
-    const body = (await response.json().catch(() => null)) as {
-      error?: { code?: string; message?: string };
-    } | null;
-    throw new AuthRequestError(
-      body?.error?.code ?? "auth_failed",
-      body?.error?.message ?? "Authentication failed",
+    const fields = await readErrorFields(
+      response,
+      "Authentication failed",
+      "auth_failed",
     );
+    throw new AuthRequestError(fields.code, fields.message, fields);
   }
   return response.json() as Promise<T>;
 }
@@ -77,7 +78,7 @@ export function setup(
 
 export async function logout(): Promise<void> {
   const response = await fetch("/api/auth/session", { method: "DELETE" });
-  if (!response.ok) throw new Error("Sign out failed");
+  if (!response.ok) throw await apiFailure(response, "Sign out failed");
 }
 
 export function getSessions(): Promise<AuthSession[]> {
