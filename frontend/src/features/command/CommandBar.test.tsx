@@ -4,6 +4,8 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { takeHandedFiles } from "@/features/import/handoff";
+
 import { CommandBarProvider } from "./CommandBarProvider";
 
 const entry = {
@@ -53,6 +55,7 @@ function renderBar() {
             <Route path="/" element={<p>Library page</p>} />
             <Route path="/books/:id" element={<p>Detail page</p>} />
             <Route path="/insights" element={<p>Insights page</p>} />
+            <Route path="/import" element={<p>Import page</p>} />
           </Routes>
         </CommandBarProvider>
       </MemoryRouter>
@@ -153,5 +156,67 @@ describe("CommandBar", () => {
     await userEvent.type(input, "insights");
     await userEvent.keyboard("{Enter}");
     expect(await screen.findByText("Insights page")).toBeInTheDocument();
+  });
+});
+
+describe("paste and drop anywhere", () => {
+  function mount() {
+    render(
+      <QueryClientProvider client={new QueryClient()}>
+        <MemoryRouter initialEntries={["/"]}>
+          <CommandBarProvider>
+            <Routes>
+              <Route path="/" element={<p>Library page</p>} />
+              <Route path="/import" element={<p>Import page</p>} />
+            </Routes>
+          </CommandBarProvider>
+        </MemoryRouter>
+      </QueryClientProvider>,
+    );
+  }
+
+  it("opens the bar resolving a link pasted outside a field", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(
+      async () => new Response("[]"),
+    );
+    mount();
+    const paste = new Event("paste", { bubbles: true }) as Event & {
+      clipboardData: { getData: () => string };
+    };
+    paste.clipboardData = { getData: () => "imdb.com/title/tt0111161" };
+    fireEvent(document.body, paste);
+    expect(
+      await screen.findByRole("combobox", { name: "Search or add" }),
+    ).toHaveValue("imdb.com/title/tt0111161");
+  });
+
+  it("hands a dropped export to the importer that claims it", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === "/api/import/detect")
+        return new Response(
+          JSON.stringify({
+            files: [
+              {
+                name: "goodreads.csv",
+                matches: [{ importer: "goodreads", confidence: 0.95 }],
+              },
+            ],
+          }),
+        );
+      return new Response("[]");
+    });
+    mount();
+    const file = new File(["Book Id,Title,Author"], "goodreads.csv", {
+      type: "text/csv",
+    });
+    const dataTransfer = { types: ["Files"], files: [file] };
+    fireEvent(window, Object.assign(new Event("dragenter"), { dataTransfer }));
+    expect(screen.getByTestId("drop-veil")).toBeInTheDocument();
+    fireEvent(
+      window,
+      Object.assign(new Event("drop", { cancelable: true }), { dataTransfer }),
+    );
+    expect(await screen.findByText("Import page")).toBeInTheDocument();
+    expect(takeHandedFiles("goodreads")).toEqual([file]);
   });
 });

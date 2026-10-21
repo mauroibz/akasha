@@ -78,7 +78,12 @@ async function json<T>(response: Response, message: string): Promise<T> {
  */
 /** A pasted link or ISBN: resolved to one record rather than searched for. */
 export function looksResolvable(value: string): boolean {
-  return /^(https?:\/\/|[\dXx -]{10,17}$)/.test(value.trim());
+  const text = value.trim();
+  // A link with or without its scheme (Sprint 095), or an ISBN.
+  return (
+    /^(https?:\/\/|[\dXx -]{10,17}$)/.test(text) ||
+    /^(?:[a-z0-9-]+\.)+[a-z]{2,}\/\S*$/i.test(text)
+  );
 }
 
 export function searchCandidates(

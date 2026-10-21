@@ -1,5 +1,5 @@
 import type { BundleMember } from "@/features/import/bundle";
-import { ApiError, readErrorFields, request } from "./request";
+import { ApiError, jsonOrApiError, readErrorFields, request } from "./request";
 
 /**
  * One provider result offered for one row of a list import (Sprint 083).
@@ -498,4 +498,25 @@ export function undoBatch(batchId: string) {
   return request(`/api/import/batches/${batchId}`, {
     method: "DELETE",
   }).then((response) => responseJson<UndoResult>(response));
+}
+
+export interface DetectedFile {
+  name: string;
+  matches: { importer: string; confidence: number }[];
+}
+
+/** Which importer each file belongs to, most confident first (Sprint 095). */
+export async function detectImporters(files: File[]): Promise<DetectedFile[]> {
+  const body = new FormData();
+  for (const file of files) body.append("files", file);
+  const response = await request("/api/import/detect", {
+    method: "POST",
+    headers: { Accept: "application/json" },
+    body,
+  });
+  const result = await jsonOrApiError<{ files: DetectedFile[] }>(
+    response,
+    "Akasha could not look at those files",
+  );
+  return result.files;
 }

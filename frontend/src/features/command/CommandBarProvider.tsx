@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 
+import { looksResolvable } from "@/api/add";
+import { isEditableTarget } from "@/features/library/library";
+
 import { CommandBar } from "./CommandBar";
+import { GlobalDrop } from "./GlobalDrop";
 import { CommandBarContext } from "./commandBar";
 
 /**
@@ -33,13 +37,27 @@ export function CommandBarProvider({ children }: { children: ReactNode }) {
         });
       }
     };
+    // A link or ISBN pasted outside a field opens the bar already resolving it
+    // (Sprint 095): copy a link in another tab, come back, paste, Enter.
+    const onPaste = (event: ClipboardEvent) => {
+      if (isEditableTarget(event.target)) return;
+      const text = event.clipboardData?.getData("text")?.trim() ?? "";
+      if (!text || !looksResolvable(text)) return;
+      event.preventDefault();
+      openBar(text);
+    };
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    window.addEventListener("paste", onPaste);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("paste", onPaste);
+    };
+  }, [openBar]);
 
   return (
     <CommandBarContext.Provider value={{ open: openBar }}>
       {children}
+      <GlobalDrop />
       {used || open ? (
         <CommandBar
           open={open}

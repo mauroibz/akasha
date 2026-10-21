@@ -328,14 +328,17 @@ export function ImportPage() {
     if (!activeImporter) return;
     const handed = takeHandedFiles(activeImporter.id);
     if (!handed) return;
-    setExportFiles(handed);
+    // A file dropped anywhere (Sprint 095) can belong to an upload connector too:
+    // a Goodreads CSV is one file, not a bundle.
+    if (activeImporter.input.kind === "upload") setFile(handed[0] ?? null);
+    else setExportFiles(handed);
     setAutoPreview(true);
   }, [activeImporter]);
   useEffect(() => {
-    if (!autoPreview || exportFiles.length === 0) return;
+    if (!autoPreview || (exportFiles.length === 0 && !file)) return;
     setAutoPreview(false);
     importForm.current?.requestSubmit();
-  }, [autoPreview, exportFiles]);
+  }, [autoPreview, exportFiles, file]);
   // The list connector's owners' checkbox (2026-09-15), keyed by connector so
   // switching tabs never carries one source's answer into another's request.
   const noCreators = !!noCreatorsByImporter[activeImporter?.id ?? ""];

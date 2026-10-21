@@ -35,7 +35,6 @@ import {
   DialogDescription,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Kbd } from "@/components/ui/kbd";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { readThemeChoice, resolveTheme, saveThemeChoice } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -271,7 +270,7 @@ export function CommandBar({
           loop
           className={cn("flex flex-col bg-popover", HEADING)}
         >
-          <div className="flex items-center gap-2 border-b border-border px-4">
+          <div className="flex items-center gap-2 border-b border-border pl-4 pr-12">
             <Search
               className="h-5 w-5 shrink-0 text-muted-foreground"
               aria-hidden="true"
@@ -283,7 +282,6 @@ export function CommandBar({
               placeholder="Find in your library, search the web, or paste a link"
               className="h-14 w-full bg-transparent text-base outline-none placeholder:text-muted-foreground"
             />
-            <Kbd className="hidden sm:inline-flex">Esc</Kbd>
           </div>
           {!resolvable && domains.length > 1 && typed.length >= 3 && (
             <div
