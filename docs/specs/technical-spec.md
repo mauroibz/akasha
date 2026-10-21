@@ -37,7 +37,8 @@ akasha/
 │   │   ├── domain/          # what a domain is (spec), which exist (registry), shared contracts
 │   │   ├── domains/         # one package per domain: book/, album/ (section 6.6)
 │   │   ├── infrastructure/  # SQLAlchemy repositories, provider HTTP, files, jobs
-│   │   └── main.py          # app factory, lifespan, static SPA mount
+│   │   ├── app/             # lifespan, providers, middleware, errors, health
+│   │   └── main.py          # app factory and static SPA mount
 │   └── tests/               # unit, integration, contract
 ├── frontend/
 │   ├── src/

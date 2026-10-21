@@ -45,7 +45,8 @@ backend/src/book_tracker/
 ├── domain/          # spec.py: what a domain is · registry.py: which ones exist
 ├── domains/         # one package per domain — book/, album/
 ├── infrastructure/  # SQLAlchemy, provider HTTP, covers, jobs
-└── main.py          # app factory, lifespan, static SPA mount
+├── app/             # lifespan, providers, middleware, errors, health
+└── main.py          # app factory and static SPA mount
 ```
 
 The rule that matters: **the shared layers never branch on which domain they are holding.** A layer

@@ -107,7 +107,7 @@ async def test_readiness_reports_low_disk_without_going_unready(
         app.router.lifespan_context(app),
         httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
     ):
-        monkeypatch.setattr("book_tracker.main.free_bytes", lambda _path: 0)
+        monkeypatch.setattr("book_tracker.app.health.free_bytes", lambda _path: 0)
         response = await client.get("/api/health/ready")
 
     assert response.status_code == 200

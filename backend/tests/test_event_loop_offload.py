@@ -295,7 +295,7 @@ async def test_the_authentication_boundary_looks_people_up_off_the_loop(
     """Every authenticated request asks the database whether anyone has set up an
     account and whose session its cookie names. Both were synchronous calls inside
     the middleware, so a slow lookup held up every request behind it (Sprint 087)."""
-    import book_tracker.main as main_module
+    import book_tracker.app.middleware as main_module
 
     def slow_has_credentialed_user(engine) -> bool:  # type: ignore[no-untyped-def]
         time.sleep(0.5)

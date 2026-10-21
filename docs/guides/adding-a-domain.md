@@ -124,7 +124,7 @@ Nine `◆`, and every one of them is a value or a function you declared in your 
 | 3 | Register the domain | `domain/registry.py` — one import, one tuple entry | yes |
 | 4 | Publish your values | `domain/registry.py` — `EntryStatus`, `EntryFormat`, `ItemTypeName` | if you declare a status or format no domain has |
 | 5 | Mirror them client-side | `frontend/src/api/library.ts` — `entryStatuses`, `entryFormats` | same condition as 4 |
-| 6 | Wire the adapter | `main.py` lifespan — construct it into the provider catalog | yes |
+| 6 | Wire the adapter | `app/providers.py` — construct it into `build_provider_catalog` | yes |
 | 7 | Credentials | `config.py` + `.env.example` | if your provider needs a key |
 | 8 | Cover host | `infrastructure/covers.py` allowlist | if your art is hosted somewhere new |
 | 9 | Recorded responses | `backend/tests/fixtures/providers/` | yes |
@@ -311,7 +311,7 @@ forget**, so the vocabulary cannot drift between the registry, the API and the c
 
 Then run `make openapi` so the checked-in schema carries your values.
 
-Then construct your adapter in the `main.py` lifespan, into the provider catalog. Everything else —
+Then construct your adapter in `app/providers.py`, into `build_provider_catalog`. Everything else —
 `/api/health/providers`, search routing, add-by-URL — picks it up from there.
 
 ### Optional step — Add an importer
