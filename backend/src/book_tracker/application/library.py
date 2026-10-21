@@ -348,6 +348,54 @@ class LibraryService:
             ],
         }
 
+    def list_views(self) -> list[dict[str, Any]]:
+        """This person's saved views, by name (Sprint 100)."""
+        with self.engine.connect() as connection:
+            rows = connection.execute(
+                text(
+                    "SELECT id, name, query FROM saved_views WHERE user_id = :user "
+                    "ORDER BY name COLLATE NOCASE"
+                ),
+                {"user": self.user_id},
+            ).all()
+        return [{"id": row[0], "name": row[1], "query": row[2]} for row in rows]
+
+    def save_view(self, name: str, query: str) -> dict[str, Any]:
+        """Keep a library filter under a name; the same name again replaces it."""
+        cleaned = name.strip()
+        if not cleaned:
+            raise LibraryError(
+                "validation_error",
+                "A saved view needs a name",
+                status_code=422,
+                details={"field": "name"},
+            )
+        now = _now()
+        with self.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "INSERT INTO saved_views (user_id, name, query, created_at, updated_at) "
+                    "VALUES (:user, :name, :query, :now, :now) "
+                    "ON CONFLICT (user_id, name) DO UPDATE SET query = excluded.query, "
+                    "updated_at = excluded.updated_at"
+                ),
+                {"user": self.user_id, "name": cleaned, "query": query.lstrip("?"), "now": now},
+            )
+            row = connection.execute(
+                text("SELECT id, name, query FROM saved_views WHERE user_id = :user AND name = :name"),
+                {"user": self.user_id, "name": cleaned},
+            ).one()
+        return {"id": row[0], "name": row[1], "query": row[2]}
+
+    def delete_view(self, view_id: int) -> None:
+        with self.engine.begin() as connection:
+            deleted = connection.execute(
+                text("DELETE FROM saved_views WHERE id = :id AND user_id = :user"),
+                {"id": view_id, "user": self.user_id},
+            ).rowcount
+        if not deleted:
+            raise LibraryError("view_not_found", "Saved view was not found", status_code=404)
+
     def now(self, *, limit: int = 24) -> list[dict[str, Any]]:
         """Entries under way, most recently touched first (Sprint 098, the Now strip).
 

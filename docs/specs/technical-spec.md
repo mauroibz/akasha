@@ -658,6 +658,9 @@ The product-spec route list is authoritative, with these refinements:
   (Sprint 095).
 - `GET /api/search/library?q=` returns the person's entries ranked by FTS5 bm25, title weighted
   highest, Inbox included: the command bar's library half (Sprint 094).
+- `GET /api/views`, `POST /api/views` (`{name, query}`; the same name again replaces its query) and
+  `DELETE /api/views/{view_id}` keep the person's saved library filters. `query` is the library's
+  own URL query string, so the server never interprets it (Sprint 100).
 
 - Authentication adds `POST /api/auth/login`, `DELETE /api/auth/session`, `GET /api/auth/me`
   first-run-only `POST /api/auth/setup`, and admin-only `POST /api/auth/act-as/{user_id}` plus

@@ -1244,3 +1244,30 @@ def rename_shelf(shelf_id: int, body: ShelfBody, library: Library) -> ShelfRespo
 def delete_shelf(shelf_id: int, library: Library) -> Response:
     library.delete_shelf(shelf_id)
     return Response(status_code=204)
+
+
+class SavedViewBody(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    query: str = Field(default="", max_length=2000)
+
+
+class SavedViewResponse(BaseModel):
+    id: int
+    name: str
+    query: str
+
+
+@router.get("/views", response_model=list[SavedViewResponse])
+def list_views(library: Library) -> list[SavedViewResponse]:
+    return [SavedViewResponse.model_validate(value) for value in library.list_views()]
+
+
+@router.post("/views", status_code=201, response_model=SavedViewResponse, responses=ERRORS)
+def save_view(body: SavedViewBody, library: Library) -> SavedViewResponse:
+    return SavedViewResponse.model_validate(library.save_view(body.name, body.query))
+
+
+@router.delete("/views/{view_id}", status_code=204, responses=ERRORS)
+def delete_view(view_id: int, library: Library) -> Response:
+    library.delete_view(view_id)
+    return Response(status_code=204)

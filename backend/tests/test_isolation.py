@@ -14,6 +14,7 @@ from sqlalchemy import text
 
 from book_tracker.api.auth import COOKIE_NAME
 from book_tracker.application.add import AddService
+from book_tracker.application.library import LibraryService
 from book_tracker.application.passwords import hash_password
 from book_tracker.application.sessions import SessionStore
 from book_tracker.config import Settings
@@ -112,6 +113,9 @@ ROUTE_POLICY = {
     # Sprint 098: the requester's own entries under way, and finished.
     ("GET", "/api/now"): "private-collection",
     ("GET", "/api/diary"): "private-collection",
+    ("GET", "/api/views"): "private-collection",
+    ("POST", "/api/views"): "private-write",
+    ("DELETE", "/api/views/{view_id}"): "private-id",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     # Sprint 095: reads the posted bytes and answers which connector claims them;
@@ -189,6 +193,7 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
         title="Only Admin Owns", identifiers=(identifier,)
     )
     shelf = DomainRepository(app.state.engine, 1).create_shelf("Admin shelf")
+    view_id = LibraryService(app.state.engine, 1).save_view("Admin view", "type=book")["id"]
     DomainRepository(app.state.engine, 1).set_cover_path(
         owned.item_id, f"covers/{owned.item_id}.jpg"
     )
@@ -270,6 +275,7 @@ def _seed_users_and_private_rows(app: object, tmp_path: Path) -> dict[str, objec
         "entry_id": owned.entry_id,
         "item_id": owned.item_id,
         "shelf_id": shelf,
+        "view_id": view_id,
         "attachment_id": attachment_id,
         "batch_id": batch_id,
         "record_id": record_id,
@@ -331,6 +337,7 @@ PRIVATE_PROBES = (
     ("POST", "/api/items/{item_id}/cover/fetch", None, None),
     ("PATCH", "/api/shelves/{shelf_id}", {"name": "probe"}, None),
     ("DELETE", "/api/shelves/{shelf_id}", None, None),
+    ("DELETE", "/api/views/{view_id}", None, None),
     ("POST", "/api/import/calibre/commit", {"batch_id": "BATCH", "choices": []}, None),
     (
         "POST",

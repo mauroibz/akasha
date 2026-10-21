@@ -311,6 +311,24 @@
    ]
   ],
   [
+   "/api/views",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/views",
+   [
+    "POST"
+   ]
+  ],
+  [
+   "/api/views/{view_id}",
+   [
+    "DELETE"
+   ]
+  ],
+  [
    "/api/search/resolve",
    [
     "GET"
