@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
+  act,
   fireEvent,
   render,
   screen,
@@ -12,21 +13,59 @@ import userEvent from "@testing-library/user-event";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { JobEventsProvider } from "@/features/activity/JobEvents";
 import { handFiles, takeHandedFiles } from "@/features/import/handoff";
 import { ImportPage } from "./ImportPage";
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
   localStorage.clear();
 });
 
+/** The tab's one EventSource, faked so a test can say a batch's search job moved. */
+class FakeEventSource {
+  static current: FakeEventSource | null = null;
+  listener: ((message: MessageEvent<string>) => void) | null = null;
+  constructor() {
+    FakeEventSource.current = this;
+  }
+  addEventListener(_type: string, listener: (m: MessageEvent<string>) => void) {
+    this.listener = listener;
+  }
+  removeEventListener() {}
+  close() {}
+}
+
+/** A change to the search job of `batchId`, as `GET /api/events` would send it. */
+function emitJob(batchId: string) {
+  act(() =>
+    FakeEventSource.current?.listener?.({
+      data: JSON.stringify({
+        id: `job-${batchId}`,
+        batch_id: batchId,
+        kind: "search_import_rows",
+        state: "running",
+        progress: {},
+        error: null,
+        error_code: null,
+        attempts: 0,
+        updated_at: new Date().toISOString(),
+      }),
+    } as MessageEvent<string>),
+  );
+}
+
 function renderImportPage(path = "/import") {
+  vi.stubGlobal("EventSource", FakeEventSource);
   return render(
     <QueryClientProvider client={new QueryClient()}>
-      <MemoryRouter initialEntries={[path]}>
-        <ImportPage />
-        <Toaster />
-      </MemoryRouter>
+      <JobEventsProvider>
+        <MemoryRouter initialEntries={[path]}>
+          <ImportPage />
+          <Toaster />
+        </MemoryRouter>
+      </JobEventsProvider>
     </QueryClientProvider>,
   );
 }
@@ -2027,7 +2066,7 @@ describe("the list connector's search-then-confirm surfaces", () => {
     expect(screen.queryByLabelText(/title is column/i)).toBeNull();
   });
 
-  it("polls while matching and shows the live search progress", async () => {
+  it("re-reads the batch on each search job event and shows the live progress", async () => {
     let reads = 0;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
       if (String(input) === "/api/importers")
@@ -2109,11 +2148,14 @@ describe("the list connector's search-then-confirm surfaces", () => {
     expect(
       await screen.findByText(/searching for matches: 1 of 2 rows searched/i),
     ).toBeVisible();
-    // The poll reads the batch on its interval; once drained, the commit gate
-    // reopens. The interval is 2s, so the wait must outlast it.
+    // Each change to the batch's search job re-reads the batch (Sprint 089); once
+    // drained, the commit gate reopens.
+    emitJob("list-1");
     expect(
-      await screen.findByText(/import 2 ready rows/i, {}, { timeout: 6000 }),
+      await screen.findByText(/searching for matches: 2 of 2 rows searched/i),
     ).toBeVisible();
+    emitJob("list-1");
+    expect(await screen.findByText(/import 2 ready rows/i)).toBeVisible();
   });
 
   it("confirms a proposal once the search has drained", async () => {
@@ -2199,12 +2241,12 @@ describe("the list connector's search-then-confirm surfaces", () => {
       screen.getByRole("button", { name: /waiting for the search/i }),
     ).toBeDisabled();
 
-    // The poll drains the batch; the proposal's Confirm is now live.
-    const confirm = await waitFor(
-      () => screen.getByRole("button", { name: /^confirm$/i }),
-      { timeout: 6000 },
+    // The search job's next change re-reads the drained batch; Confirm is live.
+    emitJob("list-1");
+    const confirm = await waitFor(() =>
+      screen.getByRole("button", { name: /^confirm$/i }),
     );
-    await screen.findByText(/import 1 ready row/i, {}, { timeout: 6000 });
+    await screen.findByText(/import 1 ready row/i);
     expect(confirm).toBeEnabled();
 
     // Answering confirms the chosen proposal.

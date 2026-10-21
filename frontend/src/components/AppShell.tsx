@@ -14,7 +14,8 @@ import { NavLink, useLocation, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 
 import { logout, stopActingAs, type AuthUser } from "@/api/auth";
-import { AkashaMark } from "@/components/AkashaMark";
+import { ActivityIndicator } from "@/features/activity/ActivityIndicator";
+import { JobEventsProvider } from "@/features/activity/JobEvents";
 import { DataCredit } from "@/components/DataCredit";
 import { Button } from "@/components/ui/button";
 import {
@@ -175,105 +176,102 @@ export function AppShell({
     // list" made structural rather than remembered: it cannot be violated by a
     // later edit without also changing this line. `strict` turns an accidental
     // eager `motion.*` component into a loud error instead of a silent bundle.
-    <LazyMotion features={domAnimation} strict>
-      <div className="min-h-screen bg-background text-foreground">
-        {actingAs && onActingAsChanged ? (
-          <>
-            <div className="h-14" aria-hidden="true" />
-            <ActingAsBanner
-              user={actingAs}
-              onActingAsChanged={onActingAsChanged}
-            />
-          </>
-        ) : null}
-        <nav
-          aria-label="Primary"
-          className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
-        >
-          {/* Decorative, not a second home link: "Library" below already goes to
-            "/", and duplicating it would make a screen reader announce the same
-            destination twice. Sized to 20px so it reads as a sibling of the
-            Lucide icons beside it rather than as a foreign object
-            (docs/brand/BRAND.md). */}
-          <AkashaMark
-            size={20}
-            className="mx-3 shrink-0 text-foreground"
-            aria-hidden="true"
-          />
-          <span
-            className="mr-2 h-5 w-px shrink-0 bg-border"
-            aria-hidden="true"
-          />
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              className={({ isActive }) =>
-                cn(
-                  "flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-ring",
-                  isActive
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                )
-              }
-            >
-              <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-          {user && onSignedOut ? (
-            <div className="ml-auto">
-              <AccountControl user={user} onSignedOut={onSignedOut} />
-            </div>
+    <JobEventsProvider>
+      <LazyMotion features={domAnimation} strict>
+        <div className="min-h-screen bg-background text-foreground">
+          {actingAs && onActingAsChanged ? (
+            <>
+              <div className="h-14" aria-hidden="true" />
+              <ActingAsBanner
+                user={actingAs}
+                onActingAsChanged={onActingAsChanged}
+              />
+            </>
           ) : null}
-        </nav>
-        {user && onSignedOut ? (
-          <header className="flex min-h-14 items-center justify-end border-b border-border/80 px-4 sm:hidden">
-            <AccountControl user={user} onSignedOut={onSignedOut} />
-          </header>
-        ) : null}
-        <nav
-          aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
-        >
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.to === "/"}
-              aria-label={item.label}
-              className={({ isActive }) =>
-                cn(
-                  "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
-                  isActive ? "text-primary" : "text-muted-foreground",
-                )
-              }
-            >
-              <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-              <span>{item.label}</span>
-            </NavLink>
-          ))}
-        </nav>
-        <div data-route-key={location.pathname}>{children}</div>
-        {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
+          <nav
+            aria-label="Primary"
+            className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
+          >
+            {/* Not a second home link: "Library" below already goes to "/". Since
+            Sprint 089 the mark is the background-work control: its dot breathes
+            while a job runs, and it opens the recent jobs. Sized to 20px so it
+            reads as a sibling of the Lucide icons beside it (docs/brand/BRAND.md). */}
+            <ActivityIndicator className="mx-1" />
+            <span
+              className="mr-2 h-5 w-px shrink-0 bg-border"
+              aria-hidden="true"
+            />
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                className={({ isActive }) =>
+                  cn(
+                    "flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-ring",
+                    isActive
+                      ? "bg-primary/15 text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )
+                }
+              >
+                <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+            {user && onSignedOut ? (
+              <div className="ml-auto">
+                <AccountControl user={user} onSignedOut={onSignedOut} />
+              </div>
+            ) : null}
+          </nav>
+          {user && onSignedOut ? (
+            <header className="flex min-h-14 items-center justify-end border-b border-border/80 px-4 sm:hidden">
+              <AccountControl user={user} onSignedOut={onSignedOut} />
+            </header>
+          ) : null}
+          <nav
+            aria-label="Primary"
+            className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
+          >
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.to === "/"}
+                aria-label={item.label}
+                className={({ isActive }) =>
+                  cn(
+                    "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
+                    isActive ? "text-primary" : "text-muted-foreground",
+                  )
+                }
+              >
+                <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
+                <span>{item.label}</span>
+              </NavLink>
+            ))}
+          </nav>
+          <div data-route-key={location.pathname}>{children}</div>
+          {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
             content so it never competes with a control. The mobile bottom padding
             clears the fixed bottom navigation. */}
-        <footer className="pb-20 sm:pb-0">
-          <DataCredit />
-        </footer>
-        <div className="h-16 sm:hidden" aria-hidden="true" />
-        {/* The application's one visible feedback surface. Mounted at the shell so
+          <footer className="pb-20 sm:pb-0">
+            <DataCredit />
+          </footer>
+          <div className="h-16 sm:hidden" aria-hidden="true" />
+          {/* The application's one visible feedback surface. Mounted at the shell so
           a confirmation survives the navigation that follows the action.
           Bottom-right, not top-centre: every screen puts its primary controls in
           the header, and a toast there covers the control the reader just used.
           The mobile offset clears the fixed bottom navigation. */}
-        <Toaster
-          position="bottom-right"
-          closeButton
-          mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
-        />
-      </div>
-    </LazyMotion>
+          <Toaster
+            position="bottom-right"
+            closeButton
+            mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
+          />
+        </div>
+      </LazyMotion>
+    </JobEventsProvider>
   );
 }

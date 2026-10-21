@@ -78,6 +78,12 @@ export default {
           "20%, 60%": { transform: "translateX(-4px)" },
           "40%, 80%": { transform: "translateX(4px)" },
         },
+        // The mark's dot while background work runs (Sprint 089): a point of
+        // light, breathing. Reduced motion stops it via index.css; the dot stays.
+        breathe: {
+          "0%, 100%": { transform: "scale(0.7)", opacity: "0.55" },
+          "50%": { transform: "scale(1.15)", opacity: "1" },
+        },
         "accordion-down": {
           from: { height: "0" },
           to: { height: "var(--radix-accordion-content-height)" },
@@ -89,6 +95,7 @@ export default {
       },
       animation: {
         shake: "shake 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1",
+        breathe: "breathe 1.8s ease-in-out infinite",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },

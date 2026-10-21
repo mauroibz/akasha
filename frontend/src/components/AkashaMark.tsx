@@ -5,6 +5,8 @@ type AkashaMarkProps = SVGProps<SVGSVGElement> & {
   size?: number | string;
   /** Render the dot in the current text colour instead of amber. */
   mono?: boolean;
+  /** The dot breathes: background work is running (Sprint 089). */
+  breathing?: boolean;
 };
 
 /**
@@ -21,6 +23,7 @@ type AkashaMarkProps = SVGProps<SVGSVGElement> & {
 export function AkashaMark({
   size = 24,
   mono = false,
+  breathing = false,
   ...props
 }: AkashaMarkProps) {
   return (
@@ -44,6 +47,12 @@ export function AkashaMark({
         r="2"
         fill={mono ? "currentColor" : "#fbbf24"}
         stroke="none"
+        data-breathing={breathing || undefined}
+        className={
+          breathing
+            ? "origin-[12px_11px] animate-breathe [transform-box:view-box]"
+            : undefined
+        }
       />
     </svg>
   );

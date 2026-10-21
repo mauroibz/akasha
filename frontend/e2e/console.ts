@@ -43,6 +43,16 @@ export const test = base.extend<{
       await page.route("**/api/item-types", (route) =>
         route.fulfill({ json: [bookItemType] }),
       );
+      // The shell's job stream (Sprint 089): an empty stream that asks the
+      // browser to wait a minute before reconnecting. A spec that needs a job
+      // event registers its own route for this URL.
+      await page.route("**/api/events", (route) =>
+        route.fulfill({
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+          body: "retry: 60000\n\n",
+        }),
+      );
       await page.route("**/api/shelves", (route) =>
         route.fulfill({ json: [] }),
       );

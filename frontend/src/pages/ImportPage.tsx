@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
+import { useJobEvent } from "@/features/activity/jobEvents";
 
 import { BackToLibrary } from "@/components/BackToLibrary";
 import { PageHeader } from "@/components/PageHeader";
@@ -292,20 +293,19 @@ export function ImportPage() {
   };
 
   const matching = preview?.state === "matching";
-  // A searching batch is polled through the idempotent preview read — the
-  // response carries the job's live counts, and flips its own state to
-  // `previewed` the moment the queue drains. The poll stops itself then.
-  useEffect(() => {
+  // A searching batch is re-read through the idempotent preview whenever its
+  // search job changes (Sprint 089's event stream; a two-second poll before). The
+  // response carries the job's live counts and flips to `previewed` when the
+  // queue drains, after which no event for this batch matters.
+  useJobEvent((event) => {
     if (!preview || preview.state !== "matching" || !source) return;
-    const timer = window.setInterval(() => {
-      void getPreview(source, preview.batch_id)
-        .then((fresh) => setPreview(fresh))
-        .catch(() => {
-          /* the next tick retries; a batch deleted mid-poll is not a screen error */
-        });
-    }, 2000);
-    return () => window.clearInterval(timer);
-  }, [preview, source]);
+    if (event.batch_id !== preview.batch_id) return;
+    void getPreview(source, preview.batch_id)
+      .then((fresh) => setPreview(fresh))
+      .catch(() => {
+        /* the next event retries; a batch deleted mid-search is not a screen error */
+      });
+  });
 
   const unresolved =
     preview?.records.filter(

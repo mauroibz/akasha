@@ -926,7 +926,7 @@ test("the list connector searches, proposes, and takes the owner's answers befor
   page,
 }) => {
   // The search-then-confirm flow against stubbed routes: the batch stages in
-  // `matching` with a live job progress, the poll drains it to `previewed`,
+  // `matching` with a live job progress, a job event drains it to `previewed`,
   // each row's proposals render with Confirm/Discard controls, and the
   // answers ride the proposal route the backend defines. The provider half of
   // the real flow is proven against recorded Open Library responses in the
@@ -986,7 +986,32 @@ test("the list connector searches, proposes, and takes the owner's answers befor
   let excluded = false;
   let commitBody: unknown;
   await stubItemTypes(page, [bookItemType]);
+  // The search job's change arrives on the shell's event stream (Sprint 089),
+  // once the preview has landed; the page then re-reads the drained batch.
+  let previewed: () => void = () => undefined;
+  const previewLanded = new Promise<void>((resolve) => (previewed = resolve));
+  await page.route("**/api/events", async (route) => {
+    await previewLanded;
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const job = {
+      id: "job-list-1",
+      batch_id: "list-1",
+      kind: "search_import_rows",
+      state: "succeeded",
+      progress: {},
+      error: null,
+      error_code: null,
+      attempts: 0,
+      updated_at: new Date().toISOString(),
+    };
+    await route.fulfill({
+      status: 200,
+      headers: { "Content-Type": "text/event-stream" },
+      body: `retry: 60000\n\nevent: job\ndata: ${JSON.stringify(job)}\n\n`,
+    });
+  });
   await page.route("**/api/import/list/preview", async (route) => {
+    previewed();
     await route.fulfill({
       status: 201,
       json: {
