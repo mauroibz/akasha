@@ -1,10 +1,10 @@
 # Implementation Roadmap
 
-**Plan revision:** 45
+**Plan revision:** 46
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [100 — Re-file and saved views](100-refile-and-views.md) (ready),
-the fourteenth of fifteen from the owner's accepted production-grade proposal (DEC-165); see
-"Production grade" below. Sprints 001–099 are done: Sprint 082
+**Active sprint:** [102 — Insights, read back to you](102-insights-read-back.md) (ready),
+the first of four from the owner's 2026-10-21 request for a 2.5 release (DEC-169); see "Character"
+below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -221,6 +221,10 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [099](099-importers.md) | StoryGraph, Hardcover, AniList and Simkl importers | 098 | completed |
 | [100](100-refile-and-views.md) | Re-file into another domain, and saved views | 099 | completed |
 | [101](101-operability.md) | Metrics, provider health from real calls, the response cache | 100 | completed |
+| [102](102-insights-read-back.md) | Insights read back as prose: a lead sentence, numbered sections, compact charts | 101 | ready |
+| 103 | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | planned |
+| 104 | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | planned |
+| 105 | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | planned |
 
 ## Sprint contracts
 
@@ -1778,6 +1782,29 @@ active.
 The walkthrough defects in the proposal's §2.5 are folded into whichever sprint touches their
 screen. Re-filing and saved views, listed under "Not scheduled" below, are scheduled by this line
 as Sprint 100.
+
+## Character — the 2.5 line
+
+Asked for by the owner on 2026-10-21 after v2.4.0, reviewed as a design canvas
+(https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c) and accepted as **DEC-169**.
+
+- **[102 — Insights, read back to you](102-insights-read-back.md).** The page as prose: a lead
+  sentence, numbered sections divided by rules, charts sized to their data, subjects folded and
+  typeset.
+- **103 — Gentle goals, underneath.** A `goals` table (migration 0026): per person and domain,
+  a count per month or per year. Progress is finished entries by month of finish date; months
+  count together. A domain declares which status is *planned* (`StatusSpec.planned`, as 098
+  declared `in_progress`), and suggestions are drawn from it with a reason each: by a creator
+  rated highly, or waiting longest.
+- **104 — Goals on the Diary.** The goal band with the calendar of lights (one light per finished
+  item, unlit places neutral, never red), the goal dialog (domain, count, month or year, picks on
+  or off), the month's picks with *Start reading* (the domain's in-progress status, hidden where
+  a domain has none) and *Something else*, and the phone layout.
+- **105 — Shelves with opinions.** The shelves page as a room of shelves: the name large, a line
+  of character, covers face-out on a ledge, the largest shelf drawn biggest, an empty shelf as a
+  dashed place. A cover opens on hover like a front cover swinging back, showing its title, year
+  and score inside; reduced motion and touch keep it closed. One shelf's page: covers without
+  chips over them, the shelf as a sentence. *New shelf* is a button, not a full-width field.
 
 ## Not scheduled
 

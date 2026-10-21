@@ -6796,3 +6796,40 @@ batch that can still be undone holds the item: the same proof `prune_items` requ
 
 Attachments are the person's rather than the cache's, so they move to the new item and are not
 deleted. Re-file records no undo effect. Moving back is a second re-file.
+
+## DEC-169 — Insights redrawn, gentle goals, and shelves with opinions: Sprints 102–105
+
+- Date: 2026-10-21
+- Status: accepted
+- Context: after v2.4.0 the owner asked for two more things for a minor release. Insights: *"i
+  love but hate the page, it needs more character, better readability, a more interesting and
+  simple to read design, right now its a bunch of boxes with floating text, charts too large."*
+  Goals: *"a non-binding (eg: not stressful) goals tracker, something similar to the every-day
+  calendar by simone yetch, or the newest app focus friend by hank green. you set a goal (2 books
+  per month), get a reading list suggestion (from your pending books) then get a nice looking,
+  filled whatever for achieving it. No gaminication/streaks or anything you can catch up if you
+  want to (read only 1 this month, 3 next) the idea is that its encouraging, not pushy"* (the
+  Everyday Calendar is Simone Giertz's). A design canvas
+  was drawn (Insights desktop and phone; the Diary with a goal; the goal dialog; three ways to fill
+  a goal). The owner: *"Ok with the general design, play a bit more with cover and element sizing.
+  i rather everything be opinionated and more interesting"*, and added Shelves: *"too bland right
+  now, it could be more opinionated."* After the Shelves board: *"Love it. a hover on a shelf
+  should open the cover as an animation, everything else looks great. build it!"*
+- Decision: four sprints, 102–105, `FINAL_SPRINT` 101 → 105, revision 46, released as 2.5.0.
+  1. **Insights** (102) reads the library back as prose: a lead sentence with the figures that
+     matter, then numbered sections divided by rules rather than boxed, each a sentence plus a
+     chart sized to its data. Subjects are a typeset list, near-duplicates folded. Sizing is
+     deliberately uneven and bold, per the owner's second note.
+  2. **Goals** (103 model and API, 104 screens) live on the Diary. A goal is per domain, *N a
+     month* or *N a year*, counted by finish date. Months count together, so a slow month is made
+     up later; there are no streaks, reminders, failure states or red. Suggestions come from the
+     domain's planned status, each with a reason, and any of them can be skipped.
+  3. The filled view is the **calendar of lights** (fill A, after the Everyday Calendar): one
+     light per finished item, in its month. The owner's "everything else looks great" did not
+     pick between the three fills; A is chosen because the Diary is already month by month and it
+     is the owner's own reference. The shelf and arch fills are not built.
+  4. **Shelves** (105) are drawn as shelves: covers standing on a ledge, sized by shelf, the
+     shelf's name large, a line of character beside it. Hovering a cover opens it, as a book's
+     front cover swings open; reduced motion keeps it closed.
+- Consequences: one migration (goals), so the release is a minor version. The mock is the
+  canvas https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.

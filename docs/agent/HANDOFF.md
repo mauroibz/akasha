@@ -2,10 +2,11 @@
 
 ## Where the project stands
 
-On 2026-10-21 the owner accepted `docs/production-grade-proposal.md` (DEC-165). The plan reopened
-as Sprints 087–101 and ran autonomously, with per-sprint verification limited to what each sprint
-changed (DEC-167). **All fifteen are completed and the project state is `complete`.** They
-shipped as **v2.4.0**, tagged and pushed on 2026-10-21 after the full release gate.
+v2.4.0 shipped on 2026-10-21 (Sprints 087–101) and runs on the owner's ZimaBoard. The owner then
+asked for a 2.5 release: Insights redrawn, gentle goals on the Diary, and Shelves redrawn. A design
+canvas was reviewed and accepted as **DEC-169**: https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
+The plan reopens as Sprints 102–105, and **102 is active (ready)**. The owner asked for the work
+to be built; release, push and deploy wait for them to ask.
 
 Waiting on the owner:
 
@@ -44,5 +45,6 @@ Waiting on the owner:
 
 ## Next session
 
-There is no planned sprint. Ask the owner what to plan next. The design mock the owner approved is the canvas artifact
+Run Sprint 102. The roadmap's "Character" section describes 103–105; expand each sprint's file
+from it when the sprint becomes active. The design mock the owner approved is the canvas artifact
 https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa.
