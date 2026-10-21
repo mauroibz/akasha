@@ -57,7 +57,9 @@ export function Arrivals({
       <h3 id="arrivals-heading" className="text-sm font-medium">
         Arriving
       </h3>
-      <p className="mt-0.5 text-sm text-muted-foreground" role="status">
+      {/* No live region of its own: it sits inside the result panel's, and two
+          nested status regions announce twice (DEC-028). */}
+      <p className="mt-0.5 text-sm text-muted-foreground">
         {done >= expected
           ? `All ${expected} filled in.`
           : `${done} of ${expected} filled in. Covers and details appear as they are found.`}
