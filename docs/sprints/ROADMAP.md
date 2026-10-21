@@ -216,7 +216,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [094](094-command-bar.md) | The command bar: library, web, resolve and navigate in one place | 093 | completed |
 | [095](095-paste-and-drop.md) | Paste and drop anywhere: file detection, scheme-less links, OpenGraph and Spotify oEmbed | 094 | completed |
 | [096](096-import-redrawn.md) | Import as three steps: source, check, done | 095 | completed |
-| 097 | Arrivals, the PWA share target, and trust-stated-status if the owner accepts it | 096 | planned |
+| [097](097-arrivals-and-share.md) | Arrivals, the PWA share target, and trust-stated-status if the owner accepts it | 096 | ready |
 | 098 | The Now strip and the Diary | 097 | planned |
 | 099 | StoryGraph, Hardcover, AniList and Simkl importers | 098 | planned |
 | 100 | Re-file into another domain, and saved views | 099 | planned |
