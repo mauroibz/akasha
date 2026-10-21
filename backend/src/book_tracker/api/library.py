@@ -631,6 +631,14 @@ def bulk_delete_entries(body: BulkSelection, library: Library) -> AffectedRespon
     return AffectedResponse(affected=affected)
 
 
+@router.get("/search/library", response_model=list[EntryResponse], responses=ERRORS)
+def search_library(
+    q: Annotated[str, Query(min_length=1, max_length=300)], library: Library
+) -> list[EntryResponse]:
+    """Your entries for a query, best first: the command bar's library half (Sprint 094)."""
+    return [EntryResponse.model_validate(row) for row in library.search_entries(q)]
+
+
 @router.get("/entries/{entry_id}", response_model=EntryResponse, responses=ERRORS)
 def get_entry(entry_id: int, library: Library) -> EntryResponse:
     return EntryResponse.model_validate(library.get_entry(entry_id))

@@ -7139,6 +7139,82 @@
         "summary": "Search"
       }
     },
+    "/api/search/library": {
+      "get": {
+        "description": "Your entries for a query, best first: the command bar's library half (Sprint 094).",
+        "operationId": "search_library_api_search_library_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": true,
+            "schema": {
+              "maxLength": 300,
+              "minLength": 1,
+              "title": "Q",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/EntryResponse"
+                  },
+                  "title": "Response Search Library Api Search Library Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Search Library"
+      }
+    },
     "/api/search/preview": {
       "get": {
         "description": "One candidate's full record, fetched without adding anything.\n\nA search result carries an identity \u2014 title, creators, year, language, ISBNs \u2014\nbut not a description, a page count or a tracklist: those live in the per-item\nfetch that used to run only at add time, which is why the confirm screen had\nnothing to show. This is that fetch, on demand and writing nothing.\n\nIt follows `search`'s quota rule rather than enrichment's (DEC-045): the spend is\nrecorded and never blocked, because somebody is waiting for this one. It is a\nrequest per press, so the screen asks rather than fetching on every click.",

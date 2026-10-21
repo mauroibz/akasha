@@ -348,6 +348,47 @@ class LibraryService:
             ],
         }
 
+    def search_entries(self, q: str, *, limit: int = 10) -> list[dict[str, Any]]:
+        """Your entries for what you typed, best first (Sprint 094, the command bar).
+
+        Ranked by FTS5's bm25 with the title weighted highest, then creators, series,
+        subjects and the note. The Inbox is included: the bar finds everything you
+        have. A fragment inside a title word ("stiar") finds nothing in FTS5, so the
+        substring match fills in after the ranked rows, as the library filter does.
+        """
+        expression = _search_expression(q)
+        fragment = normalize_text(q)
+        if expression is None and not fragment:
+            return []
+        ids: list[int] = []
+        with self.engine.connect() as connection:
+            if expression is not None:
+                ids.extend(
+                    row[0]
+                    for row in connection.execute(
+                        text(
+                            "SELECT e.id FROM entry_search s JOIN entries e ON e.id = s.rowid "
+                            "WHERE entry_search MATCH :expression AND e.user_id = :user "
+                            "ORDER BY bm25(entry_search, 10.0, 6.0, 4.0, 2.0, 1.0) LIMIT :limit"
+                        ),
+                        {"expression": expression, "user": self.user_id, "limit": limit},
+                    )
+                )
+            if fragment and len(ids) < limit:
+                ids.extend(
+                    row[0]
+                    for row in connection.execute(
+                        text(
+                            "SELECT e.id FROM entries e JOIN items i ON i.id = e.item_id "
+                            "WHERE e.user_id = :user AND i.title_normalized LIKE :pattern "
+                            "ORDER BY i.title_normalized LIMIT :limit"
+                        ),
+                        {"user": self.user_id, "pattern": f"%{fragment}%", "limit": limit},
+                    )
+                    if row[0] not in ids
+                )
+        return [self.get_entry(entry_id) for entry_id in ids[:limit]]
+
     def get_entry(self, entry_id: int) -> dict[str, Any]:
         with Session(self.engine) as session:
             return self._entry_dict(session, self._entry(session, entry_id))

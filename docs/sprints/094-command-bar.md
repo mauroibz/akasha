@@ -1,7 +1,7 @@
 # Sprint 094 — The command bar
 
 **Sprint:** 094
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 093
 **Owner:** Mauro

@@ -173,6 +173,12 @@
    ]
   ],
   [
+   "/api/search/library",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/entries/{entry_id}",
    [
     "GET"

@@ -136,3 +136,22 @@ def test_the_index_is_built_for_existing_rows_and_the_migration_reverses(tmp_pat
         assert tables == []
     finally:
         engine.dispose()
+
+
+def test_ranked_search_puts_a_title_match_before_a_note_match(engine) -> None:  # type: ignore[no-untyped-def]
+    """Sprint 094: the command bar's library half, ranked (bm25, title weighted)."""
+    noted = _book(engine, "Ficciones", ("Jorge Luis Borges",))
+    _book(engine, "Rayuela", ("Julio Cortázar",))
+    with engine.begin() as connection:
+        connection.execute(
+            text("UPDATE entries SET notes='me recordó a Rayuela' WHERE id=:id"), {"id": noted}
+        )
+    ranked = LibraryService(engine, 1).search_entries("rayuela")
+    assert [row["item"]["title"] for row in ranked] == ["Rayuela", "Ficciones"]
+
+
+def test_ranked_search_includes_the_inbox_and_finds_a_title_fragment(engine) -> None:  # type: ignore[no-untyped-def]
+    inbox = DomainRepository(engine, 1).create_or_get_entry(title="Bestiario", creators=())
+    ranked = LibraryService(engine, 1).search_entries("stiar")
+    assert [row["id"] for row in ranked] == [inbox.entry_id]
+    assert LibraryService(engine, 1).search_entries('"*') == []
