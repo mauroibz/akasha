@@ -1,7 +1,7 @@
 # Sprint 097 — Arrivals and the share target
 
 **Sprint:** 097
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 096
 **Owner:** Mauro

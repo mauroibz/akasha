@@ -53,6 +53,7 @@ import { SourceDetectDrop } from "@/features/import/SourceDetectDrop";
 import { queryKeys } from "@/api/keys";
 import { getInboxCount } from "@/api/library";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Arrivals } from "@/features/import/Arrivals";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
 interface ImportFailure {
@@ -1427,6 +1428,10 @@ export function ImportPage() {
                   </Link>
                 </p>
               )}
+              <Arrivals
+                batchId={result.batch_id}
+                expected={result.created_items}
+              />
             </div>
           )}
           {result && !undoResult && !pending && (
