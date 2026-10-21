@@ -221,3 +221,42 @@ async def test_a_queued_writer_surfaces_a_typed_error_rather_than_database_is_lo
 
     assert response.status_code == 503, response.text
     assert response.json()["error"]["code"] == "library_busy"
+
+
+def _awaits(function: object) -> bool:
+    import ast
+    import inspect
+    import textwrap
+
+    tree = ast.parse(textwrap.dedent(inspect.getsource(function)))  # type: ignore[arg-type]
+    return any(
+        isinstance(node, (ast.Await, ast.AsyncFor, ast.AsyncWith))
+        for node in ast.walk(tree.body[0])
+    )
+
+
+def test_no_route_runs_synchronous_work_as_a_coroutine_that_never_awaits(tmp_path: Path) -> None:
+    """Sprint 087's rule (production-grade proposal R3). FastAPI runs an `async def`
+    endpoint on the event loop and a `def` endpoint on a worker thread. An `async def`
+    that never awaits gains nothing from being a coroutine and runs every one of its
+    synchronous queries on the loop, stalling every other request while it does. 45
+    routes were exactly that. A route that genuinely awaits keeps `async def` and puts
+    its synchronous part through `off_loop`."""
+    import inspect
+
+    from fastapi.routing import APIRoute
+
+    static = tmp_path / "static"
+    static.mkdir()
+    (static / "index.html").write_text("<!doctype html>", encoding="utf-8")
+    app = create_app(
+        Settings(data_dir=tmp_path, static_dir=static, user_agent_contact="test@example.invalid")
+    )
+    offenders = sorted(
+        f"{route.endpoint.__module__}.{route.endpoint.__name__}"
+        for route in app.routes
+        if isinstance(route, APIRoute)
+        and inspect.iscoroutinefunction(route.endpoint)
+        and not _awaits(route.endpoint)
+    )
+    assert offenders == []

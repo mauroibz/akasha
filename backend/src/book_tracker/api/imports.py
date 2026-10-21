@@ -167,7 +167,7 @@ def _published_input(spec: ImportInputSpec) -> ImportInputResponse:
 
 
 @catalog_router.get("", response_model=list[ImporterResponse])
-async def available_importers(request: Request) -> list[ImporterResponse]:
+def available_importers(request: Request) -> list[ImporterResponse]:
     return [
         ImporterResponse(
             id=importer.name,
@@ -758,7 +758,7 @@ def _file_too_large(cap: int) -> LibraryError:
 
 
 @router.get("/{importer_name}/browse", response_model=ImportBrowseResponse)
-async def browse(
+def browse(
     importer_name: str,
     request: Request,
     path: str = Query("", max_length=500),
@@ -884,7 +884,7 @@ class RowSearchBody(BaseModel):
     "/{importer_name}/batches/{batch_id}/records/{record_id}/exclude",
     response_model=PreviewResponse,
 )
-async def exclude_row(
+def exclude_row(
     importer_name: str,
     batch_id: str,
     record_id: int,
@@ -910,7 +910,7 @@ async def exclude_row(
     "/{importer_name}/batches/{batch_id}/records/{record_id}/include",
     response_model=PreviewResponse,
 )
-async def include_row(
+def include_row(
     importer_name: str,
     batch_id: str,
     record_id: int,
@@ -959,7 +959,7 @@ async def research_row(
     "/{importer_name}/batches/{batch_id}",
     response_model=PreviewResponse,
 )
-async def read_preview(
+def read_preview(
     importer_name: str, batch_id: str, request: Request, user: CurrentUser
 ) -> PreviewResponse:
     """Re-read one previewed batch without re-sending its source.
@@ -974,7 +974,7 @@ async def read_preview(
 
 
 @router.get("/jobs/{job_id}", response_model=JobProgressResponse)
-async def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
+def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> JobProgressResponse:
     from book_tracker.infrastructure.jobs import JobRepository
 
     repo = JobRepository(request.app.state.engine)
@@ -985,7 +985,7 @@ async def get_job_progress(job_id: str, request: Request, user: CurrentUser) -> 
 
 
 @enrichment_router.post("/backfill", status_code=202, response_model=BackfillResponse)
-async def backfill_enrichment(request: Request) -> BackfillResponse:
+def backfill_enrichment(request: Request) -> BackfillResponse:
     """Queue enrichment for persisted items a provider lookup could still improve.
 
     Explicit and operator-driven: it only queues work, and the handler it queues fills
@@ -998,7 +998,7 @@ async def backfill_enrichment(request: Request) -> BackfillResponse:
 
 
 @router.delete("/batches/{batch_id}", response_model=UndoEffectSummary)
-async def undo_batch(batch_id: str, request: Request, user: CurrentUser) -> UndoEffectSummary:
+def undo_batch(batch_id: str, request: Request, user: CurrentUser) -> UndoEffectSummary:
     from book_tracker.application.undo import UndoExpiredError, UndoService
 
     undo = UndoService(

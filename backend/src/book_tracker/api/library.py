@@ -440,7 +440,7 @@ class AcceptSuggestedBody(BaseModel):
 
 
 @router.get("/entries", response_model=EntryListResponse, responses={400: {"model": ErrorResponse}})
-async def list_entries(
+def list_entries(
     library: Library,
     status: Annotated[list[EntryStatus] | None, Query()] = None,
     shelf: Annotated[list[str] | None, Query()] = None,
@@ -482,7 +482,7 @@ async def list_entries(
 
 
 @router.get("/insights", response_model=InsightResponse, responses={422: {"model": ErrorResponse}})
-async def get_insights(
+def get_insights(
     library: Library,
     type: ItemTypeName,
     key: str,
@@ -522,7 +522,7 @@ async def get_insights(
     response_model=ScoreDistributionResponse,
     responses={422: {"model": ErrorResponse}},
 )
-async def get_score_distribution(
+def get_score_distribution(
     library: Library,
     type: ItemTypeName,
     status: Annotated[list[EntryStatus] | None, Query()] = None,
@@ -595,7 +595,7 @@ async def create_entry(
 
 
 @router.patch("/entries/bulk", response_model=AffectedResponse, responses=ERRORS)
-async def bulk_entries(body: BulkBody, library: Library) -> AffectedResponse:
+def bulk_entries(body: BulkBody, library: Library) -> AffectedResponse:
     filter_values = body.filter.model_dump(mode="json") if body.filter else None
     affected = library.bulk_update(
         entry_ids=body.entry_ids,
@@ -607,13 +607,13 @@ async def bulk_entries(body: BulkBody, library: Library) -> AffectedResponse:
 
 
 @router.post("/entries/accept-suggested", response_model=AffectedResponse)
-async def accept_suggested(body: AcceptSuggestedBody, library: Library) -> AffectedResponse:
+def accept_suggested(body: AcceptSuggestedBody, library: Library) -> AffectedResponse:
     affected = library.accept_suggested(body.filter.model_dump(mode="json"))
     return AffectedResponse(affected=affected)
 
 
 @router.delete("/entries/bulk", response_model=AffectedResponse, responses=ERRORS)
-async def bulk_delete_entries(body: BulkSelection, library: Library) -> AffectedResponse:
+def bulk_delete_entries(body: BulkSelection, library: Library) -> AffectedResponse:
     """Remove the selection's entries in one transaction (triage's Discard).
 
     Same selection shape as `PATCH /entries/bulk`: explicit `entry_ids` or a
@@ -630,19 +630,19 @@ async def bulk_delete_entries(body: BulkSelection, library: Library) -> Affected
 
 
 @router.get("/entries/{entry_id}", response_model=EntryResponse, responses=ERRORS)
-async def get_entry(entry_id: int, library: Library) -> EntryResponse:
+def get_entry(entry_id: int, library: Library) -> EntryResponse:
     return EntryResponse.model_validate(library.get_entry(entry_id))
 
 
 @router.patch("/entries/{entry_id}", response_model=EntryResponse, responses=ERRORS)
-async def update_entry(entry_id: int, body: EntryPatch, library: Library) -> EntryResponse:
+def update_entry(entry_id: int, body: EntryPatch, library: Library) -> EntryResponse:
     return EntryResponse.model_validate(
         library.update_entry(entry_id, body.model_dump(mode="json", exclude_unset=True))
     )
 
 
 @router.delete("/entries/{entry_id}", status_code=204)
-async def delete_entry(entry_id: int, library: Library) -> Response:
+def delete_entry(entry_id: int, library: Library) -> Response:
     library.delete_entry(entry_id)
     return Response(status_code=204)
 
@@ -653,7 +653,7 @@ async def delete_entry(entry_id: int, library: Library) -> Response:
     response_model_exclude_none=True,
     responses=ERRORS,
 )
-async def get_item(item_id: int, library: Library) -> ItemResponse:
+def get_item(item_id: int, library: Library) -> ItemResponse:
     return ItemResponse.model_validate(library.get_item(item_id))
 
 
@@ -663,7 +663,7 @@ async def get_item(item_id: int, library: Library) -> ItemResponse:
     response_model_exclude_none=True,
     responses=ERRORS,
 )
-async def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
+def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemResponse:
     changes = body.model_dump(exclude_unset=True)
     if body.metadata is not None:
         item_type = str(library.get_item(item_id)["type"])
@@ -678,7 +678,7 @@ async def update_item(item_id: int, body: ItemPatch, library: Library) -> ItemRe
 
 
 @router.get("/item-types", response_model=list[ItemTypeResponse])
-async def list_item_types() -> list[ItemTypeResponse]:
+def list_item_types() -> list[ItemTypeResponse]:
     """The domains this build knows, and the metadata fields each one declares."""
     return [
         ItemTypeResponse(
@@ -711,7 +711,7 @@ async def list_item_types() -> list[ItemTypeResponse]:
 
 
 @router.get("/items/{item_id}/cover", responses=ERRORS, response_model=None)
-async def get_cover(item_id: int, request: Request, user: CurrentUser) -> Response:
+def get_cover(item_id: int, request: Request, user: CurrentUser) -> Response:
     item = library_for(request, user).get_item(item_id)
     if not item["cover_url"]:
         raise LibraryError("cover_not_found", "Cover was not found", status_code=404)
@@ -883,7 +883,7 @@ class AttachmentList(BaseModel):
     response_model=AttachmentList,
     responses=ERRORS,
 )
-async def list_attachments(item_id: int, library: Library) -> AttachmentList:
+def list_attachments(item_id: int, library: Library) -> AttachmentList:
     return AttachmentList(
         attachments=[
             AttachmentResponse.model_validate(row) for row in library.list_attachments(item_id)
@@ -955,7 +955,7 @@ async def add_attachment(
     responses=ERRORS,
     response_model=None,
 )
-async def download_attachment(
+def download_attachment(
     item_id: int, attachment_id: int, request: Request, user: CurrentUser
 ) -> Response:
     """Serve an opaque blob in the only way that is safe from this origin.
@@ -1030,7 +1030,7 @@ class AttachmentRename(BaseModel):
     response_model=AttachmentResponse,
     responses=ERRORS,
 )
-async def rename_attachment(
+def rename_attachment(
     item_id: int,
     attachment_id: int,
     payload: AttachmentRename,
@@ -1048,7 +1048,7 @@ async def rename_attachment(
     responses=ERRORS,
     response_model=None,
 )
-async def delete_attachment(
+def delete_attachment(
     item_id: int, attachment_id: int, request: Request, user: CurrentUser
 ) -> Response:
     library_for(request, user).delete_attachment(
@@ -1176,21 +1176,21 @@ async def fetch_cover(item_id: int, request: Request, user: CurrentUser) -> Item
 
 
 @router.get("/shelves", response_model=list[ShelfResponse])
-async def list_shelves(library: Library) -> list[ShelfResponse]:
+def list_shelves(library: Library) -> list[ShelfResponse]:
     return [ShelfResponse.model_validate(value) for value in library.list_shelves()]
 
 
 @router.post("/shelves", status_code=201, response_model=ShelfResponse, responses=ERRORS)
-async def create_shelf(body: ShelfBody, library: Library) -> ShelfResponse:
+def create_shelf(body: ShelfBody, library: Library) -> ShelfResponse:
     return ShelfResponse.model_validate(library.create_shelf(body.name))
 
 
 @router.patch("/shelves/{shelf_id}", response_model=ShelfResponse, responses=ERRORS)
-async def rename_shelf(shelf_id: int, body: ShelfBody, library: Library) -> ShelfResponse:
+def rename_shelf(shelf_id: int, body: ShelfBody, library: Library) -> ShelfResponse:
     return ShelfResponse.model_validate(library.rename_shelf(shelf_id, body.name))
 
 
 @router.delete("/shelves/{shelf_id}", status_code=204)
-async def delete_shelf(shelf_id: int, library: Library) -> Response:
+def delete_shelf(shelf_id: int, library: Library) -> Response:
     library.delete_shelf(shelf_id)
     return Response(status_code=204)

@@ -48,7 +48,7 @@ class ExportViewResponse(BaseModel):
 
 
 @router.get("/export")
-async def export(
+def export(
     request: Request,
     user: CurrentUser,
     format: Literal["json", "csv"] = Query(default="json"),
@@ -73,7 +73,7 @@ async def export(
 
 
 @router.get("/exports", response_model=list[ExportViewResponse])
-async def available_exports(request: Request, user: CurrentUser) -> list[ExportViewResponse]:
+def available_exports(request: Request, user: CurrentUser) -> list[ExportViewResponse]:
     engine = request.app.state.engine
     with Session(engine) as session:
         counts: dict[str, int] = {}
@@ -101,7 +101,7 @@ async def available_exports(request: Request, user: CurrentUser) -> list[ExportV
 
 
 @router.get("/export/{view}")
-async def export_view_route(
+def export_view_route(
     view: str, request: Request, type: ItemTypeName, user: CurrentUser
 ) -> StreamingResponse:
     resolved = find_export_view(type.value, view)

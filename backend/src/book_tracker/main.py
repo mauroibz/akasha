@@ -484,11 +484,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         return JSONResponse(status_code=full.status_code, content={"error": full.payload()})
 
     @app.get("/api/health/live")
-    async def live() -> dict[str, str]:
+    def live() -> dict[str, str]:
         return {"status": "live"}
 
     @app.get("/api/health/ready")
-    async def ready() -> JSONResponse:
+    def ready() -> JSONResponse:
         try:
             with app.state.engine.connect() as database:
                 database.execute(text("SELECT 1"))
@@ -532,7 +532,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         )
 
     @app.get("/api/health/providers", response_model=ProviderHealth)
-    async def provider_health() -> ProviderHealth:
+    def provider_health() -> ProviderHealth:
         """Which metadata providers are configured, so the UI can say search is degraded.
 
         Deliberately separate from readiness: a missing API key must never make the
@@ -581,7 +581,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         include_in_schema=False,
     )
-    async def missing_api(path: str) -> JSONResponse:
+    def missing_api(path: str) -> JSONResponse:
         return JSONResponse(status_code=404, content={"detail": "Not Found"})
 
     static_dir = configured.static_dir
@@ -589,7 +589,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         index = Path(static_dir) / "index.html"
 
         @app.get("/{path:path}", include_in_schema=False, response_model=None)
-        async def spa(path: str) -> Response:
+        def spa(path: str) -> Response:
             root = Path(static_dir).resolve()
             candidate = (root / path).resolve()
             if candidate.is_relative_to(root) and candidate.is_file() and candidate != index:

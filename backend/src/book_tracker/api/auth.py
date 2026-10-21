@@ -411,7 +411,7 @@ async def login(
     response_class=Response,
     responses={401: {"model": ErrorResponse}},
 )
-async def logout(request: Request) -> Response:
+def logout(request: Request) -> Response:
     require_auth_mode(request)
     token = request.cookies.get(COOKIE_NAME)
     if token:
@@ -426,7 +426,7 @@ async def logout(request: Request) -> Response:
     response_model=list[SessionResponse],
     responses={401: {"model": ErrorResponse}},
 )
-async def list_sessions(request: Request, user: CurrentUser) -> list[SessionResponse]:
+def list_sessions(request: Request, user: CurrentUser) -> list[SessionResponse]:
     require_auth_mode(request)
     current_session_id = getattr(request.state, "session_id", None)
     return [
@@ -448,7 +448,7 @@ async def list_sessions(request: Request, user: CurrentUser) -> list[SessionResp
     response_model=None,
     responses={401: {"model": ErrorResponse}},
 )
-async def logout_everywhere(request: Request, user: CurrentUser) -> Response:
+def logout_everywhere(request: Request, user: CurrentUser) -> Response:
     require_auth_mode(request)
     SessionStore(request.app.state.engine).delete_all(user.user_id)
     request.state.suppress_session_cookie = True
@@ -464,7 +464,7 @@ async def logout_everywhere(request: Request, user: CurrentUser) -> Response:
     response_model=None,
     responses={401: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
-async def revoke_session(session_id: str, request: Request, user: CurrentUser) -> Response:
+def revoke_session(session_id: str, request: Request, user: CurrentUser) -> Response:
     require_auth_mode(request)
     if SessionStore(request.app.state.engine).delete_for_user(user.user_id, session_id) != 1:
         raise LibraryError("session_not_found", "Session was not found", status_code=404)
@@ -476,7 +476,7 @@ async def revoke_session(session_id: str, request: Request, user: CurrentUser) -
 
 
 @router.get("/me", response_model=MeResponse, responses={401: {"model": ErrorResponse}})
-async def me(request: Request) -> MeResponse:
+def me(request: Request) -> MeResponse:
     require_auth_mode(request)
     needs_setup = not has_credentialed_user(request.app.state.engine)
     identity = getattr(request.state, "session_identity", None)
@@ -556,7 +556,7 @@ def _management_response(row: dict[str, Any]) -> UserResponse:
 
 
 @users_router.get("", response_model=list[UserSummary], responses={403: {"model": ErrorResponse}})
-async def list_users(request: Request, _admin: AdminUser) -> list[UserSummary]:
+def list_users(request: Request, _admin: AdminUser) -> list[UserSummary]:
     require_auth_mode(request)
     with request.app.state.engine.connect() as connection:
         rows = connection.execute(
@@ -705,7 +705,7 @@ async def change_password(
         422: {"model": ErrorResponse},
     },
 )
-async def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> Response:
+def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> Response:
     require_auth_mode(request)
     target = _user_by_id(request.app.state.engine, user_id)
     if target is None:
@@ -727,7 +727,7 @@ async def start_acting_as(user_id: int, request: Request, admin: AdminUser) -> R
     response_model=None,
     responses={403: {"model": ErrorResponse}},
 )
-async def stop_acting_as(request: Request, _admin: AdminUser) -> Response:
+def stop_acting_as(request: Request, _admin: AdminUser) -> Response:
     require_auth_mode(request)
     token = request.cookies.get(COOKIE_NAME)
     if token is None:
@@ -772,7 +772,7 @@ def _transfer_conflict(connection: Any, user_id: int, target_id: int) -> str | N
     response_class=Response,
     responses={403: {"model": ErrorResponse}, 404: {"model": ErrorResponse}},
 )
-async def delete_user(
+def delete_user(
     user_id: int,
     request: Request,
     admin: AdminUser,
