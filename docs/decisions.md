@@ -6706,3 +6706,33 @@ an operator command in the house style.
   The connector's guesses (a `dcterms:title` meta over `dc:title`, one creator string split on
   "and"/"&"/";") come from the owner's real file and are editable after import. Imported items
   carry an ISBN when the file has one, so DEC-008 enrichment fills the rest. Ships as v2.3.0.
+
+## DEC-165 — The production-grade proposal is accepted: fifteen sprints, 087–101
+
+- Date: 2026-10-21
+- Status: accepted
+- Context: the owner asked for a proposal "as big in scope as you feel like" to make Akasha feel
+  production grade, then for a mock of the look before anything was built. The mock (a design
+  canvas: library, detail, command bar, import check, phone, share sheet, motion, appearance; each
+  in *Paper* and *Ink*) was reviewed. The owner rejected one element, the detail page's lined
+  index card ("it feels cheap"), and asked for notes from Notion instead; the detail page was
+  redrawn as property rows, soft pills and a callout. The owner's answer to that redraw: "much
+  better, go ahead!"
+- Decision: [`production-grade-proposal.md`](production-grade-proposal.md) is accepted in full and
+  the plan reopens as Sprints 087–101 (the DEC-164 extension shape), `FINAL_SPRINT` 86 → 101,
+  revision 45. Of the proposal's §9 owner decisions:
+  1. *Dark only* is amended: *Ink* and *Paper* are equal, with *Match my device* the default. The
+     owner approved both themes in the mock. [`brand/BRAND.md`](brand/BRAND.md) and the brand handoff are amended in
+     Sprint 090, which builds the themes.
+  2. The display serif is **Newsreader**, the face the owner reviewed. Fraunces was offered and not
+     asked for.
+  3. *Trust stated status on import* stays open. Sprint 097 asks before building it.
+  4. Spotify links resolve through **oEmbed**, which needs no key. Goodreads links resolve by
+     **title search**, not page scraping. Both are the no-account defaults; Sprint 095 may revisit
+     them with evidence.
+  5. Scope is **all fifteen sprints**, in the proposal's order.
+- Consequences: one sprint at a time, as always; the proposal's §8 table is the roadmap and each
+  sprint file is expanded from it when it becomes active. Measured while planning 087: providers
+  that need pacing (MusicBrainz, AniList, Kitsu, both Wikidata clients) already pace themselves in
+  their own clients, so R2's "one limiter per provider" is narrower than written; 087 records what
+  remains instead of building a second pacing layer.

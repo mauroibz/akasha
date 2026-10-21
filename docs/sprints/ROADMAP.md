@@ -1,8 +1,10 @@
 # Implementation Roadmap
 
-**Plan revision:** 44
+**Plan revision:** 45
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** none — the plan is complete. Sprints 001–086 are done: Sprint 082
+**Active sprint:** [087 — Jobs that keep their word](087-jobs-that-keep-their-word.md) (ready),
+the first of fifteen from the owner's accepted production-grade proposal (DEC-165); see
+"Production grade" below. Sprints 001–086 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -204,6 +206,21 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [084](084-any-list-any-domain.md) | Any list, any domain: the custom list importer generalizes | 083 | completed |
 | [085](085-list-comforts.md) | List comforts: the owner's v2.2 feedback batch | 084 | completed |
 | [086](086-drop-ebook-files.md) | Drop ebook files: EPUBs on Add, read, attached, in Triage | 085 | completed |
+| [087](087-jobs-that-keep-their-word.md) | Jobs that keep their word: heartbeats, a waiting rate gate, off-loop routes, one error envelope, request ids | 086 | ready |
+| 088 | One contract, generated: typed client, `ApiError`, query keys, `usePatchEntry`, `create_app` split | 087 | planned |
+| 089 | Search and activity: FTS5 library search, the event stream, the shell activity indicator | 088 | planned |
+| 090 | Two themes: tokens, *Paper* and *Ink*, the theme setting, Newsreader and the type scale | 089 | planned |
+| 091 | Primitives: one set of controls, skeletons on every loading state | 090 | planned |
+| 092 | Motion: shared-element covers, transitions, the arch motif, the detail page as property rows | 091 | planned |
+| 093 | The phone pass: compact header, two-column grid, bottom sheets | 092 | planned |
+| 094 | The command bar: library, web, resolve and navigate in one place | 093 | planned |
+| 095 | Paste and drop anywhere: file detection, scheme-less links, OpenGraph and Spotify oEmbed | 094 | planned |
+| 096 | Import as three steps: source, check, done | 095 | planned |
+| 097 | Arrivals, the PWA share target, and trust-stated-status if the owner accepts it | 096 | planned |
+| 098 | The Now strip and the Diary | 097 | planned |
+| 099 | StoryGraph, Hardcover, AniList and Simkl importers | 098 | planned |
+| 100 | Re-file into another domain, and saved views | 099 | planned |
+| 101 | Metrics, provider health from real calls, the response cache | 100 | planned |
 
 ## Sprint contracts
 
@@ -1731,6 +1748,31 @@ choice rather than a birthright.
   EPUB's embedded OPF metadata and cover and attaches the file, through the existing `export`
   bundle pipeline; the Add screen offers every connector that declares `quick_add`. Amends
   product spec §1 (DEC-164). Ships as v2.3.0.
+
+## Production grade — the 2.4–2.7 line
+
+Asked for by the owner on 2026-10-21 after v2.3.0: *"it still feels like a vibe-coded project of
+sorts, no theme selection, no microanimation, no intent in the design (feels generic)."* The
+answer is [`../production-grade-proposal.md`](../production-grade-proposal.md), reviewed as a
+mock of the look and accepted in full as **DEC-165**. Its §8 table is this line's contract; each
+sprint file is expanded from it, against the code as it then stands, when the sprint becomes
+active.
+
+- **2.4 Foundations.** **[087 — Jobs that keep their word](087-jobs-that-keep-their-word.md)**
+  (R1–R3, R5 server half, R7); 088 one generated contract (R5, R8); 089 FTS5 search, the event
+  stream and the activity indicator (R4, I6).
+- **2.5 Look and feel.** 090 two themes and the display serif (D1, D2; amends the brand's "dark
+  only"); 091 primitives and skeletons (D5–D9); 092 motion and the detail page as property rows
+  (D3, D4; the lined index card was mocked and rejected); 093 the phone pass (A6).
+- **2.6 One door.** 094 the command bar (A1, A2, A5); 095 paste and drop anywhere (A3, A4, I5);
+  096 import as three steps (I1–I4); 097 arrivals, the share target, and trust-stated-status only
+  if the owner accepts it then (I6, I7).
+- **2.7 More to hold.** 098 Now and Diary; 099 four importers; 100 re-file and saved views; 101
+  metrics, provider health and the response cache.
+
+The walkthrough defects in the proposal's §2.5 are folded into whichever sprint touches their
+screen. Re-filing and saved views, listed under "Not scheduled" below, are scheduled by this line
+as Sprint 100.
 
 ## Not scheduled
 
