@@ -1,5 +1,6 @@
 import hashlib
 import json
+import re
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime
@@ -18,6 +19,7 @@ from sqlalchemy import (
     delete,
     false,
     func,
+    literal_column,
     or_,
     select,
     text,
@@ -129,6 +131,21 @@ class LibraryError(Exception):
         if self.action is not None:
             body["action"] = self.action
         return body
+
+
+_SEARCH_WORD = re.compile(r"\w+", re.UNICODE)
+
+
+def _search_expression(q: str) -> str | None:
+    """The FTS5 query for what a person typed: every word, each as a prefix, all required.
+
+    Each word is quoted, so nothing typed is read as FTS5 syntax (`AND`, `"`, `*`, `(`
+    and column filters are all just text here); `None` when nothing searchable is left.
+    """
+    words = _SEARCH_WORD.findall(q)
+    if not words:
+        return None
+    return " ".join(f'"{word}"*' for word in words)
 
 
 class LibraryService:
@@ -843,13 +860,27 @@ class LibraryService:
             pattern = f"%{normalize_text(q)}%"
             # The stored projection holds exactly what `normalize_text` returns
             # (DEC-036), so filtering reads a column instead of invoking the UDF
-            # once per row.
-            query = query.where(
-                or_(
-                    ItemRow.title_normalized.like(pattern),
-                    ItemRow.creator_primary_normalized.like(pattern),
+            # once per row. The substring match stays for a fragment inside a title
+            # word ("ayuel"); the FTS5 index (migration 0023, Sprint 089) adds every
+            # creator, the series, subjects, genres and the entry's own note.
+            matches = [
+                ItemRow.title_normalized.like(pattern),
+                ItemRow.creator_primary_normalized.like(pattern),
+            ]
+            expression = _search_expression(q)
+            if expression is not None:
+                matches.append(
+                    EntryRow.id.in_(
+                        select(literal_column("rowid"))
+                        .select_from(text("entry_search"))
+                        .where(
+                            text("entry_search MATCH :search_expression").bindparams(
+                                search_expression=expression
+                            )
+                        )
+                    )
                 )
-            )
+            query = query.where(or_(*matches))
         if key is not None and value is not None:
             # A key is only meaningful within one domain, so this filter requires the
             # caller to have already narrowed to exactly one (Sprint 065 deliverable 7).
