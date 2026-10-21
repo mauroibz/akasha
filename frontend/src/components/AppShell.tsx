@@ -1,4 +1,5 @@
 import {
+  BookOpen,
   Bookmark,
   ChartBar,
   LibraryBig,
@@ -37,6 +38,8 @@ interface NavItem {
   readonly to: string;
   readonly label: string;
   readonly icon: ReactNode;
+  /** Kept off the phone's bottom bar, which holds five; the command bar reaches it. */
+  readonly desktopOnly?: boolean;
 }
 
 // Triage is not here on purpose: it is the tail of the import flow, not a
@@ -58,6 +61,13 @@ const navItems: readonly NavItem[] = [
   { to: "/import", label: "Import", icon: <Upload aria-hidden="true" /> },
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
+  // Sprint 098: what you finished, month by month.
+  {
+    to: "/diary",
+    label: "Diary",
+    icon: <BookOpen aria-hidden="true" />,
+    desktopOnly: true,
+  },
 ];
 
 /**
@@ -299,7 +309,9 @@ export function AppShell({
                   }
                 >
                   <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-                  <span>{item.label}</span>
+                  {/* Icons alone below 1024px, where six labels do not fit a tablet;
+                      the label stays the link's name for a screen reader. */}
+                  <span className="sr-only lg:not-sr-only">{item.label}</span>
                   {item.to === "/import" ? <InboxBadge /> : null}
                 </NavLink>
               ))}
@@ -329,23 +341,25 @@ export function AppShell({
               aria-label="Primary"
               className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
             >
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={item.to}
-                  end={item.to === "/"}
-                  aria-label={item.label}
-                  className={({ isActive }) =>
-                    cn(
-                      "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
-                      isActive ? "text-primary" : "text-muted-foreground",
-                    )
-                  }
-                >
-                  <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-                  <span>{item.label}</span>
-                </NavLink>
-              ))}
+              {navItems
+                .filter((item) => !item.desktopOnly)
+                .map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.to === "/"}
+                    aria-label={item.label}
+                    className={({ isActive }) =>
+                      cn(
+                        "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
+                        isActive ? "text-primary" : "text-muted-foreground",
+                      )
+                    }
+                  >
+                    <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
+                    <span>{item.label}</span>
+                  </NavLink>
+                ))}
             </nav>
             <div
               key={location.pathname}

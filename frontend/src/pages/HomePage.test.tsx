@@ -94,6 +94,10 @@ test("announces loading and then renders the populated library and inbox facet",
       if (String(request).startsWith("/api/shelves")) {
         return Promise.resolve(new Response("[]", { status: 200 }));
       }
+      // The Now strip's own request (Sprint 098): nothing under way.
+      if (String(request).startsWith("/api/now")) {
+        return Promise.resolve(new Response("[]", { status: 200 }));
+      }
       return new Promise<Response>((resolve) => {
         resolveResponse = resolve;
       });

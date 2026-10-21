@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Command as CommandPrimitive } from "cmdk";
 import {
   ArrowRight,
+  BookOpen,
   BookPlus,
   ChartBar,
   Download,
@@ -190,6 +191,13 @@ export function CommandBar({
         words: "shelves shelf lists",
         icon: <Bookmark />,
         run: () => go("/shelves"),
+      },
+      {
+        id: "diary",
+        label: "Go to Diary",
+        words: "diary journal finished history month year",
+        icon: <BookOpen />,
+        run: () => go("/diary"),
       },
       {
         id: "insights",

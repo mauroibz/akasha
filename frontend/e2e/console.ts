@@ -56,6 +56,11 @@ export const test = base.extend<{
       await page.route("**/api/shelves", (route) =>
         route.fulfill({ json: [] }),
       );
+      // Sprint 098: nothing under way, and an empty diary, unless a spec says so.
+      await page.route("**/api/now", (route) => route.fulfill({ json: [] }));
+      await page.route("**/api/diary**", (route) =>
+        route.fulfill({ json: { year: 2026, years: [], months: [] } }),
+      );
       await page.route("**/api/items/*/attachments", (route) =>
         route.fulfill({ json: { attachments: [] } }),
       );

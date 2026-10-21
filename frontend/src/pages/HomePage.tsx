@@ -78,6 +78,7 @@ import { usePatchEntry } from "@/features/library/usePatchEntry";
 import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useCommandBar } from "@/features/command/commandBar";
+import { NowStrip } from "@/features/library/NowStrip";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
@@ -916,6 +917,10 @@ export function HomePage() {
           </section>
         )}
       </div>
+
+      {/* What you are in the middle of (Sprint 098), on the plain library only:
+          a search or a filter is a question this strip does not answer. */}
+      {!filterActive && !filters.query && <NowStrip />}
 
       {library.isPending && (
         // Holds the list's height while the new page resolves. Without it the

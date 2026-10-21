@@ -71,6 +71,8 @@ export interface StatusSpec {
   label: string;
   choosable: boolean;
   hotkey: string | null;
+  /** Under way: what the library's Now strip shows (Sprint 098). */
+  in_progress?: boolean;
 }
 
 /** How a domain counts progress, when that means something to it (DEC-077). */
@@ -382,6 +384,46 @@ export async function patchEntry(
   if (!response.ok)
     throw await apiFailure(response, "Your change could not be saved");
   return (await response.json()) as LibraryEntry;
+}
+
+/** Entries under way across every domain: the Now strip (Sprint 098). */
+export async function getNow(signal?: AbortSignal): Promise<LibraryEntry[]> {
+  const response = await request("/api/now", {
+    headers: { Accept: "application/json" },
+    signal,
+  });
+  if (!response.ok)
+    throw await apiFailure(
+      response,
+      "What you are in the middle of could not be loaded",
+    );
+  return response.json() as Promise<LibraryEntry[]>;
+}
+
+export interface DiaryMonth {
+  month: string;
+  counts: Record<string, number>;
+  entries: LibraryEntry[];
+}
+
+export interface Diary {
+  year: number;
+  years: number[];
+  months: DiaryMonth[];
+}
+
+/** What was finished in a year, by month (Sprint 098). */
+export async function getDiary(
+  year?: number,
+  signal?: AbortSignal,
+): Promise<Diary> {
+  const response = await request(
+    year ? `/api/diary?year=${year}` : "/api/diary",
+    { headers: { Accept: "application/json" }, signal },
+  );
+  if (!response.ok)
+    throw await apiFailure(response, "The diary could not be loaded");
+  return response.json() as Promise<Diary>;
 }
 
 /** How many entries wait in the Inbox: the nav's Import badge (Sprint 096). */

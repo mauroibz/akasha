@@ -24,6 +24,13 @@ export const queryKeys = {
     list: <F>(filters: F) => ["triage", filters] as const,
   },
   entry: (entryId: number) => ["entry", entryId] as const,
+  /**
+   * Its own root, not under `library`: the library's optimistic updates rewrite every
+   * `library` cache as pages of entries, and Now is a plain list (the Sprint 096
+   * lesson). Refreshed by the strip's own writes.
+   */
+  now: ["now"] as const,
+  diary: (year: number | undefined) => ["diary", year ?? "current"] as const,
   coverCandidates: (itemId: number) => ["cover-candidates", itemId] as const,
   itemTypes: ["item-types"] as const,
   insightMembers: (type: string, insightKey: string, value: string) =>
