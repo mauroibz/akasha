@@ -6354,3 +6354,24 @@ in code. The owner's library has no 2026 finish dates, so goals start at zero th
 
 **Next.** No sprint is planned. 2.5 needs the release gate, a version bump and notes, and the
 owner's word to push, tag and deploy.
+
+## 2026-10-21 — Release gate for 2.5.0
+
+**Done.**
+
+- The full gate.
+- Two shelf specs and the editorial shelf flow updated for the room.
+- One product fix: a shelf is labelled Empty only when it holds nothing.
+- Version surfaces at 2.5.0.
+- Release notes in `docs/operations/release-notes-v2.5.md`.
+
+**Verified and how.**
+
+- `make test`: backend 1699 passed (90% coverage), Vitest 425 passed.
+- `make smoke-container` passed.
+- Playwright: first run 149 passed and 3 failed, all in shelf specs Sprint 105 had not run
+  (`editorial.spec.ts`, two in `library.spec.ts`). After the fix and the spec updates, the full
+  run: 152 passed, 2 skipped (live metadata, by design).
+- `make check`.
+
+**Next.** Push, tag and deploy wait for the owner.

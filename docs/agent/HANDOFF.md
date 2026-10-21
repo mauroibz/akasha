@@ -5,7 +5,7 @@
 v2.4.0 shipped on 2026-10-21 (Sprints 087–101) and runs on the owner's ZimaBoard. The owner then
 asked for a 2.5 release: Insights redrawn, gentle goals on the Diary, and Shelves redrawn. A design
 canvas was reviewed and accepted as **DEC-169**: https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
-The plan reopens as Sprints 102–105. **All four are completed and the project state is `complete`.** Nothing of 2.5 is tagged, pushed or deployed. The owner asked for the work
+The plan reopens as Sprints 102–105. **All four are completed and the project state is `complete`.** 2.5.0 passed the full release gate and the version is bumped locally; nothing is pushed, tagged or deployed. The owner asked for the work
 to be built; release, push and deploy wait for them to ask.
 
 Waiting on the owner:
@@ -45,9 +45,10 @@ Waiting on the owner:
 
 ## Next session
 
-No sprint is planned. A 2.5.0 release needs the full gate (`make test`, the full Playwright run,
-`make smoke-container`), a version bump and release notes, then the owner's word to push, tag
-and deploy (migration 0026 runs on the board with its pre-migration backup). Walkthroughs can use the copy of the owner's
+No sprint is planned. 2.5.0 is ready: the gate passed (backend 1699, Vitest 425, Playwright 152 +
+2 skipped, container smoke), the version surfaces say 2.5.0 and the notes are written. Pushing,
+tagging, the GitHub Release and the board upgrade wait for the owner (migration 0026 runs on the
+board with its pre-migration backup). Walkthroughs can use the copy of the owner's
 library in the session scratchpad (`data102/`), taken from the board's 2026-10-21 nightly backup;
 it is never committed. The 2.5 canvas is https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c; the
 2.4 mock was https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa.
