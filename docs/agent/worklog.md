@@ -6145,3 +6145,32 @@ a live share and a live 30-book import watched filling in.
 nested live region announced the count twice.
 
 **Next.** Sprint 098 — Now and Diary.
+
+---
+
+## 2026-10-21 — Sprint 098: Now and Diary
+
+**Done.** `StatusSpec.in_progress`; `/api/now` and the Now strip with +1; `/api/diary` and the
+Diary page; Diary in the desktop nav and the command bar.
+
+**Verified and how.** Backend tests and route-structure suites, unit tests, `make check`, four
+specs, screenshots on a copy of the owner's data.
+
+**Found.** Cache-key collision avoided (the 096 lesson); tablet nav overflow with a sixth item;
+an empty strip's padding moved the first cover.
+
+---
+
+## 2026-10-21 — Sprint 099: more importers
+
+**Done.** StoryGraph connector; AniList through the MyAnimeList reader; "Inbox" in every guide.
+
+**Not done.** Hardcover and Simkl: no real export available, and DEC-025 forbids building against
+a guess. Owner to supply samples.
+
+**Verified and how.** Connector and conformance suites (431), `make check`, two specs.
+
+**Found.** Banker's rounding in Python turned 4.25 stars into 8. The 099 commit landed before 098
+was closed in the state; repaired in order.
+
+**Next.** Sprint 100 — re-file and saved views.

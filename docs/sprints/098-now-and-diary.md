@@ -1,7 +1,7 @@
 # Sprint 098 — Now and Diary
 
 **Sprint:** 098
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 097
 **Owner:** Mauro
