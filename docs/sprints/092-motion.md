@@ -1,7 +1,7 @@
 # Sprint 092 — Motion, and the detail page as property rows
 
 **Sprint:** 092
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 091
 **Owner:** Mauro

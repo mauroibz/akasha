@@ -23,6 +23,7 @@ import {
 import { AUTH_REQUIRED_EVENT } from "@/api/request";
 import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
+import { DetailPage } from "@/pages/DetailPage";
 import { HomePage } from "@/pages/HomePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { Loading } from "@/components/ui/skeleton";
@@ -34,9 +35,7 @@ import { Loading } from "@/components/ui/skeleton";
 const AddPage = lazy(async () => ({
   default: (await import("@/pages/AddPage")).AddPage,
 }));
-const DetailPage = lazy(async () => ({
-  default: (await import("@/pages/DetailPage")).DetailPage,
-}));
+
 const ImportPage = lazy(async () => ({
   default: (await import("@/pages/ImportPage")).ImportPage,
 }));

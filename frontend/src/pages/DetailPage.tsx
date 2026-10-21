@@ -51,6 +51,10 @@ import type { EntryFieldName } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/api/keys";
+import {
+  cachedEntry,
+  coverTransitionName,
+} from "@/features/library/cachedEntry";
 import { FilePicker } from "@/components/ui/file-picker";
 import { Loading } from "@/components/ui/skeleton";
 
@@ -176,6 +180,10 @@ export function DetailPage() {
     queryKey: queryKeys.entry(entryId),
     queryFn: () => getEntry(entryId),
     retry: false,
+    // Start from the list it was opened from, so the page and its cover are there
+    // in the first frame and the cover can grow out of the library card (Sprint
+    // 092); the entry's own read replaces it a moment later.
+    placeholderData: () => cachedEntry(cache, entryId),
   });
   const shelves = useQuery({
     queryKey: queryKeys.shelves,
@@ -283,11 +291,13 @@ export function DetailPage() {
       <BackToLibrary to={backTo} label={backLabel} />
       <div className="mt-8 grid gap-8 md:grid-cols-[240px_1fr]">
         <aside>
-          <CoverImage
-            src={item.cover_url}
-            alt={`Cover of ${item.title}`}
-            className="aspect-[2/3] w-full rounded-xl"
-          />
+          <div style={{ viewTransitionName: coverTransitionName(entry.id) }}>
+            <CoverImage
+              src={item.cover_url}
+              alt={`Cover of ${item.title}`}
+              className="aspect-[2/3] w-full rounded-xl"
+            />
+          </div>
           {/* Asked of the domain, not branched on the type: the chooser is Open
               Library's work-editions path, and an album has no work and no
               editions, so the control could only ever say no (DEC-067 row 7). */}

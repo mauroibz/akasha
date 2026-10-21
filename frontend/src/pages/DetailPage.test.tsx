@@ -115,13 +115,13 @@ const entry = {
   formats: ["physical"],
 };
 
-function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
+function renderPage(
+  initialPath = "/books/7",
+  extraRoutes?: React.ReactNode,
+  client = new QueryClient({ defaultOptions: { queries: { retry: false } } }),
+) {
   return render(
-    <QueryClientProvider
-      client={
-        new QueryClient({ defaultOptions: { queries: { retry: false } } })
-      }
-    >
+    <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[initialPath]}>
         <Routes>
           <Route path="/books/:entryId" element={<DetailPage />} />
@@ -136,6 +136,35 @@ function renderPage(initialPath = "/books/7", extraRoutes?: React.ReactNode) {
 afterEach(() => vi.restoreAllMocks());
 
 describe("DetailPage", () => {
+  it("opens at once from the library's copy of the entry, before its own read returns", async () => {
+    // Sprint 092: the cover has to be on screen in the first frame for it to grow
+    // out of the library card, so Detail starts from the list it was opened from.
+    let release: () => void = () => undefined;
+    const held = new Promise<void>((resolve) => (release = resolve));
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url.endsWith("/api/entries/7")) {
+        await held;
+        return new Response(JSON.stringify(entry));
+      }
+      if (url === "/api/shelves") return new Response("[]");
+      return new Response("[]");
+    });
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    client.setQueryData(["library", { sort: "added" }], {
+      pages: [{ items: [entry], next_cursor: null, total: 1 }],
+      pageParams: [undefined],
+    });
+    renderPage("/books/7", undefined, client);
+    expect(
+      await screen.findByRole("heading", { name: entry.item.title }),
+    ).toBeInTheDocument();
+    expect(screen.queryByText("Loading detail…")).toBeNull();
+    release();
+  });
+
   it("draws its cover through CoverImage, and a 404 shows the shared fallback (finding 4)", async () => {
     mockApi(
       async (input) => {

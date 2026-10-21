@@ -1,6 +1,7 @@
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 import { cn } from "@/lib/utils";
+import { navigateWithTransition } from "@/lib/viewTransition";
 
 /**
  * The one way back (proposal §3.2, finding 8).
@@ -24,6 +25,7 @@ export function BackToLibrary({
   to?: string;
   label?: string;
 }) {
+  const navigate = useNavigate();
   return (
     <Link
       className={cn(
@@ -31,6 +33,19 @@ export function BackToLibrary({
         className,
       )}
       to={to}
+      // The cover shrinks back into its card (Sprint 092). A modified click
+      // (new tab, new window) is left to the browser.
+      onClick={(event) => {
+        if (
+          event.metaKey ||
+          event.ctrlKey ||
+          event.shiftKey ||
+          event.button !== 0
+        )
+          return;
+        event.preventDefault();
+        navigateWithTransition(navigate, to);
+      }}
     >
       ← {label}
     </Link>

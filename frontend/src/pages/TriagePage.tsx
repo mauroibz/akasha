@@ -62,6 +62,7 @@ import { queryKeys } from "@/api/keys";
 import { usePatchEntry } from "@/features/library/usePatchEntry";
 import { NativeSelect } from "@/components/ui/native-select";
 import { Loading } from "@/components/ui/skeleton";
+import { navigateWithTransition } from "@/lib/viewTransition";
 
 const STATUS_DRAFTS_STORAGE_KEY = "akasha.triage.status-drafts.v1";
 
@@ -551,7 +552,9 @@ export function TriagePage() {
       if (event.key === "Enter") {
         event.preventDefault();
         if (selectionCount === 0 && focusedId !== null) {
-          void navigate(`/books/${focusedId}`, { state: { from: "triage" } });
+          navigateWithTransition(navigate, `/books/${focusedId}`, {
+            state: { from: "triage" },
+          });
         } else {
           // After bulk action, advance focus
           const current = Math.max(
@@ -921,7 +924,7 @@ export function TriagePage() {
                       )
                         return;
                       setFocusedId(entry.id);
-                      void navigate(`/books/${entry.id}`, {
+                      navigateWithTransition(navigate, `/books/${entry.id}`, {
                         state: { from: "triage" },
                       });
                     }}

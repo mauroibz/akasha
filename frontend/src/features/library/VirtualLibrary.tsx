@@ -15,6 +15,8 @@ import {
   tableRowHeight,
   type LibraryView,
 } from "./library";
+import { coverTransitionName } from "@/features/library/cachedEntry";
+import { navigateWithTransition } from "@/lib/viewTransition";
 
 interface VirtualLibraryProps {
   entries: LibraryEntry[];
@@ -366,7 +368,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
           // guard returns before a button's click could double-navigate.
           if ((e.target as HTMLElement).closest("button, [role='combobox']"))
             return;
-          void navigate(`/books/${entry.id}`);
+          navigateWithTransition(navigate, `/books/${entry.id}`);
         }}
         onKeyDown={(e) => {
           if (e.key !== "Enter") return;
@@ -377,7 +379,7 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
           if ((e.target as HTMLElement).closest("button, [role='combobox']"))
             return;
           e.preventDefault();
-          void navigate(`/books/${entry.id}`);
+          navigateWithTransition(navigate, `/books/${entry.id}`);
         }}
         // Both views are the same list of entries at two densities, so both
         // are a feed of articles. Table mode used to claim `role="row"` inside
@@ -395,7 +397,12 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
                 entirely: its job is pixels, not clicks. */}
             <div
               className="pointer-events-none absolute inset-x-0 top-0"
-              style={{ height: gridLayout.coverHeight }}
+              style={{
+                height: gridLayout.coverHeight,
+                // Shared with the detail page's cover: the browser's view
+                // transition grows one into the other (Sprint 092).
+                viewTransitionName: coverTransitionName(entry.id),
+              }}
               data-card-cover=""
             >
               <CoverImage
@@ -425,7 +432,9 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               aria-label={`Open ${entry.item.title}`}
               className="absolute inset-x-0 bottom-0 z-[1] block overflow-hidden rounded-b-2xl text-left transition-colors hover:bg-surface focus-visible:bg-surface focus-visible:outline-none"
               style={{ height: gridLayout.textHeight }}
-              onClick={() => void navigate(`/books/${entry.id}`)}
+              onClick={() =>
+                navigateWithTransition(navigate, `/books/${entry.id}`)
+              }
             >
               <EntryMetadata entry={entry} grid />
             </button>
@@ -454,9 +463,15 @@ export function VirtualLibrary(props: VirtualLibraryProps) {
               type="button"
               className="flex min-w-0 flex-1 items-center gap-4 overflow-hidden text-left focus-visible:outline-none"
               aria-label={`Open ${entry.item.title}`}
-              onClick={() => void navigate(`/books/${entry.id}`)}
+              onClick={() =>
+                navigateWithTransition(navigate, `/books/${entry.id}`)
+              }
             >
-              <div className="shrink-0" data-card-cover="">
+              <div
+                className="shrink-0"
+                data-card-cover=""
+                style={{ viewTransitionName: coverTransitionName(entry.id) }}
+              >
                 <CoverImage
                   src={entry.item.cover_url}
                   alt={`Cover of ${entry.item.title}`}
