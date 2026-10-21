@@ -13,3 +13,16 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
     <App />
   </React.StrictMode>,
 );
+
+// Installable, and so offered in a phone's share sheet (Sprint 097). Production only,
+// and only where the browser allows it at all: a secure context, which the exposure
+// rule already requires off the LAN.
+if (
+  import.meta.env.PROD &&
+  "serviceWorker" in navigator &&
+  window.isSecureContext
+) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js");
+  });
+}

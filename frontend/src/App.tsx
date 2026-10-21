@@ -25,6 +25,7 @@ import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
 import { DetailPage } from "@/pages/DetailPage";
 import { HomePage } from "@/pages/HomePage";
+import { SharePage } from "@/pages/SharePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
 import { Loading } from "@/components/ui/skeleton";
 
@@ -143,6 +144,8 @@ function PrivateRoutes({
             {/* The Inbox is its own page since Sprint 096 (proposal I3), no longer
                 a tab of the import screen. */}
             <Route path="/inbox" element={<TriagePage />} />
+            {/* The phone's share sheet (Sprint 097): opens the command bar. */}
+            <Route path="/share" element={<SharePage />} />
             <Route
               path="/people"
               element={
