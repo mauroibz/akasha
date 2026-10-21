@@ -73,6 +73,8 @@ export interface StatusSpec {
   hotkey: string | null;
   /** Under way: what the library's Now strip shows (Sprint 098). */
   in_progress?: boolean;
+  /** Waiting to be started: where a goal's picks come from (Sprint 103). */
+  planned?: boolean;
 }
 
 /** How a domain counts progress, when that means something to it (DEC-077). */

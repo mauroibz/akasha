@@ -2,11 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { getGoals, type Goal } from "@/api/goals";
 import { queryKeys } from "@/api/keys";
 import { getDiary } from "@/api/library";
 import { CoverImage } from "@/components/CoverImage";
 import { PageHeader } from "@/components/PageHeader";
 import { EmptyState } from "@/components/ui/empty-state";
+import { GoalBand } from "@/features/goals/GoalBand";
+import { GoalDialog } from "@/features/goals/GoalDialog";
+import { goalDomains } from "@/features/goals/goals";
 import { Loading } from "@/components/ui/skeleton";
 import { countLabel } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
@@ -23,6 +27,9 @@ function monthName(month: string): string {
 /**
  * The Diary (Sprint 098, proposal §7): what you finished, month by month, across every
  * domain: "March: 3 books, 1 movie", with the covers. Read from `date_finished`.
+ *
+ * A gentle goal sits above the months when one is set (Sprint 104, DEC-169): the
+ * calendar of lights and a few picks. Without one, a single quiet line offers it.
  */
 export function DiaryPage() {
   const navigate = useNavigate();
@@ -36,6 +43,15 @@ export function DiaryPage() {
   const labelFor = (id: string, count: number) => countLabel(count, id, types);
   const shown = diary.data?.year ?? year;
   const years = diary.data?.years ?? [];
+  const goals = useQuery({
+    queryKey: queryKeys.goals,
+    queryFn: ({ signal }) => getGoals(signal),
+  });
+  const [editing, setEditing] = useState<{ open: boolean; goal?: Goal }>({
+    open: false,
+  });
+  const canSetGoal = goalDomains(types).length > 0;
+  const goalYear = shown ?? new Date().getFullYear();
 
   return (
     <main className="mx-auto min-h-screen w-full max-w-5xl px-5 py-8">
@@ -69,6 +85,35 @@ export function DiaryPage() {
           ) : undefined
         }
       />
+      {goals.data?.map((goal) => (
+        <GoalBand
+          key={goal.item_type}
+          goal={goal}
+          year={goalYear}
+          types={types}
+          onChange={() => setEditing({ open: true, goal })}
+        />
+      ))}
+      {goals.data && canSetGoal && (
+        <p className="mt-6 text-sm text-muted-foreground">
+          {goals.data.length === 0 ? "Want something to aim at? " : null}
+          <button
+            type="button"
+            onClick={() => setEditing({ open: true })}
+            className="min-h-11 font-medium text-foreground underline decoration-primary decoration-2 underline-offset-4 focus-ring"
+          >
+            {goals.data.length === 0
+              ? "Set a gentle goal"
+              : "Add a goal for another library"}
+          </button>
+        </p>
+      )}
+      <GoalDialog
+        open={editing.open}
+        onOpenChange={(open) => setEditing((value) => ({ ...value, open }))}
+        types={types}
+        initial={editing.goal}
+      />
       {diary.isPending ? (
         <Loading label="Loading your diary…" shape="grid" className="mt-8" />
       ) : diary.isError ? (
@@ -95,7 +140,16 @@ export function DiaryPage() {
                   .map(([id, count]) => labelFor(id, count))
                   .join(", ")}
               </p>
-              <ul className="mt-3 grid grid-cols-3 gap-3 sm:grid-cols-6">
+              {/* A month's only cover is drawn large, a busy month's at shelf
+                  size (Sprint 104, the owner's "play with cover sizing"). */}
+              <ul
+                className={cn(
+                  "mt-4 grid gap-4",
+                  month.entries.length === 1
+                    ? "max-w-[11rem] grid-cols-1 sm:max-w-[13rem]"
+                    : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-5",
+                )}
+              >
                 {month.entries.map((entry) => (
                   <li key={entry.id}>
                     <button
@@ -109,9 +163,9 @@ export function DiaryPage() {
                       <CoverImage
                         src={entry.item.cover_url}
                         alt=""
-                        className="aspect-[2/3] w-full rounded-md object-cover"
+                        className="aspect-[2/3] w-full rounded-[3px_7px_7px_3px] object-cover shadow-[inset_4px_0_0_rgba(0,0,0,0.15),0_12px_22px_-12px_rgba(28,25,23,0.45)]"
                       />
-                      <span className="mt-1.5 block truncate text-xs font-medium">
+                      <span className="mt-2 block truncate text-sm font-medium">
                         {entry.item.title}
                       </span>
                     </button>

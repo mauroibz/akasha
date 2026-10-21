@@ -928,3 +928,126 @@ test("insights has no serious accessibility violations with a row open", async (
   await expect(page.getByText("Rayuela")).toBeVisible();
   await expectNoSeriousViolations(page, "insights (row open)");
 });
+
+/**
+ * The Diary with a gentle goal (Sprint 104): the band, the calendar of lights and
+ * the picks, in both themes, and the goal dialog open.
+ */
+async function stubDiaryWithGoal(page: Page) {
+  const year = new Date().getFullYear();
+  await stubItemTypes(page, [
+    {
+      ...bookItemType,
+      plural_label: "Books",
+      entry_fields: ["date_started", "date_finished", "reread_count"],
+      statuses: [
+        { value: "unsorted", label: "Inbox", choosable: false, hotkey: "u" },
+        { value: "read", label: "Read", choosable: true, hotkey: "r" },
+        {
+          value: "reading",
+          label: "Reading",
+          choosable: true,
+          hotkey: "g",
+          in_progress: true,
+        },
+        {
+          value: "to_read",
+          label: "To read",
+          choosable: true,
+          hotkey: "t",
+          planned: true,
+        },
+      ],
+    },
+  ] as Parameters<typeof stubItemTypes>[1]);
+  const entry = (id: number, title: string) => ({
+    id,
+    item_id: id,
+    status: "to_read",
+    score: null,
+    notes: null,
+    date_added: "2024-03-01T00:00:00Z",
+    date_started: null,
+    date_finished: null,
+    reread_count: 0,
+    progress: null,
+    score_provisional: false,
+    suggested_status: null,
+    shelves: [],
+    formats: [],
+    item: {
+      id,
+      type: "book",
+      title,
+      subtitle: null,
+      year: 1974,
+      creator: "Ursula K. Le Guin",
+      cover_url: null,
+      metadata: {},
+      identifiers: {},
+      sources: [],
+    },
+  });
+  await page.route("**/api/diary**", (route) =>
+    route.fulfill({ json: { year, years: [year], months: [] } }),
+  );
+  await page.route("**/api/goals", (route) =>
+    route.fulfill({
+      json: [{ item_type: "book", count: 2, period: "month", suggest: true }],
+    }),
+  );
+  await page.route("**/api/goals/book/progress**", (route) =>
+    route.fulfill({
+      json: {
+        item_type: "book",
+        year,
+        months: [2, 1, 3, 2, 0, 2, 4, 1, 1, 1, 0, 0],
+        total: 17,
+        target: 24,
+      },
+    }),
+  );
+  await page.route("**/api/goals/book/picks**", (route) =>
+    route.fulfill({
+      json: [
+        {
+          entry: entry(10, "The Dispossessed"),
+          reason: "creator",
+          creator: "Ursula K. Le Guin",
+          mean_score: 9,
+          since: null,
+        },
+        {
+          entry: entry(11, "The Lathe of Heaven"),
+          reason: "waiting",
+          creator: null,
+          mean_score: null,
+          since: "2024-03-01T00:00:00Z",
+        },
+      ],
+    }),
+  );
+}
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`the diary with a goal has no serious accessibility violations (${scheme})`, async ({
+    page,
+  }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await stubDiaryWithGoal(page);
+    await page.goto("/diary");
+    await expect(page.getByRole("region", { name: /books$/ })).toBeVisible();
+    await expect(page.getByText("The Dispossessed")).toBeVisible();
+    await expectNoSeriousViolations(page, `diary with a goal (${scheme})`);
+
+    await page.getByRole("button", { name: "Change goal" }).click();
+    await expect(
+      page.getByRole("dialog", { name: "A gentle goal" }),
+    ).toBeVisible();
+    // The dialog fades in; axe samples colour, so wait until nothing moves.
+    await expect
+      .poll(() => page.evaluate(() => document.getAnimations().length))
+      .toBe(0);
+    await expectNoSeriousViolations(page, `goal dialog (${scheme})`);
+  });
+}

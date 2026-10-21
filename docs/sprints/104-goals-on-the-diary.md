@@ -1,7 +1,7 @@
 # Sprint 104 — Goals on the Diary
 
 **Sprint:** 104
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 46
 **Depends on:** 103
 **Owner:** Mauro

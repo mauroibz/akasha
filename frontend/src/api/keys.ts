@@ -38,6 +38,10 @@ export const queryKeys = {
   providerHealth: ["provider-health"] as const,
   shelves: ["shelves"] as const,
   views: ["views"] as const,
+  goals: ["goals"] as const,
+  goalProgress: (itemType: string, year: number) =>
+    ["goals", "progress", itemType, year] as const,
+  goalPicks: (itemType: string) => ["goals", "picks", itemType] as const,
   shelfEntries: {
     /** Every page of one shelf, whichever domain it is filtered to. */
     shelf: (slug: string | undefined) => ["shelf-entries", slug] as const,
