@@ -279,6 +279,26 @@ export interface paths {
     patch: operations["update_entry_api_entries__entry_id__patch"];
     trace?: never;
   };
+  "/api/entries/{entry_id}/refile": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Refile Entry
+     * @description Move an entry into another library through that library's own record (Sprint 100).
+     */
+    post: operations["refile_entry_api_entries__entry_id__refile_post"];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/events": {
     parameters: {
       query?: never;
@@ -2106,6 +2126,15 @@ export interface components {
       /** Reason */
       reason?: string | null;
     };
+    /** RefileBody */
+    RefileBody: {
+      /** Source */
+      source: string;
+      /** Source Id */
+      source_id: string;
+      /** Source Refs */
+      source_refs?: components["schemas"]["SourceRefBody"][];
+    };
     /** RefreshBody */
     RefreshBody: {
       /** Overwrite */
@@ -3333,6 +3362,68 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["EntryPatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EntryResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  refile_entry_api_entries__entry_id__refile_post: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        entry_id: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RefileBody"];
       };
     };
     responses: {

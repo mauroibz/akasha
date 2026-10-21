@@ -637,6 +637,7 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("GET", "/api/entries/{entry_id}"),
         ("PATCH", "/api/entries/{entry_id}"),
         ("DELETE", "/api/entries/{entry_id}"),
+        ("POST", "/api/entries/{entry_id}/refile"),
         ("GET", "/api/items/{item_id}"),
         ("PATCH", "/api/items/{item_id}"),
         ("GET", "/api/item-types"),

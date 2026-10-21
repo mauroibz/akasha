@@ -597,6 +597,33 @@ async def create_entry(
     return EntryCreateResponse.model_validate(result)
 
 
+class RefileBody(BaseModel):
+    source: str = Field(max_length=50)
+    source_id: str = Field(max_length=200)
+    source_refs: list[SourceRefBody] = Field(default_factory=list, max_length=10)
+
+
+@router.post("/entries/{entry_id}/refile", response_model=EntryResponse, responses=ERRORS)
+async def refile_entry(
+    entry_id: int, body: RefileBody, request: Request, user: CurrentUser
+) -> EntryResponse:
+    """Move an entry into another library through that library's own record (Sprint 100)."""
+    add = AddService(
+        request.app.state.engine,
+        request.app.state.providers,
+        user_id=user.effective_user_id,
+        cover_client=request.app.state.provider_client,
+        data_dir=request.app.state.data_dir,
+    )
+    moved = await add.refile(
+        entry_id,
+        source=body.source,
+        source_id=body.source_id,
+        supplied_refs=[SourceRef(value.source, value.source_id) for value in body.source_refs],
+    )
+    return EntryResponse.model_validate(moved)
+
+
 @router.patch("/entries/bulk", response_model=AffectedResponse, responses=ERRORS)
 def bulk_entries(body: BulkBody, library: Library) -> AffectedResponse:
     filter_values = body.filter.model_dump(mode="json") if body.filter else None

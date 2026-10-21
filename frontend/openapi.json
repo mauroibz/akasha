@@ -2711,6 +2711,34 @@
         "title": "ProviderStatus",
         "type": "object"
       },
+      "RefileBody": {
+        "properties": {
+          "source": {
+            "maxLength": 50,
+            "title": "Source",
+            "type": "string"
+          },
+          "source_id": {
+            "maxLength": 200,
+            "title": "Source Id",
+            "type": "string"
+          },
+          "source_refs": {
+            "items": {
+              "$ref": "#/components/schemas/SourceRefBody"
+            },
+            "maxItems": 10,
+            "title": "Source Refs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "source",
+          "source_id"
+        ],
+        "title": "RefileBody",
+        "type": "object"
+      },
       "RefreshBody": {
         "properties": {
           "overwrite": {
@@ -4730,6 +4758,86 @@
           }
         },
         "summary": "Update Entry"
+      }
+    },
+    "/api/entries/{entry_id}/refile": {
+      "post": {
+        "description": "Move an entry into another library through that library's own record (Sprint 100).",
+        "operationId": "refile_entry_api_entries__entry_id__refile_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "entry_id",
+            "required": true,
+            "schema": {
+              "title": "Entry Id",
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RefileBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EntryResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Requested resource was not found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Domain conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          }
+        },
+        "summary": "Refile Entry"
       }
     },
     "/api/events": {

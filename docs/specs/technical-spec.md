@@ -661,6 +661,12 @@ The product-spec route list is authoritative, with these refinements:
 - `GET /api/views`, `POST /api/views` (`{name, query}`; the same name again replaces its query) and
   `DELETE /api/views/{view_id}` keep the person's saved library filters. `query` is the library's
   own URL query string, so the server never interprets it (Sprint 100).
+- `POST /api/entries/{entry_id}/refile` (`{source, source_id, source_refs}`) moves an entry into the
+  provider's domain: the record is created there through the add path, status (the target's
+  default when it lacks it), score, notes, the passage fields and shelves cross, formats the target
+  does not declare are dropped, attachments follow, and the old item is deleted under the
+  `prune_items` rule. Same domain is `422 refile_same_domain`; a target already in the library is
+  `409 refile_target_exists` (Sprint 100).
 
 - Authentication adds `POST /api/auth/login`, `DELETE /api/auth/session`, `GET /api/auth/me`
   first-run-only `POST /api/auth/setup`, and admin-only `POST /api/auth/act-as/{user_id}` plus

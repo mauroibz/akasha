@@ -79,6 +79,7 @@ ROUTE_POLICY = {
     ("GET", "/api/entries/{entry_id}"): "private-id",
     ("PATCH", "/api/entries/{entry_id}"): "private-id",
     ("DELETE", "/api/entries/{entry_id}"): "private-id",
+    ("POST", "/api/entries/{entry_id}/refile"): "private-id",
     ("GET", "/api/items/{item_id}"): "owned-shared-cache",
     ("PATCH", "/api/items/{item_id}"): "owned-shared-cache",
     ("GET", "/api/item-types"): "shared",
@@ -298,6 +299,7 @@ PRIVATE_PROBES = (
     ("PATCH", "/api/entries/{entry_id}", {"notes": "probe"}, None),
     ("PATCH", "/api/entries/{second_entry_id}", {"shelf_ids": ["SHELF"]}, None),
     ("DELETE", "/api/entries/{entry_id}", None, None),
+    ("POST", "/api/entries/{entry_id}/refile", {"source": "anilist", "source_id": "1"}, None),
     ("PATCH", "/api/entries/bulk", {"entry_ids": ["ENTRY"], "set": {"score": 5}}, None),
     (
         "PATCH",

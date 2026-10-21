@@ -155,6 +155,12 @@
    ]
   ],
   [
+   "/api/entries/{entry_id}/refile",
+   [
+    "POST"
+   ]
+  ],
+  [
    "/api/entries/bulk",
    [
     "PATCH"

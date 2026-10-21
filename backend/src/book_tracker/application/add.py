@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 
 import httpx
-from sqlalchemy import Engine
+from sqlalchemy import Engine, text
 
 from book_tracker.application.library import LibraryError, LibraryService
 from book_tracker.domain.identity import Identifier, InvalidIdentifier, normalize_identifier
@@ -324,3 +324,86 @@ class AddService:
             "already_exists": result.already_exists,
             "near_matches": [] if result.already_exists else near_matches,
         }
+
+    async def refile(
+        self, entry_id: int, *, source: str, source_id: str, supplied_refs: Sequence[SourceRef]
+    ) -> dict[str, Any]:
+        """Move an entry into another domain by creating that domain's item (Sprint 100).
+
+        An item's type is written at creation only (adding-a-domain guide §8), so a
+        re-file never edits it: the confirmed record is created in the target domain
+        through the ordinary add path, the entry's own values cross as far as the target
+        declares them, and the old entry goes. A status the target lacks becomes its
+        default; a format it does not hold is dropped. The old item goes too, along
+        with its cover, when no entry and no live import record still holds it.
+        """
+        old = await off_loop(self.library.get_entry, entry_id)
+        provider = self.providers.get(source)
+        target_type = getattr(provider, "item_type", None)
+        domain = DOMAINS.get(str(target_type)) if isinstance(target_type, str) else None
+        if domain is None:
+            raise LibraryError(
+                "provider_disabled", "Metadata provider is not enabled", status_code=422
+            )
+        if domain.item_type == old["item"]["type"]:
+            raise LibraryError(
+                "refile_same_domain",
+                f"This is already in {domain.label}",
+                status_code=422,
+            )
+        declared_statuses = {spec.value for spec in domain.statuses}
+        declared_formats = {spec.value for spec in domain.formats}
+        entry_values: dict[str, Any] = {}
+        if old["notes"]:
+            entry_values["notes"] = old["notes"]
+        for name in ("date_started", "date_finished", "reread_count"):
+            if name in domain.entry_fields and old[name]:
+                entry_values[name] = old[name]
+        result = await self.add(
+            manual=None,
+            source=source,
+            source_id=source_id,
+            supplied_refs=supplied_refs,
+            status=old["status"] if old["status"] in declared_statuses else None,
+            score=old["score"],
+            shelf_ids=[shelf["id"] for shelf in old["shelves"]],
+            idempotency_key=None,
+            confirm_near_match=True,
+            entry_values=entry_values,
+            formats=[value for value in old["formats"] if value in declared_formats],
+        )
+        if result["already_exists"]:
+            raise LibraryError(
+                "refile_target_exists",
+                f"{result['entry']['item']['title']} is already in your {domain.label}",
+                details={"entry_id": result["entry"]["id"]},
+            )
+        await off_loop(self._retire, entry_id, old["item_id"], result["entry"]["item_id"])
+        return await off_loop(self.library.get_entry, result["entry"]["id"])
+
+    def _retire(self, entry_id: int, old_item_id: int, new_item_id: int) -> None:
+        """Delete the re-filed entry, and its item when nothing else holds it.
+
+        The item rule is `prune_items`' (DEC-158): no entry of anyone and no import
+        record in a batch that can still be undone. Attachments are yours rather than
+        the cache's, so they follow the entry to the new item instead of going.
+        """
+        self.library.delete_entry(entry_id)
+        with self.repository.engine.begin() as connection:
+            held = connection.execute(
+                text(
+                    "SELECT EXISTS (SELECT 1 FROM entries WHERE item_id = :item)"
+                    " OR EXISTS (SELECT 1 FROM import_records WHERE matched_item_id = :item"
+                    "   AND batch_id IN (SELECT id FROM import_batches WHERE state <> 'undone'))"
+                ),
+                {"item": old_item_id},
+            ).scalar_one()
+            if held:
+                return
+            connection.execute(
+                text("UPDATE attachments SET item_id = :new WHERE item_id = :old"),
+                {"new": new_item_id, "old": old_item_id},
+            )
+            connection.execute(text("DELETE FROM items WHERE id = :id"), {"id": old_item_id})
+        if self.data_dir is not None:
+            (self.data_dir / "covers" / f"{old_item_id}.jpg").unlink(missing_ok=True)
