@@ -1,7 +1,7 @@
 # Sprint 092 — Motion, and the detail page as property rows
 
 **Sprint:** 092
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 091
 **Owner:** Mauro
@@ -57,4 +57,27 @@ Phone layout (093). New editable fields.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: Detail unit tests (31, one new), `vitest related` on
+each slice (168, 200), `make check`, and the add/detail, editorial, formats, accessibility, auth
+and library browser specs. A real Chromium confirmed one view transition opening a book and one on
+Back, with a frame captured mid-morph; screenshots of Detail in both themes.
+
+- **AC1.** The cover morphs from card to detail and back. **Deviation:** the browser's View
+  Transitions API rather than Motion's `layoutId`/`domMax`. React Router's `viewTransition` needs
+  its data router, so `lib/viewTransition.ts` starts the transition around a `flushSync`
+  navigation; Detail starts from the list's cached entry (`placeholderData`) and is no longer
+  lazy, so its cover exists in the first frame. Firefox without the API navigates plainly.
+- **AC2.** Reduced motion turns off view transitions, the route fade, button press and the
+  breathing mark (CSS block plus the helper's own check).
+- **AC3.** Library spec's DEC-023 bounds pass.
+- **AC4.** Property rows open the same opinion dialog; the Change button sits inside `dd`, named by
+  `aria-label` and worded by CSS, so the definition list stays valid and `dd` text is the value.
+
+Also: buttons scale while pressed; drop zones already had a drag-over state (the proposal's D4
+overstated that) and now lift and tint more; pages fade in (opacity only); the whole-page skeleton
+shows the breathing mark. **Found:** a route animation with a fill mode stays in
+`document.getAnimations()` after finishing, which the accessibility spec polls; and 091's
+`EmptyState` drew its title as a paragraph, which the auth spec (not run in 091) caught; it is a
+heading now. The score's settle animation already existed (`commitPop`).
+
+Commits: `5d1cc25`, `6488cef`, and the property-row commit.

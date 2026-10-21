@@ -2,9 +2,9 @@
 
 **Plan revision:** 45
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [092 — Motion](092-motion.md) (ready),
-the sixth of fifteen from the owner's accepted production-grade proposal (DEC-165); see
-"Production grade" below. Sprints 001–091 are done: Sprint 082
+**Active sprint:** [093 — The phone pass](093-phone-pass.md) (ready),
+the seventh of fifteen from the owner's accepted production-grade proposal (DEC-165); see
+"Production grade" below. Sprints 001–092 are done: Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
 domain-selectable (DEC-160, the DEC-079 extension shape) — generalized the custom list
@@ -211,8 +211,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [089](089-search-and-activity.md) | Search and activity: FTS5 library search, the event stream, the shell activity indicator | 088 | completed |
 | [090](090-two-themes.md) | Two themes: tokens, *Paper* and *Ink*, the theme setting, Newsreader and the type scale | 089 | completed |
 | [091](091-primitives.md) | Primitives: one set of controls, skeletons on every loading state | 090 | completed |
-| [092](092-motion.md) | Motion: shared-element covers, transitions, the arch motif, the detail page as property rows | 091 | ready |
-| 093 | The phone pass: compact header, two-column grid, bottom sheets | 092 | planned |
+| [092](092-motion.md) | Motion: shared-element covers, transitions, the arch motif, the detail page as property rows | 091 | completed |
+| [093](093-phone-pass.md) | The phone pass: compact header, two-column grid, bottom sheets | 092 | ready |
 | 094 | The command bar: library, web, resolve and navigate in one place | 093 | planned |
 | 095 | Paste and drop anywhere: file detection, scheme-less links, OpenGraph and Spotify oEmbed | 094 | planned |
 | 096 | Import as three steps: source, check, done | 095 | planned |

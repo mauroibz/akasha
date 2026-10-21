@@ -6053,3 +6053,18 @@ Screenshots in both themes.
 removed from the new primitives. Two triage specs pinned Ink-era colours.
 
 **Next.** Sprint 092 — motion and the property-row detail page.
+
+---
+
+## 2026-10-21 — Sprint 092: motion and property rows
+
+**Done.** Cover-to-detail view transition both ways; press, drag-over, route fade and the
+breathing page skeleton; Detail's reading data as property rows with a note callout.
+
+**Verified and how.** Detail tests, `vitest related`, `make check`, six browser specs; Chromium
+count of view transitions (1 open, 1 back) with a mid-morph frame; Detail in both themes.
+
+**Found.** React Router's `viewTransition` is a no-op without its data router; a route animation
+with a fill mode never leaves `getAnimations()`; 091's empty-state title was not a heading.
+
+**Next.** Sprint 093 — the phone pass.

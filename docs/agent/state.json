@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 45,
-  "project_status": "in_progress",
-  "active_sprint": "092",
-  "active_sprint_file": "docs/sprints/092-motion.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "091",
+  "project_status": "ready",
+  "active_sprint": "093",
+  "active_sprint_file": "docs/sprints/093-phone-pass.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "092",
   "completed_sprints": [
     "001",
     "002",
@@ -97,8 +97,9 @@
     "088",
     "089",
     "090",
-    "091"
+    "091",
+    "092"
   ],
-  "started_at": "2026-10-21T16:15:09-03:00",
-  "updated_at": "2026-10-21T16:15:09-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T16:25:26-03:00"
 }

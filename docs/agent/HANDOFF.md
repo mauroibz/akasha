@@ -4,7 +4,7 @@
 
 On 2026-10-21 the owner accepted `docs/production-grade-proposal.md` (DEC-165) and the plan
 reopened as Sprints 087–101, to run autonomously with per-sprint verification limited to what
-each sprint changed (DEC-167). 087–091 are completed. **Sprint 092 — Motion** is `ready`.
+each sprint changed (DEC-167). 087–092 are completed. **Sprint 093 — The phone pass** is `ready`.
 
 The last user-visible change: Add has an *Ebook files* drop zone. Dropped EPUBs open the import
 preview already filled from each file's own metadata and cover; one click commits them into
@@ -25,7 +25,7 @@ for v2.3.0; 087 changed no deployment files.
 
 ## Next session
 
-Run Sprint 092 (`docs/sprints/092-motion.md`). Full suites are owed once before the
+Run Sprint 093 (`docs/sprints/093-phone-pass.md`). Full suites are owed once before the
 next release (DEC-167). The design mock the owner
 approved is the canvas artifact https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa; Sprints
 090–093 build from it.
