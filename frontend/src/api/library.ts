@@ -384,6 +384,16 @@ export async function patchEntry(
   return (await response.json()) as LibraryEntry;
 }
 
+/** One item, as the import check shows an existing copy (Sprint 096). */
+export async function getItem(itemId: number): Promise<LibraryItem> {
+  const response = await request(`/api/items/${itemId}`, {
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw await apiFailure(response, "That item could not be read");
+  return response.json() as Promise<LibraryItem>;
+}
+
 /** Your entries for a query, best first: the command bar's library half (Sprint 094). */
 export async function searchLibrary(
   q: string,

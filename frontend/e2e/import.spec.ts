@@ -3,7 +3,6 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./console";
 
-import { chooseOption } from "./radix";
 import {
   albumItemType,
   bookItemType,
@@ -230,11 +229,11 @@ test("row errors and ambiguity require an explicit choice", async ({
   ).toBeVisible();
   const commit = page.getByRole("button", { name: /import 1 ready row/i });
   await expect(commit).toBeDisabled();
-  await chooseOption(
-    page,
-    page.getByRole("combobox", { name: /choice for Rayuela/i }),
-    "Create a separate edition",
-  );
+  // The choice names the copies by cover and title, never an id (Sprint 096).
+  await page
+    .getByRole("radiogroup", { name: /choice for Rayuela/i })
+    .getByText("A separate edition")
+    .click();
   await expect(commit).toBeEnabled();
 });
 

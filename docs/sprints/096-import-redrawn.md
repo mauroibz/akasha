@@ -1,7 +1,7 @@
 # Sprint 096 — Import, redrawn
 
 **Sprint:** 096
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 095
 **Owner:** Mauro

@@ -9,13 +9,6 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   commitImport,
@@ -55,6 +48,7 @@ import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { TriagePage } from "@/pages/TriagePage";
 import { NativeSelect } from "@/components/ui/native-select";
+import { AmbiguityChoice } from "@/features/import/AmbiguityChoice";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
 interface ImportFailure {
@@ -1318,39 +1312,18 @@ export function ImportPage() {
                           />
                         )}
                       {record.planned_action === "ambiguous" && (
-                        <div className="mt-3 block">
-                          <Label htmlFor={`choice-${record.record_id}`}>
-                            Choice for {record.title}
-                          </Label>
-                          <Select
-                            value={String(choices[record.record_id] ?? "")}
-                            onValueChange={(value) =>
-                              setChoices((old) => ({
-                                ...old,
-                                [record.record_id]:
-                                  value === "new" ? "new" : Number(value),
-                              }))
-                            }
-                          >
-                            <SelectTrigger
-                              id={`choice-${record.record_id}`}
-                              aria-label={`Choice for ${record.title}`}
-                              className="mt-1 h-11"
-                            >
-                              <SelectValue placeholder="Choose…" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {record.candidates.map((id) => (
-                                <SelectItem key={id} value={String(id)}>
-                                  Use existing item {id}
-                                </SelectItem>
-                              ))}
-                              <SelectItem value="new">
-                                Create a separate edition
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <AmbiguityChoice
+                          recordId={record.record_id}
+                          title={record.title}
+                          candidates={record.candidates}
+                          value={choices[record.record_id]}
+                          onChange={(value) =>
+                            setChoices((old) => ({
+                              ...old,
+                              [record.record_id]: value,
+                            }))
+                          }
+                        />
                       )}
                     </article>
                   ))}

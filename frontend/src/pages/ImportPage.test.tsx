@@ -479,6 +479,21 @@ describe("ImportPage", () => {
           }),
           { status: 201 },
         ),
+      )
+      // The copy already in the library, read so the choice can show it.
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            id: 7,
+            type: "book",
+            title: "Ficciones",
+            creator: "Jorge Luis Borges",
+            year: 1956,
+            cover_url: null,
+            metadata: {},
+            identifiers: {},
+          }),
+        ),
       );
     renderImportPage();
     await userEvent.upload(
@@ -488,23 +503,30 @@ describe("ImportPage", () => {
     await userEvent.click(
       screen.getByRole("button", { name: /preview import/i }),
     );
-    // Radix has no `required` attribute to assert; the enforcement is that the
-    // commit stays disabled until every ambiguous row has an explicit choice.
-    const choice = await screen.findByRole("combobox", {
+    // The enforcement is that the commit stays disabled until every ambiguous
+    // row has an explicit choice; the choice shows the copy, never an id
+    // (Sprint 096, proposal I4).
+    const choice = await screen.findByRole("radiogroup", {
       name: /choice for Ficciones/i,
     });
-    expect(choice).toHaveTextContent(/choose/i);
+    expect(
+      within(choice)
+        .getAllByRole("radio")
+        .some((radio) => (radio as HTMLInputElement).checked),
+    ).toBe(false);
+    expect(
+      await within(choice).findByText("Jorge Luis Borges · 1956"),
+    ).toBeVisible();
+    expect(screen.queryByText(/item 7/)).toBeNull();
     // Exact-name: the row-level "Don't import this row" control also matches
     // a loose /import/i since the owner's 2026-09-14 batch.
     expect(
       screen.getByRole("button", { name: /^import \d+ ready rows?$/i }),
     ).toBeDisabled();
 
-    await userEvent.click(choice);
     await userEvent.click(
-      await screen.findByRole("option", { name: /use existing item 7/i }),
+      within(choice).getByRole("radio", { name: /your copy: Ficciones/i }),
     );
-    expect(choice).toHaveTextContent(/use existing item 7/i);
     expect(
       screen.getByRole("button", { name: /^import \d+ ready rows?$/i }),
     ).toBeEnabled();
