@@ -1,7 +1,7 @@
 # Sprint 088 — One contract, generated
 
 **Sprint:** 088
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 087
 **Owner:** Mauro
@@ -108,4 +108,33 @@ Measured 2026-10-21 after Sprint 087 (`6b0e08a`):
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified under DEC-167 (the tests covering each change, `make check`, the
+Library and Triage browser specs: 49 passed); `make test` and the full Playwright suite were not
+run, by that decision.
+
+- **AC1.** `schema.d.ts` is generated and checked for staleness (`npm run api:check`, in
+  `make check`); `contract.ts` holds 36 hand-written types to their generated models by field
+  name. Proven by renaming `fingerprint` in `openapi.json`: `tsc` failed on `ImportPreview`.
+  It found two real drifts on its first run: `LibraryItem.cover_path` (never sent; removed) and
+  `search_progress`, which `PreviewResponse` did not declare, so Pydantic dropped it and the
+  import screen's "N of M rows searched" line had never rendered. Fixed: the model declares it,
+  and the search job writes `{searched, total}` before each row (a piece of 089 pulled forward).
+- **AC2.** `ApiError` (code, status, details, action, request id) in `api/request.ts`, with
+  `readApiError`, `apiFailure` (keeps a fixed sentence) and `jsonOrApiError`. The five hand
+  parsers and twenty bare throws use it; `ImportRequestError` and `AuthRequestError` subclass it.
+  Every user-visible sentence is unchanged. Vitest: 2 new tests.
+- **AC3.** `api/keys.ts` replaces 42 inline keys (the two insight keys stay local: one file
+  each, never invalidated elsewhere). `usePatchEntry` replaces both optimistic mutations; 2 tests.
+- **AC4.** `create_app` is 59 lines; `book_tracker/app/{lifespan,providers,middleware,errors,
+  health}.py`. `test_app_shape.py` holds routes, middleware order and handlers to a fixture taken
+  before the split; the OpenAPI export is unchanged.
+- **AC5.** The DEC-145 version check reads `compose.yaml`'s default as a fifth surface; it failed
+  on `1.5.7` and passes on `2.3.0`. Manifest and page description name a media library.
+
+Deviations: no `openapi-fetch`; generated types plus a field-name contract gave the drift check
+without rewriting 2,000 lines of API modules. `auth.ts` keeps raw `fetch` because a refused login
+must not trigger the global 401 redirect. The provider catalogue is a function in
+`app/providers.py`, not derived from the registry: the domain contract names provider wiring as
+a sanctioned shared registration point, and Google Books needs its key and warning.
+
+Commits: `1f32ee0`, `dba9fa8`, `bae338f`, `917f452`, `4a7e5fb`.

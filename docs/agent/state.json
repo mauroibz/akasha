@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 45,
-  "project_status": "in_progress",
-  "active_sprint": "088",
-  "active_sprint_file": "docs/sprints/088-one-contract-generated.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "087",
+  "project_status": "ready",
+  "active_sprint": "089",
+  "active_sprint_file": "docs/sprints/089-search-and-activity.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "088",
   "completed_sprints": [
     "001",
     "002",
@@ -93,8 +93,9 @@
     "084",
     "085",
     "086",
-    "087"
+    "087",
+    "088"
   ],
-  "started_at": "2026-10-21T15:30:29-03:00",
-  "updated_at": "2026-10-21T15:30:29-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T15:42:48-03:00"
 }

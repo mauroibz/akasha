@@ -5988,3 +5988,20 @@ Inbox; an import's results are one click away but the empty state does not say s
 §5's "arrivals" (Sprint 097).
 
 **Next.** Sprint 088 — one generated contract.
+
+---
+
+## 2026-10-21 — DEC-167; Sprint 088: one contract, generated
+
+**Done.** The owner asked for 088–101 to run autonomously and for per-sprint verification to
+cover only what changed (DEC-167: AGENTS.md, WORKFLOW.md, TESTING.md amended). 088: generated
+`schema.d.ts` plus a field-name contract; `ApiError`; `queryKeys`; `usePatchEntry`; `create_app`
+split into `book_tracker/app`; the compose default joins the version check.
+
+**Verified and how.** Covering backend tests, `vitest related` (243, then 177), `make check`, the
+library and triage Playwright specs (49). No screen changed visibly, so no screenshot.
+
+**Found.** The import screen's "N of M rows searched" line had never rendered: the response model
+dropped `search_progress`, and the job wrote no progress until it finished. Fixed here.
+
+**Next.** Sprint 089 — FTS5 search, the event stream, the activity indicator.
