@@ -11,6 +11,7 @@ import { ShelfCard } from "@/features/shelves/ShelfCard";
 import { domainsFrom } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { createShelf, getShelves, type ShelfWithCount } from "@/api/shelves";
+import { queryKeys } from "@/api/keys";
 
 type ShelfSort = "size" | "name" | "recent";
 
@@ -35,7 +36,7 @@ export function ShelvesPage() {
   const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
 
   const shelves = useQuery({
-    queryKey: ["shelves"],
+    queryKey: queryKeys.shelves,
     queryFn: getShelves,
     retry: false,
   });
@@ -50,7 +51,7 @@ export function ShelvesPage() {
       setError("");
       setNewName("");
       toast.success(`Shelf "${name}" created`);
-      void cache.invalidateQueries({ queryKey: ["shelves"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.shelves });
     },
     onError: (e: Error) => setError(e.message),
   });

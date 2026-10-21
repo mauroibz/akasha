@@ -31,6 +31,7 @@ import { useScoreDistribution } from "@/features/library/useScoreDistribution";
 import { getShelves } from "@/api/shelves";
 import type { ItemType, InsightRow } from "@/api/library";
 import { useItemTypes } from "@/features/library/useItemTypes";
+import { queryKeys } from "@/api/keys";
 
 /**
  * Ask the library a question it already has the answer to — which authors you rate
@@ -66,7 +67,10 @@ export function InsightsPage() {
   const [remembered] = useState<RememberedLibraryFilters>(
     readLibraryFiltersPreference,
   );
-  const shelfQuery = useQuery({ queryKey: ["shelves"], queryFn: getShelves });
+  const shelfQuery = useQuery({
+    queryKey: queryKeys.shelves,
+    queryFn: getShelves,
+  });
 
   // The registry loads after this component mounts, so the first domain is chosen
   // once it arrives rather than assumed up front.

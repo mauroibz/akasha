@@ -51,6 +51,7 @@ import {
 import type { EntryFieldName } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
+import { queryKeys } from "@/api/keys";
 
 /** One term/definition pair, addressable by name instead of by CSS adjacency. */
 /**
@@ -171,19 +172,19 @@ export function DetailPage() {
   const [deleteError, setDeleteError] = useState("");
   const headingRef = useRef<HTMLHeadingElement>(null);
   const detail = useQuery({
-    queryKey: ["entry", entryId],
+    queryKey: queryKeys.entry(entryId),
     queryFn: () => getEntry(entryId),
     retry: false,
   });
   const shelves = useQuery({
-    queryKey: ["shelves"],
+    queryKey: queryKeys.shelves,
     queryFn: getShelves,
     retry: false,
   });
   // The fields belong to the item's domain and change with a deployment, not with
   // an edit, so they are fetched once and shared by the facts panel and the dialog.
   const itemTypes = useQuery({
-    queryKey: ["item-types"],
+    queryKey: queryKeys.itemTypes,
     queryFn: getItemTypes,
     retry: false,
     staleTime: Infinity,
@@ -192,8 +193,8 @@ export function DetailPage() {
     mutationFn: (action: () => Promise<unknown>) => action(),
     onSuccess: () => {
       setError("");
-      void cache.invalidateQueries({ queryKey: ["entry", entryId] });
-      void cache.invalidateQueries({ queryKey: ["library"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.entry(entryId) });
+      void cache.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: (value: Error) => setError(value.message),
   });
@@ -240,7 +241,7 @@ export function DetailPage() {
     setDeleteError("");
     try {
       await deleteEntry(entry.id);
-      void cache.invalidateQueries({ queryKey: ["library"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.library.all });
       toast.success("Removed from your library");
       navigate("/");
     } catch (e) {
@@ -262,7 +263,7 @@ export function DetailPage() {
   async function handleCreateShelf(name: string) {
     try {
       const created = await createShelf(name);
-      void cache.invalidateQueries({ queryKey: ["shelves"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.shelves });
       toast.success(`Shelf "${name}" created`);
       return created;
     } catch (e) {

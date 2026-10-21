@@ -15,11 +15,8 @@ import {
   bulkDeleteEntries,
   bulkUpdateEntries,
   getLibraryPage,
-  patchEntry,
   type EntryStatus,
   type LibraryFilters,
-  type LibraryEntry,
-  type LibraryPage,
   type SortKey,
 } from "@/api/library";
 import { getShelves } from "@/api/shelves";
@@ -61,6 +58,8 @@ import {
   isEditableTarget,
   mergeUniqueEntries,
 } from "@/features/library/library";
+import { queryKeys } from "@/api/keys";
+import { usePatchEntry } from "@/features/library/usePatchEntry";
 
 const STATUS_DRAFTS_STORAGE_KEY = "akasha.triage.status-drafts.v1";
 
@@ -167,7 +166,7 @@ export function TriagePage() {
   }, [filters]);
 
   const library = useInfiniteQuery({
-    queryKey: ["triage", filters],
+    queryKey: queryKeys.triage.list(filters),
     queryFn: ({ pageParam, signal }) =>
       getLibraryPage(filters, pageParam, signal),
     initialPageParam: undefined as string | undefined,
@@ -185,7 +184,7 @@ export function TriagePage() {
   // Every shelf, for the bulk control. One request for the page, and a failure
   // costs the control rather than the screen.
   const shelfQuery = useQuery({
-    queryKey: ["shelves"],
+    queryKey: queryKeys.shelves,
     queryFn: getShelves,
     retry: false,
   });
@@ -211,57 +210,17 @@ export function TriagePage() {
       setSelectedIds(new Set());
       setAllMatching(false);
       setExcludedIds(new Set());
-      void queryClient.invalidateQueries({ queryKey: ["triage"] });
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: () => toast.error("Bulk update failed"),
   });
 
-  const rowMutation = useMutation({
-    mutationFn: ({
-      entry,
-      changes,
-    }: {
-      entry: LibraryEntry;
-      changes: Partial<Pick<LibraryEntry, "score" | "status">>;
-    }) => patchEntry(entry.id, changes),
-    onMutate: async ({ entry, changes }) => {
-      const key = ["triage", filters] as const;
-      await queryClient.cancelQueries({ queryKey: key });
-      const snapshot = queryClient.getQueryData(key);
-      queryClient.setQueryData<{ pages: LibraryPage[]; pageParams: unknown[] }>(
-        key,
-        (old) =>
-          old && {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              items: page.items.map((row) =>
-                row.id === entry.id
-                  ? {
-                      ...row,
-                      ...changes,
-                      score_provisional:
-                        changes.score === undefined
-                          ? row.score_provisional
-                          : false,
-                    }
-                  : row,
-              ),
-            })),
-          },
-      );
-      return { key, snapshot };
-    },
-    onError: (_error, _variables, context) => {
-      if (context) queryClient.setQueryData(context.key, context.snapshot);
-      toast.error("Your change could not be saved", {
-        description: "The previous value was restored.",
-      });
-    },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["triage"] });
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
+  const rowMutation = usePatchEntry({
+    key: queryKeys.triage.list(filters),
+    onSaved: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
   });
 
@@ -317,8 +276,8 @@ export function TriagePage() {
           `${successfulIds.length} ${successfulIds.length === 1 ? "status change" : "status changes"} applied`,
         );
       }
-      void queryClient.invalidateQueries({ queryKey: ["triage"] });
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
   });
 
@@ -326,8 +285,8 @@ export function TriagePage() {
     mutationFn: () => acceptSuggestedStatuses({ status: filters.statuses }),
     onSuccess: (affected) => {
       toast.success(`${affected} suggested statuses accepted`);
-      void queryClient.invalidateQueries({ queryKey: ["triage"] });
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: () => toast.error("Could not accept suggested statuses"),
   });
@@ -346,8 +305,8 @@ export function TriagePage() {
       setAllMatching(false);
       setExcludedIds(new Set());
       setConfirmDiscard(false);
-      void queryClient.invalidateQueries({ queryKey: ["triage"] });
-      void queryClient.invalidateQueries({ queryKey: ["library"] });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.triage.all });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.library.all });
     },
     onError: () => {
       setConfirmDiscard(false);

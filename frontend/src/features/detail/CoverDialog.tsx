@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { queryKeys } from "@/api/keys";
 
 interface CoverDialogProps {
   open: boolean;
@@ -43,7 +44,7 @@ export function CoverDialog({
   // Only ever fetched while the dialog is open, which is what keeps a library page
   // free of provider traffic.
   const candidates = useQuery({
-    queryKey: ["cover-candidates", item.id],
+    queryKey: queryKeys.coverCandidates(item.id),
     queryFn: () => fetchCoverCandidates(item.id),
     enabled: open,
     staleTime: 5 * 60 * 1000,

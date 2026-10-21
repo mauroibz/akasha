@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { queryKeys } from "@/api/keys";
 
 function PersonRow({
   person,
@@ -49,7 +50,7 @@ function PersonRow({
   const [deleting, setDeleting] = useState(false);
   const [decision, setDecision] = useState<"delete" | "transfer" | null>(null);
   const [target, setTarget] = useState("");
-  const users = cache.getQueryData<ManagedUser[]>(["users"]) ?? [];
+  const users = cache.getQueryData<ManagedUser[]>(queryKeys.users) ?? [];
   const save = useMutation({
     mutationFn: () =>
       updateUser(person.id, {
@@ -66,7 +67,7 @@ function PersonRow({
       }
       setPassword("");
       toast.success(`${person.username} updated`);
-      void cache.invalidateQueries({ queryKey: ["users"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.users });
     },
   });
   const remove = useMutation({
@@ -84,7 +85,7 @@ function PersonRow({
         onActAs(null);
         void navigate("/", { replace: true });
       }
-      void cache.invalidateQueries({ queryKey: ["users"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.users });
     },
   });
   const view = useMutation({
@@ -262,7 +263,7 @@ export function PeoplePage({
   const [password, setPassword] = useState("");
   const [admin, setAdmin] = useState(false);
   const users = useQuery({
-    queryKey: ["users"],
+    queryKey: queryKeys.users,
     queryFn: getUsers,
     enabled: user.is_admin,
   });
@@ -280,7 +281,7 @@ export function PeoplePage({
       setPassword("");
       setAdmin(false);
       toast.success("Person created");
-      void cache.invalidateQueries({ queryKey: ["users"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.users });
     },
   });
   return (

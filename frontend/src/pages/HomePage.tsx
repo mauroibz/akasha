@@ -1,6 +1,5 @@
 import {
   useInfiniteQuery,
-  useMutation,
   useQuery,
   useQueryClient,
 } from "@tanstack/react-query";
@@ -11,11 +10,9 @@ import { toast } from "sonner";
 
 import {
   getLibraryPage,
-  patchEntry,
   type ItemType,
   type EntryFormat,
   type EntryStatus,
-  type LibraryEntry,
   type LibraryFilters,
   type LibraryPage,
   type SortKey,
@@ -75,6 +72,8 @@ import {
   type LibraryView,
   type PinnedShelf,
 } from "@/features/library/library";
+import { queryKeys } from "@/api/keys";
+import { usePatchEntry } from "@/features/library/usePatchEntry";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
@@ -214,7 +213,7 @@ export function HomePage() {
   const domainReady =
     filters.types.length > 0 || (!itemTypes.isPending && domains.length === 0);
   const library = useInfiniteQuery({
-    queryKey: ["library", filters],
+    queryKey: queryKeys.library.list(filters),
     queryFn: ({ pageParam, signal }) =>
       getLibraryPage(filters, pageParam, signal),
     initialPageParam: undefined as string | undefined,
@@ -230,7 +229,7 @@ export function HomePage() {
   // Every shelf, not only the ones on the pages loaded so far: a shelf whose books
   // are all further down the list was previously unfilterable.
   const shelfQuery = useQuery({
-    queryKey: ["shelves"],
+    queryKey: queryKeys.shelves,
     queryFn: getShelves,
     retry: false,
   });
@@ -298,7 +297,7 @@ export function HomePage() {
   // "N of M" denominator. `limit=1` keeps this count-only companion request
   // cheap; its response total is the authority.
   const wholeLibrary = useQuery({
-    queryKey: ["library-whole", selectedDomain],
+    queryKey: queryKeys.libraryWhole(selectedDomain),
     queryFn: ({ signal }) =>
       getLibraryPage(
         {
@@ -347,67 +346,26 @@ export function HomePage() {
     library.isSuccess &&
     firstPage?.items.length === 0;
 
-  const mutation = useMutation({
-    mutationFn: ({
-      entry,
-      changes,
-    }: {
-      entry: LibraryEntry;
-      changes: Partial<Pick<LibraryEntry, "score" | "status">>;
-    }) => patchEntry(entry.id, changes),
-    onMutate: async ({ entry, changes }) => {
-      // Captured here and carried in the context. Reading `filters` again in
-      // `onError` would read whatever sort is on screen when the write fails,
-      // which is not necessarily the one this snapshot came from.
-      const key = ["library", filters] as const;
-      await queryClient.cancelQueries({ queryKey: key });
-      const snapshot = queryClient.getQueryData(key);
-      queryClient.setQueryData<{ pages: LibraryPage[]; pageParams: unknown[] }>(
-        key,
-        (old) =>
-          old && {
-            ...old,
-            pages: old.pages.map((page) => ({
-              ...page,
-              items: page.items.map((row) =>
-                row.id === entry.id
-                  ? {
-                      ...row,
-                      ...changes,
-                      score_provisional:
-                        changes.score === undefined
-                          ? row.score_provisional
-                          : false,
-                    }
-                  : row,
-              ),
-            })),
-          },
-      );
-      return { key, snapshot };
-    },
-    onError: (_error, { entry }, context) => {
-      if (context) queryClient.setQueryData(context.key, context.snapshot);
-      // The toast names no book, so the row itself says which value reverted.
-      // Visual state only: no text, no role, no second live region, so the
-      // failure is still announced exactly once (DEC-028).
-      setRollbackId(entry.id);
-      toast.error("Your change could not be saved", {
-        description: "The previous value was restored.",
-      });
-    },
-    onSuccess: (saved, { changes }) => {
+  const mutation = usePatchEntry({
+    key: queryKeys.library.list(filters),
+    // The toast names no book, so the row itself says which value reverted.
+    // Visual state only: no text, no role, no second live region, so the
+    // failure is still announced exactly once (DEC-028).
+    onRollback: (entry) => setRollbackId(entry.id),
+    onSaved: (saved, changes) => {
       const activeKeyChanged =
         (changes.score !== undefined && filters.sort === "score") ||
         (changes.status !== undefined && filters.statuses.length > 0);
       if (activeKeyChanged)
-        void queryClient.resetQueries({ queryKey: ["library", filters] });
+        void queryClient.resetQueries({
+          queryKey: queryKeys.library.list(filters),
+        });
       else
         queryClient.setQueriesData<{
           pages: LibraryPage[];
           pageParams: unknown[];
         }>(
-          { queryKey: ["library"] },
+          { queryKey: queryKeys.library.all },
           (old) =>
             old && {
               ...old,
@@ -1089,7 +1047,9 @@ export function HomePage() {
                 // travelling as router state.
                 setHighlightId(entryId);
                 setFocusedId(entryId);
-                void queryClient.invalidateQueries({ queryKey: ["library"] });
+                void queryClient.invalidateQueries({
+                  queryKey: queryKeys.library.all,
+                });
               }}
               onOpenExisting={(entryId) => {
                 setSelectedCandidate(null);

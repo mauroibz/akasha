@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { TriangleAlert } from "lucide-react";
 
 import { getProviderHealth } from "@/api/health";
+import { queryKeys } from "@/api/keys";
 
 /**
  * Says which metadata provider is unavailable and why, rather than letting a
@@ -14,7 +15,7 @@ import { getProviderHealth } from "@/api/health";
  */
 export function ProviderHealthNotice() {
   const health = useQuery({
-    queryKey: ["provider-health"],
+    queryKey: queryKeys.providerHealth,
     queryFn: getProviderHealth,
     staleTime: 60_000,
     retry: false,

@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getItemTypes } from "@/api/library";
+import { queryKeys } from "@/api/keys";
 
 /**
  * The domain registry, fetched once for the whole session.
@@ -12,7 +13,7 @@ import { getItemTypes } from "@/api/library";
  */
 export function useItemTypes(enabled = true) {
   return useQuery({
-    queryKey: ["item-types"],
+    queryKey: queryKeys.itemTypes,
     queryFn: getItemTypes,
     staleTime: Infinity,
     retry: false,

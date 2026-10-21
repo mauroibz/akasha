@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 
 import { getLibraryPage } from "@/api/library";
+import { queryKeys } from "@/api/keys";
 
 /** How many of a row's entries a card shows before deferring to the library. */
 export const memberPreview = 4;
@@ -24,7 +25,11 @@ export function useInsightMembers(params: {
   enabled: boolean;
 }) {
   return useQuery({
-    queryKey: ["insight-members", params.type, params.insightKey, params.value],
+    queryKey: queryKeys.insightMembers(
+      params.type,
+      params.insightKey,
+      params.value,
+    ),
     enabled: params.enabled,
     queryFn: ({ signal }) =>
       getLibraryPage(

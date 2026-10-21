@@ -38,6 +38,7 @@ import { deleteShelf, getShelves, renameShelf } from "@/api/shelves";
 import { getLibraryPage, patchEntry, type LibraryEntry } from "@/api/library";
 import { readPinnedShelf, writePinnedShelf } from "@/features/library/library";
 import { cn } from "@/lib/utils";
+import { queryKeys } from "@/api/keys";
 
 const everything = "";
 
@@ -67,7 +68,7 @@ export function ShelfPage() {
   const domains = useMemo(() => domainsFrom(itemTypes.data), [itemTypes.data]);
 
   const shelvesQuery = useQuery({
-    queryKey: ["shelves"],
+    queryKey: queryKeys.shelves,
     queryFn: getShelves,
     retry: false,
   });
@@ -99,7 +100,7 @@ export function ShelfPage() {
     }),
     [slug, domainChoice],
   );
-  const queryKey = ["shelf-entries", slug, domainChoice] as const;
+  const queryKey = queryKeys.shelfEntries.list(slug, domainChoice);
   const library = useInfiniteQuery({
     queryKey,
     queryFn: ({ pageParam, signal }) =>
@@ -125,7 +126,9 @@ export function ShelfPage() {
       changes: Partial<Pick<LibraryEntry, "score" | "status">>;
     }) => patchEntry(entry.id, changes),
     onSuccess: () => {
-      void cache.invalidateQueries({ queryKey: ["shelf-entries", slug] });
+      void cache.invalidateQueries({
+        queryKey: queryKeys.shelfEntries.shelf(slug),
+      });
     },
     onError: () => {
       toast.error("Your change could not be saved");
@@ -137,7 +140,7 @@ export function ShelfPage() {
     onSuccess: (updated) => {
       setRenaming(false);
       toast.success(`Shelf renamed to "${updated.name}"`);
-      void cache.invalidateQueries({ queryKey: ["shelves"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.shelves });
       navigate(`/shelves/${encodeURIComponent(updated.slug)}`, {
         replace: true,
       });
@@ -155,7 +158,7 @@ export function ShelfPage() {
         writePinnedShelf(null);
         setPinnedSlug(null);
       }
-      void cache.invalidateQueries({ queryKey: ["shelves"] });
+      void cache.invalidateQueries({ queryKey: queryKeys.shelves });
       navigate("/shelves");
     },
     onError: (e: Error) => toast.error(e.message),
