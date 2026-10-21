@@ -1,5 +1,6 @@
 """Durable job runner, enrichment, and undo tests for Sprint 011."""
 
+import asyncio
 import json
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -13,8 +14,9 @@ from sqlalchemy.orm import Session
 from book_tracker.application.undo import UndoExpiredError, UndoService
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
+from book_tracker.infrastructure import jobs as jobs_module
 from book_tracker.infrastructure.attachments import blob_path, store_blob
-from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
+from book_tracker.infrastructure.jobs import JobRepository, JobRunner, RateLimiter
 from book_tracker.infrastructure.models import JobRow
 from book_tracker.main import create_app
 from book_tracker.migrations import upgrade
@@ -402,6 +404,43 @@ class TestJobLifecycle:
 # ---------------------------------------------------------------------------
 # AC2: Clock-injected rate limiting and retry caps
 # ---------------------------------------------------------------------------
+
+
+@pytest.mark.anyio
+async def test_a_job_outliving_its_lease_is_not_reclaimed_while_it_runs(
+    engine: Engine, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The production-grade proposal's R1 said a long import search is reclaimed
+    mid-run because nothing calls `heartbeat`. It is not: `reclaim_expired` runs
+    only on the runner's idle pass, and the runner processes one job at a time in
+    one worker, so no idle pass happens while a job is in hand (Sprint 087). This
+    pins that property, with a lease that has already expired when the job starts."""
+    monkeypatch.setattr(jobs_module, "LEASE_DURATION", timedelta(0))
+    release = asyncio.Event()
+
+    class SlowHandler:
+        async def process(self, job_id: str, now: datetime) -> dict[str, Any]:
+            await release.wait()
+            return {"state": "succeeded", "progress": {}}
+
+    repo = JobRepository(engine)
+    job_id = repo.enqueue(None, "slow", {})
+    runner = JobRunner(engine, {"slow": SlowHandler()}, poll_interval=0.01)
+    worker = asyncio.create_task(runner.run_forever())
+    try:
+        await asyncio.sleep(0.2)  # twenty poll intervals past an expired lease
+        release.set()
+        for _ in range(100):
+            if (repo.get_job(job_id) or {}).get("state") == "succeeded":
+                break
+            await asyncio.sleep(0.01)
+    finally:
+        runner.stop()
+        worker.cancel()
+    job = repo.get_job(job_id)
+    assert job is not None
+    assert job["state"] == "succeeded"
+    assert job["attempts"] == 0
 
 
 class TestRateLimiting:

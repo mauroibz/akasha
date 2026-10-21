@@ -34,7 +34,7 @@ from book_tracker.application.enrichment import EnrichmentHandler
 from book_tracker.application.undo import UndoService
 from book_tracker.config import Settings
 from book_tracker.database import create_engine as create_sqlalchemy_engine
-from book_tracker.infrastructure.jobs import JobRepository
+from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import ImportEffectRow, JobRow
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.main import create_app
@@ -102,6 +102,28 @@ async def test_open_library_hit_fills_empty_fields_from_the_recorded_edition(
     assert row.year == 1984
     assert json.loads(row.metadata)["publisher"] == "Cátedra"
     assert json.loads(row.metadata)["page_count"] == 746
+
+
+@pytest.mark.anyio
+async def test_a_busy_rate_gate_waits_instead_of_spending_an_attempt(engine: Engine) -> None:
+    """The runner claims the next job the moment the last one finishes, so two
+    enrichments routinely meet the shared gate inside its interval. Returning
+    `failed` there spent a retry for nothing and pushed the item back by the
+    retry backoff; three in a row dead-lettered it (production-grade proposal R2).
+    Import search already waited on the same gate; enrichment now does too."""
+    item_id = create_item(engine, "Rayuela")
+    gate = RateLimiter(min_interval_seconds=0.5)
+    jobs = JobRepository(engine)
+    now = datetime.now(UTC)
+    async with enrichment_providers(openlibrary=OPENLIBRARY_HIT) as providers:
+        handler = EnrichmentHandler(engine, providers, rate_limiter=gate)
+        results = []
+        # The same item twice keeps one recorded edition valid for both jobs.
+        for _ in range(2):
+            job_id = jobs.enqueue(None, "enrich_item", {"item_id": item_id, "isbn": RECORDED_ISBN})
+            results.append(await handler.process(job_id, now))
+
+    assert [result["state"] for result in results] == ["succeeded", "succeeded"]
 
 
 @pytest.mark.anyio

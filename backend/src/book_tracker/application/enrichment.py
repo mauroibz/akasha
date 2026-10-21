@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from collections.abc import Collection, Mapping, Sequence
@@ -291,13 +292,15 @@ class EnrichmentHandler:
                 "error_code": "enrichment_not_configured",
             }
 
-        # Apply rate limiting if configured
-        if self.rate_limiter is not None and not self.rate_limiter.acquire(now):
-            return {
-                "state": "failed",
-                "error": "Provider rate limit reached; the job will be retried",
-                "error_code": "rate_limited",
-            }
+        # The runner claims the next job as soon as this one returns, so back-to-back
+        # jobs meet the gate inside its interval as a matter of course. Waiting is what
+        # the gate means; returning `failed` here spent a retry and the retry backoff on
+        # nothing, and three in a row dead-lettered the item (Sprint 087). Import search
+        # waits on the same gate the same way.
+        if self.rate_limiter is not None:
+            while not self.rate_limiter.acquire(now):
+                await asyncio.sleep(0.05)
+                now = datetime.now(UTC)
 
         payload_data, source_name, failure = await self._fetch(
             kind, str(value), spec, now, title=context_title, creators=context_creators

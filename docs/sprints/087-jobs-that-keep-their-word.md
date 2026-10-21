@@ -1,7 +1,7 @@
 # Sprint 087 — Jobs that keep their word
 
 **Sprint:** 087
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 086
 **Owner:** Mauro
@@ -56,9 +56,11 @@ Measured 2026-10-21 at `e8127f6`:
 
 ## Deliverables
 
-1. **Leases stay alive.** `ImportSearchHandler` heartbeats its job once per row. `JobRunner`
-   gives every handler the same means (a `heartbeat` callable or the repository), so a future long
-   handler does not have to discover it.
+1. **Leases stay alive — withdrawn on evidence.** Measured at activation: `reclaim_expired` runs
+   only on the runner's idle pass and at startup, and the runner is one sequential loop in one
+   uvicorn worker (`Dockerfile:50`), so nothing can reclaim a job while it is being processed. R1
+   as the proposal wrote it is not a live defect. A test pins the property instead of a heartbeat
+   being built for it; 089's activity indicator may want a heartbeat for its own reasons.
 2. **A busy gate waits.** `EnrichmentHandler` waits for the rate gate the way import search
    already does; `rate_limited` is no longer produced. The global gate stays as the floor for the
    providers that do not pace themselves; no second per-provider layer is built (DEC-165).
@@ -79,8 +81,8 @@ Measured 2026-10-21 at `e8127f6`:
 
 ## Acceptance criteria
 
-1. An import search job whose rows take longer in total than `LEASE_DURATION` is not reclaimed
-   while it runs and finishes with `attempts == 0`.
+1. A job that runs longer than `LEASE_DURATION` is not reclaimed while the runner is processing
+   it, and finishes with `attempts == 0`.
 2. Two enrichment jobs processed back to back inside the gate's interval both succeed; no job
    records `rate_limited`, and neither spends an attempt.
 3. Every API route endpoint is either `def` or an `async def` that awaits; the route-table test
@@ -97,10 +99,7 @@ Measured 2026-10-21 at `e8127f6`:
 
 ## Required tests (TDD)
 
-- `test_jobs.py`: heartbeat extends the lease; a heartbeating handler survives
-  `reclaim_expired` at a time past the original lease.
-- `test_import_search_job.py`: the handler heartbeats per row; a slow batch completes with zero
-  attempts spent.
+- `test_jobs.py`: a job outliving its lease inside one `tick` completes with zero attempts.
 - `test_enrichment.py`: back-to-back jobs under a not-ready gate wait and succeed.
 - `test_event_loop_offload.py`: route-table rule; health stays responsive while the middleware
   lookup and the runner's claim are slowed.
@@ -127,7 +126,7 @@ Measured 2026-10-21 at `e8127f6`:
 
 ## Commit checkpoints
 
-1. `[FIX]` Long jobs heartbeat; enrichment waits on the rate gate.
+1. `[FIX]` Enrichment waits on the rate gate; a long job is never reclaimed mid-run.
 2. `[FIX]` Routes that never await become sync; the route-table rule.
 3. `[FIX]` The middleware, the runner and the handlers leave the event loop.
 4. `[MOD]` One error envelope for every error.
