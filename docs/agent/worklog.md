@@ -6282,3 +6282,24 @@ gate (HANDOFF).
 - Some subjects are call numbers from providers; left as data.
 
 **Next.** Sprint 103, goals underneath.
+
+## 2026-10-21 — Sprint 103: gentle goals, underneath
+
+**Done.**
+
+- Migration 0026 (`goals`).
+- `StatusSpec.planned`.
+- `GoalService` and the `/api/goals` routes: set, list, delete, progress by month, and picks
+  with a reason.
+
+**Verified and how.**
+
+- `test_goals.py` and the route, isolation, app-shape, item-type, conformance, migration and
+  Now/Diary suites (315).
+- `make check`.
+- The endpoints against the copy of the owner's library.
+
+**Found.** The migrations suite forbids a CHECK that freezes a vocabulary; `period` is validated
+in code. The owner's library has no 2026 finish dates, so goals start at zero there.
+
+**Next.** Sprint 104, the screens.

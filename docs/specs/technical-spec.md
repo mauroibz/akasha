@@ -577,7 +577,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `identity` | An `IdentityStrategy`: how two candidates are judged the same record, and which source wins a merge. |
 | `fields` | The ordered `FieldSpec` list describing this domain's metadata. Storage stays opaque; this is the only description of it that exists. |
 | `enrichment` | An `EnrichmentSpec` — the ordered `item_identifiers.kind` values background enrichment may be keyed on, the provider order that answers them, and the metadata fields whose absence means a record is still worth a lookup — or `None` for a domain that does not enrich, which is a complete answer rather than a gap. A domain declares more than one key only when its **sources** supply different ones (a Letterboxd export names a film by a `boxd.it` URI and an IMDb export by its `tt` id, and neither carries the other's); an item carrying several is queued once, under the first it has, and every provider in the order must answer every declared key (DEC-113). All three parts are per-domain because all three were books' until Sprint 039, and a `completeness_fields` entry naming a field the domain does not declare is refused: a field it never stores is always absent, so the record would be re-queued for ever (DEC-067 row 3). `Domain.enriches` survives as a boolean reading of it. |
-| `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. |
+| `statuses` | The `StatusSpec` vocabulary, in the order a control offers it. Must contain `unsorted`, which must not be choosable. A status may declare `in_progress` (the Now strip, Sprint 098) or `planned` (where a goal's picks come from, Sprint 103), so the shared layer never names one. |
 | `default_status` | What a newly added entry gets when nobody chose. Must be one of `statuses`. |
 | `entry_fields` | Which of `date_started` / `date_finished` / `reread_count` this domain's entries have. Anything absent is **refused on write**, not merely hidden. |
 | `progress` | A `ProgressSpec` — how far through one of these the reader is — or `None` where that means nothing, which is a complete answer (DEC-077 shape (a)). Bounded below and **never above**: `total_field` names a `number` metadata field for reading "20 / 170" and is display only, because a cached total goes stale, an airing series has none, and a refresh could lower it under a count already stored (DEC-092). `NULL` is *not recorded* and `0` is *recorded as zero*. |
@@ -692,6 +692,15 @@ The product-spec route list is authoritative, with these refinements:
   ("Fiction, general") joins its head; a value with no letters or digits is no group at all. The
   library's `key`/`value` filter matches the same way, so a folded row opens all its members
   (Sprint 102).
+- Goals (Sprint 103, migration 0026): `GET /api/goals`, `PUT /api/goals/{item_type}`
+  (`{count 1–999, period month|year, suggest}`; setting again replaces) and
+  `DELETE /api/goals/{item_type}`, one per person and domain. A domain whose `entry_fields` lack
+  `date_finished` is refused with 422 `goal_not_supported`. `GET /api/goals/{item_type}/progress?year=`
+  returns twelve monthly counts of entries finished that year, the total, and the year's target
+  (a monthly count times twelve), so months count together and no field says behind.
+  `GET /api/goals/{item_type}/picks?limit=` returns entries in a status the domain declares
+  `planned`, each with a reason: `creator` (the primary creator averages 8 or more over two or
+  more rated entries in that domain, best first) or `waiting` (oldest added first), alternating.
 - `GET /api/views`, `POST /api/views` (`{name, query}`; the same name again replaces its query) and
   `DELETE /api/views/{view_id}` keep the person's saved library filters. `query` is the library's
   own URL query string, so the server never interprets it (Sprint 100).

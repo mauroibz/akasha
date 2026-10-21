@@ -1,7 +1,7 @@
 # Sprint 103 — Gentle goals, underneath
 
 **Sprint:** 103
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 46
 **Depends on:** 102
 **Owner:** Mauro
@@ -53,4 +53,25 @@ conformance, `make check`.
 
 ## Outcome
 
-Not started.
+Delivered 2026-10-21. Verified per DEC-167: `test_goals.py` (6), the route-structure, isolation,
+app-shape, item-type, conformance, migration and Now/Diary suites (315), `make check`, and the
+endpoints against a copy of the owner's library: migration 0026 applied after its pre-migration
+backup, a goal set for each of the four domains, picks read, the album refused.
+
+- **AC1.** `PUT`/`GET`/`DELETE /api/goals…` round-trip; another person's list is empty (service
+  test and the isolation probe). Count is 1–999 in the body model, the service and a CHECK.
+- **AC2.** `progress` returns twelve monthly counts by finish date, the total and the year's
+  target (monthly × 12, or the yearly count). No field computes "behind".
+- **AC3.** `picks` reads `StatusSpec.planned` (book `to_read`, movie `watchlist`, anime and series
+  `plan_to_watch`; albums none), alternates *creator* picks (average ≥ 8 over ≥ 2 rated, best
+  first) and *waiting* picks (oldest first), and is a total order, so repeat calls agree.
+- **AC4.** No status or domain is named in `application/goals.py`; support is read from
+  `entry_fields`.
+
+**Deviation.** The migration first had a CHECK on `period`; the migrations suite forbids freezing
+an application vocabulary in the schema, so `period` is validated where it is written.
+
+**Seen.** The owner's library has no 2026 finish dates (imports did not carry them), so on the
+board every goal starts at zero. Not a defect; worth saying in the release notes.
+
+Commit: `2e1fbd2`.

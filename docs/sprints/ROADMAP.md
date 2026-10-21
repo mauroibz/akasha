@@ -2,8 +2,8 @@
 
 **Plan revision:** 46
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [103 — Gentle goals, underneath](103-gentle-goals-underneath.md) (ready),
-the second of four from the owner's 2026-10-21 request for a 2.5 release (DEC-169); see "Character"
+**Active sprint:** [104 — Goals on the Diary](104-goals-on-the-diary.md) (ready),
+the third of four from the owner's 2026-10-21 request for a 2.5 release (DEC-169); see "Character"
 below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
@@ -222,8 +222,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [100](100-refile-and-views.md) | Re-file into another domain, and saved views | 099 | completed |
 | [101](101-operability.md) | Metrics, provider health from real calls, the response cache | 100 | completed |
 | [102](102-insights-read-back.md) | Insights read back as prose: a lead sentence, numbered sections, compact charts | 101 | completed |
-| [103](103-gentle-goals-underneath.md) | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | ready |
-| 104 | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | planned |
+| [103](103-gentle-goals-underneath.md) | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | completed |
+| [104](104-goals-on-the-diary.md) | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | ready |
 | 105 | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | planned |
 
 ## Sprint contracts
@@ -1791,12 +1791,12 @@ Asked for by the owner on 2026-10-21 after v2.4.0, reviewed as a design canvas
 - **[102 — Insights, read back to you](102-insights-read-back.md)** (**completed**). The page as prose: a lead
   sentence, numbered sections divided by rules, charts sized to their data, subjects folded and
   typeset.
-- **[103 — Gentle goals, underneath](103-gentle-goals-underneath.md).** A `goals` table (migration 0026): per person and domain,
+- **[103 — Gentle goals, underneath](103-gentle-goals-underneath.md)** (**completed**). A `goals` table (migration 0026): per person and domain,
   a count per month or per year. Progress is finished entries by month of finish date; months
   count together; albums record no finish date and have no goal. A domain declares which status is *planned* (`StatusSpec.planned`, as 098
   declared `in_progress`), and suggestions are drawn from it with a reason each: by a creator
   rated highly, or waiting longest.
-- **104 — Goals on the Diary.** The goal band with the calendar of lights (one light per finished
+- **[104 — Goals on the Diary](104-goals-on-the-diary.md).** The goal band with the calendar of lights (one light per finished
   item, unlit places neutral, never red), the goal dialog (domain, count, month or year, picks on
   or off), the month's picks with *Start reading* (the domain's in-progress status, hidden where
   a domain has none) and *Something else*, and the phone layout.

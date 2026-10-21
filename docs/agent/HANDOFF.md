@@ -5,7 +5,7 @@
 v2.4.0 shipped on 2026-10-21 (Sprints 087–101) and runs on the owner's ZimaBoard. The owner then
 asked for a 2.5 release: Insights redrawn, gentle goals on the Diary, and Shelves redrawn. A design
 canvas was reviewed and accepted as **DEC-169**: https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c.
-The plan reopens as Sprints 102–105. **102 (Insights) is completed; 103 is active (ready).** The owner asked for the work
+The plan reopens as Sprints 102–105. **102 (Insights) and 103 (goals API) are completed; 104 is active (ready).** The owner asked for the work
 to be built; release, push and deploy wait for them to ask.
 
 Waiting on the owner:
@@ -45,7 +45,7 @@ Waiting on the owner:
 
 ## Next session
 
-Run Sprint 103 from its file. The roadmap's "Character" section describes 104–105; expand each
+Run Sprint 104 from its file. The roadmap's "Character" section describes 105; expand each
 sprint's file from it when the sprint becomes active. Walkthroughs can use the copy of the owner's
 library in the session scratchpad (`data102/`), taken from the board's 2026-10-21 nightly backup;
 it is never committed. The design mock the owner approved is the canvas artifact

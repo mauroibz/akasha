@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 46,
-  "project_status": "in_progress",
-  "active_sprint": "103",
-  "active_sprint_file": "docs/sprints/103-gentle-goals-underneath.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "102",
+  "project_status": "ready",
+  "active_sprint": "104",
+  "active_sprint_file": "docs/sprints/104-goals-on-the-diary.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "103",
   "completed_sprints": [
     "001",
     "002",
@@ -108,8 +108,9 @@
     "099",
     "100",
     "101",
-    "102"
+    "102",
+    "103"
   ],
-  "started_at": "2026-10-21T20:13:12-03:00",
-  "updated_at": "2026-10-21T20:13:12-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T20:18:03-03:00"
 }
