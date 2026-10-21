@@ -76,6 +76,8 @@ BOOK_IDENTITY = IdentityStrategy(isbn_identity, SOURCE_PREFERENCE)
 
 
 _OPENLIBRARY_HOSTS = {"openlibrary.org", "www.openlibrary.org"}
+# `/book/show/53413.Rayuela` or `/book/show/18144590-the-alchemist`.
+_GOODREADS_BOOK = re.compile(r"/book/show/\d+[.-]([^/?#]+)/?")
 _OPENLIBRARY_EDITION = re.compile(r"/books/(OL\d+M)/?")
 _OPENLIBRARY_WORK = re.compile(r"/works/(OL\d+W)/?")
 
@@ -99,6 +101,13 @@ def recognize_book_input(value: str) -> UrlMatch | None:
         work = _OPENLIBRARY_WORK.fullmatch(parsed.path)
         if work:
             return UrlMatch("openlibrary", "work", work.group(1))
+    if host in {"goodreads.com", "www.goodreads.com"}:
+        # The title its slug spells, searched: Goodreads' pages are not scraped (its
+        # terms are the owner's question, DEC-165 point 4), and the confirm step
+        # catches a slug that names a different edition.
+        show = _GOODREADS_BOOK.fullmatch(parsed.path)
+        if show:
+            return UrlMatch("", "search", show.group(1).replace("_", " ").replace("-", " "))
     if host == "books.google.com" or host.endswith(".books.google.com"):
         volume = parse_qs(parsed.query).get("id", [""])[0]
         if volume:

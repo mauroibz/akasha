@@ -11,6 +11,7 @@ which ones exist. Splitting the three apart is what lets two domains be built in
 parallel without editing each other's file (technical spec 6.6, DEC-067).
 """
 
+import re
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -464,12 +465,21 @@ class UrlMatch:
     """What a domain recognized in something typed into the add box.
 
     `action` is how to spend it: `fetch` a record by its id, expand a `work` into its
-    editions, or run a `search` the domain's providers already understand.
+    editions, run a `search` the domain's providers already understand, or look a
+    record up by an `identifier` the provider stores (`kind:value`, Sprint 095).
+
+    `title_from` is an oEmbed endpoint that names the record's title, for when the
+    identifier finds nothing: the title is then searched instead (a Spotify album
+    MusicBrainz holds no link to, Sprint 095). Keyless, and only ever asked after a miss.
     """
 
     provider: str
-    action: Literal["fetch", "work", "search"]
+    action: Literal["fetch", "work", "search", "identifier"]
     value: str
+    title_from: str | None = None
+
+
+_SCHEMELESS = re.compile(r"(?i)^(?:[a-z0-9-]+\.)+[a-z]{2,}/\S*$")
 
 
 def split_url(value: str) -> tuple[SplitResult, str] | None:
@@ -482,8 +492,14 @@ def split_url(value: str) -> tuple[SplitResult, str] | None:
     here rather than reaching for `urlsplit` itself, and a domain that forgets is caught
     by `test_domain_conformance.py`.
     """
+    candidate = value.strip()
+    # A link copied without its scheme (`imdb.com/title/tt0111161`) is still a link
+    # (Sprint 095). Only something shaped like host/path qualifies, so a title with a
+    # full stop in it ("Dr. Strangelove") stays a title.
+    if "://" not in candidate and _SCHEMELESS.match(candidate):
+        candidate = f"https://{candidate}"
     try:
-        parsed = urlsplit(value)
+        parsed = urlsplit(candidate)
         host = (parsed.hostname or "").casefold()
     except ValueError:
         return None

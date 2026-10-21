@@ -106,6 +106,8 @@ ALBUM_ENRICHMENT = EnrichmentSpec(
 
 
 _MUSICBRAINZ_HOSTS = {"musicbrainz.org", "www.musicbrainz.org", "beta.musicbrainz.org"}
+# `/album/<id>`, optionally under a locale prefix (`/intl-es/album/<id>`).
+_SPOTIFY_ALBUM = re.compile(r"(?:/intl-[a-z]{2}(?:-[a-z]{2})?)?/album/([A-Za-z0-9]{22})/?")
 _MUSICBRAINZ_RELEASE_GROUP = re.compile(
     r"/release-group/([0-9a-fA-F-]{36})/?",
 )
@@ -121,6 +123,22 @@ def recognize_album_url(value: str) -> UrlMatch | None:
     if split is None:
         return None
     parsed, host = split
+    if host == "open.spotify.com":
+        # A Spotify album is this domain's own identity (DEC-052): MusicBrainz looks
+        # it up by the stored link, and Spotify's keyless oEmbed names the title for
+        # a search when it holds none (Sprint 095, DEC-165 point 4).
+        album = _SPOTIFY_ALBUM.fullmatch(parsed.path)
+        if album is None:
+            return None
+        spotify_id = album.group(1)
+        return UrlMatch(
+            "musicbrainz",
+            "identifier",
+            f"spotify:{spotify_id}",
+            title_from=(
+                f"https://open.spotify.com/oembed?url=https://open.spotify.com/album/{spotify_id}"
+            ),
+        )
     if host not in _MUSICBRAINZ_HOSTS:
         return None
     group = _MUSICBRAINZ_RELEASE_GROUP.fullmatch(parsed.path)

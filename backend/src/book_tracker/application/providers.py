@@ -3,6 +3,8 @@ import logging
 from collections.abc import Sequence
 from typing import Any
 
+import httpx
+
 from book_tracker.domain.providers import Provider, SearchCandidate, merge_and_rank
 from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
 from book_tracker.domain.spec import Domain
@@ -62,7 +64,12 @@ async def search_providers(
     return merge_and_rank(query, candidates, identity=domain.identity)[:limit]
 
 
-async def resolve_input(value: str, providers: dict[str, Provider]) -> list[SearchCandidate]:
+async def resolve_input(
+    value: str,
+    providers: dict[str, Provider],
+    *,
+    client: httpx.AsyncClient | None = None,
+) -> list[SearchCandidate]:
     """Turn something pasted into the add box into candidates.
 
     What a string *means* is the domain's to say (DEC-052 seam 6): an ISBN and an
@@ -101,6 +108,27 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
         if match.action == "work":
             resolver: Any = provider
             return list(await resolver.resolve_work(match.value))
+        if match.action == "identifier":
+            kind, _, identifier = match.value.partition(":")
+            looker: Any = provider
+            try:
+                return [await looker.fetch_by_identifier(kind, identifier)]
+            except ProviderPayloadError as error:
+                if error.code != "record_not_found" or not match.title_from or client is None:
+                    raise
+            # The provider holds no link to this identity: search the title the
+            # source's own oEmbed names instead, for the person to confirm.
+            title = await _oembed_title(client, match.title_from)
+            if title is None:
+                raise ProviderPayloadError(
+                    "That link could not be read for a title", code="record_not_found"
+                )
+            serving = [
+                candidate
+                for candidate in providers.values()
+                if getattr(candidate, "item_type", DEFAULT_DOMAIN.item_type) == domain.item_type
+            ]
+            return await search_providers(title, serving, domain=domain, timeout_seconds=5)
         try:
             return [await provider.fetch(match.value)]
         except ProviderPayloadError as error:
@@ -124,9 +152,21 @@ async def resolve_input(value: str, providers: dict[str, Provider]) -> list[Sear
         # answer, exactly as it was before the fall-through existed.
         raise last_miss
     raise InvalidResolution(
-        "Use an ISBN, an Open Library edition/work URL, a Google Books URL, "
-        "or a MusicBrainz release group URL"
+        "Paste an ISBN, or a link to a book, album, anime, film or series on Open Library, "
+        "Google Books, Goodreads, MusicBrainz, Spotify, AniList, MyAnimeList, Kitsu, IMDb, "
+        "TMDB, Letterboxd, TVmaze or Wikidata"
     )
+
+
+async def _oembed_title(client: httpx.AsyncClient, endpoint: str) -> str | None:
+    """The `title` an oEmbed endpoint gives for a link, or `None` (Sprint 095)."""
+    try:
+        response = await client.get(endpoint, timeout=5.0)
+        response.raise_for_status()
+        title = response.json().get("title")
+    except (httpx.HTTPError, ValueError, AttributeError):
+        return None
+    return title.strip() if isinstance(title, str) and title.strip() else None
 
 
 # The chooser is opened deliberately and does not block the page behind it, so it can

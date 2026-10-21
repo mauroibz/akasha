@@ -273,3 +273,7 @@ way it proves the interactive one. The job's other failure shapes (quota deferra
 containment, no-results) are proven with provider doubles in `test_import_search_job.py`,
 which the sprint file names as the deliberate split: correctness replays recordings,
 failure containment is synthetic.
+
+One file was **added** on 2026-10-21 for Sprint 095: `spotify_oembed_kind_of_blue.json`, Spotify's
+keyless oEmbed answer for the *Kind of Blue* album link, which names the title a Spotify link
+is searched by when MusicBrainz holds no link to it.

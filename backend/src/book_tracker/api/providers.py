@@ -84,7 +84,9 @@ async def resolve(
     url: Annotated[str, Query(min_length=1)], request: Request
 ) -> list[SearchCandidateResponse]:
     try:
-        rows = await resolve_input(url, _providers(request))
+        rows = await resolve_input(
+            url, _providers(request), client=getattr(request.app.state, "provider_client", None)
+        )
     except InvalidResolution as error:
         raise LibraryError("invalid_resolution", str(error), status_code=422) from error
     except ProviderPayloadError as error:
