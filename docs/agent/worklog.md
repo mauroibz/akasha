@@ -6082,3 +6082,20 @@ and after on a copy of the owner's data. First cover 243px, two columns.
 **Found.** The on-cover score picker overflowed a 150px card; fixed.
 
 **Next.** Sprint 094 — the command bar.
+
+---
+
+## 2026-10-21 — Sprint 094: the command bar
+
+**Done.** Ranked library search; the command bar (library, web with Add, resolve, go to);
+Cmd/Ctrl+K and visible doors.
+
+**Verified and how.** Backend search tests and the full backend suite once, `vitest related`,
+`make check`, five browser specs including a new keyboard-only command-bar spec; screenshots
+against live Open Library.
+
+**Found.** Stale results under a pending debounce made Enter open the wrong book; two
+route-structure tests had been red since 089 (not in its covering set). From now on a sprint
+that adds a route runs `test_library_api.py`, `test_isolation.py` and `test_app_shape.py`.
+
+**Next.** Sprint 095 — paste and drop anywhere.

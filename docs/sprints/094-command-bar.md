@@ -1,7 +1,7 @@
 # Sprint 094 — The command bar
 
 **Sprint:** 094
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 093
 **Owner:** Mauro
@@ -61,4 +61,25 @@ Global paste and drop (095); new link recognisers (095).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: ranked-search backend tests (2 new), the backend suite
+once (1646; see below), `vitest related` (227), `make check`, the library, add/detail,
+accessibility and auth specs plus a new `command-bar.spec.ts`, and screenshots of the bar in both
+themes against live Open Library.
+
+- **AC1.** `GET /api/search/library` (bm25, title 10, creators 6, series 4, subjects 2, note 1;
+  Inbox included; title fragments by substring after the ranked rows) feeds *In your library*.
+- **AC2.** Web results per domain with an explicit Add; no status is sent, so the server applies
+  the domain default; *already in your library* and near matches are said in a toast with Open
+  or Add anyway; the row becomes *Added · Open*.
+- **AC3.** Links and ISBNs resolve to *From that link*.
+- **AC4.** cmdk combobox named "Search or add"; Cmd/Ctrl+K anywhere; the spec drives it entirely
+  by keyboard.
+
+**Deviation.** The library box keeps its web half and confirm form (edition choice, near-match
+confirmation, highlight in place): it is mature and tested, and the bar is the one door that is
+always there. The header's Add opens the bar. `/` still focuses the library's filter box.
+**Found:** results of the previous text stayed listed for the debounce, so Enter opened a stale
+result (the spec caught it; they are hidden while typing settles). The nav's new door overflowed
+tablet width; it is an icon below 1024px. And the route-documentation and isolation-policy tests
+had failed since 089 (not in that sprint's covering set): fixed here, and the backend suite run
+once to look for anything else hidden (none).
