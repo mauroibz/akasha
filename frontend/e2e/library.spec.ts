@@ -1073,19 +1073,28 @@ async function stubShelvesBoard(page: Page) {
           entry_count: 10,
           covers: Array.from({ length: 10 }, () => pixelCover),
           members_by_type: { book: 7, album: 3 },
+          preview: Array.from({ length: 8 }, (_, index) => ({
+            entry_id: 100 + index,
+            title: `Member ${index + 1}`,
+            year: 2000 + index,
+            score: null,
+            cover_url: pixelCover,
+          })),
         },
       ],
     }),
   );
 }
 
-test("the shelves board holds at 390px, and the rail scrolls without the body scrolling", async ({
+test("the shelves room holds at 390px: the ledge stands what fits, nothing scrolls sideways", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await stubShelvesBoard(page);
   await page.goto("/shelves");
-  await expect(page.getByText("A shelf with a lot on it")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "A shelf with a lot on it", exact: true }),
+  ).toBeVisible();
 
   const bodyOverflow = await page.evaluate(
     () =>
@@ -1094,23 +1103,17 @@ test("the shelves board holds at 390px, and the rail scrolls without the body sc
   );
   expect(bodyOverflow, "body horizontal overflow").toBeLessThanOrEqual(0);
 
-  const rail = page.locator("[data-shelf-rail]");
-  const railBox = await rail.first().evaluate((node) => ({
-    scrollWidth: node.scrollWidth,
-    clientWidth: node.clientWidth,
-  }));
-  expect(railBox.scrollWidth).toBeGreaterThan(railBox.clientWidth);
+  // Sprint 105: the ledge no longer scrolls (a scrolling ledge clipped the
+  // opening cover and its 3D layers widened the page). A phone's ledge stands
+  // two covers, each a link to its entry with a finger-sized target, and ends
+  // with a link to the rest.
+  const covers = page.locator("[data-opening-cover]:visible");
+  await expect(covers).toHaveCount(2);
+  for (const cover of await covers.all())
+    expect((await cover.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+  await expect(page.getByRole("link", { name: /All 10/ })).toBeVisible();
 
-  // The card is one link; the rail underneath it holds nothing focusable.
-  const card = page.getByRole("link", { name: /A shelf with a lot on it/ });
-  await expect(card).toBeVisible();
-  const focusableInRail = await rail
-    .first()
-    .locator("a, button, input, select, textarea, [tabindex]")
-    .count();
-  expect(focusableInRail).toBe(0);
-
-  const createButton = page.getByRole("button", { name: "Create shelf" });
+  const createButton = page.getByRole("button", { name: "+ New shelf" });
   expect((await createButton.boundingBox())!.height).toBeGreaterThanOrEqual(44);
 });
 
@@ -1158,8 +1161,8 @@ test("a shelf page holds at 390px across the two domains it holds", async ({
   );
   await page.goto("/shelves/mixed");
   await expect(page.getByRole("heading", { name: "Mixed" })).toBeVisible();
-  await expect(page.getByText("A Book")).toBeVisible();
-  await expect(page.getByText("An Album")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open A Book" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open An Album" })).toBeVisible();
 
   const strip = page.getByRole("radiogroup", { name: "Choose a domain" });
   await expect(strip.getByRole("radio")).toHaveCount(3); // Everything, Book, Album
