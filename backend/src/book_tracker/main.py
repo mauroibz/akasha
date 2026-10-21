@@ -56,6 +56,7 @@ from book_tracker.domains.series.providers import WikidataSeriesProvider
 from book_tracker.domains.series.tvmaze import TvmazeSeriesProvider
 from book_tracker.infrastructure.diskspace import InsufficientDiskSpace, free_bytes
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.logging import configure_logging
@@ -376,14 +377,17 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         if not path.startswith("/api/") and is_spa_get:
             return await call_next(request)
 
-        needs_setup = not has_credentialed_user(request.app.state.engine)
+        # Both lookups below run on every authenticated request, so they leave the
+        # event loop: a slow one used to hold up every request behind it (Sprint 087).
+        needs_setup = not await off_loop(has_credentialed_user, request.app.state.engine)
         if needs_setup:
             if path not in {"/api/auth/me", "/api/auth/setup"}:
                 return setup_required_response()
             return await call_next(request)
 
         token = request.cookies.get(SESSION_COOKIE_NAME)
-        identity = SessionStore(request.app.state.engine).lookup(token) if token else None
+        sessions = SessionStore(request.app.state.engine)
+        identity = await off_loop(sessions.lookup, token) if token else None
         issued_token: str | None = None
         if (
             identity is None
@@ -392,7 +396,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         ):
             asserted_identity = request.headers.get(configured.trusted_proxy_header)
             if asserted_identity:
-                user = trusted_header_user(
+                user = await off_loop(
+                    trusted_header_user,
                     request.app.state.engine,
                     asserted_identity,
                     autocreate=configured.trusted_header_autocreate,
@@ -403,11 +408,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                         "unknown_proxy_identity",
                         "This proxy identity is not allowed to use Akasha",
                     )
-                created = SessionStore(request.app.state.engine).create(
-                    int(user["id"]), user_agent=request.headers.get("user-agent")
+                created = await off_loop(
+                    sessions.create, int(user["id"]), user_agent=request.headers.get("user-agent")
                 )
                 issued_token = created.token
-                identity = SessionStore(request.app.state.engine).lookup(created.token)
+                identity = await off_loop(sessions.lookup, created.token)
         principal = (
             Principal(
                 user_id=identity.user_id,

@@ -260,3 +260,71 @@ def test_no_route_runs_synchronous_work_as_a_coroutine_that_never_awaits(tmp_pat
         and not _awaits(route.endpoint)
     )
     assert offenders == []
+
+
+async def _health_while(app, slow_request, window: float = 1.2) -> float:  # type: ignore[no-untyped-def]
+    """The worst delay `/api/health/live` sees while `slow_request` is in flight.
+
+    Sampled repeatedly across the window, and timed from before each pause, so a
+    loop blocked at any moment shows up as a late sample rather than being hidden
+    in the gap before a single timer starts."""
+    import asyncio
+
+    pause = 0.02
+    worst = 0.0
+    async with (
+        app.router.lifespan_context(app),
+        httpx.AsyncClient(transport=httpx.ASGITransport(app), base_url="http://test") as client,
+    ):
+        slow = asyncio.create_task(slow_request(client))
+        deadline = time.perf_counter() + window
+        while time.perf_counter() < deadline:
+            started = time.perf_counter()
+            await asyncio.sleep(pause)
+            health = await client.get("/api/health/live")
+            assert health.status_code == 200
+            worst = max(worst, time.perf_counter() - started - pause)
+        await slow
+    return worst
+
+
+@pytest.mark.anyio
+async def test_the_authentication_boundary_looks_people_up_off_the_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every authenticated request asks the database whether anyone has set up an
+    account and whose session its cookie names. Both were synchronous calls inside
+    the middleware, so a slow lookup held up every request behind it (Sprint 087)."""
+    import book_tracker.main as main_module
+
+    def slow_has_credentialed_user(engine) -> bool:  # type: ignore[no-untyped-def]
+        time.sleep(0.5)
+        return True
+
+    monkeypatch.setattr(main_module, "has_credentialed_user", slow_has_credentialed_user)
+    app = create_app(
+        Settings(data_dir=tmp_path, auth="on", user_agent_contact="test@example.invalid")
+    )
+    elapsed = await _health_while(app, lambda client: client.get("/api/shelves"))
+    assert elapsed < 0.3, f"health waited {elapsed:.3f}s behind a session lookup"
+
+
+@pytest.mark.anyio
+async def test_the_job_runner_claims_work_off_the_loop(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The runner lives in the same process as the API. Its claim, completion and
+    reclaim queries ran on the event loop, so a contended jobs table stalled every
+    request for as long as a claim waited on the write lock (Sprint 087)."""
+    import asyncio
+
+    from book_tracker.infrastructure.jobs import JobRepository
+
+    def slow_claim(self, now):  # type: ignore[no-untyped-def]
+        time.sleep(0.5)
+        return None
+
+    monkeypatch.setattr(JobRepository, "claim", slow_claim)
+    app = create_app(Settings(data_dir=tmp_path, user_agent_contact="test@example.invalid"))
+    elapsed = await _health_while(app, lambda client: asyncio.sleep(0.6))
+    assert elapsed < 0.3, f"health waited {elapsed:.3f}s behind a job claim"

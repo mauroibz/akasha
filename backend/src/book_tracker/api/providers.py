@@ -13,6 +13,7 @@ from book_tracker.application.providers import (
 )
 from book_tracker.domain.providers import Provider, SearchCandidate
 from book_tracker.domain.registry import DEFAULT_DOMAIN, DOMAINS
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.providers import ProviderPayloadError
 
 router = APIRouter(prefix="/api")
@@ -126,7 +127,7 @@ async def preview(
         raise LibraryError("unknown_provider", f"No provider named {source!r}", status_code=422)
     quota = getattr(request.app.state, "provider_quota", None)
     if quota is not None:
-        quota.record(source, datetime.now(UTC))
+        await off_loop(quota.record, source, datetime.now(UTC))
     try:
         payload = await provider.fetch(source_id)
     except Exception as error:
@@ -160,7 +161,7 @@ async def search(
     if quota is not None:
         moment = datetime.now(UTC)
         for name in providers:
-            quota.record(name, moment)
+            await off_loop(quota.record, name, moment)
     try:
         rows = await search_providers(q, list(providers.values()), domain=domain)
     except ProvidersUnavailable as error:

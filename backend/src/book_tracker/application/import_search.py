@@ -41,6 +41,7 @@ from book_tracker.domain.providers import SearchCandidate
 from book_tracker.domain.registry import DOMAINS, IMPORTERS
 from book_tracker.infrastructure.jobs import JobRepository, RateLimiter
 from book_tracker.infrastructure.models import ImportBatchRow, ImportRecordRow
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.infrastructure.repositories import ImportRepository
 
@@ -76,7 +77,7 @@ class ImportSearchHandler:
         self.repo = JobRepository(engine)
 
     async def process(self, job_id: str, now: datetime) -> dict[str, Any]:
-        job = self.repo.get_job(job_id)
+        job = await off_loop(self.repo.get_job, job_id)
         if job is None:
             return {"state": "failed", "error": "Job was not found", "error_code": "job_not_found"}
         batch_id = job.get("batch_id")
@@ -99,31 +100,10 @@ class ImportSearchHandler:
         # no longer exist. The batch belongs to whichever connector declared
         # the search job — a shared layer never names the connector it serves
         # (AC9); a batch of any other kind has no search phase to run.
-        importer: Importer | None = None
-        with Session(self.engine) as session:
-            batch = session.get(ImportBatchRow, batch_id)
-            if batch is not None:
-                importer = IMPORTERS.get(batch.kind)
-            if (
-                batch is None
-                or batch.user_id != user_id
-                or getattr(importer, "search_job", None) != SEARCH_JOB_KIND
-            ):
-                return {
-                    "state": "failed",
-                    "error": "The batch this job searches no longer exists",
-                    "error_code": "batch_not_found",
-                }
-            if batch.state == "undone":
-                self.repo.cancel(job_id)
-                return {"state": "cancelled"}
-            rows = list(
-                session.scalars(
-                    select(ImportRecordRow)
-                    .where(ImportRecordRow.batch_id == batch_id)
-                    .order_by(ImportRecordRow.row_number)
-                )
-            )
+        loaded = await off_loop(self._load_batch, job_id, batch_id, user_id)
+        if isinstance(loaded, dict):
+            return loaded
+        importer, rows = loaded
 
         imports = ImportRepository(self.engine, user_id)
         searched = 0
@@ -183,11 +163,12 @@ class ImportSearchHandler:
             allowed = [
                 provider
                 for provider in serving
-                if self.quota is None or self.quota.allows(provider.name, now)
+                if self.quota is None or await off_loop(self.quota.allows, provider.name, now)
             ]
             if not allowed:
                 until = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
-                self.repo.defer(
+                await off_loop(
+                    self.repo.defer,
                     job_id,
                     until,
                     reason="Every provider's daily budget is spent; the search resumes tomorrow",
@@ -206,12 +187,13 @@ class ImportSearchHandler:
             finally:
                 for provider in allowed:
                     if self.quota is not None:
-                        self.quota.record(provider.name, now)
+                        await off_loop(self.quota.record, provider.name, now)
 
             if not candidates:
                 no_results += 1
                 continue
-            imports.add_proposals(
+            await off_loop(
+                imports.add_proposals,
                 batch_id=batch_id,
                 record_id=row.id,
                 proposals=tuple(
@@ -225,14 +207,7 @@ class ImportSearchHandler:
         # gate reopens. Written before the job completes so a poller reading the
         # batch the moment the job succeeds can never see `matching` with a
         # succeeded job.
-        with self.engine.begin() as connection:
-            connection.execute(
-                text(
-                    "UPDATE import_batches SET state = 'previewed', updated_at = :now"
-                    " WHERE id = :id AND state = 'matching'"
-                ),
-                {"now": _now_iso(), "id": batch_id},
-            )
+        await off_loop(self._reopen_batch, batch_id)
         return {
             "state": "succeeded",
             "progress": {
@@ -242,6 +217,46 @@ class ImportSearchHandler:
                 "total": len(rows),
             },
         }
+
+    def _load_batch(
+        self, job_id: str, batch_id: str, user_id: int
+    ) -> dict[str, Any] | tuple[Importer | None, list[ImportRecordRow]]:
+        """The batch's importer and rows, or the job's result when there is nothing to do."""
+        importer: Importer | None = None
+        with Session(self.engine) as session:
+            batch = session.get(ImportBatchRow, batch_id)
+            if batch is not None:
+                importer = IMPORTERS.get(batch.kind)
+            if (
+                batch is None
+                or batch.user_id != user_id
+                or getattr(importer, "search_job", None) != SEARCH_JOB_KIND
+            ):
+                return {
+                    "state": "failed",
+                    "error": "The batch this job searches no longer exists",
+                    "error_code": "batch_not_found",
+                }
+            if batch.state == "undone":
+                self.repo.cancel(job_id)
+                return {"state": "cancelled"}
+            return importer, list(
+                session.scalars(
+                    select(ImportRecordRow)
+                    .where(ImportRecordRow.batch_id == batch_id)
+                    .order_by(ImportRecordRow.row_number)
+                )
+            )
+
+    def _reopen_batch(self, batch_id: str) -> None:
+        with self.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE import_batches SET state = 'previewed', updated_at = :now"
+                    " WHERE id = :id AND state = 'matching'"
+                ),
+                {"now": _now_iso(), "id": batch_id},
+            )
 
 
 async def search_row(

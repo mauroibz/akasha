@@ -18,6 +18,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session
 
 from book_tracker.infrastructure.models import JobRow
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.reclaim import reclaim_import_batches
 
 
@@ -380,15 +381,19 @@ class JobRunner:
         processed. Reclaiming expired leases on each idle pass is what returns work
         abandoned by a crash; collecting committed batches past their undo window
         (Sprint 060) is the same shape of housekeeping, run the same way.
+
+        Every query the runner makes goes through `off_loop`. The runner shares the
+        event loop with the API, so a claim waiting on the write lock used to stall
+        every request in the process for as long as it waited (Sprint 087).
         """
         self._running = True
         while self._running:
             try:
                 now = datetime.now(UTC)
                 if not await self.tick(now):
-                    self.repo.reclaim_expired(now)
+                    await off_loop(self.repo.reclaim_expired, now)
                     if self.data_dir is not None:
-                        reclaim_import_batches(self.engine, self.data_dir, now=now)
+                        await off_loop(reclaim_import_batches, self.engine, self.data_dir, now=now)
                     await asyncio.sleep(self.poll_interval)
             except asyncio.CancelledError:
                 raise
@@ -401,12 +406,13 @@ class JobRunner:
 
     async def tick(self, now: datetime) -> bool:
         """Process at most one job. Returns True if a job was processed."""
-        claimed = self.repo.claim(now)
+        claimed = await off_loop(self.repo.claim, now)
         if claimed is None:
             return False
         handler = self.handlers.get(claimed.kind)
         if handler is None:
-            self.repo.fail(
+            await off_loop(
+                self.repo.fail,
                 claimed.id,
                 f"No handler is registered for {claimed.kind} jobs",
                 now,
@@ -416,9 +422,9 @@ class JobRunner:
         try:
             result = await handler.process(claimed.id, now)
             if result["state"] == "succeeded":
-                self.repo.complete(claimed.id, result.get("progress", {}), now)
+                await off_loop(self.repo.complete, claimed.id, result.get("progress", {}), now)
             elif result["state"] == "cancelled":
-                self.repo.cancel(claimed.id)
+                await off_loop(self.repo.cancel, claimed.id)
             elif result["state"] == "deferred":
                 # The handler already returned the job to the queue for later. Falling
                 # through to `fail` here would spend an attempt and reset available_at
@@ -426,7 +432,8 @@ class JobRunner:
                 # backlog that was only waiting for a provider budget to reset.
                 pass
             else:
-                self.repo.fail(
+                await off_loop(
+                    self.repo.fail,
                     claimed.id,
                     result.get("error", "unknown"),
                     now,
@@ -435,7 +442,8 @@ class JobRunner:
         except Exception as exc:
             # A handler raising is a defect, not an expected provider outcome; keep the
             # type so the job row says something better than the bare message.
-            self.repo.fail(
+            await off_loop(
+                self.repo.fail,
                 claimed.id,
                 f"{type(exc).__name__}: {exc}"[:200],
                 now,

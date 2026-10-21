@@ -6,6 +6,8 @@ from urllib.parse import parse_qsl, urlencode, urljoin, urlsplit, urlunsplit
 import httpx
 from PIL import Image, UnidentifiedImageError
 
+from book_tracker.infrastructure.offload import off_loop
+
 MAX_COVER_BYTES = 10 * 1024 * 1024
 MAX_COVER_PIXELS = 40_000_000
 MAX_COVER_EDGE = 600
@@ -169,21 +171,9 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
         finally:
             await response.aclose()
         assert temporary is not None
-        with Image.open(temporary) as image:
-            width, height = image.size
-            if width < 10 or height < 10 or width * height > MAX_COVER_PIXELS:
-                raise CoverError("cover exceeds pixel limit")
-            if width > height * MAX_COVER_ASPECT_RATIO:
-                raise CoverError("cover looks like a provider placeholder banner")
-            if width < MIN_PROVIDER_COVER_EDGE or height < MIN_PROVIDER_COVER_EDGE:
-                raise CoverError("cover image is too small to use")
-            image.load()
-            converted = image.convert("RGB")
-            converted.thumbnail((MAX_COVER_EDGE, MAX_COVER_EDGE), Image.Resampling.LANCZOS)
-            normalized = temporary.with_suffix(".jpg.tmp")
-            converted.save(normalized, "JPEG", quality=85, optimize=True)
-        temporary.unlink(missing_ok=True)
-        return normalized
+        # A decode and a LANCZOS resize are the most expensive thing a cover costs, and
+        # every add, import and enrichment pays it: off the event loop (Sprint 087).
+        return await off_loop(_normalize_provider_cover, temporary)
     except (
         CoverError,
         httpx.HTTPError,
@@ -197,6 +187,25 @@ async def prepare_cover(client: httpx.AsyncClient, url: str, data_dir: Path) -> 
         if isinstance(error, CoverError):
             raise
         raise CoverError("cover could not be prepared") from error
+
+
+def _normalize_provider_cover(temporary: Path) -> Path:
+    """Check a downloaded cover's shape and re-encode it as the stored JPEG."""
+    with Image.open(temporary) as image:
+        width, height = image.size
+        if width < 10 or height < 10 or width * height > MAX_COVER_PIXELS:
+            raise CoverError("cover exceeds pixel limit")
+        if width > height * MAX_COVER_ASPECT_RATIO:
+            raise CoverError("cover looks like a provider placeholder banner")
+        if width < MIN_PROVIDER_COVER_EDGE or height < MIN_PROVIDER_COVER_EDGE:
+            raise CoverError("cover image is too small to use")
+        image.load()
+        converted = image.convert("RGB")
+        converted.thumbnail((MAX_COVER_EDGE, MAX_COVER_EDGE), Image.Resampling.LANCZOS)
+        normalized = temporary.with_suffix(".jpg.tmp")
+        converted.save(normalized, "JPEG", quality=85, optimize=True)
+    temporary.unlink(missing_ok=True)
+    return normalized
 
 
 def install_cover(prepared: Path, data_dir: Path, item_id: int) -> Path:

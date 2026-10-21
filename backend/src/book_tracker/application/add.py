@@ -25,6 +25,7 @@ from book_tracker.domain.spec import (
     validate_status,
 )
 from book_tracker.infrastructure.covers import CoverError, install_cover, prepare_cover
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.repositories import (
     DomainRepository,
     IdentityConflict,
@@ -149,6 +150,16 @@ class AddService:
                 payload = replace(payload, metadata={**payload.metadata, **fuller})
         return payload
 
+    def _install_prepared_cover(self, prepared_cover: Path, item_id: int) -> None:
+        assert self.data_dir is not None
+        target: Path | None = None
+        try:
+            target = install_cover(prepared_cover, self.data_dir, item_id)
+            self.repository.set_cover_path(item_id, f"covers/{item_id}.jpg")
+        except (CoverError, LookupError):
+            if target is not None:
+                target.unlink(missing_ok=True)
+
     async def add(
         self,
         *,
@@ -186,7 +197,7 @@ class AddService:
             year = int(manual["year"]) if manual.get("year") is not None else None
         else:
             assert source is not None and source_id is not None
-            cached = self.repository.cached_item_for_source(source, source_id)
+            cached = await off_loop(self.repository.cached_item_for_source, source, source_id)
             if cached is not None:
                 item_type = cached.item_type
                 title = cached.title
@@ -257,8 +268,10 @@ class AddService:
             checked_formats = validate_formats(domain, formats or ())
         except InvalidFormat as error:
             raise LibraryError("invalid_format", str(error), status_code=422) from error
-        near_matches = self.repository.near_entry_ids(title, creators[0] if creators else "")
-        exact = self.repository.match(identifiers=identifiers, sources=sources)
+        near_matches = await off_loop(
+            self.repository.near_entry_ids, title, creators[0] if creators else ""
+        )
+        exact = await off_loop(self.repository.match, identifiers=identifiers, sources=sources)
         if near_matches and exact.kind is MatchKind.NEW and not confirm_near_match:
             raise LibraryError(
                 "near_match_confirmation_required",
@@ -277,7 +290,8 @@ class AddService:
                 except CoverError:
                     prepared_cover = None
         try:
-            result = self.repository.create_cached_entry(
+            result = await off_loop(
+                self.repository.create_cached_entry,
                 title=title,
                 subtitle=subtitle,
                 year=year,
@@ -304,15 +318,9 @@ class AddService:
             if result.already_exists or self.data_dir is None:
                 prepared_cover.unlink(missing_ok=True)
             else:
-                target: Path | None = None
-                try:
-                    target = install_cover(prepared_cover, self.data_dir, result.item_id)
-                    self.repository.set_cover_path(result.item_id, f"covers/{result.item_id}.jpg")
-                except (CoverError, LookupError):
-                    if target is not None:
-                        target.unlink(missing_ok=True)
+                await off_loop(self._install_prepared_cover, prepared_cover, result.item_id)
         return {
-            "entry": self.library.get_entry(result.entry_id),
+            "entry": await off_loop(self.library.get_entry, result.entry_id),
             "already_exists": result.already_exists,
             "near_matches": [] if result.already_exists else near_matches,
         }

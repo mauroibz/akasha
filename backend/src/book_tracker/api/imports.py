@@ -580,20 +580,20 @@ def _too_large(spec: ImportInputSpec) -> LibraryError:
 
 @router.post("/{importer_name}/preview", status_code=201, response_model=PreviewResponse)
 async def preview(importer_name: str, request: Request, user: CurrentUser) -> PreviewResponse:
-    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
+    await off_loop(ensure_free_space, request.app.state.data_dir, request.app.state.min_free_bytes)
     import_service = service(request, importer_name, user.effective_user_id)
     source, targets = await _source(request, importer_name)
     try:
-        result = import_service.preview(source, targets)
+        # Reading and staging a whole export is the longest synchronous thing a
+        # preview does: a large Goodreads file or Calibre library (Sprint 087).
+        result = await off_loop(import_service.preview, source, targets)
     except ImportReadError as error:
         raise read_failure(IMPORTERS[importer_name], error) from error
     finally:
         # Staging has already copied whatever the batch needs into `/data/imports`,
         # so an uploaded bundle has no reason to outlive the request — including when
         # the read failed, where leaving it behind would be a slow disk leak.
-        for materialized in (source.directory, source.export):
-            if materialized is not None:
-                shutil.rmtree(materialized, ignore_errors=True)
+        await off_loop(_remove_materialized, source)
     return PreviewResponse.model_validate(result)
 
 
@@ -627,7 +627,8 @@ async def plan(importer_name: str, request: Request, user: CurrentUser) -> Impor
         candidates = _candidates(source.manifest, spec)
         result = planned_upload(
             candidates,
-            importer.plan(
+            await off_loop(
+                importer.plan,
                 source,
                 candidates,
                 DomainRepository(request.app.state.engine, user.effective_user_id),
@@ -639,12 +640,16 @@ async def plan(importer_name: str, request: Request, user: CurrentUser) -> Impor
     except ValueError as error:
         raise LibraryError("invalid_import_plan", str(error), status_code=500) from error
     finally:
-        for materialized in (source.directory, source.export):
-            if materialized is not None:
-                shutil.rmtree(materialized, ignore_errors=True)
+        await off_loop(_remove_materialized, source)
     return ImportPlanResponse(
         wanted=list(result.wanted), holding=result.holding, reason=result.reason
     )
+
+
+def _remove_materialized(source: Any) -> None:
+    for materialized in (source.directory, source.export):
+        if materialized is not None:
+            shutil.rmtree(materialized, ignore_errors=True)
 
 
 def _candidates(manifest: str | None, spec: ImportInputSpec) -> tuple[ImportCandidate, ...]:
@@ -694,7 +699,7 @@ async def attach_file(
     exactly like an 18-book one, a file that cannot be stored costs one book rather
     than the import, and the screen can count progress honestly.
     """
-    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
+    await off_loop(ensure_free_space, request.app.state.data_dir, request.app.state.min_free_bytes)
     import_service = service(request, importer_name, user.effective_user_id)
     spec = IMPORTERS[importer_name].input
     cap = int(request.app.state.attachment_max_bytes)
@@ -721,12 +726,12 @@ async def attach_file(
         path = _bundle_member(offered, spec)
         # Resolved before a byte is read: an upload nothing wants should cost a round
         # trip, not a whole ebook.
-        item_id = import_service.resolve_file(batch_id, path)
+        item_id = await off_loop(import_service.resolve_file, batch_id, path)
         writer = BlobWriter(request.app.state.data_dir, max_bytes=cap)
         try:
             while chunk := await upload.read(UPLOAD_CHUNK_BYTES):
-                writer.write(chunk)
-            stored = writer.commit()
+                await off_loop(writer.write, chunk)
+            stored = await off_loop(writer.commit)
         except AttachmentTooLarge as error:
             raise _file_too_large(cap) from error
         except AttachmentError as error:
@@ -734,7 +739,8 @@ async def attach_file(
         except BaseException:
             writer.abort()
             raise
-        attachment = import_service.record_file(
+        attachment = await off_loop(
+            import_service.record_file,
             batch_id,
             item_id,
             filename=clean_attachment_filename(PurePosixPath(path).name) or "attachment",

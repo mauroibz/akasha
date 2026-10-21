@@ -2,6 +2,7 @@ import asyncio
 import hashlib
 import logging
 from datetime import date
+from pathlib import Path
 from typing import Annotated, Any, Literal
 from urllib.parse import quote
 
@@ -33,6 +34,7 @@ from book_tracker.infrastructure.covers import (
     prepare_uploaded_cover,
 )
 from book_tracker.infrastructure.diskspace import ensure_free_space
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.providers import ProviderPayloadError
 from book_tracker.infrastructure.repositories import DomainRepository
 
@@ -751,7 +753,7 @@ async def list_cover_candidates(
     page renders, which is the invariant that keeps cached pages provider-free.
     """
     library = library_for(request, user)
-    item = library.get_item(item_id)
+    item = await off_loop(library.get_item, item_id)
     domain = DOMAINS.get(str(item["type"]))
     if domain is not None and not domain.chooses_covers:
         # Asked of the domain rather than branched on the type. The screen already hides
@@ -761,7 +763,7 @@ async def list_cover_candidates(
     provider = request.app.state.providers.get("openlibrary")
     if provider is None:
         return CoverCandidates(candidates=[], reason="provider_disabled")
-    edition_id, isbn = library.cover_lookup(item_id)
+    edition_id, isbn = await off_loop(library.cover_lookup, item_id)
     if not edition_id and not isbn:
         return CoverCandidates(candidates=[], reason="no_provider_reference")
     try:
@@ -823,8 +825,8 @@ async def replace_cover(
     cover if anything fails.
     """
     library = library_for(request, user)
-    library.get_item(item_id)
-    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
+    await off_loop(library.get_item, item_id)
+    await off_loop(ensure_free_space, request.app.state.data_dir, request.app.state.min_free_bytes)
     chosen: str | None = None
     upload: tuple[bytes, str] | None = None
     if cover is None:
@@ -837,7 +839,7 @@ async def replace_cover(
     else:
         upload = (await cover.read(10 * 1024 * 1024 + 1), cover.content_type or "")
     target = request.app.state.data_dir / "covers" / f"{item_id}.jpg"
-    previous = target.read_bytes() if target.is_file() else None
+    previous = await off_loop(_read_if_present, target)
     try:
         if chosen is not None:
             # `prepare_cover` carries the host allowlist and the placeholder-banner
@@ -848,11 +850,10 @@ async def replace_cover(
             )
         else:
             assert upload is not None
-            prepared = prepare_uploaded_cover(upload[0], upload[1], request.app.state.data_dir)
-        install_cover(prepared, request.app.state.data_dir, item_id)
-        DomainRepository(request.app.state.engine, user.effective_user_id).set_cover_path(
-            item_id, f"covers/{item_id}.jpg"
-        )
+            prepared = await off_loop(
+                prepare_uploaded_cover, upload[0], upload[1], request.app.state.data_dir
+            )
+        await off_loop(_record_cover, request, prepared, item_id, user)
     except CoverError as error:
         raise LibraryError("invalid_cover", str(error), status_code=422) from error
     except Exception:
@@ -863,7 +864,11 @@ async def replace_cover(
             recovery.write_bytes(previous)
             recovery.replace(target)
         raise
-    return ItemResponse.model_validate(library.get_item(item_id))
+    return ItemResponse.model_validate(await off_loop(library.get_item, item_id))
+
+
+def _read_if_present(path: Path) -> bytes | None:
+    return path.read_bytes() if path.is_file() else None
 
 
 class AttachmentResponse(BaseModel):
@@ -913,8 +918,8 @@ async def add_attachment(
     library = library_for(request, user)
     # Before a single chunk is read: an upload to an item that is not here should
     # cost nothing, not 25 MiB of transfer followed by a 404.
-    library.ensure_item(item_id)
-    ensure_free_space(request.app.state.data_dir, request.app.state.min_free_bytes)
+    await off_loop(library.ensure_item, item_id)
+    await off_loop(ensure_free_space, request.app.state.data_dir, request.app.state.min_free_bytes)
 
     cap = request.app.state.attachment_max_bytes
     filename = clean_attachment_filename(file.filename or "") or "attachment"
@@ -925,8 +930,8 @@ async def add_attachment(
             # whole upload into one string, so a 25 MiB file was a 25 MiB
             # allocation per concurrent request on a machine where a cover is
             # 39 KB (DEC-049).
-            writer.write(chunk)
-        stored = writer.commit()
+            await off_loop(writer.write, chunk)
+        stored = await off_loop(writer.commit)
     except AttachmentTooLarge as error:
         raise LibraryError(
             "attachment_too_large",
@@ -941,7 +946,8 @@ async def add_attachment(
         raise
 
     return AttachmentResponse.model_validate(
-        library.record_attachment(
+        await off_loop(
+            library.record_attachment,
             item_id,
             filename=filename,
             sha256=stored.sha256,
@@ -1067,7 +1073,7 @@ async def refresh_item(
     item_id: int, body: RefreshBody, request: Request, user: CurrentUser
 ) -> ItemResponse:
     library = library_for(request, user)
-    provider, source_id = _primary_provider(request, library, item_id)
+    provider, source_id = await off_loop(_primary_provider, request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     metadata = dict(payload.metadata)
     metadata["creators"] = list(payload.creators)
@@ -1081,7 +1087,8 @@ async def refresh_item(
         and declares_field(refreshed_domain, "language")
     ):
         metadata["language"] = payload.language
-    refreshed = library.overwrite_provider_fields(
+    refreshed = await off_loop(
+        library.overwrite_provider_fields,
         item_id,
         {
             "title": payload.title,
@@ -1091,7 +1098,7 @@ async def refresh_item(
         },
     )
     if await _install_cover_from_payload(request, payload, item_id, user):
-        refreshed = library.get_item(item_id)
+        refreshed = await off_loop(library.get_item, item_id)
     return ItemResponse.model_validate(refreshed)
 
 
@@ -1138,14 +1145,18 @@ async def _install_cover_from_payload(
         except CoverError:
             continue
         try:
-            install_cover(prepared, request.app.state.data_dir, item_id)
+            await off_loop(_record_cover, request, prepared, item_id, user)
         except CoverError:
             continue
-        DomainRepository(request.app.state.engine, user.effective_user_id).set_cover_path(
-            item_id, f"covers/{item_id}.jpg"
-        )
         return True
     return False
+
+
+def _record_cover(request: Request, prepared: Path, item_id: int, user: CurrentUser) -> None:
+    install_cover(prepared, request.app.state.data_dir, item_id)
+    DomainRepository(request.app.state.engine, user.effective_user_id).set_cover_path(
+        item_id, f"covers/{item_id}.jpg"
+    )
 
 
 @router.post(
@@ -1166,13 +1177,13 @@ async def fetch_cover(item_id: int, request: Request, user: CurrentUser) -> Item
     `overwrite` flag.
     """
     library = library_for(request, user)
-    provider, source_id = _primary_provider(request, library, item_id)
+    provider, source_id = await off_loop(_primary_provider, request, library, item_id)
     payload = await _fetch_from_provider(provider, source_id)
     if not await _install_cover_from_payload(request, payload, item_id, user):
         raise LibraryError(
             "cover_unavailable", "The provider has no cover for this item", status_code=422
         )
-    return ItemResponse.model_validate(library.get_item(item_id))
+    return ItemResponse.model_validate(await off_loop(library.get_item, item_id))
 
 
 @router.get("/shelves", response_model=list[ShelfResponse])

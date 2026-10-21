@@ -29,6 +29,7 @@ from book_tracker.infrastructure.models import (
     ItemRow,
     ItemSourceRow,
 )
+from book_tracker.infrastructure.offload import off_loop
 from book_tracker.infrastructure.providers import ProviderPayloadError
 from book_tracker.infrastructure.quota import ProviderQuota
 
@@ -131,14 +132,14 @@ class EnrichmentHandler:
             if provider is None:
                 reasons.append(f"{_label(name)} is not configured.")
                 continue
-            if self.quota is not None and not self.quota.allows(name, moment):
+            if self.quota is not None and not await off_loop(self.quota.allows, name, moment):
                 capped = True
                 reasons.append(f"{_label(name)} is out of requests for today.")
                 logger.info("provider quota exhausted", extra={"provider": name})
                 continue
             available = True
             if self.quota is not None:
-                self.quota.record(name, moment)
+                await off_loop(self.quota.record, name, moment)
             try:
                 if spec.needs_item_context:
                     payload = await provider.fetch_by_identifier(
@@ -215,7 +216,7 @@ class EnrichmentHandler:
 
     async def process(self, job_id: str, now: datetime) -> dict[str, Any]:
         """Process one enrichment job. Returns a result dict with 'state' key."""
-        job = self.repo.get_job(job_id)
+        job = await off_loop(self.repo.get_job, job_id)
         if job is None:
             return {"state": "failed", "error": "Job was not found", "error_code": "job_not_found"}
         payload = job["payload"]
@@ -227,21 +228,14 @@ class EnrichmentHandler:
         owner = job.get("user_id")
 
         # Late-job guard: if the batch has been undone, cancel this job
-        if batch_id is not None:
-            with Session(self.engine) as session:
-                batch = session.get(ImportBatchRow, batch_id)
-                if batch is not None and batch.state == "undone":
-                    self.repo.cancel(job_id)
-                    return {"state": "cancelled"}
+        if batch_id is not None and await off_loop(self._batch_undone, batch_id):
+            await off_loop(self.repo.cancel, job_id)
+            return {"state": "cancelled"}
 
         # Which domain is this, and what does it enrich on? Read from the item rather
         # than carried in the payload, so a queued job picks up a deployment's current
         # provider order instead of the one that happened to be wired when it was made.
-        with self.engine.connect() as connection:
-            row = connection.execute(
-                text("SELECT type, title, metadata FROM items WHERE id = :id"),
-                {"id": item_id},
-            ).one_or_none()
+        row = await off_loop(self._item_identity, item_id)
         if row is None:
             return {
                 "state": "failed",
@@ -310,11 +304,41 @@ class EnrichmentHandler:
             if failure["state"] == "deferred":
                 # Tomorrow's budget, without spending one of this job's attempts.
                 until = (now + timedelta(days=1)).replace(hour=0, minute=5, second=0, microsecond=0)
-                self.repo.defer(job_id, until, reason=str(failure["error"]))
+                await off_loop(self.repo.defer, job_id, until, reason=str(failure["error"]))
                 return {"state": "deferred", "available_at": until.isoformat()}
             return failure
 
-        # Fill only empty fields
+        written = await off_loop(self._fill_empty_fields, item_id, batch_id, payload_data)
+        if written is None:
+            return {
+                "state": "failed",
+                "error": f"Item {item_id} no longer exists",
+                "error_code": "item_not_found",
+            }
+        filled, needs_cover = written
+
+        # Cover work happens after the write lock is released: it is remote and image
+        # work, and a failed cover must never undo a successful metadata fill.
+        if needs_cover and await self._install_cover(item_id, payload_data):
+            filled.append("cover")
+
+        if payload_data.match_note:
+            noted: bool = await off_loop(
+                self._write_match_note, item_id, payload_data.match_note, owner
+            )
+            if noted:
+                filled.append("notes")
+
+        return {"state": "succeeded", "progress": {"filled": filled, "provider": source_name}}
+
+    def _fill_empty_fields(
+        self, item_id: int, batch_id: str | None, payload_data: ItemPayload
+    ) -> tuple[list[str], bool] | None:
+        """Fill only empty fields, recording an undo effect; `None` if the item is gone.
+
+        Returns what was filled and whether the item still needs a cover. One
+        synchronous unit under one write lock, run through `off_loop` by `process`.
+        """
         filled: list[str] = []
         needs_cover = False
         now_iso = datetime.now(UTC).isoformat().replace("+00:00", "Z")
@@ -327,11 +351,7 @@ class EnrichmentHandler:
                     needs_cover = not item.cover_path
                 if item is None:
                     connection.rollback()
-                    return {
-                        "state": "failed",
-                        "error": f"Item {item_id} no longer exists",
-                        "error_code": "item_not_found",
-                    }
+                    return None
 
                 # An imported item reaches this handler with an identifier
                 # (an ISBN, a Letterboxd slug) but no `item_sources` row at
@@ -416,23 +436,12 @@ class EnrichmentHandler:
                             session.flush()
 
                 connection.commit()
+                return filled, needs_cover
             except Exception:
                 connection.rollback()
                 raise
             finally:
                 session.close()
-
-        # Cover work happens after the write lock is released: it is remote and image
-        # work, and a failed cover must never undo a successful metadata fill.
-        if needs_cover and await self._install_cover(item_id, payload_data):
-            filled.append("cover")
-
-        if payload_data.match_note and self._write_match_note(
-            item_id, payload_data.match_note, owner
-        ):
-            filled.append("notes")
-
-        return {"state": "succeeded", "progress": {"filled": filled, "provider": source_name}}
 
     def _write_match_note(self, item_id: int, note: str, owner: int | None) -> bool:
         """A note worth a person's attention when the resolved payload is weaker
@@ -473,6 +482,34 @@ class EnrichmentHandler:
             finally:
                 session.close()
 
+    def _batch_undone(self, batch_id: str) -> bool:
+        with Session(self.engine) as session:
+            batch = session.get(ImportBatchRow, batch_id)
+            return batch is not None and batch.state == "undone"
+
+    def _item_identity(self, item_id: Any) -> Any:
+        with self.engine.connect() as connection:
+            return connection.execute(
+                text("SELECT type, title, metadata FROM items WHERE id = :id"),
+                {"id": item_id},
+            ).one_or_none()
+
+    def _record_cover(self, prepared: Path, item_id: int) -> None:
+        assert self.data_dir is not None
+        install_cover(prepared, self.data_dir, item_id)
+        with self.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE items SET cover_path=:path, updated_at=:now "
+                    "WHERE id=:id AND (cover_path IS NULL OR cover_path='')"
+                ),
+                {
+                    "path": f"covers/{item_id}.jpg",
+                    "now": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
+                    "id": item_id,
+                },
+            )
+
     async def _install_cover(self, item_id: int, payload: ItemPayload) -> bool:
         """Download and install a cover for an item that has none. Never fatal."""
         if self.cover_client is None or self.data_dir is None:
@@ -484,21 +521,9 @@ class EnrichmentHandler:
             except CoverError:
                 continue
             try:
-                install_cover(prepared, self.data_dir, item_id)
+                await off_loop(self._record_cover, prepared, item_id)
             except CoverError:
                 return False
-            with self.engine.begin() as connection:
-                connection.execute(
-                    text(
-                        "UPDATE items SET cover_path=:path, updated_at=:now "
-                        "WHERE id=:id AND (cover_path IS NULL OR cover_path='')"
-                    ),
-                    {
-                        "path": f"covers/{item_id}.jpg",
-                        "now": datetime.now(UTC).isoformat().replace("+00:00", "Z"),
-                        "id": item_id,
-                    },
-                )
             return True
         if urls:
             logger.warning("enrichment could not install a cover", extra={"item_id": item_id})

@@ -381,7 +381,7 @@ async def login(
 ) -> UserResponse | JSONResponse:
     require_auth_mode(request)
     username = normalize_username(body.username)
-    user = _lookup_user(request.app.state.engine, username)
+    user = await off_loop(_lookup_user, request.app.state.engine, username)
     peer = request.client.host if request.client is not None else "unknown"
     limiter: LoginRateLimiter = request.app.state.login_limiter
     if limiter.username_limited(username) or (user is None and limiter.peer_limited(peer)):
@@ -393,8 +393,10 @@ async def login(
         limiter.fail(username, peer)
         return unauthenticated()
     assert user is not None
-    created = SessionStore(request.app.state.engine).create(
-        int(user["id"]), user_agent=request.headers.get("user-agent")
+    created = await off_loop(
+        SessionStore(request.app.state.engine).create,
+        int(user["id"]),
+        user_agent=request.headers.get("user-agent"),
     )
     set_session_cookie(response, request, created.token)
     return UserResponse(
@@ -502,7 +504,8 @@ async def setup(
 ) -> UserResponse | JSONResponse:
     require_auth_mode(request)
     credential = await off_loop(hash_password, body.password.get_secret_value())
-    user_id = _create_admin(
+    user_id = await off_loop(
+        _create_admin,
         request.app.state.engine,
         username=body.username,
         display_name=body.display_name,
@@ -511,11 +514,13 @@ async def setup(
     )
     if user_id is None:
         return error_response(409, "setup_already_completed", "Initial setup is already complete")
-    created = SessionStore(request.app.state.engine).create(
-        user_id, user_agent=request.headers.get("user-agent")
+    created = await off_loop(
+        SessionStore(request.app.state.engine).create,
+        user_id,
+        user_agent=request.headers.get("user-agent"),
     )
     set_session_cookie(response, request, created.token)
-    user = _lookup_user(request.app.state.engine, normalize_username(body.username))
+    user = await off_loop(_lookup_user, request.app.state.engine, normalize_username(body.username))
     assert user is not None
     return UserResponse(
         id=user_id,
@@ -581,33 +586,38 @@ async def create_user(body: CreateUserBody, request: Request, _admin: AdminUser)
     username = normalize_username(body.username)
     credential = await off_loop(hash_password, body.password.get_secret_value())
     now = timestamp(utc_now())
-    try:
-        with request.app.state.engine.begin() as connection:
-            result = connection.execute(
-                text(
-                    "INSERT INTO users (username,display_name,password_hash,password_salt,"
-                    "is_admin,created_at,updated_at) VALUES "
-                    "(:username,:display_name,:digest,:salt,:is_admin,:now,:now)"
-                ),
-                {
-                    "username": username,
-                    "display_name": _strip_display_name(body.display_name),
-                    "digest": credential.digest,
-                    "salt": credential.salt,
-                    "is_admin": int(body.is_admin),
-                    "now": now,
-                },
-            )
-            user_id = int(result.lastrowid or 0)
-    except IntegrityError as error:
-        raise LibraryError(
-            "validation_error",
-            "Username is already in use",
-            status_code=422,
-            details={"field": "username"},
-        ) from error
-    row = _user_by_id(request.app.state.engine, user_id)
-    assert row is not None
+
+    def persist() -> dict[str, Any]:
+        try:
+            with request.app.state.engine.begin() as connection:
+                result = connection.execute(
+                    text(
+                        "INSERT INTO users (username,display_name,password_hash,password_salt,"
+                        "is_admin,created_at,updated_at) VALUES "
+                        "(:username,:display_name,:digest,:salt,:is_admin,:now,:now)"
+                    ),
+                    {
+                        "username": username,
+                        "display_name": _strip_display_name(body.display_name),
+                        "digest": credential.digest,
+                        "salt": credential.salt,
+                        "is_admin": int(body.is_admin),
+                        "now": now,
+                    },
+                )
+                user_id = int(result.lastrowid or 0)
+        except IntegrityError as error:
+            raise LibraryError(
+                "validation_error",
+                "Username is already in use",
+                status_code=422,
+                details={"field": "username"},
+            ) from error
+        row = _user_by_id(request.app.state.engine, user_id)
+        assert row is not None
+        return row
+
+    row = await off_loop(persist)
     return _management_response(row)
 
 
@@ -620,42 +630,56 @@ async def update_user(
     user_id: int, body: UpdateUserBody, request: Request, _admin: AdminUser
 ) -> UserResponse:
     require_auth_mode(request)
-    current = _user_by_id(request.app.state.engine, user_id)
-    if current is None:
-        raise LibraryError("user_not_found", "User was not found", status_code=404)
-    demoting = body.is_admin is False and bool(current["is_admin"])
-    if demoting:
-        with request.app.state.engine.connect() as connection:
-            admins = int(
-                connection.execute(text("SELECT count(*) FROM users WHERE is_admin=1")).scalar_one()
-            )
-        if admins == 1:
-            raise LibraryError("last_admin", "The last admin cannot be demoted", status_code=409)
-    values: dict[str, Any] = {"user_id": user_id, "updated_at": timestamp(utc_now())}
-    assignments: list[str] = []
-    if "display_name" in body.model_fields_set:
-        assignments.append("display_name=:display_name")
-        values["display_name"] = _strip_display_name(body.display_name)
-    if body.is_admin is not None:
-        assignments.append("is_admin=:is_admin")
-        values["is_admin"] = int(body.is_admin)
-    if body.password is not None:
-        credential = await off_loop(hash_password, body.password.get_secret_value())
-        assignments.extend(("password_hash=:digest", "password_salt=:salt"))
-        values.update(digest=credential.digest, salt=credential.salt)
-    if assignments:
-        assignments.append("updated_at=:updated_at")
-        with request.app.state.engine.begin() as connection:
-            connection.execute(
-                text(f"UPDATE users SET {','.join(assignments)} WHERE id=:user_id"), values
-            )
-        if body.password is not None:
-            SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
-            SessionStore(request.app.state.engine).delete_all(user_id)
-        elif demoting:
-            SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
-    row = _user_by_id(request.app.state.engine, user_id)
-    assert row is not None
+    # Hashed first, on its own bounded thread: the rest is one short synchronous unit.
+    credential = (
+        await off_loop(hash_password, body.password.get_secret_value())
+        if body.password is not None
+        else None
+    )
+
+    def persist() -> dict[str, Any]:
+        current = _user_by_id(request.app.state.engine, user_id)
+        if current is None:
+            raise LibraryError("user_not_found", "User was not found", status_code=404)
+        demoting = body.is_admin is False and bool(current["is_admin"])
+        if demoting:
+            with request.app.state.engine.connect() as connection:
+                admins = int(
+                    connection.execute(
+                        text("SELECT count(*) FROM users WHERE is_admin=1")
+                    ).scalar_one()
+                )
+            if admins == 1:
+                raise LibraryError(
+                    "last_admin", "The last admin cannot be demoted", status_code=409
+                )
+        values: dict[str, Any] = {"user_id": user_id, "updated_at": timestamp(utc_now())}
+        assignments: list[str] = []
+        if "display_name" in body.model_fields_set:
+            assignments.append("display_name=:display_name")
+            values["display_name"] = _strip_display_name(body.display_name)
+        if body.is_admin is not None:
+            assignments.append("is_admin=:is_admin")
+            values["is_admin"] = int(body.is_admin)
+        if credential is not None:
+            assignments.extend(("password_hash=:digest", "password_salt=:salt"))
+            values.update(digest=credential.digest, salt=credential.salt)
+        if assignments:
+            assignments.append("updated_at=:updated_at")
+            with request.app.state.engine.begin() as connection:
+                connection.execute(
+                    text(f"UPDATE users SET {','.join(assignments)} WHERE id=:user_id"), values
+                )
+            if credential is not None:
+                SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
+                SessionStore(request.app.state.engine).delete_all(user_id)
+            elif demoting:
+                SessionStore(request.app.state.engine).clear_acting_as_for_user(user_id)
+        row = _user_by_id(request.app.state.engine, user_id)
+        assert row is not None
+        return row
+
+    row = await off_loop(persist)
     return _management_response(row)
 
 
@@ -670,27 +694,31 @@ async def change_password(
     body: ChangePasswordBody, request: Request, user: CurrentUser
 ) -> Response | JSONResponse:
     require_auth_mode(request)
-    row = _user_by_id(request.app.state.engine, user.user_id)
+    row = await off_loop(_user_by_id, request.app.state.engine, user.user_id)
     if not await _credentials_match(row, body.current_password.get_secret_value()):
         return unauthenticated()
     credential = await off_loop(hash_password, body.new_password.get_secret_value())
-    with request.app.state.engine.begin() as connection:
-        connection.execute(
-            text(
-                "UPDATE users SET password_hash=:digest,password_salt=:salt,updated_at=:now "
-                "WHERE id=:user_id"
-            ),
-            {
-                "digest": credential.digest,
-                "salt": credential.salt,
-                "now": timestamp(utc_now()),
-                "user_id": user.user_id,
-            },
-        )
     token = request.cookies.get(COOKIE_NAME)
-    SessionStore(request.app.state.engine).clear_acting_as_for_user(user.user_id)
-    if token:
-        SessionStore(request.app.state.engine).delete_other(user.user_id, token)
+
+    def persist() -> None:
+        with request.app.state.engine.begin() as connection:
+            connection.execute(
+                text(
+                    "UPDATE users SET password_hash=:digest,password_salt=:salt,updated_at=:now "
+                    "WHERE id=:user_id"
+                ),
+                {
+                    "digest": credential.digest,
+                    "salt": credential.salt,
+                    "now": timestamp(utc_now()),
+                    "user_id": user.user_id,
+                },
+            )
+        SessionStore(request.app.state.engine).clear_acting_as_for_user(user.user_id)
+        if token:
+            SessionStore(request.app.state.engine).delete_other(user.user_id, token)
+
+    await off_loop(persist)
     return Response(status_code=204)
 
 
