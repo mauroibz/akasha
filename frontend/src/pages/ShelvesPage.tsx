@@ -12,6 +12,8 @@ import { domainsFrom } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { createShelf, getShelves, type ShelfWithCount } from "@/api/shelves";
 import { queryKeys } from "@/api/keys";
+import { Loading } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 type ShelfSort = "size" | "name" | "recent";
 
@@ -166,9 +168,7 @@ export function ShelvesPage() {
       )}
 
       {shelves.isPending && (
-        <p role="status" className="mt-8 text-muted-foreground">
-          Loading shelves…
-        </p>
+        <Loading label="Loading shelves…" shape="grid" className="mt-8" />
       )}
       {shelves.isError && (
         <p role="alert" className="mt-8 text-destructive">
@@ -176,9 +176,11 @@ export function ShelvesPage() {
         </p>
       )}
       {shelves.data && shelves.data.length === 0 && (
-        <p className="mt-8 text-muted-foreground">
-          No shelves yet. Create one above.
-        </p>
+        <EmptyState title="No shelves yet" className="mt-8">
+          A shelf is any collection you want to keep together: favourites, a
+          reading group, the records you would save from a fire. Create one
+          above.
+        </EmptyState>
       )}
       {shelves.data && shelves.data.length > 0 && board.length === 0 && (
         <p className="mt-8 text-muted-foreground">

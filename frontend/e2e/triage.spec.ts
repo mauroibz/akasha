@@ -90,9 +90,10 @@ test("a provisional score is marked and the marker is explained", async ({
   // as painted colour rather than as a class name, because the class only
   // matters if Tailwind emitted it.
   const chip = plain.getByRole("combobox", { name: /score for book 2:/i });
-  // Amber, the 4-6 band -- not the lime of 7-8.
-  await expect(chip).toHaveCSS("background-color", "rgb(251, 189, 35)");
-  await expect(chip).toHaveCSS("color", "rgb(9, 9, 11)");
+  // Amber, the 4-6 band -- not the lime of 7-8. Painted in Paper: Playwright's
+  // device preference is light, and the theme follows the device (Sprint 090).
+  await expect(chip).toHaveCSS("background-color", "rgb(147, 88, 6)");
+  await expect(chip).toHaveCSS("color", "rgb(244, 240, 230)");
 });
 
 test("triage page renders and bulk-accepts suggested statuses", async ({
@@ -756,8 +757,9 @@ test("triage discards a selection in one confirmed request", async ({
   // wrong checkbox selection must not remove entries from the library.
   const discard = page.getByRole("button", { name: /discard/i });
   await expect(discard).toBeVisible();
-  await expect(discard).toHaveCSS("background-color", "rgb(239, 68, 68)");
-  await expect(discard).toHaveCSS("color", "rgb(9, 9, 11)");
+  // Paper's red (the theme follows Playwright's light device preference).
+  await expect(discard).toHaveCSS("background-color", "rgb(180, 34, 24)");
+  await expect(discard).toHaveCSS("color", "rgb(244, 240, 230)");
   await discard.click();
   await expect(deletes).toEqual([]);
   await expect(

@@ -13,6 +13,7 @@ import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Loading } from "@/components/ui/skeleton";
 
 const SESSION_QUERY_KEY = ["auth", "sessions"] as const;
 const dateTime = new Intl.DateTimeFormat(undefined, {
@@ -129,9 +130,7 @@ export function AccountSection({
           </p>
         </div>
         {sessions.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading sessions…
-          </p>
+          <Loading label="Loading sessions…" />
         ) : sessions.isError ? (
           <p role="alert" className="text-sm text-destructive">
             Your sessions could not be loaded.

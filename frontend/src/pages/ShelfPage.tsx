@@ -39,6 +39,7 @@ import { getLibraryPage, patchEntry, type LibraryEntry } from "@/api/library";
 import { readPinnedShelf, writePinnedShelf } from "@/features/library/library";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/api/keys";
+import { Loading } from "@/components/ui/skeleton";
 
 const everything = "";
 
@@ -179,9 +180,7 @@ export function ShelfPage() {
   if (shelvesQuery.isPending) {
     return (
       <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
-        <p role="status" className="text-muted-foreground">
-          Loading shelf…
-        </p>
+        <Loading label="Loading shelf…" shape="page" />
       </main>
     );
   }

@@ -134,7 +134,11 @@ test("renders a useful empty state", async () => {
     ),
   );
   renderPage();
-  expect(await screen.findByText("Your library is waiting")).toBeVisible();
+  // With books in the Inbox, the empty library points at them (Sprint 091).
+  expect(await screen.findByText("3 waiting in your Inbox")).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Sort them into your library" }),
+  ).toBeVisible();
   expect(screen.getAllByText(/Inbox 3/)[0]).toBeVisible();
 });
 

@@ -25,6 +25,7 @@ import { RoutedErrorBoundary } from "@/components/ErrorBoundary";
 import { AppShell } from "@/components/AppShell";
 import { HomePage } from "@/pages/HomePage";
 import { NotFoundPage, RouteErrorPage } from "@/pages/NotFoundPage";
+import { Loading } from "@/components/ui/skeleton";
 
 // `/` is the screen the application opens on, so it stays in the entry chunk.
 // Everything else is reached by a deliberate navigation and can arrive then:
@@ -70,8 +71,8 @@ const PeoplePage = lazy(async () => ({
  */
 function RouteFallback() {
   return (
-    <main className="p-6" role="status" aria-live="polite">
-      <p className="text-sm text-muted-foreground">Loading…</p>
+    <main className="mx-auto max-w-5xl p-6">
+      <Loading label="Loading…" shape="page" />
     </main>
   );
 }

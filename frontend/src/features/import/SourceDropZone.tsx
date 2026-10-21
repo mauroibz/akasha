@@ -1,9 +1,9 @@
 import { useState } from "react";
 
 import type { ImporterDefinition } from "@/api/imports";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
+import { FilePicker } from "@/components/ui/file-picker";
 
 /**
  * The upload affordance: drop a file on it, or choose one.
@@ -49,14 +49,14 @@ export function SourceDropZone({
       <p className="mt-1 text-sm text-muted-foreground">
         {file ? file.name : (emptyState ?? `Choose a ${label}.`)}
       </p>
-      <Input
+      <FilePicker
         id={inputId}
         // No autoFocus: the custom list leads the strip now (Sprint 085), so
         // this input renders on the import screen's first paint — focusing it
         // scrolled the freshly-opened page mid-viewport and buried the source
         // strip under the fixed header. The input is one Tab away.
-        className="mt-3 h-11 py-2"
-        type="file"
+        className="mt-3"
+        showChosen={false}
         accept={accept ?? undefined}
         onChange={(event) => onFile(event.target.files?.[0] ?? null)}
       />

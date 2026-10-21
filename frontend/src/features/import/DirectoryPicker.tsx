@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { calibreBundle, formatBytes, type CalibreBundle } from "./bundle";
+import { FilePicker } from "@/components/ui/file-picker";
 
 /**
  * Choose a library folder on your own machine.
@@ -50,16 +51,17 @@ export function DirectoryPicker({
       <p className="mt-1 text-sm text-muted-foreground">
         {chosen || (spec.empty_state ?? `Choose your ${importerLabel} folder.`)}
       </p>
-      <input
+      <FilePicker
         ref={input}
         id={inputId}
-        type="file"
         multiple
-        // Not in the HTML standard proper, but present in every current browser and
-        // the only way to read a folder without a mount. React does not know the
-        // attribute, hence the cast; a browser without it leaves the alternate below.
-        {...({ webkitdirectory: "" } as Record<string, string>)}
-        className="mt-3 block w-full text-sm file:mr-3 file:h-9 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:text-sm file:font-medium"
+        // `webkitdirectory`: not in the HTML standard proper, but present in every
+        // current browser and the only way to read a folder without a mount; a
+        // browser without it leaves the alternate below.
+        directory
+        buttonLabel="Choose a folder"
+        showChosen={false}
+        className="mt-3"
         onChange={(event) => {
           const files = Array.from(event.target.files ?? []);
           if (files.length === 0) {

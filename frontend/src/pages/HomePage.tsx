@@ -74,6 +74,8 @@ import {
 } from "@/features/library/library";
 import { queryKeys } from "@/api/keys";
 import { usePatchEntry } from "@/features/library/usePatchEntry";
+import { Loading } from "@/components/ui/skeleton";
+import { EmptyState } from "@/components/ui/empty-state";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
@@ -881,13 +883,11 @@ export function HomePage() {
         // Holds the list's height while the new page resolves. Without it the
         // page collapses to a short message between two lists and the whole
         // layout jumps underneath the crossfade.
-        <div
-          className="flex min-h-[min(70vh,760px)] items-center justify-center py-24 text-center text-muted-foreground"
-          aria-live="polite"
-          role="status"
-        >
-          Loading your library…
-        </div>
+        <Loading
+          label="Loading your library…"
+          shape="grid"
+          className="min-h-[min(70vh,760px)] pt-6"
+        />
       )}
       {library.isError && (
         <div className="py-24 text-center" role="alert">
@@ -914,11 +914,38 @@ export function HomePage() {
             Nothing in your library matches “{filters.query}”.
           </p>
         ) : (
-          <section className="py-24 text-center">
-            <h2 className="text-2xl font-semibold">Your library is waiting</h2>
-            <p className="mt-2 text-muted-foreground">
-              Search above to add something, or visit the inbox to get started.
-            </p>
+          <section className="py-16">
+            {inboxCount > 0 ? (
+              // An import lands in the Inbox, so an empty library right after one
+              // is not "waiting": it is one click from what just arrived (the
+              // Sprint 087 walkthrough, 220 books behind "Your library is waiting").
+              <EmptyState
+                title={`${inboxCount} waiting in your Inbox`}
+                action={
+                  <Button onClick={() => void navigate("/triage")}>
+                    Sort them into your library
+                  </Button>
+                }
+              >
+                Everything you import lands there first, so you can say what you
+                thought before it joins the library.
+              </EmptyState>
+            ) : (
+              <EmptyState
+                title="Your library is waiting"
+                action={
+                  <Button
+                    variant="outline"
+                    onClick={() => void navigate("/add")}
+                  >
+                    Add something
+                  </Button>
+                }
+              >
+                Search above to add something, or bring in a whole list from
+                another app.
+              </EmptyState>
+            )}
           </section>
         ))}
       {/* The crossfade is on the container and nowhere else. `mode="wait"` is

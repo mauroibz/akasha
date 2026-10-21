@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { queryKeys } from "@/api/keys";
+import { Loading } from "@/components/ui/skeleton";
 
 interface CoverDialogProps {
   open: boolean;
@@ -81,7 +82,7 @@ export function CoverDialog({
         </DialogHeader>
 
         {candidates.isPending && open && (
-          <p className="text-sm text-muted-foreground">Loading editions…</p>
+          <Loading label="Loading editions…" shape="grid" />
         )}
         {candidates.isError && (
           <p className="text-sm text-destructive">

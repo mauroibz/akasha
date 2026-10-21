@@ -25,6 +25,7 @@ import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
 import { formatBytes } from "@/lib/bytes";
 import { cn } from "@/lib/utils";
+import { Loading } from "@/components/ui/skeleton";
 
 /**
  * Files attached to this edition.
@@ -124,7 +125,7 @@ export function Attachments({ itemId }: { itemId: number }) {
       </div>
 
       {isPending ? (
-        <p className="mt-2 text-sm text-muted-foreground">Loading files…</p>
+        <Loading label="Loading files…" className="mt-2" />
       ) : isError ? (
         <p className="mt-2 text-sm text-muted-foreground">
           Files could not be loaded.

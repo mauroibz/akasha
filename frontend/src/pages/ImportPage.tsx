@@ -54,6 +54,7 @@ import { SourceDropZone } from "@/features/import/SourceDropZone";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { TriagePage } from "@/pages/TriagePage";
+import { NativeSelect } from "@/components/ui/native-select";
 
 /** A refusal as the screen shows it: what happened, and what to do about it. */
 interface ImportFailure {
@@ -607,7 +608,7 @@ export function ImportPage() {
                 <span className="text-sm text-muted-foreground">
                   Which library is this list for?
                 </span>
-                <select
+                <NativeSelect
                   id={`${importer.id}-domain`}
                   className="mt-1 h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-base focus-ring"
                   value={domainPicks[importer.id] ?? importer.item_types[0]}
@@ -628,7 +629,7 @@ export function ImportPage() {
                       </option>
                     );
                   })}
-                </select>
+                </NativeSelect>
               </label>
             </div>
           )}
@@ -698,7 +699,7 @@ export function ImportPage() {
                     <span className="text-sm text-muted-foreground">
                       Separator
                     </span>
-                    <select
+                    <NativeSelect
                       aria-label="Separator"
                       className="h-11 w-full rounded-md border border-input bg-surface-raised px-3 text-base focus-ring"
                       value={delimitersByImporter[importer.id] ?? ""}
@@ -713,7 +714,7 @@ export function ImportPage() {
                       <option value=",">Comma</option>
                       <option value=";">Semicolon</option>
                       <option value="&#9;">Tab</option>
-                    </select>
+                    </NativeSelect>
                   </label>
                 ) : (
                   <label key={name} className="flex min-w-0 flex-col gap-1">

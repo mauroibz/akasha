@@ -30,6 +30,8 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { queryKeys } from "@/api/keys";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Loading } from "@/components/ui/skeleton";
 
 function PersonRow({
   person,
@@ -193,7 +195,7 @@ function PersonRow({
             {decision === "transfer" ? (
               <Label className="space-y-2">
                 <span>Transfer to</span>
-                <select
+                <NativeSelect
                   className="h-11 w-full rounded-md border border-input bg-background px-3"
                   value={target}
                   onChange={(event) => setTarget(event.target.value)}
@@ -206,7 +208,7 @@ function PersonRow({
                         {row.display_name || row.username}
                       </option>
                     ))}
-                </select>
+                </NativeSelect>
               </Label>
             ) : null}
             <label className="flex min-h-11 items-center gap-3 rounded-lg border border-destructive/40 p-3">
@@ -369,7 +371,9 @@ export function PeoplePage({
                 </Button>
               </form>
             </Panel>
-            {users.isPending ? <p role="status">Loading people…</p> : null}
+            {users.isPending ? (
+              <Loading label="Loading people…" shape="list" />
+            ) : null}
             {users.isError ? (
               <p role="alert" className="text-destructive">
                 People could not be loaded.

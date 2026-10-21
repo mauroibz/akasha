@@ -31,7 +31,6 @@ import { CoverImage } from "@/components/CoverImage";
 import { Panel } from "@/components/Panel";
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Attachments } from "@/features/detail/Attachments";
 import { CoverDialog } from "@/features/detail/CoverDialog";
@@ -52,6 +51,8 @@ import type { EntryFieldName } from "@/features/library/labels";
 import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/api/keys";
+import { FilePicker } from "@/components/ui/file-picker";
+import { Loading } from "@/components/ui/skeleton";
 
 /** One term/definition pair, addressable by name instead of by CSS adjacency. */
 /**
@@ -207,7 +208,12 @@ export function DetailPage() {
   // here. Radix Dialog owns them now, so the hand-rolled versions are gone
   // rather than left to fight it.
 
-  if (detail.isPending) return <p role="status">Loading detail…</p>;
+  if (detail.isPending)
+    return (
+      <main className="mx-auto max-w-5xl px-4 py-10">
+        <Loading label="Loading detail…" shape="detail" />
+      </main>
+    );
   if (!detail.data) return <p role="alert">Detail could not be loaded</p>;
   const entry = detail.data;
   const item = entry.item;
@@ -313,10 +319,11 @@ export function DetailPage() {
             )}
           <div className="mt-3 block text-sm">
             <Label htmlFor="replace-cover">Replace cover</Label>
-            <Input
+            <FilePicker
               id="replace-cover"
-              className="mt-1 h-11 py-2"
-              type="file"
+              className="mt-1"
+              buttonLabel="Upload an image"
+              showChosen={false}
               accept="image/jpeg,image/png,image/webp"
               onChange={(e) => {
                 const file = e.target.files?.[0];

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { formatBytes } from "./bundle";
+import { FilePicker } from "@/components/ui/file-picker";
 
 /**
  * Drop a flat set of files: a source's own export parts, or files that each
@@ -73,13 +74,14 @@ export function ExportPicker({
           ? (spec.empty_state ?? `Choose the ${spec.label} files.`)
           : `${files.length} ${files.length === 1 ? "file" : "files"} selected · ${formatBytes(totalBytes)}`}
       </p>
-      <input
+      <FilePicker
         ref={input}
         id={inputId}
-        type="file"
         multiple
+        buttonLabel="Choose files"
+        showChosen={false}
         accept={spec.accept ?? undefined}
-        className="mt-3 block w-full text-sm file:mr-3 file:h-9 file:rounded-full file:border-0 file:bg-secondary file:px-4 file:text-sm file:font-medium"
+        className="mt-3"
         onChange={(event) => choose(event.target.files)}
       />
       {unexpected.length > 0 && (

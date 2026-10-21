@@ -60,6 +60,8 @@ import {
 } from "@/features/library/library";
 import { queryKeys } from "@/api/keys";
 import { usePatchEntry } from "@/features/library/usePatchEntry";
+import { NativeSelect } from "@/components/ui/native-select";
+import { Loading } from "@/components/ui/skeleton";
 
 const STATUS_DRAFTS_STORAGE_KEY = "akasha.triage.status-drafts.v1";
 
@@ -671,9 +673,7 @@ export function TriagePage() {
       </section>
 
       {library.isPending && (
-        <div className="py-24 text-center text-muted-foreground" role="status">
-          Loading inbox…
-        </div>
+        <Loading label="Loading inbox…" shape="list" className="py-8" />
       )}
       {library.isError && (
         <div className="py-24 text-center" role="alert">
@@ -957,7 +957,8 @@ export function TriagePage() {
                       // visible trigger in the row click guard.
                       onClick={(event) => event.stopPropagation()}
                     >
-                      <select
+                      <NativeSelect
+                        wrapperClassName="w-auto shrink-0"
                         value={targetStatus}
                         disabled={pendingStatusMutation.isPending}
                         onChange={(event) => {
@@ -974,7 +975,7 @@ export function TriagePage() {
                           pendingStatuses.has(entry.id) ? " (not saved)" : ""
                         }`}
                         className={cn(
-                          "h-9 w-24 shrink-0 rounded-md border bg-surface-raised px-2 text-xs focus-ring sm:w-28",
+                          "h-9 w-24 shrink-0 rounded-md border bg-surface-raised pl-2 pr-7 text-xs focus-ring sm:w-28",
                           pendingStatuses.has(entry.id)
                             ? "border-primary ring-1 ring-primary/40"
                             : "border-input",
@@ -987,8 +988,9 @@ export function TriagePage() {
                               {status.label}
                             </option>
                           ))}
-                      </select>
-                      <select
+                      </NativeSelect>
+                      <NativeSelect
+                        wrapperClassName="w-auto shrink-0"
                         value={
                           entry.score === null ? "none" : String(entry.score)
                         }
@@ -1011,7 +1013,7 @@ export function TriagePage() {
                           entry.score === null
                             ? "bg-surface-raised text-foreground"
                             : scoreChipClass(entry.score),
-                          "h-9 w-16 shrink-0 border border-border text-xs focus-ring sm:w-[4.5rem]",
+                          "h-9 w-16 shrink-0 border border-border pl-2 pr-6 text-xs focus-ring sm:w-[4.5rem]",
                         )}
                         title={
                           entry.score_provisional
@@ -1031,7 +1033,7 @@ export function TriagePage() {
                               : ""}
                           </option>
                         ))}
-                      </select>
+                      </NativeSelect>
                       <Button
                         size="sm"
                         className="h-9 w-9 shrink-0 rounded-full bg-primary-foreground p-0 text-primary hover:bg-primary-foreground/80"
