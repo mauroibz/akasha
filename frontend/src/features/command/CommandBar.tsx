@@ -29,6 +29,7 @@ import {
 } from "@/api/add";
 import { queryKeys } from "@/api/keys";
 import { searchLibrary } from "@/api/library";
+import { getViews } from "@/api/views";
 import { CoverImage } from "@/components/CoverImage";
 import {
   Dialog,
@@ -114,6 +115,14 @@ export function CommandBar({
     enabled: open && (resolvable || typed.length >= 3),
     staleTime: 5 * 60_000,
     retry: false,
+  });
+
+  // Saved library filters (Sprint 100), each one a place to go.
+  const views = useQuery({
+    queryKey: queryKeys.views,
+    queryFn: ({ signal }) => getViews(signal),
+    enabled: open,
+    staleTime: 60_000,
   });
 
   const close = () => onOpenChange(false);
@@ -249,12 +258,20 @@ export function CommandBar({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  const viewActions: Action[] = (views.data ?? []).map((view) => ({
+    id: `view-${view.id}`,
+    label: `Go to ${view.name}`,
+    words: `saved view filter ${view.query}`,
+    icon: <Bookmark />,
+    run: () => go(`/?${view.query}`),
+  }));
+  const allActions = [actions[0], ...viewActions, ...actions.slice(1)];
   const words = query.trim().toLowerCase();
   const shownActions = words
-    ? actions.filter((action) =>
+    ? allActions.filter((action) =>
         `${action.label} ${action.words}`.toLowerCase().includes(words),
       )
-    : actions;
+    : allActions;
   // While the typing has not settled, results on screen answer the previous text:
   // hide them, so Enter acts on what was typed rather than on what was there.
   const settling = query.trim() !== typed;

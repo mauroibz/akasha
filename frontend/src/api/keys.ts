@@ -37,6 +37,7 @@ export const queryKeys = {
     ["insight-members", type, insightKey, value] as const,
   providerHealth: ["provider-health"] as const,
   shelves: ["shelves"] as const,
+  views: ["views"] as const,
   shelfEntries: {
     /** Every page of one shelf, whichever domain it is filtered to. */
     shelf: (slug: string | undefined) => ["shelf-entries", slug] as const,

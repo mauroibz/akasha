@@ -79,6 +79,7 @@ import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { useCommandBar } from "@/features/command/commandBar";
 import { NowStrip } from "@/features/library/NowStrip";
+import { SaveView } from "@/features/library/SaveView";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
@@ -914,6 +915,7 @@ export function HomePage() {
                 }
               />
             )}
+            <SaveView query={searchParams.toString()} />
           </section>
         )}
       </div>

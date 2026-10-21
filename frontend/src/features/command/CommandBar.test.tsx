@@ -1,7 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import { MemoryRouter, Route, Routes, useLocation } from "react-router-dom";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { takeHandedFiles } from "@/features/import/handoff";
@@ -42,6 +42,13 @@ const candidate = {
   metadata: {},
 };
 
+function Where() {
+  const location = useLocation();
+  return (
+    <output aria-label="Location">{location.pathname + location.search}</output>
+  );
+}
+
 function renderBar() {
   render(
     <QueryClientProvider
@@ -57,6 +64,7 @@ function renderBar() {
             <Route path="/insights" element={<p>Insights page</p>} />
             <Route path="/import" element={<p>Import page</p>} />
           </Routes>
+          <Where />
         </CommandBarProvider>
       </MemoryRouter>
     </QueryClientProvider>,
@@ -156,6 +164,26 @@ describe("CommandBar", () => {
     await userEvent.type(input, "insights");
     await userEvent.keyboard("{Enter}");
     expect(await screen.findByText("Insights page")).toBeInTheDocument();
+  });
+
+  it("opens a saved view as the library filtered the way it was saved", async () => {
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) =>
+      String(input) === "/api/views"
+        ? new Response(
+            JSON.stringify([
+              { id: 4, name: "Vinyl", query: "type=album&status=owned" },
+            ]),
+          )
+        : new Response("[]"),
+    );
+    const input = await renderBar();
+    await userEvent.type(input, "vinyl");
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Go to Vinyl" }),
+    );
+    expect(screen.getByRole("status", { name: "Location" })).toHaveTextContent(
+      "/?type=album&status=owned",
+    );
   });
 });
 

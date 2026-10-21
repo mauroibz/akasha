@@ -382,7 +382,9 @@ class LibraryService:
                 {"user": self.user_id, "name": cleaned, "query": query.lstrip("?"), "now": now},
             )
             row = connection.execute(
-                text("SELECT id, name, query FROM saved_views WHERE user_id = :user AND name = :name"),
+                text(
+                    "SELECT id, name, query FROM saved_views WHERE user_id = :user AND name = :name"
+                ),
                 {"user": self.user_id, "name": cleaned},
             ).one()
         return {"id": row[0], "name": row[1], "query": row[2]}
