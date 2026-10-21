@@ -81,7 +81,7 @@ export function AddPage() {
       <PageHeader
         back
         title="Add"
-        lede="Drop files in, or enter something no provider lists. To add from a provider, search from the library."
+        lede="Drop files in, or enter something no provider lists. To add from a provider, press ⌘K or use Search or add: it finds titles and reads links."
       />
       {droppable.map((importer) => (
         <section

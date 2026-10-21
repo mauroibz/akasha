@@ -7,6 +7,7 @@ import {
   Settings,
   Upload,
   UserRound,
+  Search,
 } from "lucide-react";
 import { LazyMotion, domAnimation } from "motion/react";
 import { type ReactNode, useState } from "react";
@@ -25,6 +26,9 @@ import {
 } from "@/components/ui/popover";
 import { Toaster } from "@/components/ui/sonner";
 import { cn } from "@/lib/utils";
+import { CommandBarProvider } from "@/features/command/CommandBarProvider";
+import { useCommandBar } from "@/features/command/commandBar";
+import { Kbd } from "@/components/ui/kbd";
 
 interface NavItem {
   readonly to: string;
@@ -50,6 +54,35 @@ const navItems: readonly NavItem[] = [
   { to: "/shelves", label: "Shelves", icon: <Bookmark aria-hidden="true" /> },
   { to: "/insights", label: "Insights", icon: <ChartBar aria-hidden="true" /> },
 ];
+
+/** The command bar's visible door (Sprint 094); ⌘K is the other. */
+function SearchButton({ compact = false }: { compact?: boolean }) {
+  const { open } = useCommandBar();
+  return (
+    <button
+      type="button"
+      onClick={() => open()}
+      aria-label="Search or add"
+      aria-keyshortcuts="Meta+K Control+K"
+      className={cn(
+        "flex h-11 items-center justify-center gap-2 rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground focus-ring [&_svg]:h-5 [&_svg]:w-5",
+        // The words need room: at tablet width the nav is full, so the bar's door
+        // is the icon until 1024px (the library spec's no-overflow rule).
+        compact
+          ? "w-11"
+          : "w-11 lg:w-auto lg:border lg:border-border lg:px-3 lg:text-sm",
+      )}
+    >
+      <Search aria-hidden="true" />
+      {compact ? null : (
+        <span className="hidden items-center gap-2 lg:flex">
+          <span>Search or add</span>
+          <Kbd>⌘K</Kbd>
+        </span>
+      )}
+    </button>
+  );
+}
 
 /** Settings sits apart from the five destinations: visited rarely, found easily. */
 function SettingsLink() {
@@ -197,116 +230,120 @@ export function AppShell({
     // later edit without also changing this line. `strict` turns an accidental
     // eager `motion.*` component into a loud error instead of a silent bundle.
     <JobEventsProvider>
-      <LazyMotion features={domAnimation} strict>
-        <div className="min-h-screen bg-background text-foreground">
-          {actingAs && onActingAsChanged ? (
-            <>
-              <div className="h-14" aria-hidden="true" />
-              <ActingAsBanner
-                user={actingAs}
-                onActingAsChanged={onActingAsChanged}
-              />
-            </>
-          ) : null}
-          <nav
-            aria-label="Primary"
-            className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
-          >
-            {/* Not a second home link: "Library" below already goes to "/". Since
+      <CommandBarProvider>
+        <LazyMotion features={domAnimation} strict>
+          <div className="min-h-screen bg-background text-foreground">
+            {actingAs && onActingAsChanged ? (
+              <>
+                <div className="h-14" aria-hidden="true" />
+                <ActingAsBanner
+                  user={actingAs}
+                  onActingAsChanged={onActingAsChanged}
+                />
+              </>
+            ) : null}
+            <nav
+              aria-label="Primary"
+              className="hidden border-b border-border/80 bg-background/95 backdrop-blur sm:flex sm:items-center sm:gap-1 sm:px-6 sm:py-2"
+            >
+              {/* Not a second home link: "Library" below already goes to "/". Since
             Sprint 089 the mark is the background-work control: its dot breathes
             while a job runs, and it opens the recent jobs. Sized to 20px so it
             reads as a sibling of the Lucide icons beside it (docs/brand/BRAND.md). */}
-            <ActivityIndicator className="mx-1" />
-            <span
-              className="mr-2 h-5 w-px shrink-0 bg-border"
-              aria-hidden="true"
-            />
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                className={({ isActive }) =>
-                  cn(
-                    "flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-ring",
-                    isActive
-                      ? "bg-primary/15 text-primary"
-                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                  )
-                }
-              >
-                <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-            <div className="ml-auto flex items-center gap-1">
-              <SettingsLink />
-              {user && onSignedOut ? (
-                <AccountControl user={user} onSignedOut={onSignedOut} />
-              ) : null}
-            </div>
-          </nav>
-          {/* The phone's top bar (Sprint 093): the mark, which is the
+              <ActivityIndicator className="mx-1" />
+              <span
+                className="mr-2 h-5 w-px shrink-0 bg-border"
+                aria-hidden="true"
+              />
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-medium transition-colors focus-ring",
+                      isActive
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    )
+                  }
+                >
+                  <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+              <div className="ml-auto flex items-center gap-1">
+                <SearchButton />
+                <SettingsLink />
+                {user && onSignedOut ? (
+                  <AccountControl user={user} onSignedOut={onSignedOut} />
+                ) : null}
+              </div>
+            </nav>
+            {/* The phone's top bar (Sprint 093): the mark, which is the
             background-work control as on desktop, and Settings; the account
             control when signed in. Short, because on a phone every pixel above
             the first cover counts (the library spec holds it under 300px). */}
-          <header className="flex h-12 items-center justify-between gap-1 border-b border-border/80 px-2 sm:hidden">
-            <ActivityIndicator />
-            <div className="flex items-center gap-1">
-              <SettingsLink />
-              {user && onSignedOut ? (
-                <AccountControl user={user} onSignedOut={onSignedOut} />
-              ) : null}
+            <header className="flex h-12 items-center justify-between gap-1 border-b border-border/80 px-2 sm:hidden">
+              <ActivityIndicator />
+              <div className="flex items-center gap-1">
+                <SearchButton compact />
+                <SettingsLink />
+                {user && onSignedOut ? (
+                  <AccountControl user={user} onSignedOut={onSignedOut} />
+                ) : null}
+              </div>
+            </header>
+            <nav
+              aria-label="Primary"
+              className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
+            >
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={item.to}
+                  end={item.to === "/"}
+                  aria-label={item.label}
+                  className={({ isActive }) =>
+                    cn(
+                      "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
+                      isActive ? "text-primary" : "text-muted-foreground",
+                    )
+                  }
+                >
+                  <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
+                  <span>{item.label}</span>
+                </NavLink>
+              ))}
+            </nav>
+            <div
+              key={location.pathname}
+              data-route-key={location.pathname}
+              className="animate-route-enter"
+            >
+              {children}
             </div>
-          </header>
-          <nav
-            aria-label="Primary"
-            className="fixed inset-x-0 bottom-0 z-30 flex border-t border-border bg-background/95 backdrop-blur sm:hidden"
-          >
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={item.to}
-                end={item.to === "/"}
-                aria-label={item.label}
-                className={({ isActive }) =>
-                  cn(
-                    "flex h-14 flex-1 flex-col items-center justify-center gap-0.5 text-xs transition-colors focus-ring",
-                    isActive ? "text-primary" : "text-muted-foreground",
-                  )
-                }
-              >
-                <span className="[&_svg]:h-5 [&_svg]:w-5">{item.icon}</span>
-                <span>{item.label}</span>
-              </NavLink>
-            ))}
-          </nav>
-          <div
-            key={location.pathname}
-            data-route-key={location.pathname}
-            className="animate-route-enter"
-          >
-            {children}
-          </div>
-          {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
+            {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
             content so it never competes with a control. The mobile bottom padding
             clears the fixed bottom navigation. */}
-          <footer className="pb-20 sm:pb-0">
-            <DataCredit />
-          </footer>
-          <div className="h-16 sm:hidden" aria-hidden="true" />
-          {/* The application's one visible feedback surface. Mounted at the shell so
+            <footer className="pb-20 sm:pb-0">
+              <DataCredit />
+            </footer>
+            <div className="h-16 sm:hidden" aria-hidden="true" />
+            {/* The application's one visible feedback surface. Mounted at the shell so
           a confirmation survives the navigation that follows the action.
           Bottom-right, not top-centre: every screen puts its primary controls in
           the header, and a toast there covers the control the reader just used.
           The mobile offset clears the fixed bottom navigation. */}
-          <Toaster
-            position="bottom-right"
-            closeButton
-            mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
-          />
-        </div>
-      </LazyMotion>
+            <Toaster
+              position="bottom-right"
+              closeButton
+              mobileOffset={{ bottom: "80px", left: "16px", right: "16px" }}
+            />
+          </div>
+        </LazyMotion>
+      </CommandBarProvider>
     </JobEventsProvider>
   );
 }

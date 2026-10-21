@@ -384,6 +384,20 @@ export async function patchEntry(
   return (await response.json()) as LibraryEntry;
 }
 
+/** Your entries for a query, best first: the command bar's library half (Sprint 094). */
+export async function searchLibrary(
+  q: string,
+  signal?: AbortSignal,
+): Promise<LibraryEntry[]> {
+  const response = await request(
+    `/api/search/library?q=${encodeURIComponent(q)}`,
+    { headers: { Accept: "application/json" }, signal },
+  );
+  if (!response.ok)
+    throw await apiFailure(response, "Your library could not be searched");
+  return response.json() as Promise<LibraryEntry[]>;
+}
+
 export async function getEntry(entryId: number): Promise<LibraryEntry> {
   const response = await request(`/api/entries/${entryId}`, {
     headers: { Accept: "application/json" },

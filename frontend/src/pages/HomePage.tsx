@@ -77,6 +77,7 @@ import { queryKeys } from "@/api/keys";
 import { usePatchEntry } from "@/features/library/usePatchEntry";
 import { Loading } from "@/components/ui/skeleton";
 import { EmptyState } from "@/components/ui/empty-state";
+import { useCommandBar } from "@/features/command/commandBar";
 
 /** Radix Select rejects an empty item value, so "no shelf filter" needs a name. */
 const allShelves = "__all__";
@@ -153,6 +154,7 @@ export function HomePage() {
   const queryClient = useQueryClient();
   const presets = useMotionPresets();
   const navigate = useNavigate();
+  const commandBar = useCommandBar();
   const location = useLocation();
 
   // Highlight the newly added entry. The add page hands the id over as router
@@ -841,7 +843,9 @@ export function HomePage() {
             <Button
               className="hidden min-h-11 rounded-full px-4 sm:inline-flex"
               aria-label="Add to library"
-              onClick={() => searchRef.current?.focus()}
+              // The command bar is the one door for adding (Sprint 094), opened
+              // with whatever is already typed here.
+              onClick={() => commandBar.open(search)}
             >
               Add
             </Button>

@@ -76,12 +76,17 @@ async function json<T>(response: Response, message: string): Promise<T> {
  * reaches a provider that serves another domain, so looking for an album spends no
  * Google Books quota and looking for a book spends no MusicBrainz request.
  */
+/** A pasted link or ISBN: resolved to one record rather than searched for. */
+export function looksResolvable(value: string): boolean {
+  return /^(https?:\/\/|[\dXx -]{10,17}$)/.test(value.trim());
+}
+
 export function searchCandidates(
   value: string,
   itemType: string,
   signal?: AbortSignal,
 ) {
-  const resolved = /^(https?:\/\/|[\dXx -]{10,17}$)/.test(value.trim());
+  const resolved = looksResolvable(value);
   const route = resolved
     ? `/api/search/resolve?url=${encodeURIComponent(value.trim())}`
     : `/api/search?q=${encodeURIComponent(value.trim())}&type=${encodeURIComponent(itemType)}`;
@@ -102,7 +107,8 @@ export function createEntry(body: {
   source?: string;
   source_id?: string;
   source_refs?: SourceRef[];
-  status: EntryStatus;
+  /** Omitted: the server uses the item's domain default (the command bar's Add). */
+  status?: EntryStatus;
   score?: number;
   shelf_ids: number[];
   idempotency_key?: string;
