@@ -2,8 +2,8 @@
 
 **Plan revision:** 46
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [102 — Insights, read back to you](102-insights-read-back.md) (ready),
-the first of four from the owner's 2026-10-21 request for a 2.5 release (DEC-169); see "Character"
+**Active sprint:** [103 — Gentle goals, underneath](103-gentle-goals-underneath.md) (ready),
+the second of four from the owner's 2026-10-21 request for a 2.5 release (DEC-169); see "Character"
 below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
@@ -221,8 +221,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [099](099-importers.md) | StoryGraph, Hardcover, AniList and Simkl importers | 098 | completed |
 | [100](100-refile-and-views.md) | Re-file into another domain, and saved views | 099 | completed |
 | [101](101-operability.md) | Metrics, provider health from real calls, the response cache | 100 | completed |
-| [102](102-insights-read-back.md) | Insights read back as prose: a lead sentence, numbered sections, compact charts | 101 | ready |
-| 103 | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | planned |
+| [102](102-insights-read-back.md) | Insights read back as prose: a lead sentence, numbered sections, compact charts | 101 | completed |
+| [103](103-gentle-goals-underneath.md) | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | ready |
 | 104 | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | planned |
 | 105 | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | planned |
 
@@ -1788,12 +1788,12 @@ as Sprint 100.
 Asked for by the owner on 2026-10-21 after v2.4.0, reviewed as a design canvas
 (https://claude.ai/artifact/6vt1GZ5nBi5zYq67ibZh3c) and accepted as **DEC-169**.
 
-- **[102 — Insights, read back to you](102-insights-read-back.md).** The page as prose: a lead
+- **[102 — Insights, read back to you](102-insights-read-back.md)** (**completed**). The page as prose: a lead
   sentence, numbered sections divided by rules, charts sized to their data, subjects folded and
   typeset.
-- **103 — Gentle goals, underneath.** A `goals` table (migration 0026): per person and domain,
+- **[103 — Gentle goals, underneath](103-gentle-goals-underneath.md).** A `goals` table (migration 0026): per person and domain,
   a count per month or per year. Progress is finished entries by month of finish date; months
-  count together. A domain declares which status is *planned* (`StatusSpec.planned`, as 098
+  count together; albums record no finish date and have no goal. A domain declares which status is *planned* (`StatusSpec.planned`, as 098
   declared `in_progress`), and suggestions are drawn from it with a reason each: by a creator
   rated highly, or waiting longest.
 - **104 — Goals on the Diary.** The goal band with the calendar of lights (one light per finished

@@ -6255,3 +6255,30 @@ gate (HANDOFF).
 **Found.** The handoff said migrations 0021–0025 were new since v2.3.0; only 0023–0025 are.
 
 **Next.** No sprint is planned.
+
+## 2026-10-21 — Sprint 102: Insights, read back to you
+
+**Done.**
+
+- `GET /api/insights/summary`.
+- `insight_group` folding for rankings and the key/value filter.
+- `Domain.plural_label` and `countLabel`.
+- The Insights page redrawn as prose with numbered sections; the old card components deleted.
+
+**Verified and how.**
+
+- The insights, library, isolation, app-shape, item-type, conformance and domain backend suites.
+- `vitest related` (260) and `make check`.
+- The insights, accessibility and library specs (55).
+- The page in the running app on a copy of the owner's library, copied from the board's
+  2026-10-21 nightly backup into the session scratchpad: Paper, Ink and 390px.
+
+**Found.**
+
+- The long-running Vite server again did not pick up a Tailwind config change (`bg-primary-deep`),
+  so the first screenshots lacked the lead bars; restarting it fixed them. Sprint 090 hit the
+  same thing.
+- The leader's name truncated at 390px; it wraps to two lines now.
+- Some subjects are call numbers from providers; left as data.
+
+**Next.** Sprint 103, goals underneath.

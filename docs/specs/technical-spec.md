@@ -584,6 +584,7 @@ One `Domain` (defined in `backend/src/book_tracker/domain/spec.py`, declared in 
 | `entry_field_labels` | What this domain calls those fields, for the ones a neutral word gets wrong: an anime has *Rewatches*, a book has *Rereads*. Partial — `Started` and `Finished` are right for both, and a key naming a field the domain does not declare is refused by conformance. The client falls back to a neutral word, never to a book's. |
 | `formats` | The `FormatSpec` vocabulary for how a copy is held. Closed and declared, which is what a shelf is not (DEC-059). |
 | `entry_panel_label` | The heading over the personal region of the detail page. "Your reading data" is a book's phrase. |
+| `plural_label` | The label counted, for copy that counts: "142 Books", "3 Anime". Declared because an added "s" is wrong for anime and series (Sprint 102). |
 | `recognize` | What a string pasted into the add box means to this domain, or `None`. |
 | `chooses_covers` | Whether to offer the cover chooser. The shared chooser is Open Library's work-editions path, so only a domain that source serves may declare it; a domain declaring `false` is never offered a control that could only say no. |
 
@@ -684,6 +685,13 @@ The product-spec route list is authoritative, with these refinements:
   (Sprint 095).
 - `GET /api/search/library?q=` returns the person's entries ranked by FTS5 bm25, title weighted
   highest, Inbox included: the command bar's library half (Sprint 094).
+- `GET /api/insights/summary?type=` (the same filters as `/api/insights`) returns the figures the
+  insights page's lead sentence reads: entries held, finished (a finish date, the Diary's measure),
+  rated and unrated, the modal score (a tie goes up) and the earliest-dated item. Rankings group
+  through `insight_group`, which is `normalize_text` plus one fold: a trailing generic qualifier
+  ("Fiction, general") joins its head; a value with no letters or digits is no group at all. The
+  library's `key`/`value` filter matches the same way, so a folded row opens all its members
+  (Sprint 102).
 - `GET /api/views`, `POST /api/views` (`{name, query}`; the same name again replaces its query) and
   `DELETE /api/views/{view_id}` keep the person's saved library filters. `query` is the library's
   own URL query string, so the server never interprets it (Sprint 100).

@@ -1,7 +1,7 @@
 # Sprint 102 — Insights, read back to you
 
 **Sprint:** 102
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 46
 **Depends on:** 101
 **Owner:** Mauro
@@ -61,4 +61,45 @@ check`, the insights and accessibility specs, and screenshots of the page in Pap
 
 ## Outcome
 
-Not started.
+Delivered 2026-10-21. Verified per DEC-167: `test_insights_read_back.py` (4), the insights,
+library, isolation, app-shape, error-envelope, item-type, conformance and domain suites (358),
+`vitest related` (260), `make check`, the insights, accessibility and library specs (55), and the
+page in the running app on a copy of the owner's library (the board's 2026-10-21 backup) in
+Paper, Ink and at 390px.
+
+- **AC1.** `GET /api/insights/summary`: held, finished (a finish date, as the Diary counts),
+  rated, unrated, the modal score (a tie goes up), the earliest-dated item; filters as every
+  insight. Route-structure and isolation tests updated.
+- **AC2.** Rankings group through a new SQLite function, `insight_group`: `normalize_text` plus a
+  trailing " general" folded into its head. The label prefers a spelling without the qualifier.
+  The library's `key`/`value` filter matches the same way, so the folded row opens all three.
+- **AC3.** A value with no letters or digits groups to nothing and is not a row: the owner's
+  `{'` language is gone from Insights.
+- **AC4.** The page: domain tabs as text, a lead sentence, then numbered sections divided by
+  rules. Rating: the usual score in 7–9rem serif beside ten bars at most 72px tall. The
+  domain's first leading key is a ranked list: serif rank numerals, fanned covers, the leader
+  drawn larger, rows that open in place. Then many-valued keys typeset by weight, the chronology
+  as short bars with its grain toggle, keys of two to six values as one share bar, the rest as
+  one line each. Every value still opens the filtered library.
+- **AC5.** The accessibility spec passes on the page (both orders, a row open).
+
+Also: each domain declares `plural_label` (required, checked by conformance, on
+`/api/item-types`); `countLabel` uses it, and the Diary no longer says "2 animes". A
+`bg-primary-deep` utility gives the readable amber as a fill. The old card components
+(InsightsCard, LongTailCard, ScoreDistributionCard, ChronologyCard, HeroSummary,
+InsightsRanking) and the helpers only they used are deleted.
+
+**Deviations.**
+- The lead sentence judges ("You rate generously") rather than restating the modal score,
+  which the rating section already states; it says nothing about scores below five ratings.
+- The ranked list goes to the first leading key in the domain's declared order, not the key
+  with the strongest lead, so a book's list is its authors rather than its subjects.
+- The phone spec's strip check required the domain strip to overflow. Text tabs fit five
+  domains at 390px, so it now checks the strip scrolls in its own box (`overflow-x: auto`)
+  and stays inside the viewport.
+
+**Seen and left.** Subjects imported from some providers include call numbers ("658.4/012",
+"Hd30.28 .r854 2011"); they are the owner's data and show in "And the rest". In Ink the deep
+amber is the brighter one, so the leading decade stands out less than in Paper.
+
+Commits: `0cc2c78`, `5c454dc`, `4f94fb7`.
