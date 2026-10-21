@@ -117,7 +117,9 @@ export default {
       animation: {
         shake: "shake 0.32s cubic-bezier(0.36, 0.07, 0.19, 0.97) 1",
         breathe: "breathe 1.8s ease-in-out infinite",
-        "route-enter": "route-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1) both",
+        // No fill mode: a finished animation with a fill stays in
+        // document.getAnimations(), which specs poll to reach zero.
+        "route-enter": "route-enter 0.18s cubic-bezier(0.22, 1, 0.36, 1)",
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
       },

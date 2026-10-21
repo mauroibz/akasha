@@ -39,7 +39,7 @@ export function EmptyState({
       >
         <path d="M4 21V10a8 8 0 0 1 16 0v11" />
       </svg>
-      <p className="font-display text-2xl font-medium">{title}</p>
+      <h2 className="font-display text-2xl font-medium">{title}</h2>
       {children ? (
         <div className="max-w-md text-sm text-muted-foreground">{children}</div>
       ) : null}

@@ -882,7 +882,10 @@ describe("DetailPage", () => {
     const user = userEvent.setup();
     await screen.findByRole("heading", { name: "Rayuela" });
     await user.click(screen.getByRole("button", { name: /edit opinion/i }));
-    const rereads = screen.getByLabelText(/rereads/i);
+    // The dialog's field: the page's "Change rereads" button is also named for it.
+    const rereads = within(screen.getByRole("dialog")).getByLabelText(
+      /rereads/i,
+    );
     await user.clear(rereads);
     await user.type(rereads, "99999");
     await user.click(screen.getByRole("button", { name: /save opinion/i }));

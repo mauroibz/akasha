@@ -1,3 +1,13 @@
+import {
+  Bookmark,
+  CalendarCheck,
+  CalendarPlus,
+  CircleDot,
+  Gauge,
+  Repeat,
+  Shapes,
+  Star,
+} from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
@@ -155,6 +165,60 @@ function Fact({
     <div data-fact={name}>
       <dt className="text-xs text-muted-foreground">{label}</dt>
       <dd>{children}</dd>
+    </div>
+  );
+}
+
+/**
+ * One of your values on the detail page, as a property row (Sprint 092, DEC-165):
+ * a muted label with its icon, the value beside it, a soft fill on hover. A row
+ * whose value the opinion dialog edits opens that dialog on click, and carries a
+ * small "Change" button for the keyboard; nothing new becomes editable. Keeps the
+ * `data-fact`/`dt`/`dd` shape every test and spec reads.
+ */
+function PropertyRow({
+  name,
+  label,
+  icon,
+  onEdit,
+  children,
+}: {
+  name: string;
+  label: string;
+  icon: React.ReactNode;
+  onEdit?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      data-fact={name}
+      onClick={onEdit}
+      className={cn(
+        "group -mx-2 grid grid-cols-[9.5rem_1fr] items-center gap-3 rounded-md px-2 py-1.5 transition-colors sm:grid-cols-[11rem_1fr]",
+        onEdit && "cursor-pointer hover:bg-muted/70",
+      )}
+    >
+      <dt className="flex items-center gap-2 text-sm text-muted-foreground [&_svg]:h-4 [&_svg]:w-4 [&_svg]:shrink-0">
+        {icon}
+        {label}
+      </dt>
+      <dd className="flex min-w-0 items-center justify-between gap-2">
+        {children}
+        {onEdit ? (
+          // Named by aria-label and worded by CSS, so the value's own text is all
+          // a reader of `dd` finds, and the button stays inside the `dd` a
+          // definition list allows (Sprint 092).
+          <button
+            type="button"
+            aria-label={`Change ${label.toLowerCase()}`}
+            onClick={(event) => {
+              event.stopPropagation();
+              onEdit();
+            }}
+            className="ml-auto shrink-0 rounded px-1.5 text-xs text-muted-foreground opacity-0 transition-opacity after:content-['Change'] focus-ring focus-visible:opacity-100 group-hover:opacity-100"
+          />
+        ) : null}
+      </dd>
     </div>
   );
 }
@@ -373,11 +437,23 @@ export function DetailPage() {
             heading={entryPanelLabel(item.type, itemTypes.data)}
             headingId="entry-panel-heading"
           >
-            <dl className="grid grid-cols-2 gap-4">
-              <Fact name="status" label="Status">
-                {statusLabelFor(item.type, itemTypes.data, entry.status)}
-              </Fact>
-              <Fact name="score" label="Score">
+            <dl className="space-y-0.5">
+              <PropertyRow
+                name="status"
+                label="Status"
+                icon={<CircleDot aria-hidden="true" />}
+                onEdit={() => setDialog("opinion")}
+              >
+                <span className="inline-flex rounded-full bg-primary/15 px-2.5 py-0.5 text-sm font-medium text-primary">
+                  {statusLabelFor(item.type, itemTypes.data, entry.status)}
+                </span>
+              </PropertyRow>
+              <PropertyRow
+                name="score"
+                label="Score"
+                icon={<Star aria-hidden="true" />}
+                onEdit={() => setDialog("opinion")}
+              >
                 <span
                   className={cn(
                     scoreChipShape,
@@ -394,42 +470,71 @@ export function DetailPage() {
                     (provisional)
                   </span>
                 )}
-              </Fact>
-              <Fact name="formats" label="Format">
+              </PropertyRow>
+              <PropertyRow
+                name="formats"
+                label="Format"
+                icon={<Shapes aria-hidden="true" />}
+                onEdit={() => setDialog("opinion")}
+              >
                 {(entry.formats ?? [])
                   .map(
                     (format) => formatLabels(itemTypes.data)[format] ?? format,
                   )
                   .join(", ") || "—"}
-              </Fact>
+              </PropertyRow>
               {has("date_started") && (
-                <Fact name="started" label={nameOf("date_started")}>
+                <PropertyRow
+                  name="started"
+                  label={nameOf("date_started")}
+                  icon={<CalendarPlus aria-hidden="true" />}
+                  onEdit={() => setDialog("opinion")}
+                >
                   {entry.date_started ?? "—"}
-                </Fact>
+                </PropertyRow>
               )}
               {has("date_finished") && (
-                <Fact name="finished" label={nameOf("date_finished")}>
+                <PropertyRow
+                  name="finished"
+                  label={nameOf("date_finished")}
+                  icon={<CalendarCheck aria-hidden="true" />}
+                  onEdit={() => setDialog("opinion")}
+                >
                   {entry.date_finished ?? "—"}
-                </Fact>
+                </PropertyRow>
               )}
               {has("reread_count") && (
-                <Fact name="rereads" label={nameOf("reread_count")}>
+                <PropertyRow
+                  name="rereads"
+                  label={nameOf("reread_count")}
+                  icon={<Repeat aria-hidden="true" />}
+                  onEdit={() => setDialog("opinion")}
+                >
                   {entry.reread_count}
-                </Fact>
+                </PropertyRow>
               )}
               {progress && (
-                <Fact name="progress" label={progress.label}>
+                <PropertyRow
+                  name="progress"
+                  label={progress.label}
+                  icon={<Gauge aria-hidden="true" />}
+                  onEdit={() => setDialog("opinion")}
+                >
                   {entry.progress == null
                     ? "—"
                     : typeof progressTotal === "number"
                       ? `${entry.progress} / ${progressTotal} ${progress.unit_label}s`
                       : `${entry.progress} ${progress.unit_label}s`}
-                </Fact>
+                </PropertyRow>
               )}
               {/* Editable where it is read. The owner's complaint was distance:
                   shelf membership lived inside a dialog named after something
                   else, and creating a shelf was a whole route. */}
-              <Fact name="shelves" label="Shelves">
+              <PropertyRow
+                name="shelves"
+                label="Shelves"
+                icon={<Bookmark aria-hidden="true" />}
+              >
                 <ShelfPicker
                   current={entry.shelves}
                   available={shelves.data ?? []}
@@ -440,14 +545,31 @@ export function DetailPage() {
                   }}
                   onCreate={handleCreateShelf}
                 />
-              </Fact>
+              </PropertyRow>
             </dl>
             {entry.notes && (
-              <div className="mt-4">
-                <p className="text-xs text-muted-foreground">Notes</p>
-                <p className="mt-1 whitespace-pre-wrap text-foreground">
-                  {entry.notes}
-                </p>
+              // The note as a callout, marked with the arch (Sprint 092).
+              <div className="mt-4 flex gap-3 rounded-lg bg-muted/60 p-4">
+                <svg
+                  aria-hidden="true"
+                  width="18"
+                  height="18"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth={2}
+                  strokeLinecap="round"
+                  className="mt-1 shrink-0 text-muted-foreground"
+                >
+                  <path d="M4 21V10a8 8 0 0 1 16 0v11" />
+                  <circle cx="12" cy="11" r="2" fill="#fbbf24" stroke="none" />
+                </svg>
+                <div>
+                  <p className="text-xs text-muted-foreground">Notes</p>
+                  <p className="mt-1 whitespace-pre-wrap font-display text-lg italic text-foreground">
+                    {entry.notes}
+                  </p>
+                </div>
               </div>
             )}
             <div className="mt-5 flex flex-wrap gap-3">
