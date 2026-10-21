@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 45,
-  "project_status": "in_progress",
-  "active_sprint": "101",
-  "active_sprint_file": "docs/sprints/101-operability.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "100",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "101",
   "completed_sprints": [
     "001",
     "002",
@@ -106,8 +106,9 @@
     "097",
     "098",
     "099",
-    "100"
+    "100",
+    "101"
   ],
-  "started_at": "2026-10-21T17:54:21-03:00",
-  "updated_at": "2026-10-21T17:54:21-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T18:03:56-03:00"
 }

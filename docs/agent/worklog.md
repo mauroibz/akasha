@@ -6205,3 +6205,31 @@ was closed in the state; repaired in order.
 - Re-file records no undo effect; moving back is a second re-file (DEC-168).
 
 **Next.** Sprint 101: metrics, provider health from real calls, and the response cache.
+
+---
+
+## 2026-10-21 — Sprint 101: operability
+
+**Done.**
+
+- `ObservedProvider` around every provider: health states from the last 20 calls, and a 24-hour
+  search cache (migration 0025).
+- `state` on `/api/health/providers` and in the Add page's notice.
+- Opt-in `/metrics` in Prometheus text.
+
+**Verified and how.**
+
+- The full backend suite: 1686 passed.
+- `vitest related` and `make check`.
+- Live with metrics on: a repeated search took 2 ms against 1.07 s, `/metrics` counted one
+  provider call for the two requests, and health read correctly.
+
+**Found.**
+
+- Python 3.12 protocol `isinstance` checks read attributes statically, so a `__getattr__` proxy
+  failed `EnrichingProvider`. The wrapper now puts `name` and its observed coroutine methods on
+  the instance.
+- `test_events` failed once under full-suite load and passed in the rerun.
+
+**Next.** No sprint is planned. The project state is `complete`, and a release is owed the full
+gate (HANDOFF).

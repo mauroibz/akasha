@@ -220,7 +220,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [098](098-now-and-diary.md) | The Now strip and the Diary | 097 | completed |
 | [099](099-importers.md) | StoryGraph, Hardcover, AniList and Simkl importers | 098 | completed |
 | [100](100-refile-and-views.md) | Re-file into another domain, and saved views | 099 | completed |
-| [101](101-operability.md) | Metrics, provider health from real calls, the response cache | 100 | ready |
+| [101](101-operability.md) | Metrics, provider health from real calls, the response cache | 100 | completed |
 
 ## Sprint contracts
 
