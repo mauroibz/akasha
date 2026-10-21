@@ -666,6 +666,8 @@ def test_every_documented_route_exists_on_the_router(tmp_path: Path) -> None:
         ("POST", "/api/import/jobs/{job_id}/retry"),
         ("GET", "/api/events"),
         ("GET", "/api/search/library"),
+        ("GET", "/api/now"),
+        ("GET", "/api/diary"),
         ("DELETE", "/api/import/batches/{batch_id}"),
         ("GET", "/api/importers"),
         ("POST", "/api/import/detect"),

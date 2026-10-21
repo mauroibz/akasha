@@ -109,6 +109,9 @@ ROUTE_POLICY = {
     ("GET", "/api/events"): "private-collection",
     # Sprint 094: ranks only the requester's own entries.
     ("GET", "/api/search/library"): "private-collection",
+    # Sprint 098: the requester's own entries under way, and finished.
+    ("GET", "/api/now"): "private-collection",
+    ("GET", "/api/diary"): "private-collection",
     ("DELETE", "/api/import/batches/{batch_id}"): "private-id",
     ("GET", "/api/importers"): "shared",
     # Sprint 095: reads the posted bytes and answers which connector claims them;

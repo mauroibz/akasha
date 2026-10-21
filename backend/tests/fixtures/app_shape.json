@@ -173,6 +173,18 @@
    ]
   ],
   [
+   "/api/now",
+   [
+    "GET"
+   ]
+  ],
+  [
+   "/api/diary",
+   [
+    "GET"
+   ]
+  ],
+  [
    "/api/search/library",
    [
     "GET"

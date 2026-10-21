@@ -61,7 +61,7 @@ SERIES_FIELDS = (
 # has. The hotkeys are the same letters; the vocabulary adds nothing to `EntryStatus`.
 SERIES_STATUSES = (
     UNSORTED,
-    StatusSpec("watching", "Watching", hotkey="w"),
+    StatusSpec("watching", "Watching", hotkey="w", in_progress=True),
     StatusSpec("completed", "Completed", hotkey="c"),
     StatusSpec("on_hold", "On hold", hotkey="h"),
     StatusSpec("dropped", "Dropped", hotkey="d"),

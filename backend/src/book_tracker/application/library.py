@@ -348,6 +348,76 @@ class LibraryService:
             ],
         }
 
+    def now(self, *, limit: int = 24) -> list[dict[str, Any]]:
+        """Entries under way, most recently touched first (Sprint 098, the Now strip).
+
+        "Under way" is each domain's own declaration (`StatusSpec.in_progress`), so a
+        domain added later joins without this method naming it.
+        """
+        pairs = [
+            (domain.item_type, status.value)
+            for domain in DOMAINS.values()
+            for status in domain.statuses
+            if status.in_progress
+        ]
+        if not pairs:
+            return []
+        clauses = " OR ".join(
+            f"(i.type = :type{index} AND e.status = :status{index})" for index in range(len(pairs))
+        )
+        params: dict[str, Any] = {"user": self.user_id, "limit": limit}
+        for index, (item_type, status) in enumerate(pairs):
+            params[f"type{index}"] = item_type
+            params[f"status{index}"] = status
+        with self.engine.connect() as connection:
+            ids = [
+                row[0]
+                for row in connection.execute(
+                    text(
+                        "SELECT e.id FROM entries e JOIN items i ON i.id = e.item_id "
+                        f"WHERE e.user_id = :user AND ({clauses}) "
+                        "ORDER BY e.updated_at DESC, e.id DESC LIMIT :limit"
+                    ),
+                    params,
+                )
+            ]
+        return [self.get_entry(entry_id) for entry_id in ids]
+
+    def diary(self, year: int) -> dict[str, Any]:
+        """What was finished in `year`, by month, newest first (Sprint 098).
+
+        Reads `date_finished` alone: an entry with no finish date is not in the diary,
+        whatever its status. `years` lists every year that has one, for the switch.
+        """
+        with self.engine.connect() as connection:
+            years = [
+                int(row[0])
+                for row in connection.execute(
+                    text(
+                        "SELECT DISTINCT substr(date_finished, 1, 4) AS year FROM entries "
+                        "WHERE user_id = :user AND date_finished IS NOT NULL "
+                        "AND length(date_finished) >= 4 ORDER BY year DESC"
+                    ),
+                    {"user": self.user_id},
+                )
+                if str(row[0]).isdigit()
+            ]
+            rows = connection.execute(
+                text(
+                    "SELECT e.id, substr(e.date_finished, 1, 7), i.type FROM entries e "
+                    "JOIN items i ON i.id = e.item_id "
+                    "WHERE e.user_id = :user AND e.date_finished LIKE :prefix "
+                    "ORDER BY e.date_finished DESC, e.id DESC"
+                ),
+                {"user": self.user_id, "prefix": f"{year:04d}-%"},
+            ).all()
+        months: dict[str, dict[str, Any]] = {}
+        for entry_id, month, item_type in rows:
+            bucket = months.setdefault(month, {"month": month, "counts": {}, "entries": []})
+            bucket["counts"][item_type] = bucket["counts"].get(item_type, 0) + 1
+            bucket["entries"].append(self.get_entry(entry_id))
+        return {"year": year, "years": years, "months": list(months.values())}
+
     def search_entries(self, q: str, *, limit: int = 10) -> list[dict[str, Any]]:
         """Your entries for what you typed, best first (Sprint 094, the command bar).
 

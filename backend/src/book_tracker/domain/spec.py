@@ -83,6 +83,9 @@ class StatusSpec:
     label: str
     choosable: bool = True
     hotkey: str | None = None
+    #: Whether an entry in this status is under way: what the library's *Now* strip
+    #: shows (Sprint 098). Declared, so the shared layer never names "reading".
+    in_progress: bool = False
 
 
 @dataclass(frozen=True)

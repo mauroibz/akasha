@@ -650,6 +650,9 @@ The product-spec route list is authoritative, with these refinements:
 
 - `GET /api/events` streams the current person's job changes as Server-Sent Events, and
   `POST /api/import/jobs/{job_id}/retry` requeues a failed job (Sprint 089).
+- `GET /api/now` returns the person's entries in a status their domain declares `in_progress`,
+  most recently touched first; `GET /api/diary?year=` groups the entries finished that year by
+  month with per-domain counts (Sprint 098).
 - `POST /api/import/detect` (multipart `files`) reads the first 64 KiB of each file and returns the
   connectors that claim it, most confident first, from each connector's optional `sniff`
   (Sprint 095).

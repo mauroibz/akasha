@@ -153,6 +153,29 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/diary": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Diary
+     * @description What was finished in a year, by month (Sprint 098); this year when not asked.
+     *
+     *     Resolved per request: a default in the signature is evaluated once, at import, and
+     *     a server running across New Year would keep showing the old one.
+     */
+    get: operations["diary_api_diary_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/enrichment/backfill": {
     parameters: {
       query?: never;
@@ -935,6 +958,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  "/api/now": {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Now
+     * @description Entries under way across every domain: the library's Now strip (Sprint 098).
+     */
+    get: operations["now_api_now_get"];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   "/api/search": {
     parameters: {
       query?: never;
@@ -1304,6 +1347,26 @@ export interface components {
       confidence: number;
       /** Importer */
       importer: string;
+    };
+    /** DiaryMonth */
+    DiaryMonth: {
+      /** Counts */
+      counts: {
+        [key: string]: number;
+      };
+      /** Entries */
+      entries: components["schemas"]["EntryResponse"][];
+      /** Month */
+      month: string;
+    };
+    /** DiaryResponse */
+    DiaryResponse: {
+      /** Months */
+      months: components["schemas"]["DiaryMonth"][];
+      /** Year */
+      year: number;
+      /** Years */
+      years: number[];
     };
     /** EntryCreateBody */
     EntryCreateBody: {
@@ -2178,6 +2241,11 @@ export interface components {
       choosable: boolean;
       /** Hotkey */
       hotkey?: string | null;
+      /**
+       * In Progress
+       * @default false
+       */
+      in_progress: boolean;
       /** Label */
       label: string;
       /** Value */
@@ -2656,6 +2724,64 @@ export interface operations {
         };
       };
       /** @description Conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  diary_api_diary_get: {
+    parameters: {
+      query?: {
+        year?: number | null;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["DiaryResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
       409: {
         headers: {
           [name: string]: unknown;
@@ -5079,6 +5205,62 @@ export interface operations {
         };
         content: {
           "application/json": components["schemas"]["ItemResponse"];
+        };
+      };
+      /** @description Unauthorized */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Requested resource was not found */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Domain conflict */
+      409: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+      /** @description Unprocessable Entity */
+      422: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["ErrorResponse"];
+        };
+      };
+    };
+  };
+  now_api_now_get: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Successful Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          "application/json": components["schemas"]["EntryResponse"][];
         };
       };
       /** @description Unauthorized */

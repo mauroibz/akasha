@@ -126,6 +126,7 @@ class StatusSpecResponse(BaseModel):
     label: str
     choosable: bool
     hotkey: str | None = None
+    in_progress: bool = False
 
 
 class FormatSpecResponse(BaseModel):
@@ -629,6 +630,36 @@ def bulk_delete_entries(body: BulkSelection, library: Library) -> AffectedRespon
         excluded_entry_ids=body.excluded_entry_ids,
     )
     return AffectedResponse(affected=affected)
+
+
+@router.get("/now", response_model=list[EntryResponse], responses=ERRORS)
+def now(library: Library) -> list[EntryResponse]:
+    """Entries under way across every domain: the library's Now strip (Sprint 098)."""
+    return [EntryResponse.model_validate(row) for row in library.now()]
+
+
+class DiaryMonth(BaseModel):
+    month: str
+    counts: dict[str, int]
+    entries: list[EntryResponse]
+
+
+class DiaryResponse(BaseModel):
+    year: int
+    years: list[int]
+    months: list[DiaryMonth]
+
+
+@router.get("/diary", response_model=DiaryResponse, responses=ERRORS)
+def diary(
+    library: Library, year: Annotated[int | None, Query(ge=1000, le=9999)] = None
+) -> DiaryResponse:
+    """What was finished in a year, by month (Sprint 098); this year when not asked.
+
+    Resolved per request: a default in the signature is evaluated once, at import, and
+    a server running across New Year would keep showing the old one.
+    """
+    return DiaryResponse.model_validate(library.diary(year or date.today().year))
 
 
 @router.get("/search/library", response_model=list[EntryResponse], responses=ERRORS)
