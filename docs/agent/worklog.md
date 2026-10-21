@@ -6114,3 +6114,19 @@ real Goodreads CSV.
 **Found.** The import preview prints raw status values; the bar's Esc hint overlapped the close.
 
 **Next.** Sprint 096 — import redrawn.
+
+---
+
+## 2026-10-21 — Sprint 096: import redrawn
+
+**Done.** Import is one nav entry with the Inbox count; a drop area over a grid of source cards;
+the Inbox at `/inbox`; Export in Settings; ambiguous rows show covers and titles; domain words for
+statuses; redirects for old addresses.
+
+**Verified and how.** `vitest related` on every touched page, `make check`, nine browser specs;
+screenshots of the grid and Settings.
+
+**Found.** The Inbox count under the `library` cache key broke the Library's optimistic update;
+moved. `ImportPage.tsx` is still one large file (partial split).
+
+**Next.** Sprint 097 — arrivals and the share target; trust-stated-status waits for the owner.

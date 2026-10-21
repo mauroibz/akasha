@@ -1,7 +1,7 @@
 # Sprint 096 — Import, redrawn
 
 **Sprint:** 096
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 095
 **Owner:** Mauro
@@ -59,4 +59,25 @@ The arrivals strip and trust-stated-status (097).
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `vitest related` across Import, Triage, Settings,
+the shell and Home (46 + 57 + 51 and more), `make check`, and the import, triage, accessibility,
+add-ebooks, feedback, editorial, resilience, command-bar and library specs; screenshots of the
+grid and Settings against a copy of the owner's data.
+
+- **AC1.** The nav says *Import* with the Inbox count; the step strip is gone; the Inbox is
+  `/inbox`; Export is Settings > *Your data*; an ambiguous row shows each copy by cover, title,
+  creator and year (a new `getItem`), never "item 42"; status suggestions use the domain's
+  labels; the guide reads "How to get your list". The Import page links to the Inbox with its
+  count; Settings is titled Settings, with Appearance and Your data as sections.
+- **AC2.** `/import?tab=triage` and `/triage` reach `/inbox`; `/import?tab=export` and `/export`
+  reach `/settings#your-data`.
+- **AC3.** Every importer's preview and commit tests pass; tests that relied on a source opening
+  by itself now open the one they are about.
+
+**Deviation.** Deliverable 4 is partial: `AmbiguityChoice` and `SourceDetectDrop` moved to
+`features/import/`; the rest of `ImportPage.tsx` was not split (it is ~1,500 lines). The last-used
+source is marked on its card rather than opened. **Found:** the Inbox count first lived under the
+`library` cache key, where the Library's prefix-wide optimistic update tried to treat a number as
+a page and broke a status change (the library spec caught it); it has its own key. The badge
+widened the nav at tablet width; items tighten below 1024px. An empty disabled form showed under
+the grid; hidden until a source is chosen.
