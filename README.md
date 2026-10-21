@@ -174,6 +174,7 @@ and never reaches the process.
 | ---------------------- | ---------------- | ------------------------------------------------------------------------------------------ |
 | `USER_AGENT_CONTACT`   | *required*       | Contact address sent to metadata providers                                                 |
 | `AKASHA_AUTH`          | `off`            | `on` turns on accounts, per-user libraries and login — the runbook's [auth section](docs/operations/runbook.md#turning-authentication-on) is the guide |
+| `AKASHA_METRICS`       | `off`            | `on` serves Prometheus text at `/metrics`: queue depth, job outcomes, provider calls and request latency |
 | `GOOGLE_BOOKS_API_KEY` | *empty*          | Optional. Without it, search uses Open Library alone and Spanish-language coverage is poor |
 | `TMDB_READ_TOKEN`     | *empty*          | Optional. The movie domain's poster fallback for films with a TMDB id and no IMDb id       |
 | `AKASHA_ATTACHMENT_MAX_BYTES` | `26214400` (25 MiB) | Per-file cap on attachments                                                       |

@@ -2702,6 +2702,16 @@
               }
             ],
             "title": "Reason"
+          },
+          "state": {
+            "default": "working",
+            "enum": [
+              "working",
+              "degraded",
+              "down"
+            ],
+            "title": "State",
+            "type": "string"
           }
         },
         "required": [

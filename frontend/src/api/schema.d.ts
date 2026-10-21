@@ -2125,6 +2125,12 @@ export interface components {
       name: string;
       /** Reason */
       reason?: string | null;
+      /**
+       * State
+       * @default working
+       * @enum {string}
+       */
+      state: "working" | "degraded" | "down";
     };
     /** RefileBody */
     RefileBody: {

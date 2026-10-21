@@ -18,6 +18,7 @@ from book_tracker.api.providers import router as providers_router
 from book_tracker.app.errors import NOT_FOUND, install_error_handlers
 from book_tracker.app.health import install_health_routes
 from book_tracker.app.lifespan import back_up_before_migrating, make_lifespan
+from book_tracker.app.metrics import install_metrics
 from book_tracker.app.middleware import install_middleware
 from book_tracker.config import Settings
 
@@ -46,6 +47,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     install_error_handlers(app)
     install_middleware(app, configured)
     install_health_routes(app)
+    install_metrics(app, configured)
 
     auth_responses: dict[int | str, dict[str, Any]] = {
         401: {"model": ErrorResponse},

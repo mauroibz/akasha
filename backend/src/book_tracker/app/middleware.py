@@ -170,6 +170,12 @@ def install_middleware(app: FastAPI, configured: Settings) -> None:
             finally:
                 if logged:
                     route = request.scope.get("route")
+                    request.app.state.request_timings.record(
+                        request.method,
+                        getattr(route, "path", "unmatched"),
+                        status,
+                        time.perf_counter() - started,
+                    )
                     logging.getLogger("book_tracker.requests").info(
                         "request_finished",
                         extra={

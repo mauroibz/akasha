@@ -5,7 +5,7 @@ import { getProviderHealth } from "@/api/health";
 import { queryKeys } from "@/api/keys";
 
 /**
- * Says which metadata provider is unavailable and why, rather than letting a
+ * Says which metadata provider is unavailable or not answering, and why, rather than letting a
  * search quietly return half its results. Fed by `GET /api/health/providers`,
  * which Sprint 014 added; this invents no endpoint of its own.
  *
@@ -23,7 +23,8 @@ export function ProviderHealthNotice() {
 
   if (!health.data?.degraded) return null;
   const unavailable = health.data.providers.filter(
-    (provider) => !provider.available,
+    (provider) =>
+      !provider.available || (provider.state ?? "working") !== "working",
   );
   if (unavailable.length === 0) return null;
 
@@ -41,8 +42,11 @@ export function ProviderHealthNotice() {
         <ul className="mt-1 space-y-0.5 text-muted-foreground">
           {unavailable.map((provider) => (
             <li key={provider.name}>
-              {provider.name} is unavailable
-              {provider.reason ? `: ${provider.reason}` : ""}
+              {!provider.available
+                ? `${provider.name} is unavailable${provider.reason ? `: ${provider.reason}` : ""}`
+                : provider.state === "down"
+                  ? `${provider.name} is not answering`
+                  : `${provider.name} is failing some requests`}
             </li>
           ))}
         </ul>

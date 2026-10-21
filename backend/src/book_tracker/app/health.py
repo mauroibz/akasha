@@ -1,5 +1,7 @@
 """Liveness, readiness and provider configuration (split out of `create_app`, 088)."""
 
+from typing import Literal
+
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -15,6 +17,9 @@ class ProviderStatus(BaseModel):
     name: str
     available: bool
     reason: str | None = None
+    #: From the provider's own recent calls (Sprint 101): `available` says it is
+    #: configured, this says whether it is answering.
+    state: Literal["working", "degraded", "down"] = "working"
 
 
 class ProviderHealth(BaseModel):
@@ -88,10 +93,12 @@ def install_health_routes(app: FastAPI) -> None:
             name for domain in DOMAINS.values() for name in domain.identity.source_preference
         ]
         order = list(dict.fromkeys([*preferred, *catalog]))
+        observations = getattr(app.state, "provider_observations", None)
         rows = [
             ProviderStatus(
                 name=name,
                 available=name in configured_providers,
+                state=observations.state(name) if observations is not None else "working",
                 reason=(
                     None
                     if name in configured_providers
@@ -101,4 +108,7 @@ def install_health_routes(app: FastAPI) -> None:
             for name in order
             if name in catalog
         ]
-        return ProviderHealth(providers=rows, degraded=not all(row.available for row in rows))
+        return ProviderHealth(
+            providers=rows,
+            degraded=not all(row.available and row.state == "working" for row in rows),
+        )

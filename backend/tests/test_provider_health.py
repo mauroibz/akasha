@@ -48,6 +48,7 @@ async def test_missing_google_key_warns_at_startup_and_reports_a_degraded_provid
         "name": "googlebooks",
         "available": False,
         "reason": "GOOGLE_BOOKS_API_KEY is not set",
+        "state": "working",
     }
     # Every other wired provider needs no key, so it is available. Asserted over the
     # catalog rather than over a literal list: this test used to enumerate the three
@@ -143,6 +144,7 @@ async def test_the_rows_are_derived_from_the_registry_not_from_a_list_of_names(
         "name": "igdb",
         "available": False,
         "reason": "IGDB_CLIENT_ID is not set",
+        "state": "working",
     } in body["providers"]
 
 

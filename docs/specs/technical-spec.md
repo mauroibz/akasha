@@ -324,7 +324,33 @@ Undated search results are resolved against `/works/{id}/editions.json` for ever
 
 Merged search results preserve the relevance ordering the providers returned. Each candidate retains its provider-returned position, the two providers are interleaved fairly, and title-match, language, and cover-presence signals act only as tie-breakers. Merging must never re-sort results by title.
 
-Provider availability is reported by `GET /api/health/providers` — one row per provider with `available` and a `reason`, plus a `degraded` flag — so the interface can render a degraded-search state. The absence of `GOOGLE_BOOKS_API_KEY` is logged at startup rather than silently reducing search to one provider. This endpoint is deliberately separate from readiness: a missing key must never make the application look down.
+Provider availability is reported by `GET /api/health/providers`: one row per provider with
+`available`, a `reason` and a `state`, plus a `degraded` flag, so the interface can render a
+degraded-search state.
+
+- `available` says the provider is configured.
+- `state` says whether it is answering (Sprint 101). Every provider is wrapped in one generic
+  `ObservedProvider`, which records each call over the last 20.
+  - `down`: the last three calls all failed.
+  - `degraded`: at least 30% of the window failed.
+  - `working`: anything else.
+- Only a call that did not get an answer counts as a failure: a transport error, a timeout, or a
+  `ProviderPayloadError` other than `record_not_found` or `unsupported_identity_kind`.
+- `degraded` is true when any row is unavailable or not `working`.
+
+The same wrapper keeps `search` answers in `provider_responses` (migration 0025) for 24 hours,
+keyed by provider, normalized query and limit. Failures are never stored, and `fetch` is never
+cached, because *Refresh from provider* must ask again.
+
+`AKASHA_METRICS=on` mounts `GET /metrics` in Prometheus text format with these families:
+
+- `akasha_job_queue_depth`
+- `akasha_jobs` (by kind and state)
+- `akasha_provider_calls_total` (by outcome)
+- `akasha_provider_call_seconds`
+- `akasha_request_seconds` (by method, route template and status)
+
+When it is off, the route does not exist. The absence of `GOOGLE_BOOKS_API_KEY` is logged at startup rather than silently reducing search to one provider. This endpoint is deliberately separate from readiness: a missing key must never make the application look down.
 
 Open Library search must not map work-level `first_publish_year` into edition publication year. It may expose that value separately as `original_year`; `items.year` is populated only from edition data. A work URL resolves to an edition-picker list, preferring editions with valid ISBNs and useful language metadata for ranking, but never silently chooses one. A chosen result always carries an edition identity.
 

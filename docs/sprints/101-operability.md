@@ -1,7 +1,7 @@
 # Sprint 101 — Metrics, provider health from real calls, the response cache
 
 **Sprint:** 101
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 45
 **Depends on:** 100
 **Owner:** Mauro

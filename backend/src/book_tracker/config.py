@@ -48,6 +48,9 @@ class Settings(BaseSettings):
     sqlite_busy_timeout_ms: int = 5_000
     # Authentication is opt-in so every existing install remains unchanged.
     auth: Literal["off", "on"] = "off"
+    #: `/metrics` in Prometheus text format (Sprint 101). Off by default: it names
+    #: providers and routes, which is nobody's business on an open LAN unless asked for.
+    metrics: Literal["off", "on"] = "off"
     cookie_secure: bool | None = None
     # Shared with Sprint 081's trusted identity header: a forwarded scheme is
     # authoritative only when the immediate peer is explicitly trusted.

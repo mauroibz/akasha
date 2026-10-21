@@ -40,6 +40,22 @@ describe("ProviderHealthNotice", () => {
     expect(notice).not.toHaveTextContent(/openlibrary/);
   });
 
+  it("names a configured provider that has stopped answering", async () => {
+    stub({
+      degraded: true,
+      providers: [
+        { name: "openlibrary", available: true, reason: null, state: "down" },
+        { name: "anilist", available: true, reason: null, state: "degraded" },
+        { name: "kitsu", available: true, reason: null, state: "working" },
+      ],
+    });
+    renderNotice();
+    const notice = await screen.findByRole("status");
+    expect(notice).toHaveTextContent("openlibrary is not answering");
+    expect(notice).toHaveTextContent("anilist is failing some requests");
+    expect(notice).not.toHaveTextContent(/kitsu/);
+  });
+
   it("says nothing while every provider is available", async () => {
     stub({
       degraded: false,

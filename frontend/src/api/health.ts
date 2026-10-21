@@ -4,6 +4,8 @@ export interface ProviderStatus {
   name: string;
   available: boolean;
   reason: string | null;
+  /** From the provider's recent calls (Sprint 101); `available` only says configured. */
+  state?: "working" | "degraded" | "down";
 }
 
 export interface ProviderHealth {
@@ -11,7 +13,7 @@ export interface ProviderHealth {
   degraded: boolean;
 }
 
-/** Which metadata providers are configured. Search still works while degraded. */
+/** Which metadata providers are configured and answering. Search still works while degraded. */
 export async function getProviderHealth(): Promise<ProviderHealth> {
   const response = await request("/api/health/providers", {
     headers: { Accept: "application/json" },

@@ -22,6 +22,11 @@ from book_tracker.backup import BackupError, create_backup, read_manifest
 from book_tracker.config import Settings
 from book_tracker.database import create_engine
 from book_tracker.infrastructure.jobs import JobRunner, RateLimiter
+from book_tracker.infrastructure.observed import (
+    ObservedProvider,
+    ProviderObservations,
+    ResponseCache,
+)
 from book_tracker.infrastructure.providers import create_provider_client
 from book_tracker.infrastructure.quota import ProviderQuota
 from book_tracker.logging import configure_logging
@@ -136,7 +141,16 @@ def make_lifespan(configured: Settings) -> Callable[[FastAPI], Any]:
         app.state.min_free_bytes = configured.min_free_bytes
         app.state.calibre_dir = configured.calibre_dir
         catalog = build_provider_catalog(provider_client, configured)
-        app.state.provider_catalog = {provider.name: provider for provider in catalog}
+        # Every call observed and every search kept for a day, whichever provider it
+        # is (Sprint 101): health reads the observations, `/metrics` reads both.
+        app.state.provider_observations = ProviderObservations()
+        response_cache = ResponseCache(app.state.engine)
+        app.state.provider_catalog = {
+            provider.name: ObservedProvider(
+                provider, app.state.provider_observations, cache=response_cache
+            )
+            for provider in catalog
+        }
         # What search, add and enrichment actually reach. A provider missing its
         # configuration is disabled, not failed (technical spec 6.2).
         app.state.providers = {

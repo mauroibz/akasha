@@ -477,6 +477,19 @@ particular one.
 For Tailscale specifically — including the zero-tap identity-header login —
 see [Running behind `tailscale serve`](#running-behind-tailscale-serve) above.
 
+## Metrics
+
+Set `AKASHA_METRICS=on` in `.env` and restart to serve Prometheus text at `/metrics`. It reports
+jobs waiting or running, jobs by kind and state, provider calls by outcome with time spent, and
+API request latency by route template. Provider counters reset when the process restarts.
+
+The route is unauthenticated, like the health checks, and it names providers and routes. Scrape it
+from the LAN and do not proxy it to the internet.
+
+*Search is running on fewer providers* on the Add page now also names a configured provider that
+has stopped answering. That is a provider outage, not a fault in Akasha: searches keep working on
+the other providers, and the notice clears once the provider answers again.
+
 ## When something is wrong
 
 | Symptom | Cause |
