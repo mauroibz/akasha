@@ -77,6 +77,14 @@ class ErrorResponse(BaseModel):
     error: ErrorDetail
 
 
+class ShelfPreviewResponse(BaseModel):
+    entry_id: int
+    title: str
+    year: int | None
+    score: int | None
+    cover_url: str | None
+
+
 class ShelfResponse(BaseModel):
     id: int
     name: str
@@ -94,6 +102,12 @@ class ShelfResponse(BaseModel):
     #: shape the facets block already builds for the whole library, keyed by shelf
     #: instead. An empty shelf returns `{}` here, not a missing key.
     members_by_type: dict[str, int] = Field(default_factory=dict)
+    #: Up to eight members, as a shelf's ledge stands them up (Sprint 105): what an
+    #: opened cover shows, beside the cover itself.
+    preview: list[ShelfPreviewResponse] = Field(default_factory=list)
+    #: Members with a finish date, and the mean score of the rated ones (Sprint 105).
+    finished_count: int = 0
+    mean_score: float | None = None
 
 
 class SourceResponse(BaseModel):

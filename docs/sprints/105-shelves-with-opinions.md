@@ -1,7 +1,7 @@
 # Sprint 105 — Shelves with opinions
 
 **Sprint:** 105
-**Status:** ready
+**Status:** in_progress
 **Roadmap revision:** 46
 **Depends on:** 104
 **Owner:** Mauro

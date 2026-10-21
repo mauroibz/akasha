@@ -787,17 +787,112 @@ class LibraryService:
                 .where(ShelfRow.user_id == self.user_id)
                 .order_by(ShelfRow.name.collate("NOCASE"), ShelfRow.id)
             ).all()
-            covers_by_shelf = self._shelf_covers(session, [row[0].id for row in rows])
-            members_by_shelf = self._shelf_members_by_type(session, [row[0].id for row in rows])
+            ids = [row[0].id for row in rows]
+            covers_by_shelf = self._shelf_covers(session, ids)
+            members_by_shelf = self._shelf_members_by_type(session, ids)
+            preview_by_shelf = self._shelf_preview(session, ids)
+            figures_by_shelf = self._shelf_figures(session, ids)
             return [
                 {
                     **self._shelf_dict(row[0]),
                     "entry_count": row[1],
                     "covers": covers_by_shelf.get(row[0].id, []),
                     "members_by_type": members_by_shelf.get(row[0].id, {}),
+                    "preview": preview_by_shelf.get(row[0].id, []),
+                    **figures_by_shelf.get(row[0].id, {"finished_count": 0, "mean_score": None}),
                 }
                 for row in rows
             ]
+
+    #: How many members a shelf's ledge stands up (Sprint 105).
+    SHELF_PREVIEW = 8
+
+    def _shelf_preview(
+        self, session: Session, shelf_ids: Sequence[int]
+    ) -> dict[int, list[dict[str, Any]]]:
+        """The members a shelf's ledge stands up, with what an opened cover shows.
+
+        Sprint 105: title, year and score, as well as the cover. The order is the
+        covers' own (highest scored, then most recently added, then entry id), so the
+        ledge leads with the same faces the shelf always showed; members without a
+        cover are included, since the ledge draws a typeset cover for them.
+        """
+        if not shelf_ids:
+            return {}
+        ranked = (
+            select(
+                EntryShelfRow.shelf_id,
+                EntryRow.id.label("entry_id"),
+                EntryRow.score,
+                ItemRow.id.label("item_id"),
+                ItemRow.title,
+                ItemRow.year,
+                ItemRow.cover_path,
+                ItemRow.updated_at,
+                func.row_number()
+                .over(
+                    partition_by=EntryShelfRow.shelf_id,
+                    order_by=(
+                        EntryRow.score.desc(),
+                        EntryRow.date_added.desc(),
+                        EntryRow.id.desc(),
+                    ),
+                )
+                .label("rn"),
+            )
+            .select_from(EntryShelfRow)
+            .join(EntryRow, EntryRow.id == EntryShelfRow.entry_id)
+            .join(ItemRow, ItemRow.id == EntryRow.item_id)
+            .where(EntryShelfRow.shelf_id.in_(shelf_ids))
+        ).subquery()
+        rows = session.execute(
+            select(ranked)
+            .where(ranked.c.rn <= self.SHELF_PREVIEW)
+            .order_by(ranked.c.shelf_id, ranked.c.rn)
+        ).all()
+        preview: dict[int, list[dict[str, Any]]] = {}
+        for row in rows:
+            cover = None
+            if row.cover_path is not None:
+                version = row.updated_at.replace(":", "").replace("-", "")
+                cover = f"/api/items/{row.item_id}/cover?v={version}"
+            preview.setdefault(row.shelf_id, []).append(
+                {
+                    "entry_id": row.entry_id,
+                    "title": row.title,
+                    "year": row.year,
+                    "score": row.score,
+                    "cover_url": cover,
+                }
+            )
+        return preview
+
+    @staticmethod
+    def _shelf_figures(session: Session, shelf_ids: Sequence[int]) -> dict[int, dict[str, Any]]:
+        """A shelf's line of character (Sprint 105): finished members and mean score.
+
+        Finished means a finish date, the Diary's measure.
+        """
+        if not shelf_ids:
+            return {}
+        rows = session.execute(
+            select(
+                EntryShelfRow.shelf_id,
+                func.count(EntryRow.date_finished),
+                func.avg(EntryRow.score),
+            )
+            .select_from(EntryShelfRow)
+            .join(EntryRow, EntryRow.id == EntryShelfRow.entry_id)
+            .where(EntryShelfRow.shelf_id.in_(shelf_ids))
+            .group_by(EntryShelfRow.shelf_id)
+        ).all()
+        return {
+            shelf_id: {
+                "finished_count": finished,
+                "mean_score": round(mean, 1) if mean is not None else None,
+            }
+            for shelf_id, finished, mean in rows
+        }
 
     @staticmethod
     def _shelf_members_by_type(

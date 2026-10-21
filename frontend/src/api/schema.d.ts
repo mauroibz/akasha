@@ -2448,6 +2448,19 @@ export interface components {
       /** Name */
       name: string;
     };
+    /** ShelfPreviewResponse */
+    ShelfPreviewResponse: {
+      /** Cover Url */
+      cover_url: string | null;
+      /** Entry Id */
+      entry_id: number;
+      /** Score */
+      score: number | null;
+      /** Title */
+      title: string;
+      /** Year */
+      year: number | null;
+    };
     /** ShelfResponse */
     ShelfResponse: {
       /** Covers */
@@ -2457,14 +2470,23 @@ export interface components {
        * @default 0
        */
       entry_count: number;
+      /**
+       * Finished Count
+       * @default 0
+       */
+      finished_count: number;
       /** Id */
       id: number;
+      /** Mean Score */
+      mean_score?: number | null;
       /** Members By Type */
       members_by_type?: {
         [key: string]: number;
       };
       /** Name */
       name: string;
+      /** Preview */
+      preview?: components["schemas"]["ShelfPreviewResponse"][];
       /** Slug */
       slug: string;
       /** Updated At */

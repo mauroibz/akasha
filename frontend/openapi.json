@@ -3366,6 +3366,60 @@
         "title": "ShelfBody",
         "type": "object"
       },
+      "ShelfPreviewResponse": {
+        "properties": {
+          "cover_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Url"
+          },
+          "entry_id": {
+            "title": "Entry Id",
+            "type": "integer"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Year"
+          }
+        },
+        "required": [
+          "entry_id",
+          "title",
+          "year",
+          "score",
+          "cover_url"
+        ],
+        "title": "ShelfPreviewResponse",
+        "type": "object"
+      },
       "ShelfResponse": {
         "properties": {
           "covers": {
@@ -3380,9 +3434,25 @@
             "title": "Entry Count",
             "type": "integer"
           },
+          "finished_count": {
+            "default": 0,
+            "title": "Finished Count",
+            "type": "integer"
+          },
           "id": {
             "title": "Id",
             "type": "integer"
+          },
+          "mean_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mean Score"
           },
           "members_by_type": {
             "additionalProperties": {
@@ -3394,6 +3464,13 @@
           "name": {
             "title": "Name",
             "type": "string"
+          },
+          "preview": {
+            "items": {
+              "$ref": "#/components/schemas/ShelfPreviewResponse"
+            },
+            "title": "Preview",
+            "type": "array"
           },
           "slug": {
             "title": "Slug",
