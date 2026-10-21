@@ -6022,3 +6022,19 @@ follows its job by event.
 by batch before closing. No relevance ranking yet (094).
 
 **Next.** Sprint 090 — two themes.
+
+---
+
+## 2026-10-21 — Sprint 090: two themes
+
+**Done.** Ink and Paper token sets with a contrast test; `/settings` with the theme picker;
+no-flash inline script; Newsreader on titles; brand docs amended.
+
+**Verified and how.** Contrast (48), theme and settings tests, `vitest related`, `make check`,
+accessibility/library/editorial specs (63, on Paper). Screenshots of Library, Detail and Settings in
+both themes on a copy of the owner's data.
+
+**Felt wrong.** A stale Vite dev server hid the serif until restarted. The phone has no Settings
+entry without auth yet (093).
+
+**Next.** Sprint 091 — primitives.

@@ -1,7 +1,7 @@
 # Sprint 090 — Two themes
 
 **Sprint:** 090
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 45
 **Depends on:** 089
 **Owner:** Mauro
@@ -59,4 +59,27 @@ browser specs, and screenshots of Library and Detail in both themes.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-21. Verified per DEC-167: `contrast.test.ts` (48 checks, both themes),
+`theme.test.ts`, `SettingsPage.test.tsx`, `vitest related` on every touched file (93, then 164),
+`make check`, the accessibility, library and editorial browser specs (63; Playwright's default
+device preference is light, so these ran on Paper), and screenshots of Library, Detail and
+Settings in both themes against a copy of the owner's data.
+
+- **AC1.** Ink and Paper token sets under `[data-theme]`, from the mock. `--primary-text`
+  separates amber that is read (Paper `#9A4A07`) from the amber fill (`#E9A23B`); Tailwind's
+  `text-primary`, `border-primary` and `ring-primary` map to it, so no component changed class.
+  Paper's score ramp is darker so a filled chip's page-coloured number reads at 4.5:1.
+- **AC2.** `/settings` (Appearance: Match my device, Paper, Ink), linked from the desktop nav;
+  per-browser, live with the OS while following it.
+- **AC3.** An inline script in `index.html` sets the theme before first paint.
+- **AC4.** Newsreader (bundled, optical size) on page titles, the detail title, Insights, Export,
+  sign-in and the library lockup.
+
+Found while looking: the long-running Vite dev server had not reloaded the Tailwind config, so the
+first screenshots showed no serif; a production build proved the classes were generated, and a
+restart fixed the dev server. An always-on phone header for the Settings link pushed the first
+cover from under 300px to 351px at 390px (the library spec caught it); the phone header stays
+auth-only and the phone's Settings entry is 093's. For a signed-in non-admin, the account menu's
+old "Settings" entry (which opened `/people`) is now "Account".
+
+Commit: `049603f`.
