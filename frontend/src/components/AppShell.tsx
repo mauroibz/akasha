@@ -277,7 +277,13 @@ export function AppShell({
               </NavLink>
             ))}
           </nav>
-          <div data-route-key={location.pathname}>{children}</div>
+          <div
+            key={location.pathname}
+            data-route-key={location.pathname}
+            className="animate-route-enter"
+          >
+            {children}
+          </div>
           {/* The CC BY-SA credit (DEC-105): findable from every screen, below the
             content so it never competes with a control. The mobile bottom padding
             clears the fixed bottom navigation. */}

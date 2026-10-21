@@ -41,8 +41,8 @@ export function SourceDropZone({
         if (dropped) onFile(dropped);
       }}
       className={cn(
-        "rounded-2xl border-2 border-dashed p-5 transition-colors",
-        over ? "border-primary bg-primary/5" : "border-border",
+        "rounded-2xl border-2 border-dashed p-5 transition-[color,background-color,border-color,transform] duration-150",
+        over ? "scale-[1.01] border-primary bg-primary/10" : "border-border",
       )}
     >
       <Label htmlFor={inputId}>{label}</Label>

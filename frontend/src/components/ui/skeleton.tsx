@@ -1,5 +1,7 @@
 import type { HTMLAttributes } from "react";
 
+import { AkashaMark } from "@/components/AkashaMark";
+
 import { cn } from "@/lib/utils";
 
 /** A quiet shape where content will be (Sprint 091). Reduced motion stops the pulse. */
@@ -40,6 +42,9 @@ export function Loading({
       <span className="sr-only">{label}</span>
       {shape === "page" && (
         <div className="space-y-6">
+          {/* The brand's point of light, breathing in its arch: the one place a
+              whole page waits (Sprint 092). */}
+          <AkashaMark size={36} breathing className="text-muted-foreground" />
           <Skeleton className="h-3 w-24" />
           <Skeleton className="h-10 w-72 max-w-full" />
           <Skeleton className="h-4 w-96 max-w-full" />
