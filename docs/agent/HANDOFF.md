@@ -13,8 +13,9 @@ Triage with the EPUB attached. Also on the Import strip as "Ebook files".
 
 ## Verified (final tree)
 
-Backend 1617 · Vitest 345 · `make check` green · Playwright 146 + 2 skipped · smoke-container
-green · live walkthrough clean (three real EPUBs, fresh data dir).
+Backend 1630 · Vitest 345 · `make check` green · Playwright 146 + 2 skipped · live walkthrough
+clean (220-row Goodreads import, 220/220 enrichments on first attempt). smoke-container last ran
+for v2.3.0; 087 changed no deployment files.
 
 ## Known and left
 
