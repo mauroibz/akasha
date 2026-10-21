@@ -34,7 +34,7 @@ export function Arrivals({
         },
         undefined,
         signal,
-        SHOWN,
+        Math.min(Math.max(expected, 1), 100),
       ),
     staleTime: 2_000,
   });
@@ -49,7 +49,13 @@ export function Arrivals({
       void queryClient.invalidateQueries({ queryKey: key });
   });
 
-  const rows = entries.data?.items ?? [];
+  // The batch is the newest `expected` Inbox entries; enrichment runs them in the
+  // order they were queued, first row first, so the strip shows that end of the
+  // batch: the covers that arrive soonest, not the twelve that arrive last.
+  const rows = (entries.data?.items ?? [])
+    .slice(0, expected)
+    .reverse()
+    .slice(0, SHOWN);
   if (expected === 0 || rows.length === 0) return null;
   const done = Math.min(finished, expected);
   return (
