@@ -23,19 +23,19 @@ import {
 import { Button } from "@/components/ui/button";
 import { buttonVariants } from "@/components/ui/button-variants";
 import { Input } from "@/components/ui/input";
-import { VirtualLibrary } from "@/features/library/VirtualLibrary";
+import { CoverImage } from "@/components/CoverImage";
+import { TypesetCover } from "@/features/shelves/OpeningCover";
+import { scoreChipClass, scoreChipShape } from "@/lib/score";
 import {
   defaultLibraryFilters,
   mergeUniqueEntries,
 } from "@/features/library/library";
-import {
-  domainsFrom,
-  formatLabels,
-  statusLabels,
-} from "@/features/library/labels";
+import { domainsFrom, formatLabels } from "@/features/library/labels";
 import { useItemTypes } from "@/features/library/useItemTypes";
 import { deleteShelf, getShelves, renameShelf } from "@/api/shelves";
-import { getLibraryPage, patchEntry, type LibraryEntry } from "@/api/library";
+import { getLibraryPage, type ItemType } from "@/api/library";
+import type { ShelfWithCount } from "@/api/shelves";
+import { countLabel } from "@/features/library/labels";
 import { readPinnedShelf, writePinnedShelf } from "@/features/library/library";
 import { cn } from "@/lib/utils";
 import { queryKeys } from "@/api/keys";
@@ -118,24 +118,6 @@ export function ShelfPage() {
   );
   const firstPage = library.data?.pages[0];
 
-  const mutation = useMutation({
-    mutationFn: ({
-      entry,
-      changes,
-    }: {
-      entry: LibraryEntry;
-      changes: Partial<Pick<LibraryEntry, "score" | "status">>;
-    }) => patchEntry(entry.id, changes),
-    onSuccess: () => {
-      void cache.invalidateQueries({
-        queryKey: queryKeys.shelfEntries.shelf(slug),
-      });
-    },
-    onError: () => {
-      toast.error("Your change could not be saved");
-    },
-  });
-
   const rename = useMutation({
     mutationFn: (name: string) => renameShelf(shelf!.id, name),
     onSuccess: (updated) => {
@@ -199,19 +181,8 @@ export function ShelfPage() {
     );
   }
 
-  const statusCounts = firstPage?.facets.status_counts ?? {};
-  const statusEntries = Object.entries(statusCounts).filter(
-    ([, n]) => (n ?? 0) > 0,
-  );
-  const statusTotal = statusEntries.reduce((sum, [, n]) => sum + (n ?? 0), 0);
   const formatCounts = firstPage?.facets.format_counts ?? {};
   const formatLabelsById = formatLabels(itemTypes.data);
-  const scored = entries.filter((entry) => entry.score !== null);
-  const meanScore =
-    scored.length > 0
-      ? scored.reduce((sum, entry) => sum + (entry.score ?? 0), 0) /
-        scored.length
-      : null;
 
   return (
     <main className="mx-auto min-h-screen max-w-[1600px] px-5 py-8">
@@ -256,65 +227,20 @@ export function ShelfPage() {
         }
       />
 
-      <div className="mt-6 flex flex-wrap items-end gap-6">
-        <p className="text-3xl font-semibold tabular-nums">
-          {shelf.entry_count}
+      <p className="mt-4 max-w-[44ch] font-display text-xl leading-snug text-foreground/85 md:text-2xl">
+        {shelfSentence(shelf, itemTypes.data)}
+      </p>
+      {Object.keys(formatCounts).length > 0 && (
+        <p className="mt-2 text-sm text-muted-foreground">
+          {Object.entries(formatCounts)
+            .filter(([, n]) => (n ?? 0) > 0)
+            .map(
+              ([format, count]) =>
+                `${formatLabelsById[format] ?? format} ${count}`,
+            )
+            .join(" · ")}
         </p>
-        {statusTotal > 0 && (
-          <div className="flex min-w-[200px] flex-col gap-1.5">
-            <div
-              aria-hidden="true"
-              className="flex h-2.5 overflow-hidden rounded-full bg-surface-raised"
-            >
-              {statusEntries.map(([status, count], index) => (
-                <div
-                  key={status}
-                  style={{
-                    width: `${((count ?? 0) / statusTotal) * 100}%`,
-                    opacity: Math.max(1 - index * 0.18, 0.25),
-                  }}
-                  className="h-full bg-primary"
-                />
-              ))}
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {/* A shelf can span domains that disagree about their status
-                  vocabulary, so this reads the shared fallback labels rather
-                  than one domain's own (`statusLabelFor` needs exactly one
-                  domain to resolve against, which a mixed shelf does not
-                  have). */}
-              {statusEntries
-                .map(
-                  ([status, count]) =>
-                    `${count} ${(statusLabels[status as keyof typeof statusLabels] ?? status).toLowerCase()}`,
-                )
-                .join(" · ")}
-            </p>
-          </div>
-        )}
-        {meanScore !== null && (
-          <div>
-            <p className="text-xs text-muted-foreground">Mean score</p>
-            <p className="text-lg font-semibold tabular-nums">
-              {meanScore.toFixed(1)}
-            </p>
-          </div>
-        )}
-        {Object.keys(formatCounts).length > 0 && (
-          <div>
-            <p className="text-xs text-muted-foreground">Formats</p>
-            <p className="text-sm">
-              {Object.entries(formatCounts)
-                .filter(([, n]) => (n ?? 0) > 0)
-                .map(
-                  ([format, count]) =>
-                    `${formatLabelsById[format] ?? format} ${count}`,
-                )
-                .join(" · ")}
-            </p>
-          </div>
-        )}
-      </div>
+      )}
 
       {domainsHeld.length > 1 && (
         <div className="mt-6">
@@ -326,24 +252,61 @@ export function ShelfPage() {
         </div>
       )}
 
-      <div className="mt-6">
-        <VirtualLibrary
-          entries={entries}
-          total={firstPage?.total ?? entries.length}
-          hasNextPage={Boolean(library.hasNextPage)}
-          isFetchingNextPage={library.isFetchingNextPage}
-          focusedId={null}
-          loadNextPage={() => void library.fetchNextPage()}
-          onFocusEntry={() => {}}
-          onScore={(entry, score) =>
-            mutation.mutate({ entry, changes: { score } })
-          }
-          onStatus={(entry, status) =>
-            mutation.mutate({ entry, changes: { status } })
-          }
-          view="grid"
-        />
-      </div>
+      {/* Covers without chips over them (Sprint 105): a shelf is for looking at;
+          status and score are changed on an entry's own page. */}
+      <ul className="mt-10 grid grid-cols-2 gap-x-6 gap-y-10 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+        {entries.map((entry) => (
+          <li key={entry.id}>
+            <Link
+              to={`/books/${entry.id}`}
+              aria-label={`Open ${entry.item.title}`}
+              className="group block rounded-md focus-ring"
+            >
+              <span className="block aspect-[2/3] overflow-hidden rounded-[3px_7px_7px_3px] shadow-[inset_5px_0_0_rgba(0,0,0,0.18),0_16px_26px_-14px_rgba(28,25,23,0.5)] transition-transform duration-300 group-hover:-translate-y-1 motion-reduce:transform-none">
+                {entry.item.cover_url ? (
+                  <CoverImage
+                    src={entry.item.cover_url}
+                    alt=""
+                    className="h-full w-full object-cover"
+                    placeholderClassName="h-full w-full"
+                  />
+                ) : (
+                  <TypesetCover title={entry.item.title} seed={entry.id} />
+                )}
+              </span>
+              <span className="mt-3 block font-display text-lg leading-tight">
+                {entry.item.title}
+              </span>
+            </Link>
+            <span className="mt-1 flex items-center gap-2 text-sm text-muted-foreground">
+              <span className="truncate">{entry.item.creator}</span>
+              {entry.score !== null && (
+                <span
+                  className={cn(
+                    scoreChipShape,
+                    "ml-auto",
+                    scoreChipClass(entry.score),
+                  )}
+                >
+                  {entry.score}
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ul>
+      {library.hasNextPage && (
+        <div className="mt-10 flex justify-center">
+          <Button
+            variant="outline"
+            className="rounded-full px-6"
+            disabled={library.isFetchingNextPage}
+            onClick={() => void library.fetchNextPage()}
+          >
+            {library.isFetchingNextPage ? "Loading…" : "Show more"}
+          </Button>
+        </div>
+      )}
 
       <AlertDialog
         open={renaming}
@@ -411,4 +374,28 @@ export function ShelfPage() {
       </AlertDialog>
     </main>
   );
+}
+
+/**
+ * A shelf read back in one sentence (Sprint 105): how many, how many finished,
+ * how you rate them. A mixed shelf counts "things", since no one domain's noun
+ * is right for it.
+ */
+function shelfSentence(
+  shelf: ShelfWithCount,
+  types: ItemType[] | undefined,
+): string {
+  if (shelf.entry_count === 0)
+    return "Nothing on it yet. Add to it from anything's own page.";
+  const ids = Object.keys(shelf.members_by_type ?? {});
+  const held =
+    ids.length === 1
+      ? countLabel(shelf.entry_count, ids[0], types)
+      : `${shelf.entry_count} things`;
+  const parts = [`${held.charAt(0).toUpperCase()}${held.slice(1)}`];
+  if (shelf.finished_count) parts.push(`${shelf.finished_count} finished`);
+  let sentence = `${parts.join(", ")}.`;
+  if (shelf.mean_score != null)
+    sentence += ` You rate them ${shelf.mean_score.toFixed(1)}.`;
+  return sentence;
 }

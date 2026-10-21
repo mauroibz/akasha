@@ -16,6 +16,19 @@ export interface ShelfWithCount extends Shelf {
   //: for the same reason `covers` is: `AddForm` and `ShelfPicker` build
   //: shelf-shaped values that never carry it.
   members_by_type?: Record<string, number>;
+  //: Up to eight members as the shelf's ledge stands them up, and the shelf's
+  //: two figures (Sprint 105). Optional for the same reason as `covers`.
+  preview?: ShelfPreviewMember[];
+  finished_count?: number;
+  mean_score?: number | null;
+}
+
+export interface ShelfPreviewMember {
+  entry_id: number;
+  title: string;
+  year: number | null;
+  score: number | null;
+  cover_url: string | null;
 }
 
 async function jsonOrThrow<T>(

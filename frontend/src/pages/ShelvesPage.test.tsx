@@ -16,9 +16,15 @@ const bookType = {
   entry_fields: [],
   formats: [],
   entry_panel_label: "Your reading data",
+  plural_label: "Books",
 };
 
-const albumType = { ...bookType, id: "album", label: "Album" };
+const albumType = {
+  ...bookType,
+  id: "album",
+  label: "Album",
+  plural_label: "Albums",
+};
 
 function renderPage() {
   const client = new QueryClient({
@@ -44,6 +50,24 @@ const shelves = [
     entry_count: 5,
     covers: [],
     members_by_type: { book: 5 },
+    finished_count: 3,
+    mean_score: 8.6,
+    preview: [
+      {
+        entry_id: 11,
+        title: "Rayuela",
+        year: 1963,
+        score: 10,
+        cover_url: "/api/items/11/cover?v=1",
+      },
+      {
+        entry_id: 12,
+        title: "Ficciones",
+        year: 1944,
+        score: 9,
+        cover_url: null,
+      },
+    ],
   },
   {
     id: 2,
@@ -52,6 +76,9 @@ const shelves = [
     entry_count: 3,
     covers: [],
     members_by_type: { book: 3 },
+    finished_count: 0,
+    mean_score: null,
+    preview: [],
   },
 ];
 
@@ -67,18 +94,74 @@ function stubApi(rows: unknown[] = shelves, types: unknown[] = [bookType]) {
 }
 
 describe("ShelvesPage", () => {
-  it("lists shelves as board cards with entry counts", async () => {
+  it("reads the room back in a sentence, and each shelf in a line", async () => {
     stubApi();
     renderPage();
-    expect(await screen.findByText("Favorites")).toBeVisible();
-    // A shelf spans domains and always did, so it counts items rather than
-    // naming one domain's noun (Sprint 029 deliverable 6).
-    expect(screen.getByText("5 items")).toBeVisible();
-    expect(screen.getByText("Sci-fi")).toBeVisible();
-    expect(screen.getByText("3 items")).toBeVisible();
+    expect(
+      await screen.findByText(
+        (_, node) =>
+          node?.tagName === "P" &&
+          node.textContent ===
+            "Two shelves, 8 things on them. Your best-loved is Favorites.",
+      ),
+    ).toBeInTheDocument();
+    const favorites = document.querySelector(
+      '[data-shelf-row="favorites"]',
+    ) as HTMLElement;
+    expect(favorites).toHaveTextContent(
+      "5 books · 3 finished · you rate them 8.6",
+    );
+    expect(within(favorites).getByText("Books")).toBeVisible();
   });
 
-  it("creates a shelf and refreshes the board", async () => {
+  it("stands the preview on the ledge as covers that open, each a link", async () => {
+    stubApi();
+    renderPage();
+    const cover = await screen.findByRole("link", {
+      name: "Rayuela, 1963, scored 10",
+    });
+    expect(cover).toHaveAttribute("href", "/books/11");
+    expect(cover).toHaveAttribute("data-opening-cover");
+    // No art: a typeset cover carries the title instead of an empty box.
+    const typeset = screen.getByRole("link", {
+      name: "Ficciones, 1944, scored 9",
+    });
+    expect(within(typeset).getAllByText("Ficciones")).toHaveLength(2);
+    expect(screen.getByRole("link", { name: /See all 5/ })).toHaveAttribute(
+      "href",
+      "/shelves/favorites",
+    );
+  });
+
+  it("draws an empty shelf as a dashed place and says so", async () => {
+    stubApi([
+      {
+        id: 9,
+        name: "Walkthrough",
+        slug: "walkthrough",
+        entry_count: 0,
+        covers: [],
+        members_by_type: {},
+        preview: [],
+        finished_count: 0,
+        mean_score: null,
+      },
+    ]);
+    renderPage();
+    const row = await screen.findByText("Walkthrough");
+    const shelf = row.closest("[data-shelf-row]") as HTMLElement;
+    expect(shelf).toHaveTextContent("Empty");
+    expect(shelf).toHaveTextContent("Nothing here yet.");
+  });
+
+  it("a shelf's name links into its own page", async () => {
+    stubApi();
+    renderPage();
+    const link = await screen.findByRole("link", { name: "Favorites" });
+    expect(link).toHaveAttribute("href", "/shelves/favorites");
+  });
+
+  it("creates a shelf from a button, not a standing field", async () => {
     let created = false;
     vi.spyOn(globalThis, "fetch").mockImplementation(async (input, init) => {
       const url = String(input);
@@ -88,7 +171,9 @@ describe("ShelvesPage", () => {
         created = true;
         return new Response(
           JSON.stringify({ id: 3, name: "New", slug: "new", entry_count: 0 }),
-          { status: 201 },
+          {
+            status: 201,
+          },
         );
       }
       if (url === "/api/shelves")
@@ -105,163 +190,23 @@ describe("ShelvesPage", () => {
       return new Response("[]");
     });
     renderPage();
-    await screen.findByText("Favorites");
+    await screen.findByRole("link", { name: "Favorites" });
+    expect(
+      screen.queryByRole("textbox", { name: "New shelf name" }),
+    ).toBeNull();
     const user = userEvent.setup();
-    await user.type(screen.getByPlaceholderText(/new shelf name/i), "New");
-    await user.click(screen.getByRole("button", { name: /create shelf/i }));
-    await waitFor(() => expect(screen.getByText("New")).toBeVisible());
-  });
-
-  it("a shelf card links into its own page", async () => {
-    stubApi();
-    renderPage();
-    const link = await screen.findByRole("link", { name: /Favorites/ });
-    expect(link).toHaveAttribute("href", "/shelves/favorites");
-  });
-
-  it("renders one magnitude bar per card, proportional to shelf size", async () => {
-    stubApi([
-      {
-        id: 1,
-        name: "Big",
-        slug: "big",
-        entry_count: 30,
-        covers: [],
-        members_by_type: { book: 30 },
-      },
-      {
-        id: 2,
-        name: "Small",
-        slug: "small",
-        entry_count: 10,
-        covers: [],
-        members_by_type: { book: 10 },
-      },
-    ]);
-    renderPage();
-    await screen.findByText("Big");
-    const bars = document.querySelectorAll("[data-magnitude]");
-    expect(bars).toHaveLength(2);
-    const magnitudes = Array.from(bars).map((bar) =>
-      bar.getAttribute("data-magnitude"),
+    await user.click(screen.getByRole("button", { name: "+ New shelf" }));
+    await user.type(
+      screen.getByRole("textbox", { name: "New shelf name" }),
+      "New",
     );
-    // 30 is the leader: its own share is 1; 10 is a third of it.
-    expect(magnitudes).toEqual(["1", "0.333"]);
-    for (const bar of bars) {
-      expect(bar).toHaveAttribute("aria-hidden", "true");
-    }
-  });
-
-  it("gives a shelf's count visible weight against the largest shelf", async () => {
-    stubApi([
-      {
-        id: 1,
-        name: "Big",
-        slug: "big",
-        entry_count: 30,
-        covers: [],
-        members_by_type: { book: 30 },
-      },
-      {
-        id: 2,
-        name: "Small",
-        slug: "small",
-        entry_count: 1,
-        covers: [],
-        members_by_type: { book: 1 },
-      },
-    ]);
-    renderPage();
-    const bigCount = await screen.findByText("30 items");
-    const smallCount = await screen.findByText("1 item");
-    expect(bigCount.className).toContain("font-semibold");
-    expect(smallCount.className).toContain("text-muted-foreground");
-    expect(bigCount.className).not.toEqual(smallCount.className);
-  });
-
-  it("shows a rail of covers, the shared placeholder, or nothing for an empty shelf", async () => {
-    stubApi([
-      {
-        id: 1,
-        name: "Covered",
-        slug: "covered",
-        entry_count: 2,
-        covers: ["/api/items/1/cover?v=1", "/api/items/2/cover?v=1"],
-        members_by_type: { book: 2 },
-      },
-      {
-        id: 2,
-        name: "Coverless",
-        slug: "coverless",
-        entry_count: 3,
-        covers: [],
-        members_by_type: { book: 3 },
-      },
-      {
-        id: 3,
-        name: "Unstarted",
-        slug: "unstarted",
-        entry_count: 0,
-        covers: [],
-        members_by_type: {},
-      },
-    ]);
-    renderPage();
-    const coveredCard = (await screen.findByText("Covered")).closest("a");
-    expect(coveredCard).not.toBeNull();
-    // Decorative like the ranking's own `CoverStack` (empty `alt`), so these
-    // are real `<img>` elements rather than accessible-role ones.
-    expect((coveredCard as HTMLElement).querySelectorAll("img")).toHaveLength(
-      2,
+    await user.click(screen.getByRole("button", { name: "Create shelf" }));
+    await waitFor(() =>
+      expect(screen.getByRole("link", { name: "New" })).toBeVisible(),
     );
-
-    const coverlessCard = screen.getByText("Coverless").closest("a");
-    expect(coverlessCard).not.toBeNull();
-    expect(
-      within(coverlessCard as HTMLElement).getByRole("img", {
-        name: "No cover",
-      }),
-    ).toBeInTheDocument();
-    expect(screen.getByText("3 items")).toBeVisible();
-
-    const emptyCard = screen.getByText("Unstarted").closest("a");
-    expect(emptyCard).not.toBeNull();
-    expect(
-      within(emptyCard as HTMLElement).queryByRole("img"),
-    ).not.toBeInTheDocument();
-    expect(within(emptyCard as HTMLElement).getByText("Empty")).toBeVisible();
   });
 
-  it("shows one chip per domain a shelf holds, and they sum to its total", async () => {
-    stubApi(
-      [
-        {
-          id: 1,
-          name: "Mixed",
-          slug: "mixed",
-          entry_count: 8,
-          covers: [],
-          members_by_type: { book: 5, album: 3 },
-        },
-      ],
-      [bookType, albumType],
-    );
-    renderPage();
-    const card = (await screen.findByText("Mixed")).closest("a") as HTMLElement;
-    expect(within(card).getByText("Book 5")).toBeVisible();
-    expect(within(card).getByText("Album 3")).toBeVisible();
-  });
-
-  it("shows exactly one chip for a single-domain shelf", async () => {
-    stubApi();
-    renderPage();
-    const card = (await screen.findByText("Favorites")).closest(
-      "a",
-    ) as HTMLElement;
-    expect(card.querySelectorAll("li")).toHaveLength(1);
-  });
-
-  it("the domain filter narrows the board and re-counts the cards", async () => {
+  it("the domain filter narrows the room", async () => {
     stubApi(
       [
         {
@@ -271,6 +216,7 @@ describe("ShelvesPage", () => {
           entry_count: 5,
           covers: [],
           members_by_type: { book: 5 },
+          preview: [],
         },
         {
           id: 2,
@@ -279,6 +225,7 @@ describe("ShelvesPage", () => {
           entry_count: 8,
           covers: [],
           members_by_type: { book: 5, album: 3 },
+          preview: [],
         },
       ],
       [bookType, albumType],
@@ -286,21 +233,21 @@ describe("ShelvesPage", () => {
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("Books only");
-    expect(screen.getByText("Mixed")).toBeVisible();
+    const mixed = document.querySelector(
+      '[data-shelf-row="mixed"]',
+    ) as HTMLElement;
+    expect(mixed).toHaveTextContent("Books · Albums");
+    expect(mixed).toHaveTextContent("8 things");
 
-    await user.click(screen.getByRole("radio", { name: "Album" }));
-
+    await user.click(screen.getByRole("radio", { name: "Albums" }));
     expect(screen.queryByText("Books only")).not.toBeInTheDocument();
     expect(screen.getByText("Mixed")).toBeVisible();
-    // Recounted to the chosen domain's members only (deliverable 3).
-    const card = screen.getByText("Mixed").closest("a") as HTMLElement;
-    expect(within(card).getByText("3 items")).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: "All" }));
     expect(screen.getByText("Books only")).toBeVisible();
   });
 
-  it("sorts by size (default), by name, and by recently added", async () => {
+  it("sorts by size (default), by name, and by recently changed", async () => {
     stubApi([
       {
         id: 1,
@@ -309,7 +256,8 @@ describe("ShelvesPage", () => {
         entry_count: 1,
         covers: [],
         members_by_type: { book: 1 },
-        updated_at: "2026-09-01T00:00:00Z",
+        preview: [],
+        updated_at: "2026-09-05T00:00:00Z",
       },
       {
         id: 2,
@@ -318,27 +266,22 @@ describe("ShelvesPage", () => {
         entry_count: 9,
         covers: [],
         members_by_type: { book: 9 },
-        updated_at: "2026-09-05T00:00:00Z",
+        preview: [],
+        updated_at: "2026-09-01T00:00:00Z",
       },
     ]);
     const user = userEvent.setup();
     renderPage();
     await screen.findByText("Zeta");
-
     const names = () =>
-      [...document.querySelectorAll("[data-shelf-name]")].map(
-        (node) => node.textContent,
+      [...document.querySelectorAll("[data-shelf-row]")].map((node) =>
+        node.getAttribute("data-shelf-row"),
       );
-
-    // Largest first by default.
-    expect(names()[0]).toBe("Alpha");
-
-    await user.click(screen.getByRole("button", { name: "Name" }));
-    expect(names()[0]).toBe("Alpha");
-    expect(names()[1]).toBe("Zeta");
-
-    await user.click(screen.getByRole("button", { name: "Recently added" }));
-    expect(names()[0]).toBe("Alpha");
+    expect(names()).toEqual(["alpha", "zeta"]);
+    await user.click(screen.getByRole("button", { name: "Recent" }));
+    expect(names()).toEqual(["zeta", "alpha"]);
+    await user.click(screen.getByRole("button", { name: "A–Z" }));
+    expect(names()).toEqual(["alpha", "zeta"]);
   });
 
   it("surfaces duplicate slug errors", async () => {
@@ -361,14 +304,15 @@ describe("ShelvesPage", () => {
     });
     renderPage();
     const user = userEvent.setup();
-    await screen.findByText("Favorites");
+    await screen.findByRole("link", { name: "Favorites" });
+    await user.click(screen.getByRole("button", { name: "+ New shelf" }));
     await user.type(
-      screen.getByPlaceholderText(/new shelf name/i),
+      screen.getByRole("textbox", { name: "New shelf name" }),
       "Favorites",
     );
-    await user.click(screen.getByRole("button", { name: /create shelf/i }));
+    await user.click(screen.getByRole("button", { name: "Create shelf" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
-      /already in use/i,
+      "Shelf name is already in use",
     );
   });
 });

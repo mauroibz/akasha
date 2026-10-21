@@ -142,8 +142,8 @@ describe("ShelfPage", () => {
     stubApi();
     renderPage();
     await screen.findByRole("heading", { name: "Mixed" });
-    await screen.findByText("Rayuela");
-    expect(screen.getByText("Discovery")).toBeVisible();
+    await screen.findByRole("link", { name: "Open Rayuela" });
+    expect(screen.getByRole("link", { name: "Open Discovery" })).toBeVisible();
   });
 
   it("offers only the domains this shelf actually holds in its strip", async () => {
@@ -165,25 +165,28 @@ describe("ShelfPage", () => {
     stubApi();
     const user = userEvent.setup();
     renderPage();
-    await screen.findByText("Rayuela");
-    expect(screen.getByText("Discovery")).toBeVisible();
+    await screen.findByRole("link", { name: "Open Rayuela" });
+    expect(screen.getByRole("link", { name: "Open Discovery" })).toBeVisible();
 
     await user.click(screen.getByRole("radio", { name: "Book" }));
 
     await waitFor(() => {
-      expect(screen.queryByText("Discovery")).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole("link", { name: "Open Discovery" }),
+      ).not.toBeInTheDocument();
     });
-    expect(screen.getByText("Rayuela")).toBeVisible();
+    expect(screen.getByRole("link", { name: "Open Rayuela" })).toBeVisible();
   });
 
   it("the card's count equals the page's entry count for a mixed shelf", async () => {
     stubApi();
     renderPage();
     await screen.findByRole("heading", { name: "Mixed" });
-    // The shelf's own entry_count (from the board) matches the page's total.
-    expect(screen.getByText("2")).toBeVisible();
-    await screen.findByText("Rayuela");
-    expect(screen.getByText("Discovery")).toBeVisible();
+    // The shelf's own entry_count (from the board) is the sentence's count; a
+    // mixed shelf counts "things", since no one domain's noun fits it.
+    expect(screen.getByText(/^2 things\./)).toBeVisible();
+    await screen.findByRole("link", { name: "Open Rayuela" });
+    expect(screen.getByRole("link", { name: "Open Discovery" })).toBeVisible();
   });
 
   it("renames the shelf, with the change reflected immediately", async () => {

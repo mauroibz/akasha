@@ -687,7 +687,7 @@ test("shelves has no serious accessibility violations", async ({ page }) => {
   await expectNoSeriousViolations(page, "shelves");
 });
 
-test("the shelves board with a rail and domain chips has no serious accessibility violations", async ({
+test("the shelves room has no serious accessibility violations", async ({
   page,
 }) => {
   await stubItemTypes(page, [bookItemType, albumItemType]);
@@ -710,7 +710,9 @@ test("the shelves board with a rail and domain chips has no serious accessibilit
     }),
   );
   await page.goto("/shelves");
-  await expect(page.getByText("Mixed")).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: "Mixed", exact: true }),
+  ).toBeVisible();
   await expectNoSeriousViolations(page, "shelves (board)");
 });
 
@@ -748,7 +750,7 @@ test("the shelf page has no serious accessibility violations", async ({
   );
   await page.goto("/shelves/mixed");
   await expect(page.getByRole("heading", { name: "Mixed" })).toBeVisible();
-  await expect(page.getByText("Rayuela")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Open Rayuela" })).toBeVisible();
   await expectNoSeriousViolations(page, "shelf page");
 });
 
