@@ -6765,3 +6765,21 @@ an operator command in the house style.
 - Consequences: the proposal's §2.4 table is left as written, as the record of what was believed
   on 2026-10-21; this entry is the correction. Sprint 089's activity indicator does not have a
   heartbeat to read and must be designed from job state and the event stream alone.
+
+## DEC-167 — A sprint verifies what it changed; the full suites run before a release
+
+- Date: 2026-10-21
+- Status: accepted
+- Context: the owner, before asking for Sprints 088–101 to run autonomously: "change the
+  agents.md and seeds protocol to not require thorough testing between each sprint, or this is
+  going to take forever. Do not run all the e2e tests every time, at most only validate what you
+  changed." Sprint 087's full gate (backend with coverage, Vitest, Playwright, a 15-minute live
+  walkthrough) took longer than its implementation.
+- Decision: per sprint, the required evidence is the tests that cover the changed code, `make
+  check`, the Playwright specs for any changed screen, and a look at a changed screen in the running
+  app. `make test`, the full Playwright suite and the container smoke run once before a release is
+  tagged or deployed, or on request. `AGENTS.md` §3, `docs/agent/WORKFLOW.md`,
+  `docs/agent/TESTING.md` and the roadmap's definition of done are amended to match. DEC-084's
+  cadence rules still govern how commands are run.
+- Consequences: a regression outside a sprint's touched area can survive until the release gate,
+  and is then fixed there. TDD within a sprint is unchanged.

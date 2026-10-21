@@ -7,6 +7,25 @@ This playbook keeps sprint evidence trustworthy without paying for the same evid
 It governs cadence and execution; the active sprint still governs which behaviors and commands are
 required.
 
+## Scope since DEC-167
+
+On 2026-10-21 the owner asked that sprints stop running the whole product's suites: *"Do not run
+all the e2e tests every time, at most only validate what you changed."* Where this playbook below
+says "exhaustive gate", read it as **the tests that cover what the sprint changed**:
+
+| | Per sprint | Before a release or on request |
+|---|---|---|
+| `python scripts/validate_project.py` | required | required |
+| `make check` | required | required |
+| Backend tests for the changed modules | required | — |
+| `npx vitest related <changed files> --run` | required when frontend code changed | — |
+| Playwright specs covering a changed screen | required when a screen changed | — |
+| `make test` | not owed | required |
+| `npm run test:e2e` (full) | not owed | required |
+| `make smoke-container` | deployment work only | required |
+
+The rest of this playbook still applies to how those commands are run.
+
 ## The verification ladder
 
 1. **During TDD, stay focused.** Run the failing test, then its file or nearest neighboring suite.

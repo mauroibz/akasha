@@ -1853,5 +1853,6 @@ Every sprint must:
 - update OpenAPI/types/docs when contracts move;
 - record material deviations in `docs/decisions.md`;
 - review downstream sprint impact;
-- pass `python scripts/validate_project.py`, `make check`, and `make test` when available;
+- pass `python scripts/validate_project.py`, `make check`, and the tests covering what it changed
+  (DEC-167; `make test` and the full browser suite run before a release, not per sprint);
 - end with a clean worktree and an updated next-agent handoff.

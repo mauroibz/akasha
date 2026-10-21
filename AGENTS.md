@@ -49,29 +49,28 @@ If state is inconsistent, repair documentation-only inconsistencies when the int
 
 ## 3. Verify
 
-Follow `docs/agent/TESTING.md`'s verification ladder. After implementation and tests are frozen, run
-each distinct command in the sprint's `Verification` section once, plus `make check` and `make test`
-if those targets exist and the sprint did not already name them. For UI behavior, execute the
-specified browser or Playwright checks rather than relying only on unit tests. For deployment work,
-build and exercise the container.
+Verify **what the sprint changed**, not the whole product (DEC-167, the owner's 2026-10-21
+instruction). Per sprint:
 
-A sprint may declare a **narrowed gate** in its `Verification` section — naming the exhaustive
-commands it does *not* owe, with the reason — but only when its diff qualifies under
-`docs/agent/TESTING.md`'s "Gate scope by what changed". The declaration is checked against the actual
-diff at closure, not taken on trust: a sprint that ends up touching application code owes the full
-gate regardless of what it planned, and must say so in its Outcome.
+- the tests for the code the sprint touched: the backend test files that cover the changed
+  modules, and `npx vitest related <changed files> --run` on the frontend;
+- `make check` (lint, types, the OpenAPI check, the project validator), which is fast;
+- for a changed screen, only the Playwright specs that cover that screen, plus a look at the
+  screen in the running app.
 
-Do not rerun an exhaustive product suite merely because the only subsequent changes are sprint
-Outcome, roadmap, worklog, handoff, or state documentation. Classify the post-gate diff using the
-playbook and run its required closure checks. Any later change to runtime code, tests, migrations,
-dependencies, build/test configuration, or generated contracts invalidates the relevant gate and
-must be verified again.
+`make test` and the full Playwright suite are **not** run per sprint. They run once before a
+release is tagged or deployed, and whenever the owner asks. For deployment work, build and
+exercise the container.
+
+Do not rerun tests merely because the only subsequent changes are sprint Outcome, roadmap,
+worklog, handoff, or state documentation. A later code change is verified the same way: by the
+tests that cover it.
 
 A sprint is not complete if required verification is skipped. If the environment makes a check impossible, leave the sprint `in_progress`, document the exact blocker and command output in `docs/agent/HANDOFF.md`, and do not claim completion.
 
 ### Walkthrough gate
 
-A sprint touching user-visible behavior is not complete until you have run the application against realistic data, performed the sprint's user flow end to end, and recorded in `docs/agent/worklog.md` what you exercised, what you observed, and anything that felt wrong. Passing tests are not evidence that a flow works.
+A sprint touching user-visible behavior is not complete until you have looked at the changed flow in the running application (a screenshot or a short scripted pass is enough) and recorded in `docs/agent/worklog.md` what you exercised, what you observed, and anything that felt wrong. Passing tests are not evidence that a flow works.
 
 This gate exists because thirteen sprints closed with green gates on a product whose entire feedback layer was invisible and whose enrichment pipeline had never once succeeded (DEC-025). Two rules follow from that failure:
 

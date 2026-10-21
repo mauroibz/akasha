@@ -115,15 +115,14 @@ Never rewrite an old decision to hide that it changed. Append a superseding entr
 
 ## Verification evidence
 
-`docs/agent/TESTING.md` is the canonical verification cadence. Its important boundary is the code
-freeze: exhaustive gates run once after implementation stabilizes, and closure documentation does
-not invalidate product evidence. A post-gate runtime, test, migration, dependency, build/test
-configuration, or generated-contract change does invalidate the affected evidence and must be
-verified again.
+`docs/agent/TESTING.md` is the canonical verification cadence. Since DEC-167 a sprint verifies
+what it changed: the tests covering the touched code, `make check`, and the Playwright specs for a
+changed screen. The exhaustive suites run once before a release, not per sprint. Closure
+documentation does not invalidate evidence.
 
 The active sprint names required commands. Record concise actual results in its Outcome, for example test counts, build success, and smoke-check behavior. Do not paste huge logs. A command not run must be labeled `NOT RUN` with reason; required checks then prevent completion unless the user explicitly changes acceptance.
 
-Visual behavior requires browser/Playwright execution. Container behavior requires a built/run image. Database migration behavior requires migrating real temporary SQLite files. A unit test is not a substitute for these checks.
+Visual behavior requires a look in a browser (a screenshot or the covering Playwright spec). Container behavior requires a built/run image. Database migration behavior requires migrating real temporary SQLite files. A unit test is not a substitute for these checks.
 
 ## Blocked handoff
 
