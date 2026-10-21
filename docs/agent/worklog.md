@@ -6174,3 +6174,34 @@ a guess. Owner to supply samples.
 was closed in the state; repaired in order.
 
 **Next.** Sprint 100 — re-file and saved views.
+
+---
+
+## 2026-10-21 — Sprint 100: re-file and saved views
+
+**Done.**
+
+- Saved views: migration 0024, `/api/views`, *Save view* on the library, and views listed under
+  *Go to* in the command bar.
+- Re-file: `POST /api/entries/{id}/refile` and *Move to another library…* on the Detail page.
+  The old item is deleted under the prune rule (DEC-168).
+
+**Verified and how.**
+
+- Covering backend tests and the route-structure suites.
+- `vitest related` and `make check`.
+- A live walkthrough on the dev data:
+  - *Books I read* was saved and reopened from the command bar at the same URL.
+  - Cowboy Bebop was re-filed from Wikidata series to Kitsu anime, keeping status, score, notes,
+    finish date and shelf. DVD was dropped, and the old entry and item answer 404.
+
+**Found.**
+
+- With the events stream open, `networkidle` never settles. Walkthrough scripts must wait on
+  `load` and then on elements.
+- Ctrl+K pressed before the page hydrated did nothing. That is the script's timing, not a defect.
+- The detail footer reads "Series data from…" on an anime page. It is the shell-wide TVmaze
+  credit (DEC-105), not stale data.
+- Re-file records no undo effect; moving back is a second re-file (DEC-168).
+
+**Next.** Sprint 101: metrics, provider health from real calls, and the response cache.

@@ -219,8 +219,8 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [097](097-arrivals-and-share.md) | Arrivals, the PWA share target, and trust-stated-status if the owner accepts it | 096 | completed |
 | [098](098-now-and-diary.md) | The Now strip and the Diary | 097 | completed |
 | [099](099-importers.md) | StoryGraph, Hardcover, AniList and Simkl importers | 098 | completed |
-| [100](100-refile-and-views.md) | Re-file into another domain, and saved views | 099 | ready |
-| 101 | Metrics, provider health from real calls, the response cache | 100 | planned |
+| [100](100-refile-and-views.md) | Re-file into another domain, and saved views | 099 | completed |
+| [101](101-operability.md) | Metrics, provider health from real calls, the response cache | 100 | ready |
 
 ## Sprint contracts
 

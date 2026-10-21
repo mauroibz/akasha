@@ -4,11 +4,13 @@
 
 On 2026-10-21 the owner accepted `docs/production-grade-proposal.md` (DEC-165) and the plan
 reopened as Sprints 087–101, to run autonomously with per-sprint verification limited to what
-each sprint changed (DEC-167). 087–099 are completed. **Sprint 100 — Re-file and saved views** is `ready`. Waiting on the owner: trust-stated-status on import (DEC-165 point 3); a real Hardcover and a real Simkl export (Sprint 099).
+each sprint changed (DEC-167). 087–100 are completed. **Sprint 101 — Metrics, provider health from real calls, the response cache** is `ready`; it is the last planned sprint (FINAL_SPRINT=101). Waiting on the owner: trust-stated-status on import (DEC-165 point 3); a real Hardcover and a real Simkl export (Sprint 099).
 
-The last user-visible change: Add has an *Ebook files* drop zone. Dropped EPUBs open the import
-preview already filled from each file's own metadata and cover; one click commits them into
-Triage with the EPUB attached. Also on the Import strip as "Ebook files".
+The last user-visible changes (Sprint 100):
+
+- The library's filter chips end in *Save view*, and saved views appear in the command bar.
+- The Detail page has *Move to another library…*, which re-files an entry into another domain
+  through that domain's own record (DEC-168).
 
 ## Verified (final tree)
 
@@ -25,7 +27,7 @@ for v2.3.0; 087 changed no deployment files.
 
 ## Next session
 
-Run Sprint 100 (`docs/sprints/100-refile-and-views.md`). A sprint that adds a route also runs `test_library_api.py`, `test_isolation.py` and `test_app_shape.py`. Full suites are owed once before the
+Run Sprint 101 (`docs/sprints/101-operability.md`). A sprint that adds a route also runs `test_library_api.py`, `test_isolation.py` and `test_app_shape.py`. Full suites are owed once before the
 next release (DEC-167). The design mock the owner
 approved is the canvas artifact https://claude.ai/artifact/KRWdo67P7QfirBsBK4mdRa; Sprints
 090–093 build from it.

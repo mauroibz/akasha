@@ -6783,3 +6783,16 @@ an operator command in the house style.
   cadence rules still govern how commands are run.
 - Consequences: a regression outside a sprint's touched area can survive until the release gate,
   and is then fixed there. TDD within a sprint is unchanged.
+
+## DEC-168 — A re-file deletes the item it leaves, under the prune rule
+
+**Date:** 2026-10-21 · **Sprint:** 100
+
+Deleting an entry leaves its item as shared cache (DEC-158). A re-file is different: the item it
+leaves is the wrong-domain record. Kept as cache, it would come back as a near-match on the next
+add or import into the old domain. So `refile` deletes the old item, its identities and sources
+(by cascade), and its cover. It does this only when no entry of anyone and no import record in a
+batch that can still be undone holds the item: the same proof `prune_items` requires.
+
+Attachments are the person's rather than the cache's, so they move to the new item and are not
+deleted. Re-file records no undo effect. Moving back is a second re-file.

@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 45,
-  "project_status": "in_progress",
-  "active_sprint": "100",
-  "active_sprint_file": "docs/sprints/100-refile-and-views.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "099",
+  "project_status": "ready",
+  "active_sprint": "101",
+  "active_sprint_file": "docs/sprints/101-operability.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "100",
   "completed_sprints": [
     "001",
     "002",
@@ -105,8 +105,9 @@
     "096",
     "097",
     "098",
-    "099"
+    "099",
+    "100"
   ],
-  "started_at": "2026-10-21T17:42:19-03:00",
-  "updated_at": "2026-10-21T17:42:19-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-21T17:54:03-03:00"
 }
