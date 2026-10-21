@@ -80,6 +80,15 @@ def _write_fastapi(root: Path, version: str) -> None:
     path.write_text(text[:start] + f'version="{version}"' + text[end:], encoding="utf-8")
 
 
+@_writer("compose.yaml")
+def _write_compose(root: Path, version: str) -> None:
+    path = root / "compose.yaml"
+    text = path.read_text(encoding="utf-8")
+    start = text.index("${AKASHA_VERSION:-") + len("${AKASHA_VERSION:-")
+    end = text.index("}", start)
+    path.write_text(text[:start] + version + text[end:], encoding="utf-8")
+
+
 SURFACE_PATHS = tuple(WRITERS)
 
 

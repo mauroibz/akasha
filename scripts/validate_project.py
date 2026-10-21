@@ -294,8 +294,11 @@ def validate_text_hygiene(errors: list[str]) -> None:
             errors.append(f"{path.relative_to(ROOT)} has no trailing newline")
 
 
+COMPOSE_VERSION_RE = re.compile(r"\$\{AKASHA_VERSION:-([^}]+)\}")
+
+
 def validate_version_surfaces(root: Path, errors: list[str]) -> str | None:
-    """Compare the four version surfaces and return the agreed version.
+    """Compare the five version surfaces and return the agreed version.
 
     ``backend/pyproject.toml`` is the source of truth the release procedure
     reads; the other three must match it. Any disagreement — or a missing or
@@ -346,6 +349,20 @@ def validate_version_surfaces(root: Path, errors: list[str]) -> str | None:
             errors.append("backend/src/book_tracker/main.py has no FastAPI version= string")
         else:
             versions["backend/src/book_tracker/main.py"] = match.group(1)
+
+    # The image tag a fresh `docker compose up` pulls when AKASHA_VERSION is unset.
+    # Nothing checked it, and it sat at 1.5.7 through 2.3.0 (Sprint 088).
+    compose_path = root / "compose.yaml"
+    try:
+        compose_text = compose_path.read_text(encoding="utf-8")
+    except OSError as exc:
+        errors.append(f"cannot read compose.yaml: {exc}")
+    else:
+        compose_match = COMPOSE_VERSION_RE.search(compose_text)
+        if compose_match is None:
+            errors.append("compose.yaml has no ${AKASHA_VERSION:-...} image default")
+        else:
+            versions["compose.yaml"] = compose_match.group(1)
 
     for surface, version in versions.items():
         if version != expected:

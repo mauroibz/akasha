@@ -1,7 +1,7 @@
 {
   "name": "Akasha",
   "short_name": "Akasha",
-  "description": "A self-hosted personal book tracker. It records what you thought of a book.",
+  "description": "A self-hosted personal library of the books, music, anime, films and series you have, and what you thought of them.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
