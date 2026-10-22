@@ -6424,3 +6424,38 @@ owner's word to push, tag and deploy.
 session; other usernames were reset by the board after two attempts.
 
 **Next.** Tag, push, GitHub Release; the board upgrade needs the owner or SSH access.
+
+## 2026-10-22 — Sprint 107: episodes and chapters, underneath
+
+**Done.**
+
+- Planned Sprints 107–108 from the owner's request for an optional episode and chapter
+  tracker (DEC-171, `854bacb`), then built 107 (`8c108ed`): `ProgressSpec.parts_field`,
+  `StatusSpec.abandoned`, series `season_episodes` from TVmaze's episode list, book
+  `chapters` from Open Library's numbered contents, migration 0027
+  (`entries.progress_marks`), marks driving `progress`, the item's resolved `outline`, and
+  `POST /api/items/{id}/outline`.
+- Mid-sprint the owner asked that dropping an entry ask how far it got. The declaration went
+  into 107; the dialog is in 108's file (DEC-172).
+
+**Verified and how.**
+
+- 788 backend tests over the 26 files covering the change; `make check`; migration up and
+  down in `test_progress_marks.py`.
+- Live, scratchpad copy of `data/` (17 entries, migrated with its backup): Breaking Bad by
+  IMDb URL came from Wikidata without seasons; the outline action fetched 7/13/13/13/16
+  from TVmaze; ten marks set the count to 10; a typed 4 cleared them; *Thinking, Fast and
+  Slow* arrived with 38 chapters; the export carried the marks.
+
+**Found.**
+
+- TVmaze's lookup redirect drops `?embed=episodes`, so the episode list is its own request.
+- Open Library's contents for *Don Quijote* are eight essays about the novel, which is why
+  only numbered rows count as chapters.
+- The application has no JSON restore; the export carries marks and the backup restores.
+- The only scratchpad library at hand is the local dev `data/` (16 books, 6 albums); the
+  board's nightly backup is not reachable from this machine.
+- A series added through Wikidata gets no seasons until the outline action runs; the
+  tracker must offer it even when the one-part fallback outline exists.
+
+**Next.** Sprint 108.

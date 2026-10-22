@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 47,
-  "project_status": "in_progress",
-  "active_sprint": "107",
-  "active_sprint_file": "docs/sprints/107-progress-marks-underneath.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "106",
+  "project_status": "ready",
+  "active_sprint": "108",
+  "active_sprint_file": "docs/sprints/108-progress-marks-on-the-detail-page.md",
+  "active_sprint_status": "ready",
+  "last_completed_sprint": "107",
   "completed_sprints": [
     "001",
     "002",
@@ -112,8 +112,9 @@
     "103",
     "104",
     "105",
-    "106"
+    "106",
+    "107"
   ],
-  "started_at": "2026-10-22T11:05:06-03:00",
-  "updated_at": "2026-10-22T11:05:06-03:00"
+  "started_at": "",
+  "updated_at": "2026-10-22T11:20:49-03:00"
 }

@@ -1,7 +1,7 @@
 # Sprint 107 — Episodes and chapters, underneath
 
 **Sprint:** 107
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 48
 **Depends on:** 106
 **Owner:** Mauro
@@ -100,4 +100,40 @@ back.
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-22 in `8c108ed`.
+
+- **AC1.** `PATCH /api/entries/{id}` takes `progress_marks`; marks set `progress` to their
+  count, a typed count clears them, both together is 422, a film refuses marks
+  (`invalid_progress`). An empty set stores `NULL` and records `progress` 0.
+- **AC2.** TVmaze's fetch and IMDb lookup add `season_episodes` from
+  `/shows/<id>/episodes` (recorded: Breaking Bad 7/13/13/13/16, The Mandalorian 8/8/8,
+  Samantha Oups 29/2). A failed episode list leaves the rest of the record.
+- **AC3.** Open Library gives `chapters` from the numbered rows of an edition's contents
+  (*Thinking, Fast and Slow*: 38 of 50 rows); Rayuela's edition has none and gets none.
+  Neither `chapters` nor `season_episodes` is a completeness field.
+- **AC4.** `POST /api/items/{id}/outline` fills a series from TVmaze (200), answers 502
+  `provider_failure` on a recorded 503 with the item unchanged, 422 `outline_unavailable`
+  for a miss or a film, and returns an item that already has the field untouched.
+- **AC5.** Marks beyond the outline are kept and counted.
+- **AC6.** Conformance checks `parts_field` (a `rows` field with two numbered columns) and
+  `abandoned` (only where progress is declared); three new malformed fixtures fail it.
+- **AC7.** The JSON export carries `progress_marks`.
+
+**Verified.** 788 backend tests across the 26 files covering the changed modules (one
+pre-existing zipfile warning in the Trakt refusal test), `make check` (with regenerated
+`openapi.json` and `schema.d.ts`), migration 0026 → 0027 → 0026 in
+`test_progress_marks.py`. Live, on a scratchpad copy of the local dev library (17 entries,
+migrated with its pre-migration backup): Breaking Bad resolved from its IMDb URL through
+Wikidata had no seasons, the outline action fetched five from TVmaze, ten marks gave
+`progress` 10, a typed 4 cleared them; *Thinking, Fast and Slow* added from Open Library
+arrived with 38 chapters; the export carried the marks.
+
+**Deviations (DEC-172).**
+- The owner asked mid-sprint that dropping an entry ask how far it got. The declaration
+  (`StatusSpec.abandoned`, on book, anime and series `dropped`) is here; the question is
+  Sprint 108's.
+- TVmaze's episode list is a second request: the lookup's 301 drops `?embed=episodes`.
+- Only numbered contents rows count as chapters.
+- There is no JSON restore in the application; the export carries marks and the database
+  backup is the restore path.
+- Six existing tests that used a book as the domain without progress now use a film.

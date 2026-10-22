@@ -6908,3 +6908,26 @@ deleted. Re-file records no undo effect. Moving back is a second re-file.
      opens to rows of lights in the goal calendar's style. No ratings, notes or dates per part.
 - Consequences: one migration (0027), so a minor version. Albums keep their tracklist as
   metadata and get no marks; films have no progress.
+
+## DEC-172 — What Sprint 107 found, and dropping asks how far (Sprints 107–108)
+
+- Date: 2026-10-22
+- Status: accepted
+- Context: while Sprint 107 was being built the owner added: *"add a flow, if i add
+  'dropped' as a status ask me how far i got into it."*
+- Decision:
+  1. **Abandoned is declared.** `StatusSpec.abandoned` marks a status as stopped partway;
+     book, anime and series declare it on `dropped`, and conformance refuses it on a domain
+     without progress. Sprint 108 asks the question when an entry moves into such a status,
+     with the tracker's lights or a count, and *Skip* writes nothing more.
+  2. **TVmaze is asked twice.** `/lookup/shows?imdb=…&embed=episodes` redirects to
+     `/shows/<id>` without the parameter (measured), so fetch and lookup both follow with
+     `/shows/<id>/episodes`. Search never does.
+  3. **Only numbered contents are chapters.** Open Library's contents mix introductions,
+     part headings and back matter with chapters, and *Don Quijote*'s edition lists eight
+     essays. Rows with a numeric `label` count; none means no `chapters`.
+  4. **No JSON restore exists**, so "export and restore" in Sprint 107 is the export; the
+     database backup restores the column as stored.
+  5. **The outline action never overwrites.** An item that already has its outline field is
+     returned unchanged, so a typed chapter count stays the owner's.
+- Consequences: Sprint 108 gains the drop question. Nothing else in the plan moves.
