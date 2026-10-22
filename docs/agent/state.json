@@ -1,11 +1,11 @@
 {
   "schema_version": 1,
   "plan_revision": 47,
-  "project_status": "in_progress",
-  "active_sprint": "106",
-  "active_sprint_file": "docs/sprints/106-inbox-one-at-a-time.md",
-  "active_sprint_status": "in_progress",
-  "last_completed_sprint": "105",
+  "project_status": "complete",
+  "active_sprint": null,
+  "active_sprint_file": null,
+  "active_sprint_status": null,
+  "last_completed_sprint": "106",
   "completed_sprints": [
     "001",
     "002",
@@ -111,8 +111,9 @@
     "102",
     "103",
     "104",
-    "105"
+    "105",
+    "106"
   ],
-  "started_at": "2026-10-22T03:08:11+00:00",
-  "updated_at": "2026-10-22T03:08:11+00:00"
+  "started_at": "",
+  "updated_at": "2026-10-22T03:36:40+00:00"
 }

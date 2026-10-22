@@ -6375,3 +6375,33 @@ owner's word to push, tag and deploy.
 - `make check`.
 
 **Next.** Push, tag and deploy wait for the owner.
+
+## 2026-10-22 — Sprint 106 (complete)
+
+**Done.**
+
+- Planned 106 from the owner's request (DEC-170), revision 47.
+- `/inbox/deck`: the inbox as a deck of cards, with File, Later, swipe, undo, a card back and
+  an end screen. *One at a time* in the inbox header.
+- Shared triage helpers moved to `features/triage/deck.ts`; `TriagePage` uses them.
+
+**Verified and how.**
+
+- `vitest related` (17), `make check`, `triage-deck.spec.ts` (5), `triage.spec.ts` (23), the
+  accessibility spec (30).
+- Looked at the deck at 390×664, 390×740, 800×1100 and 1440×900 in Ink and Paper, a drag
+  caught mid-lean, a card caught flying, the back, the end fan.
+- Real backend (empty data dir in the scratchpad, four books added by API, one shelf): swipe
+  filed *Pastoralia* as read/8/Stories, *Later* left *Tenth of December* unsorted, `t` and `→`
+  filed *Lincoln in the Bardo* and undo put it back `unsorted`; each read back from the API.
+
+**Found.**
+
+- The turn-over button turned the card twice when the press landed on its SVG icon.
+- Waiting for the fly-out dropped fast key presses; decisions now land first.
+- A screenshot taken straight after a score tap catches the 150ms colour transition and looks
+  unselected; it is not.
+- Out of scope, seen: on a phone the inbox list itself still truncates titles to a few letters;
+  the deck is the answer offered, the list is unchanged.
+
+**Next.** No sprint is planned. 106 is unreleased on top of 2.5.0.

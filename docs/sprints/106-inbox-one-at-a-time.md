@@ -1,7 +1,7 @@
 # Sprint 106 — The inbox, one at a time
 
 **Sprint:** 106
-**Status:** in_progress
+**Status:** completed
 **Roadmap revision:** 47
 **Depends on:** 105
 **Owner:** Mauro
@@ -80,4 +80,59 @@ Per DEC-167: `vitest related` for the changed files, `make check`, `e2e/triage-d
 
 ## Outcome
 
-_Not started._
+Delivered 2026-10-22 in `5a21642`. Verified per DEC-167: `vitest related` for the changed files
+(3 files, 17 tests: `deck.test.ts`, `TriageDeckPage.test.tsx`, the app), `make check`, a new
+`e2e/triage-deck.spec.ts` (5), `e2e/triage.spec.ts` (23, unchanged and green with the new header)
+and the accessibility spec (30, one new for the deck, front and back). Walkthrough: the deck at
+390×664, 390×740, 800×1100 and 1440×900 in Ink and Paper on stubbed data, and at 390×740 against
+the real backend with four manually added books and a shelf.
+
+- **Deliverable 1.** `/inbox/deck`, a Radix dialog over the shell (focus held, `Esc` leaves) at
+  `100dvh`. The inbox header gains *One at a time*, the primary button; *Accept all suggested*
+  moves to secondary beside it. The deck reads the same query key and filter as the list.
+- **Deliverable 2.** The card is the cover (a typeset cover when there is none). Tapping it, the
+  corner button or `i` turns it over in 3D to *The back*: subtitle, creator, year, the import's
+  suggestion, the score and whether it is provisional, formats, date added, and a link to the
+  full page. The title is under the card, stepped down by length so the whole of it fits.
+- **Deliverable 3.** Status as large buttons (the list's target rule, including the list's
+  unsaved drafts), ten score buttons (tap again to clear), shelf toggles in one scrolling row.
+- **Deliverable 4.** *File* sends one `PATCH /api/entries/{id}`; *Later* sends nothing and
+  remembers the pass in the tab (`akasha.triage.passed.v1`). A drag leans the card up to 14°
+  and stamps it with the target status or *Later*; let go past 96px (or flicked) it decides.
+  The decision lands at once and a copy flies off, so keys pressed in quick succession are
+  never dropped. The next two cards stand behind.
+- **Deliverable 5.** Undo reverses the last card; a filed card's undo waits for its own request
+  and then writes back the previous status and, if they were sent, score and shelves.
+- **Deliverable 6.** Keys as planned. Space and Enter stay the focused button's own.
+- **Deliverable 7.** *That's the deck* or *Inbox clear*, the last five filed covers fanned,
+  "*N* filed · *M* left for later", *Go through the M you passed*, *Back to the inbox*.
+
+Acceptance criteria:
+
+1. Fit at 390×664 and 1440×900, including a provisional card: card, title (unclipped), statuses,
+   score and both actions in the viewport, the layer not scrolling (Playwright).
+2. One PATCH with the target status; an untouched provisional score is not sent (Vitest).
+3. *Later* writes nothing; the passed card returns after the rest (Vitest, Playwright).
+4. Undo restores status, score and shelves (Vitest; real backend: the entry read back
+   `unsorted`).
+5. Swipe right files, left passes, a short drag springs back (Playwright, mouse drag at 390px).
+6. The Vitest suite runs reduced: every flow works with no fly-outs.
+7. Accessibility spec passes on the deck, front and back.
+
+Found and fixed during the walkthrough:
+
+- A press on the turn-over button landed on its SVG icon; `instanceof HTMLElement` let the card's
+  own tap handler turn it over a second time, so the button did nothing. The check is `Element`.
+- The first design waited for the fly-out before moving on, and dropped keys pressed during it;
+  the decision now lands first and a departing copy animates.
+- A 104-character title was cut at three lines of 48px on desktop; titles step down by length.
+
+Deviations and notes:
+
+- TDD order: the pure deck module and the page were drafted before their tests; every test was
+  then observed against the code, and two real defects above were found by the browser specs,
+  not by unit tests.
+- Undoing a filed card whose provisional score was changed restores the number but not the
+  provisional flag (a PATCH with a score always confirms it). Recorded, not fixed.
+- The container's Playwright browser build (1194) did not match the package's (1228); a symlink
+  outside the repository bridged it. Nothing in the repository changed for it.

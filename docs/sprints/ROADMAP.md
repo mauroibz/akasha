@@ -2,9 +2,8 @@
 
 **Plan revision:** 47
 **Delivery rule:** one sprint must leave a demonstrably usable or risk-reducing increment, green quality gates, updated documentation, and a clean worktree.
-**Active sprint:** [106 — The inbox, one at a time](106-inbox-one-at-a-time.md) (ready), the
-owner's 2026-10-22 request to sort a large inbox card by card on a phone (DEC-170); see "The deck"
-below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
+**Active sprint:** none. Sprint 106, the owner's 2026-10-22 request to sort a large inbox card
+by card on a phone (DEC-170), is completed; see "The deck" below. Sprints 102–105, the owner's 2026-10-21 request for a 2.5 release
 (DEC-169), are completed; see "Character" below. Sprints 001–101 are done; 087–101 shipped as v2.4.0. Sprint 082
 shipped v2.0.0, Sprint 083 delivered the hand-written-CSV importer plus the owner's
 feedback batch (DEC-159), and Sprint 084 — the owner's 2026-09-14 request to make it
@@ -226,7 +225,7 @@ that its cost is unknown — see DEC-035 and DEC-042.
 | [103](103-gentle-goals-underneath.md) | Gentle goals: the model, progress by month, suggestions from the planned status | 102 | completed |
 | [104](104-goals-on-the-diary.md) | Goals on the Diary: the calendar of lights, the goal dialog, the picks | 103 | completed |
 | [105](105-shelves-with-opinions.md) | Shelves with opinions: covers on a ledge, a cover that opens on hover | 104 | completed |
-| [106](106-inbox-one-at-a-time.md) | The inbox one at a time: a full-screen deck of cards to file or pass | 105 | ready |
+| [106](106-inbox-one-at-a-time.md) | The inbox one at a time: a full-screen deck of cards to file or pass | 105 | completed |
 
 ## Sprint contracts
 
@@ -1813,7 +1812,7 @@ Asked for by the owner on 2026-10-21 after v2.4.0, reviewed as a design canvas
 Asked for by the owner on 2026-10-22, with a screenshot of the inbox at phone width where every
 title was cut to three letters, and accepted as **DEC-170**.
 
-- **[106 — The inbox, one at a time](106-inbox-one-at-a-time.md).** `/inbox/deck`: a full-screen
+- **[106 — The inbox, one at a time](106-inbox-one-at-a-time.md)** (**completed**). `/inbox/deck`: a full-screen
   deck, one card per inbox entry with a large cover and the whole title, the status, score and
   shelves on the same screen, *File* and *Later* (swipe right and left), undo, a card that turns
   over to its back, and an end with what was filed and what was passed.
